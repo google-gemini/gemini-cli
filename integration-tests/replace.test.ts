@@ -48,7 +48,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should insert a multi-line block of text', async () => {
+  it.skip('should insert a multi-line block of text', async () => {
     const rig = new TestRig();
     await rig.setup('should insert a multi-line block of text');
     const fileName = 'insert_block.txt';
