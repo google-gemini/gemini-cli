@@ -61,7 +61,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          IS_DOCKER: '${{ matrix.sandbox == "sandbox:docker" }}'
+          IS_DOCKER: "${{ matrix.sandbox == 'sandbox:docker' }}"
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
