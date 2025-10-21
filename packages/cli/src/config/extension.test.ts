@@ -21,6 +21,7 @@ import {
   loadExtensionConfig,
   loadExtensions,
   uninstallExtension,
+  hashValue,
 } from './extension.js';
 import {
   GEMINI_DIR,
@@ -1259,6 +1260,10 @@ This extension will run the following MCP servers:
           extensionsDir: userExtensionsDir,
           name: 'my-local-extension',
           version: '1.0.0',
+          installMetadata: {
+            source: userExtensionsDir,
+            type: 'local',
+          },
         });
 
         await uninstallExtension('my-local-extension', isUpdate);
@@ -1269,7 +1274,8 @@ This extension will run the following MCP servers:
         } else {
           expect(mockLogExtensionUninstall).toHaveBeenCalled();
           expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
-            'my-local-extension',
+            hashValue('my-local-extension'),
+            hashValue(userExtensionsDir),
             'success',
           );
         }
@@ -1313,7 +1319,8 @@ This extension will run the following MCP servers:
       expect(fs.existsSync(sourceExtDir)).toBe(false);
       expect(mockLogExtensionUninstall).toHaveBeenCalled();
       expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
-        'gemini-sql-extension',
+        hashValue('gemini-sql-extension'),
+        hashValue('https://github.com/google/gemini-sql-extension'),
         'success',
       );
     });
@@ -1423,6 +1430,10 @@ This extension will run the following MCP servers:
         extensionsDir: userExtensionsDir,
         name: 'ext1',
         version: '1.0.0',
+        installMetadata: {
+          source: userExtensionsDir,
+          type: 'local',
+        },
       });
 
       disableExtension(
@@ -1433,7 +1444,8 @@ This extension will run the following MCP servers:
 
       expect(mockLogExtensionDisable).toHaveBeenCalled();
       expect(ExtensionDisableEvent).toHaveBeenCalledWith(
-        'ext1',
+        hashValue('ext1'),
+        hashValue(userExtensionsDir),
         SettingScope.Workspace,
       );
     });
@@ -1497,6 +1509,10 @@ This extension will run the following MCP servers:
         extensionsDir: userExtensionsDir,
         name: 'ext1',
         version: '1.0.0',
+        installMetadata: {
+          source: userExtensionsDir,
+          type: 'local',
+        },
       });
       const extensionEnablementManager = new ExtensionEnablementManager();
       disableExtension(
@@ -1512,7 +1528,8 @@ This extension will run the following MCP servers:
 
       expect(mockLogExtensionEnable).toHaveBeenCalled();
       expect(ExtensionEnableEvent).toHaveBeenCalledWith(
-        'ext1',
+        hashValue('ext1'),
+        hashValue(userExtensionsDir),
         SettingScope.Workspace,
       );
     });
