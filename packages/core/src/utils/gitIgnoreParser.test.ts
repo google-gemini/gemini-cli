@@ -250,4 +250,24 @@ src/*.tmp
       expect(parser.isIgnored('bla/!bar')).toBe(true);
     });
   });
+
+  describe('Trailing Spaces', () => {
+    beforeEach(async () => {
+      await setupGitRepo();
+    });
+
+    it('should correctly handle significant trailing spaces', async () => {
+      await createTestFile('.gitignore', 'foo\\ \nbar ');
+      await createTestFile('foo ', 'content');
+      await createTestFile('bar', 'content');
+      await createTestFile('bar ', 'content');
+
+      // 'foo\ ' should match 'foo '
+      expect(parser.isIgnored('foo ')).toBe(true);
+
+      // 'bar ' should be trimmed to 'bar'
+      expect(parser.isIgnored('bar')).toBe(true);
+      expect(parser.isIgnored('bar ')).toBe(false);
+    });
+  });
 });

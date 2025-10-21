@@ -564,9 +564,11 @@ class GrepToolInvocation extends BaseToolInvocation<
  * Implementation of the Grep tool logic (moved from CLI)
  */
 export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
+  static readonly Name = GREP_TOOL_NAME;
+
   constructor(private readonly config: Config) {
     super(
-      GREP_TOOL_NAME,
+      GrepTool.Name,
       'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
       Kind.Search,

@@ -243,38 +243,6 @@ describe('Configuration Integration Tests', () => {
     });
   });
 
-  describe('Extension Context Files', () => {
-    it('should have an empty array for extension context files by default', () => {
-      const configParams: ConfigParameters = {
-        sessionId: 'test-session',
-        cwd: '/tmp',
-        model: 'test-model',
-        embeddingModel: 'test-embedding-model',
-        sandbox: undefined,
-        targetDir: tempDir,
-        debugMode: false,
-      };
-      const config = new Config(configParams);
-      expect(config.getExtensionContextFilePaths()).toEqual([]);
-    });
-
-    it('should correctly store and return extension context file paths', () => {
-      const contextFiles = ['/path/to/file1.txt', '/path/to/file2.js'];
-      const configParams: ConfigParameters = {
-        sessionId: 'test-session',
-        cwd: '/tmp',
-        model: 'test-model',
-        embeddingModel: 'test-embedding-model',
-        sandbox: undefined,
-        targetDir: tempDir,
-        debugMode: false,
-        extensionContextFilePaths: contextFiles,
-      };
-      const config = new Config(configParams);
-      expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);
-    });
-  });
-
   describe('Approval Mode Integration Tests', () => {
     let parseArguments: typeof import('./config.js').parseArguments;
 
