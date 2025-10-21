@@ -39,7 +39,7 @@ jobs:
   calculate-versions:
     name: 'Calculate Versions and Plan'
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
 
     outputs:
       STABLE_VERSION: '${{ steps.versions.outputs.STABLE_VERSION }}'
@@ -198,7 +198,7 @@ jobs:
     name: 'Publish preview'
     needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       packages: 'write'
@@ -264,7 +264,7 @@ jobs:
     name: 'Publish stable'
     needs: ['calculate-versions', 'test', 'publish-preview']
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       packages: 'write'

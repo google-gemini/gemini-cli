@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WEB_SEARCH_TOOL_NAME } from './tool-names.js';
 import type { GroundingMetadata } from '@google/genai';
 import type { ToolInvocation, ToolResult } from './tools.js';
@@ -64,8 +65,11 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WebSearchToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   override getDescription(): string {
@@ -187,7 +191,10 @@ export class WebSearchTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WEB_SEARCH_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       WebSearchTool.Name,
       'GoogleSearch',
@@ -203,6 +210,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
         },
         required: ['query'],
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -222,7 +232,16 @@ export class WebSearchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebSearchToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
-    return new WebSearchToolInvocation(this.config, params);
+    return new WebSearchToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
