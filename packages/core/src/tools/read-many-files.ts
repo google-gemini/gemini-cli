@@ -27,6 +27,7 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
+import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -392,7 +393,7 @@ ${finalExclusionPatternsForDescription
           logFileOperation(
             this.config,
             new FileOperationEvent(
-              ReadManyFilesTool.Name,
+              READ_MANY_FILES_TOOL_NAME,
               FileOperation.READ,
               lines,
               mimetype,
@@ -474,7 +475,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ReadManyFilesParams,
   ToolResult
 > {
-  static readonly Name: string = 'read_many_files';
+  static readonly Name = READ_MANY_FILES_TOOL_NAME;
 
   constructor(private config: Config) {
     const parameterSchema = {

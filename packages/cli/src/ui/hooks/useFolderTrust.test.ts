@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, type Mock, type MockInstance } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFolderTrust } from './useFolderTrust.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -28,10 +28,10 @@ vi.mock('node:process', async () => {
 describe('useFolderTrust', () => {
   let mockSettings: LoadedSettings;
   let mockTrustedFolders: LoadedTrustedFolders;
-  let loadTrustedFoldersSpy: vi.SpyInstance;
-  let isWorkspaceTrustedSpy: vi.SpyInstance;
+  let loadTrustedFoldersSpy: MockInstance;
+  let isWorkspaceTrustedSpy: MockInstance;
   let onTrustChange: (isTrusted: boolean | undefined) => void;
-  let addItem: vi.Mock;
+  let addItem: Mock;
 
   beforeEach(() => {
     mockSettings = {
