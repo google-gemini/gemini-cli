@@ -574,40 +574,11 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('Model Router with Auth', () => {
-    it('should disable model router by default for oauth-personal', async () => {
+  describe('Model Router', () => {
+    it('should disable model router by default', async () => {
       const config = new Config({
         ...baseParams,
         useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should enable model router by default for other auth types', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should disable model router for specified auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should enable model router for other auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [],
       });
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       expect(config.getUseModelRouter()).toBe(true);
@@ -617,10 +588,18 @@ describe('Server Config (config.ts)', () => {
       const config = new Config({
         ...baseParams,
         useModelRouter: false,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
       });
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should enable model router when useModelRouter is true', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+      });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getUseModelRouter()).toBe(true);
     });
   });
 
