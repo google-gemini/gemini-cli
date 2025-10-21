@@ -19,7 +19,7 @@ jobs:
           REPO_NAME: '${{ github.event.repository.name }}'
         run: |
           mkdir -p ./pr
-          echo '$REPO_NAME' > ./pr/repo_name
+          echo '${{ env.REPO_NAME }}' > ./pr/repo_name
       - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'repo_name'
