@@ -995,6 +995,40 @@ describe('setApprovalMode with folder trust', () => {
   });
 });
 
+describe('isYoloModeDisabled', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should return false when yolo mode is not disabled and folder is trusted', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    expect(config.isYoloModeDisabled()).toBe(false);
+  });
+
+  it('should return true when yolo mode is disabled by parameter', () => {
+    const config = new Config({ ...baseParams, disableYoloMode: true });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+
+  it('should return true when folder is untrusted', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+
+  it('should return true when yolo is disabled and folder is untrusted', () => {
+    const config = new Config({ ...baseParams, disableYoloMode: true });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+});
+
 describe('BaseLlmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {

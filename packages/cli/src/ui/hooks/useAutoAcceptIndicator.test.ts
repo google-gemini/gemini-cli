@@ -37,6 +37,7 @@ vi.mock('@google/gemini-cli-core', async () => {
 interface MockConfigInstanceShape {
   getApprovalMode: Mock<() => ApprovalMode>;
   setApprovalMode: Mock<(value: ApprovalMode) => void>;
+  isYoloModeDisabled: Mock<() => boolean>;
   isTrustedFolder: Mock<() => boolean>;
   getCoreTools: Mock<() => string[]>;
   getToolDiscoveryCommand: Mock<() => string | undefined>;
@@ -76,6 +77,7 @@ describe('useAutoAcceptIndicator', () => {
         setApprovalMode: instanceSetApprovalModeMock as Mock<
           (value: ApprovalMode) => void
         >,
+        isYoloModeDisabled: vi.fn().mockReturnValue(false),
         isTrustedFolder: vi.fn().mockReturnValue(true) as Mock<() => boolean>,
         getCoreTools: vi.fn().mockReturnValue([]) as Mock<() => string[]>,
         getToolDiscoveryCommand: vi.fn().mockReturnValue(undefined) as Mock<
@@ -468,6 +470,45 @@ describe('useAutoAcceptIndicator', () => {
       );
 
       expect(mockAddItem).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('when YOLO mode is disabled by settings', () => {
+    beforeEach(() => {
+      // Ensure isYoloModeDisabled returns true for these tests
+      if (mockConfigInstance && mockConfigInstance.isYoloModeDisabled) {
+        mockConfigInstance.isYoloModeDisabled.mockReturnValue(true);
+      }
+    });
+
+    it('should not enable YOLO mode when Ctrl+Y is pressed and add an info message', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      const mockAddItem = vi.fn();
+      const { result } = renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      expect(result.current).toBe(ApprovalMode.DEFAULT);
+
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      // setApprovalMode should not be called because the check should return early
+      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+      // An info message should be added
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.WARNING,
+          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
+        },
+        expect.any(Number),
+      );
+      // The mode should not change
+      expect(result.current).toBe(ApprovalMode.DEFAULT);
     });
   });
 
