@@ -1199,24 +1199,13 @@ export class Config {
           !allowedTools || allowedTools.includes(definition.name);
 
         if (isAllowed && !isExcluded) {
-          try {
-            const messageBusEnabled = this.getEnableMessageBusIntegration();
-            const wrapper = new SubagentToolWrapper(
-              definition,
-              this,
-              messageBusEnabled ? this.getMessageBus() : undefined,
-            );
-            registry.registerTool(wrapper);
-          } catch (error) {
-            console.error(
-              `Failed to wrap agent '${definition.name}' as a tool:`,
-              error,
-            );
-          }
-        } else if (this.getDebugMode()) {
-          debugLogger.log(
-            `[Config] Skipping registration of agent '${definition.name}' due to allow/exclude configuration.`,
+          const messageBusEnabled = this.getEnableMessageBusIntegration();
+          const wrapper = new SubagentToolWrapper(
+            definition,
+            this,
+            messageBusEnabled ? this.getMessageBus() : undefined,
           );
+          registry.registerTool(wrapper);
         }
       }
     }

@@ -158,7 +158,7 @@ class GeminiAgent {
         );
         isAuthenticated = true;
       } catch (e) {
-        console.error(`Authentication failed: ${e}`);
+        debugLogger.error(`Authentication failed: ${e}`);
       }
     }
 
@@ -660,7 +660,7 @@ class Session {
                 );
               }
             } catch (globError) {
-              console.error(
+              debugLogger.error(
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
             }
@@ -670,7 +670,7 @@ class Session {
             );
           }
         } else {
-          console.error(
+          debugLogger.error(
             `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
