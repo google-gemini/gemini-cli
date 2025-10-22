@@ -20,8 +20,6 @@ const TRACER_VERSION = 'v1';
 export interface SpanMetadata {
   /** The name of the span. */
   name: string;
-  /** The state of the span. */
-  state: 'success' | 'error';
   /** The input to the span. */
   input?: unknown;
   /** The output of the span. */
@@ -65,7 +63,6 @@ export async function runInDevTraceSpan<R>(
     return await fn({
       metadata: {
         name: spanName,
-        state: 'success',
         attributes: {},
       },
       endSpan: () => {
@@ -81,7 +78,6 @@ export async function runInDevTraceSpan<R>(
     async (span) => {
       const meta: SpanMetadata = {
         name: spanName,
-        state: 'success',
         attributes: {},
       };
       const endSpan = () => {
@@ -95,21 +91,6 @@ export async function runInDevTraceSpan<R>(
           span.setAttribute(key, value as AttributeValue);
         }
         if (meta.error) {
-          meta.state = 'error';
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: getErrorMessage(meta.error),
-          });
-          if (meta.error instanceof Error) {
-            span.recordException(meta.error);
-          }
-        }
-        span.end();
-      };
-      try {
-        const output = await fn({ metadata: meta, endSpan });
-        if (meta.error) {
-          meta.state = 'error';
           span.setStatus({
             code: SpanStatusCode.ERROR,
             message: getErrorMessage(meta.error),
@@ -120,9 +101,11 @@ export async function runInDevTraceSpan<R>(
         } else {
           span.setStatus({ code: SpanStatusCode.OK });
         }
-        return output;
+        span.end();
+      };
+      try {
+        return await fn({ metadata: meta, endSpan });
       } catch (e) {
-        meta.state = 'error';
         span.setStatus({
           code: SpanStatusCode.ERROR,
           message: getErrorMessage(e),
