@@ -18,6 +18,3 @@ accessible.
 - Build the sandbox image locally using:
   ```bash
   npm run build:all
-  Or request that the image be published publicly on Docker Hub.
-  Contributor: @Nimraakram12
-  ```
