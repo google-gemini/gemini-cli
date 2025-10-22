@@ -77,6 +77,9 @@ export class Storage {
   }
 
   static getOAuthCredsPath(): string {
+    if (process.env['GEMINI_OAUTH_CREDS_PATH']) {
+      return process.env['GEMINI_OAUTH_CREDS_PATH'];
+    }
     return path.join(Storage.getGlobalGeminiDir(), OAUTH_FILE);
   }
 

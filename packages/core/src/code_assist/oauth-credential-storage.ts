@@ -6,13 +6,9 @@
 
 import { type Credentials } from 'google-auth-library';
 import { HybridTokenStorage } from '../mcp/token-storage/hybrid-token-storage.js';
-import { OAUTH_FILE } from '../config/storage.js';
+import { Storage } from '../config/storage.js';
 import type { OAuthCredentials } from '../mcp/token-storage/types.js';
-import * as path from 'node:path';
-import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
-import { GEMINI_DIR } from '../utils/paths.js';
-
 const KEYCHAIN_SERVICE_NAME = 'gemini-cli-oauth';
 const MAIN_ACCOUNT_KEY = 'main-account';
 
@@ -86,7 +82,7 @@ export class OAuthCredentialStorage {
       await this.storage.deleteCredentials(MAIN_ACCOUNT_KEY);
 
       // Also try to remove the old file if it exists
-      const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
+      const oldFilePath = Storage.getOAuthCredsPath();
       await fs.rm(oldFilePath, { force: true }).catch(() => {});
     } catch (error: unknown) {
       console.error(error);
@@ -98,7 +94,7 @@ export class OAuthCredentialStorage {
    * Migrate credentials from old file-based storage to keychain
    */
   private static async migrateFromFileStorage(): Promise<Credentials | null> {
-    const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
+    const oldFilePath = Storage.getOAuthCredsPath();
 
     let credsJson: string;
     try {
