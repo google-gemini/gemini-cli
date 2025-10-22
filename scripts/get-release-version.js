@@ -424,7 +424,7 @@ export function getVersion(options = {}) {
       }
       break;
     case 'promote-nightly':
-      versionData = promoteNightlyVersion();
+      versionData = promoteNightlyVersion({ args });
       break;
     case 'stable':
       versionData = getStableVersion(args);
