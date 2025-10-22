@@ -33,7 +33,7 @@ const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
 
   return (
     <Box flexDirection="row" columnGap={2} height={1}>
-      <Text color={theme.text.primary} bold>
+      <Text color={theme.text.primary} bold aria-label="Todo list">
         📝 Todo
       </Text>
       <Text color={theme.text.secondary}>{score} (ctrl+t to toggle)</Text>
@@ -44,22 +44,39 @@ const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
 const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   switch (status) {
     case 'completed':
-      return <Text color={theme.status.success}>✓</Text>;
+      return (
+        <Text color={theme.status.success} aria-label="Completed">
+          ✓
+        </Text>
+      );
     case 'in_progress':
-      return <Text color={theme.text.accent}>»</Text>;
+      return (
+        <Text color={theme.text.accent} aria-label="In Progress">
+          »
+        </Text>
+      );
     case 'pending':
-      return <Text color={theme.text.primary}>☐</Text>;
+      return (
+        <Text color={theme.text.primary} aria-label="Pending">
+          ☐
+        </Text>
+      );
     case 'cancelled':
     default:
-      return <Text color={theme.status.error}>✗</Text>;
+      return (
+        <Text color={theme.status.error} aria-label="Cancelled">
+          ✗
+        </Text>
+      );
   }
 };
 
-const TodoItemDisplay: React.FC<{ todo: Todo; wrap?: 'truncate' }> = ({
-  todo,
-  wrap,
-}) => (
-  <Box flexDirection="row" columnGap={1}>
+const TodoItemDisplay: React.FC<{
+  todo: Todo;
+  wrap?: 'truncate';
+  role?: 'listitem';
+}> = ({ todo, wrap, role: ariaRole }) => (
+  <Box flexDirection="row" columnGap={1} aria-role={ariaRole}>
     <TodoStatusDisplay status={todo.status} />
     <Box flexShrink={1}>
       <Text color={theme.text.primary} wrap={wrap}>
@@ -140,9 +157,9 @@ interface TodoListDisplayProps {
 }
 
 const TodoListDisplay: React.FC<TodoListDisplayProps> = ({ todos }) => (
-  <Box flexDirection="column">
+  <Box flexDirection="column" aria-role="list">
     {todos.todos.map((todo: Todo, index: number) => (
-      <TodoItemDisplay todo={todo} key={index} />
+      <TodoItemDisplay todo={todo} key={index} role="listitem" />
     ))}
   </Box>
 );
