@@ -563,7 +563,7 @@ of v0.3.0:
     "usageStatisticsEnabled": true
   },
   "model": {
-    "name": "gemini-2.5-pro-latest",
+    "name": "gemini-2.5-pro",
     "maxSessionTurns": 10,
     "summarizeToolOutput": {
       "run_shell_command": {
@@ -714,7 +714,7 @@ for that specific session.
 
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
-  - Example: `npm start -- --model gemini-2.5-pro-latest`
+  - Example: `npm start -- --model gemini-2.5-pro`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
