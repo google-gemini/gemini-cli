@@ -21,3 +21,40 @@ accessible.
   Or request that the image be published publicly on Docker Hub.
   Contributor: @Nimraakram12
   ```
+
+---
+
+---
+
+---
+
+## Gemini CLI Cannot Find Code When Using `gemini code find`
+
+### What happened
+
+When running:
+
+```bash
+gemini code find "<query>"
+
+no results appear even if your code exists locally.
+
+**Root cause**
+This occurs when the Gemini CLI is not running inside a sandbox environment (gemini sandbox init).
+Without sandbox access, Gemini cannot index or search local files.
+
+**Workaround**
+1. Initialize a sandbox:
+gemini sandbox init
+
+2. Re-run your command:
+gemini code find "Pickover formula"
+
+3. Ensure your project files are located in the current working directory.
+
+**Contributor**
+@Nimraakram12
+
+**Related Issue**
+#11679
+```
