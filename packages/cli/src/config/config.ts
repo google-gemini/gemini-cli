@@ -635,6 +635,8 @@ export async function loadCliConfig(
       settings.experimental?.codebaseInvestigatorSettings,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
+    enableHooks: settings.tools?.enableHooks ?? false,
+    hooks: settings.hooks || {},
   });
 }
 
