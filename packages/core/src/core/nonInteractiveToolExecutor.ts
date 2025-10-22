@@ -19,15 +19,17 @@ export async function executeToolCall(
   abortSignal: AbortSignal,
 ): Promise<CompletedToolCall> {
   return new Promise<CompletedToolCall>((resolve, reject) => {
-    new CoreToolScheduler({
+    const scheduler = new CoreToolScheduler({
       config,
       getPreferredEditor: () => undefined,
       onEditorClose: () => {},
       onAllToolCallsComplete: async (completedToolCalls) => {
         resolve(completedToolCalls[0]);
       },
-    })
-      .schedule(toolCallRequest, abortSignal)
-      .catch(reject);
+    });
+
+    scheduler.schedule(toolCallRequest, abortSignal).catch((error) => {
+      reject(error);
+    });
   });
 }

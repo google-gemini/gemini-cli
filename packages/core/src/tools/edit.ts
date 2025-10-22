@@ -560,13 +560,16 @@ Expectation for required parameters:
 
   protected createInvocation(
     params: EditToolParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
       this.config,
       params,
-      this.messageBus,
-      this.name,
-      this.displayName,
+      messageBus ?? this.messageBus,
+      toolName ?? this.name,
+      displayName ?? this.displayName,
     );
   }
 
