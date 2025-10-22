@@ -344,10 +344,11 @@ vi.mock('os', async (importOriginal) => {
 });
 vi.mock('node:os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof import('node:os')>();
-  const pathMod = await import('node:path');
   return {
     ...actualOs,
-    homedir: vi.fn(() => pathMod.join(pathMod.sep, 'mock', 'home', 'user')),
+    homedir: vi.fn(() =>
+      process.platform === 'win32' ? 'C:\\mock\\home\\user' : '/mock/home/user',
+    ),
   };
 });
 
@@ -928,6 +929,8 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
 
   it('should correctly use mocked homedir for global path', async () => {
     vi.stubEnv('HOME', MOCK_HOME);
+    vi.stubEnv('USERPROFILE', MOCK_HOME);
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     const actualCore = await vi.importActual<typeof ServerConfig>(
       '@google/gemini-cli-core',
     );
