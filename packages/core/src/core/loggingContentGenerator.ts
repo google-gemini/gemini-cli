@@ -209,7 +209,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       );
       spanMetadata.output = {
         streamChunks: responses.map((r) => ({
-          content: r.candidates?.length ? r.candidates[0] : [],
+          content: r.candidates?.[0]?.content ?? null,
         })),
         usageMetadata: lastUsageMetadata,
         durationMs,
