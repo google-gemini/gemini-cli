@@ -75,6 +75,7 @@ const MIGRATION_MAP: Record<string, string> = {
   disableUpdateNag: 'general.disableUpdateNag',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
   enableMessageBusIntegration: 'tools.enableMessageBusIntegration',
+  enableHooks: 'tools.enableHooks',
   enablePromptCompletion: 'general.enablePromptCompletion',
   enforcedAuthType: 'security.auth.enforcedType',
   excludeTools: 'tools.exclude',
