@@ -430,8 +430,7 @@ export function KeypressProvider({
       usePassthrough = true;
     }
 
-    let isPaste = false;
-    let pasteBuffer = Buffer.alloc(0);
+    let pasteBuffer: Buffer | null = null;
     let kittySequenceBuffer = '';
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
@@ -478,24 +477,25 @@ export function KeypressProvider({
       }
       if (key.name === 'paste-start') {
         flushKittyBufferOnInterrupt('paste start');
-        isPaste = true;
-        return;
-      }
-      if (key.name === 'paste-end') {
-        isPaste = false;
-        broadcast({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: true,
-          sequence: pasteBuffer.toString(),
-        });
         pasteBuffer = Buffer.alloc(0);
         return;
       }
+      if (key.name === 'paste-end') {
+        if (pasteBuffer !== null) {
+          broadcast({
+            name: '',
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: true,
+            sequence: pasteBuffer.toString(),
+          });
+        }
+        pasteBuffer = null;
+        return;
+      }
 
-      if (isPaste) {
+      if (pasteBuffer !== null) {
         pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
         return;
       }
@@ -528,7 +528,7 @@ export function KeypressProvider({
           ctrl: false,
           meta: true,
           shift: false,
-          paste: isPaste,
+          paste: pasteBuffer !== null,
           sequence: key.sequence,
         });
         return;
@@ -763,7 +763,7 @@ export function KeypressProvider({
       if (key.name === 'return' && key.sequence === `${ESC}\r`) {
         key.meta = true;
       }
-      broadcast({ ...key, paste: isPaste });
+      broadcast({ ...key, paste: pasteBuffer !== null });
     };
 
     const handleRawKeypress = (data: Buffer) => {
@@ -871,7 +871,7 @@ export function KeypressProvider({
       }
 
       // Flush any pending paste data to avoid data loss on exit.
-      if (isPaste) {
+      if (pasteBuffer !== null) {
         broadcast({
           name: '',
           ctrl: false,
@@ -880,7 +880,7 @@ export function KeypressProvider({
           paste: true,
           sequence: pasteBuffer.toString(),
         });
-        pasteBuffer = Buffer.alloc(0);
+        pasteBuffer = null;
       }
 
       if (draggingTimer) {
