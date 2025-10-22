@@ -10,6 +10,7 @@ import {
   type AttributeValue,
   type SpanOptions,
 } from '@opentelemetry/api';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
@@ -82,10 +83,10 @@ export async function runInDevTraceSpan<R>(
       };
       const endSpan = () => {
         if (meta.input !== undefined) {
-          span.setAttribute('input-json', JSON.stringify(meta.input));
+          span.setAttribute('input-json', safeJsonStringify(meta.input));
         }
         if (meta.output !== undefined) {
-          span.setAttribute('output-json', JSON.stringify(meta.output));
+          span.setAttribute('output-json', safeJsonStringify(meta.output));
         }
         for (const [key, value] of Object.entries(meta.attributes)) {
           span.setAttribute(key, value as AttributeValue);
