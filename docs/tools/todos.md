@@ -49,8 +49,8 @@ write_todos({
 
 ## Important notes
 
-- **Enabling:** This tool is disabled by default. To use it, you must enable it
-  in your `settings.json` file by setting `"useWriteTodos": true`.
+- **Enabling:** This tool is enabled by default. You can disable it in your
+  `settings.json` file by setting `"useWriteTodos": false`.
 
 - **Intended Use:** This tool is primarily used by the agent for complex,
   multi-turn tasks. It is generally not used for simple, single-turn questions.

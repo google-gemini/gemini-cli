@@ -411,7 +411,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`useWriteTodos`** (boolean):
   - **Description:** Enable the write_todos tool.
-  - **Default:** `false`
+  - **Default:** `true`
 
 #### `security`
 
