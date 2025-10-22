@@ -196,7 +196,6 @@ runs:
       run: |
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.cli-package-name }}" \
           --no-tag
         npm dist-tag rm ${{ inputs.cli-package-name }} false --silent
 
