@@ -257,7 +257,7 @@ ${finalExclusionPatternsForDescription
       if (ignoredCount > 0) {
         skippedFiles.push({
           path: `${ignoredCount} file(s)`,
-          reason: 'ignored by .gitignore or .geminiignore',
+          reason: 'ignored by project ignore files',
         });
       }
     } catch (error) {
