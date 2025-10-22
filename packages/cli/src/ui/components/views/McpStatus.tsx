@@ -115,8 +115,8 @@ export const McpStatus: React.FC<McpStatusProps> = ({
         }
 
         let serverDisplayName = serverName;
-        if (server.extensionName) {
-          serverDisplayName += ` (from ${server.extensionName})`;
+        if (server.extension?.name) {
+          serverDisplayName += ` (from ${server.extension?.name})`;
         }
 
         const toolCount = serverTools.length;
