@@ -98,7 +98,7 @@ const LINTERS = {
   },
   yamllint: {
     check: 'command -v yamllint',
-    installer: `pip3 install --user "yamllint==${YAMLLINT_VERSION}"`,
+    installer: `pip3 install --user --break-system-packages "yamllint==${YAMLLINT_VERSION}"`,
     run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
   },
 };
