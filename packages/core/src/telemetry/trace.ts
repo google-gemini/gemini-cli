@@ -1,0 +1,154 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import {
+  SpanStatusCode,
+  trace,
+  type AttributeValue,
+  type SpanOptions,
+} from '@opentelemetry/api';
+
+const TRACER_NAME = 'gemini-cli';
+const TRACER_VERSION = 'v1';
+
+/**
+ * Metadata for a span.
+ */
+export interface SpanMetadata {
+  /** The name of the span. */
+  name: string;
+  /** The state of the span. */
+  state: 'success' | 'error';
+  /** The input to the span. */
+  input?: unknown;
+  /** The output of the span. */
+  output?: unknown;
+  error?: unknown;
+  /** Additional attributes for the span. */
+  attributes: Record<string, unknown>;
+}
+
+/**
+ * Runs a function in a new OpenTelemetry span.
+ *
+ * The `meta` object will be automatically used to set the span's status and attributes upon completion.
+ *
+ * @example
+ * ```typescript
+ * runInDevTraceSpan({ name: 'my-operation' }, ({ metadata }) => {
+ *   metadata.input = { foo: 'bar' };
+ *   // ... do work ...
+ *   metadata.output = { result: 'baz' };
+ *   metadata.attributes['my.custom.attribute'] = 'some-value';
+ * });
+ * ```
+ *
+ * @param opts The options for the span.
+ * @param fn The function to run in the span.
+ * @returns The result of the function.
+ */
+export async function runInDevTraceSpan<R>(
+  opts: SpanOptions & { name: string; noAutoEnd?: boolean },
+  fn: ({
+    metadata,
+  }: {
+    metadata: SpanMetadata;
+    endSpan: () => void;
+  }) => Promise<R>,
+): Promise<R> {
+  const { name: spanName, noAutoEnd, ...restOfSpanOpts } = opts;
+  if (process.env['ENABLE_DEV_TRACING'] !== 'true') {
+    // If ENABLE_DEV_TRACING env var not set, we do not trace.
+    return await fn({
+      metadata: {
+        name: spanName,
+        state: 'success',
+        attributes: {},
+      },
+      endSpan: () => {
+        // noop
+      },
+    });
+  }
+
+  const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
+  return await tracer.startActiveSpan(
+    opts.name,
+    restOfSpanOpts,
+    async (span) => {
+      const meta: SpanMetadata = {
+        name: spanName,
+        state: 'success',
+        attributes: {},
+      };
+      const endSpan = () => {
+        if (meta.input !== undefined) {
+          span.setAttribute('input-json', JSON.stringify(meta.input));
+        }
+        if (meta.output !== undefined) {
+          span.setAttribute('output-json', JSON.stringify(meta.output));
+        }
+        for (const [key, value] of Object.entries(meta.attributes)) {
+          span.setAttribute(key, value as AttributeValue);
+        }
+        if (meta.error) {
+          meta.state = 'error';
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: getErrorMessage(meta.error),
+          });
+          if (meta.error instanceof Error) {
+            span.recordException(meta.error);
+          }
+        }
+        span.end();
+      };
+      try {
+        const output = await fn({ metadata: meta, endSpan });
+        if (meta.error) {
+          meta.state = 'error';
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: getErrorMessage(meta.error),
+          });
+          if (meta.error instanceof Error) {
+            span.recordException(meta.error);
+          }
+        } else {
+          span.setStatus({ code: SpanStatusCode.OK });
+        }
+        return output;
+      } catch (e) {
+        meta.state = 'error';
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: getErrorMessage(e),
+        });
+        if (e instanceof Error) {
+          span.recordException(e);
+        }
+        throw e;
+      } finally {
+        if (!noAutoEnd) {
+          endSpan();
+        }
+      }
+    },
+  );
+}
+
+/**
+ * Gets the error message from an error object.
+ *
+ * @param e The error object.
+ * @returns The error message.
+ */
+function getErrorMessage(e: unknown): string {
+  if (e instanceof Error) {
+    return e.message;
+  }
+  return `${e}`;
+}
