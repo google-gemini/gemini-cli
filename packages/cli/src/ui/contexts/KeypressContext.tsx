@@ -397,9 +397,6 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
   const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
-  const isDraggingRef = useRef(false);
-  const dragBufferRef = useRef('');
-  const draggingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const subscribe = useCallback(
     (handler: KeypressHandler) => subscribers.add(handler),
@@ -417,13 +414,6 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
-    const clearDraggingTimer = () => {
-      if (draggingTimerRef.current) {
-        clearTimeout(draggingTimerRef.current);
-        draggingTimerRef.current = null;
-      }
-    };
-
     const wasRaw = stdin.isRaw;
     if (wasRaw === false) {
       setRawMode(true);
@@ -446,6 +436,16 @@ export function KeypressProvider({
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
+    let isDragging = false;
+    let dragBuffer = '';
+    let draggingTimer: NodeJS.Timeout | null = null;
+
+    const clearDraggingTimer = () => {
+      if (draggingTimer) {
+        clearTimeout(draggingTimer);
+        draggingTimer = null;
+      }
+    };
 
     const flushKittyBufferOnInterrupt = (reason: string) => {
       if (kittySequenceBuffer) {
@@ -503,16 +503,16 @@ export function KeypressProvider({
       if (
         key.sequence === SINGLE_QUOTE ||
         key.sequence === DOUBLE_QUOTE ||
-        isDraggingRef.current
+        isDragging
       ) {
-        isDraggingRef.current = true;
-        dragBufferRef.current += key.sequence;
+        isDragging = true;
+        dragBuffer += key.sequence;
 
         clearDraggingTimer();
-        draggingTimerRef.current = setTimeout(() => {
-          isDraggingRef.current = false;
-          const seq = dragBufferRef.current;
-          dragBufferRef.current = '';
+        draggingTimer = setTimeout(() => {
+          isDragging = false;
+          const seq = dragBuffer;
+          dragBuffer = '';
           if (seq) {
             broadcast({ ...key, name: '', paste: true, sequence: seq });
           }
@@ -883,21 +883,21 @@ export function KeypressProvider({
         pasteBuffer = Buffer.alloc(0);
       }
 
-      if (draggingTimerRef.current) {
-        clearTimeout(draggingTimerRef.current);
-        draggingTimerRef.current = null;
+      if (draggingTimer) {
+        clearTimeout(draggingTimer);
+        draggingTimer = null;
       }
-      if (isDraggingRef.current && dragBufferRef.current) {
+      if (isDragging && dragBuffer) {
         broadcast({
           name: '',
           ctrl: false,
           meta: false,
           shift: false,
           paste: true,
-          sequence: dragBufferRef.current,
+          sequence: dragBuffer,
         });
-        isDraggingRef.current = false;
-        dragBufferRef.current = '';
+        isDragging = false;
+        dragBuffer = '';
       }
     };
   }, [
