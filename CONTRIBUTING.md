@@ -279,6 +279,47 @@ npm run lint
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
 
+### Working with Pre-Release Versions (Development)
+
+This project uses **GitHub Packages** to host development and pre-release
+versions of the CLI. To install these versions, you must configure your
+user-level `~/.npmrc` file to authenticate with the GitHub registry.
+
+We have created a script to automate this process for you.
+
+#### Setting Up Your Environment for Development (Recommended)
+
+To automatically configure your environment to use the GitHub Packages registry,
+run the following command:
+
+```bash
+npm run use-dev
+```
+
+This command will:
+
+1.  Check that you have the [GitHub CLI (`gh`)](https://cli.github.com/)
+    installed and that you are logged in.
+2.  **Back up** your existing `~/.npmrc` to `~/.npmrc.bak` if a backup doesn't
+    already exist.
+3.  **Automatically add** the necessary configuration to your `~/.npmrc` file.
+
+This setup is required for installing pre-release packages with the
+`@google-gemini` scope, both locally within a project and globally (e.g.,
+`npm install -g @google-gemini/gemini-cli@<version>`).
+
+#### Switching Back to the Production Registry
+
+To automatically remove the development configuration and revert to the public
+npm registry (`npmjs.org`), you can run:
+
+```bash
+npm run use-prod
+```
+
+This command will safely remove the lines added by the `use-dev` script from
+your `~/.npmrc` file.
+
 ### Project Structure
 
 - `packages/`: Contains the individual sub-packages of the project.

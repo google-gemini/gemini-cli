@@ -55,7 +55,9 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "pre-commit": "node scripts/pre-commit.js"
+    "pre-commit": "node scripts/pre-commit.js",
+    "use-dev": "node scripts/configure-registry.js dev",
+    "use-prod": "node scripts/configure-registry.js prod"
   },
   "overrides": {
     "wrap-ansi": "9.0.2",
@@ -111,6 +113,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@google-gemini/gemini-cli": "^0.11.0-nightly.20251021.0e7b3951",
     "@testing-library/dom": "^10.4.1",
     "simple-git": "^3.28.0"
   },
