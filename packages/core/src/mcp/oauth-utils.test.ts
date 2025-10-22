@@ -297,14 +297,32 @@ describe('OAuthUtils', () => {
       const result = OAuthUtils.buildResourceParameter(
         'https://example.com/oauth/token',
       );
-      expect(result).toBe('https://example.com');
+      expect(result).toBe('https://example.com/oauth/token');
     });
 
     it('should handle URLs with ports', () => {
       const result = OAuthUtils.buildResourceParameter(
         'https://example.com:8080/oauth/token',
       );
-      expect(result).toBe('https://example.com:8080');
+      expect(result).toBe('https://example.com:8080/oauth/token');
+    });
+
+    it('should strip query parameters from the URL', () => {
+      const result = OAuthUtils.buildResourceParameter(
+        'https://example.com/api/v1/data?user=123&scope=read',
+      );
+      expect(result).toBe('https://example.com/api/v1/data');
+    });
+
+    it('should strip URL fragments from the URL', () => {
+      const result = OAuthUtils.buildResourceParameter(
+        'https://example.com/api/v1/data#section-one',
+      );
+      expect(result).toBe('https://example.com/api/v1/data');
+    });
+
+    it('should throw an error for invalid URLs', () => {
+      expect(() => OAuthUtils.buildResourceParameter('not-a-url')).toThrow();
     });
   });
 });

@@ -360,6 +360,6 @@ export class OAuthUtils {
    */
   static buildResourceParameter(endpointUrl: string): string {
     const url = new URL(endpointUrl);
-    return `${url.protocol}//${url.host}`;
+    return `${url.protocol}//${url.host}${url.pathname}`;
   }
 }
