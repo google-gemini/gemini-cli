@@ -1862,7 +1862,7 @@ describe('loadCliConfig with includeDirectories', () => {
       context: {
         includeDirectories: [
           path.resolve(path.sep, 'settings', 'path1'),
-          path.join(os.homedir(), 'settings', 'path2'),
+          path.join(MOCK_HOME, 'settings', 'path2'),
           path.join(mockCwd, 'settings', 'path3'),
         ],
       },
@@ -1873,7 +1873,7 @@ describe('loadCliConfig with includeDirectories', () => {
       path.resolve(path.sep, 'cli', 'path1'),
       path.join(mockCwd, 'cli', 'path2'),
       path.resolve(path.sep, 'settings', 'path1'),
-      path.join(os.homedir(), 'settings', 'path2'),
+      path.join(MOCK_HOME, 'settings', 'path2'),
       path.join(mockCwd, 'settings', 'path3'),
     ];
     expect(config.getWorkspaceContext().getDirectories()).toEqual(
