@@ -16,30 +16,75 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { useMemo } from 'react';
 import type { HistoryItemToolGroup } from '../../types.js';
 
-const TodoItemDisplay: React.FC<{ todo: Todo }> = ({ todo }) => (
-  <Box flexDirection="row">
-    <Box marginRight={1}>
-      <TodoStatusDisplay status={todo.status} />
+const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
+  const score = useMemo(() => {
+    let total = 0;
+    let completed = 0;
+    for (const todo of todos.todos) {
+      if (todo.status !== 'cancelled') {
+        total += 1;
+        if (todo.status === 'completed') {
+          completed += 1;
+        }
+      }
+    }
+    return `${completed}/${total}`;
+  }, [todos]);
+
+  return (
+    <Box flexDirection="row" columnGap={2} height={1}>
+      <Text color={theme.text.primary} bold aria-label="Todo list">
+        📝 Todo
+      </Text>
+      <Text color={theme.text.secondary}>{score} (ctrl+t to toggle)</Text>
     </Box>
-    <Box flexShrink={1}>
-      <Text color={theme.text.primary}>{todo.description}</Text>
-    </Box>
-  </Box>
-);
+  );
+};
 
 const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   switch (status) {
     case 'completed':
-      return <Text color={theme.status.success}>✓</Text>;
+      return (
+        <Text color={theme.status.success} aria-label="Completed">
+          ✓
+        </Text>
+      );
     case 'in_progress':
-      return <Text color={theme.text.accent}>»</Text>;
+      return (
+        <Text color={theme.text.accent} aria-label="In Progress">
+          »
+        </Text>
+      );
     case 'pending':
-      return <Text color={theme.text.primary}>☐</Text>;
+      return (
+        <Text color={theme.text.primary} aria-label="Pending">
+          ☐
+        </Text>
+      );
     case 'cancelled':
     default:
-      return <Text color={theme.status.error}>✗</Text>;
+      return (
+        <Text color={theme.status.error} aria-label="Cancelled">
+          ✗
+        </Text>
+      );
   }
 };
+
+const TodoItemDisplay: React.FC<{
+  todo: Todo;
+  wrap?: 'truncate';
+  role?: 'listitem';
+}> = ({ todo, wrap, role: ariaRole }) => (
+  <Box flexDirection="row" columnGap={1} aria-role={ariaRole}>
+    <TodoStatusDisplay status={todo.status} />
+    <Box flexShrink={1}>
+      <Text color={theme.text.primary} wrap={wrap}>
+        {todo.description}
+      </Text>
+    </Box>
+  </Box>
+);
 
 export const TodoTray: React.FC = () => {
   const uiState = useUIState();
@@ -72,62 +117,49 @@ export const TodoTray: React.FC = () => {
     return todos.todos.find((todo) => todo.status === 'in_progress') || null;
   }, [todos]);
 
-  if (todos === null) {
-    return null;
-  }
-
-  if (uiState.showFullTodos) {
-    return (
-      <Box
-        borderStyle="single"
-        paddingLeft={1}
-        paddingRight={1}
-        borderBottom={false}
-        flexDirection="column"
-        borderColor={theme.border.default}
-      >
-        <Text color={theme.text.accent}>
-          📝 Todo:
-          <Text color={theme.text.secondary}>(ctrl+t to collapse)</Text>
-        </Text>
-
-        <Box paddingLeft={4} paddingRight={2} paddingTop={1}>
-          <TodoListDisplay todos={todos!} />
-        </Box>
-      </Box>
-    );
-  }
-
-  if (inProgress === null) {
+  if (todos === null || !todos.todos || todos.todos.length === 0) {
     return null;
   }
 
   return (
     <Box
       borderStyle="single"
+      borderBottom={false}
+      borderRight={false}
+      borderLeft={false}
+      borderColor={theme.border.default}
       paddingLeft={1}
       paddingRight={1}
-      borderBottom={false}
-      flexDirection="row"
-      borderColor={theme.border.default}
     >
-      <Text color={theme.text.accent}>
-        📝 Todo:
-        <Text color={theme.text.secondary}>(ctrl+t to expand)</Text>
-      </Text>
-      <TodoItemDisplay todo={inProgress} />
+      {uiState.showFullTodos ? (
+        <Box flexDirection="column" rowGap={1}>
+          <TodoTitleDisplay todos={todos} />
+          <TodoListDisplay todos={todos!} />
+        </Box>
+      ) : (
+        <Box flexDirection="row" columnGap={1} height={1}>
+          <Box flexShrink={0} flexGrow={0}>
+            <TodoTitleDisplay todos={todos} />
+          </Box>
+          {inProgress && (
+            <Box flexShrink={1} flexGrow={1}>
+              <TodoItemDisplay todo={inProgress!} wrap="truncate" />
+            </Box>
+          )}
+        </Box>
+      )}
     </Box>
   );
 };
 
-export interface TodoListDisplayProps {
+interface TodoListDisplayProps {
   todos: TodoList;
 }
 
-export const TodoListDisplay: React.FC<TodoListDisplayProps> = ({ todos }) => (
-  <Box flexDirection="column">
+const TodoListDisplay: React.FC<TodoListDisplayProps> = ({ todos }) => (
+  <Box flexDirection="column" aria-role="list">
     {todos.todos.map((todo: Todo, index: number) => (
-      <TodoItemDisplay todo={todo} key={index} />
+      <TodoItemDisplay todo={todo} key={index} role="listitem" />
     ))}
   </Box>
 );

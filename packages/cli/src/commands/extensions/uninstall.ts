@@ -7,6 +7,7 @@
 import type { CommandModule } from 'yargs';
 import { uninstallExtension } from '../../config/extension.js';
 import { ExtensionNotFoundError, getErrorMessage } from '../../utils/errors.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 interface UninstallArgs {
   name: string; // can be extension name or source URL.
@@ -15,12 +16,12 @@ interface UninstallArgs {
 export async function handleUninstall(args: UninstallArgs) {
   try {
     await uninstallExtension(args.name, false);
-    console.log(`Extension "${args.name}" successfully uninstalled.`);
+    debugLogger.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
     if (error instanceof ExtensionNotFoundError) {
-      console.error(error.message);
+      debugLogger.error(error.message);
     } else {
-      console.error(getErrorMessage(error));
+      debugLogger.error(getErrorMessage(error));
     }
     process.exit(1);
   }
