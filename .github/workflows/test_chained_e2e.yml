@@ -237,5 +237,5 @@ jobs:
       allowForks: 'true'
       sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
       token: '${{ secrets.GITHUB_TOKEN }}'
-      status: '${{ job.status }}''
+      status: '${{ job.status }}'
       context: 'Set E2E Status'
