@@ -76,6 +76,283 @@ const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u03A9': 'z',
 };
 
+/**
+ * Check if a buffer could potentially be a valid kitty sequence or its prefix.
+ */
+function couldBeKittySequence(buffer: string): boolean {
+  // Kitty sequences always start with ESC[.
+  if (buffer.length === 0) return true;
+  if (buffer === ESC || buffer === `${ESC}[`) return true;
+
+  if (!buffer.startsWith(`${ESC}[`)) return false;
+
+  // Check for known kitty sequence patterns:
+  // 1. ESC[<digit> - could be CSI-u or tilde-coded
+  // 2. ESC[1;<digit> - parameterized functional
+  // 3. ESC[<letter> - legacy functional keys
+  // 4. ESC[Z - reverse tab
+  const afterCSI = buffer.slice(2);
+
+  // Check if it starts with a digit (could be CSI-u or parameterized)
+  if (/^\d/.test(afterCSI)) return true;
+
+  // Check for known single-letter sequences
+  if (/^[ABCDHFPQRSZ]/.test(afterCSI)) return true;
+
+  // Check for 1; pattern (parameterized sequences)
+  if (/^1;\d/.test(afterCSI)) return true;
+
+  // Anything else starting with ESC[ that doesn't match our patterns
+  // is likely not a kitty sequence we handle
+  return false;
+}
+
+/**
+ * Parses a single complete kitty/parameterized/legacy sequence from the start
+ * of the buffer.
+ *
+ * This enables peel-and-continue parsing for batched input, allowing us to
+ * "peel off" one complete event when multiple sequences arrive in a single
+ * chunk, preventing buffer overflow and fragmentation.
+ *
+ * @param buffer - The input buffer string to parse.
+ * @returns The parsed Key and the number of characters consumed, or null if
+ * no complete sequence is found at the start of the buffer.
+ */
+function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
+  // In older terminals ESC [ Z was used as Cursor Backward Tabulation (CBT)
+  // In newer terminals the same functionality of key combination for moving
+  // backward through focusable elements is Shift+Tab, hence we will
+  // map ESC [ Z to Shift+Tab
+  // 0) Reverse Tab (legacy): ESC [ Z
+  //    Treat as Shift+Tab for UI purposes.
+  //    Regex parts:
+  //    ^     - start of buffer
+  //    ESC [ - CSI introducer
+  //    Z     - legacy reverse tab
+  const revTabLegacy = new RegExp(`^${ESC}\\[Z`);
+  let m = buffer.match(revTabLegacy);
+  if (m) {
+    return {
+      key: {
+        name: 'tab',
+        ctrl: false,
+        meta: false,
+        shift: true,
+        paste: false,
+        sequence: buffer.slice(0, m[0].length),
+        kittyProtocol: true,
+      },
+      length: m[0].length,
+    };
+  }
+
+  // 1) Reverse Tab (parameterized): ESC [ 1 ; <mods> Z
+  //    Parameterized reverse Tab: ESC [ 1 ; <mods> Z
+  const revTabParam = new RegExp(`^${ESC}\\[1;(\\d+)Z`);
+  m = buffer.match(revTabParam);
+  if (m) {
+    let mods = parseInt(m[1], 10);
+    if (mods >= KITTY_MODIFIER_EVENT_TYPES_OFFSET) {
+      mods -= KITTY_MODIFIER_EVENT_TYPES_OFFSET;
+    }
+    const bits = mods - KITTY_MODIFIER_BASE;
+    const alt = (bits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
+    const ctrl = (bits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
+    return {
+      key: {
+        name: 'tab',
+        ctrl,
+        meta: alt,
+        // Reverse tab implies Shift behavior; force shift regardless of mods
+        shift: true,
+        paste: false,
+        sequence: buffer.slice(0, m[0].length),
+        kittyProtocol: true,
+      },
+      length: m[0].length,
+    };
+  }
+
+  // 2) Parameterized functional: ESC [ 1 ; <mods> (A|B|C|D|H|F|P|Q|R|S)
+  // 2) Parameterized functional: ESC [ 1 ; <mods> (A|B|C|D|H|F|P|Q|R|S)
+  //    Arrows, Home/End, F1–F4 with modifiers encoded in <mods>.
+  const arrowPrefix = new RegExp(`^${ESC}\\[1;(\\d+)([ABCDHFPQSR])`);
+  m = buffer.match(arrowPrefix);
+  if (m) {
+    let mods = parseInt(m[1], 10);
+    if (mods >= KITTY_MODIFIER_EVENT_TYPES_OFFSET) {
+      mods -= KITTY_MODIFIER_EVENT_TYPES_OFFSET;
+    }
+    const bits = mods - KITTY_MODIFIER_BASE;
+    const shift = (bits & MODIFIER_SHIFT_BIT) === MODIFIER_SHIFT_BIT;
+    const alt = (bits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
+    const ctrl = (bits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
+    const sym = m[2];
+    const symbolToName: { [k: string]: string } = {
+      A: 'up',
+      B: 'down',
+      C: 'right',
+      D: 'left',
+      H: 'home',
+      F: 'end',
+      P: 'f1',
+      Q: 'f2',
+      R: 'f3',
+      S: 'f4',
+    };
+    const name = symbolToName[sym] || '';
+    if (!name) return null;
+    return {
+      key: {
+        name,
+        ctrl,
+        meta: alt,
+        shift,
+        paste: false,
+        sequence: buffer.slice(0, m[0].length),
+        kittyProtocol: true,
+      },
+      length: m[0].length,
+    };
+  }
+
+  // 3) CSI-u form: ESC [ <code> ; <mods> (u|~)
+  // 3) CSI-u and tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
+  //    'u' terminator: Kitty CSI-u; '~' terminator: tilde-coded function keys.
+  const csiUPrefix = new RegExp(`^${ESC}\\[(\\d+)(;(\\d+))?([u~])`);
+  m = buffer.match(csiUPrefix);
+  if (m) {
+    const keyCode = parseInt(m[1], 10);
+    let modifiers = m[3] ? parseInt(m[3], 10) : KITTY_MODIFIER_BASE;
+    if (modifiers >= KITTY_MODIFIER_EVENT_TYPES_OFFSET) {
+      modifiers -= KITTY_MODIFIER_EVENT_TYPES_OFFSET;
+    }
+    const modifierBits = modifiers - KITTY_MODIFIER_BASE;
+    const shift = (modifierBits & MODIFIER_SHIFT_BIT) === MODIFIER_SHIFT_BIT;
+    const alt = (modifierBits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
+    const ctrl = (modifierBits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
+    const terminator = m[4];
+
+    // Tilde-coded functional keys (Delete, Insert, PageUp/Down, Home/End)
+    if (terminator === '~') {
+      let name: string | null = null;
+      switch (keyCode) {
+        case 1:
+          name = 'home';
+          break;
+        case 2:
+          name = 'insert';
+          break;
+        case 3:
+          name = 'delete';
+          break;
+        case 4:
+          name = 'end';
+          break;
+        case 5:
+          name = 'pageup';
+          break;
+        case 6:
+          name = 'pagedown';
+          break;
+        default:
+          break;
+      }
+      if (name) {
+        return {
+          key: {
+            name,
+            ctrl,
+            meta: alt,
+            shift,
+            paste: false,
+            sequence: buffer.slice(0, m[0].length),
+            kittyProtocol: true,
+          },
+          length: m[0].length,
+        };
+      }
+    }
+
+    const kittyKeyCodeToName: { [key: number]: string } = {
+      [CHAR_CODE_ESC]: 'escape',
+      [KITTY_KEYCODE_TAB]: 'tab',
+      [KITTY_KEYCODE_BACKSPACE]: 'backspace',
+      [KITTY_KEYCODE_ENTER]: 'return',
+      [KITTY_KEYCODE_NUMPAD_ENTER]: 'return',
+    };
+
+    const name = kittyKeyCodeToName[keyCode];
+    if (name) {
+      return {
+        key: {
+          name,
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence: buffer.slice(0, m[0].length),
+          kittyProtocol: true,
+        },
+        length: m[0].length,
+      };
+    }
+
+    // Ctrl+letters and Alt+letters
+    if (
+      (ctrl || alt) &&
+      keyCode >= 'a'.charCodeAt(0) &&
+      keyCode <= 'z'.charCodeAt(0)
+    ) {
+      const letter = String.fromCharCode(keyCode);
+      return {
+        key: {
+          name: letter,
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence: buffer.slice(0, m[0].length),
+          kittyProtocol: true,
+        },
+        length: m[0].length,
+      };
+    }
+  }
+
+  // 4) Legacy function keys (no parameters): ESC [ (A|B|C|D|H|F)
+  //    Arrows + Home/End without modifiers.
+  const legacyFuncKey = new RegExp(`^${ESC}\\[([ABCDHF])`);
+  m = buffer.match(legacyFuncKey);
+  if (m) {
+    const sym = m[1];
+    const nameMap: { [key: string]: string } = {
+      A: 'up',
+      B: 'down',
+      C: 'right',
+      D: 'left',
+      H: 'home',
+      F: 'end',
+    };
+    const name = nameMap[sym]!;
+    return {
+      key: {
+        name,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: buffer.slice(0, m[0].length),
+        kittyProtocol: true,
+      },
+      length: m[0].length,
+    };
+  }
+
+  return null;
+}
+
 export interface Key {
   name: string;
   ctrl: boolean;
@@ -168,279 +445,6 @@ export function KeypressProvider({
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
-
-    // Check if a buffer could potentially be a valid kitty sequence or its prefix
-    const couldBeKittySequence = (buffer: string): boolean => {
-      // Kitty sequences always start with ESC[.
-      if (buffer.length === 0) return true;
-      if (buffer === ESC || buffer === `${ESC}[`) return true;
-
-      if (!buffer.startsWith(`${ESC}[`)) return false;
-
-      // Check for known kitty sequence patterns:
-      // 1. ESC[<digit> - could be CSI-u or tilde-coded
-      // 2. ESC[1;<digit> - parameterized functional
-      // 3. ESC[<letter> - legacy functional keys
-      // 4. ESC[Z - reverse tab
-      const afterCSI = buffer.slice(2);
-
-      // Check if it starts with a digit (could be CSI-u or parameterized)
-      if (/^\d/.test(afterCSI)) return true;
-
-      // Check for known single-letter sequences
-      if (/^[ABCDHFPQRSZ]/.test(afterCSI)) return true;
-
-      // Check for 1; pattern (parameterized sequences)
-      if (/^1;\d/.test(afterCSI)) return true;
-
-      // Anything else starting with ESC[ that doesn't match our patterns
-      // is likely not a kitty sequence we handle
-      return false;
-    };
-
-    // Parse a single complete kitty sequence from the start (prefix) of the
-    // buffer and return both the Key and the number of characters consumed.
-    // This lets us "peel off" one complete event when multiple sequences arrive
-    // in a single chunk, preventing buffer overflow and fragmentation.
-    // Parse a single complete kitty/parameterized/legacy sequence from the start
-    // of the buffer and return both the parsed Key and the number of characters
-    // consumed. This enables peel-and-continue parsing for batched input.
-    const parseKittyPrefix = (
-      buffer: string,
-    ): { key: Key; length: number } | null => {
-      // In older terminals ESC [ Z was used as Cursor Backward Tabulation (CBT)
-      // In newer terminals the same functionality of key combination for moving
-      // backward through focusable elements is Shift+Tab, hence we will
-      // map ESC [ Z to Shift+Tab
-      // 0) Reverse Tab (legacy): ESC [ Z
-      //    Treat as Shift+Tab for UI purposes.
-      //    Regex parts:
-      //    ^     - start of buffer
-      //    ESC [ - CSI introducer
-      //    Z     - legacy reverse tab
-      const revTabLegacy = new RegExp(`^${ESC}\\[Z`);
-      let m = buffer.match(revTabLegacy);
-      if (m) {
-        return {
-          key: {
-            name: 'tab',
-            ctrl: false,
-            meta: false,
-            shift: true,
-            paste: false,
-            sequence: buffer.slice(0, m[0].length),
-            kittyProtocol: true,
-          },
-          length: m[0].length,
-        };
-      }
-
-      // 1) Reverse Tab (parameterized): ESC [ 1 ; <mods> Z
-      //    Parameterized reverse Tab: ESC [ 1 ; <mods> Z
-      const revTabParam = new RegExp(`^${ESC}\\[1;(\\d+)Z`);
-      m = buffer.match(revTabParam);
-      if (m) {
-        let mods = parseInt(m[1], 10);
-        if (mods >= KITTY_MODIFIER_EVENT_TYPES_OFFSET) {
-          mods -= KITTY_MODIFIER_EVENT_TYPES_OFFSET;
-        }
-        const bits = mods - KITTY_MODIFIER_BASE;
-        const alt = (bits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
-        const ctrl = (bits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
-        return {
-          key: {
-            name: 'tab',
-            ctrl,
-            meta: alt,
-            // Reverse tab implies Shift behavior; force shift regardless of mods
-            shift: true,
-            paste: false,
-            sequence: buffer.slice(0, m[0].length),
-            kittyProtocol: true,
-          },
-          length: m[0].length,
-        };
-      }
-
-      // 2) Parameterized functional: ESC [ 1 ; <mods> (A|B|C|D|H|F|P|Q|R|S)
-      // 2) Parameterized functional: ESC [ 1 ; <mods> (A|B|C|D|H|F|P|Q|R|S)
-      //    Arrows, Home/End, F1–F4 with modifiers encoded in <mods>.
-      const arrowPrefix = new RegExp(`^${ESC}\\[1;(\\d+)([ABCDHFPQSR])`);
-      m = buffer.match(arrowPrefix);
-      if (m) {
-        let mods = parseInt(m[1], 10);
-        if (mods >= KITTY_MODIFIER_EVENT_TYPES_OFFSET) {
-          mods -= KITTY_MODIFIER_EVENT_TYPES_OFFSET;
-        }
-        const bits = mods - KITTY_MODIFIER_BASE;
-        const shift = (bits & MODIFIER_SHIFT_BIT) === MODIFIER_SHIFT_BIT;
-        const alt = (bits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
-        const ctrl = (bits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
-        const sym = m[2];
-        const symbolToName: { [k: string]: string } = {
-          A: 'up',
-          B: 'down',
-          C: 'right',
-          D: 'left',
-          H: 'home',
-          F: 'end',
-          P: 'f1',
-          Q: 'f2',
-          R: 'f3',
-          S: 'f4',
-        };
-        const name = symbolToName[sym] || '';
-        if (!name) return null;
-        return {
-          key: {
-            name,
-            ctrl,
-            meta: alt,
-            shift,
-            paste: false,
-            sequence: buffer.slice(0, m[0].length),
-            kittyProtocol: true,
-          },
-          length: m[0].length,
-        };
-      }
-
-      // 3) CSI-u form: ESC [ <code> ; <mods> (u|~)
-      // 3) CSI-u and tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
-      //    'u' terminator: Kitty CSI-u; '~' terminator: tilde-coded function keys.
-      const csiUPrefix = new RegExp(`^${ESC}\\[(\\d+)(;(\\d+))?([u~])`);
-      m = buffer.match(csiUPrefix);
-      if (m) {
-        const keyCode = parseInt(m[1], 10);
-        let modifiers = m[3] ? parseInt(m[3], 10) : KITTY_MODIFIER_BASE;
-        if (modifiers >= KITTY_MODIFIER_EVENT_TYPES_OFFSET) {
-          modifiers -= KITTY_MODIFIER_EVENT_TYPES_OFFSET;
-        }
-        const modifierBits = modifiers - KITTY_MODIFIER_BASE;
-        const shift =
-          (modifierBits & MODIFIER_SHIFT_BIT) === MODIFIER_SHIFT_BIT;
-        const alt = (modifierBits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
-        const ctrl = (modifierBits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
-        const terminator = m[4];
-
-        // Tilde-coded functional keys (Delete, Insert, PageUp/Down, Home/End)
-        if (terminator === '~') {
-          let name: string | null = null;
-          switch (keyCode) {
-            case 1:
-              name = 'home';
-              break;
-            case 2:
-              name = 'insert';
-              break;
-            case 3:
-              name = 'delete';
-              break;
-            case 4:
-              name = 'end';
-              break;
-            case 5:
-              name = 'pageup';
-              break;
-            case 6:
-              name = 'pagedown';
-              break;
-            default:
-              break;
-          }
-          if (name) {
-            return {
-              key: {
-                name,
-                ctrl,
-                meta: alt,
-                shift,
-                paste: false,
-                sequence: buffer.slice(0, m[0].length),
-                kittyProtocol: true,
-              },
-              length: m[0].length,
-            };
-          }
-        }
-
-        const kittyKeyCodeToName: { [key: number]: string } = {
-          [CHAR_CODE_ESC]: 'escape',
-          [KITTY_KEYCODE_TAB]: 'tab',
-          [KITTY_KEYCODE_BACKSPACE]: 'backspace',
-          [KITTY_KEYCODE_ENTER]: 'return',
-          [KITTY_KEYCODE_NUMPAD_ENTER]: 'return',
-        };
-
-        const name = kittyKeyCodeToName[keyCode];
-        if (name) {
-          return {
-            key: {
-              name,
-              ctrl,
-              meta: alt,
-              shift,
-              paste: false,
-              sequence: buffer.slice(0, m[0].length),
-              kittyProtocol: true,
-            },
-            length: m[0].length,
-          };
-        }
-
-        // Ctrl+letters and Alt+letters
-        if (
-          (ctrl || alt) &&
-          keyCode >= 'a'.charCodeAt(0) &&
-          keyCode <= 'z'.charCodeAt(0)
-        ) {
-          const letter = String.fromCharCode(keyCode);
-          return {
-            key: {
-              name: letter,
-              ctrl,
-              meta: alt,
-              shift,
-              paste: false,
-              sequence: buffer.slice(0, m[0].length),
-              kittyProtocol: true,
-            },
-            length: m[0].length,
-          };
-        }
-      }
-
-      // 4) Legacy function keys (no parameters): ESC [ (A|B|C|D|H|F)
-      //    Arrows + Home/End without modifiers.
-      const legacyFuncKey = new RegExp(`^${ESC}\\[([ABCDHF])`);
-      m = buffer.match(legacyFuncKey);
-      if (m) {
-        const sym = m[1];
-        const nameMap: { [key: string]: string } = {
-          A: 'up',
-          B: 'down',
-          C: 'right',
-          D: 'left',
-          H: 'home',
-          F: 'end',
-        };
-        const name = nameMap[sym]!;
-        return {
-          key: {
-            name,
-            ctrl: false,
-            meta: false,
-            shift: false,
-            paste: false,
-            sequence: buffer.slice(0, m[0].length),
-            kittyProtocol: true,
-          },
-          length: m[0].length,
-        };
-      }
-
-      return null;
-    };
 
     const broadcast = (key: Key) => {
       for (const handler of subscribers) {
