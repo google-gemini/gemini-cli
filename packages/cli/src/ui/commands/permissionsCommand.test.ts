@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as process from 'node:process';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { permissionsCommand } from './permissionsCommand.js';
 import { type CommandContext, CommandKind } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -59,7 +60,7 @@ describe('permissionsCommand', () => {
       type: 'dialog',
       dialog: 'permissions',
       props: {
-        targetDirectory: '/test/dir',
+        targetDirectory: path.resolve('/test/dir'),
       },
     });
   });
@@ -92,8 +93,9 @@ describe('permissionsCommand', () => {
     expect(actionResult).toEqual({
       type: 'message',
       messageType: 'error',
-      content:
-        'Error accessing path: /nonexistent/dir. ENOENT: no such file or directory',
+      content: `Error accessing path: ${path.resolve(
+        '/nonexistent/dir',
+      )}. ENOENT: no such file or directory`,
     });
   });
 
@@ -108,7 +110,7 @@ describe('permissionsCommand', () => {
     expect(actionResult).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Path is not a directory: /file/not/dir',
+      content: `Path is not a directory: ${path.resolve('/file/not/dir')}`,
     });
   });
 });
