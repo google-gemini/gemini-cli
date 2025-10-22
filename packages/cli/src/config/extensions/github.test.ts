@@ -22,6 +22,7 @@ import * as path from 'node:path';
 import * as tar from 'tar';
 import * as archiver from 'archiver';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { ExtensionEnablementManager } from './extensionEnablement.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockArch = vi.hoisted(() => vi.fn());
@@ -140,6 +141,7 @@ describe('git extension helpers', () => {
     it('should return NOT_UPDATABLE for non-git extensions', async () => {
       const extension: GeminiCLIExtension = {
         name: 'test',
+        id: 'test-id',
         path: '/ext',
         version: '1.0.0',
         isActive: true,
@@ -149,13 +151,17 @@ describe('git extension helpers', () => {
         },
         contextFiles: [],
       };
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
     });
 
     it('should return ERROR if no remotes found', async () => {
       const extension: GeminiCLIExtension = {
         name: 'test',
+        id: 'test-id',
         path: '/ext',
         version: '1.0.0',
         isActive: true,
@@ -166,13 +172,17 @@ describe('git extension helpers', () => {
         contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([]);
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
 
     it('should return UPDATE_AVAILABLE when remote hash is different', async () => {
       const extension: GeminiCLIExtension = {
         name: 'test',
+        id: 'test-id',
         path: '/ext',
         version: '1.0.0',
         isActive: true,
@@ -188,13 +198,17 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('local-hash');
 
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
     it('should return UP_TO_DATE when remote and local hashes are the same', async () => {
       const extension: GeminiCLIExtension = {
         name: 'test',
+        id: 'test-id',
         path: '/ext',
         version: '1.0.0',
         isActive: true,
@@ -210,13 +224,17 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('same-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('same-hash');
 
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
     it('should return ERROR on git error', async () => {
       const extension: GeminiCLIExtension = {
         name: 'test',
+        id: 'test-id',
         path: '/ext',
         version: '1.0.0',
         isActive: true,
@@ -228,7 +246,10 @@ describe('git extension helpers', () => {
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
   });

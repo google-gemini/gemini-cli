@@ -10,6 +10,7 @@ import { ApiError } from '@google/genai';
 import type { HttpError } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
+import { debugLogger } from './debugLogger.js';
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -43,7 +44,7 @@ describe('retryWithBackoff', () => {
     // Disable 429 simulation for tests
     setSimulate429(false);
     // Suppress unhandled promise rejection warnings for tests that expect errors
-    console.warn = vi.fn();
+    debugLogger.warn = vi.fn();
   });
 
   afterEach(() => {
@@ -499,5 +500,26 @@ describe('retryWithBackoff', () => {
       // Should trigger fallback after 2 consecutive 429s (attempts 2-3)
       expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
     });
+  });
+  it('should abort the retry loop when the signal is aborted', async () => {
+    const abortController = new AbortController();
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error: HttpError = new Error('Server error');
+      error.status = 500;
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 5,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    abortController.abort();
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(mockFn).toHaveBeenCalledTimes(1);
   });
 });
