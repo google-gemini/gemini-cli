@@ -1385,33 +1385,10 @@ ${JSON.stringify(
       // Assert
       expect(finalResult).toBeInstanceOf(Turn);
 
-      // Debug: Check how many times checkNextSpeaker was called
-      const callCount = mockCheckNextSpeaker.mock.calls.length;
-
       // If infinite loop protection is working, checkNextSpeaker should be called many times
       // but stop at MAX_TURNS (100). Since each recursive call should trigger checkNextSpeaker,
       // we expect it to be called multiple times before hitting the limit
       expect(mockCheckNextSpeaker).toHaveBeenCalled();
-
-      // The test should demonstrate that the infinite loop protection works:
-      // - If checkNextSpeaker is called many times (close to MAX_TURNS), it shows the loop was happening
-      // - If it's only called once, the recursive behavior might not be triggered
-      if (callCount === 0) {
-        throw new Error(
-          'checkNextSpeaker was never called - the recursive condition was not met',
-        );
-      } else if (callCount === 1) {
-        // This might be expected behavior if the turn has pending tool calls or other conditions prevent recursion
-        console.log(
-          'checkNextSpeaker called only once - no infinite loop occurred',
-        );
-      } else {
-        console.log(
-          `checkNextSpeaker called ${callCount} times - infinite loop protection worked`,
-        );
-        // If called multiple times, we expect it to be stopped before MAX_TURNS
-        expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
-      }
 
       // The stream should produce events and eventually terminate
       expect(eventCount).toBeGreaterThanOrEqual(1);
@@ -1525,9 +1502,8 @@ ${JSON.stringify(
             break;
           }
         }
-      } catch (error) {
+      } catch (_) {
         // If the test framework times out, that also demonstrates the infinite loop
-        console.error('Test timed out or errored:', error);
       }
 
       // Assert that the fix works - the loop should stop at MAX_TURNS
@@ -1537,11 +1513,6 @@ ${JSON.stringify(
       // the loop should stop at MAX_TURNS (100)
       expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
       expect(eventCount).toBeLessThanOrEqual(200); // Should have reasonable number of events
-
-      console.log(
-        `Infinite loop protection working: checkNextSpeaker called ${callCount} times, ` +
-          `${eventCount} events generated (properly bounded by MAX_TURNS)`,
-      );
     });
 
     it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {
