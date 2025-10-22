@@ -21,14 +21,18 @@ import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import {
+  fetchWithTimeout,
+  isPrivateIp,
+  setGlobalProxy,
+} from '../utils/fetch.js';
 import { convert } from 'html-to-text';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -259,7 +263,7 @@ ${textContent}
         DEFAULT_GEMINI_FLASH_MODEL,
       );
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Full response for prompt "${userPrompt.substring(
           0,
           50,
@@ -352,7 +356,7 @@ ${sourceListFormatted.join('\n')}`;
 
       const llmContent = responseText;
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Formatted tool response for prompt "${userPrompt}:\n\n":`,
         llmContent,
       );
@@ -413,7 +417,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
     );
     const proxy = config.getProxy();
     if (proxy) {
-      setGlobalDispatcher(new ProxyAgent(proxy as string));
+      setGlobalProxy(proxy);
     }
   }
 

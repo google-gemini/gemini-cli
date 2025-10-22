@@ -8,6 +8,7 @@ import { useCallback, useReducer, useEffect } from 'react';
 import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -394,7 +395,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         normalizedKey = normalizeKey(key);
       } catch (error) {
         // Handle malformed key inputs gracefully
-        console.warn('Malformed key input in vim mode:', key, error);
+        debugLogger.warn('Malformed key input in vim mode:', key, error);
         return false;
       }
 

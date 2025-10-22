@@ -609,6 +609,40 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
     });
 
+    it('should not allow user or workspace to override system disableYoloMode', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        security: {
+          disableYoloMode: false,
+        },
+      };
+      const workspaceSettingsContent = {
+        security: {
+          disableYoloMode: false, // This should be ignored
+        },
+      };
+      const systemSettingsContent = {
+        security: {
+          disableYoloMode: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
+    });
+
     it('should handle contextFileName correctly when only in user settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
@@ -1073,8 +1107,6 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      const e = settings.user.settings.model?.chatCompression;
-      console.log(e);
 
       expect(settings.user.settings.model?.chatCompression).toEqual({
         contextPercentageThreshold: 0.5,
