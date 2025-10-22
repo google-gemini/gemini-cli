@@ -411,18 +411,16 @@ export function KeypressProvider({
   debugKeystrokeLogging?: boolean;
 }) {
   const { stdin, setRawMode } = useStdin();
-  const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
 
+  const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
   const subscribe = useCallback(
     (handler: KeypressHandler) => subscribers.add(handler),
     [subscribers],
   );
-
   const unsubscribe = useCallback(
     (handler: KeypressHandler) => subscribers.delete(handler),
     [subscribers],
   );
-
   const broadcast = useCallback(
     (key: Key) => subscribers.forEach((handler) => handler(key)),
     [subscribers],
