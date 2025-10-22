@@ -142,7 +142,7 @@ export function setupLinters() {
 
 export function runESLint() {
   console.log('\nRunning ESLint...');
-  if (!runCommand('npm run lint:ci')) {
+  if (!runCommand('npm run lint')) {
     process.exit(1);
   }
 }
