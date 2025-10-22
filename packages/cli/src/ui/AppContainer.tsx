@@ -42,6 +42,7 @@ import {
   AuthType,
   clearCachedCredentialFile,
   ShellExecutionService,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -398,7 +399,7 @@ export const AppContainer = (props: AppContainerProps) => {
           config.isBrowserLaunchSuppressed()
         ) {
           await runExitCleanup();
-          console.log(`
+          debugLogger.log(`
 ----------------------------------------------------------------
 Logging in with Google... Please restart Gemini CLI to continue.
 ----------------------------------------------------------------
@@ -567,7 +568,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         Date.now(),
       );
       if (config.getDebugMode()) {
-        console.log(
+        debugLogger.log(
           `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(
             0,
             200,
@@ -942,7 +943,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     (key: Key) => {
       // Debug log keystrokes if enabled
       if (settings.merged.general?.debugKeystrokeLogging) {
-        console.log('[DEBUG] Keystroke:', JSON.stringify(key));
+        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
       if (keyMatchers[Command.QUIT](key)) {

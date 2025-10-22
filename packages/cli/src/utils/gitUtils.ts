@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { ProxyAgent } from 'undici';
 
@@ -24,7 +25,7 @@ export const isGitHubRepository = (): boolean => {
     return pattern.test(remotes);
   } catch (_error) {
     // If any filesystem error occurs, assume not a git repo
-    console.debug(`Failed to get git remote:`, _error);
+    debugLogger.debug(`Failed to get git remote:`, _error);
     return false;
   }
 };
@@ -83,7 +84,10 @@ export const getLatestGitHubRelease = async (
     }
     return releaseTag;
   } catch (_error) {
-    console.debug(`Failed to determine latest run-gemini-cli release:`, _error);
+    debugLogger.debug(
+      `Failed to determine latest run-gemini-cli release:`,
+      _error,
+    );
     throw new Error(
       `Unable to determine the latest run-gemini-cli release on GitHub.`,
     );

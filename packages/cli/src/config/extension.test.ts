@@ -25,7 +25,7 @@ import {
   EXTENSIONS_DIRECTORY_NAME,
   INSTALL_METADATA_FILENAME,
 } from './extensions/variables.js';
-import { ExtensionManager } from './extension-manager.js';
+import { hashValue, ExtensionManager } from './extension-manager.js';
 import { ExtensionStorage } from './extensions/storage.js';
 import { INSTALL_WARNING_MESSAGE } from './extensions/consent.js';
 
@@ -1200,6 +1200,10 @@ This extension will run the following MCP servers:
           extensionsDir: userExtensionsDir,
           name: 'my-local-extension',
           version: '1.0.0',
+          installMetadata: {
+            source: userExtensionsDir,
+            type: 'local',
+          },
         });
 
         await extensionManager.uninstallExtension(
@@ -1213,7 +1217,8 @@ This extension will run the following MCP servers:
         } else {
           expect(mockLogExtensionUninstall).toHaveBeenCalled();
           expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
-            'my-local-extension',
+            hashValue('my-local-extension'),
+            hashValue(userExtensionsDir),
             'success',
           );
         }
@@ -1257,7 +1262,8 @@ This extension will run the following MCP servers:
       expect(fs.existsSync(sourceExtDir)).toBe(false);
       expect(mockLogExtensionUninstall).toHaveBeenCalled();
       expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
-        'gemini-sql-extension',
+        hashValue('gemini-sql-extension'),
+        hashValue('https://github.com/google/gemini-sql-extension'),
         'success',
       );
     });
@@ -1346,13 +1352,18 @@ This extension will run the following MCP servers:
         extensionsDir: userExtensionsDir,
         name: 'ext1',
         version: '1.0.0',
+        installMetadata: {
+          source: userExtensionsDir,
+          type: 'local',
+        },
       });
 
       extensionManager.disableExtension('ext1', SettingScope.Workspace);
 
       expect(mockLogExtensionDisable).toHaveBeenCalled();
       expect(ExtensionDisableEvent).toHaveBeenCalledWith(
-        'ext1',
+        hashValue('ext1'),
+        hashValue(userExtensionsDir),
         SettingScope.Workspace,
       );
     });
@@ -1405,13 +1416,18 @@ This extension will run the following MCP servers:
         extensionsDir: userExtensionsDir,
         name: 'ext1',
         version: '1.0.0',
+        installMetadata: {
+          source: userExtensionsDir,
+          type: 'local',
+        },
       });
       extensionManager.disableExtension('ext1', SettingScope.Workspace);
       extensionManager.enableExtension('ext1', SettingScope.Workspace);
 
       expect(mockLogExtensionEnable).toHaveBeenCalled();
       expect(ExtensionEnableEvent).toHaveBeenCalledWith(
-        'ext1',
+        hashValue('ext1'),
+        hashValue(userExtensionsDir),
         SettingScope.Workspace,
       );
     });

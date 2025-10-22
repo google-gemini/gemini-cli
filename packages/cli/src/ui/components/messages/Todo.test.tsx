@@ -31,12 +31,6 @@ const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
   }) as unknown as HistoryItem;
 
 describe('<TodoTray />', () => {
-  const mockHistoryItem = createTodoHistoryItem([
-    { description: 'Pending Task', status: 'pending' },
-    { description: 'In Progress Task', status: 'in_progress' },
-    { description: 'Completed Task', status: 'completed' },
-  ]);
-
   const renderWithUiState = (uiState: Partial<UIState>) =>
     render(
       <UIStateContext.Provider value={uiState as UIState}>
@@ -44,99 +38,106 @@ describe('<TodoTray />', () => {
       </UIStateContext.Provider>,
     );
 
-  it('renders null when no todos are in the history', () => {
-    const { lastFrame } = renderWithUiState({ history: [] });
-    expect(lastFrame()).toMatchSnapshot();
-  });
+  it.each([true, false])(
+    'renders null when no todos are in the history',
+    (showFullTodos) => {
+      const { lastFrame } = renderWithUiState({ history: [], showFullTodos });
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
 
-  it('renders null when todos exist but none are in progress and full view is off', () => {
-    const historyWithNoInProgress = createTodoHistoryItem([
-      { description: 'Pending Task', status: 'pending' },
-      { description: 'In Progress Task', status: 'cancelled' },
-      { description: 'Completed Task', status: 'completed' },
-    ]);
+  it.each([true, false])(
+    'renders null when todo list is empty',
+    (showFullTodos) => {
+      const { lastFrame } = renderWithUiState({
+        history: [createTodoHistoryItem([])],
+        showFullTodos,
+      });
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
+
+  it.each([true, false])(
+    'renders when todos exist but none are in progress',
+    (showFullTodos) => {
+      const { lastFrame } = renderWithUiState({
+        history: [
+          createTodoHistoryItem([
+            { description: 'Pending Task', status: 'pending' },
+            { description: 'In Progress Task', status: 'cancelled' },
+            { description: 'Completed Task', status: 'completed' },
+          ]),
+        ],
+        showFullTodos,
+      });
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
+
+  it.each([true, false])(
+    'renders when todos exist and one is in progress',
+    (showFullTodos) => {
+      const { lastFrame } = renderWithUiState({
+        history: [
+          createTodoHistoryItem([
+            { description: 'Pending Task', status: 'pending' },
+            { description: 'Task 2', status: 'in_progress' },
+            { description: 'In Progress Task', status: 'cancelled' },
+            { description: 'Completed Task', status: 'completed' },
+          ]),
+        ],
+        showFullTodos,
+      });
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
+
+  it.each([true, false])(
+    'renders a todo list with long descriptions that wrap when full view is on',
+    (showFullTodos) => {
+      const { lastFrame } = render(
+        <Box width="50">
+          <UIStateContext.Provider
+            value={
+              {
+                history: [
+                  createTodoHistoryItem([
+                    {
+                      description:
+                        'This is a very long description for a pending task that should wrap around multiple lines when the terminal width is constrained.',
+                      status: 'in_progress',
+                    },
+                    {
+                      description:
+                        'Another completed task with an equally verbose description to test wrapping behavior.',
+                      status: 'completed',
+                    },
+                  ]),
+                ],
+                showFullTodos,
+              } as UIState
+            }
+          >
+            <TodoTray />
+          </UIStateContext.Provider>
+        </Box>,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
+
+  it('renders the most recent todo list when multiple write_todos calls are in history', () => {
     const { lastFrame } = renderWithUiState({
-      history: [historyWithNoInProgress],
-      showFullTodos: false,
-    });
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders an empty todo list when full view is on', () => {
-    const emptyTodosHistoryItem = createTodoHistoryItem([]);
-    const { lastFrame } = renderWithUiState({
-      history: [emptyTodosHistoryItem],
-      showFullTodos: true,
-    });
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders a todo list with various statuses when full view is on', () => {
-    const variousTodosHistoryItem = createTodoHistoryItem([
-      { description: 'Task 1', status: 'pending' },
-      { description: 'Task 2', status: 'in_progress' },
-      { description: 'Task 3', status: 'completed' },
-      { description: 'Task 4', status: 'cancelled' },
-    ]);
-    const { lastFrame } = renderWithUiState({
-      history: [variousTodosHistoryItem],
-      showFullTodos: true,
-    });
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders a todo list with long descriptions that wrap when full view is on', () => {
-    const longDescriptionTodosHistoryItem = createTodoHistoryItem([
-      {
-        description:
-          'This is a very long description for a pending task that should wrap around multiple lines when the terminal width is constrained.',
-        status: 'pending',
-      },
-      {
-        description:
-          'Another completed task with an equally verbose description to test wrapping behavior.',
-        status: 'completed',
-      },
-    ]);
-    const { lastFrame } = render(
-      <Box width="30">
-        <UIStateContext.Provider
-          value={
-            {
-              history: [longDescriptionTodosHistoryItem],
-              showFullTodos: true,
-            } as UIState
-          }
-        >
-          <TodoTray />
-        </UIStateContext.Provider>
-      </Box>,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders a single todo item when full view is on', () => {
-    const singleTodoHistoryItem = createTodoHistoryItem([
-      { description: 'Single task', status: 'pending' },
-    ]);
-    const { lastFrame } = renderWithUiState({
-      history: [singleTodoHistoryItem],
-      showFullTodos: true,
-    });
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders only the in-progress task when full view is off', () => {
-    const { lastFrame } = renderWithUiState({
-      history: [mockHistoryItem],
-      showFullTodos: false,
-    });
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders the full todo list when full view is on', () => {
-    const { lastFrame } = renderWithUiState({
-      history: [mockHistoryItem],
+      history: [
+        createTodoHistoryItem([
+          { description: 'Older Task 1', status: 'completed' },
+          { description: 'Older Task 2', status: 'pending' },
+        ]),
+        createTodoHistoryItem([
+          { description: 'Newer Task 1', status: 'pending' },
+          { description: 'Newer Task 2', status: 'in_progress' },
+        ]),
+      ],
       showFullTodos: true,
     });
     expect(lastFrame()).toMatchSnapshot();

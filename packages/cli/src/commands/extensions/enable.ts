@@ -5,10 +5,14 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { FatalConfigError, getErrorMessage } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  debugLogger,
+  FatalConfigError,
+  getErrorMessage,
+} from '@google/gemini-cli-core';
 
 interface EnableArgs {
   name: string;
@@ -30,11 +34,11 @@ export function handleEnable(args: EnableArgs) {
       extensionManager.enableExtension(args.name, SettingScope.User);
     }
     if (args.scope) {
-      console.log(
+      debugLogger.log(
         `Extension "${args.name}" successfully enabled for scope "${args.scope}".`,
       );
     } else {
-      console.log(
+      debugLogger.log(
         `Extension "${args.name}" successfully enabled in all scopes.`,
       );
     }

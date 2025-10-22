@@ -210,10 +210,11 @@ export class ExtensionManager {
         logExtensionUpdateEvent(
           this.telemetryConfig,
           new ExtensionUpdateEvent(
-            newExtensionConfig.name,
+            hashValue(newExtensionConfig.name),
+            getExtensionId(newExtensionConfig, installMetadata),
             newExtensionConfig.version,
             previousExtensionConfig.version,
-            installMetadata.source,
+            installMetadata.type,
             'success',
           ),
         );
@@ -221,9 +222,10 @@ export class ExtensionManager {
         logExtensionInstallEvent(
           this.telemetryConfig,
           new ExtensionInstallEvent(
-            newExtensionConfig.name,
+            hashValue(newExtensionConfig.name),
+            getExtensionId(newExtensionConfig, installMetadata),
             newExtensionConfig.version,
-            installMetadata.source,
+            installMetadata.type,
             'success',
           ),
         );
@@ -241,14 +243,19 @@ export class ExtensionManager {
           // Ignore error, this is just for logging.
         }
       }
+      const config = newExtensionConfig ?? previousExtensionConfig;
+      const extensionId = config
+        ? getExtensionId(config, installMetadata)
+        : undefined;
       if (isUpdate) {
         logExtensionUpdateEvent(
           this.telemetryConfig,
           new ExtensionUpdateEvent(
-            newExtensionConfig?.name ?? previousExtensionConfig.name,
+            hashValue(config?.name ?? ''),
+            extensionId ?? '',
             newExtensionConfig?.version ?? '',
             previousExtensionConfig.version,
-            installMetadata.source,
+            installMetadata.type,
             'error',
           ),
         );
@@ -256,9 +263,10 @@ export class ExtensionManager {
         logExtensionInstallEvent(
           this.telemetryConfig,
           new ExtensionInstallEvent(
-            newExtensionConfig?.name ?? '',
+            hashValue(newExtensionConfig?.name ?? ''),
+            extensionId ?? '',
             newExtensionConfig?.version ?? '',
-            installMetadata.source,
+            installMetadata.type,
             'error',
           ),
         );
@@ -272,16 +280,16 @@ export class ExtensionManager {
     isUpdate: boolean,
   ): Promise<void> {
     const installedExtensions = this.loadExtensions();
-    const extensionName = installedExtensions.find(
+    const extension = installedExtensions.find(
       (installed) =>
         installed.name.toLowerCase() === extensionIdentifier.toLowerCase() ||
         installed.installMetadata?.source.toLowerCase() ===
           extensionIdentifier.toLowerCase(),
-    )?.name;
-    if (!extensionName) {
+    );
+    if (!extension) {
       throw new Error(`Extension not found.`);
     }
-    const storage = new ExtensionStorage(extensionName);
+    const storage = new ExtensionStorage(extension.name);
 
     await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
@@ -292,11 +300,15 @@ export class ExtensionManager {
     // uninstalls related to updates.
     if (isUpdate) return;
 
-    this.extensionEnablementManager.remove(extensionName);
+    this.extensionEnablementManager.remove(extension.name);
 
     logExtensionUninstall(
       this.telemetryConfig,
-      new ExtensionUninstallEvent(extensionName, 'success'),
+      new ExtensionUninstallEvent(
+        hashValue(extension.name),
+        extension.id,
+        'success',
+      ),
     );
   }
 
@@ -359,28 +371,6 @@ export class ExtensionManager {
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
-      // IDs are created by hashing details of the installation source in order to
-      // deduplicate extensions with conflicting names and also obfuscate any
-      // potentially sensitive information such as private git urls, system paths,
-      // or project names.
-      const hash = createHash('sha256');
-      const githubUrlParts =
-        installMetadata &&
-        (installMetadata.type === 'git' ||
-          installMetadata.type === 'github-release')
-          ? tryParseGithubUrl(installMetadata.source)
-          : null;
-      if (githubUrlParts) {
-        // For github repos, we use the https URI to the repo as the ID.
-        hash.update(
-          `https://github.com/${githubUrlParts.owner}/${githubUrlParts.repo}`,
-        );
-      } else {
-        hash.update(installMetadata?.source ?? config.name);
-      }
-
-      const id = hash.digest('hex');
-
       return {
         name: config.name,
         version: config.version,
@@ -393,7 +383,7 @@ export class ExtensionManager {
           config.name,
           this.workspaceDir,
         ),
-        id,
+        id: getExtensionId(config, installMetadata),
       };
     } catch (e) {
       debugLogger.error(
@@ -472,6 +462,7 @@ export class ExtensionManager {
 
     const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
     let output = `${status} ${extension.name} (${extension.version})`;
+    output += `\n ID: ${extension.id}`;
     output += `\n Path: ${extension.path}`;
     if (extension.installMetadata) {
       output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
@@ -522,7 +513,7 @@ export class ExtensionManager {
     this.extensionEnablementManager.disable(name, true, scopePath);
     logExtensionDisable(
       this.telemetryConfig,
-      new ExtensionDisableEvent(name, scope),
+      new ExtensionDisableEvent(hashValue(name), extension.id, scope),
     );
   }
 
@@ -542,7 +533,7 @@ export class ExtensionManager {
     this.extensionEnablementManager.enable(name, true, scopePath);
     logExtensionEnable(
       this.telemetryConfig,
-      new ExtensionEnableEvent(name, scope),
+      new ExtensionEnableEvent(hashValue(name), extension.id, scope),
     );
   }
 }
@@ -575,4 +566,32 @@ function validateName(name: string) {
       `Invalid extension name: "${name}". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.`,
     );
   }
+}
+
+export function getExtensionId(
+  config: ExtensionConfig,
+  installMetadata?: ExtensionInstallMetadata,
+): string {
+  // IDs are created by hashing details of the installation source in order to
+  // deduplicate extensions with conflicting names and also obfuscate any
+  // potentially sensitive information such as private git urls, system paths,
+  // or project names.
+  let idValue = config.name;
+  const githubUrlParts =
+    installMetadata &&
+    (installMetadata.type === 'git' ||
+      installMetadata.type === 'github-release')
+      ? tryParseGithubUrl(installMetadata.source)
+      : null;
+  if (githubUrlParts) {
+    // For github repos, we use the https URI to the repo as the ID.
+    idValue = `https://github.com/${githubUrlParts.owner}/${githubUrlParts.repo}`;
+  } else {
+    idValue = installMetadata?.source ?? config.name;
+  }
+  return hashValue(idValue);
+}
+
+export function hashValue(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
 }

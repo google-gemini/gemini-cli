@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -114,8 +115,11 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ReadManyFilesParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -477,7 +481,10 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
 > {
   static readonly Name = READ_MANY_FILES_TOOL_NAME;
 
-  constructor(private config: Config) {
+  constructor(
+    private config: Config,
+    messageBus?: MessageBus,
+  ) {
     const parameterSchema = {
       type: 'object',
       properties: {
@@ -559,12 +566,24 @@ This tool is useful when you need to understand or analyze a collection of files
 Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
       Kind.Read,
       parameterSchema,
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
   protected createInvocation(
     params: ReadManyFilesParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ReadManyFilesParams, ToolResult> {
-    return new ReadManyFilesToolInvocation(this.config, params);
+    return new ReadManyFilesToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
