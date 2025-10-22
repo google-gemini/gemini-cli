@@ -267,7 +267,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
+      console.warn(
         `[MemoryTool] Error executing save_memory for fact "${fact}": ${errorMessage}`,
       );
       return {
@@ -289,9 +289,11 @@ export class MemoryTool
   extends BaseDeclarativeTool<SaveMemoryParams, ToolResult>
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
+  static readonly Name = MEMORY_TOOL_NAME;
+
   constructor() {
     super(
-      MEMORY_TOOL_NAME,
+      MemoryTool.Name,
       'Save Memory',
       memoryToolDescription,
       Kind.Think,

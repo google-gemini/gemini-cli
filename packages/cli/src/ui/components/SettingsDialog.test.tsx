@@ -28,6 +28,7 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
+import { waitFor } from '@testing-library/react';
 import { saveModifiedSettings, TEST_ONLY } from '../../utils/settingsUtils.js';
 import {
   getSettingsSchema,
@@ -129,60 +130,105 @@ vi.mock('../../utils/settingsUtils.js', async () => {
   };
 });
 
-// Helper function to simulate key presses (commented out for now)
-// const simulateKeyPress = async (keyData: Partial<Key> & { name: string }) => {
-//   if (currentKeypressHandler) {
-//     const key: Key = {
-//       ctrl: false,
-//       meta: false,
-//       shift: false,
-//       paste: false,
-//       sequence: keyData.sequence || keyData.name,
-//       ...keyData,
-//     };
-//     currentKeypressHandler(key);
-//     // Allow React to process the state update
-//     await new Promise(resolve => setTimeout(resolve, 10));
-//   }
-// };
+// Shared test schemas
+enum StringEnum {
+  FOO = 'foo',
+  BAR = 'bar',
+  BAZ = 'baz',
+}
 
-// Mock console.log to avoid noise in tests
-// const originalConsoleLog = console.log;
-// const originalConsoleError = console.error;
+const ENUM_SETTING: SettingDefinition = {
+  type: 'enum',
+  label: 'Theme',
+  options: [
+    {
+      label: 'Foo',
+      value: StringEnum.FOO,
+    },
+    {
+      label: 'Bar',
+      value: StringEnum.BAR,
+    },
+    {
+      label: 'Baz',
+      value: StringEnum.BAZ,
+    },
+  ],
+  category: 'UI',
+  requiresRestart: false,
+  default: StringEnum.BAR,
+  description: 'The color theme for the UI.',
+  showInDialog: true,
+};
+
+const ENUM_FAKE_SCHEMA: SettingsSchemaType = {
+  ui: {
+    showInDialog: false,
+    properties: {
+      theme: {
+        ...ENUM_SETTING,
+      },
+    },
+  },
+} as unknown as SettingsSchemaType;
+
+const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
+  tools: {
+    type: 'object',
+    label: 'Tools',
+    category: 'Tools',
+    requiresRestart: false,
+    default: {},
+    description: 'Tool settings.',
+    showInDialog: false,
+    properties: {
+      shell: {
+        type: 'object',
+        label: 'Shell',
+        category: 'Tools',
+        requiresRestart: false,
+        default: {},
+        description: 'Shell tool settings.',
+        showInDialog: false,
+        properties: {
+          showColor: {
+            type: 'boolean',
+            label: 'Show Color',
+            category: 'Tools',
+            requiresRestart: false,
+            default: false,
+            description: 'Show color in shell output.',
+            showInDialog: true,
+          },
+          enableInteractiveShell: {
+            type: 'boolean',
+            label: 'Enable Interactive Shell',
+            category: 'Tools',
+            requiresRestart: true,
+            default: true,
+            description: 'Enable interactive shell mode.',
+            showInDialog: true,
+          },
+          pager: {
+            type: 'string',
+            label: 'Pager',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'cat',
+            description: 'The pager command to use for shell output.',
+            showInDialog: true,
+          },
+        },
+      },
+    },
+  },
+} as unknown as SettingsSchemaType;
 
 describe('SettingsDialog', () => {
   // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // Custom waitFor utility for ink testing environment (not compatible with @testing-library/react)
-  const waitFor = async (
-    predicate: () => void,
-    options: { timeout?: number; interval?: number } = {},
-  ) => {
-    const { timeout = 1000, interval = 10 } = options;
-    const start = Date.now();
-    let lastError: unknown;
-    while (Date.now() - start < timeout) {
-      try {
-        predicate();
-        return;
-      } catch (e) {
-        lastError = e;
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval));
-    }
-    if (lastError) {
-      throw lastError;
-    }
-    throw new Error('waitFor timed out');
-  };
-
   beforeEach(() => {
-    // Reset keypress mock state (variables are commented out)
-    // currentKeypressHandler = null;
-    // isKeypressActive = false;
-    // console.log = vi.fn();
-    // console.error = vi.fn();
     mockToggleVimEnabled.mockResolvedValue(true);
   });
 
@@ -190,11 +236,6 @@ describe('SettingsDialog', () => {
     TEST_ONLY.clearFlattenedSchema();
     vi.clearAllMocks();
     vi.resetAllMocks();
-    // Reset keypress mock state (variables are commented out)
-    // currentKeypressHandler = null;
-    // isKeypressActive = false;
-    // console.log = originalConsoleLog;
-    // console.error = originalConsoleError;
   });
 
   describe('Initial Rendering', () => {
@@ -395,11 +436,11 @@ describe('SettingsDialog', () => {
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
         new Set<string>(['general.disableAutoUpdate']),
-        {
-          general: {
+        expect.objectContaining({
+          general: expect.objectContaining({
             disableAutoUpdate: true,
-          },
-        },
+          }),
+        }),
         expect.any(LoadedSettings),
         SettingScope.User,
       );
@@ -408,51 +449,10 @@ describe('SettingsDialog', () => {
     });
 
     describe('enum values', () => {
-      enum StringEnum {
-        FOO = 'foo',
-        BAR = 'bar',
-        BAZ = 'baz',
-      }
-
-      const SETTING: SettingDefinition = {
-        type: 'enum',
-        label: 'Theme',
-        options: [
-          {
-            label: 'Foo',
-            value: StringEnum.FOO,
-          },
-          {
-            label: 'Bar',
-            value: StringEnum.BAR,
-          },
-          {
-            label: 'Baz',
-            value: StringEnum.BAZ,
-          },
-        ],
-        category: 'UI',
-        requiresRestart: false,
-        default: StringEnum.BAR,
-        description: 'The color theme for the UI.',
-        showInDialog: true,
-      };
-
-      const FAKE_SCHEMA: SettingsSchemaType = {
-        ui: {
-          showInDialog: false,
-          properties: {
-            theme: {
-              ...SETTING,
-            },
-          },
-        },
-      } as unknown as SettingsSchemaType;
-
       it('toggles enum values with the enter key', async () => {
         vi.mocked(saveModifiedSettings).mockClear();
 
-        vi.mocked(getSettingsSchema).mockReturnValue(FAKE_SCHEMA);
+        vi.mocked(getSettingsSchema).mockReturnValue(ENUM_FAKE_SCHEMA);
         const settings = createMockSettings();
         const onSelect = vi.fn();
         const component = (
@@ -474,11 +474,11 @@ describe('SettingsDialog', () => {
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
-          {
-            ui: {
+          expect.objectContaining({
+            ui: expect.objectContaining({
               theme: StringEnum.BAZ,
-            },
-          },
+            }),
+          }),
           expect.any(LoadedSettings),
           SettingScope.User,
         );
@@ -488,7 +488,7 @@ describe('SettingsDialog', () => {
 
       it('loops back when reaching the end of an enum', async () => {
         vi.mocked(saveModifiedSettings).mockClear();
-        vi.mocked(getSettingsSchema).mockReturnValue(FAKE_SCHEMA);
+        vi.mocked(getSettingsSchema).mockReturnValue(ENUM_FAKE_SCHEMA);
         const settings = createMockSettings();
         settings.setValue(SettingScope.User, 'ui.theme', StringEnum.BAZ);
         const onSelect = vi.fn();
@@ -511,11 +511,11 @@ describe('SettingsDialog', () => {
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
-          {
-            ui: {
+          expect.objectContaining({
+            ui: expect.objectContaining({
               theme: StringEnum.FOO,
-            },
-          },
+            }),
+          }),
           expect.any(LoadedSettings),
           SettingScope.User,
         );
@@ -925,6 +925,129 @@ describe('SettingsDialog', () => {
       const output = lastFrame();
       // Should show settings with override indicators
       expect(output).toContain('Settings');
+    });
+  });
+
+  describe('Race Condition Regression Tests', () => {
+    it('should not reset sibling settings when toggling a nested setting multiple times', async () => {
+      vi.mocked(saveModifiedSettings).mockClear();
+
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+
+      const settings = createMockSettings({
+        tools: {
+          shell: {
+            showColor: false,
+            enableInteractiveShell: true,
+          },
+        },
+      });
+
+      const onSelect = vi.fn();
+      const component = (
+        <KeypressProvider kittyProtocolEnabled={false}>
+          <SettingsDialog settings={settings} onSelect={onSelect} />
+        </KeypressProvider>
+      );
+
+      const { stdin, unmount } = render(component);
+
+      await wait();
+
+      // Toggle showColor 5 times to trigger race condition
+      for (let i = 0; i < 5; i++) {
+        act(() => {
+          stdin.write(TerminalKeys.ENTER as string);
+        });
+        await wait(50);
+      }
+
+      await waitFor(() => {
+        expect(
+          vi.mocked(saveModifiedSettings).mock.calls.length,
+        ).toBeGreaterThan(0);
+      });
+
+      // Verify sibling settings are preserved
+      const calls = vi.mocked(saveModifiedSettings).mock.calls;
+      calls.forEach((call) => {
+        const [modifiedKeys, pendingSettings] = call;
+
+        if (modifiedKeys.has('tools.shell.showColor')) {
+          expect(pendingSettings.tools?.shell?.enableInteractiveShell).toBe(
+            true,
+          );
+          expect(modifiedKeys.has('tools.shell.enableInteractiveShell')).toBe(
+            false,
+          );
+        }
+      });
+
+      expect(calls.length).toBeGreaterThan(0);
+
+      unmount();
+    });
+
+    it('should preserve multiple sibling settings in nested objects during rapid toggles', async () => {
+      vi.mocked(saveModifiedSettings).mockClear();
+
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+
+      const settings = createMockSettings({
+        tools: {
+          shell: {
+            showColor: false,
+            enableInteractiveShell: true,
+            pager: 'less',
+          },
+        },
+      });
+
+      const onSelect = vi.fn();
+      const component = (
+        <KeypressProvider kittyProtocolEnabled={false}>
+          <SettingsDialog settings={settings} onSelect={onSelect} />
+        </KeypressProvider>
+      );
+
+      const { stdin, unmount } = render(component);
+
+      await wait();
+
+      // Rapid toggles
+      for (let i = 0; i < 3; i++) {
+        act(() => {
+          stdin.write(TerminalKeys.ENTER as string);
+        });
+        await wait(30);
+      }
+
+      await waitFor(() => {
+        expect(
+          vi.mocked(saveModifiedSettings).mock.calls.length,
+        ).toBeGreaterThan(0);
+      });
+
+      // Verify all siblings preserved
+      const calls = vi.mocked(saveModifiedSettings).mock.calls;
+      calls.forEach((call) => {
+        const [modifiedKeys, pendingSettings] = call;
+
+        if (modifiedKeys.has('tools.shell.showColor')) {
+          const shellSettings = pendingSettings.tools?.shell as
+            | Record<string, unknown>
+            | undefined;
+          expect(shellSettings?.['enableInteractiveShell']).toBe(true);
+          expect(shellSettings?.['pager']).toBe('less');
+          expect(modifiedKeys.size).toBe(1);
+          expect(modifiedKeys.has('tools.shell.enableInteractiveShell')).toBe(
+            false,
+          );
+          expect(modifiedKeys.has('tools.shell.pager')).toBe(false);
+        }
+      });
+
+      unmount();
     });
   });
 

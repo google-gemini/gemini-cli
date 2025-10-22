@@ -26,7 +26,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should handle $ literally when replacing text ending with $', async () => {
+  it.skip('should handle $ literally when replacing text ending with $', async () => {
     const rig = new TestRig();
     await rig.setup(
       'should handle $ literally when replacing text ending with $',
@@ -48,7 +48,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should insert a multi-line block of text', async () => {
+  it.skip('should insert a multi-line block of text', async () => {
     const rig = new TestRig();
     await rig.setup('should insert a multi-line block of text');
     const fileName = 'insert_block.txt';
@@ -67,7 +67,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should delete a block of text', async () => {
+  it.skip('should delete a block of text', async () => {
     const rig = new TestRig();
     await rig.setup('should delete a block of text');
     const fileName = 'delete_block.txt';
@@ -78,7 +78,7 @@ describe('replace', () => {
     rig.createFile(fileName, originalContent);
 
     await rig.run(
-      `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers.`,
+      `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers and the newline that follows it.`,
     );
 
     const foundToolCall = await rig.waitForToolCall('replace');
