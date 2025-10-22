@@ -957,7 +957,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         [],
         false,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        {} as any,
+        { findFiles: vi.fn().mockReturnValue([]) } as any,
         [],
         true,
       );
