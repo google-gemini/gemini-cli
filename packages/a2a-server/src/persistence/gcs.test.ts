@@ -76,6 +76,9 @@ const mockGetPersistedState = getPersistedState as Mock;
 const TEST_METADATA_KEY = METADATA_KEY || '__persistedState';
 
 type MockWriteStream = {
+  once: Mock<
+    (event: string, cb: (error?: Error | null) => void) => MockWriteStream
+  >;
   on: Mock<
     (event: string, cb: (error?: Error | null) => void) => MockWriteStream
   >;
@@ -117,6 +120,9 @@ describe('GCSTaskStore', () => {
       on: vi.fn((event, cb) => {
         if (event === 'finish') setTimeout(cb, 0); // Simulate async finish
         return mockWriteStream;
+      }),
+      once: vi.fn((event, cb) => {
+        if (event === 'finish') setTimeout(cb, 0); // Simulate async finish        return mockWriteStream;
       }),
       destroy: vi.fn(),
       destroyed: false,
@@ -201,7 +207,7 @@ describe('GCSTaskStore', () => {
       metadata: {},
     };
 
-    it.skip('should save metadata and workspace', async () => {
+    it('should save metadata and workspace', async () => {
       const store = new GCSTaskStore(bucketName);
       await store.save(mockTask);
 
