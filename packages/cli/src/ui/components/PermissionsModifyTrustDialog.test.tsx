@@ -46,6 +46,7 @@ describe('PermissionsModifyTrustDialog', () => {
   let mockCommitTrustLevelChange: Mock;
 
   beforeEach(() => {
+    mockedCwd.mockReturnValue('/test/dir');
     mockUpdateTrustLevel = vi.fn();
     mockCommitTrustLevelChange = vi.fn();
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
@@ -120,6 +121,17 @@ describe('PermissionsModifyTrustDialog', () => {
     });
   });
 
+  it('should render the labels with folder names', async () => {
+    const { lastFrame } = renderWithProviders(
+      <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
+    );
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Trust this folder (dir)');
+      expect(lastFrame()).toContain('Trust parent folder (test)');
+    });
+  });
+
   it('should call onExit when escape is pressed', async () => {
     const onExit = vi.fn();
     const { stdin, lastFrame } = renderWithProviders(
@@ -129,7 +141,7 @@ describe('PermissionsModifyTrustDialog', () => {
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
     act(() => {
-      stdin.write('\x1b'); // escape key
+      stdin.write('\u001b[27u'); // Kitty escape key
     });
 
     await waitFor(() => {
@@ -189,7 +201,7 @@ describe('PermissionsModifyTrustDialog', () => {
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
-    act(() => stdin.write('\x1b')); // Press escape
+    act(() => stdin.write('\u001b[27u')); // Press kitty escape key
 
     await waitFor(() => {
       expect(mockCommitTrustLevelChange).not.toHaveBeenCalled();

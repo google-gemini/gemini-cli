@@ -7,7 +7,13 @@
  */
 
 import { execSync } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+  lstatSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -164,7 +170,156 @@ export function runYamllint() {
 
 export function runPrettier() {
   console.log('\nRunning Prettier...');
-  if (!runCommand('prettier --write .')) {
+  if (!runCommand('prettier --check .')) {
+    process.exit(1);
+  }
+}
+
+export function runSensitiveKeywordLinter() {
+  console.log('\nRunning sensitive keyword linter...');
+  const SENSITIVE_PATTERN = /gemini-\d+(\.\d+)?/g;
+  const ALLOWED_KEYWORDS = new Set([
+    'gemini-2.5',
+    'gemini-2.0',
+    'gemini-1.5',
+    'gemini-1.0',
+  ]);
+
+  function getChangedFiles() {
+    const baseRef = process.env.GITHUB_BASE_REF || 'main';
+    try {
+      execSync(`git fetch origin ${baseRef}`);
+      const mergeBase = execSync(`git merge-base HEAD origin/${baseRef}`)
+        .toString()
+        .trim();
+      return execSync(`git diff --name-only ${mergeBase}..HEAD`)
+        .toString()
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+    } catch (_error) {
+      console.error(`Could not get changed files against origin/${baseRef}.`);
+      try {
+        console.log('Falling back to diff against HEAD~1');
+        return execSync(`git diff --name-only HEAD~1..HEAD`)
+          .toString()
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+      } catch (_fallbackError) {
+        console.error('Could not get changed files against HEAD~1 either.');
+        process.exit(1);
+      }
+    }
+  }
+
+  const changedFiles = getChangedFiles();
+  let violationsFound = false;
+
+  for (const file of changedFiles) {
+    if (!existsSync(file) || lstatSync(file).isDirectory()) {
+      continue;
+    }
+    const content = readFileSync(file, 'utf-8');
+    const lines = content.split('\n');
+    let match;
+    while ((match = SENSITIVE_PATTERN.exec(content)) !== null) {
+      const keyword = match[0];
+      if (!ALLOWED_KEYWORDS.has(keyword)) {
+        violationsFound = true;
+        const matchIndex = match.index;
+        let lineNum = 0;
+        let charCount = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (charCount + line.length + 1 > matchIndex) {
+            lineNum = i + 1;
+            const colNum = matchIndex - charCount + 1;
+            console.log(
+              `::warning file=${file},line=${lineNum},col=${colNum}::Found sensitive keyword "${keyword}". Please make sure this change is appropriate to submit.`,
+            );
+            break;
+          }
+          charCount += line.length + 1; // +1 for the newline
+        }
+      }
+    }
+  }
+
+  if (!violationsFound) {
+    console.log('No sensitive keyword violations found.');
+  }
+}
+
+function stripJSONComments(json) {
+  return json.replace(
+    /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g,
+    (m, g) => (g ? '' : m),
+  );
+}
+
+export function runTSConfigLinter() {
+  console.log('\nRunning tsconfig linter...');
+
+  let files = [];
+  try {
+    // Find all tsconfig.json files under packages/ using a git pathspec
+    files = execSync("git ls-files 'packages/**/tsconfig.json'")
+      .toString()
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch (e) {
+    console.error('Error finding tsconfig.json files:', e.message);
+    process.exit(1);
+  }
+
+  let hasError = false;
+
+  for (const file of files) {
+    const tsconfigPath = join(process.cwd(), file);
+    if (!existsSync(tsconfigPath)) {
+      console.error(`Error: ${tsconfigPath} does not exist.`);
+      hasError = true;
+      continue;
+    }
+
+    try {
+      const content = readFileSync(tsconfigPath, 'utf-8');
+      const config = JSON.parse(stripJSONComments(content));
+
+      // Check if exclude exists and matches exactly
+      if (config.exclude) {
+        if (!Array.isArray(config.exclude)) {
+          console.error(
+            `Error: ${file} "exclude" must be an array. Found: ${JSON.stringify(
+              config.exclude,
+            )}`,
+          );
+          hasError = true;
+        } else {
+          const allowedExclude = new Set(['node_modules', 'dist']);
+          const invalidExcludes = config.exclude.filter(
+            (item) => !allowedExclude.has(item),
+          );
+
+          if (invalidExcludes.length > 0) {
+            console.error(
+              `Error: ${file} "exclude" contains invalid items: ${JSON.stringify(
+                invalidExcludes,
+              )}. Only "node_modules" and "dist" are allowed.`,
+            );
+            hasError = true;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error parsing ${tsconfigPath}: ${error.message}`);
+      hasError = true;
+    }
+  }
+
+  if (hasError) {
     process.exit(1);
   }
 }
@@ -190,6 +345,12 @@ function main() {
   if (args.includes('--prettier')) {
     runPrettier();
   }
+  if (args.includes('--sensitive-keywords')) {
+    runSensitiveKeywordLinter();
+  }
+  if (args.includes('--tsconfig')) {
+    runTSConfigLinter();
+  }
 
   if (args.length === 0) {
     setupLinters();
@@ -198,6 +359,8 @@ function main() {
     runShellcheck();
     runYamllint();
     runPrettier();
+    runSensitiveKeywordLinter();
+    runTSConfigLinter();
     console.log('\nAll linting checks passed!');
   }
 }

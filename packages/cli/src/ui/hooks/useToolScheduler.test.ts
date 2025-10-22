@@ -70,6 +70,9 @@ const mockConfig = {
   getUseModelRouter: () => false,
   getGeminiClient: () => null, // No client needed for these tests
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
+  getEnableMessageBusIntegration: () => false,
+  getMessageBus: () => null,
+  getPolicyEngine: () => null,
 } as unknown as Config;
 
 const mockTool = new MockTool({
@@ -163,8 +166,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     // Check that execute WAS called
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
       request.args,
-      expect.any(AbortSignal),
-      undefined,
     );
 
     // Check that onComplete was called with success
@@ -311,11 +312,7 @@ describe('useReactToolScheduler', () => {
       await vi.runAllTimersAsync();
     });
 
-    expect(mockTool.execute).toHaveBeenCalledWith(
-      request.args,
-      expect.any(AbortSignal),
-      undefined,
-    );
+    expect(mockTool.execute).toHaveBeenCalledWith(request.args);
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
         status: 'success',

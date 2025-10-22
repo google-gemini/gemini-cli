@@ -26,7 +26,7 @@ vi.mock('./updateEventEmitter.js', async () => {
   return {
     ...actual,
     updateEventEmitter: {
-      ...actual.updateEventEmitter,
+      ...(actual['updateEventEmitter'] as EventEmitter),
       emit: vi.fn(),
     },
   };
@@ -122,6 +122,23 @@ describe('handleAutoUpdate', () => {
     );
     expect(mockSpawn).not.toHaveBeenCalled();
   });
+
+  it.each([PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX])(
+    'should suppress update notifications when running via %s',
+    (packageManager) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: undefined,
+        updateMessage: `Running via ${packageManager}, update not applicable.`,
+        isGlobal: false,
+        packageManager,
+      });
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+      expect(mockUpdateEventEmitter.emit).not.toHaveBeenCalled();
+      expect(mockSpawn).not.toHaveBeenCalled();
+    },
+  );
 
   it('should emit "update-received" but not update if no update command is found', () => {
     mockGetInstallationInfo.mockReturnValue({
@@ -230,7 +247,13 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should use the "@nightly" tag for nightly updates', async () => {
-    mockUpdateInfo.update.latest = '2.0.0-nightly';
+    mockUpdateInfo = {
+      ...mockUpdateInfo,
+      update: {
+        ...mockUpdateInfo.update,
+        latest: '2.0.0-nightly',
+      },
+    };
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
       updateMessage: 'This is an additional message.',

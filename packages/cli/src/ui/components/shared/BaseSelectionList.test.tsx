@@ -35,16 +35,20 @@ describe('BaseSelectionList', () => {
   const mockOnHighlight = vi.fn();
   const mockRenderItem = vi.fn();
 
-  // Define standard test items
   const items = [
-    { value: 'A', label: 'Item A' },
-    { value: 'B', label: 'Item B', disabled: true },
-    { value: 'C', label: 'Item C' },
+    { value: 'A', label: 'Item A', key: 'A' },
+    { value: 'B', label: 'Item B', disabled: true, key: 'B' },
+    { value: 'C', label: 'Item C', key: 'C' },
   ];
 
   // Helper to render the component with default props
   const renderComponent = (
-    props: Partial<BaseSelectionListProps<string, { label: string }>> = {},
+    props: Partial<
+      BaseSelectionListProps<
+        string,
+        { value: string; label: string; disabled?: boolean; key: string }
+      >
+    > = {},
     activeIndex: number = 0,
   ) => {
     vi.mocked(useSelectionList).mockReturnValue({
@@ -53,12 +57,16 @@ describe('BaseSelectionList', () => {
     });
 
     mockRenderItem.mockImplementation(
-      (item: (typeof items)[0], context: RenderItemContext) => (
-        <Text color={context.titleColor}>{item.label}</Text>
-      ),
+      (
+        item: { value: string; label: string; disabled?: boolean; key: string },
+        context: RenderItemContext,
+      ) => <Text color={context.titleColor}>{item.label}</Text>,
     );
 
-    const defaultProps: BaseSelectionListProps<string, { label: string }> = {
+    const defaultProps: BaseSelectionListProps<
+      string,
+      { value: string; label: string; disabled?: boolean; key: string }
+    > = {
       items,
       onSelect: mockOnSelect,
       onHighlight: mockOnHighlight,
@@ -216,6 +224,7 @@ describe('BaseSelectionList', () => {
       const longList = Array.from({ length: 15 }, (_, i) => ({
         value: `Item ${i + 1}`,
         label: `Item ${i + 1}`,
+        key: `Item ${i + 1}`,
       }));
 
       // We must increase maxItemsToShow (default 10) to see the 10th item and beyond
@@ -249,19 +258,22 @@ describe('BaseSelectionList', () => {
     const longList = Array.from({ length: 10 }, (_, i) => ({
       value: `Item ${i + 1}`,
       label: `Item ${i + 1}`,
+      key: `Item ${i + 1}`,
     }));
     const MAX_ITEMS = 3;
 
     const renderScrollableList = (initialActiveIndex: number = 0) => {
       // Define the props used for the initial render and subsequent rerenders
-      const componentProps: BaseSelectionListProps<string, { label: string }> =
-        {
-          items: longList,
-          maxItemsToShow: MAX_ITEMS,
-          onSelect: mockOnSelect,
-          onHighlight: mockOnHighlight,
-          renderItem: mockRenderItem,
-        };
+      const componentProps: BaseSelectionListProps<
+        string,
+        { value: string; label: string; key: string }
+      > = {
+        items: longList,
+        maxItemsToShow: MAX_ITEMS,
+        onSelect: mockOnSelect,
+        onHighlight: mockOnHighlight,
+        renderItem: mockRenderItem,
+      };
 
       vi.mocked(useSelectionList).mockReturnValue({
         activeIndex: initialActiveIndex,
@@ -311,11 +323,13 @@ describe('BaseSelectionList', () => {
       // New visible window should be Items 2, 3, 4 (scroll offset 1).
       await updateActiveIndex(3);
 
-      const output = lastFrame();
-      expect(output).not.toContain('Item 1');
-      expect(output).toContain('Item 2');
-      expect(output).toContain('Item 4');
-      expect(output).not.toContain('Item 5');
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).not.toContain('Item 1');
+        expect(output).toContain('Item 2');
+        expect(output).toContain('Item 4');
+        expect(output).not.toContain('Item 5');
+      });
     });
 
     it('should scroll up when activeIndex moves before the visible window', async () => {
@@ -323,19 +337,23 @@ describe('BaseSelectionList', () => {
 
       await updateActiveIndex(4);
 
-      let output = lastFrame();
-      expect(output).toContain('Item 3'); // Should see items 3, 4, 5
-      expect(output).toContain('Item 5');
-      expect(output).not.toContain('Item 2');
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain('Item 3'); // Should see items 3, 4, 5
+        expect(output).toContain('Item 5');
+        expect(output).not.toContain('Item 2');
+      });
 
       // Now test scrolling up: move to index 1 (Item 2)
       // This should trigger scroll up to show items 2, 3, 4
       await updateActiveIndex(1);
 
-      output = lastFrame();
-      expect(output).toContain('Item 2');
-      expect(output).toContain('Item 4');
-      expect(output).not.toContain('Item 5'); // Item 5 should no longer be visible
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain('Item 2');
+        expect(output).toContain('Item 4');
+        expect(output).not.toContain('Item 5'); // Item 5 should no longer be visible
+      });
     });
 
     it('should pin the scroll offset to the end if selection starts near the end', async () => {
@@ -363,16 +381,19 @@ describe('BaseSelectionList', () => {
       expect(lastFrame()).toContain('Item 1');
 
       await updateActiveIndex(3); // Should trigger scroll
-      let output = lastFrame();
-      expect(output).toContain('Item 2');
-      expect(output).toContain('Item 4');
-      expect(output).not.toContain('Item 1');
-
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain('Item 2');
+        expect(output).toContain('Item 4');
+        expect(output).not.toContain('Item 1');
+      });
       await updateActiveIndex(5); // Scroll further
-      output = lastFrame();
-      expect(output).toContain('Item 4');
-      expect(output).toContain('Item 6');
-      expect(output).not.toContain('Item 3');
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toContain('Item 4');
+        expect(output).toContain('Item 6');
+        expect(output).not.toContain('Item 3');
+      });
     });
 
     it('should correctly identify the selected item within the visible window', () => {
@@ -400,17 +421,16 @@ describe('BaseSelectionList', () => {
           expect.objectContaining({ value: 'Item 6' }),
           expect.objectContaining({ isSelected: true }),
         );
-      });
 
-      // Item 4 (index 3) should not be selected
-      expect(mockRenderItem).toHaveBeenCalledWith(
-        expect.objectContaining({ value: 'Item 4' }),
-        expect.objectContaining({ isSelected: false }),
-      );
+        // Item 4 (index 3) should not be selected
+        expect(mockRenderItem).toHaveBeenCalledWith(
+          expect.objectContaining({ value: 'Item 4' }),
+          expect.objectContaining({ isSelected: false }),
+        );
+      });
     });
 
     it('should handle maxItemsToShow larger than the list length', () => {
-      // Test edge case where maxItemsToShow exceeds available items
       const { lastFrame } = renderComponent(
         { items: longList, maxItemsToShow: 15 },
         0,
@@ -428,6 +448,7 @@ describe('BaseSelectionList', () => {
     const longList = Array.from({ length: 10 }, (_, i) => ({
       value: `Item ${i + 1}`,
       label: `Item ${i + 1}`,
+      key: `Item ${i + 1}`,
     }));
     const MAX_ITEMS = 3;
 

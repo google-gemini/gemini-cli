@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { ToolCallDecision } from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -38,23 +39,34 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
   return render(<StatsDisplay duration="1s" />);
 };
 
+// Helper to create metrics with default zero values
+const createTestMetrics = (
+  overrides: Partial<SessionMetrics> = {},
+): SessionMetrics => ({
+  models: {},
+  tools: {
+    totalCalls: 0,
+    totalSuccess: 0,
+    totalFail: 0,
+    totalDurationMs: 0,
+    totalDecisions: {
+      accept: 0,
+      reject: 0,
+      modify: 0,
+      [ToolCallDecision.AUTO_ACCEPT]: 0,
+    },
+    byName: {},
+  },
+  files: {
+    totalLinesAdded: 0,
+    totalLinesRemoved: 0,
+  },
+  ...overrides,
+});
+
 describe('<StatsDisplay />', () => {
   it('renders only the Performance section in its zero state', () => {
-    const zeroMetrics: SessionMetrics = {
-      models: {},
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
-        byName: {},
-      },
-      files: {
-        totalLinesAdded: 0,
-        totalLinesRemoved: 0,
-      },
-    };
+    const zeroMetrics = createTestMetrics();
 
     const { lastFrame } = renderWithMockedStats(zeroMetrics);
     const output = lastFrame();
@@ -67,7 +79,7 @@ describe('<StatsDisplay />', () => {
   });
 
   it('renders a table with two models correctly', () => {
-    const metrics: SessionMetrics = {
+    const metrics = createTestMetrics({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 3, totalErrors: 0, totalLatencyMs: 15000 },
@@ -92,19 +104,7 @@ describe('<StatsDisplay />', () => {
           },
         },
       },
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
-        byName: {},
-      },
-      files: {
-        totalLinesAdded: 0,
-        totalLinesRemoved: 0,
-      },
-    };
+    });
 
     const { lastFrame } = renderWithMockedStats(metrics);
     const output = lastFrame();
@@ -117,7 +117,7 @@ describe('<StatsDisplay />', () => {
   });
 
   it('renders all sections when all data is present', () => {
-    const metrics: SessionMetrics = {
+    const metrics = createTestMetrics({
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
@@ -136,22 +136,28 @@ describe('<StatsDisplay />', () => {
         totalSuccess: 1,
         totalFail: 1,
         totalDurationMs: 123,
-        totalDecisions: { accept: 1, reject: 0, modify: 0 },
+        totalDecisions: {
+          accept: 1,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
         byName: {
           'test-tool': {
             count: 2,
             success: 1,
             fail: 1,
             durationMs: 123,
-            decisions: { accept: 1, reject: 0, modify: 0 },
+            decisions: {
+              accept: 1,
+              reject: 0,
+              modify: 0,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
           },
         },
       },
-      files: {
-        totalLinesAdded: 0,
-        totalLinesRemoved: 0,
-      },
-    };
+    });
 
     const { lastFrame } = renderWithMockedStats(metrics);
     const output = lastFrame();
@@ -166,29 +172,34 @@ describe('<StatsDisplay />', () => {
 
   describe('Conditional Rendering Tests', () => {
     it('hides User Agreement when no decisions are made', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 2,
           totalSuccess: 1,
           totalFail: 1,
           totalDurationMs: 123,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 }, // No decisions
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          }, // No decisions
           byName: {
             'test-tool': {
               count: 2,
               success: 1,
               fail: 1,
               durationMs: 123,
-              decisions: { accept: 0, reject: 0, modify: 0 },
+              decisions: {
+                accept: 0,
+                reject: 0,
+                modify: 0,
+                [ToolCallDecision.AUTO_ACCEPT]: 0,
+              },
             },
           },
         },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
+      });
 
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
@@ -200,7 +211,7 @@ describe('<StatsDisplay />', () => {
     });
 
     it('hides Efficiency section when cache is not used', () => {
-      const metrics: SessionMetrics = {
+      const metrics = createTestMetrics({
         models: {
           'gemini-2.5-pro': {
             api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
@@ -214,19 +225,7 @@ describe('<StatsDisplay />', () => {
             },
           },
         },
-        tools: {
-          totalCalls: 0,
-          totalSuccess: 0,
-          totalFail: 0,
-          totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
-          byName: {},
-        },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
+      });
 
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
@@ -238,61 +237,61 @@ describe('<StatsDisplay />', () => {
 
   describe('Conditional Color Tests', () => {
     it('renders success rate in green for high values', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
           totalSuccess: 10,
           totalFail: 0,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
+      });
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
     });
 
     it('renders success rate in yellow for medium values', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
           totalSuccess: 9,
           totalFail: 1,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
+      });
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
     });
 
     it('renders success rate in red for low values', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 10,
           totalSuccess: 5,
           totalFail: 5,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
+      });
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
     });
@@ -300,21 +299,25 @@ describe('<StatsDisplay />', () => {
 
   describe('Code Changes Display', () => {
     it('displays Code Changes when line counts are present', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 1,
           totalSuccess: 1,
           totalFail: 0,
           totalDurationMs: 100,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
         files: {
           totalLinesAdded: 42,
           totalLinesRemoved: 18,
         },
-      };
+      });
 
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
@@ -326,21 +329,21 @@ describe('<StatsDisplay />', () => {
     });
 
     it('hides Code Changes when no lines are added or removed', () => {
-      const metrics: SessionMetrics = {
-        models: {},
+      const metrics = createTestMetrics({
         tools: {
           totalCalls: 1,
           totalSuccess: 1,
           totalFail: 0,
           totalDurationMs: 100,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: {
+            accept: 0,
+            reject: 0,
+            modify: 0,
+            [ToolCallDecision.AUTO_ACCEPT]: 0,
+          },
           byName: {},
         },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
+      });
 
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
@@ -351,21 +354,7 @@ describe('<StatsDisplay />', () => {
   });
 
   describe('Title Rendering', () => {
-    const zeroMetrics: SessionMetrics = {
-      models: {},
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
-        byName: {},
-      },
-      files: {
-        totalLinesAdded: 0,
-        totalLinesRemoved: 0,
-      },
-    };
+    const zeroMetrics = createTestMetrics();
 
     it('renders the default title when no title prop is provided', () => {
       const { lastFrame } = renderWithMockedStats(zeroMetrics);
