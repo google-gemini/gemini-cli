@@ -99,7 +99,7 @@ export class McpClient {
   /**
    * Connects to the MCP server.
    */
-  async connect(): Promise<void> {
+  async connect(cliConfig?: Config): Promise<void> {
     if (this.status !== MCPServerStatus.DISCONNECTED) {
       throw new Error(
         `Can only connect when the client is disconnected, current state is ${this.status}`,
@@ -112,6 +112,7 @@ export class McpClient {
         this.serverConfig,
         this.debugMode,
         this.workspaceContext,
+        cliConfig?.getVersion(),
       );
       const originalOnError = this.client.onerror;
       this.client.onerror = (error) => {
@@ -517,6 +518,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       debugMode,
       workspaceContext,
+      cliConfig.getVersion(),
     );
 
     mcpClient.onerror = (error) => {
@@ -752,10 +754,11 @@ export async function connectToMcpServer(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  version?: string,
 ): Promise<Client> {
   const mcpClient = new Client({
-    name: 'gemini-cli-mcp-client',
-    version: '0.0.1',
+    name: 'gemini-cli',
+    version: version || 'unknown',
   });
 
   mcpClient.registerCapabilities({
