@@ -1148,7 +1148,7 @@ describe('AppContainer State Management', () => {
           cancelOngoingRequest: mockCancelOngoingRequest,
         });
 
-        render(
+        const { rerender } = render(
           <AppContainer
             config={mockConfig}
             settings={mockSettings}
@@ -1163,6 +1163,15 @@ describe('AppContainer State Management', () => {
           meta: false,
           shift: false,
         } as Key);
+
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
 
         expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(1);
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
@@ -1212,7 +1221,7 @@ describe('AppContainer State Management', () => {
       });
 
       it('should reset press count after a timeout', () => {
-        render(
+        const { rerender } = render(
           <AppContainer
             config={mockConfig}
             settings={mockSettings}
@@ -1227,6 +1236,14 @@ describe('AppContainer State Management', () => {
           meta: false,
           shift: false,
         } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         // Advance timer past the reset threshold
@@ -1238,6 +1255,14 @@ describe('AppContainer State Management', () => {
           meta: false,
           shift: false,
         } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
@@ -1249,7 +1274,7 @@ describe('AppContainer State Management', () => {
           setText: vi.fn(),
         });
 
-        render(
+        const { rerender } = render(
           <AppContainer
             config={mockConfig}
             settings={mockSettings}
@@ -1264,12 +1289,28 @@ describe('AppContainer State Management', () => {
           meta: false,
           shift: false,
         } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
         handleGlobalKeypress({
           name: 'd',
           ctrl: true,
           meta: false,
           shift: false,
         } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
 
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
@@ -1317,7 +1358,7 @@ describe('AppContainer State Management', () => {
       });
 
       it('should reset press count after a timeout', () => {
-        render(
+        const { rerender } = render(
           <AppContainer
             config={mockConfig}
             settings={mockSettings}
@@ -1332,6 +1373,14 @@ describe('AppContainer State Management', () => {
           meta: false,
           shift: false,
         } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         // Advance timer past the reset threshold
@@ -1343,6 +1392,14 @@ describe('AppContainer State Management', () => {
           meta: false,
           shift: false,
         } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
