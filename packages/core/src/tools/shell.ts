@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import type { Config } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
@@ -92,7 +93,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     ) {
       const allowedTools = this.config.getAllowedTools() || [];
       const [SHELL_TOOL_NAME] = SHELL_TOOL_NAMES;
-      if (doesToolInvocationMatch(SHELL_TOOL_NAME, command, allowedTools)) {
+      if (doesToolInvocationMatch(SHELL_TOOL_NAME, this, allowedTools)) {
         // If it's an allowed shell command, we don't need to confirm execution.
         return false;
       }
@@ -236,6 +237,35 @@ export class ShellToolInvocation extends BaseToolInvocation<
             console.error('missing pgrep output');
           }
         }
+      }
+
+      // Register cleanup handler with AbortSignal for background processes
+      if (backgroundPIDs.length > 0 && !signal.aborted) {
+        const cleanup = () => {
+          for (const pid of backgroundPIDs) {
+            try {
+              if (os.platform() === 'win32') {
+                spawn('taskkill', ['/pid', pid.toString(), '/f'], {
+                  stdio: 'ignore',
+                });
+              } else {
+                process.kill(-pid, 'SIGTERM');
+                setTimeout(() => {
+                  try {
+                    process.kill(-pid, 'SIGKILL');
+                  } catch {
+                    // Process may already be dead
+                  }
+                }, 200);
+              }
+            } catch {
+              // Process may already be dead
+            }
+          }
+        };
+
+        // Register cleanup with the AbortSignal
+        signal.addEventListener('abort', cleanup, { once: true });
       }
 
       let llmContent = '';

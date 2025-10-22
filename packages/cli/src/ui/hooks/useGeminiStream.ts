@@ -94,6 +94,7 @@ export const useGeminiStream = (
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
     cmd: PartListUnion,
+    signal: AbortSignal,
   ) => Promise<SlashCommandProcessorResult | false>,
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
@@ -332,7 +333,7 @@ export const useGeminiStream = (
         if (!shellModeActive) {
           // Handle UI-only commands first
           const slashCommandResult = isSlashCommand(trimmedQuery)
-            ? await handleSlashCommand(trimmedQuery)
+            ? await handleSlashCommand(trimmedQuery, abortSignal)
             : false;
 
           if (slashCommandResult) {
