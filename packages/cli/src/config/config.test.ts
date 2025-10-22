@@ -21,6 +21,8 @@ import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
+const MOCK_HOME = path.join(path.sep, 'mock', 'home', 'user');
+
 const mockFsHelper = vi.hoisted(() => {
   const files = new Map<string, string>();
   const directories = new Set<string>();
@@ -68,7 +70,7 @@ vi.mock('./sandboxConfig.js', () => ({
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
-  const mockHome = '/mock/home/user';
+  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -147,7 +149,7 @@ vi.mock('fs', async (importOriginal) => {
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
-  const mockHome = '/mock/home/user';
+  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -226,7 +228,7 @@ vi.mock('node:fs', async (importOriginal) => {
 
 vi.mock('fs/promises', async (importOriginal) => {
   const pathMod = await import('node:path');
-  const mockHome = '/mock/home/user';
+  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -279,7 +281,7 @@ vi.mock('fs/promises', async (importOriginal) => {
 });
 vi.mock('node:fs/promises', async (importOriginal) => {
   const pathMod = await import('node:path');
-  const mockHome = '/mock/home/user';
+  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -333,16 +335,18 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
+  const pathMod = await import('node:path');
   return {
     ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
+    homedir: vi.fn(() => pathMod.join(pathMod.sep, 'mock', 'home', 'user')),
   };
 });
 vi.mock('node:os', async (importOriginal) => {
-  const actualOs = await importOriginal<typeof os>();
+  const actualOs = await importOriginal<typeof import('node:os')>();
+  const pathMod = await import('node:path');
   return {
     ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
+    homedir: vi.fn(() => pathMod.join(pathMod.sep, 'mock', 'home', 'user')),
   };
 });
 
@@ -772,7 +776,7 @@ describe('loadCliConfig', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
   });
 
@@ -863,7 +867,7 @@ describe('loadCliConfig', () => {
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     // Other common mocks would be reset here.
   });
 
@@ -922,7 +926,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   it('should correctly use mocked homedir for global path', async () => {
-    vi.stubEnv('HOME', '/mock/home/user');
+    vi.stubEnv('HOME', MOCK_HOME);
     const actualCore = await vi.importActual<typeof ServerConfig>(
       '@google/gemini-cli-core',
     );
@@ -930,10 +934,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       actualCore.loadServerHierarchicalMemory,
     );
 
-    const MOCK_GEMINI_DIR_LOCAL = path.join(
-      '/mock/home/user',
-      ServerConfig.GEMINI_DIR,
-    );
+    const MOCK_GEMINI_DIR_LOCAL = path.join(MOCK_HOME, ServerConfig.GEMINI_DIR);
     const MOCK_GLOBAL_PATH_LOCAL = path.join(
       MOCK_GEMINI_DIR_LOCAL,
       'GEMINI.md',
@@ -1449,7 +1450,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
   });
 
@@ -1779,7 +1780,7 @@ describe('loadCliConfig folderTrust', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
   });
 
@@ -1831,7 +1832,7 @@ describe('loadCliConfig with includeDirectories', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(process, 'cwd').mockReturnValue(
       path.resolve(path.sep, 'home', 'user', 'project'),
@@ -1885,7 +1886,7 @@ describe('loadCliConfig chatCompression', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
   });
 
@@ -1925,7 +1926,7 @@ describe('loadCliConfig useRipgrep', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
   });
 
@@ -1991,7 +1992,7 @@ describe('screenReader configuration', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
   });
 
@@ -2046,7 +2047,7 @@ describe('loadCliConfig tool exclusions', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.stdin.isTTY = true;
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
@@ -2154,7 +2155,7 @@ describe('loadCliConfig interactive', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.stdin.isTTY = true;
   });
@@ -2308,7 +2309,7 @@ describe('loadCliConfig approval mode', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.argv = ['node', 'script.js']; // Reset argv for each test
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
@@ -2427,7 +2428,7 @@ describe('loadCliConfig fileFiltering', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(MOCK_HOME);
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.argv = ['node', 'script.js']; // Reset argv for each test
   });
