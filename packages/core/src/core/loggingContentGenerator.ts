@@ -242,7 +242,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       },
       async ({ metadata: spanMetadata }) => {
         spanMetadata.input = { request: req };
-        const output = this.wrapped.embedContent(req);
+        const output = await this.wrapped.embedContent(req);
         spanMetadata.output = output;
         return output;
       },
