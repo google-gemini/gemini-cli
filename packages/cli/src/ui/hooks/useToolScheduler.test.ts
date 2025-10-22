@@ -186,6 +186,7 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     ]);
   });
 });
+
 describe('useReactToolScheduler', () => {
   let onComplete: Mock;
   let capturedOnConfirmForTest:
