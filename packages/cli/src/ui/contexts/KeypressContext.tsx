@@ -879,10 +879,7 @@ export function KeypressProvider({
         pasteBuffer = null;
       }
 
-      if (draggingTimer) {
-        clearTimeout(draggingTimer);
-        draggingTimer = null;
-      }
+      clearDraggingTimer();
       if (dragBuffer) {
         broadcast({
           name: '',
