@@ -1,7 +1,7 @@
 ## Docker Sandbox Image Access Issue
 
 Some users may experience errors when trying to pull the Gemini sandbox image
-from: `us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.10.0`
+from: `us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:<version>`
 
 ### ��� Error Example
 
