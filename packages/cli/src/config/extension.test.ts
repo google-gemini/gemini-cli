@@ -8,7 +8,6 @@ import { vi, type MockedFunction } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
 import {
   type GeminiCLIExtension,
   ExtensionUninstallEvent,
@@ -489,11 +488,7 @@ describe('extension tests', () => {
         });
 
         const extension = extensionManager.loadExtension(extensionDir);
-
-        const expectedHash = createHash('sha256')
-          .update('http://somehost.com/foo/bar')
-          .digest('hex');
-        expect(extension?.id).toBe(expectedHash);
+        expect(extension?.id).toBe(hashValue('http://somehost.com/foo/bar'));
       });
 
       it('should generate id from owner/repo for github http urls', () => {
@@ -508,11 +503,7 @@ describe('extension tests', () => {
         });
 
         const extension = extensionManager.loadExtension(extensionDir);
-
-        const expectedHash = createHash('sha256')
-          .update('https://github.com/foo/bar')
-          .digest('hex');
-        expect(extension?.id).toBe(expectedHash);
+        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
       });
 
       it('should generate id from owner/repo for github ssh urls', () => {
@@ -527,11 +518,7 @@ describe('extension tests', () => {
         });
 
         const extension = extensionManager.loadExtension(extensionDir);
-
-        const expectedHash = createHash('sha256')
-          .update('https://github.com/foo/bar')
-          .digest('hex');
-        expect(extension?.id).toBe(expectedHash);
+        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
       });
 
       it('should generate id from source for github-release extension', () => {
@@ -546,11 +533,7 @@ describe('extension tests', () => {
         });
 
         const extension = extensionManager.loadExtension(extensionDir);
-
-        const expectedHash = createHash('sha256')
-          .update('https://github.com/foo/bar')
-          .digest('hex');
-        expect(extension?.id).toBe(expectedHash);
+        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
       });
 
       it('should generate id from the original source for local extension', () => {
@@ -565,11 +548,7 @@ describe('extension tests', () => {
         });
 
         const extension = extensionManager.loadExtension(extensionDir);
-
-        const expectedHash = createHash('sha256')
-          .update('/some/path')
-          .digest('hex');
-        expect(extension?.id).toBe(expectedHash);
+        expect(extension?.id).toBe(hashValue('/some/path'));
       });
 
       it('should generate id from the original source for linked extensions', async () => {
@@ -587,11 +566,7 @@ describe('extension tests', () => {
         const extension = extensionManager.loadExtension(
           new ExtensionStorage(extensionName).getExtensionDir(),
         );
-
-        const expectedHash = createHash('sha256')
-          .update(actualExtensionDir)
-          .digest('hex');
-        expect(extension?.id).toBe(expectedHash);
+        expect(extension?.id).toBe(hashValue(actualExtensionDir));
       });
 
       it('should generate id from name for extension with no install metadata', () => {
@@ -602,11 +577,7 @@ describe('extension tests', () => {
         });
 
         const extension = extensionManager.loadExtension(extensionDir);
-
-        const expectedHash = createHash('sha256')
-          .update('no-meta-name')
-          .digest('hex');
-        expect(extension?.id).toBe(expectedHash);
+        expect(extension?.id).toBe(hashValue('no-meta-name'));
       });
     });
   });
