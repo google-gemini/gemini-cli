@@ -26,7 +26,6 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions } from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -67,7 +66,8 @@ import {
   relaunchOnExitCode,
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
-import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
+import { ExtensionManager } from './config/extension-manager.js';
+import { requestConsentNonInteractive } from './config/extensions/consent.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -224,7 +224,16 @@ export async function startInteractiveUI(
 export async function main() {
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
-  migrateDeprecatedSettings(settings);
+  migrateDeprecatedSettings(
+    settings,
+    // Temporary extension manager only used during this non-interactive UI phase.
+    new ExtensionManager({
+      workspaceDir: process.cwd(),
+      loadedSettings: settings,
+      enabledExtensionOverrides: [],
+      requestConsent: requestConsentNonInteractive,
+    }),
+  );
   await cleanupCheckpoints();
 
   const argv = await parseArguments(settings.merged);
@@ -359,10 +368,16 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    const extensionEnablementManager = new ExtensionEnablementManager(
-      argv.extensions,
-    );
-    const extensions = loadExtensions(extensionEnablementManager);
+    // Eventually, `extensions` should move off of `config` entirely and into
+    // the UI state instead.
+    const extensionManager = new ExtensionManager({
+      loadedSettings: settings,
+      workspaceDir: process.cwd(),
+      // At this stage, we still don't have an interactive UI.
+      requestConsent: requestConsentNonInteractive,
+      enabledExtensionOverrides: argv.extensions ?? [],
+    });
+    const extensions = extensionManager.loadExtensions();
     const config = await loadCliConfig(
       settings.merged,
       extensions,

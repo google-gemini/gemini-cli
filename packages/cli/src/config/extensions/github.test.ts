@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockedFunction,
+} from 'vitest';
 import {
   checkForExtensionUpdate,
   cloneFromGit,
@@ -22,7 +30,8 @@ import * as path from 'node:path';
 import * as tar from 'tar';
 import * as archiver from 'archiver';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
-import { ExtensionEnablementManager } from './extensionEnablement.js';
+import { ExtensionManager } from '../extension-manager.js';
+import { loadSettings } from '../settings.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockArch = vi.hoisted(() => vi.fn());
@@ -134,8 +143,29 @@ describe('git extension helpers', () => {
       revparse: vi.fn(),
     };
 
+    let extensionManager: ExtensionManager;
+    let mockRequestConsent: MockedFunction<
+      (consent: string) => Promise<boolean>
+    >;
+    let tempHomeDir: string;
+    let tempWorkspaceDir: string;
+
     beforeEach(() => {
+      tempHomeDir = fsSync.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+      );
+      tempWorkspaceDir = fsSync.mkdtempSync(
+        path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
+      );
       vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
+      mockRequestConsent = vi.fn();
+      mockRequestConsent.mockResolvedValue(true);
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        enabledExtensionOverrides: [],
+        requestConsent: mockRequestConsent,
+        loadedSettings: loadSettings(tempWorkspaceDir),
+      });
     });
 
     it('should return NOT_UPDATABLE for non-git extensions', async () => {
@@ -150,10 +180,7 @@ describe('git extension helpers', () => {
         },
         contextFiles: [],
       };
-      const result = await checkForExtensionUpdate(
-        extension,
-        new ExtensionEnablementManager(),
-      );
+      const result = await checkForExtensionUpdate(extension, extensionManager);
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
     });
 
@@ -170,10 +197,7 @@ describe('git extension helpers', () => {
         contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([]);
-      const result = await checkForExtensionUpdate(
-        extension,
-        new ExtensionEnablementManager(),
-      );
+      const result = await checkForExtensionUpdate(extension, extensionManager);
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
 
@@ -195,10 +219,7 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('local-hash');
 
-      const result = await checkForExtensionUpdate(
-        extension,
-        new ExtensionEnablementManager(),
-      );
+      const result = await checkForExtensionUpdate(extension, extensionManager);
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
@@ -220,10 +241,7 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('same-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('same-hash');
 
-      const result = await checkForExtensionUpdate(
-        extension,
-        new ExtensionEnablementManager(),
-      );
+      const result = await checkForExtensionUpdate(extension, extensionManager);
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
@@ -241,10 +259,7 @@ describe('git extension helpers', () => {
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 
-      const result = await checkForExtensionUpdate(
-        extension,
-        new ExtensionEnablementManager(),
-      );
+      const result = await checkForExtensionUpdate(extension, extensionManager);
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
   });

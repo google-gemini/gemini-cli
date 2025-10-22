@@ -6,16 +6,17 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  INSTALL_WARNING_MESSAGE,
-  installOrUpdateExtension,
-  requestConsentNonInteractive,
-} from '../../config/extension.js';
-import {
   debugLogger,
   type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { stat } from 'node:fs/promises';
+import {
+  INSTALL_WARNING_MESSAGE,
+  requestConsentNonInteractive,
+} from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
 
 interface InstallArgs {
   source: string;
@@ -66,10 +67,16 @@ export async function handleInstall(args: InstallArgs) {
       debugLogger.log('You have consented to the following:');
       debugLogger.log(INSTALL_WARNING_MESSAGE);
     }
-    const name = await installOrUpdateExtension(
-      installMetadata,
+
+    const workspaceDir = process.cwd();
+    const extensionManager = new ExtensionManager({
+      workspaceDir,
+      enabledExtensionOverrides: [],
       requestConsent,
-    );
+      loadedSettings: loadSettings(workspaceDir),
+    });
+    const name =
+      await extensionManager.installOrUpdateExtension(installMetadata);
     debugLogger.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
     debugLogger.error(getErrorMessage(error));
