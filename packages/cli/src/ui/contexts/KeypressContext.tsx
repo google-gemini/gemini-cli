@@ -18,6 +18,8 @@ import {
   useContext,
   useEffect,
   useRef,
+  // Changes related to unresponsive ENTER key: Import useState to manage readline re-initialization.
+  useState,
 } from 'react';
 import readline from 'node:readline';
 import { PassThrough } from 'node:stream';
@@ -123,6 +125,10 @@ export function KeypressProvider({
   const isDraggingRef = useRef(false);
   const dragBufferRef = useRef('');
   const draggingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // State to force re-creation of the readline interface.
+  const [readlineKey, setReadlineKey] = useState(0);
+  // Ref to hold the current readline instance for proper cleanup.
+  const rlRef = useRef<readline.Interface | null>(null);
 
   const subscribe = useCallback(
     (handler: KeypressHandler) => {
@@ -137,6 +143,19 @@ export function KeypressProvider({
     },
     [subscribers],
   );
+
+  useEffect(() => {
+    const handleFocusIn = (data: Buffer) => {
+      if (data.toString() === FOCUS_IN) {
+        setReadlineKey((prev) => prev + 1);
+      }
+    };
+
+    stdin.on('data', handleFocusIn);
+    return () => {
+      stdin.removeListener('data', handleFocusIn);
+    };
+  }, [stdin]);
 
   useEffect(() => {
     const clearDraggingTimer = () => {
@@ -818,18 +837,20 @@ export function KeypressProvider({
       }
     };
 
-    let rl: readline.Interface;
     if (usePassthrough) {
-      rl = readline.createInterface({
+      rlRef.current = readline.createInterface({
         input: keypressStream,
         escapeCodeTimeout: 0,
       });
-      readline.emitKeypressEvents(keypressStream, rl);
+      readline.emitKeypressEvents(keypressStream, rlRef.current);
       keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
     } else {
-      rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 0 });
-      readline.emitKeypressEvents(stdin, rl);
+      rlRef.current = readline.createInterface({
+        input: stdin,
+        escapeCodeTimeout: 0,
+      });
+      readline.emitKeypressEvents(stdin, rlRef.current);
       stdin.on('keypress', handleKeypress);
     }
 
@@ -841,7 +862,9 @@ export function KeypressProvider({
         stdin.removeListener('keypress', handleKeypress);
       }
 
-      rl.close();
+      if (rlRef.current) {
+        rlRef.current.close();
+      }
 
       // Restore the terminal to its original state.
       if (wasRaw === false) {
@@ -908,6 +931,7 @@ export function KeypressProvider({
     config,
     subscribers,
     debugKeystrokeLogging,
+    readlineKey,
   ]);
 
   return (
