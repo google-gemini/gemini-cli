@@ -348,6 +348,21 @@ describe('ShellExecutionService', () => {
 
       expect(mockHeadlessTerminal.scrollLines).toHaveBeenCalledWith(10);
     });
+
+    it('should not throw when resizing a pty that has already exited (Windows)', () => {
+      const resizeError = new Error('Cannot resize a pty that has already exited');
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw resizeError;
+      });
+
+      // This should catch the specific error and not re-throw it.
+      expect(() => {
+        ShellExecutionService.resizePty(mockPtyProcess.pid, 100, 40);
+      }).not.toThrow();
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
+      expect(mockHeadlessTerminal.resize).toHaveBeenCalledWith(100, 40);
+    });
   });
 
   describe('Failed Execution', () => {
