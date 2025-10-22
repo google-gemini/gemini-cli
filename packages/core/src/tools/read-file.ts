@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
@@ -48,8 +49,11 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: ReadFileToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -136,9 +140,14 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ReadFileToolParams,
   ToolResult
 > {
-  constructor(private config: Config) {
+  static readonly Name = READ_FILE_TOOL_NAME;
+
+  constructor(
+    private config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
-      READ_FILE_TOOL_NAME,
+      ReadFileTool.Name,
       'ReadFile',
       `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
       Kind.Read,
@@ -163,6 +172,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
         required: ['absolute_path'],
         type: 'object',
       },
+      true,
+      false,
+      messageBus,
     );
   }
 
@@ -207,7 +219,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ReadFileToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ReadFileToolParams, ToolResult> {
-    return new ReadFileToolInvocation(this.config, params);
+    return new ReadFileToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
