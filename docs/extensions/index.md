@@ -190,6 +190,7 @@ Each object in the array should have the following properties:
 - `description`: A description of the setting and what it's used for.
 - `envVar`: The name of the environment variable that the setting will be stored
   as.
+- `sensitive`: (optional) If true, the user's input will be obfuscated.
 
 **Example**
 
@@ -201,7 +202,8 @@ Each object in the array should have the following properties:
     {
       "name": "API Key",
       "description": "Your API key for the service.",
-      "envVar": "MY_API_KEY"
+      "envVar": "MY_API_KEY",
+      "sensitive": "true"
     }
   ]
 }
@@ -210,10 +212,6 @@ Each object in the array should have the following properties:
 When a user installs this extension, they will be prompted to enter their API
 key. The value will be saved to a `.env` file in the extension's directory
 (e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
-
-These will be available to scripts within your extension and also in the
-gemini-extension.json file. They are not available to e.g., custom commands or
-GEMINI.md files.
 
 ### Custom commands
 

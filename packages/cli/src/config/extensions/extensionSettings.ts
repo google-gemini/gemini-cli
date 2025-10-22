@@ -5,7 +5,6 @@
  */
 
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import { ExtensionStorage } from '../extension.js';
 import type { ExtensionConfig } from '../extension.js';
 
@@ -27,13 +26,8 @@ export async function maybePromptForSettings(
     return;
   }
 
-  const envFilePath = path.join(
-    new ExtensionStorage(extensionName).getExtensionDir(),
-    '.env',
-  );
+  const envFilePath = new ExtensionStorage(extensionName).getEnvFilePath();
   let envContent = '';
-
-  console.log(''); // for spacing
   for (const setting of settings) {
     const answer = await requestSetting(setting);
     envContent += `${setting.envVar}=${answer}\n`;
@@ -45,25 +39,10 @@ export async function maybePromptForSettings(
 export async function promptForSetting(
   setting: ExtensionSetting,
 ): Promise<string> {
-  if (setting.sensitive) {
-    const response = await prompts({
-      type: 'password',
-      name: 'value',
-      message: `${setting.name}\n${setting.description}`,
-    });
-    return response.value;
-  } else {
-    const readline = await import('node:readline');
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    return new Promise((resolve) => {
-      const query = `${setting.name}\n${setting.description}\n> `;
-      rl.question(query, (answer) => {
-        rl.close();
-        resolve(answer);
-      });
-    });
-  }
+  const response = await prompts({
+    type: setting.sensitive ? 'password' : 'text',
+    name: 'value',
+    message: `${setting.name}\n${setting.description}`,
+  });
+  return response.value;
 }

@@ -16,14 +16,13 @@ import {
   loadInstallMetadata,
   ExtensionStorage,
   loadExtensionConfig,
-  EXTENSION_SETTINGS_FILENAME,
 } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
-import * as path from 'node:path';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import { getErrorMessage } from '../../utils/errors.js';
 import { type ExtensionEnablementManager } from './extensionEnablement.js';
+import { promptForSetting } from './extensionSettings.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -68,38 +67,19 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    const previousExtensionConfig = await loadExtensionConfig({
+    const previousExtensionConfig = loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
       extensionEnablementManager,
     });
-
-    const extensionStorage = new ExtensionStorage(extension.name);
-    const extensionDir = extensionStorage.getExtensionDir();
-    const settingsPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
-    const tempSettingsPath = path.join(tempDir, EXTENSION_SETTINGS_FILENAME);
-
-    if (fs.existsSync(settingsPath)) {
-      await fs.promises.copyFile(settingsPath, tempSettingsPath);
-    }
 
     await installOrUpdateExtension(
       installMetadata,
       requestConsent,
       cwd,
       previousExtensionConfig,
+      promptForSetting,
     );
-
-    if (fs.existsSync(tempSettingsPath)) {
-      const updatedExtensionStorage = new ExtensionStorage(extension.name);
-      const updatedExtensionDir = updatedExtensionStorage.getExtensionDir();
-      const updatedSettingsPath = path.join(
-        updatedExtensionDir,
-        EXTENSION_SETTINGS_FILENAME,
-      );
-      await fs.promises.copyFile(tempSettingsPath, updatedSettingsPath);
-    }
-
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = loadExtension({
       extensionDir: updatedExtensionStorage.getExtensionDir(),

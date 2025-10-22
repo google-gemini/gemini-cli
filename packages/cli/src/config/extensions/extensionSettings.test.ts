@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'node:fs/promises';
+import { vi } from 'vitest';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import {
@@ -16,21 +15,17 @@ import {
 import type { ExtensionConfig } from '../extension.js';
 import { ExtensionStorage } from '../extension.js';
 import prompts from 'prompts';
+import * as fsPromises from 'node:fs/promises';
+import * as fs from 'node:fs';
 
-vi.mock('node:fs/promises');
 vi.mock('prompts');
-
-// Mock readline, as it's tricky to test directly
-const mockReadline = {
-  createInterface: vi.fn().mockReturnValue({
-    question: vi.fn((_query, callback) => callback('test-answer')),
-    close: vi.fn(),
-  }),
-};
-vi.mock('node:readline', () => ({
-  default: mockReadline,
-  createInterface: mockReadline.createInterface,
-}));
+vi.mock('os', async (importOriginal) => {
+  const mockedOs = await importOriginal<typeof os>();
+  return {
+    ...mockedOs,
+    homedir: vi.fn(),
+  };
+});
 
 describe('extensionSettings', () => {
   let tempHomeDir: string;
@@ -39,15 +34,17 @@ describe('extensionSettings', () => {
   beforeEach(() => {
     tempHomeDir = os.tmpdir() + path.sep + `gemini-cli-test-home-${Date.now()}`;
     extensionDir = path.join(tempHomeDir, '.gemini', 'extensions', 'test-ext');
+    // Spy and mock the method, but also create the directory so we can write to it.
     vi.spyOn(ExtensionStorage.prototype, 'getExtensionDir').mockReturnValue(
       extensionDir,
     );
-    vi.mocked(fs.writeFile).mockClear();
+    fs.mkdirSync(extensionDir, { recursive: true });
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.mocked(prompts).mockClear();
-    mockReadline.createInterface.mockClear();
   });
 
   afterEach(() => {
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
@@ -64,7 +61,6 @@ describe('extensionSettings', () => {
       const config: ExtensionConfig = { name: 'test-ext', version: '1.0.0' };
       await maybePromptForSettings(config, mockRequestSetting);
       expect(mockRequestSetting).not.toHaveBeenCalled();
-      expect(fs.writeFile).not.toHaveBeenCalled();
     });
 
     it('should do nothing if settings are empty', async () => {
@@ -75,7 +71,6 @@ describe('extensionSettings', () => {
       };
       await maybePromptForSettings(config, mockRequestSetting);
       expect(mockRequestSetting).not.toHaveBeenCalled();
-      expect(fs.writeFile).not.toHaveBeenCalled();
     });
 
     it('should call requestSetting for each setting', async () => {
@@ -105,17 +100,15 @@ describe('extensionSettings', () => {
       await maybePromptForSettings(config, mockRequestSetting);
 
       const expectedEnvPath = path.join(extensionDir, '.env');
+      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
       const expectedContent = 'VAR1=mock-VAR1\nVAR2=mock-VAR2\n';
 
-      expect(fs.writeFile).toHaveBeenCalledWith(
-        expectedEnvPath,
-        expectedContent,
-      );
+      expect(actualContent).toBe(expectedContent);
     });
   });
 
   describe('promptForSetting', () => {
-    it('should use prompts for sensitive settings', async () => {
+    it('should use prompts with type "password" for sensitive settings', async () => {
       const setting: ExtensionSetting = {
         name: 'API Key',
         description: 'Your secret key',
@@ -132,41 +125,43 @@ describe('extensionSettings', () => {
         message: 'API Key\nYour secret key',
       });
       expect(result).toBe('secret-key');
-      expect(mockReadline.createInterface).not.toHaveBeenCalled();
     });
 
-    it('should use readline for non-sensitive settings', async () => {
+    it('should use prompts with type "text" for non-sensitive settings', async () => {
       const setting: ExtensionSetting = {
         name: 'Username',
         description: 'Your public username',
         envVar: 'USERNAME',
         sensitive: false,
       };
+      vi.mocked(prompts).mockResolvedValue({ value: 'test-user' });
 
       const result = await promptForSetting(setting);
 
-      expect(mockReadline.createInterface).toHaveBeenCalled();
-      const mockInterface = mockReadline.createInterface.mock.results[0].value;
-      expect(mockInterface.question).toHaveBeenCalledWith(
-        'Username\nYour public username\n> ',
-        expect.any(Function),
-      );
-      expect(result).toBe('test-answer');
-      expect(prompts).not.toHaveBeenCalled();
+      expect(prompts).toHaveBeenCalledWith({
+        type: 'text',
+        name: 'value',
+        message: 'Username\nYour public username',
+      });
+      expect(result).toBe('test-user');
     });
 
-    it('should default to non-sensitive if sensitive is undefined', async () => {
+    it('should default to "text" if sensitive is undefined', async () => {
       const setting: ExtensionSetting = {
         name: 'Username',
         description: 'Your public username',
         envVar: 'USERNAME',
       };
+      vi.mocked(prompts).mockResolvedValue({ value: 'test-user' });
 
       const result = await promptForSetting(setting);
 
-      expect(mockReadline.createInterface).toHaveBeenCalled();
-      expect(result).toBe('test-answer');
-      expect(prompts).not.toHaveBeenCalled();
+      expect(prompts).toHaveBeenCalledWith({
+        type: 'text',
+        name: 'value',
+        message: 'Username\nYour public username',
+      });
+      expect(result).toBe('test-user');
     });
   });
 });

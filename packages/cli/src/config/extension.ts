@@ -102,6 +102,14 @@ export class ExtensionStorage {
     return path.join(this.getExtensionDir(), EXTENSIONS_CONFIG_FILENAME);
   }
 
+  getEnvFilePath(): string {
+    return path.join(this.getExtensionDir(), EXTENSION_SETTINGS_FILENAME);
+  }
+
+  static getEnvFilePath(dirPath: string): string {
+    return path.join(dirPath, EXTENSION_SETTINGS_FILENAME);
+  }
+
   static getUserExtensionsDir(): string {
     const storage = new Storage(os.homedir());
     return storage.getExtensionsDir();
@@ -186,7 +194,7 @@ export function loadExtension(
 
   try {
     let customEnv: Record<string, string> = {};
-    const envPath = path.join(effectiveExtensionPath, '.env');
+    const envPath = ExtensionStorage.getEnvFilePath(effectiveExtensionPath);
     if (fs.existsSync(envPath)) {
       const envFile = fs.readFileSync(envPath, 'utf-8');
       customEnv = dotenv.parse(envFile);
@@ -400,6 +408,51 @@ async function promptForConsentInteractive(
   });
 }
 
+async function copySettingsToTempDirOnUpdate(
+  extensionDir: string,
+): Promise<string | undefined> {
+  const tempDir = await ExtensionStorage.createTmpDir();
+  const settingsPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+  console.log(settingsPath);
+  let tempSettingsPath: string | undefined;
+  if (fs.existsSync(settingsPath)) {
+    tempSettingsPath = path.join(tempDir, EXTENSION_SETTINGS_FILENAME);
+    console.log(tempSettingsPath);
+    await fs.promises.copyFile(settingsPath, tempSettingsPath);
+  }
+  return tempSettingsPath;
+}
+
+async function maybeCopySettingsFromTempDir(
+  extensionDir: string,
+  tempSettingsPath: string,
+) {
+  const settingsPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+  if (fs.existsSync(tempSettingsPath)) {
+    await fs.promises.copyFile(tempSettingsPath, settingsPath);
+  }
+  return tempSettingsPath;
+}
+
+async function promptForNewSettingsOnUpdate(
+  newExtensionConfig: ExtensionConfig,
+  previousExtensionConfig: ExtensionConfig,
+  requestSetting: (setting: ExtensionSetting) => Promise<string>,
+): Promise<void> {
+  const oldSettings = new Set(
+    previousExtensionConfig.settings?.map((s) => s.name) || [],
+  );
+  const newSettings =
+    newExtensionConfig.settings?.filter((s) => !oldSettings.has(s.name)) || [];
+  if (newSettings.length > 0) {
+    const configWithOnlyNewSettings = {
+      ...newExtensionConfig,
+      settings: newSettings,
+    };
+    await maybePromptForSettings(configWithOnlyNewSettings, requestSetting);
+  }
+}
+
 export async function installOrUpdateExtension(
   installMetadata: ExtensionInstallMetadata,
   requestConsent: (consent: string) => Promise<boolean>,
@@ -412,7 +465,7 @@ export async function installOrUpdateExtension(
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
   const extensionEnablementManager = new ExtensionEnablementManager();
-
+  // path.join(tempDir, EXTENSION_SETTINGS_FILENAME)
   try {
     const settings = loadSettings(cwd).merged;
     if (!isWorkspaceTrusted(settings).isTrusted) {
@@ -486,6 +539,25 @@ export async function installOrUpdateExtension(
         extensionEnablementManager,
       });
 
+      if (isUpdate && previousExtensionConfig && installMetadata.autoUpdate) {
+        const oldSettings = new Set(
+          previousExtensionConfig.settings?.map((s) => s.name) || [],
+        );
+        const newSettings = new Set(
+          newExtensionConfig.settings?.map((s) => s.name) || [],
+        );
+
+        const settingsAreEqual =
+          oldSettings.size === newSettings.size &&
+          [...oldSettings].every((value) => newSettings.has(value));
+
+        if (!settingsAreEqual) {
+          throw new Error(
+            `Extension "${newExtensionConfig.name}" has settings changes and cannot be auto-updated. Please update manually.`,
+          );
+        }
+      }
+
       const newExtensionName = newExtensionConfig.name;
       if (!isUpdate) {
         const installedExtensions = loadExtensions(
@@ -511,14 +583,24 @@ export async function installOrUpdateExtension(
 
       const extensionStorage = new ExtensionStorage(newExtensionName);
       const destinationPath = extensionStorage.getExtensionDir();
-
+      const tempSettingsPath = isUpdate
+        ? await copySettingsToTempDirOnUpdate(destinationPath)
+        : undefined;
       if (isUpdate) {
         await uninstallExtension(newExtensionName, isUpdate, cwd);
       }
 
       await fs.promises.mkdir(destinationPath, { recursive: true });
       if (requestSetting !== undefined) {
-        await maybePromptForSettings(newExtensionConfig, requestSetting);
+        if (isUpdate && previousExtensionConfig) {
+          await promptForNewSettingsOnUpdate(
+            newExtensionConfig,
+            previousExtensionConfig,
+            requestSetting,
+          );
+        } else if (!isUpdate) {
+          await maybePromptForSettings(newExtensionConfig, requestSetting);
+        }
       }
 
       if (
@@ -535,6 +617,9 @@ export async function installOrUpdateExtension(
         INSTALL_METADATA_FILENAME,
       );
       await fs.promises.writeFile(metadataPath, metadataString);
+      if (tempSettingsPath) {
+        await maybeCopySettingsFromTempDir(destinationPath, tempSettingsPath);
+      }
     } finally {
       if (tempDir) {
         await fs.promises.rm(tempDir, { recursive: true, force: true });
