@@ -384,6 +384,21 @@ export function useKeypressContext() {
   return context;
 }
 
+/**
+ * Determines if the passthrough stream workaround should be used.
+ * This is necessary for Node.js versions older than 20 or when the
+ * PASTE_WORKAROUND environment variable is set, to correctly handle
+ * paste events.
+ */
+function shouldUsePassthrough(): boolean {
+  const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
+  return (
+    nodeMajorVersion < 20 ||
+    process.env['PASTE_WORKAROUND'] === '1' ||
+    process.env['PASTE_WORKAROUND'] === 'true'
+  );
+}
+
 export function KeypressProvider({
   children,
   kittyProtocolEnabled,
@@ -419,16 +434,7 @@ export function KeypressProvider({
       setRawMode(true);
     }
 
-    const keypressStream = new PassThrough();
-    let usePassthrough = false;
-    const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
-    if (
-      nodeMajorVersion < 20 ||
-      process.env['PASTE_WORKAROUND'] === '1' ||
-      process.env['PASTE_WORKAROUND'] === 'true'
-    ) {
-      usePassthrough = true;
-    }
+    const keypressStream = shouldUsePassthrough() ? new PassThrough() : null;
 
     // If non-null that means we are in paste mode
     let pasteBuffer: Buffer | null = null;
@@ -786,13 +792,13 @@ export function KeypressProvider({
         markerLength = pasteModeSuffixBuffer.length;
 
         if (nextMarkerPos === -1) {
-          keypressStream.write(data.slice(pos));
+          keypressStream!.write(data.slice(pos));
           return;
         }
 
         const nextData = data.slice(pos, nextMarkerPos);
         if (nextData.length > 0) {
-          keypressStream.write(nextData);
+          keypressStream!.write(nextData);
         }
         const createPasteKeyEvent = (
           name: 'paste-start' | 'paste-end',
@@ -814,7 +820,7 @@ export function KeypressProvider({
     };
 
     let rl: readline.Interface;
-    if (usePassthrough) {
+    if (keypressStream !== null) {
       rl = readline.createInterface({
         input: keypressStream,
         escapeCodeTimeout: 0,
@@ -829,7 +835,7 @@ export function KeypressProvider({
     }
 
     return () => {
-      if (usePassthrough) {
+      if (keypressStream !== null) {
         keypressStream.removeListener('keypress', handleKeypress);
         stdin.removeListener('data', handleRawKeypress);
       } else {
