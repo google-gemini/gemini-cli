@@ -21,6 +21,40 @@ import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
+const mockFsHelper = vi.hoisted(() => {
+  const files = new Map<string, string>();
+  const directories = new Set<string>();
+  return {
+    files,
+    directories,
+    setFile: (path: string, content: string) => {
+      files.set(path, content);
+      // Simple dirname approximation to ensure parent dirs exist
+      const parts = path.split('/');
+      parts.pop();
+      let current = '';
+      for (const part of parts) {
+        if (part === '') {
+          current = '/'; // Handle absolute paths starting with /
+        } else {
+          current =
+            current === '/'
+              ? '/' + part
+              : current
+                ? current + '/' + part
+                : part;
+        }
+        if (current) directories.add(current);
+      }
+    },
+    setDirectory: (path: string) => directories.add(path),
+    reset: () => {
+      files.clear();
+      directories.clear();
+    },
+  };
+});
+
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi
     .fn()
@@ -32,13 +66,13 @@ vi.mock('./sandboxConfig.js', () => ({
 }));
 
 vi.mock('fs', async (importOriginal) => {
-  const actualFs = await importOriginal<typeof import('fs')>();
+  const actual = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
   const mockHome = '/mock/home/user';
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
-  const mockPaths = new Set([
+  const baseMockPaths = new Set([
     MOCK_CWD1,
     MOCK_CWD2,
     pathMod.resolve(pathMod.sep, 'cli', 'path1'),
@@ -48,22 +82,263 @@ vi.mock('fs', async (importOriginal) => {
     pathMod.join(MOCK_CWD2, 'settings', 'path3'),
   ]);
 
+  const isMockedFile = (p: unknown) => mockFsHelper.files.has(String(p));
+  const isMockedDir = (p: unknown) =>
+    baseMockPaths.has(String(p)) || mockFsHelper.directories.has(String(p));
+
   return {
-    ...actualFs,
+    ...actual,
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn(),
-    existsSync: vi.fn((p) => mockPaths.has(p.toString())),
+    existsSync: vi.fn((p) => isMockedFile(p) || isMockedDir(p)),
     statSync: vi.fn((p) => {
-      if (mockPaths.has(p.toString())) {
+      if (isMockedDir(p)) {
         return { isDirectory: () => true } as unknown as import('fs').Stats;
       }
-      return (actualFs as typeof import('fs')).statSync(p as unknown as string);
+      if (isMockedFile(p)) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as import('fs').Stats;
+      }
+      return (actual as typeof import('fs')).statSync(p as unknown as string);
+    }),
+    readFileSync: vi.fn((p, options) => {
+      if (isMockedFile(p)) {
+        return mockFsHelper.files.get(p.toString());
+      }
+      return (actual as typeof import('fs')).readFileSync(p, options);
     }),
     realpathSync: vi.fn((p) => p),
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(async (p, options) => {
+        if (isMockedFile(p)) {
+          return mockFsHelper.files.get(p.toString());
+        }
+        return actual.promises.readFile(p, options);
+      }),
+      stat: vi.fn(async (p) => {
+        process.stderr.write('stat: ' + p + ' (' + typeof p + ')\n');
+        if (isMockedDir(p)) {
+          return { isDirectory: () => true } as unknown as import('fs').Stats;
+        }
+        if (isMockedFile(p)) {
+          return {
+            isDirectory: () => false,
+            isFile: () => true,
+          } as unknown as import('fs').Stats;
+        }
+        return actual.promises.stat(p);
+      }),
+      access: vi.fn(async (p) => {
+        if (
+          mockFsHelper.files.has(p.toString()) ||
+          mockFsHelper.directories.has(String(p))
+        ) {
+          return undefined; // access resolves on success
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (actual as any).access(p);
+      }),
+    },
+  };
+});
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  const pathMod = await import('node:path');
+  const mockHome = '/mock/home/user';
+  const MOCK_CWD1 = process.cwd();
+  const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
+
+  const baseMockPaths = new Set([
+    MOCK_CWD1,
+    MOCK_CWD2,
+    pathMod.resolve(pathMod.sep, 'cli', 'path1'),
+    pathMod.resolve(pathMod.sep, 'settings', 'path1'),
+    pathMod.join(mockHome, 'settings', 'path2'),
+    pathMod.join(MOCK_CWD2, 'cli', 'path2'),
+    pathMod.join(MOCK_CWD2, 'settings', 'path3'),
+  ]);
+
+  const isMockedFile = (p: unknown) => mockFsHelper.files.has(String(p));
+  const isMockedDir = (p: unknown) =>
+    baseMockPaths.has(String(p)) || mockFsHelper.directories.has(String(p));
+
+  return {
+    ...actual,
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    existsSync: vi.fn((p) => isMockedFile(p) || isMockedDir(p)),
+    statSync: vi.fn((p) => {
+      if (isMockedDir(p)) {
+        return { isDirectory: () => true } as unknown as import('fs').Stats;
+      }
+      if (isMockedFile(p)) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as import('fs').Stats;
+      }
+      return (actual as typeof import('fs')).statSync(p as unknown as string);
+    }),
+    readFileSync: vi.fn((p, options) => {
+      if (isMockedFile(p)) {
+        return mockFsHelper.files.get(p.toString());
+      }
+      return (actual as typeof import('fs')).readFileSync(p, options);
+    }),
+    realpathSync: vi.fn((p) => p),
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(async (p, options) => {
+        if (isMockedFile(p)) {
+          return mockFsHelper.files.get(p.toString());
+        }
+        return actual.promises.readFile(p, options);
+      }),
+      stat: vi.fn(async (p) => {
+        process.stderr.write('stat: ' + p + ' (' + typeof p + ')\n');
+        if (isMockedDir(p)) {
+          return { isDirectory: () => true } as unknown as import('fs').Stats;
+        }
+        if (isMockedFile(p)) {
+          return {
+            isDirectory: () => false,
+            isFile: () => true,
+          } as unknown as import('fs').Stats;
+        }
+        return actual.promises.stat(p);
+      }),
+      access: vi.fn(async (p) => {
+        if (
+          mockFsHelper.files.has(p.toString()) ||
+          mockFsHelper.directories.has(String(p))
+        ) {
+          return undefined; // access resolves on success
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (actual as any).access(p);
+      }),
+    },
+  };
+});
+
+vi.mock('fs/promises', async (importOriginal) => {
+  const pathMod = await import('node:path');
+  const mockHome = '/mock/home/user';
+  const MOCK_CWD1 = process.cwd();
+  const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
+
+  const baseMockPaths = new Set([
+    MOCK_CWD1,
+    MOCK_CWD2,
+    pathMod.resolve(pathMod.sep, 'cli', 'path1'),
+    pathMod.resolve(pathMod.sep, 'settings', 'path1'),
+    pathMod.join(mockHome, 'settings', 'path2'),
+    pathMod.join(MOCK_CWD2, 'cli', 'path2'),
+    pathMod.join(MOCK_CWD2, 'settings', 'path3'),
+  ]);
+
+  const actual = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...actual,
+    readFile: vi.fn(async (p, options) => {
+      if (mockFsHelper.files.has(p.toString())) {
+        return mockFsHelper.files.get(p.toString());
+      }
+      return actual.readFile(p, options);
+    }),
+    stat: vi.fn(async (p) => {
+      process.stderr.write('stat: ' + p + ' (' + typeof p + ')\n');
+      if (
+        baseMockPaths.has(String(p)) ||
+        mockFsHelper.directories.has(String(p))
+      ) {
+        return { isDirectory: () => true } as unknown as import('fs').Stats;
+      }
+      if (mockFsHelper.files.has(p.toString())) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as import('fs').Stats;
+      }
+      return actual.stat(p);
+    }),
+    access: vi.fn(async (p) => {
+      if (
+        mockFsHelper.files.has(p.toString()) ||
+        mockFsHelper.directories.has(String(p))
+      ) {
+        return undefined; // access resolves on success
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actual as any).access(p);
+    }),
+  };
+});
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const pathMod = await import('node:path');
+  const mockHome = '/mock/home/user';
+  const MOCK_CWD1 = process.cwd();
+  const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
+
+  const baseMockPaths = new Set([
+    MOCK_CWD1,
+    MOCK_CWD2,
+    pathMod.resolve(pathMod.sep, 'cli', 'path1'),
+    pathMod.resolve(pathMod.sep, 'settings', 'path1'),
+    pathMod.join(mockHome, 'settings', 'path2'),
+    pathMod.join(MOCK_CWD2, 'cli', 'path2'),
+    pathMod.join(MOCK_CWD2, 'settings', 'path3'),
+  ]);
+
+  const actual = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...actual,
+    readFile: vi.fn(async (p, options) => {
+      if (mockFsHelper.files.has(p.toString())) {
+        return mockFsHelper.files.get(p.toString());
+      }
+      return actual.readFile(p, options);
+    }),
+    stat: vi.fn(async (p) => {
+      process.stderr.write('stat: ' + p + ' (' + typeof p + ')\n');
+      if (
+        baseMockPaths.has(String(p)) ||
+        mockFsHelper.directories.has(String(p))
+      ) {
+        return { isDirectory: () => true } as unknown as import('fs').Stats;
+      }
+      if (mockFsHelper.files.has(p.toString())) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as import('fs').Stats;
+      }
+      return actual.stat(p);
+    }),
+    access: vi.fn(async (p) => {
+      if (
+        mockFsHelper.files.has(p.toString()) ||
+        mockFsHelper.directories.has(String(p))
+      ) {
+        return undefined; // access resolves on success
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actual as any).access(p);
+    }),
   };
 });
 
 vi.mock('os', async (importOriginal) => {
+  const actualOs = await importOriginal<typeof os>();
+  return {
+    ...actualOs,
+    homedir: vi.fn(() => '/mock/home/user'),
+  };
+});
+vi.mock('node:os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
   return {
     ...actualOs,
@@ -646,18 +921,15 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     );
   });
 
-  // NOTE TO FUTURE DEVELOPERS:
-  // To re-enable tests for loadHierarchicalGeminiMemory, ensure that:
-  // 1. os.homedir() is reliably mocked *before* the config.ts module is loaded
-  //    and its functions (which use os.homedir()) are called.
-  // 2. fs/promises and fs mocks correctly simulate file/directory existence,
-  //    readability, and content based on paths derived from the mocked os.homedir().
-  // 3. Spies on console functions (for logger output) are correctly set up if needed.
-  // Example of a previously failing test structure:
-  it.skip('should correctly use mocked homedir for global path', async () => {
-    // This test is skipped because mockFs and fsPromises are not properly imported/mocked
-    // TODO: Fix this test by properly setting up mock-fs and fs/promises mocks
-    /*
+  it('should correctly use mocked homedir for global path', async () => {
+    vi.stubEnv('HOME', '/mock/home/user');
+    const actualCore = await vi.importActual<typeof ServerConfig>(
+      '@google/gemini-cli-core',
+    );
+    vi.mocked(ServerConfig.loadServerHierarchicalMemory).mockImplementation(
+      actualCore.loadServerHierarchicalMemory,
+    );
+
     const MOCK_GEMINI_DIR_LOCAL = path.join(
       '/mock/home/user',
       ServerConfig.GEMINI_DIR,
@@ -666,17 +938,36 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       MOCK_GEMINI_DIR_LOCAL,
       'GEMINI.md',
     );
-    mockFs({
-      [MOCK_GLOBAL_PATH_LOCAL]: { type: 'file', content: 'GlobalContentOnly' },
-    });
-    const memory = await loadHierarchicalGeminiMemory('/some/other/cwd', false);
-    expect(memory).toBe('GlobalContentOnly');
-    expect(vi.mocked(os.homedir)).toHaveBeenCalled();
-    expect(fsPromises.readFile).toHaveBeenCalledWith(
-      MOCK_GLOBAL_PATH_LOCAL,
-      'utf-8',
-    );
-    */
+
+    mockFsHelper.setDirectory(MOCK_GEMINI_DIR_LOCAL);
+    mockFsHelper.setFile(MOCK_GLOBAL_PATH_LOCAL, 'GlobalContentOnly');
+
+    try {
+      const memory = await ServerConfig.loadServerHierarchicalMemory(
+        '/some/other/cwd',
+        [],
+        false,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {} as any,
+        [],
+        true,
+      );
+
+      if (typeof memory === 'string') {
+        expect(memory).toContain('GlobalContentOnly');
+      } else if (
+        memory &&
+        typeof memory === 'object' &&
+        'memoryContent' in memory
+      ) {
+        expect(memory.memoryContent).toContain('GlobalContentOnly');
+      } else {
+        // Fallback expectation if structure is different
+        expect(memory).toBe('GlobalContentOnly');
+      }
+    } finally {
+      mockFsHelper.reset();
+    }
   });
 });
 
