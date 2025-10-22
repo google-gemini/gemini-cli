@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
+
 // Mapping from common CSS color names (lowercase) to hex codes (lowercase)
 // Excludes names directly supported by Ink
 export const CSS_NAME_TO_HEX_MAP: Readonly<Record<string, string>> = {
@@ -224,7 +226,7 @@ export function resolveColor(colorValue: string): string | undefined {
   }
 
   // 4. Could not resolve
-  console.warn(
+  debugLogger.warn(
     `[ColorUtils] Could not resolve color "${colorValue}" to an Ink-compatible format.`,
   );
   return undefined;

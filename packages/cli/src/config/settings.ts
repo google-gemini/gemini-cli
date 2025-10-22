@@ -10,6 +10,7 @@ import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
+  debugLogger,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
@@ -753,7 +754,7 @@ export function migrateDeprecatedSettings(
   const processScope = (scope: SettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
     if (settings.extensions?.disabled) {
-      console.log(
+      debugLogger.log(
         `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
       );
       const extensionEnablementManager = new ExtensionEnablementManager();
