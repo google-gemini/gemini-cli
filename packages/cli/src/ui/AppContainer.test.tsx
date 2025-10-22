@@ -1095,6 +1095,42 @@ describe('AppContainer State Management', () => {
     let handleGlobalKeypress: (key: Key) => void;
     let mockHandleSlashCommand: Mock;
     let mockCancelOngoingRequest: Mock;
+    let rerender: () => void;
+
+    // Helper function to reduce boilerplate in tests
+    const setupKeypressTest = () => {
+      const { rerender: inkRerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      rerender = () =>
+        inkRerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+    };
+
+    const pressKey = (key: Partial<Key>, times = 1) => {
+      for (let i = 0; i < times; i++) {
+        handleGlobalKeypress({
+          name: 'c',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          ...key,
+        } as Key);
+        rerender();
+      }
+    };
 
     beforeEach(() => {
       // Capture the keypress handler from the AppContainer
@@ -1147,122 +1183,33 @@ describe('AppContainer State Management', () => {
           thought: null,
           cancelOngoingRequest: mockCancelOngoingRequest,
         });
+        setupKeypressTest();
 
-        const { rerender } = render(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
-
-        handleGlobalKeypress({
-          name: 'c',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'c', ctrl: true });
 
         expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(1);
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
 
       it('should quit on second press', () => {
-        const { rerender } = render(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        setupKeypressTest();
 
-        handleGlobalKeypress({
-          name: 'c',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
-        handleGlobalKeypress({
-          name: 'c',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'c', ctrl: true }, 2);
 
         expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
         expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
       });
 
       it('should reset press count after a timeout', () => {
-        const { rerender } = render(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        setupKeypressTest();
 
-        handleGlobalKeypress({
-          name: 'c',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'c', ctrl: true });
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         // Advance timer past the reset threshold
         vi.advanceTimersByTime(1001);
 
-        handleGlobalKeypress({
-          name: 'c',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'c', ctrl: true });
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
@@ -1273,133 +1220,31 @@ describe('AppContainer State Management', () => {
           text: 'some text',
           setText: vi.fn(),
         });
+        setupKeypressTest();
 
-        const { rerender } = render(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
-
-        handleGlobalKeypress({
-          name: 'd',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
-        handleGlobalKeypress({
-          name: 'd',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'd', ctrl: true }, 2);
 
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
 
       it('should quit on second press if buffer is empty', () => {
-        const { rerender } = render(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        setupKeypressTest();
 
-        handleGlobalKeypress({
-          name: 'd',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
-        handleGlobalKeypress({
-          name: 'd',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'd', ctrl: true }, 2);
 
         expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
       });
 
       it('should reset press count after a timeout', () => {
-        const { rerender } = render(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        setupKeypressTest();
 
-        handleGlobalKeypress({
-          name: 'd',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'd', ctrl: true });
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         // Advance timer past the reset threshold
         vi.advanceTimersByTime(1001);
 
-        handleGlobalKeypress({
-          name: 'd',
-          ctrl: true,
-          meta: false,
-          shift: false,
-        } as Key);
-        rerender(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
+        pressKey({ name: 'd', ctrl: true });
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
