@@ -11,8 +11,12 @@ import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 export class MessageBus extends EventEmitter {
-  constructor(private readonly policyEngine: PolicyEngine) {
+  constructor(
+    private readonly policyEngine: PolicyEngine,
+    private readonly debug = false,
+  ) {
     super();
+    this.debug = debug;
   }
 
   private isValidMessage(message: Message): boolean {
@@ -35,6 +39,9 @@ export class MessageBus extends EventEmitter {
   }
 
   publish(message: Message): void {
+    if (this.debug) {
+      console.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+    }
     try {
       if (!this.isValidMessage(message)) {
         throw new Error(

@@ -14,16 +14,70 @@ import {
 } from '@google/gemini-cli-core';
 
 describe('createPolicyEngineConfig', () => {
-  it('should return ASK_USER for all tools by default', () => {
+  it('should return ASK_USER for write tools and ALLOW for read-only tools by default', () => {
     const settings: Settings = {};
     const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
     expect(config.defaultDecision).toBe(PolicyDecision.ASK_USER);
+    // The order of the rules is not guaranteed, so we sort them by tool name.
+    config.rules?.sort((a, b) =>
+      (a.toolName ?? '').localeCompare(b.toolName ?? ''),
+    );
     expect(config.rules).toEqual([
-      { toolName: 'replace', decision: 'ask_user', priority: 10 },
-      { toolName: 'save_memory', decision: 'ask_user', priority: 10 },
-      { toolName: 'run_shell_command', decision: 'ask_user', priority: 10 },
-      { toolName: 'write_file', decision: 'ask_user', priority: 10 },
-      { toolName: WEB_FETCH_TOOL_NAME, decision: 'ask_user', priority: 10 },
+      {
+        toolName: 'glob',
+        decision: PolicyDecision.ALLOW,
+        priority: 50,
+      },
+      {
+        toolName: 'google_web_search',
+        decision: PolicyDecision.ALLOW,
+        priority: 50,
+      },
+      {
+        toolName: 'list_directory',
+        decision: PolicyDecision.ALLOW,
+        priority: 50,
+      },
+      {
+        toolName: 'read_file',
+        decision: PolicyDecision.ALLOW,
+        priority: 50,
+      },
+      {
+        toolName: 'read_many_files',
+        decision: PolicyDecision.ALLOW,
+        priority: 50,
+      },
+      {
+        toolName: 'replace',
+        decision: PolicyDecision.ASK_USER,
+        priority: 10,
+      },
+      {
+        toolName: 'run_shell_command',
+        decision: PolicyDecision.ASK_USER,
+        priority: 10,
+      },
+      {
+        toolName: 'save_memory',
+        decision: PolicyDecision.ASK_USER,
+        priority: 10,
+      },
+      {
+        toolName: 'search_file_content',
+        decision: PolicyDecision.ALLOW,
+        priority: 50,
+      },
+      {
+        toolName: 'web_fetch',
+        decision: PolicyDecision.ASK_USER,
+        priority: 10,
+      },
+      {
+        toolName: 'write_file',
+        decision: PolicyDecision.ASK_USER,
+        priority: 10,
+      },
     ]);
   });
 
@@ -157,18 +211,6 @@ describe('createPolicyEngineConfig', () => {
     );
     expect(excludedRule).toBeDefined();
     expect(excludedRule?.priority).toBe(195);
-  });
-
-  it('should allow read-only tools if autoAccept is true', () => {
-    const settings: Settings = {
-      tools: { autoAccept: true },
-    };
-    const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
-    const rule = config.rules?.find(
-      (r) => r.toolName === 'glob' && r.decision === PolicyDecision.ALLOW,
-    );
-    expect(rule).toBeDefined();
-    expect(rule?.priority).toBe(50);
   });
 
   it('should allow all tools in YOLO mode', () => {
@@ -417,29 +459,6 @@ describe('createPolicyEngineConfig', () => {
     expect(excludeRule?.priority).toBe(195);
 
     // Exclude (195) should win over trust (90) when evaluated
-  });
-
-  it('should create all read-only tool rules when autoAccept is enabled', () => {
-    const settings: Settings = {
-      tools: { autoAccept: true },
-    };
-    const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
-
-    // All read-only tools should have allow rules
-    const readOnlyTools = [
-      'glob',
-      'search_file_content',
-      'list_directory',
-      'read_file',
-      'read_many_files',
-    ];
-    for (const tool of readOnlyTools) {
-      const rule = config.rules?.find(
-        (r) => r.toolName === tool && r.decision === PolicyDecision.ALLOW,
-      );
-      expect(rule).toBeDefined();
-      expect(rule?.priority).toBe(50);
-    }
   });
 
   it('should handle all approval modes correctly', () => {

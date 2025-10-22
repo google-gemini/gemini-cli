@@ -76,9 +76,8 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
-
 import { AgentRegistry } from '../agents/registry.js';
+import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 
 export enum ApprovalMode {
@@ -141,7 +140,7 @@ export interface GeminiCLIExtension {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];
-  id?: string;
+  id: string;
 }
 
 export interface ExtensionInstallMetadata {
@@ -158,6 +157,7 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type { FileFilteringOptions };
 export {
@@ -474,7 +474,7 @@ export class Config {
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
     this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? false,
       maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
       maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 5,
       thinkingBudget:
@@ -491,7 +491,7 @@ export class Config {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.policyEngine = new PolicyEngine(params.policyEngineConfig);
-    this.messageBus = new MessageBus(this.policyEngine);
+    this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
@@ -506,7 +506,7 @@ export class Config {
     }
 
     if (this.getProxy()) {
-      setGlobalDispatcher(new ProxyAgent(this.getProxy() as string));
+      setGlobalProxy(this.getProxy() as string);
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
@@ -1124,7 +1124,7 @@ export class Config {
         // the tool registry.
         const messageBusEnabled = this.getEnableMessageBusIntegration();
         if (this.debugMode && messageBusEnabled) {
-          console.log(
+          debugLogger.log(
             `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
           );
         }
@@ -1132,7 +1132,7 @@ export class Config {
           ? [...args, this.getMessageBus()]
           : args;
         if (this.debugMode && messageBusEnabled) {
-          console.log(
+          debugLogger.log(
             `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
           );
         }
@@ -1207,7 +1207,7 @@ export class Config {
             );
           }
         } else if (this.getDebugMode()) {
-          console.log(
+          debugLogger.log(
             `[Config] Skipping registration of agent '${definition.name}' due to allow/exclude configuration.`,
           );
         }

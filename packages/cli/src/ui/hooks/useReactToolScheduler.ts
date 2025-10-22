@@ -20,7 +20,7 @@ import type {
   Status as CoreStatus,
   EditorType,
 } from '@google/gemini-cli-core';
-import { CoreToolScheduler } from '@google/gemini-cli-core';
+import { CoreToolScheduler, debugLogger } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo } from 'react';
 import type {
   HistoryItemToolGroup,
@@ -198,7 +198,7 @@ function mapCoreStatusToDisplayStatus(coreStatus: CoreStatus): ToolCallStatus {
       return ToolCallStatus.Pending;
     default: {
       const exhaustiveCheck: never = coreStatus;
-      console.warn(`Unknown core status encountered: ${exhaustiveCheck}`);
+      debugLogger.warn(`Unknown core status encountered: ${exhaustiveCheck}`);
       return ToolCallStatus.Error;
     }
   }

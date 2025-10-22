@@ -8,6 +8,7 @@ import type { Config } from '../config/config.js';
 import { isPerformanceMonitoringActive } from './metrics.js';
 import { getMemoryMonitor } from './memory-monitor.js';
 import { ActivityType } from './activity-types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Activity event data structure
@@ -152,7 +153,7 @@ export class ActivityMonitor {
         listener(event);
       } catch (error) {
         // Silently catch listener errors to avoid disrupting the application
-        console.debug('ActivityMonitor listener error:', error);
+        debugLogger.debug('ActivityMonitor listener error:', error);
       }
     });
   }

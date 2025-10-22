@@ -6,6 +6,7 @@
 
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
 const PRIVATE_IP_RANGES = [
   /^10\./,
@@ -53,5 +54,13 @@ export async function fetchWithTimeout(
     throw new FetchError(getErrorMessage(error));
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+export function setGlobalProxy(proxy: string) {
+  try {
+    setGlobalDispatcher(new ProxyAgent(proxy));
+  } catch (e) {
+    console.error(`Failed to set proxy: ${getErrorMessage(e)}`);
   }
 }

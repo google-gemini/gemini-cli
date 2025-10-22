@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
@@ -48,8 +49,11 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: ReadFileToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -138,7 +142,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
 > {
   static readonly Name = READ_FILE_TOOL_NAME;
 
-  constructor(private config: Config) {
+  constructor(
+    private config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       ReadFileTool.Name,
       'ReadFile',
@@ -165,6 +172,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
         required: ['absolute_path'],
         type: 'object',
       },
+      true,
+      false,
+      messageBus,
     );
   }
 
@@ -209,7 +219,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ReadFileToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ReadFileToolParams, ToolResult> {
-    return new ReadFileToolInvocation(this.config, params);
+    return new ReadFileToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

@@ -8,7 +8,11 @@
 import type { CommandModule } from 'yargs';
 import { loadSettings } from '../../config/settings.js';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
-import { MCPServerStatus, createTransport } from '@google/gemini-cli-core';
+import {
+  MCPServerStatus,
+  createTransport,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { loadExtensions } from '../../config/extension.js';
 import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
@@ -84,11 +88,11 @@ export async function listMcpServers(): Promise<void> {
   const serverNames = Object.keys(mcpServers);
 
   if (serverNames.length === 0) {
-    console.log('No MCP servers configured.');
+    debugLogger.log('No MCP servers configured.');
     return;
   }
 
-  console.log('Configured MCP servers:\n');
+  debugLogger.log('Configured MCP servers:\n');
 
   for (const serverName of serverNames) {
     const server = mcpServers[serverName];
@@ -125,7 +129,7 @@ export async function listMcpServers(): Promise<void> {
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }
 
-    console.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
+    debugLogger.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
   }
 }
 
