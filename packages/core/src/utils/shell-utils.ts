@@ -738,3 +738,75 @@ export function isCommandAllowed(
   }
   return { allowed: false, reason: blockReason };
 }
+
+/**
+ * Determines whether a shell invocation should be auto-approved based on an allowlist.
+ *
+ * This reuses the same parsing logic as command-permission enforcement so that
+ * chained commands must be individually covered by the allowlist.
+ *
+ * @param invocation The shell tool invocation being evaluated.
+ * @param allowedPatterns The configured allowlist patterns (e.g. `run_shell_command(git)`).
+ * @returns True if every parsed command segment is allowed by the patterns; false otherwise.
+ */
+export function isShellInvocationAllowlisted(
+  invocation: AnyToolInvocation,
+  allowedPatterns: string[],
+): boolean {
+  if (!allowedPatterns.length) {
+    return false;
+  }
+
+  const hasShellWildcard = allowedPatterns.some((pattern) =>
+    SHELL_TOOL_NAMES.includes(pattern),
+  );
+  const hasShellSpecificPattern = allowedPatterns.some((pattern) =>
+    SHELL_TOOL_NAMES.some((name) => pattern.startsWith(`${name}(`)),
+  );
+
+  if (!hasShellWildcard && !hasShellSpecificPattern) {
+    return false;
+  }
+
+  if (hasShellWildcard) {
+    return true;
+  }
+
+  if (
+    !('params' in invocation) ||
+    typeof invocation.params !== 'object' ||
+    invocation.params === null ||
+    !('command' in invocation.params)
+  ) {
+    return false;
+  }
+
+  const commandValue = (invocation.params as { command?: unknown }).command;
+  if (typeof commandValue !== 'string' || !commandValue.trim()) {
+    return false;
+  }
+
+  const command = commandValue.trim();
+
+  const parseResult = parseCommandDetails(command);
+  if (!parseResult || parseResult.hasError) {
+    return false;
+  }
+
+  const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
+  const commandsToValidate = parseResult.details
+    .map((detail) => normalize(detail.text))
+    .filter(Boolean);
+
+  if (commandsToValidate.length === 0) {
+    return false;
+  }
+
+  return commandsToValidate.every((commandSegment) =>
+    doesToolInvocationMatch(
+      SHELL_TOOL_NAMES[0],
+      { params: { command: commandSegment } } as AnyToolInvocation,
+      allowedPatterns,
+    ),
+  );
+}

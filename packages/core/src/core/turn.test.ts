@@ -784,6 +784,68 @@ describe('Turn', () => {
         { type: GeminiEventType.Content, value: 'Success' },
       ]);
     });
+
+    it('should yield content events with traceId', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+            responseId: 'trace-123',
+          } as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        'test-model',
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Hello', traceId: 'trace-123' },
+      ]);
+    });
+
+    it('should yield thought events with traceId', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: '[Thought: thinking]', thought: 'thinking' }],
+                },
+              },
+            ],
+            responseId: 'trace-456',
+          } as unknown as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        'test-model',
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        {
+          type: GeminiEventType.Thought,
+          value: { subject: '', description: '[Thought: thinking]' },
+          traceId: 'trace-456',
+        },
+      ]);
+    });
   });
 
   describe('getDebugResponses', () => {

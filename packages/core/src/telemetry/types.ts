@@ -54,6 +54,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_tools_count?: number;
   mcp_tools?: string;
   output_format: OutputFormat;
+  extensions_count: number;
+  extension_ids: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -85,6 +87,9 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       config.getFileFilteringRespectGitIgnore();
     this.mcp_servers_count = mcpServers ? Object.keys(mcpServers).length : 0;
     this.output_format = config.getOutputFormat();
+    const extensions = config.getExtensions();
+    this.extensions_count = extensions.length;
+    this.extension_ids = extensions.map((e) => e.id).join(',');
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -116,6 +121,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       mcp_tools: this.mcp_tools,
       mcp_tools_count: this.mcp_tools_count,
       output_format: this.output_format,
+      extensions_count: this.extensions_count,
+      extension_ids: this.extension_ids,
     };
   }
 
@@ -198,6 +205,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   tool_type: 'native' | 'mcp';
   content_length?: number;
   mcp_server_name?: string;
+  extension_id?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -243,6 +251,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       ) {
         this.tool_type = 'mcp';
         this.mcp_server_name = call.tool.serverName;
+        this.extension_id = call.tool.extensionId;
       } else {
         this.tool_type = 'native';
       }
@@ -292,6 +301,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       tool_type: this.tool_type,
       content_length: this.content_length,
       mcp_server_name: this.mcp_server_name,
+      extension_id: this.extension_id,
       metadata: this.metadata,
     };
 
@@ -627,6 +637,7 @@ export interface SlashCommandEvent extends BaseTelemetryEvent {
   command: string;
   subcommand?: string;
   status?: SlashCommandStatus;
+  extension_id?: string;
   toOpenTelemetryAttributes(config: Config): LogAttributes;
   toLogBody(): string;
 }
@@ -635,6 +646,7 @@ export function makeSlashCommandEvent({
   command,
   subcommand,
   status,
+  extension_id,
 }: Omit<
   SlashCommandEvent,
   CommonFields | 'toOpenTelemetryAttributes' | 'toLogBody'
@@ -645,6 +657,7 @@ export function makeSlashCommandEvent({
     command,
     subcommand,
     status,
+    extension_id,
     toOpenTelemetryAttributes(config: Config): LogAttributes {
       return {
         ...getCommonAttributes(config),
@@ -653,6 +666,7 @@ export function makeSlashCommandEvent({
         command: this.command,
         subcommand: this.subcommand,
         status: this.status,
+        extension_id: this.extension_id,
       };
     },
     toLogBody(): string {
@@ -1041,12 +1055,14 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
   'event.timestamp': string;
   extension_name: string;
+  extension_id: string;
   extension_version: string;
   extension_source: string;
   status: 'success' | 'error';
 
   constructor(
     extension_name: string,
+    extension_id: string,
     extension_version: string,
     extension_source: string,
     status: 'success' | 'error',
@@ -1054,6 +1070,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_install';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_source = extension_source;
     this.status = status;
@@ -1132,12 +1149,18 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_uninstall';
   'event.timestamp': string;
   extension_name: string;
+  extension_id: string;
   status: 'success' | 'error';
 
-  constructor(extension_name: string, status: 'success' | 'error') {
+  constructor(
+    extension_name: string,
+    extension_id: string,
+    status: 'success' | 'error',
+  ) {
     this['event.name'] = 'extension_uninstall';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.extension_id = extension_id;
     this.status = status;
   }
 
@@ -1161,6 +1184,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
   'event.name': 'extension_update';
   'event.timestamp': string;
   extension_name: string;
+  extension_id: string;
   extension_previous_version: string;
   extension_version: string;
   extension_source: string;
@@ -1168,6 +1192,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
 
   constructor(
     extension_name: string,
+    extension_id: string,
     extension_version: string,
     extension_previous_version: string,
     extension_source: string,
@@ -1176,6 +1201,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_update';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_previous_version = extension_previous_version;
     this.extension_source = extension_source;
@@ -1205,12 +1231,18 @@ export class ExtensionEnableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_enable';
   'event.timestamp': string;
   extension_name: string;
+  extension_id: string;
   setting_scope: string;
 
-  constructor(extension_name: string, settingScope: string) {
+  constructor(
+    extension_name: string,
+    extension_id: string,
+    settingScope: string,
+  ) {
     this['event.name'] = 'extension_enable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
 
@@ -1291,12 +1323,18 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
   'event.timestamp': string;
   extension_name: string;
+  extension_id: string;
   setting_scope: string;
 
-  constructor(extension_name: string, settingScope: string) {
+  constructor(
+    extension_name: string,
+    extension_id: string,
+    settingScope: string,
+  ) {
     this['event.name'] = 'extension_disable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
 
