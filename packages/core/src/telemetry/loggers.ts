@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LogRecord } from '@opentelemetry/api-logs';
+import type { LogRecord, LogAttributes } from '@opentelemetry/api-logs';
 import { logs } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
+import { getCommonAttributes } from './telemetryAttributes.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
-} from './types.js';
+  EVENT_RESEARCH_OPT_IN,
+} from './constants.js';
 import type {
   ApiErrorEvent,
   ApiRequestEvent,
@@ -29,6 +31,7 @@ import type {
   SlashCommandEvent,
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
+  ResearchOptInEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
   InvalidChunkEvent,
@@ -403,6 +406,28 @@ export function logKittySequenceOverflow(
   const logRecord: LogRecord = {
     body: event.toLogBody(),
     attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+}
+
+export function logResearchOptIn(
+  config: Config,
+  event: ResearchOptInEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logResearchOptInEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    opt_in_status: event.opt_in_status,
+    ...(event.contact_email && { contact_email: event.contact_email }),
+    ...(event.user_id && { user_id: event.user_id }),
+    'event.name': EVENT_RESEARCH_OPT_IN,
+    'event.timestamp': event['event.timestamp'],
+  };
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Research opt-in: ${event.opt_in_status ? 'enabled' : 'disabled'}`,
+    attributes,
   };
   logger.emit(logRecord);
 }
