@@ -267,9 +267,6 @@ class MemoryToolInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(
-        `[MemoryTool] Error executing save_memory for fact "${fact}": ${errorMessage}`,
-      );
       return {
         llmContent: JSON.stringify({
           success: false,

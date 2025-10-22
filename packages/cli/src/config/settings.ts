@@ -617,7 +617,7 @@ export function loadSettings(
                   'utf-8',
                 );
               } catch (e) {
-                console.error(
+                debugLogger.error(
                   `Error migrating settings file on disk: ${getErrorMessage(
                     e,
                   )}`,
@@ -799,6 +799,6 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
-    console.error('Error saving user settings file:', error);
+    debugLogger.error('Error saving user settings file:', error);
   }
 }
