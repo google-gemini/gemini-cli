@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EOL } from 'node:os';
@@ -18,6 +19,7 @@ import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
@@ -110,8 +112,11 @@ class GrepToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: RipGrepToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   /**
@@ -175,7 +180,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
 
       if (this.config.getDebugMode()) {
-        console.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
+        debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
       for (const searchDir of searchDirectories) {
@@ -449,7 +454,10 @@ export class RipGrepTool extends BaseDeclarativeTool<
 > {
   static readonly Name = GREP_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       RipGrepTool.Name,
       'SearchText',
@@ -476,6 +484,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
         required: ['pattern'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -548,7 +559,16 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: RipGrepToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
-    return new GrepToolInvocation(this.config, params);
+    return new GrepToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
