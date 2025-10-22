@@ -5,6 +5,7 @@
  */
 
 import {
+  diag,
   SpanStatusCode,
   trace,
   type AttributeValue,
@@ -82,27 +83,37 @@ export async function runInDevTraceSpan<R>(
         attributes: {},
       };
       const endSpan = () => {
-        if (meta.input !== undefined) {
-          span.setAttribute('input-json', safeJsonStringify(meta.input));
-        }
-        if (meta.output !== undefined) {
-          span.setAttribute('output-json', safeJsonStringify(meta.output));
-        }
-        for (const [key, value] of Object.entries(meta.attributes)) {
-          span.setAttribute(key, value as AttributeValue);
-        }
-        if (meta.error) {
+        try {
+          if (meta.input !== undefined) {
+            span.setAttribute('input-json', safeJsonStringify(meta.input));
+          }
+          if (meta.output !== undefined) {
+            span.setAttribute('output-json', safeJsonStringify(meta.output));
+          }
+          for (const [key, value] of Object.entries(meta.attributes)) {
+            span.setAttribute(key, value as AttributeValue);
+          }
+          if (meta.error) {
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: getErrorMessage(meta.error),
+            });
+            if (meta.error instanceof Error) {
+              span.recordException(meta.error);
+            }
+          } else {
+            span.setStatus({ code: SpanStatusCode.OK });
+          }
+        } catch (e) {
+          // Log the error but don't rethrow, to ensure span.end() is called.
+          diag.error('Error setting span attributes in endSpan', e);
           span.setStatus({
             code: SpanStatusCode.ERROR,
-            message: getErrorMessage(meta.error),
+            message: `Error in endSpan: ${getErrorMessage(e)}`,
           });
-          if (meta.error instanceof Error) {
-            span.recordException(meta.error);
-          }
-        } else {
-          span.setStatus({ code: SpanStatusCode.OK });
+        } finally {
+          span.end();
         }
-        span.end();
       };
       try {
         return await fn({ metadata: meta, endSpan });
