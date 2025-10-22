@@ -3,16 +3,20 @@ import com.google.gemini.cli.CloseDiffAction
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.chains.SimpleDiffRequestChain
+import com.intellij.diff.contents.DocumentContent
 import com.intellij.diff.editor.ChainDiffVirtualFile
+import com.intellij.diff.requests.ContentDiffRequest
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.diff.util.DiffUserDataKeys
+import com.intellij.diff.util.DiffUserDataKeysEx
+import com.intellij.diff.util.Side
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.diff.DiffBundle
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -69,11 +73,17 @@ class DiffManager(private val project: Project) : Disposable {
       DiffContentFactory.getInstance().create("")
     }
 
-    val content2 = DiffContentFactory.getInstance().create(project, newContent, file?.fileType)
+    val content2 = DiffContentFactory.getInstance().createEditable(project, newContent, file?.fileType)
 
     val diffTitle = "${Paths.get(filePath).fileName} ↔ Modified"
     val request = SimpleDiffRequest(diffTitle, content1, content2, "Original", "Gemini's suggestion")
 
+    // Make left side read-only and right side editable to enable revert button behavior
+    request.putUserData(DiffUserDataKeys.MASTER_SIDE, Side.RIGHT)
+    request.putUserData(DiffUserDataKeys.PREFERRED_FOCUS_SIDE, Side.RIGHT)
+    request.putUserData(DiffUserDataKeys.FORCE_READ_ONLY_CONTENTS, booleanArrayOf(true, false))
+    request.putUserData(DiffUserDataKeysEx.LAST_REVISION_WITH_LOCAL, true)
+    request.putUserData(DiffUserDataKeysEx.VCS_DIFF_ACCEPT_LEFT_ACTION_TEXT, DiffBundle.message("action.presentation.diff.revert.text"))
     // Add custom actions to the diff viewer
     val actions = listOf(CloseDiffAction(this, filePath), AcceptDiffAction(this, filePath))
     request.putUserData(DiffUserDataKeys.CONTEXT_ACTIONS, actions)
@@ -183,14 +193,21 @@ class DiffManager(private val project: Project) : Disposable {
 
     var content: String? = null
     actualFileToClose?.let { file ->
-      // It's important to get the content before closing the editor.
-      val editor = fileEditorManager.getSelectedEditor(file)
-      if (editor is TextEditor) {
-        // Must be run in a read action
-        ApplicationManager.getApplication().runReadAction {
-          content = editor.editor.document.text
+      if (file is ChainDiffVirtualFile) {
+        val producer = file.chain.requests.firstOrNull()
+        if (producer is SimpleDiffRequestChain.DiffRequestProducerWrapper) {
+          val request = producer.request
+          if (request is ContentDiffRequest && request.contents.size > 1) {
+            val centerDiffContent = request.contents.getOrNull(1)
+            if (centerDiffContent is DocumentContent) {
+              ApplicationManager.getApplication().runReadAction {
+                content = centerDiffContent.document.text
+              }
+            }
+          }
         }
       }
+
       ApplicationManager.getApplication().invokeLater {
         fileEditorManager.closeFile(file)
       }
