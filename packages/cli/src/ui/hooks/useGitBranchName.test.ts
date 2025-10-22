@@ -10,7 +10,8 @@ import { act } from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs';
-import * as fsPromises from 'node:fs/promises'; // For mocking fs
+import * as fsPromises from 'node:fs/promises';
+import path from 'node:path'; // For mocking fs
 import { spawnAsync as mockSpawnAsync } from '@google/gemini-cli-core';
 
 // Mock @google/gemini-cli-core
@@ -39,7 +40,7 @@ vi.mock('node:fs/promises', async () => {
 });
 
 const CWD = '/test/project';
-const GIT_LOGS_HEAD_PATH = `${CWD}/.git/logs/HEAD`;
+const GIT_LOGS_HEAD_PATH = path.join(CWD, '.git', 'logs', 'HEAD');
 
 describe('useGitBranchName', () => {
   beforeEach(() => {
