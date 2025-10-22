@@ -624,4 +624,32 @@ describe('E2E Tests', () => {
     assertUniqueFinalEventIsLast(events);
     expect(events.length).toBe(10);
   });
+
+  it('should include traceId in status updates when available', async () => {
+    const traceId = 'test-trace-id';
+    sendMessageStreamSpy.mockImplementation(async function* () {
+      yield* [
+        { type: 'content', value: 'Hello', traceId },
+        { type: 'thought', value: { subject: 'Thinking...' }, traceId },
+      ];
+    });
+
+    const agent = request.agent(app);
+    const res = await agent
+      .post('/')
+      .send(createStreamMessageRequest('hello', 'a2a-trace-id-test'))
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const events = streamToSSEEvents(res.text);
+
+    // The first two events are task-creation and working status
+    const textContentEvent = events[2].result as TaskStatusUpdateEvent;
+    expect(textContentEvent.kind).toBe('status-update');
+    expect(textContentEvent.metadata?.['traceId']).toBe(traceId);
+
+    const thoughtEvent = events[3].result as TaskStatusUpdateEvent;
+    expect(thoughtEvent.kind).toBe('status-update');
+    expect(thoughtEvent.metadata?.['traceId']).toBe(traceId);
+  });
 });

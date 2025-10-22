@@ -10,6 +10,7 @@ import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LruCache } from './LruCache.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { promptIdContext } from './promptIdContext.js';
+import { debugLogger } from './debugLogger.js';
 
 const MAX_CACHE_SIZE = 50;
 
@@ -112,7 +113,7 @@ export async function FixLLMEditWithInstruction(
   let promptId = promptIdContext.getStore();
   if (!promptId) {
     promptId = `llm-fixer-fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    console.warn(
+    debugLogger.warn(
       `Could not find promptId in context. This is unexpected. Using a fallback ID: ${promptId}`,
     );
   }
