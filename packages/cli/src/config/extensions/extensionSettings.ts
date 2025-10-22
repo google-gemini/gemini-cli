@@ -14,14 +14,26 @@ export interface ExtensionSetting {
   name: string;
   description: string;
   envVar: string;
-  sensitive?: boolean;
 }
 
 export async function maybePromptForSettings(
   extensionConfig: ExtensionConfig,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
+  previousExtensionConfig?: ExtensionConfig,
 ): Promise<void> {
-  const { settings, name: extensionName } = extensionConfig;
+  let settings = extensionConfig.settings;
+  const { name: extensionName } = extensionConfig;
+  if (!settings || settings.length === 0) {
+    return;
+  }
+
+  if (previousExtensionConfig) {
+    const oldSettings = new Set(
+      previousExtensionConfig.settings?.map((s) => s.name) || [],
+    );
+    settings = settings.filter((s) => !oldSettings.has(s.name));
+  }
+
   if (!settings || settings.length === 0) {
     return;
   }
@@ -33,14 +45,15 @@ export async function maybePromptForSettings(
     envContent += `${setting.envVar}=${answer}\n`;
   }
 
-  await fs.writeFile(envFilePath, envContent);
+  await fs.appendFile(envFilePath, envContent);
 }
 
 export async function promptForSetting(
   setting: ExtensionSetting,
 ): Promise<string> {
   const response = await prompts({
-    type: setting.sensitive ? 'password' : 'text',
+    // type: setting.sensitive ? 'password' : 'text',
+    type: 'text',
     name: 'value',
     message: `${setting.name}\n${setting.description}`,
   });

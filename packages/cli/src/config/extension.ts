@@ -434,25 +434,6 @@ async function maybeCopySettingsFromTempDir(
   return tempSettingsPath;
 }
 
-async function promptForNewSettingsOnUpdate(
-  newExtensionConfig: ExtensionConfig,
-  previousExtensionConfig: ExtensionConfig,
-  requestSetting: (setting: ExtensionSetting) => Promise<string>,
-): Promise<void> {
-  const oldSettings = new Set(
-    previousExtensionConfig.settings?.map((s) => s.name) || [],
-  );
-  const newSettings =
-    newExtensionConfig.settings?.filter((s) => !oldSettings.has(s.name)) || [];
-  if (newSettings.length > 0) {
-    const configWithOnlyNewSettings = {
-      ...newExtensionConfig,
-      settings: newSettings,
-    };
-    await maybePromptForSettings(configWithOnlyNewSettings, requestSetting);
-  }
-}
-
 export async function installOrUpdateExtension(
   installMetadata: ExtensionInstallMetadata,
   requestConsent: (consent: string) => Promise<boolean>,
@@ -593,10 +574,10 @@ export async function installOrUpdateExtension(
       await fs.promises.mkdir(destinationPath, { recursive: true });
       if (requestSetting !== undefined) {
         if (isUpdate && previousExtensionConfig) {
-          await promptForNewSettingsOnUpdate(
+          await maybePromptForSettings(
             newExtensionConfig,
-            previousExtensionConfig,
             requestSetting,
+            previousExtensionConfig,
           );
         } else if (!isUpdate) {
           await maybePromptForSettings(newExtensionConfig, requestSetting);

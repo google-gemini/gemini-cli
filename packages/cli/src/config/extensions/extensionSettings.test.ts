@@ -113,7 +113,7 @@ describe('extensionSettings', () => {
         name: 'API Key',
         description: 'Your secret key',
         envVar: 'API_KEY',
-        sensitive: true,
+        // sensitive: true,
       };
       vi.mocked(prompts).mockResolvedValue({ value: 'secret-key' });
 
@@ -132,7 +132,7 @@ describe('extensionSettings', () => {
         name: 'Username',
         description: 'Your public username',
         envVar: 'USERNAME',
-        sensitive: false,
+        // sensitive: false,
       };
       vi.mocked(prompts).mockResolvedValue({ value: 'test-user' });
 

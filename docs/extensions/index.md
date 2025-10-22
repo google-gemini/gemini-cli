@@ -190,7 +190,6 @@ Each object in the array should have the following properties:
 - `description`: A description of the setting and what it's used for.
 - `envVar`: The name of the environment variable that the setting will be stored
   as.
-- `sensitive`: (optional) If true, the user's input will be obfuscated.
 
 **Example**
 
@@ -202,8 +201,7 @@ Each object in the array should have the following properties:
     {
       "name": "API Key",
       "description": "Your API key for the service.",
-      "envVar": "MY_API_KEY",
-      "sensitive": "true"
+      "envVar": "MY_API_KEY"
     }
   ]
 }
