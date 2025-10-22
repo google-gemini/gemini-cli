@@ -1581,8 +1581,9 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this should set the paste protection)
-      stdin.write(`\x1b[200~pasted content\x1b[201~`);
-      await vi.runAllTimersAsync();
+      act(() => {
+        stdin.write(`\x1b[200~pasted content\x1b[201~`);
+      });
 
       // Simulate an Enter key press immediately after paste
       stdin.write('\r');
