@@ -18,6 +18,10 @@ concurrency:
   cancel-in-progress: |-
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
+permissions:
+  contents: 'read'
+  statuses: 'write'
+
 jobs:
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
@@ -66,6 +70,22 @@ jobs:
             const temp = '${{ runner.temp }}/artifacts';
             const repo_name = String(fs.readFileSync(path.join(temp, 'repo_name')));
             core.setOutput('repo_name', repo_name);
+
+  set_pending_status:
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    needs:
+      - 'download_repo_name'
+    steps:
+      - name: 'Set pending status'
+        uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
+        if: 'always()'
+        with:
+          allowForks: 'true'
+          repo: '${{ needs.download_repo_name.outputs.repo_name }}'
+          sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          token: '${{ secrets.GITHUB_TOKEN }}'
+          status: 'pending'
+          context: 'Set e2e pending Status'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
@@ -229,3 +249,20 @@ jobs:
             exit 1
           fi
           echo "All required E2E jobs passed!"
+
+  set_workflow_status:
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    needs:
+      - 'download_repo_name'
+      - 'e2e'
+    steps:
+      - name: 'Set workflow status'
+        uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
+        if: 'always()'
+        with:
+          allowForks: 'true'
+          repo: '${{ needs.download_repo_name.outputs.repo_name }}'
+          sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          token: '${{ secrets.GITHUB_TOKEN }}'
+          status: '${{ job.status }}'
+          context: 'Set E2E Status'
