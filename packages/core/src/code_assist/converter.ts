@@ -73,6 +73,7 @@ interface VertexGenerationConfig {
 
 export interface CaGenerateContentResponse {
   response: VertexGenerateContentResponse;
+  traceId?: string;
 }
 
 interface VertexGenerateContentResponse {
@@ -139,6 +140,7 @@ export function fromGenerateContentResponse(
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
   out.modelVersion = inres.modelVersion;
+  out.responseId = res.traceId;
   return out;
 }
 

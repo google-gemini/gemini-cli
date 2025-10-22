@@ -11,6 +11,8 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
 } from './quotaErrorDetection.js';
+import { delay, createAbortError } from './delay.js';
+import { debugLogger } from './debugLogger.js';
 
 const FETCH_FAILED_MESSAGE =
   'exception TypeError: fetch failed sending request';
@@ -31,6 +33,7 @@ export interface RetryOptions {
   ) => Promise<string | boolean | null>;
   authType?: string;
   retryFetchErrors?: boolean;
+  signal?: AbortSignal;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -76,15 +79,6 @@ function defaultShouldRetry(
 }
 
 /**
- * Delays execution for a specified number of milliseconds.
- * @param ms The number of milliseconds to delay.
- * @returns A promise that resolves after the delay.
- */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
  * Retries a function with exponential backoff and jitter.
  * @param fn The asynchronous function to retry.
  * @param options Optional retry configuration.
@@ -95,6 +89,10 @@ export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options?: Partial<RetryOptions>,
 ): Promise<T> {
+  if (options?.signal?.aborted) {
+    throw createAbortError();
+  }
+
   if (options?.maxAttempts !== undefined && options.maxAttempts <= 0) {
     throw new Error('maxAttempts must be a positive number.');
   }
@@ -112,6 +110,7 @@ export async function retryWithBackoff<T>(
     shouldRetryOnError,
     shouldRetryOnContent,
     retryFetchErrors,
+    signal,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     ...cleanOptions,
@@ -122,6 +121,9 @@ export async function retryWithBackoff<T>(
   let consecutive429Count = 0;
 
   while (attempt < maxAttempts) {
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
     attempt++;
     try {
       const result = await fn();
@@ -132,13 +134,17 @@ export async function retryWithBackoff<T>(
       ) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
-        await delay(delayWithJitter);
+        await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
         continue;
       }
 
       return result;
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+
       const errorStatus = getErrorStatus(error);
 
       // Check for Pro quota exceeded error first - immediate fallback for OAuth users
@@ -163,7 +169,7 @@ export async function retryWithBackoff<T>(
           }
         } catch (fallbackError) {
           // If fallback fails, continue with original error
-          console.warn('Fallback to Flash model failed:', fallbackError);
+          debugLogger.warn('Fallback to Flash model failed:', fallbackError);
         }
       }
 
@@ -190,7 +196,7 @@ export async function retryWithBackoff<T>(
           }
         } catch (fallbackError) {
           // If fallback fails, continue with original error
-          console.warn('Fallback to Flash model failed:', fallbackError);
+          debugLogger.warn('Fallback to Flash model failed:', fallbackError);
         }
       }
 
@@ -222,7 +228,7 @@ export async function retryWithBackoff<T>(
           }
         } catch (fallbackError) {
           // If fallback fails, continue with original error
-          console.warn('Fallback to Flash model failed:', fallbackError);
+          debugLogger.warn('Fallback to Flash model failed:', fallbackError);
         }
       }
 
@@ -239,11 +245,11 @@ export async function retryWithBackoff<T>(
 
       if (delayDurationMs > 0) {
         // Respect Retry-After header if present and parsed
-        console.warn(
+        debugLogger.warn(
           `Attempt ${attempt} failed with status ${delayErrorStatus ?? 'unknown'}. Retrying after explicit delay of ${delayDurationMs}ms...`,
           error,
         );
-        await delay(delayDurationMs);
+        await delay(delayDurationMs, signal);
         // Reset currentDelay for next potential non-429 error, or if Retry-After is not present next time
         currentDelay = initialDelayMs;
       } else {
@@ -252,7 +258,7 @@ export async function retryWithBackoff<T>(
         // Add jitter: +/- 30% of currentDelay
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
-        await delay(delayWithJitter);
+        await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
       }
     }
@@ -362,13 +368,13 @@ function logRetryAttempt(
   }
 
   if (errorStatus === 429) {
-    console.warn(message, error);
+    debugLogger.warn(message, error);
   } else if (errorStatus && errorStatus >= 500 && errorStatus < 600) {
     console.error(message, error);
   } else if (error instanceof Error) {
     // Fallback for errors that might not have a status but have a message
     if (error.message.includes('429')) {
-      console.warn(
+      debugLogger.warn(
         `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`,
         error,
       );
@@ -378,9 +384,9 @@ function logRetryAttempt(
         error,
       );
     } else {
-      console.warn(message, error); // Default to warn for other errors
+      debugLogger.warn(message, error); // Default to warn for other errors
     }
   } else {
-    console.warn(message, error); // Default to warn if error type is unknown
+    debugLogger.warn(message, error); // Default to warn if error type is unknown
   }
 }

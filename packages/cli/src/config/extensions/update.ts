@@ -18,9 +18,10 @@ import {
   loadExtensionConfig,
 } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import { getErrorMessage } from '../../utils/errors.js';
+import { type ExtensionEnablementManager } from './extensionEnablement.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -30,6 +31,7 @@ export interface ExtensionUpdateInfo {
 
 export async function updateExtension(
   extension: GeminiCLIExtension,
+  extensionEnablementManager: ExtensionEnablementManager,
   cwd: string = process.cwd(),
   requestConsent: (consent: string) => Promise<boolean>,
   currentState: ExtensionUpdateState,
@@ -67,6 +69,7 @@ export async function updateExtension(
     const previousExtensionConfig = await loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
+      extensionEnablementManager,
     });
     await installOrUpdateExtension(
       installMetadata,
@@ -79,6 +82,7 @@ export async function updateExtension(
     const updatedExtension = loadExtension({
       extensionDir: updatedExtensionStorage.getExtensionDir(),
       workspaceDir: cwd,
+      extensionEnablementManager,
     });
     if (!updatedExtension) {
       dispatchExtensionStateUpdate({
@@ -101,7 +105,7 @@ export async function updateExtension(
       updatedVersion,
     };
   } catch (e) {
-    console.error(
+    debugLogger.error(
       `Error updating extension, rolling back. ${getErrorMessage(e)}`,
     );
     dispatchExtensionStateUpdate({
@@ -120,6 +124,7 @@ export async function updateAllUpdatableExtensions(
   requestConsent: (consent: string) => Promise<boolean>,
   extensions: GeminiCLIExtension[],
   extensionsState: Map<string, ExtensionUpdateStatus>,
+  extensionEnablementManager: ExtensionEnablementManager,
   dispatch: (action: ExtensionUpdateAction) => void,
 ): Promise<ExtensionUpdateInfo[]> {
   return (
@@ -133,6 +138,7 @@ export async function updateAllUpdatableExtensions(
         .map((extension) =>
           updateExtension(
             extension,
+            extensionEnablementManager,
             cwd,
             requestConsent,
             extensionsState.get(extension.name)!.status,
@@ -150,6 +156,7 @@ export interface ExtensionUpdateCheckResult {
 
 export async function checkForAllExtensionUpdates(
   extensions: GeminiCLIExtension[],
+  extensionEnablementManager: ExtensionEnablementManager,
   dispatch: (action: ExtensionUpdateAction) => void,
   cwd: string = process.cwd(),
 ): Promise<void> {
@@ -174,11 +181,12 @@ export async function checkForAllExtensionUpdates(
       },
     });
     promises.push(
-      checkForExtensionUpdate(extension, cwd).then((state) =>
-        dispatch({
-          type: 'SET_STATE',
-          payload: { name: extension.name, state },
-        }),
+      checkForExtensionUpdate(extension, extensionEnablementManager, cwd).then(
+        (state) =>
+          dispatch({
+            type: 'SET_STATE',
+            payload: { name: extension.name, state },
+          }),
       ),
     );
   }

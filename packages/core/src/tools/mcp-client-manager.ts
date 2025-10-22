@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config, MCPServerConfig } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import type { ToolRegistry } from './tool-registry.js';
-import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
   McpClient,
   MCPDiscoveryState,
@@ -14,7 +13,6 @@ import {
 } from './mcp-client.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { EventEmitter } from 'node:events';
-import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
@@ -23,30 +21,12 @@ import type { WorkspaceContext } from '../utils/workspaceContext.js';
  */
 export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
-  private readonly mcpServers: Record<string, MCPServerConfig>;
-  private readonly mcpServerCommand: string | undefined;
   private readonly toolRegistry: ToolRegistry;
-  private readonly promptRegistry: PromptRegistry;
-  private readonly debugMode: boolean;
-  private readonly workspaceContext: WorkspaceContext;
   private discoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
   private readonly eventEmitter?: EventEmitter;
 
-  constructor(
-    mcpServers: Record<string, MCPServerConfig>,
-    mcpServerCommand: string | undefined,
-    toolRegistry: ToolRegistry,
-    promptRegistry: PromptRegistry,
-    debugMode: boolean,
-    workspaceContext: WorkspaceContext,
-    eventEmitter?: EventEmitter,
-  ) {
-    this.mcpServers = mcpServers;
-    this.mcpServerCommand = mcpServerCommand;
+  constructor(toolRegistry: ToolRegistry, eventEmitter?: EventEmitter) {
     this.toolRegistry = toolRegistry;
-    this.promptRegistry = promptRegistry;
-    this.debugMode = debugMode;
-    this.workspaceContext = workspaceContext;
     this.eventEmitter = eventEmitter;
   }
 
@@ -62,22 +42,23 @@ export class McpClientManager {
     await this.stop();
 
     const servers = populateMcpServerCommand(
-      this.mcpServers,
-      this.mcpServerCommand,
+      cliConfig.getMcpServers() || {},
+      cliConfig.getMcpServerCommand(),
     );
 
     this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
 
     this.eventEmitter?.emit('mcp-client-update', this.clients);
-    const discoveryPromises = Object.entries(servers).map(
-      async ([name, config]) => {
+    const discoveryPromises = Object.entries(servers)
+      .filter(([_, config]) => !config.extension || config.extension.isActive)
+      .map(async ([name, config]) => {
         const client = new McpClient(
           name,
           config,
           this.toolRegistry,
-          this.promptRegistry,
-          this.workspaceContext,
-          this.debugMode,
+          cliConfig.getPromptRegistry(),
+          cliConfig.getWorkspaceContext(),
+          cliConfig.getDebugMode(),
         );
         this.clients.set(name, client);
 
@@ -95,8 +76,7 @@ export class McpClientManager {
             )}`,
           );
         }
-      },
-    );
+      });
 
     await Promise.all(discoveryPromises);
     this.discoveryState = MCPDiscoveryState.COMPLETED;

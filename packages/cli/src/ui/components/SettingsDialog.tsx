@@ -37,6 +37,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -153,19 +154,16 @@ export function SettingsDialog({
             );
           }
 
-          setPendingSettings((prev) =>
-            setPendingSettingValue(key, newValue as boolean, prev),
-          );
-
           if (!requiresRestart(key)) {
             const immediateSettings = new Set([key]);
+            const currentScopeSettings =
+              settings.forScope(selectedScope).settings;
             const immediateSettingsObject = setPendingSettingValueAny(
               key,
               newValue,
-              {} as Settings,
+              currentScopeSettings,
             );
-
-            console.log(
+            debugLogger.log(
               `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
               newValue,
             );
@@ -205,17 +203,12 @@ export function SettingsDialog({
               next.delete(key);
               return next;
             });
-
-            // Refresh pending settings from the saved state
-            setPendingSettings(
-              structuredClone(settings.forScope(selectedScope).settings),
-            );
           } else {
             // For restart-required settings, track as modified
             setModifiedSettings((prev) => {
               const updated = new Set(prev).add(key);
               const needsRestart = hasRestartRequiredSettings(updated);
-              console.log(
+              debugLogger.log(
                 `[DEBUG SettingsDialog] Modified settings:`,
                 Array.from(updated),
                 'Needs restart:',
@@ -299,10 +292,11 @@ export function SettingsDialog({
 
     if (!requiresRestart(key)) {
       const immediateSettings = new Set([key]);
+      const currentScopeSettings = settings.forScope(selectedScope).settings;
       const immediateSettingsObject = setPendingSettingValueAny(
         key,
         parsed,
-        {} as Settings,
+        currentScopeSettings,
       );
       saveModifiedSettings(
         immediateSettings,
@@ -658,14 +652,16 @@ export function SettingsDialog({
                       typeof defaultValue === 'string'
                     ? defaultValue
                     : undefined;
+              const currentScopeSettings =
+                settings.forScope(selectedScope).settings;
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
                       currentSetting.value,
                       toSaveValue,
-                      {} as Settings,
+                      currentScopeSettings,
                     )
-                  : ({} as Settings);
+                  : currentScopeSettings;
 
               saveModifiedSettings(
                 immediateSettings,

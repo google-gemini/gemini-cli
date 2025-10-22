@@ -42,6 +42,7 @@ import {
   AuthType,
   clearCachedCredentialFile,
   ShellExecutionService,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -90,6 +91,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -159,6 +161,9 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const extensions = config.getExtensions();
+  const [extensionEnablementManager] = useState<ExtensionEnablementManager>(
+    new ExtensionEnablementManager(config.getEnabledExtensions()),
+  );
   const {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
@@ -167,6 +172,7 @@ export const AppContainer = (props: AppContainerProps) => {
     addConfirmUpdateExtensionRequest,
   } = useExtensionUpdates(
     extensions,
+    extensionEnablementManager,
     historyManager.addItem,
     config.getWorkingDir(),
   );
@@ -335,6 +341,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const {
     isThemeDialogOpen,
     openThemeDialog,
+    closeThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand(
@@ -383,7 +390,7 @@ export const AppContainer = (props: AppContainerProps) => {
           config.isBrowserLaunchSuppressed()
         ) {
           await runExitCleanup();
-          console.log(`
+          debugLogger.log(`
 ----------------------------------------------------------------
 Logging in with Google... Please restart Gemini CLI to continue.
 ----------------------------------------------------------------
@@ -528,7 +535,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
           config.getDebugMode(),
           config.getFileService(),
           settings.merged,
-          config.getExtensionContextFilePaths(),
+          config.getExtensions(),
           config.isTrustedFolder(),
           settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
           config.getFileFilteringOptions(),
@@ -552,7 +559,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         Date.now(),
       );
       if (config.getDebugMode()) {
-        console.log(
+        debugLogger.log(
           `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(
             0,
             200,
@@ -927,7 +934,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     (key: Key) => {
       // Debug log keystrokes if enabled
       if (settings.merged.general?.debugKeystrokeLogging) {
-        console.log('[DEBUG] Keystroke:', JSON.stringify(key));
+        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
       if (keyMatchers[Command.QUIT](key)) {
@@ -1266,6 +1273,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const uiActions: UIActions = useMemo(
     () => ({
       handleThemeSelect,
+      closeThemeDialog,
       handleThemeHighlight,
       handleAuthSelect,
       setAuthState,
@@ -1291,6 +1299,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     }),
     [
       handleThemeSelect,
+      closeThemeDialog,
       handleThemeHighlight,
       handleAuthSelect,
       setAuthState,
