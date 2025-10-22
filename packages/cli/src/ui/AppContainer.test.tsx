@@ -105,6 +105,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
@@ -136,6 +137,7 @@ describe('AppContainer State Management', () => {
   const mockedUseTextBuffer = useTextBuffer as Mock;
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
+  const mockedUseKeypress = useKeypress as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1089,16 +1091,19 @@ describe('AppContainer State Management', () => {
     });
   });
 
-  describe('Keyboard Input Handling', () => {
-    it('should block quit command during authentication', () => {
-      mockedUseAuthCommand.mockReturnValue({
-        authState: 'unauthenticated',
-        setAuthState: vi.fn(),
-        authError: null,
-        onAuthError: vi.fn(),
+  describe('Keyboard Input Handling (CTRL+C / CTRL+D)', () => {
+    let handleGlobalKeypress: (key: Key) => void;
+    let mockHandleSlashCommand: Mock;
+    let mockCancelOngoingRequest: Mock;
+
+    beforeEach(() => {
+      // Capture the keypress handler from the AppContainer
+      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
+        handleGlobalKeypress = callback;
       });
 
-      const mockHandleSlashCommand = vi.fn();
+      // Mock slash command handler
+      mockHandleSlashCommand = vi.fn();
       mockedUseSlashCommandProcessor.mockReturnValue({
         handleSlashCommand: mockHandleSlashCommand,
         slashCommands: [],
@@ -1108,86 +1113,10 @@ describe('AppContainer State Management', () => {
         confirmationRequest: null,
       });
 
-      render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
-
-      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
-    });
-
-    it('should prevent exit command when text buffer has content', () => {
-      mockedUseTextBuffer.mockReturnValue({
-        text: 'some user input',
-        setText: vi.fn(),
-      });
-
-      const mockHandleSlashCommand = vi.fn();
-      mockedUseSlashCommandProcessor.mockReturnValue({
-        handleSlashCommand: mockHandleSlashCommand,
-        slashCommands: [],
-        pendingHistoryItems: [],
-        commandContext: {},
-        shellConfirmationRequest: null,
-        confirmationRequest: null,
-      });
-
-      render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
-
-      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
-    });
-
-    it('should require double Ctrl+C to exit when dialogs are open', () => {
-      vi.useFakeTimers();
-
-      mockedUseThemeCommand.mockReturnValue({
-        isThemeDialogOpen: true,
-        openThemeDialog: vi.fn(),
-        handleThemeSelect: vi.fn(),
-        handleThemeHighlight: vi.fn(),
-      });
-
-      const mockHandleSlashCommand = vi.fn();
-      mockedUseSlashCommandProcessor.mockReturnValue({
-        handleSlashCommand: mockHandleSlashCommand,
-        slashCommands: [],
-        pendingHistoryItems: [],
-        commandContext: {},
-        shellConfirmationRequest: null,
-        confirmationRequest: null,
-      });
-
-      render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
-
-      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
-
-      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
-
-      vi.useRealTimers();
-    });
-
-    it('should cancel ongoing request on first Ctrl+C', () => {
-      const mockCancelOngoingRequest = vi.fn();
+      // Mock request cancellation
+      mockCancelOngoingRequest = vi.fn();
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'responding',
+        streamingState: 'idle',
         submitQuery: vi.fn(),
         initError: null,
         pendingHistoryItems: [],
@@ -1195,57 +1124,227 @@ describe('AppContainer State Management', () => {
         cancelOngoingRequest: mockCancelOngoingRequest,
       });
 
-      const mockHandleSlashCommand = vi.fn();
-      mockedUseSlashCommandProcessor.mockReturnValue({
-        handleSlashCommand: mockHandleSlashCommand,
-        slashCommands: [],
-        pendingHistoryItems: [],
-        commandContext: {},
-        shellConfirmationRequest: null,
-        confirmationRequest: null,
+      // Default empty text buffer
+      mockedUseTextBuffer.mockReturnValue({
+        text: '',
+        setText: vi.fn(),
       });
 
-      render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
-
-      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+      vi.useFakeTimers();
     });
 
-    it('should reset Ctrl+C state after timeout', () => {
-      vi.useFakeTimers();
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-      const mockHandleSlashCommand = vi.fn();
-      mockedUseSlashCommandProcessor.mockReturnValue({
-        handleSlashCommand: mockHandleSlashCommand,
-        slashCommands: [],
-        pendingHistoryItems: [],
-        commandContext: {},
-        shellConfirmationRequest: null,
-        confirmationRequest: null,
+    describe('CTRL+C', () => {
+      it('should cancel ongoing request on first press', () => {
+        mockedUseGeminiStream.mockReturnValue({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: null,
+          cancelOngoingRequest: mockCancelOngoingRequest,
+        });
+
+        render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+
+        handleGlobalKeypress({
+          name: 'c',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(1);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
 
-      render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
+      it('should quit on second press', () => {
+        const { rerender } = render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
 
-      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+        handleGlobalKeypress({
+          name: 'c',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+        handleGlobalKeypress({
+          name: 'c',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
 
-      vi.advanceTimersByTime(1001);
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
+      });
 
-      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+      it('should reset press count after a timeout', () => {
+        render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
 
-      vi.useRealTimers();
+        handleGlobalKeypress({
+          name: 'c',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        // Advance timer past the reset threshold
+        vi.advanceTimersByTime(1001);
+
+        handleGlobalKeypress({
+          name: 'c',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('CTRL+D', () => {
+      it('should do nothing if text buffer is not empty', () => {
+        mockedUseTextBuffer.mockReturnValue({
+          text: 'some text',
+          setText: vi.fn(),
+        });
+
+        render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+
+        handleGlobalKeypress({
+          name: 'd',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        handleGlobalKeypress({
+          name: 'd',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      });
+
+      it('should quit on second press if buffer is empty', () => {
+        const { rerender } = render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+
+        handleGlobalKeypress({
+          name: 'd',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+        handleGlobalKeypress({
+          name: 'd',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
+      });
+
+      it('should reset press count after a timeout', () => {
+        render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+
+        handleGlobalKeypress({
+          name: 'd',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        // Advance timer past the reset threshold
+        vi.advanceTimersByTime(1001);
+
+        handleGlobalKeypress({
+          name: 'd',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        } as Key);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      });
     });
   });
 
