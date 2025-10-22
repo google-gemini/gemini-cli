@@ -129,7 +129,11 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npx vitest run packages/cli/src/ui/components/InputPrompt.test.tsx --repeats 100'
+        run: |
+          for i in {1..100}; do
+            echo "Run #$i"
+            npm run test -w @google/gemini-cli -- src/ui/components/InputPrompt.test.tsx || exit 1
+          done
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -197,7 +201,11 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npx vitest run packages/cli/src/ui/components/InputPrompt.test.tsx --repeats 100'
+        run: |
+          for i in {1..100}; do
+            echo "Run #$i"
+            npm run test -w @google/gemini-cli -- src/ui/components/InputPrompt.test.tsx || exit 1
+          done
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -338,7 +346,8 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
-        run: 'npx vitest run packages/cli/src/ui/components/InputPrompt.test.tsx --repeats 100'
+        run: |
+          for ($i=1; $i -le 100; $i++) { Write-Host "Run #$i"; npm run test -w @google/gemini-cli -- src/ui/components/shared/BaseSelectionList.test.tsx; if ($LASTEXITCODE -ne 0) { exit 1 } }
         shell: 'pwsh'
 
       - name: 'Bundle'
