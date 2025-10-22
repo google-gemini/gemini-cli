@@ -1933,7 +1933,7 @@ export function useTextBuffer({
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (key.ctrl && !key.shift && key.name === 'z') undo();
       else if (key.ctrl && key.shift && key.name === 'z') redo();
-      else if (input && !key.ctrl && !key.meta) {
+      else if (input && !key.ctrl && !key.meta && key.name !== 'tab') {
         insert(input, { paste: key.paste });
       }
     },
