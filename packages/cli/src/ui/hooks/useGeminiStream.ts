@@ -890,6 +890,7 @@ export const useGeminiStream = (
                 });
               }
             } catch (error: unknown) {
+              spanMetadata.error = error;
               if (error instanceof UnauthorizedError) {
                 onAuthError('Session expired or is unauthorized.');
               } else if (!isNodeError(error) || error.name !== 'AbortError') {
@@ -907,6 +908,7 @@ export const useGeminiStream = (
                   userMessageTimestamp,
                 );
               }
+
             } finally {
               setIsResponding(false);
             }
