@@ -678,19 +678,28 @@ export class ShellExecutionService {
       return { pid: ptyProcess.pid, result };
     } catch (e) {
       const error = e as Error;
-      return {
-        pid: undefined,
-        result: Promise.resolve({
-          error,
-          rawOutput: Buffer.from(''),
-          output: '',
-          exitCode: 1,
-          signal: null,
-          aborted: false,
+      if (error.message.includes('posix_spawnp failed')) {
+        onOutputEvent({
+          type: 'data',
+          chunk:
+            '[GEMINI_CLI_WARNING] PTY execution failed, falling back to child_process. This may be due to sandbox restrictions.\n',
+        });
+        throw e;
+      } else {
+        return {
           pid: undefined,
-          executionMethod: 'none',
-        }),
-      };
+          result: Promise.resolve({
+            error,
+            rawOutput: Buffer.from(''),
+            output: '',
+            exitCode: 1,
+            signal: null,
+            aborted: false,
+            pid: undefined,
+            executionMethod: 'none',
+          }),
+        };
+      }
     }
   }
 
@@ -741,7 +750,11 @@ export class ShellExecutionService {
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
-        if (e instanceof Error && 'code' in e && e.code === 'ESRCH') {
+        if (
+          e instanceof Error &&
+          (('code' in e && e.code === 'ESRCH') ||
+            e.message === 'Cannot resize a pty that has already exited')
+        ) {
           // ignore
         } else {
           throw e;

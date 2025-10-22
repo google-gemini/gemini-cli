@@ -50,7 +50,7 @@ import {
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { disableExtension } from './extension.js';
+import { disableExtension, ExtensionStorage } from './extension.js';
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
@@ -65,7 +65,8 @@ import {
   migrateDeprecatedSettings,
   SettingScope,
 } from './settings.js';
-import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import { FatalConfigError, GEMINI_DIR, Storage } from '@google/gemini-cli-core';
+import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) GEMINI_DIR for consistency
@@ -93,9 +94,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-vi.mock('./extension.js', () => ({
-  disableExtension: vi.fn(),
-}));
+vi.mock('./extension.js');
 
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
@@ -1074,8 +1073,6 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      const e = settings.user.settings.model?.chatCompression;
-      console.log(e);
 
       expect(settings.user.settings.model?.chatCompression).toEqual({
         contextPercentageThreshold: 0.5,
@@ -2349,7 +2346,9 @@ describe('Settings Loading and Merging', () => {
       mockFsExistsSync = vi.mocked(fs.existsSync);
       mockFsReadFileSync = vi.mocked(fs.readFileSync);
       mockDisableExtension = vi.mocked(disableExtension);
-
+      vi.mocked(ExtensionStorage.getUserExtensionsDir).mockReturnValue(
+        new Storage(osActual.homedir()).getExtensionsDir(),
+      );
       (mockFsExistsSync as Mock).mockReturnValue(true);
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: true,
@@ -2392,11 +2391,13 @@ describe('Settings Loading and Merging', () => {
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'user-ext-1',
         SettingScope.User,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.User,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
 
@@ -2404,11 +2405,13 @@ describe('Settings Loading and Merging', () => {
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'workspace-ext-1',
         SettingScope.Workspace,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.Workspace,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
 
