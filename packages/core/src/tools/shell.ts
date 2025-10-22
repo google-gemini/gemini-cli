@@ -78,21 +78,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
-  override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Try message bus confirmation first if available
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false; // No confirmation needed
-      }
-      if (decision === 'DENY') {
-        throw new Error('Tool execution denied by policy.');
-      }
-      // if 'ASK_USER', fall through to legacy logic
-    }
-
     const command = stripShellWrapper(this.params.command);
     const rootCommands = [...new Set(getCommandRoots(command))];
 

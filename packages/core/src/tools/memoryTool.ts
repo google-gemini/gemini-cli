@@ -191,23 +191,9 @@ class MemoryToolInvocation extends BaseToolInvocation<
     return `in ${tildeifyPath(memoryFilePath)}`;
   }
 
-  override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false;
-      }
-      if (decision === 'DENY') {
-        throw new Error(
-          `Tool execution for "${
-            this._toolDisplayName || this._toolName
-          }" denied by policy.`,
-        );
-      }
-    }
-
     const memoryFilePath = getGlobalMemoryFilePath();
     const allowlistKey = memoryFilePath;
 
