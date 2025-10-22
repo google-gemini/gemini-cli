@@ -170,7 +170,7 @@ jobs:
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
         # run: 'npm run test:integration:sandbox:none'
-          run: 'echo "success"'
+        run: 'echo "success"'
 
   e2e_windows:
     name: 'Slow E2E - Win'
