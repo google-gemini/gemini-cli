@@ -85,7 +85,6 @@ vi.mock('@google/gemini-cli-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(
     '@google/gemini-cli-core',
   );
-
   return {
     ...actualServer,
     IdeClient: {
@@ -604,6 +603,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         contextFiles: ['/path/to/ext1/GEMINI.md'],
         isActive: true,
@@ -611,6 +611,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       {
         path: '/path/to/ext2',
         name: 'ext2',
+        id: 'ext2-id',
         version: '1.0.0',
         contextFiles: [],
         isActive: true,
@@ -618,6 +619,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       {
         path: '/path/to/ext3',
         name: 'ext3',
+        id: 'ext3-id',
         version: '1.0.0',
         contextFiles: [
           '/path/to/ext3/context1.md',
@@ -691,6 +693,8 @@ describe('mergeMcpServers', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
+
         version: '1.0.0',
         mcpServers: {
           'ext1-server': {
@@ -731,6 +735,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool3', 'tool4'],
         contextFiles: [],
@@ -739,6 +744,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext2',
         name: 'ext2',
+        id: 'ext2-id',
         version: '1.0.0',
         excludeTools: ['tool5'],
         contextFiles: [],
@@ -765,6 +771,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool2', 'tool3'],
         contextFiles: [],
@@ -791,6 +798,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool2', 'tool3'],
         contextFiles: [],
@@ -799,6 +807,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext2',
         name: 'ext2',
+        id: 'ext2-id',
         version: '1.0.0',
         excludeTools: ['tool3', 'tool4'],
         contextFiles: [],
@@ -872,6 +881,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool1', 'tool2'],
         contextFiles: [],
@@ -898,6 +908,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool2'],
         contextFiles: [],
@@ -1099,6 +1110,23 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(SHELL_TOOL_NAME); // From approval mode
     expect(excludedTools).not.toContain(EDIT_TOOL_NAME); // Should be allowed in auto_edit
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME); // Should be allowed in auto_edit
+  });
+
+  it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      security: {
+        disableYoloMode: true,
+      },
+    };
+    const extensions: GeminiCLIExtension[] = [];
+
+    await expect(
+      loadCliConfig(settings, extensions, 'test-session', argv),
+    ).rejects.toThrow(
+      'Cannot start in YOLO mode when it is disabled by settings',
+    );
   });
 
   it('should throw an error for invalid approval mode values in loadCliConfig', async () => {
@@ -1328,7 +1356,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+    expect(config.getModel()).toBe('auto');
   });
 
   it('always prefers model from argv', async () => {
@@ -1641,12 +1669,12 @@ describe('loadCliConfig useRipgrep', () => {
   });
 
   describe('loadCliConfig useModelRouter', () => {
-    it('should be false by default when useModelRouter is not set in settings', async () => {
+    it('should be true by default when useModelRouter is not set in settings', async () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getUseModelRouter()).toBe(true);
     });
 
     it('should be true when useModelRouter is set to true in settings', async () => {

@@ -574,52 +574,27 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('Model Router with Auth', () => {
-    it('should disable model router by default for oauth-personal', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+  describe('UseModelRouter Configuration', () => {
+    it('should default useModelRouter to false when not provided', () => {
+      const config = new Config(baseParams);
       expect(config.getUseModelRouter()).toBe(false);
     });
 
-    it('should enable model router by default for other auth types', async () => {
-      const config = new Config({
+    it('should set useModelRouter to true when provided as true', () => {
+      const paramsWithModelRouter: ConfigParameters = {
         ...baseParams,
         useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
+      };
+      const config = new Config(paramsWithModelRouter);
       expect(config.getUseModelRouter()).toBe(true);
     });
 
-    it('should disable model router for specified auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should enable model router for other auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [],
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should keep model router disabled when useModelRouter is false', async () => {
-      const config = new Config({
+    it('should set useModelRouter to false when explicitly provided as false', () => {
+      const paramsWithModelRouter: ConfigParameters = {
         ...baseParams,
         useModelRouter: false,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      };
+      const config = new Config(paramsWithModelRouter);
       expect(config.getUseModelRouter()).toBe(false);
     });
   });
@@ -1017,6 +992,40 @@ describe('setApprovalMode with folder trust', () => {
       expect(canUseRipgrep).not.toHaveBeenCalled();
       expect(logRipgrepFallback).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('isYoloModeDisabled', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should return false when yolo mode is not disabled and folder is trusted', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    expect(config.isYoloModeDisabled()).toBe(false);
+  });
+
+  it('should return true when yolo mode is disabled by parameter', () => {
+    const config = new Config({ ...baseParams, disableYoloMode: true });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+
+  it('should return true when folder is untrusted', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+
+  it('should return true when yolo is disabled and folder is untrusted', () => {
+    const config = new Config({ ...baseParams, disableYoloMode: true });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(config.isYoloModeDisabled()).toBe(true);
   });
 });
 
