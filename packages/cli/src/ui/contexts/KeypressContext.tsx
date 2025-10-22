@@ -434,7 +434,6 @@ export function KeypressProvider({
     let kittySequenceBuffer = '';
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
-    let waitingForEnterAfterBackslash = false;
     let isDragging = false;
     let dragBuffer = '';
     let draggingTimer: NodeJS.Timeout | null = null;
@@ -534,12 +533,9 @@ export function KeypressProvider({
         return;
       }
 
-      if (key.name === 'return' && waitingForEnterAfterBackslash) {
-        if (backslashTimeout) {
-          clearTimeout(backslashTimeout);
-          backslashTimeout = null;
-        }
-        waitingForEnterAfterBackslash = false;
+      if (key.name === 'return' && backslashTimeout !== null) {
+        clearTimeout(backslashTimeout);
+        backslashTimeout = null;
         broadcast({
           ...key,
           shift: true,
@@ -550,21 +546,16 @@ export function KeypressProvider({
 
       if (key.sequence === '\\' && !key.name) {
         // Corrected escaping for backslash
-        waitingForEnterAfterBackslash = true;
         backslashTimeout = setTimeout(() => {
-          waitingForEnterAfterBackslash = false;
           backslashTimeout = null;
           broadcast(key);
         }, BACKSLASH_ENTER_DETECTION_WINDOW_MS);
         return;
       }
 
-      if (waitingForEnterAfterBackslash && key.name !== 'return') {
-        if (backslashTimeout) {
-          clearTimeout(backslashTimeout);
-          backslashTimeout = null;
-        }
-        waitingForEnterAfterBackslash = false;
+      if (backslashTimeout !== null && key.name !== 'return') {
+        clearTimeout(backslashTimeout);
+        backslashTimeout = null;
         broadcast({
           name: '',
           sequence: '\\',
