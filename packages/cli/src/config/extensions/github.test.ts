@@ -52,52 +52,117 @@ describe('git extension helpers', () => {
   });
 
   describe('cloneFromGit', () => {
-    const mockGit = {
-      clone: vi.fn(),
-      getRemotes: vi.fn(),
-      fetch: vi.fn(),
-      checkout: vi.fn(),
+    let cloneGit: {
+      clone: ReturnType<typeof vi.fn>;
+      env: ReturnType<typeof vi.fn>;
+    };
+    let repoGit: {
+      clone: ReturnType<typeof vi.fn>;
+      addConfig: ReturnType<typeof vi.fn>;
+      getRemotes: ReturnType<typeof vi.fn>;
+      fetch: ReturnType<typeof vi.fn>;
+      checkout: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
-      vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
+      cloneGit = {
+        clone: vi.fn().mockResolvedValue(undefined),
+        env: vi.fn().mockReturnThis(),
+      };
+      repoGit = {
+        clone: vi.fn(),
+        addConfig: vi.fn().mockResolvedValue(undefined),
+        getRemotes: vi.fn(),
+        fetch: vi.fn().mockResolvedValue(undefined),
+        checkout: vi.fn().mockResolvedValue(undefined),
+      };
+      vi.mocked(simpleGit).mockReset();
+      vi.mocked(simpleGit)
+        .mockReturnValueOnce(cloneGit as unknown as SimpleGit)
+        .mockReturnValue(repoGit as unknown as SimpleGit);
+      vi.spyOn(fsSync.promises, 'mkdir').mockResolvedValue(undefined);
     });
 
     it('should clone, fetch and checkout a repo', async () => {
+      repoGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
+      ]);
+      const originalGitConfigCount = process.env['GIT_CONFIG_COUNT'];
+      const originalGitConfigKey0 = process.env['GIT_CONFIG_KEY_0'];
+      const originalGitConfigValue0 = process.env['GIT_CONFIG_VALUE_0'];
+      process.env['GIT_CONFIG_COUNT'] = '1';
+      process.env['GIT_CONFIG_KEY_0'] = 'init.defaultBranch';
+      process.env['GIT_CONFIG_VALUE_0'] = 'main';
       const installMetadata = {
         source: 'http://my-repo.com',
         ref: 'my-ref',
         type: 'git' as const,
       };
       const destination = '/dest';
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
-      ]);
-
       await cloneFromGit(installMetadata, destination);
 
-      expect(mockGit.clone).toHaveBeenCalledWith('http://my-repo.com', './', [
-        '--depth',
-        '1',
-      ]);
-      expect(mockGit.getRemotes).toHaveBeenCalledWith(true);
-      expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'my-ref');
-      expect(mockGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
+      expect(simpleGit).toHaveBeenNthCalledWith(1);
+      expect(cloneGit.env).toHaveBeenCalledTimes(1);
+      const envArg = cloneGit.env.mock.calls[0][0] as NodeJS.ProcessEnv;
+      expect(envArg['GIT_CONFIG_COUNT']).toBe('2');
+      expect(envArg['GIT_CONFIG_KEY_0']).toBe('init.defaultBranch');
+      expect(envArg['GIT_CONFIG_VALUE_0']).toBe('main');
+      expect(envArg['GIT_CONFIG_KEY_1']).toBe('core.hooksPath');
+      expect(envArg['GIT_CONFIG_VALUE_1']).toBe('/dev/null');
+      expect(cloneGit.clone).toHaveBeenCalledWith(
+        'http://my-repo.com',
+        destination,
+        ['--depth', '1'],
+      );
+      expect(simpleGit).toHaveBeenNthCalledWith(2, destination);
+      expect(fsSync.promises.mkdir).toHaveBeenCalledWith(
+        path.join(destination, 'hooks-disabled'),
+        { recursive: true },
+      );
+      expect(repoGit.addConfig).toHaveBeenCalledWith(
+        'core.hooksPath',
+        'hooks-disabled',
+        false,
+        'local',
+      );
+      expect(repoGit.getRemotes).toHaveBeenCalledWith(true);
+      expect(repoGit.fetch).toHaveBeenCalledWith('origin', 'my-ref');
+      expect(repoGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
+      expect(process.env['GIT_CONFIG_COUNT']).toBe('1');
+      expect(process.env['GIT_CONFIG_KEY_0']).toBe('init.defaultBranch');
+      expect(process.env['GIT_CONFIG_VALUE_0']).toBe('main');
+      expect(process.env['GIT_CONFIG_KEY_1']).toBeUndefined();
+      expect(process.env['GIT_CONFIG_VALUE_1']).toBeUndefined();
+
+      if (originalGitConfigCount === undefined) {
+        delete process.env['GIT_CONFIG_COUNT'];
+      } else {
+        process.env['GIT_CONFIG_COUNT'] = originalGitConfigCount;
+      }
+      if (originalGitConfigKey0 === undefined) {
+        delete process.env['GIT_CONFIG_KEY_0'];
+      } else {
+        process.env['GIT_CONFIG_KEY_0'] = originalGitConfigKey0;
+      }
+      if (originalGitConfigValue0 === undefined) {
+        delete process.env['GIT_CONFIG_VALUE_0'];
+      } else {
+        process.env['GIT_CONFIG_VALUE_0'] = originalGitConfigValue0;
+      }
     });
 
     it('should use HEAD if ref is not provided', async () => {
+      repoGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
+      ]);
       const installMetadata = {
         source: 'http://my-repo.com',
         type: 'git' as const,
       };
       const destination = '/dest';
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
-      ]);
-
       await cloneFromGit(installMetadata, destination);
 
-      expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'HEAD');
+      expect(repoGit.fetch).toHaveBeenCalledWith('origin', 'HEAD');
     });
 
     it('should throw if no remotes are found', async () => {
@@ -106,7 +171,7 @@ describe('git extension helpers', () => {
         type: 'git' as const,
       };
       const destination = '/dest';
-      mockGit.getRemotes.mockResolvedValue([]);
+      repoGit.getRemotes.mockResolvedValue([]);
 
       await expect(cloneFromGit(installMetadata, destination)).rejects.toThrow(
         'Failed to clone Git repository from http://my-repo.com',
@@ -119,7 +184,7 @@ describe('git extension helpers', () => {
         type: 'git' as const,
       };
       const destination = '/dest';
-      mockGit.clone.mockRejectedValue(new Error('clone failed'));
+      cloneGit.clone.mockRejectedValue(new Error('clone failed'));
 
       await expect(cloneFromGit(installMetadata, destination)).rejects.toThrow(
         'Failed to clone Git repository from http://my-repo.com',

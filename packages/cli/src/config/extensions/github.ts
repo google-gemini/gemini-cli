@@ -22,6 +22,8 @@ import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
 import { type ExtensionEnablementManager } from './extensionEnablement.js';
 
+const HOOKS_DISABLED_DIR = 'hooks-disabled';
+
 /**
  * Clones a Git repository to a specified local path.
  * @param installMetadata The metadata for the extension to install.
@@ -32,7 +34,17 @@ export async function cloneFromGit(
   destination: string,
 ): Promise<void> {
   try {
-    const git = simpleGit(destination);
+    const cloneEnv: NodeJS.ProcessEnv = { ...process.env };
+    const existingConfigCountRaw = cloneEnv['GIT_CONFIG_COUNT'];
+    const existingConfigCount = existingConfigCountRaw
+      ? Number.parseInt(existingConfigCountRaw, 10)
+      : 0;
+    const hookConfigIndex = Number.isNaN(existingConfigCount)
+      ? 0
+      : existingConfigCount;
+    cloneEnv['GIT_CONFIG_COUNT'] = (hookConfigIndex + 1).toString();
+    cloneEnv[`GIT_CONFIG_KEY_${hookConfigIndex}`] = 'core.hooksPath';
+    cloneEnv[`GIT_CONFIG_VALUE_${hookConfigIndex}`] = os.devNull;
     let sourceUrl = installMetadata.source;
     const token = getGitHubToken();
     if (token) {
@@ -52,7 +64,15 @@ export async function cloneFromGit(
         // We let git handle the source as is.
       }
     }
-    await git.clone(sourceUrl, './', ['--depth', '1']);
+    await simpleGit()
+      .env(cloneEnv)
+      .clone(sourceUrl, destination, ['--depth', '1']);
+
+    const git = simpleGit(destination);
+    await fs.promises.mkdir(path.join(destination, HOOKS_DISABLED_DIR), {
+      recursive: true,
+    });
+    await git.addConfig('core.hooksPath', HOOKS_DISABLED_DIR, false, 'local');
 
     const remotes = await git.getRemotes(true);
     if (remotes.length === 0) {
