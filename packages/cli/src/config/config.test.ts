@@ -1112,6 +1112,23 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME); // Should be allowed in auto_edit
   });
 
+  it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      security: {
+        disableYoloMode: true,
+      },
+    };
+    const extensions: GeminiCLIExtension[] = [];
+
+    await expect(
+      loadCliConfig(settings, extensions, 'test-session', argv),
+    ).rejects.toThrow(
+      'Cannot start in YOLO mode when it is disabled by settings',
+    );
+  });
+
   it('should throw an error for invalid approval mode values in loadCliConfig', async () => {
     // Create a mock argv with an invalid approval mode that bypasses argument parsing validation
     const invalidArgv: Partial<CliArgs> & { approvalMode: string } = {
