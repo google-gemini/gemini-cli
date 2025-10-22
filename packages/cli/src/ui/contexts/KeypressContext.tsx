@@ -430,10 +430,17 @@ export function KeypressProvider({
       usePassthrough = true;
     }
 
+    // If non-null that means we are in paste mode
     let pasteBuffer: Buffer | null = null;
+
+    // Used to turn "\" quickly followed by a "enter" into a shift enter
+    let backslashTimeout: NodeJS.Timeout | null = null;
+
+    // Buffers incomplete Kitty sequences and timer to flush it
     let kittySequenceBuffer = '';
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
-    let backslashTimeout: NodeJS.Timeout | null = null;
+
+    // Used to detect filename drag-and-drops.
     let dragBuffer = '';
     let draggingTimer: NodeJS.Timeout | null = null;
 
