@@ -234,6 +234,8 @@ jobs:
     uses: myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886 # ratchet:myrotvorets/set-commit-status-action@master
     if: always()
     with:
-      token: ${{ secrets.GITHUB_TOKEN }}
-      status: ${{ job.status }}
+      allowForks: 'true'
+      sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+      token: '${{ secrets.GITHUB_TOKEN }}'
+      status: '${{ job.status }}''
       context: 'Set E2E Status'
