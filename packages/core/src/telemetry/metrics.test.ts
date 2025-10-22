@@ -92,6 +92,7 @@ describe('Telemetry Metrics', () => {
   let recordGenAiClientTokenUsageModule: typeof import('./metrics.js').recordGenAiClientTokenUsage;
   let recordGenAiClientOperationDurationModule: typeof import('./metrics.js').recordGenAiClientOperationDuration;
   let recordFlickerFrameModule: typeof import('./metrics.js').recordFlickerFrame;
+  let recordExitFailModule: typeof import('./metrics.js').recordExitFail;
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
 
   beforeEach(async () => {
@@ -133,6 +134,7 @@ describe('Telemetry Metrics', () => {
     recordGenAiClientOperationDurationModule =
       metricsJsModule.recordGenAiClientOperationDuration;
     recordFlickerFrameModule = metricsJsModule.recordFlickerFrame;
+    recordExitFailModule = metricsJsModule.recordExitFail;
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
 
     const otelApiModule = await import('@opentelemetry/api');
@@ -161,6 +163,28 @@ describe('Telemetry Metrics', () => {
       recordFlickerFrameModule(config);
 
       // Called for session, then for flicker
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+      });
+    });
+  });
+
+  describe('recordExitFail', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordExitFailModule(config);
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a exit fail event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordExitFailModule(config);
+
+      // Called for session, then for exit fail
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
       expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
         'session.id': 'test-session-id',
