@@ -106,16 +106,17 @@ export async function runInDevTraceSpan<R>(
       try {
         return await fn({ metadata: meta, endSpan });
       } catch (e) {
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: getErrorMessage(e),
-        });
-        if (e instanceof Error) {
-          span.recordException(e);
+        meta.error = e;
+        if (noAutoEnd) {
+          // For streaming operations, the delegated endSpan call will not be reached
+          // on an exception, so we must end the span here to prevent a leak.
+          endSpan();
         }
         throw e;
       } finally {
         if (!noAutoEnd) {
+          // For non-streaming operations, this ensures the span is always closed,
+          // and if an error occurred, it will be recorded correctly by endSpan.
           endSpan();
         }
       }
