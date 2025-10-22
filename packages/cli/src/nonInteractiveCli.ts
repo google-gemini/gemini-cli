@@ -56,6 +56,30 @@ export async function runNonInteractive(
         ? new StreamJsonFormatter()
         : null;
 
+    const abortController = new AbortController();
+
+    // Track if we're in the process of aborting to handle multiple signals
+    let isAborting = false;
+
+    // Signal handler for graceful cancellation
+    const handleSignal = (signal: NodeJS.Signals) => {
+      if (isAborting) {
+        // Second signal: force exit immediately
+        process.stderr.write('\nForced exit\n');
+        process.exit(signal === 'SIGINT' ? 130 : 143);
+      }
+
+      isAborting = true;
+      process.stderr.write('\nCancelling...\n');
+      abortController.abort();
+      // Note: Don't exit here - let the abort flow through the system
+      // and trigger handleCancellationError() which will exit with proper code
+    };
+
+    // Register signal handlers
+    const sigintHandler = () => handleSignal('SIGINT');
+    const sigtermHandler = () => handleSignal('SIGTERM');
+
     try {
       consolePatcher.patch();
       // Handle EPIPE errors when the output is piped to a command that closes early.
@@ -78,7 +102,8 @@ export async function runNonInteractive(
         });
       }
 
-      const abortController = new AbortController();
+      process.on('SIGINT', sigintHandler);
+      process.on('SIGTERM', sigtermHandler);
 
       let query: Part[] | undefined;
 
@@ -286,6 +311,10 @@ export async function runNonInteractive(
     } catch (error) {
       handleError(error, config);
     } finally {
+      // Remove our signal handlers to avoid interfering with other cleanup
+      process.off('SIGINT', sigintHandler);
+      process.off('SIGTERM', sigtermHandler);
+
       consolePatcher.cleanup();
       if (isTelemetrySdkInitialized()) {
         await shutdownTelemetry(config);
