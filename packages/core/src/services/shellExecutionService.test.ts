@@ -291,6 +291,54 @@ describe('ShellExecutionService', () => {
       expect(mockHeadlessTerminal.resize).toHaveBeenCalledWith(100, 40);
     });
 
+    it('should not resize the pty if it is not active', async () => {
+      const isPtyActiveSpy = vi
+        .spyOn(ShellExecutionService, 'isPtyActive')
+        .mockReturnValue(false);
+
+      await simulateExecution('ls -l', (pty) => {
+        ShellExecutionService.resizePty(pty.pid!, 100, 40);
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(mockPtyProcess.resize).not.toHaveBeenCalled();
+      expect(mockHeadlessTerminal.resize).not.toHaveBeenCalled();
+      isPtyActiveSpy.mockRestore();
+    });
+
+    it('should ignore errors when resizing an exited pty', async () => {
+      const resizeError = new Error(
+        'Cannot resize a pty that has already exited',
+      );
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw resizeError;
+      });
+
+      // We don't expect this test to throw an error
+      await expect(
+        simulateExecution('ls -l', (pty) => {
+          ShellExecutionService.resizePty(pty.pid!, 100, 40);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        }),
+      ).resolves.not.toThrow();
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
+    });
+
+    it('should re-throw other errors during resize', async () => {
+      const otherError = new Error('Some other error');
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw otherError;
+      });
+
+      await expect(
+        simulateExecution('ls -l', (pty) => {
+          ShellExecutionService.resizePty(pty.pid!, 100, 40);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        }),
+      ).rejects.toThrow('Some other error');
+    });
+
     it('should scroll the headless terminal', async () => {
       await simulateExecution('ls -l', (pty) => {
         pty.onData.mock.calls[0][0]('file1.txt\n');
