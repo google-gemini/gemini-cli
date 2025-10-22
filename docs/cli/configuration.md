@@ -275,7 +275,7 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 
 - **`telemetry`** (object)
   - **Description:** Configures logging and metrics collection for Gemini CLI.
-    For more information, see [Telemetry](../telemetry.md).
+    For more information, see [Telemetry](./telemetry.md).
   - **Default:**
     `{"enabled": false, "target": "local", "otlpEndpoint": "http://localhost:4317", "logPrompts": true}`
   - **Properties:**
