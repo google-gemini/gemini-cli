@@ -33,7 +33,7 @@ const mockFsHelper = vi.hoisted(() => {
     setFile: (path: string, content: string) => {
       files.set(path, content);
       // Simple dirname approximation to ensure parent dirs exist
-      const parts = path.split('/');
+      const parts = path.split(/[/\\]/);
       parts.pop();
       let current = '';
       for (const part of parts) {
@@ -71,7 +71,8 @@ vi.mock('./sandboxConfig.js', () => ({
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
-  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
+  const mockHome =
+    process.platform === 'win32' ? 'C:\\mock\\home\\user' : '/mock/home/user';
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -150,7 +151,8 @@ vi.mock('fs', async (importOriginal) => {
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
-  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
+  const mockHome =
+    process.platform === 'win32' ? 'C:\\mock\\home\\user' : '/mock/home/user';
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -229,7 +231,8 @@ vi.mock('node:fs', async (importOriginal) => {
 
 vi.mock('fs/promises', async (importOriginal) => {
   const pathMod = await import('node:path');
-  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
+  const mockHome =
+    process.platform === 'win32' ? 'C:\\mock\\home\\user' : '/mock/home/user';
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -282,7 +285,8 @@ vi.mock('fs/promises', async (importOriginal) => {
 });
 vi.mock('node:fs/promises', async (importOriginal) => {
   const pathMod = await import('node:path');
-  const mockHome = pathMod.join(pathMod.sep, 'mock', 'home', 'user');
+  const mockHome =
+    process.platform === 'win32' ? 'C:\\mock\\home\\user' : '/mock/home/user';
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
