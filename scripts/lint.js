@@ -119,6 +119,8 @@ function runCommand(command, stdio = 'inherit') {
     } catch (_e) {
       if (process.platform === 'linux') {
         env.PATH = `${env.PATH}:${process.env.HOME}/.local/bin`;
+      } else if (process.platform === 'darwin') {
+        env.PATH = `${env.PATH}:${process.env.HOME}/Library/Python/3.12/bin`;
       }
     }
     execSync(command, { stdio, env });
