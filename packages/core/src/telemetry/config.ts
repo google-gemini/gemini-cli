@@ -66,7 +66,9 @@ export function parseOtlpHeaders(
         return Object.keys(result).length > 0 ? result : undefined;
       }
     } catch {
-      // Fall through to delimiter parsing
+      // It looked like JSON but failed to parse, so we assume it's invalid.
+      return undefined;
+
     }
   }
 
