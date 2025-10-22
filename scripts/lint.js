@@ -108,10 +108,18 @@ function runCommand(command, stdio = 'inherit') {
     const env = { ...process.env };
     const nodeBin = join(process.cwd(), 'node_modules', '.bin');
     env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${env.PATH}`;
-    if (process.platform === 'darwin') {
-      env.PATH = `${env.PATH}:${process.env.HOME}/Library/Python/3.12/bin`;
-    } else if (process.platform === 'linux') {
-      env.PATH = `${env.PATH}:${process.env.HOME}/.local/bin`;
+    try {
+      const pythonUserBase = execSync('python3 -m site --user-base', {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      if (pythonUserBase) {
+        env.PATH = `${env.PATH}:${pythonUserBase}/bin`;
+      }
+    } catch (_e) {
+      if (process.platform === 'linux') {
+        env.PATH = `${env.PATH}:${process.env.HOME}/.local/bin`;
+      }
     }
     execSync(command, { stdio, env });
     return true;
