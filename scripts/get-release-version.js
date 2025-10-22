@@ -428,7 +428,7 @@ export function getVersion(options = {}) {
       // A promoted nightly version is still a nightly, so we should check for conflicts.
       if (doesVersionExist({ args, version: versionData.releaseVersion })) {
         throw new Error(
-          `Version conflict! Promoted nightly version ${versionData.releaseVersion} already exists.`
+          `Version conflict! Promoted nightly version ${versionData.releaseVersion} already exists.`,
         );
       }
       break;
