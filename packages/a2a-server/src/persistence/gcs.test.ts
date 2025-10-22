@@ -196,8 +196,6 @@ describe('GCSTaskStore', () => {
     });
     (fse.pathExists as Mock).mockResolvedValue(true);
     fsMocks.readdir.mockResolvedValue(['file1.txt']);
-    // mockTar.c.mockResolvedValue(undefined);
-    // mockTar.x.mockResolvedValue(undefined);
     mockFse.remove.mockResolvedValue(undefined);
     mockFse.ensureDir.mockResolvedValue(undefined);
     mockGzipSync.mockReturnValue(Buffer.from('compressed'));
@@ -257,7 +255,6 @@ describe('GCSTaskStore', () => {
 
       expect(mockFile.save).toHaveBeenCalledTimes(1);
       expect(mockTar.c).toHaveBeenCalledTimes(1);
-      // expect(mockCreateReadStream).toHaveBeenCalledTimes(1);
       expect(mockFse.remove).toHaveBeenCalledTimes(1);
       expect(logger.info).toHaveBeenCalledWith(
         expect.stringContaining('metadata saved to GCS'),
