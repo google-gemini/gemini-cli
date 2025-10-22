@@ -1099,7 +1099,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Codebase Investigator',
             category: 'Experimental',
             requiresRestart: true,
-            default: true,
+            default: false,
             description: 'Enable the Codebase Investigator agent.',
             showInDialog: true,
           },
