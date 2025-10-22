@@ -147,6 +147,10 @@
         "slug": "docs/tools/memory"
       },
       {
+        "label": "Todos",
+        "slug": "docs/tools/todos"
+      },
+      {
         "label": "MCP Servers",
         "slug": "docs/tools/mcp-server"
       }
