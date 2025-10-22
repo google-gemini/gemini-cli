@@ -582,6 +582,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const cancelHandlerRef = useRef<() => void>(() => {});
 
+  const getPreferredEditor = useCallback(
+    () => settings.merged.general?.preferredEditor as EditorType,
+    [settings.merged.general?.preferredEditor],
+  );
+
+  const onCancelSubmit = useCallback(() => {
+    cancelHandlerRef.current();
+  }, []);
+
   const {
     streamingState,
     submitQuery,
@@ -601,13 +610,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setDebugMessage,
     handleSlashCommand,
     shellModeActive,
-    () => settings.merged.general?.preferredEditor as EditorType,
+    getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
     refreshStatic,
-    () => cancelHandlerRef.current(),
+    onCancelSubmit,
     setEmbeddedShellFocused,
     terminalWidth,
     terminalHeight,
