@@ -323,12 +323,17 @@ export class MemoryTool
     return null;
   }
 
-  protected createInvocation(params: SaveMemoryParams) {
+  protected createInvocation(
+    params: SaveMemoryParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
+  ) {
     return new MemoryToolInvocation(
       params,
-      this.messageBus,
-      this.name,
-      this.displayName,
+      messageBus ?? this.messageBus,
+      toolName ?? this.name,
+      displayName ?? this.displayName,
     );
   }
 
