@@ -1064,7 +1064,12 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
 
-    await runNonInteractive(mockConfig, mockSettings, 'Hello!', 'prompt-id-special-chars');
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      'Hello!',
+      'prompt-id-special-chars',
+    );
 
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
       [{ text: 'Hello!' }],
