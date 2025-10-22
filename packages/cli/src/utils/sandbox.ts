@@ -14,7 +14,11 @@ import { quote, parse } from 'shell-quote';
 import { USER_SETTINGS_DIR } from '../config/settings.js';
 import { promisify } from 'node:util';
 import type { Config, SandboxConfig } from '@google/gemini-cli-core';
-import { FatalSandboxError, GEMINI_DIR } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  FatalSandboxError,
+  GEMINI_DIR,
+} from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
 
@@ -92,7 +96,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
     } catch (_err) {
       // Silently ignore if /etc/os-release is not found or unreadable.
       // The default (false) will be applied in this case.
-      console.warn(
+      debugLogger.warn(
         'Warning: Could not read /etc/os-release to auto-detect Debian/Ubuntu for UID/GID default.',
       );
     }
@@ -301,7 +305,7 @@ export async function start_sandbox(
         });
         // install handlers to stop proxy on exit/signal
         const stopProxy = () => {
-          console.log('stopping proxy ...');
+          debugLogger.log('stopping proxy ...');
           if (proxyProcess?.pid) {
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
@@ -325,7 +329,7 @@ export async function start_sandbox(
             `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
           );
         });
-        console.log('waiting for proxy to start ...');
+        debugLogger.log('waiting for proxy to start ...');
         await execAsync(
           `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
         );
@@ -559,7 +563,7 @@ export async function start_sandbox(
       containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
         'hex',
       )}`;
-      console.log(`ContainerName: ${containerName}`);
+      debugLogger.log(`ContainerName: ${containerName}`);
     } else {
       let index = 0;
       const containerNameCheck = execSync(
@@ -571,7 +575,7 @@ export async function start_sandbox(
         index++;
       }
       containerName = `${imageName}-${index}`;
-      console.log(`ContainerName (regular): ${containerName}`);
+      debugLogger.log(`ContainerName (regular): ${containerName}`);
     }
     args.push('--name', containerName, '--hostname', containerName);
 
@@ -773,7 +777,7 @@ export async function start_sandbox(
       });
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
-        console.log('stopping proxy container ...');
+        debugLogger.log('stopping proxy container ...');
         execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
       process.on('exit', stopProxy);
@@ -795,7 +799,7 @@ export async function start_sandbox(
           `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
         );
       });
-      console.log('waiting for proxy to start ...');
+      debugLogger.log('waiting for proxy to start ...');
       await execAsync(
         `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
       );
@@ -821,7 +825,7 @@ export async function start_sandbox(
       sandboxProcess?.on('close', (code, signal) => {
         process.stdin.resume();
         if (code !== 0 && code !== null) {
-          console.log(
+          debugLogger.log(
             `Sandbox process exited with code: ${code}, signal: ${signal}`,
           );
         }
@@ -847,7 +851,7 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
     }
 
     checkProcess.on('error', (err) => {
-      console.warn(
+      debugLogger.warn(
         `Failed to start '${sandbox}' command for image check: ${err.message}`,
       );
       resolve(false);
@@ -882,7 +886,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
     };
 
     const onError = (err: Error) => {
-      console.warn(
+      debugLogger.warn(
         `Failed to start '${sandbox} pull ${image}' command: ${err.message}`,
       );
       cleanup();
@@ -895,7 +899,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
         cleanup();
         resolve(true);
       } else {
-        console.warn(
+        debugLogger.warn(
           `Failed to pull image ${image}. '${sandbox} pull ${image}' exited with code ${code}.`,
         );
         if (stderrData.trim()) {
@@ -953,7 +957,7 @@ async function ensureSandboxImageIsPresent(
       console.info(`Sandbox image ${image} is now available after pulling.`);
       return true;
     } else {
-      console.warn(
+      debugLogger.warn(
         `Sandbox image ${image} still not found after a pull attempt. This might indicate an issue with the image name or registry, or the pull command reported success but failed to make the image available.`,
       );
       return false;

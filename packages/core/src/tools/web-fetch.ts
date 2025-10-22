@@ -21,14 +21,18 @@ import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import {
+  fetchWithTimeout,
+  isPrivateIp,
+  setGlobalProxy,
+} from '../utils/fetch.js';
 import { convert } from 'html-to-text';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -110,8 +114,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
@@ -269,7 +275,7 @@ ${textContent}
         DEFAULT_GEMINI_FLASH_MODEL,
       );
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Full response for prompt "${userPrompt.substring(
           0,
           50,
@@ -362,7 +368,7 @@ ${sourceListFormatted.join('\n')}`;
 
       const llmContent = responseText;
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Formatted tool response for prompt "${userPrompt}:\n\n":`,
         llmContent,
       );
@@ -395,7 +401,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   WebFetchToolParams,
   ToolResult
 > {
-  static readonly Name: string = WEB_FETCH_TOOL_NAME;
+  static readonly Name = WEB_FETCH_TOOL_NAME;
 
   constructor(
     private readonly config: Config,
@@ -410,7 +416,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
         properties: {
           prompt: {
             description:
-              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
+              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
             type: 'string',
           },
         },
@@ -423,7 +429,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
     );
     const proxy = config.getProxy();
     if (proxy) {
-      setGlobalDispatcher(new ProxyAgent(proxy as string));
+      setGlobalProxy(proxy);
     }
   }
 
@@ -450,7 +456,15 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
-    return new WebFetchToolInvocation(this.config, params, messageBus);
+    return new WebFetchToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

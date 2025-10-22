@@ -142,7 +142,7 @@ export function setupLinters() {
 
 export function runESLint() {
   console.log('\nRunning ESLint...');
-  if (!runCommand('npm run lint:ci')) {
+  if (!runCommand('npm run lint')) {
     process.exit(1);
   }
 }
@@ -251,6 +251,79 @@ export function runSensitiveKeywordLinter() {
   }
 }
 
+function stripJSONComments(json) {
+  return json.replace(
+    /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g,
+    (m, g) => (g ? '' : m),
+  );
+}
+
+export function runTSConfigLinter() {
+  console.log('\nRunning tsconfig linter...');
+
+  let files = [];
+  try {
+    // Find all tsconfig.json files under packages/ using a git pathspec
+    files = execSync("git ls-files 'packages/**/tsconfig.json'")
+      .toString()
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch (e) {
+    console.error('Error finding tsconfig.json files:', e.message);
+    process.exit(1);
+  }
+
+  let hasError = false;
+
+  for (const file of files) {
+    const tsconfigPath = join(process.cwd(), file);
+    if (!existsSync(tsconfigPath)) {
+      console.error(`Error: ${tsconfigPath} does not exist.`);
+      hasError = true;
+      continue;
+    }
+
+    try {
+      const content = readFileSync(tsconfigPath, 'utf-8');
+      const config = JSON.parse(stripJSONComments(content));
+
+      // Check if exclude exists and matches exactly
+      if (config.exclude) {
+        if (!Array.isArray(config.exclude)) {
+          console.error(
+            `Error: ${file} "exclude" must be an array. Found: ${JSON.stringify(
+              config.exclude,
+            )}`,
+          );
+          hasError = true;
+        } else {
+          const allowedExclude = new Set(['node_modules', 'dist']);
+          const invalidExcludes = config.exclude.filter(
+            (item) => !allowedExclude.has(item),
+          );
+
+          if (invalidExcludes.length > 0) {
+            console.error(
+              `Error: ${file} "exclude" contains invalid items: ${JSON.stringify(
+                invalidExcludes,
+              )}. Only "node_modules" and "dist" are allowed.`,
+            );
+            hasError = true;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error parsing ${tsconfigPath}: ${error.message}`);
+      hasError = true;
+    }
+  }
+
+  if (hasError) {
+    process.exit(1);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -275,6 +348,9 @@ function main() {
   if (args.includes('--sensitive-keywords')) {
     runSensitiveKeywordLinter();
   }
+  if (args.includes('--tsconfig')) {
+    runTSConfigLinter();
+  }
 
   if (args.length === 0) {
     setupLinters();
@@ -284,6 +360,7 @@ function main() {
     runYamllint();
     runPrettier();
     runSensitiveKeywordLinter();
+    runTSConfigLinter();
     console.log('\nAll linting checks passed!');
   }
 }
