@@ -210,7 +210,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
     }
 
     const fileService = this.config.getFileService();
-    if (fileService.shouldGeminiIgnoreFile(params.absolute_path)) {
+    const fileFilteringOptions = this.config.getFileFilteringOptions();
+    if (
+      fileService.shouldIgnoreFile(params.absolute_path, fileFilteringOptions)
+    ) {
       return `File path '${filePath}' is ignored by .geminiignore pattern(s).`;
     }
 
