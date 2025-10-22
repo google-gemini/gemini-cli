@@ -8,7 +8,11 @@
 import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import {
+  DiscoveredMCPTool,
+  generateValidName,
+  returnSanitizedMcpContent,
+} from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import type { ToolResult } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import type { CallableTool, Part } from '@google/genai';
@@ -431,17 +435,11 @@ describe('DiscoveredMCPTool', () => {
 
       expect(toolResult.llmContent).toEqual([
         {
-          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: application/octet-stream]`,
-        },
-        {
-          inlineData: {
-            mimeType: 'application/octet-stream',
-            data: 'BASE64_BINARY_DATA',
-          },
+          text: '[Tool returned unsupported mimetype: application/octet-stream]',
         },
       ]);
       expect(toolResult.returnDisplay).toBe(
-        '[Embedded Resource: application/octet-stream]',
+        '[Tool returned unsupported mimetype: application/octet-stream]',
       );
     });
 
@@ -726,6 +724,60 @@ describe('DiscoveredMCPTool', () => {
         controller.abort();
         expect(controller.signal.aborted).toBe(true);
       });
+    });
+  });
+
+  describe('returnSanitizedMcpContent', () => {
+    it('should return a sanitized copy when an unsupported mime type is present', () => {
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: 'testTool',
+            response: {
+              content: [
+                {
+                  type: 'image',
+                  data: 'BASE64_IMAGE_DATA',
+                  mimeType: 'image/tiff', // Unsupported
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const sanitized = returnSanitizedMcpContent(sdkResponse);
+      expect(sanitized).not.toBe(sdkResponse);
+      const sanitizedContent =
+        sanitized[0].functionResponse?.response?.['content'];
+      expect(sanitizedContent).toEqual([
+        {
+          type: 'text',
+          text: '[Tool returned unsupported mimetype: image/tiff]',
+        },
+      ]);
+    });
+
+    it('should return the original object if no sanitization is needed', () => {
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: 'testTool',
+            response: {
+              content: [
+                {
+                  type: 'image',
+                  data: 'BASE64_IMAGE_DATA',
+                  mimeType: 'image/png', // Supported
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const sanitized = returnSanitizedMcpContent(sdkResponse);
+      expect(sanitized).toBe(sdkResponse);
     });
   });
 
