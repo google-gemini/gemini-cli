@@ -1586,7 +1586,9 @@ describe('InputPrompt', () => {
       });
 
       // Simulate an Enter key press immediately after paste
-      stdin.write('\r');
+      act(() => {
+        stdin.write('\r');
+      });
       await vi.runAllTimersAsync();
 
       // Verify that onSubmit was NOT called due to recent paste protection
