@@ -113,6 +113,7 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
+  props?: Record<string, unknown>;
 
   dialog:
     | 'help'
