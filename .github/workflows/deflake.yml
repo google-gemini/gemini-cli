@@ -68,7 +68,7 @@ jobs:
           VERBOSE: 'true'
         shell: 'bash'
         run: |
-          if [[ "${{ env.IS_DOCKER }}" === "true" ]]; then
+          if [[ "${{ env.IS_DOCKER }}" == "true" ]]; then
             npm run deflake:test:integration:sandbox:docker -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
           else
             npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
