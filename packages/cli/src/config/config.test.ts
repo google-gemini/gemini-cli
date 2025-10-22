@@ -1123,13 +1123,7 @@ describe('Approval mode tool exclusion logic', () => {
     const extensions: GeminiCLIExtension[] = [];
 
     await expect(
-      loadCliConfig(
-        settings,
-        extensions,
-        new ExtensionEnablementManager(argv.extensions),
-        'test-session',
-        argv,
-      ),
+      loadCliConfig(settings, extensions, 'test-session', argv),
     ).rejects.toThrow(
       'Cannot start in YOLO mode when it is disabled by settings',
     );
