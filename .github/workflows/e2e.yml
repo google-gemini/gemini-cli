@@ -1,4 +1,4 @@
-name: 'Test: E2E'
+name: 'Testing: E2E'
 
 on:
   workflow_run:
