@@ -129,7 +129,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'for i in {1..100}; do echo "Iteration $i"; npx vitest run packages/a2a-server/src/persistence/gcs.test.ts --reporter=basic --reporter=junit --outputFile=packages/a2a-server/junit.xml || exit 1; done'
+        run: 'npm run test:ci'
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -197,7 +197,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'for i in {1..100}; do echo "Iteration $i"; npx vitest run packages/a2a-server/src/persistence/gcs.test.ts --reporter=basic --reporter=junit --outputFile=packages/a2a-server/junit.xml || exit 1; done'
+        run: 'npm run test:ci -- --coverage.enabled=false'
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -338,7 +338,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
-        run: 'for ($i=1; $i -le 100; $i++) { Write-Output "Iteration $i"; npx vitest run packages/a2a-server/src/persistence/gcs.test.ts --reporter=basic --reporter=junit --outputFile=packages/a2a-server/junit.xml; if ($LASTEXITCODE -ne 0) { exit 1 } }'
+        run: 'npm run test:ci -- --coverage.enabled=false'
         shell: 'pwsh'
 
       - name: 'Bundle'
