@@ -8,6 +8,7 @@ import type { CommandModule } from 'yargs';
 import { loadExtensions, toOutputString } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export async function handleList() {
   try {
@@ -16,16 +17,16 @@ export async function handleList() {
       process.cwd(),
     );
     if (extensions.length === 0) {
-      console.log('No extensions installed.');
+      debugLogger.log('No extensions installed.');
       return;
     }
-    console.log(
+    debugLogger.log(
       extensions
         .map((extension, _): string => toOutputString(extension, process.cwd()))
         .join('\n\n'),
     );
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }

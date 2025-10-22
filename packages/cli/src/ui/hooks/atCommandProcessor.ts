@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import type { PartListUnion, PartUnion } from '@google/genai';
 import type { AnyToolInvocation, Config } from '@google/gemini-cli-core';
 import {
+  debugLogger,
   getErrorMessage,
   isNodeError,
   unescapePath,
@@ -372,7 +373,7 @@ export async function handleAtCommand({
     }
 
     const message = `Ignored ${totalIgnored} files:\n${messages.join('\n')}`;
-    console.log(message);
+    debugLogger.log(message);
     onDebugMessage(message);
   }
 

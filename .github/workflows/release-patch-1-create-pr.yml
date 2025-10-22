@@ -28,10 +28,19 @@ on:
         description: 'The original PR number to comment back on.'
         required: false
         type: 'string'
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   create-patch:
     runs-on: 'ubuntu-latest'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       pull-requests: 'write'
@@ -49,26 +58,44 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'configure .npmrc'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Install Script Dependencies'
-        run: 'npm install yargs'
+        run: 'npm ci'
 
       - name: 'Configure Git User'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          REPOSITORY: '${{ github.repository }}'
         run: |-
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
           # Configure git to use GITHUB_TOKEN for remote operations (has actions:write for workflow files)
-          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
 
       - name: 'Create Patch'
         id: 'create_patch'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          CLI_PACKAGE_NAME: '${{ vars.CLI_PACKAGE_NAME }}'
+          PATCH_COMMIT: '${{ github.event.inputs.commit }}'
+          PATCH_CHANNEL: '${{ github.event.inputs.channel }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
         continue-on-error: true
         run: |
           # Capture output and display it in logs using tee
           {
-            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --pullRequestNumber=${{ github.event.inputs.original_pr }} --dry-run=${{ github.event.inputs.dry_run }}
+            node scripts/releasing/create-patch-pr.js \
+              --cli-package-name="${CLI_PACKAGE_NAME}" \
+              --commit="${PATCH_COMMIT}" \
+              --channel="${PATCH_CHANNEL}" \
+              --pullRequestNumber="${ORIGINAL_PR}" \
+              --dry-run="${DRY_RUN}"
             echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
           } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
@@ -87,14 +114,17 @@ jobs:
           REPOSITORY: '${{ github.repository }}'
           GITHUB_RUN_ID: '${{ github.run_id }}'
           LOG_CONTENT: '${{ env.LOG_CONTENT }}'
+          TARGET_REF: '${{ github.event.inputs.ref }}'
         continue-on-error: true
         run: |
-          git checkout '${{ github.event.inputs.ref }}'
+          git checkout "${TARGET_REF}"
           node scripts/releasing/patch-create-comment.js
 
       - name: 'Fail Workflow if Main Task Failed'
         if: 'always() && steps.create_patch.outputs.EXIT_CODE != 0'
+        env:
+          EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
         run: |
-          echo "Patch creation failed with exit code: ${{ steps.create_patch.outputs.EXIT_CODE }}"
+          echo "Patch creation failed with exit code: ${EXIT_CODE}"
           echo "Check the logs above and the comment posted to the original PR for details."
           exit 1

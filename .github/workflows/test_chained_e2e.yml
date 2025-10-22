@@ -1,0 +1,231 @@
+name: 'Test Chained E2E'
+
+on:
+  workflow_run:
+    workflows: ['Trigger E2E']
+    types: ['completed']
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: 'SHA of the commit to test'
+        required: true
+      repo_name:
+        description: 'Repository name (e.g., owner/repo)'
+        required: true
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: |-
+    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+
+jobs:
+  merge_queue_skipper:
+    name: 'Merge Queue Skipper'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    outputs:
+      skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
+    steps:
+      - id: 'merge-queue-e2e-skipper'
+        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
+        with:
+          secret: '${{ secrets.GITHUB_TOKEN }}'
+
+  download_repo_name:
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    outputs:
+      repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
+    steps:
+      - name: 'Mock Repo Artifact'
+        if: "${{ github.event_name != 'workflow_run' }}"
+        env:
+          REPO_NAME: '${{ github.event.inputs.repo_name }}'
+        run: |
+          mkdir -p ./pr
+          echo '${{ env.REPO_NAME }}' > ./pr/repo_name
+      - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'repo_name'
+          path: 'pr/'
+      - name: 'Download the repo_name artifact'
+        uses: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0' # ratchet:actions/download-artifact@v5
+        env:
+          RUN_ID: "${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id  }}"
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          name: 'repo_name'
+          run-id: '${{ env.RUN_ID }}'
+          path: '${{ runner.temp }}/artifacts'
+      - name: 'Output Repo Name'
+        id: 'output-repo-name'
+        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '${{ runner.temp }}/artifacts';
+            const repo_name = String(fs.readFileSync(path.join(temp, 'repo_name')));
+            core.setOutput('repo_name', repo_name);
+
+  e2e_linux:
+    name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
+    needs: 'download_repo_name'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    strategy:
+      fail-fast: false
+      matrix:
+        sandbox:
+          - 'sandbox:none'
+          - 'sandbox:docker'
+        node-version:
+          - '20.x'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
+
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Set up Docker'
+        if: "matrix.sandbox == 'sandbox:docker'"
+        uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+
+      - name: 'Run E2E tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          VERBOSE: 'true'
+        shell: 'bash'
+        run: |
+          if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
+            npm run test:integration:sandbox:docker
+          else
+            npm run test:integration:sandbox:none
+          fi
+
+  e2e_mac:
+    name: 'E2E Test (macOS)'
+    needs: 'download_repo_name'
+    runs-on: 'macos-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
+
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Fix rollup optional dependencies on macOS'
+        if: "runner.os == 'macOS'"
+        run: |
+          npm cache clean --force
+      - name: 'Run E2E tests (non-Windows)'
+        if: "runner.os != 'Windows'"
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          SANDBOX: 'sandbox:none'
+          VERBOSE: 'true'
+        run: 'npm run test:integration:sandbox:none'
+
+  e2e_windows:
+    name: 'Slow E2E - Win'
+    needs:
+      - 'merge_queue_skipper'
+      - 'download_repo_name'
+    if: |
+      needs.merge_queue_skipper.outputs.skip == 'false'
+    runs-on: 'gemini-cli-windows-16-core'
+    continue-on-error: true
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
+
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 'Configure Windows Defender exclusions'
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+        shell: 'pwsh'
+
+      - name: 'Configure npm for Windows performance'
+        run: |
+          npm config set progress false
+          npm config set audit false
+          npm config set fund false
+          npm config set loglevel error
+          npm config set maxsockets 32
+          npm config set registry https://registry.npmjs.org/
+        shell: 'pwsh'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+        shell: 'pwsh'
+
+      - name: 'Build project'
+        run: 'npm run build'
+        shell: 'pwsh'
+
+      - name: 'Run E2E tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          SANDBOX: 'sandbox:none'
+          VERBOSE: 'true'
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'test'
+        shell: 'pwsh'
+        run: 'npm run test:integration:sandbox:none'
+
+  e2e:
+    name: 'E2E'
+    if: |
+      always() && needs.merge_queue_skipper.outputs.skip == 'false'
+    needs:
+      - 'e2e_linux'
+      - 'e2e_mac'
+      - 'merge_queue_skipper'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Check E2E test results'
+        run: |
+          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
+               ${{ needs.e2e_mac.result }} != 'success' ]]; then
+            echo "One or more E2E jobs failed."
+            exit 1
+          fi
+          echo "All required E2E jobs passed!"

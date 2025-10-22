@@ -8,6 +8,7 @@ import { isNodeError } from '../utils/errors.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as process from 'node:process';
+import { debugLogger } from './debugLogger.js';
 
 export type Unsubscribe = () => void;
 
@@ -72,7 +73,7 @@ export class WorkspaceContext {
       this.directories.add(resolved);
       this.notifyDirectoriesChanged();
     } catch (err) {
-      console.warn(
+      debugLogger.warn(
         `[WARN] Skipping unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
       );
     }

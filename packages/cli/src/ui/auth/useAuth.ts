@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
-import { AuthType, type Config } from '@google/gemini-cli-core';
+import { AuthType, debugLogger, type Config } from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
@@ -80,7 +80,7 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
       try {
         await config.refreshAuth(authType);
 
-        console.log(`Authenticated via "${authType}".`);
+        debugLogger.log(`Authenticated via "${authType}".`);
         setAuthError(null);
         setAuthState(AuthState.Authenticated);
       } catch (e) {

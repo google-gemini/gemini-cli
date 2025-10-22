@@ -18,7 +18,7 @@ on:
         type: 'string'
         default: 'main'
       workflow_id:
-        description: 'The workflow to trigger. Defaults to patch-release.yml'
+        description: 'The workflow to trigger. Defaults to release-patch-3-release.yml'
         required: false
         type: 'string'
         default: 'release-patch-3-release.yml'
@@ -37,11 +37,20 @@ on:
         required: false
         type: 'boolean'
         default: false
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   trigger-patch-release:
     if: "(github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')) || github.event_name == 'workflow_dispatch'"
     runs-on: 'ubuntu-latest'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       actions: 'write'
       contents: 'write'
@@ -74,5 +83,7 @@ jobs:
           GITHUB_EVENT_PAYLOAD: '${{ toJSON(github.event) }}'
           FORCE_SKIP_TESTS: '${{ github.event.inputs.force_skip_tests }}'
           TEST_MODE: '${{ github.event.inputs.test_mode }}'
+          ENVIRONMENT: "${{ github.event.inputs.environment || 'prod' }}"
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
         run: |
-          node scripts/releasing/patch-trigger.js --dry-run=${{ github.event.inputs.dry_run }}
+          node scripts/releasing/patch-trigger.js --dry-run="${DRY_RUN}"

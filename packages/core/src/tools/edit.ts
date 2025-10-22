@@ -22,7 +22,6 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
-import { ReadFileTool } from './read-file.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -34,7 +33,8 @@ import type {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
-import { EDIT_TOOL_NAME } from './tool-names.js';
+import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -182,7 +182,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       } else if (occurrences === 0) {
         error = {
           display: `Failed to edit, could not find the string to replace.`,
-          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
+          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
           type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
         };
       } else if (occurrences !== expectedReplacements) {
@@ -256,12 +256,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         throw error;
       }
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.log(`Error preparing edit: ${errorMsg}`);
+      debugLogger.log(`Error preparing edit: ${errorMsg}`);
       return false;
     }
 
     if (editData.error) {
-      console.log(`Error: ${editData.error.display}`);
+      debugLogger.log(`Error: ${editData.error.display}`);
       return false;
     }
 
@@ -410,7 +410,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       logFileOperation(
         this.config,
         new FileOperationEvent(
-          EditTool.Name,
+          EDIT_TOOL_NAME,
           operation,
           editData.newContent.split('\n').length,
           mimetype,
@@ -466,11 +466,12 @@ export class EditTool
   implements ModifiableDeclarativeTool<EditToolParams>
 {
   static readonly Name = EDIT_TOOL_NAME;
+
   constructor(private readonly config: Config) {
     super(
       EditTool.Name,
       'Edit',
-      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
+      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
 
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
 

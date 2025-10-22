@@ -10,32 +10,34 @@ import {
   type PolicyRule,
   ApprovalMode,
   // Read-only tools
-  GlobTool,
-  GrepTool,
-  LSTool,
-  ReadFileTool,
-  ReadManyFilesTool,
-  RipGrepTool,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
   // Write tools
-  EditTool,
-  MemoryTool,
-  ShellTool,
+  SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
-  WebSearchTool,
+  GLOB_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  type PolicyEngine,
+  type MessageBus,
+  MessageBusType,
+  type UpdatePolicy,
 } from '@google/gemini-cli-core';
-import type { Settings } from './settings.js';
+import { type Settings } from './settings.js';
 
 // READ_ONLY_TOOLS is a list of built-in tools that do not modify the user's
 // files or system state.
 const READ_ONLY_TOOLS = new Set([
-  GlobTool.Name,
-  GrepTool.Name,
-  RipGrepTool.Name,
-  LSTool.Name,
-  ReadFileTool.Name,
-  ReadManyFilesTool.Name,
-  WebSearchTool.Name,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
 ]);
 
 // WRITE_TOOLS is a list of built-in tools that can modify the user's files or
@@ -45,9 +47,9 @@ const READ_ONLY_TOOLS = new Set([
 // any tool that isn't read only will require a confirmation unless altered by
 // config and policy.
 const WRITE_TOOLS = new Set([
-  EditTool.Name,
-  MemoryTool.Name,
-  ShellTool.Name,
+  EDIT_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
 ]);
@@ -71,6 +73,7 @@ export function createPolicyEngineConfig(
   //   90: MCP servers with trust=true
   //   100: Explicitly allowed individual tools
   //   195: Explicitly excluded MCP servers
+  //   199: Tools that the user has selected as "Always Allow" in the interactive UI.
   //   200: Explicitly excluded individual tools (highest priority)
 
   // MCP servers that are explicitly allowed in settings.mcp.allowed
@@ -139,16 +142,14 @@ export function createPolicyEngineConfig(
     }
   }
 
-  // If auto-accept is enabled, allow all read-only tools.
+  // Allow all read-only tools.
   // Priority: 50
-  if (settings.tools?.autoAccept) {
-    for (const tool of READ_ONLY_TOOLS) {
-      rules.push({
-        toolName: tool,
-        decision: PolicyDecision.ALLOW,
-        priority: 50,
-      });
-    }
+  for (const tool of READ_ONLY_TOOLS) {
+    rules.push({
+      toolName: tool,
+      decision: PolicyDecision.ALLOW,
+      priority: 50,
+    });
   }
 
   // Only add write tool rules if not in YOLO mode
@@ -170,7 +171,7 @@ export function createPolicyEngineConfig(
     });
   } else if (approvalMode === ApprovalMode.AUTO_EDIT) {
     rules.push({
-      toolName: EditTool.Name,
+      toolName: EDIT_TOOL_NAME,
       decision: PolicyDecision.ALLOW,
       priority: 15, // Higher than write tools (10) to override ASK_USER
     });
@@ -180,4 +181,22 @@ export function createPolicyEngineConfig(
     rules,
     defaultDecision: PolicyDecision.ASK_USER,
   };
+}
+
+export function createPolicyUpdater(
+  policyEngine: PolicyEngine,
+  messageBus: MessageBus,
+) {
+  messageBus.subscribe(
+    MessageBusType.UPDATE_POLICY,
+    (message: UpdatePolicy) => {
+      const toolName = message.toolName;
+
+      policyEngine.addRule({
+        toolName,
+        decision: PolicyDecision.ALLOW,
+        priority: 199, // High priority, but lower than explicit DENY (200)
+      });
+    },
+  );
 }

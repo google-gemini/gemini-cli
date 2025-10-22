@@ -14,6 +14,7 @@ import { SettingScope } from '../../config/settings.js';
 import {
   AuthType,
   clearCachedCredentialFile,
+  debugLogger,
   type Config,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -108,7 +109,7 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           runExitCleanup();
-          console.log(
+          debugLogger.log(
             `
 ----------------------------------------------------------------
 Logging in with Google... Please restart Gemini CLI to continue.

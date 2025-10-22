@@ -15,15 +15,18 @@ import { processImports } from './memoryImportProcessor.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { GEMINI_DIR } from './paths.js';
+import type { GeminiCLIExtension } from '../config/config.js';
+import { debugLogger } from './debugLogger.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) =>
-    console.debug('[DEBUG] [MemoryDiscovery]', ...args),
+    debugLogger.debug('[DEBUG] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) => console.warn('[WARN] [MemoryDiscovery]', ...args),
+  warn: (...args: any[]) =>
+    debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
     console.error('[ERROR] [MemoryDiscovery]', ...args),
@@ -84,7 +87,6 @@ async function getGeminiMdFilePathsInternal(
   userHomePath: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
@@ -107,7 +109,6 @@ async function getGeminiMdFilePathsInternal(
         userHomePath,
         debugMode,
         fileService,
-        extensionContextFilePaths,
         folderTrust,
         fileFilteringOptions,
         maxDirs,
@@ -137,7 +138,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
   userHomePath: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
@@ -224,11 +224,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
         allPaths.add(dPath);
       }
     }
-  }
-
-  // Add extension context file paths.
-  for (const extensionPath of extensionContextFilePaths) {
-    allPaths.add(extensionPath);
   }
 
   const finalPaths = Array.from(allPaths);
@@ -343,7 +338,7 @@ export async function loadServerHierarchicalMemory(
   includeDirectoriesToReadGemini: readonly string[],
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
+  extensions: GeminiCLIExtension[],
   folderTrust: boolean,
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
@@ -363,11 +358,18 @@ export async function loadServerHierarchicalMemory(
     userHomePath,
     debugMode,
     fileService,
-    extensionContextFilePaths,
     folderTrust,
     fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     maxDirs,
   );
+
+  // Add extension file paths separately since they may be conditionally enabled.
+  filePaths.push(
+    ...extensions
+      .filter((ext) => ext.isActive)
+      .flatMap((ext) => ext.contextFiles),
+  );
+
   if (filePaths.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');

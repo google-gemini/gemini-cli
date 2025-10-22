@@ -56,7 +56,7 @@ describe('mcp add command', () => {
 
   it('should add a stdio server to project settings', async () => {
     await parser.parseAsync(
-      'add my-server /path/to/server arg1 arg2 -e FOO=bar',
+      'add -e FOO=bar my-server /path/to/server arg1 arg2',
     );
 
     expect(mockSetValue).toHaveBeenCalledWith(
@@ -72,9 +72,27 @@ describe('mcp add command', () => {
     );
   });
 
+  it('should handle multiple env vars before positional args', async () => {
+    await parser.parseAsync(
+      'add -e FOO=bar -e BAZ=qux my-server /path/to/server',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'my-server': {
+          command: '/path/to/server',
+          args: [],
+          env: { FOO: 'bar', BAZ: 'qux' },
+        },
+      },
+    );
+  });
+
   it('should add an sse server to user settings', async () => {
     await parser.parseAsync(
-      'add --transport sse sse-server https://example.com/sse-endpoint --scope user -H "X-API-Key: your-key"',
+      'add --transport sse --scope user -H "X-API-Key: your-key" sse-server https://example.com/sse-endpoint',
     );
 
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
@@ -87,7 +105,7 @@ describe('mcp add command', () => {
 
   it('should add an http server to project settings', async () => {
     await parser.parseAsync(
-      'add --transport http http-server https://example.com/mcp -H "Authorization: Bearer your-token"',
+      'add --transport http -H "Authorization: Bearer your-token" http-server https://example.com/mcp',
     );
 
     expect(mockSetValue).toHaveBeenCalledWith(

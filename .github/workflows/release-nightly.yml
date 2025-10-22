@@ -2,7 +2,7 @@ name: 'Release: Nightly'
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 20 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -31,7 +31,7 @@ on:
 
 jobs:
   release:
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
@@ -137,7 +137,7 @@ jobs:
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create and Merge Pull Request'
-        if: "github.event.inputs.environment == 'prod'"
+        if: "github.event.inputs.environment != 'dev'"
         uses: './.github/actions/create-pull-request'
         with:
           branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
@@ -148,7 +148,7 @@ jobs:
           working-directory: './release'
 
       - name: 'Create Issue on Failure'
-        if: "${{ failure() && github.event.inputs.environment == 'prod' && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
+        if: "${{ failure() && github.event.inputs.environment != 'dev' && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'

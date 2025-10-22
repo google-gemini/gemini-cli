@@ -149,10 +149,16 @@ describe('useSlashCommandProcessor', () => {
           openPrivacyNotice: vi.fn(),
           openSettingsDialog: vi.fn(),
           openModelDialog: mockOpenModelDialog,
+          openPermissionsDialog: vi.fn(),
           quit: mockSetQuittingMessages,
           setDebugMessage: vi.fn(),
           toggleCorgiMode: vi.fn(),
+          toggleDebugProfiler: vi.fn(),
+          dispatchExtensionStateUpdate: vi.fn(),
+          addConfirmUpdateExtensionRequest: vi.fn(),
         },
+        new Map(), // extensionsUpdateState
+        true, // isConfigInitialized
       ),
     );
 
@@ -175,7 +181,7 @@ describe('useSlashCommandProcessor', () => {
         expect(result.current.slashCommands).toHaveLength(1);
       });
 
-      expect(result.current.slashCommands[0]?.name).toBe('test');
+      expect(result.current.slashCommands?.[0]?.name).toBe('test');
       expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockFileLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockMcpLoadCommands).toHaveBeenCalledTimes(1);
@@ -456,7 +462,7 @@ describe('useSlashCommandProcessor', () => {
         name: 'loadwiththoughts',
         action: vi.fn().mockResolvedValue({
           type: 'load_history',
-          history: [{ type: MessageType.MODEL, text: 'response' }],
+          history: [{ type: MessageType.GEMINI, text: 'response' }],
           clientHistory: historyWithThoughts,
         }),
       });
@@ -901,18 +907,26 @@ describe('useSlashCommandProcessor', () => {
           mockClearItems,
           mockLoadHistory,
           vi.fn(), // refreshStatic
-          vi.fn(), // onDebugMessage
-          vi.fn(), // openThemeDialog
-          mockOpenAuthDialog,
-          vi.fn(), // openEditorDialog
-          vi.fn(), // toggleCorgiMode
-          mockSetQuittingMessages,
-          vi.fn(), // openPrivacyNotice
-
-          vi.fn(), // openSettingsDialog
-          vi.fn(), // toggleVimEnabled
           vi.fn().mockResolvedValue(false), // toggleVimEnabled
           vi.fn(), // setIsProcessing
+          vi.fn(), // setGeminiMdFileCount
+          {
+            openAuthDialog: vi.fn(),
+            openThemeDialog: vi.fn(),
+            openEditorDialog: vi.fn(),
+            openPrivacyNotice: vi.fn(),
+            openSettingsDialog: vi.fn(),
+            openModelDialog: vi.fn(),
+            openPermissionsDialog: vi.fn(),
+            quit: vi.fn(),
+            setDebugMessage: vi.fn(),
+            toggleCorgiMode: vi.fn(),
+            toggleDebugProfiler: vi.fn(),
+            dispatchExtensionStateUpdate: vi.fn(),
+            addConfirmUpdateExtensionRequest: vi.fn(),
+          },
+          new Map(), // extensionsUpdateState
+          true, // isConfigInitialized
         ),
       );
 
@@ -959,7 +973,7 @@ describe('useSlashCommandProcessor', () => {
     it('should log a simple slash command', async () => {
       const result = setupProcessorHook(loggingTestCommands);
       await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
       );
       await act(async () => {
         await result.current.handleSlashCommand('/logtest');
@@ -978,7 +992,7 @@ describe('useSlashCommandProcessor', () => {
     it('logs nothing for a bogus command', async () => {
       const result = setupProcessorHook(loggingTestCommands);
       await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
       );
       await act(async () => {
         await result.current.handleSlashCommand('/bogusbogusbogus');
@@ -990,7 +1004,7 @@ describe('useSlashCommandProcessor', () => {
     it('logs a failure event for a failed command', async () => {
       const result = setupProcessorHook(loggingTestCommands);
       await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
       );
       await act(async () => {
         await result.current.handleSlashCommand('/fail');
@@ -1009,7 +1023,7 @@ describe('useSlashCommandProcessor', () => {
     it('should log a slash command with a subcommand', async () => {
       const result = setupProcessorHook(loggingTestCommands);
       await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
       );
       await act(async () => {
         await result.current.handleSlashCommand('/logwithsub sub');
@@ -1027,7 +1041,7 @@ describe('useSlashCommandProcessor', () => {
     it('should log the command path when an alias is used', async () => {
       const result = setupProcessorHook(loggingTestCommands);
       await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
       );
       await act(async () => {
         await result.current.handleSlashCommand('/la');
@@ -1043,7 +1057,7 @@ describe('useSlashCommandProcessor', () => {
     it('should not log for unknown commands', async () => {
       const result = setupProcessorHook(loggingTestCommands);
       await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
       );
       await act(async () => {
         await result.current.handleSlashCommand('/unknown');

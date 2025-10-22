@@ -6,7 +6,7 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
-import { useConsoleMessages } from './useConsoleMessages';
+import { useConsoleMessages } from './useConsoleMessages.js';
 import { useCallback } from 'react';
 
 describe('useConsoleMessages', () => {

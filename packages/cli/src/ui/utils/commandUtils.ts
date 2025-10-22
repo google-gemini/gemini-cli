@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
 import type { SpawnOptions } from 'node:child_process';
 import { spawn } from 'node:child_process';
 
@@ -165,7 +166,7 @@ export const getUrlOpenCommand = (): string => {
     default:
       // Default to xdg-open, which appears to be supported for the less popular operating systems.
       openCmd = 'xdg-open';
-      console.warn(
+      debugLogger.warn(
         `Unknown platform: ${process.platform}. Attempting to open URLs with: ${openCmd}.`,
       );
       break;

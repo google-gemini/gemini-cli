@@ -23,7 +23,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { vi } from 'vitest';
+import { vi, type Mock, type MockInstance } from 'vitest';
 import type { LoadedSettings } from './config/settings.js';
 
 // Mock core modules
@@ -59,17 +59,20 @@ vi.mock('./services/CommandService.js', () => ({
   },
 }));
 
+vi.mock('./services/FileCommandLoader.js');
+vi.mock('./services/McpPromptLoader.js');
+
 describe('runNonInteractive', () => {
   let mockConfig: Config;
   let mockSettings: LoadedSettings;
   let mockToolRegistry: ToolRegistry;
-  let mockCoreExecuteToolCall: vi.Mock;
-  let mockShutdownTelemetry: vi.Mock;
-  let consoleErrorSpy: vi.SpyInstance;
-  let processStdoutSpy: vi.SpyInstance;
+  let mockCoreExecuteToolCall: Mock;
+  let mockShutdownTelemetry: Mock;
+  let consoleErrorSpy: MockInstance;
+  let processStdoutSpy: MockInstance;
   let mockGeminiClient: {
-    sendMessageStream: vi.Mock;
-    getChatRecordingService: vi.Mock;
+    sendMessageStream: Mock;
+    getChatRecordingService: Mock;
   };
 
   beforeEach(async () => {
@@ -936,6 +939,46 @@ describe('runNonInteractive', () => {
     expect(mockAction).toHaveBeenCalledWith(expect.any(Object), 'arg1 arg2');
 
     expect(processStdoutSpy).toHaveBeenCalledWith('Acknowledged');
+  });
+
+  it('should instantiate CommandService with correct loaders for slash commands', async () => {
+    // This test indirectly checks that handleSlashCommand is using the right loaders.
+    const { FileCommandLoader } = await import(
+      './services/FileCommandLoader.js'
+    );
+    const { McpPromptLoader } = await import('./services/McpPromptLoader.js');
+
+    mockGetCommands.mockReturnValue([]); // No commands found, so it will fall through
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Acknowledged' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 1 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      '/mycommand',
+      'prompt-id-loaders',
+    );
+
+    // Check that loaders were instantiated with the config
+    expect(FileCommandLoader).toHaveBeenCalledTimes(1);
+    expect(FileCommandLoader).toHaveBeenCalledWith(mockConfig);
+    expect(McpPromptLoader).toHaveBeenCalledTimes(1);
+    expect(McpPromptLoader).toHaveBeenCalledWith(mockConfig);
+
+    // Check that instances were passed to CommandService.create
+    expect(mockCommandServiceCreate).toHaveBeenCalledTimes(1);
+    const loadersArg = mockCommandServiceCreate.mock.calls[0][0];
+    expect(loadersArg).toHaveLength(2);
+    expect(loadersArg[0]).toBe(vi.mocked(McpPromptLoader).mock.instances[0]);
+    expect(loadersArg[1]).toBe(vi.mocked(FileCommandLoader).mock.instances[0]);
   });
 
   it('should allow a normally-excluded tool when --allowed-tools is set', async () => {

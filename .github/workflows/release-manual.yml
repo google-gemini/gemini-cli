@@ -48,7 +48,7 @@ on:
 jobs:
   release:
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       packages: 'write'
@@ -85,8 +85,10 @@ jobs:
       - name: 'Prepare Release Info'
         id: 'release_info'
         working-directory: './release'
+        env:
+          INPUT_VERSION: '${{ github.event.inputs.version }}'
         run: |
-          RELEASE_VERSION="${{ github.event.inputs.version }}"
+          RELEASE_VERSION="${INPUT_VERSION}"
           echo "RELEASE_VERSION=${RELEASE_VERSION#v}" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(git describe --tags --abbrev=0)" >> "${GITHUB_OUTPUT}"
 

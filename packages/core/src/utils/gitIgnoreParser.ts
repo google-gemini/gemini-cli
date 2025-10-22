@@ -35,11 +35,14 @@ export class GitIgnoreParser implements GitIgnoreFilter {
 
     const relativeBaseDir = isExcludeFile
       ? '.'
-      : path.dirname(path.relative(this.projectRoot, patternsFilePath));
+      : path
+          .dirname(path.relative(this.projectRoot, patternsFilePath))
+          .split(path.sep)
+          .join(path.posix.sep);
 
     return content
       .split('\n')
-      .map((p) => p.trim())
+      .map((p) => p.trimStart())
       .filter((p) => p !== '' && !p.startsWith('#'))
       .map((p) => {
         const isNegative = p.startsWith('!');
@@ -68,11 +71,11 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           if (!isAnchoredInFile && !p.includes('/')) {
             // If no slash and not anchored in file, it matches files in any
             // subdirectory.
-            newPattern = path.join('**', p);
+            newPattern = path.posix.join('**', p);
           }
 
           // Prepend the .gitignore file's directory.
-          newPattern = path.join(relativeBaseDir, newPattern);
+          newPattern = path.posix.join(relativeBaseDir, newPattern);
 
           // Anchor the pattern to a nested gitignore directory.
           if (!newPattern.startsWith('/')) {
@@ -88,9 +91,6 @@ export class GitIgnoreParser implements GitIgnoreFilter {
         if (isNegative) {
           newPattern = '!' + newPattern;
         }
-
-        // Even in windows, Ignore expects forward slashes.
-        newPattern = newPattern.replace(/\\/g, '/');
 
         return newPattern;
       })
@@ -173,6 +173,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           const gitignorePath = path.join(dir, '.gitignore');
           if (fs.existsSync(gitignorePath)) {
             const patterns = this.loadPatternsForFile(gitignorePath);
+
             this.cache.set(dir, patterns);
             ig.add(patterns);
           } else {

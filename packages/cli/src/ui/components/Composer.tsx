@@ -26,6 +26,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
+import { TodoTray } from './messages/Todo.js';
 
 export const Composer = () => {
   const config = useConfig();
@@ -64,6 +65,8 @@ export const Composer = () => {
       )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+
+      <TodoTray />
 
       <Box
         marginTop={1}
