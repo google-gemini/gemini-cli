@@ -434,7 +434,6 @@ export function KeypressProvider({
     let kittySequenceBuffer = '';
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
-    let isDragging = false;
     let dragBuffer = '';
     let draggingTimer: NodeJS.Timeout | null = null;
 
@@ -502,14 +501,13 @@ export function KeypressProvider({
       if (
         key.sequence === SINGLE_QUOTE ||
         key.sequence === DOUBLE_QUOTE ||
-        isDragging
+        draggingTimer !== null
       ) {
-        isDragging = true;
         dragBuffer += key.sequence;
 
         clearDraggingTimer();
         draggingTimer = setTimeout(() => {
-          isDragging = false;
+          draggingTimer = null;
           const seq = dragBuffer;
           dragBuffer = '';
           if (seq) {
@@ -878,7 +876,7 @@ export function KeypressProvider({
         clearTimeout(draggingTimer);
         draggingTimer = null;
       }
-      if (isDragging && dragBuffer) {
+      if (dragBuffer) {
         broadcast({
           name: '',
           ctrl: false,
@@ -887,7 +885,6 @@ export function KeypressProvider({
           paste: true,
           sequence: dragBuffer,
         });
-        isDragging = false;
         dragBuffer = '';
       }
     };
