@@ -401,6 +401,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** A denylist of MCP servers to exclude.
   - **Default:** `undefined`
 
+#### `useSmartEdit`
+
+- **`useSmartEdit`** (boolean):
+  - **Description:** Enable the smart-edit tool instead of the replace tool.
+  - **Default:** `true`
+
+#### `useWriteTodos`
+
+- **`useWriteTodos`** (boolean):
+  - **Description:** Enable the write_todos tool.
+  - **Default:** `false`
+
 #### `security`
 
 - **`security.folderTrust.enabled`** (boolean):
