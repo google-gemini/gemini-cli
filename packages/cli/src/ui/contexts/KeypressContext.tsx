@@ -402,16 +402,17 @@ export function KeypressProvider({
   const draggingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const subscribe = useCallback(
-    (handler: KeypressHandler) => {
-      subscribers.add(handler);
-    },
+    (handler: KeypressHandler) => subscribers.add(handler),
     [subscribers],
   );
 
   const unsubscribe = useCallback(
-    (handler: KeypressHandler) => {
-      subscribers.delete(handler);
-    },
+    (handler: KeypressHandler) => subscribers.delete(handler),
+    [subscribers],
+  );
+
+  const broadcast = useCallback(
+    (key: Key) => subscribers.forEach((handler) => handler(key)),
     [subscribers],
   );
 
@@ -445,12 +446,6 @@ export function KeypressProvider({
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
-
-    const broadcast = (key: Key) => {
-      for (const handler of subscribers) {
-        handler(key);
-      }
-    };
 
     const flushKittyBufferOnInterrupt = (reason: string) => {
       if (kittySequenceBuffer) {
@@ -910,8 +905,8 @@ export function KeypressProvider({
     setRawMode,
     kittyProtocolEnabled,
     config,
-    subscribers,
     debugKeystrokeLogging,
+    broadcast,
   ]);
 
   return (
