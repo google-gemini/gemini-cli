@@ -77,6 +77,11 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
 
+      - name: 'Configure npm for GitHub Packages'
+        run: |
+          echo "@google-gemini:registry=https://npm.pkg.github.com/" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+
       - name: 'Install dependencies'
         run: 'npm ci'
 
@@ -129,6 +134,11 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '20.x'
+
+      - name: 'Configure npm for GitHub Packages'
+        run: |
+          echo "@google-gemini:registry=https://npm.pkg.github.com/" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
 
       - name: 'Install dependencies'
         run: 'npm ci'
@@ -198,6 +208,12 @@ jobs:
           npm config set loglevel error
           npm config set maxsockets 32
           npm config set registry https://registry.npmjs.org/
+        shell: 'pwsh'
+
+      - name: 'Configure npm for GitHub Packages'
+        run: |
+          echo "@google-gemini:registry=https://npm.pkg.github.com/" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
         shell: 'pwsh'
 
       - name: 'Install dependencies'
