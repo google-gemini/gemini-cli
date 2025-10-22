@@ -27,7 +27,7 @@ export interface SpanMetadata {
   output?: unknown;
   error?: unknown;
   /** Additional attributes for the span. */
-  attributes: Record<string, unknown>;
+  attributes: Record<string, AttributeValue>;
 }
 
 /**
