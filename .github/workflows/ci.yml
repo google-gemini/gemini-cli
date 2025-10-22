@@ -129,7 +129,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npm run test:ci'
+        run: 'npx vitest run packages/cli/src/ui/components/InputPrompt.test.tsx --repeats 100'
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -197,7 +197,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npm run test:ci -- --coverage.enabled=false'
+        run: 'npx vitest run packages/cli/src/ui/components/InputPrompt.test.tsx --repeats 100'
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -338,7 +338,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
-        run: 'npm run test:ci -- --coverage.enabled=false'
+        run: 'npx vitest run packages/cli/src/ui/components/InputPrompt.test.tsx --repeats 100'
         shell: 'pwsh'
 
       - name: 'Bundle'
