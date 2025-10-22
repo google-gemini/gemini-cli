@@ -21,7 +21,8 @@ import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
-const MOCK_HOME = path.join(path.sep, 'mock', 'home', 'user');
+const MOCK_HOME =
+  process.platform === 'win32' ? 'C:\\mock\\home\\user' : '/mock/home/user';
 
 const mockFsHelper = vi.hoisted(() => {
   const files = new Map<string, string>();
