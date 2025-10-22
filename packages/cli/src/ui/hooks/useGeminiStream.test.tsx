@@ -129,20 +129,6 @@ vi.mock('./useLogger.js', () => ({
   }),
 }));
 
-const mockKillAllBackgroundProcesses = vi.hoisted(() => vi.fn());
-
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actualCoreModule = (await importOriginal()) as any;
-  return {
-    ...actualCoreModule,
-    GitService: vi.fn(),
-    GeminiClient: MockedGeminiClientClass,
-    UserPromptEvent: MockedUserPromptEvent,
-    parseAndFormatApiError: mockParseAndFormatApiError,
-    killAllBackgroundProcesses: mockKillAllBackgroundProcesses,
-  };
-});
-
 const mockStartNewPrompt = vi.fn();
 const mockAddUsage = vi.fn();
 vi.mock('../contexts/SessionContext.js', () => ({
@@ -180,6 +166,9 @@ describe('useGeminiStream', () => {
       // MockedGeminiClientClass is defined in the module scope by the previous change.
       // It will use the mockStartChat and mockSendMessageStream that are managed within beforeEach.
       const clientInstance = new MockedGeminiClientClass(mockConfig);
+      clientInstance.getLoopDetectionService = vi.fn().mockReturnValue({
+        disableForSession: vi.fn(),
+      });
       return clientInstance;
     });
 
@@ -322,6 +311,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         );
       },
       {
@@ -485,6 +476,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         mockSetShellInputFocused,
+        80,
+        24,
       ),
     );
 
@@ -566,6 +559,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         mockSetShellInputFocused,
+        80,
+        24,
       ),
     );
 
@@ -676,6 +671,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         mockSetShellInputFocused,
+        80,
+        24,
       ),
     );
 
@@ -787,6 +784,8 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         mockSetShellInputFocused,
+        80,
+        24,
       ),
     );
 
@@ -918,6 +917,8 @@ describe('useGeminiStream', () => {
           () => {},
           cancelSubmitSpy,
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -929,6 +930,32 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       expect(cancelSubmitSpy).toHaveBeenCalled();
+    });
+
+    it('should call setShellInputFocused(false) when escape is pressed', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        await new Promise(() => {}); // Keep stream open
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      // Wait for the response to start
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Simulate escape key press
+      simulateEscapeKeyPress();
+
+      // Verify setShellInputFocused was called with false
+      expect(mockSetShellInputFocused).toHaveBeenCalledWith(false);
     });
 
     it('should not do anything if escape is pressed when not responding', () => {
@@ -1271,6 +1298,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -1326,6 +1355,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -1857,6 +1888,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -2025,7 +2058,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           onCancelSubmitSpy,
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2075,6 +2108,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -2129,6 +2164,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -2223,6 +2260,8 @@ describe('useGeminiStream', () => {
             () => {},
             () => {},
             mockSetShellInputFocused,
+            80,
+            24,
           ),
         );
 
@@ -2275,6 +2314,8 @@ describe('useGeminiStream', () => {
         vi.fn(), // onEditorClose
         vi.fn(), // onCancelSubmit
         mockSetShellInputFocused,
+        80,
+        24,
       ),
     );
 
@@ -2344,6 +2385,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -2493,6 +2536,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -2549,6 +2594,8 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           mockSetShellInputFocused,
+          80,
+          24,
         ),
       );
 
@@ -2578,9 +2625,271 @@ describe('useGeminiStream', () => {
     });
   });
 
-  describe('Background Process Cancellation', () => {
+  describe('Loop Detection Confirmation', () => {
+    beforeEach(() => {
+      // Add mock for getLoopDetectionService to the config
+      const mockLoopDetectionService = {
+        disableForSession: vi.fn(),
+      };
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+        ...new MockedGeminiClientClass(mockConfig),
+        getLoopDetectionService: () => mockLoopDetectionService,
+      });
+    });
+
+    it('should set loopDetectionConfirmationRequest when LoopDetected event is received', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Some content',
+          };
+          yield {
+            type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+        expect(
+          typeof result.current.loopDetectionConfirmationRequest?.onComplete,
+        ).toBe('function');
+      });
+    });
+
+    it('should disable loop detection and show message when user selects "disable"', async () => {
+      const mockLoopDetectionService = {
+        disableForSession: vi.fn(),
+      };
+      const mockClient = {
+        ...new MockedGeminiClientClass(mockConfig),
+        getLoopDetectionService: () => mockLoopDetectionService,
+      };
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // Wait for confirmation request to be set
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // Simulate user selecting "disable"
+      await act(async () => {
+        result.current.loopDetectionConfirmationRequest?.onComplete({
+          userSelection: 'disable',
+        });
+      });
+
+      // Verify loop detection was disabled
+      expect(mockLoopDetectionService.disableForSession).toHaveBeenCalledTimes(
+        1,
+      );
+
+      // Verify confirmation request was cleared
+      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+
+      // Verify appropriate message was added
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: 'info',
+          text: 'Loop detection has been disabled for this session. Retrying request...',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should keep loop detection enabled and show message when user selects "keep"', async () => {
+      const mockLoopDetectionService = {
+        disableForSession: vi.fn(),
+      };
+      const mockClient = {
+        ...new MockedGeminiClientClass(mockConfig),
+        getLoopDetectionService: () => mockLoopDetectionService,
+      };
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // Wait for confirmation request to be set
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // Simulate user selecting "keep"
+      await act(async () => {
+        result.current.loopDetectionConfirmationRequest?.onComplete({
+          userSelection: 'keep',
+        });
+      });
+
+      // Verify loop detection was NOT disabled
+      expect(mockLoopDetectionService.disableForSession).not.toHaveBeenCalled();
+
+      // Verify confirmation request was cleared
+      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+
+      // Verify appropriate message was added
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: 'info',
+          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should handle multiple loop detection events properly', async () => {
+      const { result } = renderTestHook();
+
+      // First loop detection - set up fresh mock for first call
+      mockSendMessageStream.mockReturnValueOnce(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      // First loop detection
+      await act(async () => {
+        await result.current.submitQuery('first query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // Simulate user selecting "keep" for first request
+      await act(async () => {
+        result.current.loopDetectionConfirmationRequest?.onComplete({
+          userSelection: 'keep',
+        });
+      });
+
+      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+
+      // Verify first message was added
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: 'info',
+          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
+        },
+        expect.any(Number),
+      );
+
+      // Second loop detection - set up fresh mock for second call
+      mockSendMessageStream.mockReturnValueOnce(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      // Second loop detection
+      await act(async () => {
+        await result.current.submitQuery('second query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // Simulate user selecting "disable" for second request
+      await act(async () => {
+        result.current.loopDetectionConfirmationRequest?.onComplete({
+          userSelection: 'disable',
+        });
+      });
+
+      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+
+      // Verify second message was added
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: 'info',
+          text: 'Loop detection has been disabled for this session. Retrying request...',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should process LoopDetected event after moving pending history to history', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Some content before loop',
+          };
+          yield {
+            type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // Wait for the loop detection confirmation to appear
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // The pending content should have been added to history before loop detection
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'gemini',
+          text: 'Some content before loop',
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('Background Process Cancellation via AbortSignal', () => {
     let keypressCallback: (key: any) => void;
     const mockUseKeypress = useKeypress as Mock;
+
+    const simulateEscapeKeyPress = () => {
+      act(() => {
+        keypressCallback({ name: 'escape' });
+      });
+    };
 
     beforeEach(() => {
       // Capture the callback passed to useKeypress
@@ -2591,24 +2900,18 @@ describe('useGeminiStream', () => {
           keypressCallback = () => {};
         }
       });
-
-      // Clear the background process mock
-      mockKillAllBackgroundProcesses.mockClear();
     });
 
-    const simulateEscapeKeyPress = () => {
-      act(() => {
-        keypressCallback({ name: 'escape' });
-      });
-    };
-
-    it('should call killAllBackgroundProcesses when user cancels a request', async () => {
+    it('should abort the request via AbortSignal when user cancels', async () => {
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Part 1' };
         // Keep the stream open
         await new Promise(() => {});
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
+
+      // Spy on AbortController.abort
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
 
       const { result } = renderTestHook();
 
@@ -2625,10 +2928,8 @@ describe('useGeminiStream', () => {
       // Simulate escape key press to cancel
       simulateEscapeKeyPress();
 
-      // Verify killAllBackgroundProcesses was called
-      await waitFor(() => {
-        expect(mockKillAllBackgroundProcesses).toHaveBeenCalledTimes(1);
-      });
+      // Verify AbortController.abort was called (which triggers background process cleanup)
+      expect(abortSpy).toHaveBeenCalled();
 
       // Verify streaming was cancelled
       await waitFor(() => {
@@ -2639,9 +2940,47 @@ describe('useGeminiStream', () => {
     it('should handle background process cleanup on error', async () => {
       // Implementation for error case test will go here
     });
+
+    it('should propagate AbortSignal to shell tool invocations', async () => {
+      // This test verifies that the AbortSignal is passed to tool calls
+      // which enables the shell tool to register cleanup handlers
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Starting...' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      // Capture the AbortSignal passed to sendMessageStream
+      let capturedSignal: AbortSignal | undefined;
+      mockSendMessageStream.mockImplementation((_parts, signal) => {
+        capturedSignal = signal;
+        return mockStream;
+      });
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      // Verify that an AbortSignal was passed
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+
+      // Verify the signal is not aborted initially
+      expect(capturedSignal?.aborted).toBe(false);
+
+      // Cancel the request
+      simulateEscapeKeyPress();
+
+      // Verify the signal is now aborted
+      expect(capturedSignal?.aborted).toBe(true);
+    });
   });
 
-  describe('Loop Detection Confirmation', () => {
+  describe('Loop Detection Confirmation - Additional Tests', () => {
     beforeEach(() => {
       // Add mock for getLoopDetectionService to the config
       const mockLoopDetectionService = {
@@ -2854,30 +3193,30 @@ describe('useGeminiStream', () => {
       });
 
       // Verify that the content was added to history before the loop detection dialog
-=======
-      // Verify cancellation message is added
->>>>>>> 2c2ecb1f (fix: enable cancellation of slash commands and background processes)
       await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          {
-            type: MessageType.INFO,
-            text: 'Request cancelled.',
-          },
-          expect.any(Number),
-        );
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
-      // Verify state is reset
-      expect(result.current.streamingState).toBe(StreamingState.Idle);
+      // The pending content should have been added to history before loop detection
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'gemini',
+          text: 'Some response content',
+        }),
+        expect.any(Number),
+      );
     });
 
-    it('should call killAllBackgroundProcesses when AbortController is aborted', async () => {
+    it('should trigger AbortSignal when cancelOngoingRequest is called directly', async () => {
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Part 1' };
         // Keep the stream open
         await new Promise(() => {});
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
+
+      // Spy on AbortController.abort
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
 
       const { result } = renderTestHook();
 
@@ -2896,8 +3235,10 @@ describe('useGeminiStream', () => {
         result.current.cancelOngoingRequest();
       });
 
-      // Verify killAllBackgroundProcesses was called
-      expect(mockKillAllBackgroundProcesses).toHaveBeenCalledTimes(1);
+      // Verify AbortController.abort was called (which triggers background process cleanup)
+      expect(abortSpy).toHaveBeenCalled();
+
+      abortSpy.mockRestore();
     });
   });
 });

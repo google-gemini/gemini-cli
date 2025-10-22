@@ -987,17 +987,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
           refreshStatic();
           return newValue;
         });
-      } else if (keyMatchers[Command.TOGGLE_TOOL_DESCRIPTIONS](key)) {
-        const newValue = !showToolDescriptions;
-        setShowToolDescriptions(newValue);
-
-        const mcpServers = config.getMcpServers();
-        if (Object.keys(mcpServers || {}).length > 0) {
-          handleSlashCommand(
-            newValue ? '/mcp desc' : '/mcp nodesc',
-            appAbortController.current.signal,
-          );
-        }
       } else if (
         keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
