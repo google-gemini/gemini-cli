@@ -135,5 +135,8 @@ function getErrorMessage(e: unknown): string {
   if (e instanceof Error) {
     return e.message;
   }
-  return `${e}`;
+  if (typeof e === 'string') {
+    return e;
+  }
+  return safeJsonStringify(e);
 }
