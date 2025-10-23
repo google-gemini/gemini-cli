@@ -7,13 +7,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  EXTENSIONS_CONFIG_FILENAME,
-  INSTALL_METADATA_FILENAME,
-} from '../config/extension.js';
-import {
   type MCPServerConfig,
   type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
+import {
+  EXTENSIONS_CONFIG_FILENAME,
+  INSTALL_METADATA_FILENAME,
+} from '../config/extensions/variables.js';
 import type { ExtensionSetting } from '../config/extensions/extensionSettings.js';
 
 export function createExtension({

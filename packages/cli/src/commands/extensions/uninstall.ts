@@ -5,9 +5,12 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { uninstallExtension } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface UninstallArgs {
   name: string; // can be extension name or source URL.
@@ -15,7 +18,14 @@ interface UninstallArgs {
 
 export async function handleUninstall(args: UninstallArgs) {
   try {
-    await uninstallExtension(args.name, false);
+    const workspaceDir = process.cwd();
+    const extensionManager = new ExtensionManager({
+      workspaceDir,
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
+      loadedSettings: loadSettings(workspaceDir),
+    });
+    await extensionManager.uninstallExtension(args.name, false);
     debugLogger.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
     debugLogger.error(getErrorMessage(error));

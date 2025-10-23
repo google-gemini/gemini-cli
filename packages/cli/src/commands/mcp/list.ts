@@ -14,8 +14,9 @@ import {
   debugLogger,
 } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { loadExtensions } from '../../config/extension.js';
-import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -26,7 +27,13 @@ async function getMcpServersFromConfig(): Promise<
   Record<string, MCPServerConfig>
 > {
   const settings = loadSettings();
-  const extensions = loadExtensions(new ExtensionEnablementManager());
+  const extensionManager = new ExtensionManager({
+    loadedSettings: settings,
+    workspaceDir: process.cwd(),
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+  });
+  const extensions = extensionManager.loadExtensions();
   const mcpServers = { ...(settings.merged.mcpServers || {}) };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {

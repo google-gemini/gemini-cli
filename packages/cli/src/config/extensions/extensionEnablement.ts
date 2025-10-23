@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
-import { ExtensionStorage } from '../extension.js';
+import { ExtensionStorage } from './storage.js';
 
 export interface ExtensionEnablementConfig {
   overrides: string[];
