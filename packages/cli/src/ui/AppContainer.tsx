@@ -44,6 +44,7 @@ import {
   clearCachedCredentialFile,
   recordExitFail,
   ShellExecutionService,
+  ApiKeyCredentialStorage,
   debugLogger,
   coreEvents,
   CoreEvent,
@@ -366,10 +367,14 @@ export const AppContainer = (props: AppContainerProps) => {
     initializationResult.themeError,
   );
 
-  const { authState, setAuthState, authError, onAuthError } = useAuthCommand(
-    settings,
-    config,
-  );
+  const {
+    authState,
+    setAuthState,
+    authError,
+    onAuthError,
+    apiKeyDefaultValue,
+    reloadApiKey,
+  } = useAuthCommand(settings, config);
 
   const { proQuotaRequest, handleProQuotaChoice } = useQuotaAndFallback({
     config,
@@ -417,6 +422,34 @@ Logging in with Google... Please restart Gemini CLI to continue.
     },
     [settings, config, setAuthState, onAuthError],
   );
+
+  const handleApiKeySubmit = useCallback(
+    async (apiKey: string) => {
+      try {
+        if (!apiKey.trim() && apiKey.length > 1) {
+          onAuthError(
+            'API key cannot be empty string with length greater than 1.',
+          );
+          return;
+        }
+
+        await ApiKeyCredentialStorage.saveApiKey(apiKey);
+        await reloadApiKey();
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        setAuthState(AuthState.Authenticated);
+      } catch (e) {
+        onAuthError(
+          `Failed to save API key: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    },
+    [setAuthState, onAuthError, reloadApiKey, config],
+  );
+
+  const handleApiKeyCancel = useCallback(() => {
+    // Go back to auth method selection
+    setAuthState(AuthState.Updating);
+  }, [setAuthState]);
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
@@ -1042,7 +1075,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true });
+  const dialogsVisible =
+    shouldShowIdePrompt ||
+    isFolderTrustDialogOpen ||
+    !!shellConfirmationRequest ||
+    !!confirmationRequest ||
+    confirmUpdateExtensionRequests.length > 0 ||
+    !!loopDetectionConfirmationRequest ||
+    isThemeDialogOpen ||
+    isSettingsDialogOpen ||
+    isModelDialogOpen ||
+    isPermissionsDialogOpen ||
+    isAuthenticating ||
+    isAuthDialogOpen ||
+    isEditorDialogOpen ||
+    showPrivacyNotice ||
+    showIdeRestartPrompt ||
+    !!proQuotaRequest ||
+    isAuthDialogOpen ||
+    authState === AuthState.AwaitingApiKeyInput;
+
+  useKeypress(handleGlobalKeypress, { isActive: !dialogsVisible });
 
   // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
@@ -1145,24 +1198,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
-  const dialogsVisible =
-    shouldShowIdePrompt ||
-    isFolderTrustDialogOpen ||
-    !!shellConfirmationRequest ||
-    !!confirmationRequest ||
-    confirmUpdateExtensionRequests.length > 0 ||
-    !!loopDetectionConfirmationRequest ||
-    isThemeDialogOpen ||
-    isSettingsDialogOpen ||
-    isModelDialogOpen ||
-    isPermissionsDialogOpen ||
-    isAuthenticating ||
-    isAuthDialogOpen ||
-    isEditorDialogOpen ||
-    showPrivacyNotice ||
-    showIdeRestartPrompt ||
-    !!proQuotaRequest;
-
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
@@ -1178,6 +1213,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isConfigInitialized,
       authError,
       isAuthDialogOpen,
+      isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
+      apiKeyDefaultValue,
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
@@ -1333,6 +1370,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       historyManager,
       embeddedShellFocused,
       showDebugProfiler,
+      apiKeyDefaultValue,
+      authState,
     ],
   );
 
@@ -1367,6 +1406,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
       setQueueErrorMessage,
       popAllMessages,
+      handleApiKeySubmit,
+      handleApiKeyCancel,
     }),
     [
       handleThemeSelect,
@@ -1393,6 +1434,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
       setQueueErrorMessage,
       popAllMessages,
+      handleApiKeySubmit,
+      handleApiKeyCancel,
     ],
   );
 
