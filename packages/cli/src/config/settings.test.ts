@@ -50,7 +50,6 @@ import {
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { disableExtension, ExtensionStorage } from './extension.js';
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
@@ -67,8 +66,8 @@ import {
   saveSettings,
   type SettingsFile,
 } from './settings.js';
-import { FatalConfigError, GEMINI_DIR, Storage } from '@google/gemini-cli-core';
-import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import { ExtensionManager } from './extension-manager.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
@@ -2392,18 +2391,13 @@ describe('Settings Loading and Merging', () => {
   describe('migrateDeprecatedSettings', () => {
     let mockFsExistsSync: Mock;
     let mockFsReadFileSync: Mock;
-    let mockDisableExtension: Mock;
 
     beforeEach(() => {
       vi.resetAllMocks();
-
       mockFsExistsSync = vi.mocked(fs.existsSync);
-      mockFsReadFileSync = vi.mocked(fs.readFileSync);
-      mockDisableExtension = vi.mocked(disableExtension);
-      vi.mocked(ExtensionStorage.getUserExtensionsDir).mockReturnValue(
-        new Storage(osActual.homedir()).getExtensionsDir(),
-      );
       (mockFsExistsSync as Mock).mockReturnValue(true);
+      mockFsReadFileSync = vi.mocked(fs.readFileSync);
+      mockFsReadFileSync.mockReturnValue('{}');
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: true,
         source: undefined,
@@ -2438,35 +2432,38 @@ describe('Settings Loading and Merging', () => {
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        loadedSettings,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+      const mockDisableExtension = vi.spyOn(
+        extensionManager,
+        'disableExtension',
+      );
+      mockDisableExtension.mockImplementation(() => {});
 
-      migrateDeprecatedSettings(loadedSettings, MOCK_WORKSPACE_DIR);
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
 
       // Check user settings migration
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'user-ext-1',
         SettingScope.User,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.User,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
 
       // Check workspace settings migration
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'workspace-ext-1',
         SettingScope.Workspace,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.Workspace,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
 
       // Check that setValue was called to remove the deprecated setting
@@ -2508,8 +2505,19 @@ describe('Settings Loading and Merging', () => {
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        loadedSettings,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+      const mockDisableExtension = vi.spyOn(
+        extensionManager,
+        'disableExtension',
+      );
+      mockDisableExtension.mockImplementation(() => {});
 
-      migrateDeprecatedSettings(loadedSettings, MOCK_WORKSPACE_DIR);
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
 
       expect(mockDisableExtension).not.toHaveBeenCalled();
       expect(setValueSpy).not.toHaveBeenCalled();
