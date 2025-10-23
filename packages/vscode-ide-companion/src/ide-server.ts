@@ -153,18 +153,6 @@ export class IDEServer {
       );
 
       app.use((req, res, next) => {
-        const host = req.headers.host || '';
-        const allowedHosts = [
-          `localhost:${this.port}`,
-          `127.0.0.1:${this.port}`,
-        ];
-        if (!allowedHosts.includes(host)) {
-          return res.status(403).json({ error: 'Invalid Host header' });
-        }
-        next();
-      });
-
-      app.use((req, res, next) => {
         const authHeader = req.headers.authorization;
         if (!authHeader) {
           this.log('Missing Authorization header. Rejecting request.');
@@ -331,7 +319,7 @@ export class IDEServer {
         }
       });
 
-      this.server = app.listen(0, '127.0.0.1', async () => {
+      this.server = app.listen(0, '0.0.0.0', async () => {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
@@ -343,7 +331,7 @@ export class IDEServer {
             os.tmpdir(),
             `gemini-ide-server-${process.ppid}.json`,
           );
-          this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
+          this.log(`IDE server listening on http://0.0.0.0:${this.port}`);
 
           if (this.authToken) {
             await writePortAndWorkspace({
