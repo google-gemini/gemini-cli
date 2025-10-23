@@ -46,12 +46,11 @@ import {
   afterEach,
   type Mocked,
   type Mock,
-  fail,
 } from 'vitest';
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { disableExtension } from './extension.js';
+import { disableExtension, ExtensionStorage } from './extension.js';
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
@@ -59,7 +58,6 @@ import {
   USER_SETTINGS_PATH, // This IS the mocked path.
   getSystemSettingsPath,
   getSystemDefaultsPath,
-  SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   migrateSettingsToV1,
   needsMigration,
   type Settings,
@@ -67,13 +65,14 @@ import {
   migrateDeprecatedSettings,
   SettingScope,
 } from './settings.js';
-import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import { FatalConfigError, GEMINI_DIR, Storage } from '@google/gemini-cli-core';
+import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
-// Use the (mocked) SETTINGS_DIRECTORY_NAME for consistency
+// Use the (mocked) GEMINI_DIR for consistency
 const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
   MOCK_WORKSPACE_DIR,
-  SETTINGS_DIRECTORY_NAME,
+  GEMINI_DIR,
   'settings.json',
 );
 
@@ -95,9 +94,7 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-vi.mock('./extension.js', () => ({
-  disableExtension: vi.fn(),
-}));
+vi.mock('./extension.js');
 
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
@@ -612,6 +609,40 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
     });
 
+    it('should not allow user or workspace to override system disableYoloMode', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        security: {
+          disableYoloMode: false,
+        },
+      };
+      const workspaceSettingsContent = {
+        security: {
+          disableYoloMode: false, // This should be ignored
+        },
+      };
+      const systemSettingsContent = {
+        security: {
+          disableYoloMode: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
+    });
+
     it('should handle contextFileName correctly when only in user settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
@@ -1076,8 +1107,6 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      const e = settings.user.settings.model?.chatCompression;
-      console.log(e);
 
       expect(settings.user.settings.model?.chatCompression).toEqual({
         contextPercentageThreshold: 0.5,
@@ -1267,7 +1296,7 @@ describe('Settings Loading and Merging', () => {
 
       try {
         loadSettings(MOCK_WORKSPACE_DIR);
-        fail('loadSettings should have thrown a FatalConfigError');
+        throw new Error('loadSettings should have thrown a FatalConfigError');
       } catch (e) {
         expect(e).toBeInstanceOf(FatalConfigError);
         const error = e as FatalConfigError;
@@ -1337,9 +1366,10 @@ describe('Settings Loading and Merging', () => {
       expect((settings.workspace.settings as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
-      expect(
-        (settings.workspace.settings as TestSettings)['nested']['value'],
-      ).toBe('workspace_endpoint_from_env');
+      const nested = (settings.workspace.settings as TestSettings)[
+        'nested'
+      ] as Record<string, unknown>;
+      expect(nested['value']).toBe('workspace_endpoint_from_env');
       expect((settings.merged as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
@@ -1587,21 +1617,14 @@ describe('Settings Loading and Merging', () => {
         (settings.user.settings as TestSettings)['undefinedVal'],
       ).toBeUndefined();
 
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNull'],
-      ).toBeNull();
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedBool'],
-      ).toBe(true);
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNum'],
-      ).toBe(0);
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedString'],
-      ).toBe('literal');
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['anotherEnv'],
-      ).toBe('env_string_nested_value');
+      const nestedObj = (settings.user.settings as TestSettings)[
+        'nestedObj'
+      ] as Record<string, unknown>;
+      expect(nestedObj['nestedNull']).toBeNull();
+      expect(nestedObj['nestedBool']).toBe(true);
+      expect(nestedObj['nestedNum']).toBe(0);
+      expect(nestedObj['nestedString']).toBe('literal');
+      expect(nestedObj['anotherEnv']).toBe('env_string_nested_value');
 
       delete process.env['MY_ENV_STRING'];
       delete process.env['MY_ENV_STRING_NESTED'];
@@ -2137,14 +2160,14 @@ describe('Settings Loading and Merging', () => {
           vimMode: false,
         },
         model: {
-          maxSessionTurns: 0,
+          maxSessionTurns: -1,
         },
         context: {
           includeDirectories: [],
         },
         security: {
           folderTrust: {
-            enabled: null,
+            enabled: undefined,
           },
         },
       };
@@ -2153,9 +2176,13 @@ describe('Settings Loading and Merging', () => {
 
       expect(v1Settings).toEqual({
         vimMode: false,
-        maxSessionTurns: 0,
+        maxSessionTurns: -1,
         includeDirectories: [],
-        folderTrust: null,
+        security: {
+          folderTrust: {
+            enabled: undefined,
+          },
+        },
       });
     });
 
@@ -2343,9 +2370,9 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('migrateDeprecatedSettings', () => {
-    let mockFsExistsSync: Mocked<typeof fs.existsSync>;
-    let mockFsReadFileSync: Mocked<typeof fs.readFileSync>;
-    let mockDisableExtension: Mocked<typeof disableExtension>;
+    let mockFsExistsSync: Mock;
+    let mockFsReadFileSync: Mock;
+    let mockDisableExtension: Mock;
 
     beforeEach(() => {
       vi.resetAllMocks();
@@ -2353,9 +2380,14 @@ describe('Settings Loading and Merging', () => {
       mockFsExistsSync = vi.mocked(fs.existsSync);
       mockFsReadFileSync = vi.mocked(fs.readFileSync);
       mockDisableExtension = vi.mocked(disableExtension);
-
+      vi.mocked(ExtensionStorage.getUserExtensionsDir).mockReturnValue(
+        new Storage(osActual.homedir()).getExtensionsDir(),
+      );
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: undefined,
+      });
     });
 
     afterEach(() => {
@@ -2393,11 +2425,13 @@ describe('Settings Loading and Merging', () => {
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'user-ext-1',
         SettingScope.User,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.User,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
 
@@ -2405,11 +2439,13 @@ describe('Settings Loading and Merging', () => {
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'workspace-ext-1',
         SettingScope.Workspace,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.Workspace,
+        expect.any(ExtensionEnablementManager),
         MOCK_WORKSPACE_DIR,
       );
 

@@ -11,17 +11,18 @@ import {
 } from '../../ui/state/extensions.js';
 import {
   copyExtension,
-  installExtension,
-  uninstallExtension,
+  installOrUpdateExtension,
   loadExtension,
   loadInstallMetadata,
   ExtensionStorage,
   loadExtensionConfig,
 } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import { getErrorMessage } from '../../utils/errors.js';
+import { type ExtensionEnablementManager } from './extensionEnablement.js';
+import { promptForSetting } from './extensionSettings.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -31,6 +32,7 @@ export interface ExtensionUpdateInfo {
 
 export async function updateExtension(
   extension: GeminiCLIExtension,
+  extensionEnablementManager: ExtensionEnablementManager,
   cwd: string = process.cwd(),
   requestConsent: (consent: string) => Promise<boolean>,
   currentState: ExtensionUpdateState,
@@ -65,23 +67,24 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    await copyExtension(extension.path, tempDir);
-    const previousExtensionConfig = await loadExtensionConfig({
+    const previousExtensionConfig = loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
+      extensionEnablementManager,
     });
-    await uninstallExtension(extension.name, cwd);
-    await installExtension(
+
+    await installOrUpdateExtension(
       installMetadata,
       requestConsent,
       cwd,
       previousExtensionConfig,
+      promptForSetting,
     );
-
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = loadExtension({
       extensionDir: updatedExtensionStorage.getExtensionDir(),
       workspaceDir: cwd,
+      extensionEnablementManager,
     });
     if (!updatedExtension) {
       dispatchExtensionStateUpdate({
@@ -90,7 +93,7 @@ export async function updateExtension(
       });
       throw new Error('Updated extension not found after installation.');
     }
-    const updatedVersion = updatedExtension.config.version;
+    const updatedVersion = updatedExtension.version;
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: {
@@ -104,7 +107,7 @@ export async function updateExtension(
       updatedVersion,
     };
   } catch (e) {
-    console.error(
+    debugLogger.error(
       `Error updating extension, rolling back. ${getErrorMessage(e)}`,
     );
     dispatchExtensionStateUpdate({
@@ -123,6 +126,7 @@ export async function updateAllUpdatableExtensions(
   requestConsent: (consent: string) => Promise<boolean>,
   extensions: GeminiCLIExtension[],
   extensionsState: Map<string, ExtensionUpdateStatus>,
+  extensionEnablementManager: ExtensionEnablementManager,
   dispatch: (action: ExtensionUpdateAction) => void,
 ): Promise<ExtensionUpdateInfo[]> {
   return (
@@ -136,6 +140,7 @@ export async function updateAllUpdatableExtensions(
         .map((extension) =>
           updateExtension(
             extension,
+            extensionEnablementManager,
             cwd,
             requestConsent,
             extensionsState.get(extension.name)!.status,
@@ -153,6 +158,7 @@ export interface ExtensionUpdateCheckResult {
 
 export async function checkForAllExtensionUpdates(
   extensions: GeminiCLIExtension[],
+  extensionEnablementManager: ExtensionEnablementManager,
   dispatch: (action: ExtensionUpdateAction) => void,
   cwd: string = process.cwd(),
 ): Promise<void> {
@@ -177,11 +183,12 @@ export async function checkForAllExtensionUpdates(
       },
     });
     promises.push(
-      checkForExtensionUpdate(extension, cwd).then((state) =>
-        dispatch({
-          type: 'SET_STATE',
-          payload: { name: extension.name, state },
-        }),
+      checkForExtensionUpdate(extension, extensionEnablementManager, cwd).then(
+        (state) =>
+          dispatch({
+            type: 'SET_STATE',
+            payload: { name: extension.name, state },
+          }),
       ),
     );
   }

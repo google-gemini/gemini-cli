@@ -46,8 +46,9 @@ export enum Command {
 
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
-  TOGGLE_TOOL_DESCRIPTIONS = 'toggleToolDescriptions',
+  SHOW_FULL_TODOS = 'showFullTodos',
   TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
+  TOGGLE_MARKDOWN = 'toggleMarkdown',
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
@@ -115,7 +116,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
 
   // History navigation
-  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true }],
+  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
   [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true }],
   [Command.NAVIGATION_UP]: [{ key: 'up' }],
   [Command.NAVIGATION_DOWN]: [{ key: 'down' }],
@@ -156,8 +157,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'o', ctrl: true }],
-  [Command.TOGGLE_TOOL_DESCRIPTIONS]: [{ key: 't', ctrl: true }],
+  [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
+  [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],

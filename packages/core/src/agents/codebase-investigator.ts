@@ -5,10 +5,12 @@
  */
 
 import type { AgentDefinition } from './types.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GLOB_TOOL_NAME } from '../tools/tool-names.js';
-import { GrepTool } from '../tools/grep.js';
+import {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { z } from 'zod';
 
@@ -44,10 +46,9 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
 > = {
   name: 'codebase_investigator',
   displayName: 'Codebase Investigator Agent',
-  description: `Your primary tool for multifile search tasks and codebase exploration. 
-    Invoke this tool to delegate search tasks to an autonomous subagent. 
-    Use this to find features, understand context, or locate specific files, functions, or symbols. 
-    Returns a structured Json report with key file paths, symbols, architectural map and insights to solve a task or answer questions`,
+  description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. 
+    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation. 
+    It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
   inputConfig: {
     inputs: {
       objective: {
@@ -81,7 +82,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
 
   toolConfig: {
     // Grant access only to read-only tools.
-    tools: [LSTool.Name, ReadFileTool.Name, GLOB_TOOL_NAME, GrepTool.Name],
+    tools: [LS_TOOL_NAME, READ_FILE_TOOL_NAME, GLOB_TOOL_NAME, GREP_TOOL_NAME],
   },
 
   promptConfig: {
