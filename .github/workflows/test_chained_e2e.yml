@@ -18,9 +18,9 @@ on:
         required: true
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  group: '${{ github.workflow }}-${{ github.head_ref || github.event.workflow_run.head_branch || github.ref }}'
   cancel-in-progress: |-
-    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+    ${{ github.event_name != 'push' && github.event_name != 'merge_group' }}
 
 permissions:
   contents: 'read'
@@ -104,6 +104,7 @@ jobs:
       - 'parse_run_context'
     steps:
       - name: 'Set pending status'
+        permissions: 'write-all'
         uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
         if: 'always()'
         with:
@@ -292,6 +293,7 @@ jobs:
       - 'e2e'
     steps:
       - name: 'Set workflow status'
+        permissions: 'write-all'
         uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
         if: 'always()'
         with:
