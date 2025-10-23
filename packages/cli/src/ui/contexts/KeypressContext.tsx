@@ -817,20 +817,17 @@ export function KeypressProvider({
       }
     };
 
-    let rl: readline.Interface;
+    let input: NodeJS.ReadableStream;
     if (keypressStream !== null) {
-      rl = readline.createInterface({
-        input: keypressStream,
-        escapeCodeTimeout: 0,
-      });
-      readline.emitKeypressEvents(keypressStream, rl);
-      keypressStream.on('keypress', handleKeypress);
+      // handleRawKeypress sends data to keypressStream
       stdin.on('data', handleRawKeypress);
+      input = keypressStream;
     } else {
-      rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 0 });
-      readline.emitKeypressEvents(stdin, rl);
-      stdin.on('keypress', handleKeypress);
+      input = stdin;
     }
+    const rl = readline.createInterface({ input, escapeCodeTimeout: 0 });
+    readline.emitKeypressEvents(stdin, rl);
+    stdin.on('keypress', handleKeypress);
 
     return () => {
       if (keypressStream !== null) {
