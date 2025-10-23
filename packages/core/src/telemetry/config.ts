@@ -41,6 +41,7 @@ export interface TelemetryArgOverrides {
   telemetryOtlpProtocol?: string;
   telemetryLogPrompts?: boolean;
   telemetryOutfile?: string;
+  telemetryRootCertPath?: string;
 }
 
 /**
@@ -108,6 +109,11 @@ export async function resolveTelemetrySettings(options: {
     parseBooleanEnvFlag(env['GEMINI_TELEMETRY_USE_COLLECTOR']) ??
     settings.useCollector;
 
+  const rootCertPath =
+    argv.telemetryRootCertPath ??
+    env['GEMINI_TELEMETRY_ROOT_CERT_PATH'] ??
+    settings.rootCertPath;
+
   return {
     enabled,
     target,
@@ -116,5 +122,6 @@ export async function resolveTelemetrySettings(options: {
     logPrompts,
     outfile,
     useCollector,
+    rootCertPath,
   };
 }

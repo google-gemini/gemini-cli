@@ -111,6 +111,7 @@ export interface TelemetrySettings {
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
+  rootCertPath?: string;
 }
 
 export interface OutputSettings {
@@ -418,6 +419,7 @@ export class Config {
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
       useCollector: params.telemetry?.useCollector,
+      rootCertPath: params.telemetry?.rootCertPath,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -802,6 +804,10 @@ export class Config {
 
   getTelemetryUseCollector(): boolean {
     return this.telemetrySettings.useCollector ?? false;
+  }
+
+  getTelemetrySslRootFilePath(): string | undefined {
+    return this.telemetrySettings.rootCertPath;
   }
 
   getGeminiClient(): GeminiClient {

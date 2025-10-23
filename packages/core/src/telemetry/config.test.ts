@@ -151,5 +151,32 @@ describe('telemetry/config helpers', () => {
         /Invalid telemetry target/i,
       );
     });
+
+    it('resolves rootCertPath from argv, env, and settings', async () => {
+      // Only settings
+      let resolved = await resolveTelemetrySettings({
+        settings: { rootCertPath: '/settings/cert.pem' },
+      });
+      expect(resolved.rootCertPath).toBe('/settings/cert.pem');
+
+      // Env overrides settings
+      resolved = await resolveTelemetrySettings({
+        settings: { rootCertPath: '/settings/cert.pem' },
+        env: { GEMINI_TELEMETRY_ROOT_CERT_PATH: '/env/cert.pem' },
+      });
+      expect(resolved.rootCertPath).toBe('/env/cert.pem');
+
+      // Argv overrides env and settings
+      resolved = await resolveTelemetrySettings({
+        argv: { telemetryRootCertPath: '/argv/cert.pem' },
+        settings: { rootCertPath: '/settings/cert.pem' },
+        env: { GEMINI_TELEMETRY_ROOT_CERT_PATH: '/env/cert.pem' },
+      });
+      expect(resolved.rootCertPath).toBe('/argv/cert.pem');
+
+      // Undefined when not present
+      resolved = await resolveTelemetrySettings({});
+      expect(resolved.rootCertPath).toBeUndefined();
+    });
   });
 });
