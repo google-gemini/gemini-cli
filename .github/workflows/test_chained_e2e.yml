@@ -85,7 +85,6 @@ jobs:
           sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
           status: 'pending'
-          context: 'Set e2e pending Status'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
@@ -265,4 +264,3 @@ jobs:
           sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
           status: '${{ job.status }}'
-          context: 'Set E2E Status'
