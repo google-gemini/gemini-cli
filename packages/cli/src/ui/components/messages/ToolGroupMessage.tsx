@@ -22,7 +22,7 @@ interface ToolGroupMessageProps {
   terminalWidth: number;
   isFocused?: boolean;
   activeShellPtyId?: number | null;
-  shellFocused?: boolean;
+  embeddedShellFocused?: boolean;
   onShellInputSubmit?: (input: string) => void;
 }
 
@@ -33,10 +33,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   terminalWidth,
   isFocused = true,
   activeShellPtyId,
-  shellFocused,
+  embeddedShellFocused,
 }) => {
-  const isShellFocused =
-    shellFocused &&
+  const isEmbeddedShellFocused =
+    embeddedShellFocused &&
     toolCalls.some(
       (t) =>
         t.ptyId === activeShellPtyId && t.status === ToolCallStatus.Executing,
@@ -51,7 +51,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
   const borderColor =
-    isShellCommand || isShellFocused
+    (isShellCommand && hasPending) || isEmbeddedShellFocused
       ? theme.ui.symbol
       : hasPending
         ? theme.status.warning
@@ -96,9 +96,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         Ink to render the border of the box incorrectly and span multiple lines and even
         cause tearing.
       */
-      width="100%"
-      marginLeft={1}
-      borderDimColor={hasPending}
+      width={terminalWidth}
+      borderDimColor={
+        hasPending && (!isShellCommand || !isEmbeddedShellFocused)
+      }
       borderColor={borderColor}
       gap={1}
     >
@@ -119,7 +120,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                       : 'medium'
                 }
                 activeShellPtyId={activeShellPtyId}
-                shellFocused={shellFocused}
+                embeddedShellFocused={embeddedShellFocused}
                 config={config}
               />
             </Box>

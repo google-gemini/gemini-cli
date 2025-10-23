@@ -28,6 +28,7 @@ import {
   parseInputForHighlighting,
   buildSegmentsForVisualSlice,
 } from '../utils/highlight.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -35,6 +36,25 @@ import {
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { useShellFocusState } from '../contexts/ShellFocusContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { StreamingState } from '../types.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
+
+/**
+ * Returns if the terminal can be trusted to handle paste events atomically
+ * rather than potentially sending multiple paste events separated by line
+ * breaks which could trigger unintended command execution.
+ */
+export function isTerminalPasteTrusted(
+  kittyProtocolSupported: boolean,
+): boolean {
+  // Ideally we could trust all VSCode family terminals as well but it appears
+  // we cannot as Cursor users on windows reported being impacted by this
+  // issue (https://github.com/google-gemini/gemini-cli/issues/3763).
+  return kittyProtocolSupported;
+}
+
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -52,29 +72,23 @@ export interface InputPromptProps {
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
-  isShellFocused?: boolean;
+  isEmbeddedShellFocused?: boolean;
+  setQueueErrorMessage: (message: string | null) => void;
+  streamingState: StreamingState;
+  popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
 }
 
 // The input content, input container, and input suggestions list may have different widths
-export const calculatePromptWidths = (terminalWidth: number) => {
-  const widthFraction = 0.9;
+export const calculatePromptWidths = (mainContentWidth: number) => {
   const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
   const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
-  const MIN_CONTENT_WIDTH = 2;
 
-  const innerContentWidth =
-    Math.floor(terminalWidth * widthFraction) -
-    FRAME_PADDING_AND_BORDER -
-    PROMPT_PREFIX_WIDTH;
-
-  const inputWidth = Math.max(MIN_CONTENT_WIDTH, innerContentWidth);
   const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
-  const containerWidth = inputWidth + FRAME_OVERHEAD;
-  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
+  const suggestionsWidth = Math.max(20, mainContentWidth);
 
   return {
-    inputWidth,
-    containerWidth,
+    inputWidth: Math.max(mainContentWidth - FRAME_OVERHEAD, 1),
+    containerWidth: mainContentWidth,
     suggestionsWidth,
     frameOverhead: FRAME_OVERHEAD,
   } as const;
@@ -97,13 +111,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   approvalMode,
   onEscapePromptChange,
   vimHandleInput,
-  isShellFocused,
+  isEmbeddedShellFocused,
+  setQueueErrorMessage,
+  streamingState,
+  popAllMessages,
 }) => {
+  const kittyProtocol = useKittyKeyboardProtocol();
+  const isShellFocused = useShellFocusState();
+  const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const recentPasteTime = useRef<number | null>(null);
+  const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
+    number | null
+  >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
@@ -133,6 +155,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     slashCommands,
     commandContext,
     reverseSearchActive,
+    shellModeActive,
     config,
   );
 
@@ -153,6 +176,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     reverseSearchCompletion.resetCompletionState;
   const resetCommandSearchCompletionState =
     commandSearchCompletion.resetCompletionState;
+
+  const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
 
   const resetEscapeState = useCallback(() => {
     if (escapeTimerRef.current) {
@@ -205,6 +230,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
+  const handleSubmit = useCallback(
+    (submittedValue: string) => {
+      const trimmedMessage = submittedValue.trim();
+      const isSlash = isSlashCommand(trimmedMessage);
+
+      const isShell = shellModeActive;
+      if (
+        (isSlash || isShell) &&
+        streamingState === StreamingState.Responding
+      ) {
+        setQueueErrorMessage(
+          `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
+        );
+        return;
+      }
+      handleSubmitAndClear(trimmedMessage);
+    },
+    [
+      handleSubmitAndClear,
+      shellModeActive,
+      streamingState,
+      setQueueErrorMessage,
+    ],
+  );
+
   const customSetTextAndResetCompletionSignal = useCallback(
     (newText: string) => {
       buffer.setText(newText);
@@ -240,6 +290,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetReverseSearchCompletionState,
     resetCommandSearchCompletionState,
   ]);
+
+  // Helper function to handle loading queued messages into input
+  // Returns true if we should continue with input history navigation
+  const tryLoadQueuedMessages = useCallback(() => {
+    if (buffer.text.trim() === '' && popAllMessages) {
+      popAllMessages((allMessages) => {
+        if (allMessages) {
+          buffer.setText(allMessages);
+        } else {
+          // No queued messages, proceed with input history
+          inputHistory.navigateUp();
+        }
+      });
+      return true; // We handled the up arrow key
+    }
+    return false;
+  }, [buffer, popAllMessages, inputHistory]);
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -291,6 +358,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // TODO(jacobr): this special case is likely not needed anymore.
+      // We should probably stop supporting paste if the InputPrompt is not
+      // focused.
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
@@ -298,19 +368,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
-        recentPasteTime.current = Date.now();
+        if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
+          setRecentUnsafePasteTime(Date.now());
 
-        // Clear any existing paste timeout
-        if (pasteTimeoutRef.current) {
-          clearTimeout(pasteTimeoutRef.current);
+          // Clear any existing paste timeout
+          if (pasteTimeoutRef.current) {
+            clearTimeout(pasteTimeoutRef.current);
+          }
+
+          // Clear the paste protection after a very short delay to prevent
+          // false positives.
+          // Due to how we use a reducer for text buffer state updates, it is
+          // reasonable to expect that key events that are really part of the
+          // same paste will be processed in the same event loop tick. 40ms
+          // is chosen arbitrarily as it is faster than a typical human
+          // could go from pressing paste to pressing enter. The fastest typists
+          // can type at 200 words per minute which roughly translates to 50ms
+          // per letter.
+          pasteTimeoutRef.current = setTimeout(() => {
+            setRecentUnsafePasteTime(null);
+            pasteTimeoutRef.current = null;
+          }, 40);
         }
-
-        // Clear the paste protection after a safe delay
-        pasteTimeoutRef.current = setTimeout(() => {
-          recentPasteTime.current = null;
-          pasteTimeoutRef.current = null;
-        }, 500);
-
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
@@ -486,7 +565,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // If the command is a perfect match, pressing enter should execute it.
       if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
-        handleSubmitAndClear(buffer.text);
+        handleSubmit(buffer.text);
         return;
       }
 
@@ -538,6 +617,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (keyMatchers[Command.HISTORY_UP](key)) {
+          // Check for queued messages first when input is empty
+          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
+          // Only navigate history if popAllMessages doesn't exist
           inputHistory.navigateUp();
           return;
         }
@@ -551,6 +636,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
+          // Check for queued messages first when input is empty
+          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
+          // Only navigate history if popAllMessages doesn't exist
           inputHistory.navigateUp();
           return;
         }
@@ -579,8 +670,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
           // Check if a paste operation occurred recently to prevent accidental auto-submission
-          if (recentPasteTime.current !== null) {
-            // Paste occurred recently, ignore this submit to prevent auto-execution
+          if (recentUnsafePasteTime !== null) {
+            // Paste occurred recently in a terminal where we don't trust pastes
+            // to be reported correctly so assume this paste was really a
+            // newline that was part of the paste.
+            // This has the added benefit that in the worst case at least users
+            // get some feedback that their keypress was handled rather than
+            // wondering why it was completey ignored.
+            buffer.newline();
             return;
           }
 
@@ -591,7 +688,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            handleSubmit(buffer.text);
           }
         }
         return;
@@ -672,6 +769,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onClearScreen,
       inputHistory,
       handleSubmitAndClear,
+      handleSubmit,
       shellHistory,
       reverseSearchCompletion,
       handleClipboardImage,
@@ -682,14 +780,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
+      recentUnsafePasteTime,
       commandSearchActive,
       commandSearchCompletion,
+      kittyProtocol.supported,
+      tryLoadQueuedMessages,
     ],
   );
 
-  useKeypress(handleInput, {
-    isActive: !isShellFocused,
-  });
+  useKeypress(handleInput, { isActive: !isEmbeddedShellFocused });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
@@ -840,9 +939,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       <Box
         borderStyle="round"
         borderColor={
-          statusColor ?? (focus ? theme.border.focused : theme.border.default)
+          isShellFocused && !isEmbeddedShellFocused
+            ? (statusColor ?? theme.border.focused)
+            : theme.border.default
         }
         paddingX={1}
+        width={mainAreaWidth}
+        flexDirection="row"
+        alignItems="flex-start"
+        minHeight={3}
       >
         <Text
           color={statusColor ?? theme.text.accent}
@@ -869,7 +974,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
-            focus ? (
+            showCursor ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
                 <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
@@ -924,7 +1029,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         relativeVisualColForHighlight - segStart,
                         relativeVisualColForHighlight - segStart + 1,
                       );
-                      const highlighted = chalk.inverse(charToHighlight);
+                      const highlighted = showCursor
+                        ? chalk.inverse(charToHighlight)
+                        : charToHighlight;
                       display =
                         cpSlice(
                           seg.text,
@@ -960,7 +1067,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   if (!currentLineGhost) {
                     renderedLine.push(
                       <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                        {chalk.inverse(' ')}
+                        {showCursor ? chalk.inverse(' ') : ' '}
                       </Text>,
                     );
                   }
@@ -976,7 +1083,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
                     <Text>
                       {renderedLine}
-                      {showCursorBeforeGhost && chalk.inverse(' ')}
+                      {showCursorBeforeGhost &&
+                        (showCursor ? chalk.inverse(' ') : ' ')}
                       {currentLineGhost && (
                         <Text color={theme.text.secondary}>
                           {currentLineGhost}

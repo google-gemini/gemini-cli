@@ -255,6 +255,36 @@ describe('patch-create-comment', () => {
     });
   });
 
+  describe('GitHub App Permission Scenarios', () => {
+    it('should parse manual commands with clipboard emoji correctly', () => {
+      const result = runPatchCreateComment(
+        '--original-pr 8655 --exit-code 1 --commit abc1234 --channel stable --repository google-gemini/gemini-cli --test',
+        {
+          LOG_CONTENT: `❌ Failed to create release branch due to insufficient GitHub App permissions.
+
+📋 Please run these commands manually to create the branch:
+
+\`\`\`bash
+git checkout -b hotfix/v0.4.1/stable/cherry-pick-abc1234 v0.4.1
+git push origin hotfix/v0.4.1/stable/cherry-pick-abc1234
+\`\`\``,
+        },
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.stdout).toContain('🔒 **GitHub App Permission Issue**');
+      expect(result.stdout).toContain(
+        'Please run these commands manually to create the release branch:',
+      );
+      expect(result.stdout).toContain(
+        'git checkout -b hotfix/v0.4.1/stable/cherry-pick-abc1234 v0.4.1',
+      );
+      expect(result.stdout).toContain(
+        'git push origin hotfix/v0.4.1/stable/cherry-pick-abc1234',
+      );
+    });
+  });
+
   describe('Test Mode Flag', () => {
     it('should generate mock content in test mode for success', () => {
       const result = runPatchCreateComment(

@@ -28,13 +28,23 @@ on:
         description: 'The original PR number to comment back on.'
         required: false
         type: 'string'
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   create-patch:
     runs-on: 'ubuntu-latest'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       pull-requests: 'write'
+      actions: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -48,41 +58,53 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: 'Install Dependencies'
+      - name: 'configure .npmrc'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Install Script Dependencies'
         run: 'npm ci'
 
-      - name: 'Generate GitHub App Token'
-        id: 'generate_token'
-        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
-        with:
-          app-id: '${{ secrets.APP_ID }}'
-          private-key: '${{ secrets.PRIVATE_KEY }}'
-          permission-pull-requests: 'write'
-          permission-contents: 'write'
-
       - name: 'Configure Git User'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          REPOSITORY: '${{ github.repository }}'
         run: |-
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
+          # Configure git to use GITHUB_TOKEN for remote operations (has actions:write for workflow files)
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
 
       - name: 'Create Patch'
         id: 'create_patch'
         env:
-          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          CLI_PACKAGE_NAME: '${{ vars.CLI_PACKAGE_NAME }}'
+          PATCH_COMMIT: '${{ github.event.inputs.commit }}'
+          PATCH_CHANNEL: '${{ github.event.inputs.channel }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
         continue-on-error: true
         run: |
-          # Capture output directly to environment variable
+          # Capture output and display it in logs using tee
           {
-            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
+            node scripts/releasing/create-patch-pr.js \
+              --cli-package-name="${CLI_PACKAGE_NAME}" \
+              --commit="${PATCH_COMMIT}" \
+              --channel="${PATCH_CHANNEL}" \
+              --pullRequestNumber="${ORIGINAL_PR}" \
+              --dry-run="${DRY_RUN}"
             echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
-          } 2>&1 | {
+          } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
             cat >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
-          }
+          )
 
       - name: 'Comment on Original PR'
-        if: 'inputs.original_pr'
+        if: 'always() && inputs.original_pr'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
@@ -91,6 +113,18 @@ jobs:
           CHANNEL: '${{ github.event.inputs.channel }}'
           REPOSITORY: '${{ github.repository }}'
           GITHUB_RUN_ID: '${{ github.run_id }}'
+          LOG_CONTENT: '${{ env.LOG_CONTENT }}'
+          TARGET_REF: '${{ github.event.inputs.ref }}'
+        continue-on-error: true
         run: |
-          git checkout '${{ github.event.inputs.ref }}'
+          git checkout "${TARGET_REF}"
           node scripts/releasing/patch-create-comment.js
+
+      - name: 'Fail Workflow if Main Task Failed'
+        if: 'always() && steps.create_patch.outputs.EXIT_CODE != 0'
+        env:
+          EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
+        run: |
+          echo "Patch creation failed with exit code: ${EXIT_CODE}"
+          echo "Check the logs above and the comment posted to the original PR for details."
+          exit 1

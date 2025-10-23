@@ -12,6 +12,7 @@ import {
   type CommandContext,
   type SlashCommand,
 } from '../commands/types.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Type alias for improved type safety based on actual fzf result structure
 type FzfCommandResult = {
@@ -189,7 +190,7 @@ function useCommandSuggestions(
 
         // Safety check: ensure leafCommand and completion exist
         if (!leafCommand?.completion) {
-          console.warn(
+          debugLogger.warn(
             'Attempted argument completion without completion function',
           );
           return;
@@ -485,14 +486,20 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   );
   const { isPerfectMatch } = usePerfectMatch(parserResult);
 
-  // Update external state - this is now much simpler and focused
+  // Clear internal state when disabled
   useEffect(() => {
-    if (!enabled || query === null) {
+    if (!enabled) {
       setSuggestions([]);
       setIsLoadingSuggestions(false);
       setIsPerfectMatch(false);
       setCompletionStart(-1);
       setCompletionEnd(-1);
+    }
+  }, [enabled, setSuggestions, setIsLoadingSuggestions, setIsPerfectMatch]);
+
+  // Update external state only when enabled
+  useEffect(() => {
+    if (!enabled || query === null) {
       return;
     }
 

@@ -5,8 +5,14 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { installExtension } from '../../config/extension.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import {
+  installOrUpdateExtension,
+  requestConsentNonInteractive,
+} from '../../config/extension.js';
+import {
+  debugLogger,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
 
@@ -20,12 +26,15 @@ export async function handleLink(args: InstallArgs) {
       source: args.path,
       type: 'link',
     };
-    const extensionName = await installExtension(installMetadata);
-    console.log(
+    const extensionName = await installOrUpdateExtension(
+      installMetadata,
+      requestConsentNonInteractive,
+    );
+    debugLogger.log(
       `Extension "${extensionName}" linked successfully and enabled.`,
     );
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }

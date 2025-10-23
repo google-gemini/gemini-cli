@@ -1,0 +1,49 @@
+name: 'Release Sandbox'
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
+        description: 'Whether this is a dry run.'
+        required: false
+        type: 'boolean'
+        default: true
+
+jobs:
+  build:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      packages: 'write'
+      issues: 'write'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref || github.sha }}'
+          fetch-depth: 0
+      - name: 'Push'
+        uses: './.github/actions/push-sandbox'
+        with:
+          dockerhub-username: '${{ secrets.DOCKER_SERVICE_ACCOUNT_NAME }}'
+          dockerhub-token: '${{ secrets.DOCKER_SERVICE_ACCOUNT_KEY }}'
+          github-actor: '${{ github.actor }}'
+          github-secret: '${{ secrets.GITHUB_TOKEN }}'
+          github-sha: '${{ github.sha }}'
+          github-ref-name: '${{github.event.inputs.ref}}'
+          dry-run: '${{ github.event.inputs.dry-run }}'
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry-run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Sandbox Release Failed on $(date +'%Y-%m-%d')' \
+            --body 'The sandbox-release workflow failed. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'

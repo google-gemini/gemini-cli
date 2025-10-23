@@ -6,7 +6,7 @@
 
 import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
-import { type ThoughtSummary } from '../core/turn.js';
+import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -15,6 +15,8 @@ import type {
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
+
+export const SESSION_FILE_PREFIX = 'session-';
 
 /**
  * Token usage summary for a message or conversation.
@@ -149,7 +151,7 @@ export class ChatRecordingService {
           .toISOString()
           .slice(0, 16)
           .replace(/:/g, '-');
-        const filename = `session-${timestamp}-${this.sessionId.slice(
+        const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
           0,
           8,
         )}.json`;
@@ -195,7 +197,7 @@ export class ChatRecordingService {
    * Records a message in the conversation.
    */
   recordMessage(message: {
-    model: string;
+    model: string | undefined;
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
   }): void {

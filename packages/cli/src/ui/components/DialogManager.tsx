@@ -9,24 +9,35 @@ import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
-import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
+import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
+import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+
+interface DialogManagerProps {
+  addItem: UseHistoryManagerReturn['addItem'];
+  terminalWidth: number;
+}
 
 // Props for DialogManager
-export const DialogManager = () => {
+export const DialogManager = ({
+  addItem,
+  terminalWidth,
+}: DialogManagerProps) => {
   const config = useConfig();
   const settings = useSettings();
 
@@ -36,23 +47,7 @@ export const DialogManager = () => {
     uiState;
 
   if (uiState.showIdeRestartPrompt) {
-    return (
-      <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
-        <Text color={theme.status.warning}>
-          Workspace trust has changed. Press &apos;r&apos; to restart Gemini to
-          apply the changes.
-        </Text>
-      </Box>
-    );
-  }
-  if (uiState.showWorkspaceMigrationDialog) {
-    return (
-      <WorkspaceMigrationDialog
-        workspaceExtensions={uiState.workspaceExtensions}
-        onOpen={uiActions.onWorkspaceMigrationDialogOpen}
-        onClose={uiActions.onWorkspaceMigrationDialogClose}
-      />
-    );
+    return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
   }
   if (uiState.proQuotaRequest) {
     return (
@@ -93,20 +88,21 @@ export const DialogManager = () => {
   }
   if (uiState.confirmationRequest) {
     return (
-      <Box flexDirection="column">
-        {uiState.confirmationRequest.prompt}
-        <Box paddingY={1}>
-          <RadioButtonSelect
-            items={[
-              { label: 'Yes', value: true },
-              { label: 'No', value: false },
-            ]}
-            onSelect={(value: boolean) => {
-              uiState.confirmationRequest!.onConfirm(value);
-            }}
-          />
-        </Box>
-      </Box>
+      <ConsentPrompt
+        prompt={uiState.confirmationRequest.prompt}
+        onConfirm={uiState.confirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.confirmUpdateExtensionRequests.length > 0) {
+    const request = uiState.confirmUpdateExtensionRequests[0];
+    return (
+      <ConsentPrompt
+        prompt={request.prompt}
+        onConfirm={request.onConfirm}
+        terminalWidth={terminalWidth}
+      />
     );
   }
   if (uiState.isThemeDialogOpen) {
@@ -119,6 +115,7 @@ export const DialogManager = () => {
         )}
         <ThemeDialog
           onSelect={uiActions.handleThemeSelect}
+          onCancel={uiActions.closeThemeDialog}
           onHighlight={uiActions.handleThemeHighlight}
           settings={settings}
           availableTerminalHeight={
@@ -140,6 +137,9 @@ export const DialogManager = () => {
         />
       </Box>
     );
+  }
+  if (uiState.isModelDialogOpen) {
+    return <ModelDialog onClose={uiActions.closeModelDialog} />;
   }
   if (uiState.isAuthenticating) {
     return (
@@ -184,6 +184,15 @@ export const DialogManager = () => {
       <PrivacyNotice
         onExit={() => uiActions.exitPrivacyNotice()}
         config={config}
+      />
+    );
+  }
+
+  if (uiState.isPermissionsDialogOpen) {
+    return (
+      <PermissionsModifyTrustDialog
+        onExit={uiActions.closePermissionsDialog}
+        addItem={addItem}
       />
     );
   }
