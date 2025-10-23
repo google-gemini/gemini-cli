@@ -65,11 +65,12 @@ locations for these files:
     controls over users' Gemini CLI setups.
 
 **Note on environment variables in settings:** String values within your
-`settings.json` files can reference environment variables using either
-`$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically
-resolved when the settings are loaded. For example, if you have an environment
-variable `MY_API_TOKEN`, you could use it in `settings.json` like this:
-`"apiKey": "$MY_API_TOKEN"`.
+`settings.json` and `gemini-extension.json` files can reference environment
+variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
+be automatically resolved when the settings are loaded. For example, if you have
+an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
+this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
 > **Note for Enterprise Users:** For guidance on deploying and managing Gemini
 > CLI in a corporate environment, please see the
