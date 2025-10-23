@@ -5,6 +5,9 @@
  */
 
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+import * as dotenv from 'dotenv';
+
 import { ExtensionStorage } from '../extension.js';
 import type { ExtensionConfig } from '../extension.js';
 
@@ -20,32 +23,50 @@ export async function maybePromptForSettings(
   extensionConfig: ExtensionConfig,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
   previousExtensionConfig?: ExtensionConfig,
+  previousSettings?: Record<string, string>,
 ): Promise<void> {
-  let settings = extensionConfig.settings;
-  const { name: extensionName } = extensionConfig;
+  const { name: extensionName, settings } = extensionConfig;
+  const envFilePath = new ExtensionStorage(extensionName).getEnvFilePath();
+
   if (!settings || settings.length === 0) {
+    // No settings for this extension. Clear any existing .env file.
+    if (fsSync.existsSync(envFilePath)) {
+      await fs.writeFile(envFilePath, '');
+    }
     return;
   }
 
+  let settingsToPrompt = settings;
   if (previousExtensionConfig) {
     const oldSettings = new Set(
       previousExtensionConfig.settings?.map((s) => s.name) || [],
     );
-    settings = settings.filter((s) => !oldSettings.has(s.name));
+    settingsToPrompt = settingsToPrompt.filter((s) => !oldSettings.has(s.name));
   }
 
-  if (!settings || settings.length === 0) {
-    return;
+  const allSettings: Record<string, string> = { ...(previousSettings ?? {}) };
+
+  if (settingsToPrompt && settingsToPrompt.length > 0) {
+    for (const setting of settingsToPrompt) {
+      const answer = await requestSetting(setting);
+      allSettings[setting.envVar] = answer;
+    }
   }
 
-  const envFilePath = new ExtensionStorage(extensionName).getEnvFilePath();
+  const validEnvVars = new Set(settings.map((s) => s.envVar));
+  const finalSettings: Record<string, string> = {};
+  for (const [key, value] of Object.entries(allSettings)) {
+    if (validEnvVars.has(key)) {
+      finalSettings[key] = value;
+    }
+  }
+
   let envContent = '';
-  for (const setting of settings) {
-    const answer = await requestSetting(setting);
-    envContent += `${setting.envVar}=${answer}\n`;
+  for (const [key, value] of Object.entries(finalSettings)) {
+    envContent += `${key}=${value}\n`;
   }
 
-  await fs.appendFile(envFilePath, envContent);
+  await fs.writeFile(envFilePath, envContent);
 }
 
 export async function promptForSetting(
@@ -58,4 +79,18 @@ export async function promptForSetting(
     message: `${setting.name}\n${setting.description}`,
   });
   return response.value;
+}
+
+export function getEnvContents(
+  extensionStorage: ExtensionStorage,
+): Record<string, string> {
+  let customEnv: Record<string, string> = {};
+  if (fsSync.existsSync(extensionStorage.getEnvFilePath())) {
+    const envFile = fsSync.readFileSync(
+      extensionStorage.getEnvFilePath(),
+      'utf-8',
+    );
+    customEnv = dotenv.parse(envFile);
+  }
+  return customEnv;
 }

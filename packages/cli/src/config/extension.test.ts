@@ -1111,7 +1111,7 @@ This extension will run the following MCP servers:
       );
     });
 
-    it('should only prompt for new settings on update', async () => {
+    it('should only prompt for new settings on update, and preserve old settings', async () => {
       // 1. Create and install the "old" version of the extension.
       const oldSourceExtDir = createExtension({
         extensionsDir: tempHomeDir, // Create it in a temp location first
@@ -1131,11 +1131,20 @@ This extension will run the following MCP servers:
         { source: oldSourceExtDir, type: 'local' },
         async (_) => true,
         process.cwd(),
+        undefined,
+        async () => 'old-api-key',
       );
+
+      const envPath = new ExtensionStorage(
+        'my-local-extension',
+      ).getEnvFilePath();
+      expect(fs.existsSync(envPath)).toBe(true);
+      let envContent = fs.readFileSync(envPath, 'utf-8');
+      expect(envContent).toContain('MY_API_KEY=old-api-key');
 
       // 2. Create the "new" version of the extension in a new source directory.
       const newSourceExtDir = createExtension({
-        extensionsDir: tempHomeDir, // Another temp location
+        extensionsDir: path.join(tempHomeDir, 'new-source'), // Another temp location
         name: 'my-local-extension', // Same name
         version: '1.1.0', // New version
         settings: [
@@ -1159,7 +1168,7 @@ This extension will run the following MCP servers:
       });
 
       const promptForSettingsMock = vi.fn(
-        async (_: ExtensionSetting): Promise<string> => Promise.resolve(''),
+        async (_: ExtensionSetting): Promise<string> => 'new-setting-value',
       );
 
       // 3. Call installOrUpdateExtension to perform the update.
@@ -1175,6 +1184,11 @@ This extension will run the following MCP servers:
       expect(promptForSettingsMock).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'New Setting' }),
       );
+
+      expect(fs.existsSync(envPath)).toBe(true);
+      envContent = fs.readFileSync(envPath, 'utf-8');
+      expect(envContent).toContain('MY_API_KEY=old-api-key');
+      expect(envContent).toContain('NEW_SETTING=new-setting-value');
     });
 
     it('should fail auto-update if settings have changed', async () => {

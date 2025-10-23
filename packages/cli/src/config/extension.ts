@@ -45,10 +45,10 @@ import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import chalk from 'chalk';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import * as dotenv from 'dotenv';
 import type { ConfirmationRequest } from '../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
 import {
+  getEnvContents,
   maybePromptForSettings,
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
@@ -104,10 +104,6 @@ export class ExtensionStorage {
 
   getEnvFilePath(): string {
     return path.join(this.getExtensionDir(), EXTENSION_SETTINGS_FILENAME);
-  }
-
-  static getEnvFilePath(dirPath: string): string {
-    return path.join(dirPath, EXTENSION_SETTINGS_FILENAME);
   }
 
   static getUserExtensionsDir(): string {
@@ -193,19 +189,13 @@ export function loadExtension(
   }
 
   try {
-    let customEnv: Record<string, string> = {};
-    const envPath = ExtensionStorage.getEnvFilePath(effectiveExtensionPath);
-    if (fs.existsSync(envPath)) {
-      const envFile = fs.readFileSync(envPath, 'utf-8');
-      customEnv = dotenv.parse(envFile);
-    }
-
     let config = loadExtensionConfig({
       extensionDir: effectiveExtensionPath,
       workspaceDir,
       extensionEnablementManager,
     });
 
+    const customEnv = getEnvContents(new ExtensionStorage(config.name));
     config = resolveEnvVarsInObject(config, customEnv);
 
     if (config.mcpServers) {
@@ -408,32 +398,6 @@ async function promptForConsentInteractive(
   });
 }
 
-async function copySettingsToTempDirOnUpdate(
-  extensionDir: string,
-): Promise<string | undefined> {
-  const tempDir = await ExtensionStorage.createTmpDir();
-  const settingsPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
-  console.log(settingsPath);
-  let tempSettingsPath: string | undefined;
-  if (fs.existsSync(settingsPath)) {
-    tempSettingsPath = path.join(tempDir, EXTENSION_SETTINGS_FILENAME);
-    console.log(tempSettingsPath);
-    await fs.promises.copyFile(settingsPath, tempSettingsPath);
-  }
-  return tempSettingsPath;
-}
-
-async function maybeCopySettingsFromTempDir(
-  extensionDir: string,
-  tempSettingsPath: string,
-) {
-  const settingsPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
-  if (fs.existsSync(tempSettingsPath)) {
-    await fs.promises.copyFile(tempSettingsPath, settingsPath);
-  }
-  return tempSettingsPath;
-}
-
 export async function installOrUpdateExtension(
   installMetadata: ExtensionInstallMetadata,
   requestConsent: (consent: string) => Promise<boolean>,
@@ -564,10 +528,9 @@ export async function installOrUpdateExtension(
 
       const extensionStorage = new ExtensionStorage(newExtensionName);
       const destinationPath = extensionStorage.getExtensionDir();
-      const tempSettingsPath = isUpdate
-        ? await copySettingsToTempDirOnUpdate(destinationPath)
-        : undefined;
+      let previousSettings: Record<string, string> | undefined;
       if (isUpdate) {
+        previousSettings = getEnvContents(extensionStorage);
         await uninstallExtension(newExtensionName, isUpdate, cwd);
       }
 
@@ -578,6 +541,7 @@ export async function installOrUpdateExtension(
             newExtensionConfig,
             requestSetting,
             previousExtensionConfig,
+            previousSettings,
           );
         } else if (!isUpdate) {
           await maybePromptForSettings(newExtensionConfig, requestSetting);
@@ -598,9 +562,6 @@ export async function installOrUpdateExtension(
         INSTALL_METADATA_FILENAME,
       );
       await fs.promises.writeFile(metadataPath, metadataString);
-      if (tempSettingsPath) {
-        await maybeCopySettingsFromTempDir(destinationPath, tempSettingsPath);
-      }
     } finally {
       if (tempDir) {
         await fs.promises.rm(tempDir, { recursive: true, force: true });
