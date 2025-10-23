@@ -566,13 +566,13 @@ for that specific session.
 - **`--telemetry`**:
   - Enables [telemetry](./telemetry.md).
 - **`--telemetry-target`**:
-  - Sets the telemetry target. See [telemetry](../telemetry.md) for more
+  - Sets the telemetry target. See [telemetry](./telemetry.md) for more
     information.
 - **`--telemetry-otlp-endpoint`**:
-  - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for
+  - Sets the OTLP endpoint for telemetry. See [telemetry](./telemetry.md) for
     more information.
 - **`--telemetry-log-prompts`**:
-  - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md)
+  - Enables logging of prompts for telemetry. See [telemetry](./telemetry.md)
     for more information.
 - **`--checkpointing`**:
   - Enables [checkpointing](./checkpointing.md).
