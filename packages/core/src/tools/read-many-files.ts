@@ -225,7 +225,7 @@ ${finalExclusionPatternsForDescription
       );
 
       const fileDiscovery = this.config.getFileService();
-      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
+      const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativeEntries, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
@@ -253,19 +253,11 @@ ${finalExclusionPatternsForDescription
         filesToConsider.add(fullPath);
       }
 
-      // Add info about git-ignored files if any were filtered
-      if (gitIgnoredCount > 0) {
+      // Add info about ignored files if any were filtered
+      if (ignoredCount > 0) {
         skippedFiles.push({
-          path: `${gitIgnoredCount} file(s)`,
-          reason: 'git ignored',
-        });
-      }
-
-      // Add info about gemini-ignored files if any were filtered
-      if (geminiIgnoredCount > 0) {
-        skippedFiles.push({
-          path: `${geminiIgnoredCount} file(s)`,
-          reason: 'gemini ignored',
+          path: `${ignoredCount} file(s)`,
+          reason: 'ignored by project ignore files',
         });
       }
     } catch (error) {
