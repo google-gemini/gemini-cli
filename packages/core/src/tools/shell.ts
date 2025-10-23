@@ -9,6 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
+import type { AnyToolInvocation } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -36,10 +37,9 @@ import {
   getCommandRoots,
   initializeShellParsers,
   isCommandAllowed,
-  SHELL_TOOL_NAMES,
+  isShellInvocationAllowlisted,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
-import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
@@ -90,9 +90,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       !this.config.isInteractive() &&
       this.config.getApprovalMode() !== ApprovalMode.YOLO
     ) {
-      const allowedTools = this.config.getAllowedTools() || [];
-      const [SHELL_TOOL_NAME] = SHELL_TOOL_NAMES;
-      if (doesToolInvocationMatch(SHELL_TOOL_NAME, command, allowedTools)) {
+      if (this.isInvocationAllowlisted(command)) {
         // If it's an allowed shell command, we don't need to confirm execution.
         return false;
       }
@@ -323,6 +321,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
         fs.unlinkSync(tempFilePath);
       }
     }
+  }
+
+  private isInvocationAllowlisted(command: string): boolean {
+    const allowedTools = this.config.getAllowedTools() || [];
+    if (allowedTools.length === 0) {
+      return false;
+    }
+
+    const invocation = { params: { command } } as unknown as AnyToolInvocation;
+    return isShellInvocationAllowlisted(invocation, allowedTools);
   }
 }
 
