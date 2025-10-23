@@ -449,6 +449,7 @@ describe('run_shell_command', () => {
       .readToolLogs()
       .filter((log) => log.toolRequest.name === 'run_shell_command');
 
+    // Success is false because tool is in the scheduled state.
     for (const log of toolLogs) {
       expect(log.toolRequest.success).toBe(false);
       expect(log.toolRequest.args).toContain('&&');
