@@ -55,7 +55,7 @@ if (process.env.DEBUG && !sandboxCommand) {
   }
 }
 
-nodeArgs.push(join(root, 'packages', 'cli'));
+nodeArgs.push(join(root, 'bundle', 'gemini.js'));
 nodeArgs.push(...process.argv.slice(2));
 
 const env = {
@@ -69,7 +69,11 @@ if (process.env.DEBUG) {
   // than the relaunched process making it harder to debug.
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
-const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+
+const child = spawn('node', nodeArgs, {
+  stdio: 'inherit',
+  env,
+});
 
 child.on('close', (code) => {
   process.exit(code);
