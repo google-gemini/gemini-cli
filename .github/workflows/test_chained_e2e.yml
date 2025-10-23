@@ -110,7 +110,6 @@ jobs:
           sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
           status: 'pending'
-          context: 'Set e2e pending Status'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
@@ -291,4 +290,3 @@ jobs:
           sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
           status: '${{ job.status }}'
-          context: 'Set E2E Status'

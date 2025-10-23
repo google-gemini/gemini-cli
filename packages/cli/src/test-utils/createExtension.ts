@@ -14,6 +14,7 @@ import {
   type MCPServerConfig,
   type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
+import type { ExtensionSetting } from '../config/extensions/extensionSettings.js';
 
 export function createExtension({
   extensionsDir = 'extensions-dir',
@@ -23,12 +24,13 @@ export function createExtension({
   contextFileName = undefined as string | undefined,
   mcpServers = {} as Record<string, MCPServerConfig>,
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
+  settings = undefined as ExtensionSetting[] | undefined,
 } = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName, mcpServers }),
+    JSON.stringify({ name, version, contextFileName, mcpServers, settings }),
   );
 
   if (addContextFile) {
