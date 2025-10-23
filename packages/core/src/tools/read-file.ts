@@ -214,7 +214,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
     if (
       fileService.shouldIgnoreFile(params.absolute_path, fileFilteringOptions)
     ) {
-      return `File path '${filePath}' is ignored by .geminiignore pattern(s).`;
+      return `File path '${filePath}' is ignored by configured ignore patterns.`;
     }
 
     return null;
