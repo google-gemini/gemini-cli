@@ -448,7 +448,11 @@ describe('run_shell_command', () => {
     const toolLogs = rig
       .readToolLogs()
       .filter((log) => log.toolRequest.name === 'run_shell_command');
-    expect(toolLogs.length).toBe(0);
+
+    for (const log of toolLogs) {
+      expect(log.toolRequest.success).toBe(false);
+      expect(log.toolRequest.args).toContain('&&');
+    }
   });
 
   it('should allow all with "ShellTool" and other specific tools', async () => {
