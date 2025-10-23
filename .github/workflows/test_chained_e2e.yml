@@ -92,8 +92,8 @@ jobs:
           SHA: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
         shell: 'bash'
         run: |
-          echo "REPO=$REPO" >> $GITHUB_OUTPUT
-          echo "SHA=$SHA" >> $GITHUB_OUTPUT
+          echo "REPO=$REPO" >> "$GITHUB_OUTPUT"
+          echo "SHA=$SHA" >> "$GITHUB_OUTPUT"
 
   set_pending_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
