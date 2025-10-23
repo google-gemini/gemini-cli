@@ -2450,6 +2450,8 @@ describe('Settings Loading and Merging', () => {
       );
 
       // Check that setValue was called to remove the deprecated setting
+      expect(setValueSpy).toHaveBeenCalledTimes(2);
+
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'extensions',
@@ -2457,6 +2459,7 @@ describe('Settings Loading and Merging', () => {
           disabled: undefined,
         },
       );
+      // eslint-disable-next-line vitest/prefer-called-exactly-once-with
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.Workspace,
         'extensions',

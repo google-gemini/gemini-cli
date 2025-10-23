@@ -95,7 +95,6 @@ async function main() {
     `Analyzing patch creation result for PR ${originalPr} (exit code: ${exitCode})`,
   );
 
-  const [_owner, _repo] = repository.split('/');
   const npmTag = channel === 'stable' ? 'latest' : 'preview';
 
   if (testMode) {
@@ -110,7 +109,7 @@ async function main() {
   }
 
   let commentBody;
-  let logContent = '';
+  let logContent;
 
   // Get log content from environment variable or generate mock content for testing
   if (testMode && !process.env.LOG_CONTENT) {
@@ -362,7 +361,7 @@ No output was generated during patch creation.
       // Clean up temp file
       try {
         unlinkSync(tmpFile);
-      } catch (_e) {
+      } catch {
         // Ignore cleanup errors
       }
     }

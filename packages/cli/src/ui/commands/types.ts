@@ -191,6 +191,7 @@ export interface SlashCommand {
   altNames?: string[];
   description: string;
   hidden?: boolean;
+  isFeedback?: boolean;
 
   kind: CommandKind;
 

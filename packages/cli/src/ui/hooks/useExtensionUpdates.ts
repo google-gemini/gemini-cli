@@ -239,5 +239,6 @@ export const useExtensionUpdates = (
     dispatchExtensionStateUpdate,
     confirmUpdateExtensionRequests,
     addConfirmUpdateExtensionRequest,
+    setExtensionsUpdateState: dispatchExtensionStateUpdate,
   };
 };

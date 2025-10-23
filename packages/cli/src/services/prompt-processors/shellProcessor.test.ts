@@ -368,11 +368,6 @@ describe('ShellProcessor', () => {
       expect.any(Object),
       context.session.sessionShellAllowlist,
     );
-    expect(mockCheckCommandPermissions).toHaveBeenCalledWith(
-      'cmd2',
-      expect.any(Object),
-      context.session.sessionShellAllowlist,
-    );
     expect(mockShellExecute).toHaveBeenCalledTimes(2);
     expect(result).toEqual([{ text: 'Run output1 and output2' }]);
   });

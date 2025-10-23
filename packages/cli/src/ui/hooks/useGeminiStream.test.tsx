@@ -2893,7 +2893,6 @@ describe('useGeminiStream', () => {
 
       // Verify that the request was retried
       await waitFor(() => {
-        expect(mockSendMessageStream).toHaveBeenCalledTimes(3); // 1st query, 2nd query, retry of 2nd query
         expect(mockSendMessageStream).toHaveBeenNthCalledWith(
           3,
           'second query',

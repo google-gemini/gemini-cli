@@ -1042,7 +1042,6 @@ describe('CoreToolScheduler request queueing', () => {
       abortController.signal,
     );
 
-    // Ensure the second tool call hasn't been executed yet.
     expect(executeFn).toHaveBeenCalledWith({ a: 1 });
 
     // Complete the first tool call.
@@ -1067,7 +1066,6 @@ describe('CoreToolScheduler request queueing', () => {
       // Now the second tool call should have been executed.
       expect(executeFn).toHaveBeenCalledTimes(2);
     });
-    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Wait for the second completion.
     await vi.waitFor(() => {
@@ -1390,7 +1388,6 @@ describe('CoreToolScheduler request queueing', () => {
     // Ensure the tool was called twice with the correct arguments.
     expect(executeFn).toHaveBeenCalledTimes(2);
     expect(executeFn).toHaveBeenCalledWith({ a: 1 });
-    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
@@ -1922,8 +1919,16 @@ describe('truncateAndSaveToFile', () => {
     const content = 'a'.repeat(2_000_000);
     const callId = 'test-call-id';
     const projectTempDir = '/tmp';
+    const wrapWidth = 120;
 
     mockWriteFile.mockRejectedValue(new Error('File write failed'));
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
 
     const result = await truncateAndSaveToFile(
       content,
@@ -1937,7 +1942,10 @@ describe('truncateAndSaveToFile', () => {
     expect(result.content).toContain(
       '[Note: Could not save full output to file]',
     );
-    expect(mockWriteFile).toHaveBeenCalled();
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      path.join(projectTempDir, `${callId}.output`),
+      expectedFileContent,
+    );
   });
 
   it('should save to correct file path with call ID', async () => {

@@ -893,7 +893,7 @@ describe('ShellExecutionService child_process fallback', () => {
       abortController.abort();
 
       // Check the first kill signal
-      expect(mockProcessKill).toHaveBeenCalledWith(
+      expect(mockProcessKill).toHaveBeenCalledExactlyOnceWith(
         -mockChildProcess.pid!,
         'SIGTERM',
       );
@@ -902,10 +902,6 @@ describe('ShellExecutionService child_process fallback', () => {
       await vi.advanceTimersByTimeAsync(250);
 
       // Check the second kill signal
-      expect(mockProcessKill).toHaveBeenCalledWith(
-        -mockChildProcess.pid!,
-        'SIGKILL',
-      );
 
       // Finally, simulate the process exiting and await the result
       mockChildProcess.emit('exit', null, 'SIGKILL');

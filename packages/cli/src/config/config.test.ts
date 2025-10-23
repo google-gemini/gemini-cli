@@ -21,6 +21,10 @@ import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
+vi.mock('./sandboxConfig.js', () => ({
+  loadSandboxConfig: vi.fn(() => Promise.resolve(undefined)),
+}));
+
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi
     .fn()
@@ -499,6 +503,7 @@ describe('loadCliConfig', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.stubEnv('GEMINI_SANDBOX', 'false');
   });
 
   afterEach(() => {
@@ -1865,6 +1870,7 @@ describe('loadCliConfig interactive', () => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.stubEnv('GEMINI_SANDBOX', 'false');
     process.stdin.isTTY = true;
   });
 

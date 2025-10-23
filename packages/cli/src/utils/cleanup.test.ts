@@ -24,7 +24,7 @@ describe('cleanup', () => {
 
     await runExit();
 
-    expect(cleanupFn).toHaveBeenCalledTimes(1);
+    expect(cleanupFn).toHaveBeenCalledOnce();
   });
 
   it('should run a registered asynchronous function', async () => {
@@ -33,7 +33,7 @@ describe('cleanup', () => {
 
     await runExit();
 
-    expect(cleanupFn).toHaveBeenCalledTimes(1);
+    expect(cleanupFn).toHaveBeenCalledOnce();
   });
 
   it('should run multiple registered functions', async () => {
@@ -45,8 +45,8 @@ describe('cleanup', () => {
 
     await runExit();
 
-    expect(syncFn).toHaveBeenCalledTimes(1);
-    expect(asyncFn).toHaveBeenCalledTimes(1);
+    expect(syncFn).toHaveBeenCalledOnce();
+    expect(asyncFn).toHaveBeenCalledOnce();
   });
 
   it('should continue running cleanup functions even if one throws an error', async () => {
@@ -59,7 +59,7 @@ describe('cleanup', () => {
 
     await expect(runExit()).resolves.not.toThrow();
 
-    expect(errorFn).toHaveBeenCalledTimes(1);
-    expect(successFn).toHaveBeenCalledTimes(1);
+    expect(errorFn).toHaveBeenCalledOnce();
+    expect(successFn).toHaveBeenCalledOnce();
   });
 });

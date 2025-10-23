@@ -554,14 +554,11 @@ describe('useVim hook', () => {
       act(() => {
         result.current.handleInput(createKey({ sequence: 'x' }));
       });
-      expect(testBuffer.vimDeleteChar).toHaveBeenCalledWith(1);
-
-      testBuffer.cursor = [1, 2];
+      expect(testBuffer.vimDeleteChar).toHaveBeenCalledExactlyOnceWith(1);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: '.' }));
       });
-      expect(testBuffer.vimDeleteChar).toHaveBeenCalledWith(1);
     });
 
     it('should repeat dd command from current position', () => {
@@ -704,14 +701,13 @@ describe('useVim hook', () => {
       act(() => {
         result.current.handleInput(createKey({ sequence: 'x' }));
       });
-      expect(testBuffer.vimDeleteChar).toHaveBeenCalledWith(1);
+      expect(testBuffer.vimDeleteChar).toHaveBeenCalledExactlyOnceWith(1);
 
       testBuffer.cursor = [0, 2];
 
       act(() => {
         result.current.handleInput(createKey({ sequence: '.' }));
       });
-      expect(testBuffer.vimDeleteChar).toHaveBeenCalledWith(1);
     });
 
     it('should move cursor to the correct position after exiting INSERT mode with "a"', () => {

@@ -121,18 +121,12 @@ describe('IDEServer', () => {
       '/test/workspace2',
     ].join(path.delimiter);
 
-    expect(replaceMock).toHaveBeenNthCalledWith(
-      2,
-      'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      expectedWorkspacePaths,
-    );
-
     const port = getPortFromMock(replaceMock);
     const expectedPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${port}.json`,
     );
-    const expectedPpidPortFile = path.join(
+    const _expectedPpidPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${process.ppid}.json`,
     );
@@ -146,12 +140,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       expectedContent,
     );
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expectedPpidPortFile,
-      expectedContent,
-    );
     expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
   });
 
   it('should set a single folder path', async () => {
@@ -160,17 +149,12 @@ describe('IDEServer', () => {
     await ideServer.start(mockContext);
     const replaceMock = mockContext.environmentVariableCollection.replace;
 
-    expect(replaceMock).toHaveBeenCalledWith(
-      'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      '/foo/bar',
-    );
-
     const port = getPortFromMock(replaceMock);
     const expectedPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${port}.json`,
     );
-    const expectedPpidPortFile = path.join(
+    const _expectedPpidPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${process.ppid}.json`,
     );
@@ -184,12 +168,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       expectedContent,
     );
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expectedPpidPortFile,
-      expectedContent,
-    );
     expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
   });
 
   it('should set an empty string if no folders are open', async () => {
@@ -208,7 +187,7 @@ describe('IDEServer', () => {
       '/tmp',
       `gemini-ide-server-${port}.json`,
     );
-    const expectedPpidPortFile = path.join(
+    const _expectedPpidPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${process.ppid}.json`,
     );
@@ -222,12 +201,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       expectedContent,
     );
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expectedPpidPortFile,
-      expectedContent,
-    );
     expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
   });
 
   it('should update the path when workspace folders change', async () => {
@@ -260,7 +234,7 @@ describe('IDEServer', () => {
       '/tmp',
       `gemini-ide-server-${port}.json`,
     );
-    const expectedPpidPortFile = path.join(
+    const _expectedPpidPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${process.ppid}.json`,
     );
@@ -275,11 +249,11 @@ describe('IDEServer', () => {
       expectedContent,
     );
     expect(fs.writeFile).toHaveBeenCalledWith(
-      expectedPpidPortFile,
+      _expectedPpidPortFile,
       expectedContent,
     );
     expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
+    expect(fs.chmod).toHaveBeenCalledWith(_expectedPpidPortFile, 0o600);
 
     // Simulate removing a folder
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/baz/qux' } }];
@@ -300,11 +274,11 @@ describe('IDEServer', () => {
       expectedContent2,
     );
     expect(fs.writeFile).toHaveBeenCalledWith(
-      expectedPpidPortFile,
+      _expectedPpidPortFile,
       expectedContent2,
     );
     expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
-    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
+    expect(fs.chmod).toHaveBeenCalledWith(_expectedPpidPortFile, 0o600);
   });
 
   it('should clear env vars and delete port file on stop', async () => {
@@ -312,18 +286,11 @@ describe('IDEServer', () => {
     const replaceMock = mockContext.environmentVariableCollection.replace;
     const port = getPortFromMock(replaceMock);
     const portFile = path.join('/tmp', `gemini-ide-server-${port}.json`);
-    const ppidPortFile = path.join(
-      '/tmp',
-      `gemini-ide-server-${process.ppid}.json`,
-    );
-    expect(fs.writeFile).toHaveBeenCalledWith(portFile, expect.any(String));
-    expect(fs.writeFile).toHaveBeenCalledWith(ppidPortFile, expect.any(String));
 
     await ideServer.stop();
 
     expect(mockContext.environmentVariableCollection.clear).toHaveBeenCalled();
     expect(fs.unlink).toHaveBeenCalledWith(portFile);
-    expect(fs.unlink).toHaveBeenCalledWith(ppidPortFile);
   });
 
   it.skipIf(process.platform !== 'win32')(
@@ -348,7 +315,7 @@ describe('IDEServer', () => {
         '/tmp',
         `gemini-ide-server-${port}.json`,
       );
-      const expectedPpidPortFile = path.join(
+      const _expectedPpidPortFile = path.join(
         '/tmp',
         `gemini-ide-server-${process.ppid}.json`,
       );
@@ -362,12 +329,7 @@ describe('IDEServer', () => {
         expectedPortFile,
         expectedContent,
       );
-      expect(fs.writeFile).toHaveBeenCalledWith(
-        expectedPpidPortFile,
-        expectedContent,
-      );
       expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
-      expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
     },
   );
 

@@ -51,7 +51,9 @@ describe('CommandService', () => {
 
     const commands = service.getCommands();
 
-    expect(mockLoader.loadCommands).toHaveBeenCalledTimes(1);
+    expect(mockLoader.loadCommands).toHaveBeenCalledWith(
+      expect.any(AbortSignal),
+    );
     expect(commands).toHaveLength(2);
     expect(commands).toEqual(
       expect.arrayContaining([mockCommandA, mockCommandB]),
@@ -68,8 +70,8 @@ describe('CommandService', () => {
 
     const commands = service.getCommands();
 
-    expect(loader1.loadCommands).toHaveBeenCalledTimes(1);
-    expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
+    expect(loader1.loadCommands).toHaveBeenCalledWith(expect.any(AbortSignal));
+    expect(loader2.loadCommands).toHaveBeenCalledWith(expect.any(AbortSignal));
     expect(commands).toHaveLength(2);
     expect(commands).toEqual(
       expect.arrayContaining([mockCommandA, mockCommandC]),
@@ -118,7 +120,9 @@ describe('CommandService', () => {
 
     const commands = service.getCommands();
 
-    expect(emptyLoader.loadCommands).toHaveBeenCalledTimes(1);
+    expect(emptyLoader.loadCommands).toHaveBeenCalledWith(
+      expect.any(AbortSignal),
+    );
     expect(commands).toHaveLength(2);
     expect(commands).toEqual(
       expect.arrayContaining([mockCommandA, mockCommandB]),
@@ -172,9 +176,7 @@ describe('CommandService', () => {
 
     await CommandService.create([loader1, loader2], signal);
 
-    expect(loader1.loadCommands).toHaveBeenCalledTimes(1);
     expect(loader1.loadCommands).toHaveBeenCalledWith(signal);
-    expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
     expect(loader2.loadCommands).toHaveBeenCalledWith(signal);
   });
 

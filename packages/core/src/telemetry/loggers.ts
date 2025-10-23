@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LogRecord } from '@opentelemetry/api-logs';
+import type { LogAttributes, LogRecord } from '@opentelemetry/api-logs';
 import { logs } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
@@ -44,6 +44,7 @@ import type {
   ModelSlashCommandEvent,
   SmartEditStrategyEvent,
   SmartEditCorrectionEvent,
+  FeedbackEvent,
   AgentStartEvent,
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
@@ -68,6 +69,7 @@ import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
 import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { getCommonAttributes } from './telemetryAttributes.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -644,6 +646,24 @@ export function logWebFetchFallbackAttempt(
   const logRecord: LogRecord = {
     body: event.toLogBody(),
     attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+}
+
+export function logFeedback(config: Config, event: FeedbackEvent): void {
+  ClearcutLogger.getInstance(config)?.logFeedbackEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': 'feedback',
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Feedback received: ${event.feedback}`,
+    attributes,
   };
   logger.emit(logRecord);
 }

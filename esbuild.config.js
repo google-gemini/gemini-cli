@@ -13,7 +13,7 @@ import { wasmLoader } from 'esbuild-plugin-wasm';
 let esbuild;
 try {
   esbuild = (await import('esbuild')).default;
-} catch (_error) {
+} catch (_) {
   console.warn('esbuild not available, skipping bundle step');
   process.exit(0);
 }

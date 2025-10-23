@@ -158,7 +158,6 @@ describe('MemoryMonitor', () => {
           heapSizeLimit: mockHeapStatistics.heap_size_limit,
         });
 
-        // Verify metrics were recorded
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
           mockMemoryUsage.heapUsed,
@@ -586,17 +585,33 @@ describe('MemoryMonitor', () => {
             component: 'monitoring_start',
           },
         );
-
-        // Fast-forward and verify monitoring snapshot
-        vi.advanceTimersByTime(1000);
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          expect.any(Number),
+          mockMemoryUsage.heapTotal,
           {
-            memory_type: 'heap_used',
+            memory_type: 'heap_total',
             component: 'monitoring_start',
           },
         );
+        expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
+          mockConfig,
+          mockMemoryUsage.external,
+          {
+            memory_type: 'external',
+            component: 'monitoring_start',
+          },
+        );
+        expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
+          mockConfig,
+          mockMemoryUsage.rss,
+          {
+            memory_type: 'rss',
+            component: 'monitoring_start',
+          },
+        );
+
+        // Fast-forward and verify monitoring snapshot
+        vi.advanceTimersByTime(1000);
       });
     });
 

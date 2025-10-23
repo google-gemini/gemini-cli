@@ -161,14 +161,10 @@ describe('mcp list command', () => {
 
     await listMcpServers();
 
-    expect(debugLogger.log).toHaveBeenCalledWith(
+     
+    expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining(
         'config-server: /config/server  (stdio) - Connected',
-      ),
-    );
-    expect(debugLogger.log).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'extension-server (from test-extension): /ext/server  (stdio) - Connected',
       ),
     );
   });

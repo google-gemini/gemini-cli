@@ -132,7 +132,9 @@ async function setIdeModeAndSyncConnection(
   }
 }
 
-export const ideCommand = async (): Promise<SlashCommand> => {
+export const ideCommand = async (
+  _signal: AbortSignal,
+): Promise<SlashCommand> => {
   const ideClient = await IdeClient.getInstance();
   const currentIDE = ideClient.getCurrentIde();
   if (!currentIDE) {
