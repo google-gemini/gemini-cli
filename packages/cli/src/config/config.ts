@@ -68,7 +68,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
-  mockResponses: string | undefined;
+  fakeResponses: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -194,9 +194,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'The format of the CLI output.',
           choices: ['text', 'json', 'stream-json'],
         })
-        .option('mock-responses', {
+        .option('fake-responses', {
           type: 'string',
-          description: 'Path to a file with mock model responses for testing.',
+          description: 'Path to a file with fake model responses for testing.',
         })
         .deprecateOption(
           'prompt',
@@ -654,7 +654,7 @@ export async function loadCliConfig(
       settings.tools?.enableMessageBusIntegration ?? false,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
-    mockResponses: argv.mockResponses,
+    fakeResponses: argv.fakeResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
   });

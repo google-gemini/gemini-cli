@@ -21,7 +21,7 @@ describe('Interactive Mode', () => {
 
   it('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-test', {
-      mockResponsesPath: join(
+      fakeResponsesPath: join(
         import.meta.dirname,
         'context-compress-interactive.compress.json',
       ),
@@ -50,7 +50,7 @@ describe('Interactive Mode', () => {
 
   it('should handle compression failure on token inflation', async () => {
     await rig.setup('interactive-compress-failure', {
-      mockResponsesPath: join(
+      fakeResponsesPath: join(
         import.meta.dirname,
         'context-compress-interactive.compress-failure.json',
       ),
@@ -80,7 +80,7 @@ describe('Interactive Mode', () => {
 
   it('should handle /compress command on empty history', async () => {
     rig.setup('interactive-compress-empty', {
-      mockResponsesPath: join(
+      fakeResponsesPath: join(
         import.meta.dirname,
         'context-compress-interactive.compress-empty.json',
       ),

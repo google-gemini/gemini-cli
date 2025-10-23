@@ -17,7 +17,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
-export type MockResponses = {
+export type FakeResponses = {
   generateContent: GenerateContentResponse[];
   generateContentStream: GenerateContentResponse[][];
   countTokens: CountTokensResponse[];
@@ -26,10 +26,10 @@ export type MockResponses = {
 
 // A ContentGenerator that responds with canned responses.
 //
-// Typically these would come from a file, provided by the `--mock-responses`
+// Typically these would come from a file, provided by the `--fake-responses`
 // CLI argument.
-export class MockContentGenerator implements ContentGenerator {
-  private responses: MockResponses;
+export class FakeContentGenerator implements ContentGenerator {
+  private responses: FakeResponses;
   private callCounters = {
     generateContent: 0,
     generateContentStream: 0,
@@ -38,7 +38,7 @@ export class MockContentGenerator implements ContentGenerator {
   };
   userTier?: UserTierId;
 
-  constructor(responses: MockResponses) {
+  constructor(responses: FakeResponses) {
     this.responses = {
       generateContent: responses.generateContent ?? [],
       generateContentStream: responses.generateContentStream ?? [],
@@ -47,10 +47,10 @@ export class MockContentGenerator implements ContentGenerator {
     };
   }
 
-  static async fromFile(filePath: string): Promise<MockContentGenerator> {
+  static async fromFile(filePath: string): Promise<FakeContentGenerator> {
     const fileContent = await promises.readFile(filePath, 'utf-8');
-    const responses = JSON.parse(fileContent) as MockResponses;
-    return new MockContentGenerator(responses);
+    const responses = JSON.parse(fileContent) as FakeResponses;
+    return new FakeContentGenerator(responses);
   }
 
   generateContent(
