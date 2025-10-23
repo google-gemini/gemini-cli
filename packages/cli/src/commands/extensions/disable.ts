@@ -10,6 +10,7 @@ import { getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface DisableArgs {
   name: string;
@@ -20,8 +21,8 @@ export function handleDisable(args: DisableArgs) {
   const workspaceDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir,
-    enabledExtensionOverrides: [],
     requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
     loadedSettings: loadSettings(workspaceDir),
   });
 

@@ -52,7 +52,7 @@ import {
 } from './extensions/extensionSettings.js';
 
 interface ExtensionManagerParams {
-  enabledExtensionOverrides: string[];
+  enabledExtensionOverrides?: string[];
   loadedSettings: LoadedSettings;
   requestConsent: (consent: string) => Promise<boolean>;
   requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;

@@ -14,6 +14,7 @@ import { getErrorMessage } from '../../utils/errors.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface InstallArgs {
   path: string;
@@ -28,8 +29,8 @@ export async function handleLink(args: InstallArgs) {
     const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
-      enabledExtensionOverrides: [],
       requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
       loadedSettings: loadSettings(workspaceDir),
     });
     const extensionName =

@@ -55,8 +55,8 @@ describe('useExtensionUpdates', () => {
     vi.mocked(updateExtension).mockReset();
     extensionManager = new ExtensionManager({
       workspaceDir: tempHomeDir,
-      enabledExtensionOverrides: [],
       requestConsent: vi.fn(),
+      requestSetting: vi.fn(),
       loadedSettings: loadSettings(),
     });
   });

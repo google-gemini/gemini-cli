@@ -32,6 +32,7 @@ import * as archiver from 'archiver';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../extension-manager.js';
 import { loadSettings } from '../settings.js';
+import type { ExtensionSetting } from './extensionSettings.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockArch = vi.hoisted(() => vi.fn());
@@ -147,6 +148,9 @@ describe('git extension helpers', () => {
     let mockRequestConsent: MockedFunction<
       (consent: string) => Promise<boolean>
     >;
+    let mockPromptForSettings: MockedFunction<
+      (setting: ExtensionSetting) => Promise<string>
+    >;
     let tempHomeDir: string;
     let tempWorkspaceDir: string;
 
@@ -160,10 +164,12 @@ describe('git extension helpers', () => {
       vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
       mockRequestConsent = vi.fn();
       mockRequestConsent.mockResolvedValue(true);
+      mockPromptForSettings = vi.fn();
+      mockPromptForSettings.mockResolvedValue('');
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-        enabledExtensionOverrides: [],
         requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
         loadedSettings: loadSettings(tempWorkspaceDir),
       });
     });

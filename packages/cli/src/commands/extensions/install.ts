@@ -72,7 +72,6 @@ export async function handleInstall(args: InstallArgs) {
     const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
-      enabledExtensionOverrides: [],
       requestConsent,
       requestSetting: promptForSetting,
       loadedSettings: loadSettings(workspaceDir),

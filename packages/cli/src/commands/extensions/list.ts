@@ -10,14 +10,15 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 export async function handleList() {
   try {
     const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
-      enabledExtensionOverrides: [],
       requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
       loadedSettings: loadSettings(workspaceDir),
     });
     const extensions = extensionManager.loadExtensions();

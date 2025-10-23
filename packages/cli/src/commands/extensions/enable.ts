@@ -13,6 +13,7 @@ import {
   FatalConfigError,
   getErrorMessage,
 } from '@google/gemini-cli-core';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface EnableArgs {
   name: string;
@@ -23,8 +24,8 @@ export function handleEnable(args: EnableArgs) {
   const workingDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir: workingDir,
-    enabledExtensionOverrides: [],
     requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
     loadedSettings: loadSettings(workingDir),
   });
   try {

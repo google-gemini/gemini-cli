@@ -175,6 +175,8 @@ export const AppContainer = (props: AppContainerProps) => {
           description,
           addConfirmUpdateExtensionRequest,
         ),
+      // TODO: Support requesting settings in the interactive CLI
+      requestSetting: null,
       loadedSettings: settings,
     }),
   );

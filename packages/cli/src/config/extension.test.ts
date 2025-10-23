@@ -136,7 +136,6 @@ describe('extension tests', () => {
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
-      enabledExtensionOverrides: [],
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
       loadedSettings: loadSettings(tempWorkspaceDir),
@@ -1024,7 +1023,6 @@ This extension will run the following MCP servers:
 
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-        enabledExtensionOverrides: [],
         requestConsent: mockRequestConsent,
         requestSetting: null,
         loadedSettings: loadSettings(tempWorkspaceDir),

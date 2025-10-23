@@ -18,6 +18,7 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface UpdateArgs {
   name?: string;
@@ -31,8 +32,8 @@ export async function handleUpdate(args: UpdateArgs) {
   const workspaceDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir,
-    enabledExtensionOverrides: [],
     requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
     loadedSettings: loadSettings(workspaceDir),
   });
 

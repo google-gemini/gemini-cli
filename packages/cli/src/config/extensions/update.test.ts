@@ -19,6 +19,7 @@ import {
 } from './variables.js';
 import { ExtensionManager } from '../extension-manager.js';
 import { loadSettings } from '../settings.js';
+import type { ExtensionSetting } from './extensionSettings.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -76,6 +77,9 @@ describe('update tests', () => {
   let userExtensionsDir: string;
   let extensionManager: ExtensionManager;
   let mockRequestConsent: MockedFunction<(consent: string) => Promise<boolean>>;
+  let mockPromptForSettings: MockedFunction<
+    (setting: ExtensionSetting) => Promise<string>
+  >;
 
   beforeEach(() => {
     tempHomeDir = fs.mkdtempSync(
@@ -97,10 +101,12 @@ describe('update tests', () => {
     Object.values(mockGit).forEach((fn) => fn.mockReset());
     mockRequestConsent = vi.fn();
     mockRequestConsent.mockResolvedValue(true);
+    mockPromptForSettings = vi.fn();
+    mockPromptForSettings.mockResolvedValue('');
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
-      enabledExtensionOverrides: [],
       requestConsent: mockRequestConsent,
+      requestSetting: mockPromptForSettings,
       loadedSettings: loadSettings(tempWorkspaceDir),
     });
   });

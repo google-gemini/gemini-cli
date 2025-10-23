@@ -16,6 +16,7 @@ import {
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -29,8 +30,8 @@ async function getMcpServersFromConfig(): Promise<
   const extensionManager = new ExtensionManager({
     loadedSettings: settings,
     workspaceDir: process.cwd(),
-    enabledExtensionOverrides: [],
     requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
   });
   const extensions = extensionManager.loadExtensions();
   const mcpServers = { ...(settings.merged.mcpServers || {}) };
