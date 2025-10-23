@@ -53,7 +53,7 @@ export class FakeContentGenerator implements ContentGenerator {
     return new FakeContentGenerator(responses);
   }
 
-  generateContent(
+  async generateContent(
     _request: GenerateContentParameters,
     _userPromptId: string,
   ): Promise<GenerateContentResponse> {
@@ -65,7 +65,7 @@ export class FakeContentGenerator implements ContentGenerator {
           safeJsonStringify(_request.contents),
       );
     }
-    return Promise.resolve(response);
+    return response;
   }
 
   async generateContentStream(
@@ -92,7 +92,9 @@ export class FakeContentGenerator implements ContentGenerator {
     return Promise.resolve(stream());
   }
 
-  countTokens(_request: CountTokensParameters): Promise<CountTokensResponse> {
+  async countTokens(
+    _request: CountTokensParameters,
+  ): Promise<CountTokensResponse> {
     const response =
       this.responses.countTokens[this.callCounters.countTokens++];
     if (!response) {
@@ -101,10 +103,10 @@ export class FakeContentGenerator implements ContentGenerator {
           safeJsonStringify(_request.contents),
       );
     }
-    return Promise.resolve(response);
+    return response;
   }
 
-  embedContent(
+  async embedContent(
     _request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     const response =
@@ -115,6 +117,6 @@ export class FakeContentGenerator implements ContentGenerator {
           safeJsonStringify(_request.contents),
       );
     }
-    return Promise.resolve(response);
+    return response;
   }
 }
