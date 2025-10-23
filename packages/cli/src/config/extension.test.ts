@@ -27,6 +27,7 @@ import {
 import { hashValue, ExtensionManager } from './extension-manager.js';
 import { ExtensionStorage } from './extensions/storage.js';
 import { INSTALL_WARNING_MESSAGE } from './extensions/consent.js';
+import type { ExtensionSetting } from './extensions/extensionSettings.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -110,6 +111,9 @@ describe('extension tests', () => {
   let userExtensionsDir: string;
   let extensionManager: ExtensionManager;
   let mockRequestConsent: MockedFunction<(consent: string) => Promise<boolean>>;
+  let mockPromptForSettings: MockedFunction<
+    (setting: ExtensionSetting) => Promise<string>
+  >;
 
   beforeEach(() => {
     tempHomeDir = fs.mkdtempSync(
@@ -121,6 +125,8 @@ describe('extension tests', () => {
     userExtensionsDir = path.join(tempHomeDir, EXTENSIONS_DIRECTORY_NAME);
     mockRequestConsent = vi.fn();
     mockRequestConsent.mockResolvedValue(true);
+    mockPromptForSettings = vi.fn();
+    mockPromptForSettings.mockResolvedValue('');
     fs.mkdirSync(userExtensionsDir, { recursive: true });
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
@@ -132,6 +138,7 @@ describe('extension tests', () => {
       workspaceDir: tempWorkspaceDir,
       enabledExtensionOverrides: [],
       requestConsent: mockRequestConsent,
+      requestSetting: mockPromptForSettings,
       loadedSettings: loadSettings(tempWorkspaceDir),
     });
   });
@@ -331,6 +338,36 @@ describe('extension tests', () => {
         delete process.env['TEST_API_KEY'];
         delete process.env['TEST_DB_URL'];
       }
+    });
+
+    it('should resolve environment variables from an extension .env file', () => {
+      const extDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+            env: {
+              API_KEY: '$MY_API_KEY',
+              STATIC_VALUE: 'no-substitution',
+            },
+          },
+        },
+      });
+
+      const envFilePath = path.join(extDir, '.env');
+      fs.writeFileSync(envFilePath, 'MY_API_KEY=test-key-from-file\n');
+
+      const extensions = extensionManager.loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      const extension = extensions[0];
+      const serverConfig = extension.mcpServers!['test-server'];
+      expect(serverConfig.env).toBeDefined();
+      expect(serverConfig.env!['API_KEY']).toBe('test-key-from-file');
+      expect(serverConfig.env!['STATIC_VALUE']).toBe('no-substitution');
     });
 
     it('should handle missing environment variables gracefully', () => {
@@ -947,6 +984,176 @@ This extension will run the following MCP servers:
 
       // Still only called once
       expect(mockRequestConsent).toHaveBeenCalledOnce();
+    });
+
+    it('should prompt for settings if promptForSettings', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 'API Key',
+            description: 'Your API key for the service.',
+            envVar: 'MY_API_KEY',
+          },
+        ],
+      });
+
+      await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+
+      expect(mockPromptForSettings).toHaveBeenCalled();
+    });
+
+    it('should not prompt for settings if promptForSettings is false', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 'API Key',
+            description: 'Your API key for the service.',
+            envVar: 'MY_API_KEY',
+          },
+        ],
+      });
+
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        enabledExtensionOverrides: [],
+        requestConsent: mockRequestConsent,
+        requestSetting: null,
+        loadedSettings: loadSettings(tempWorkspaceDir),
+      });
+
+      await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+    });
+
+    it('should only prompt for new settings on update, and preserve old settings', async () => {
+      // 1. Create and install the "old" version of the extension.
+      const oldSourceExtDir = createExtension({
+        extensionsDir: tempHomeDir, // Create it in a temp location first
+        name: 'my-local-extension',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 'API Key',
+            description: 'Your API key for the service.',
+            envVar: 'MY_API_KEY',
+          },
+        ],
+      });
+
+      mockPromptForSettings.mockResolvedValueOnce('old-api-key');
+      // Install it so it exists in the userExtensionsDir
+      await extensionManager.installOrUpdateExtension({
+        source: oldSourceExtDir,
+        type: 'local',
+      });
+
+      const envPath = new ExtensionStorage(
+        'my-local-extension',
+      ).getEnvFilePath();
+      expect(fs.existsSync(envPath)).toBe(true);
+      let envContent = fs.readFileSync(envPath, 'utf-8');
+      expect(envContent).toContain('MY_API_KEY=old-api-key');
+      expect(mockPromptForSettings).toHaveBeenCalledTimes(1);
+
+      // 2. Create the "new" version of the extension in a new source directory.
+      const newSourceExtDir = createExtension({
+        extensionsDir: path.join(tempHomeDir, 'new-source'), // Another temp location
+        name: 'my-local-extension', // Same name
+        version: '1.1.0', // New version
+        settings: [
+          {
+            name: 'API Key',
+            description: 'Your API key for the service.',
+            envVar: 'MY_API_KEY',
+          },
+          {
+            name: 'New Setting',
+            description: 'A new setting.',
+            envVar: 'NEW_SETTING',
+          },
+        ],
+      });
+
+      const previousExtensionConfig = extensionManager.loadExtensionConfig(
+        path.join(userExtensionsDir, 'my-local-extension'),
+      );
+      mockPromptForSettings.mockResolvedValueOnce('new-setting-value');
+
+      // 3. Call installOrUpdateExtension to perform the update.
+      await extensionManager.installOrUpdateExtension(
+        { source: newSourceExtDir, type: 'local' },
+        previousExtensionConfig,
+      );
+
+      expect(mockPromptForSettings).toHaveBeenCalledTimes(2);
+      expect(mockPromptForSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'New Setting' }),
+      );
+
+      expect(fs.existsSync(envPath)).toBe(true);
+      envContent = fs.readFileSync(envPath, 'utf-8');
+      expect(envContent).toContain('MY_API_KEY=old-api-key');
+      expect(envContent).toContain('NEW_SETTING=new-setting-value');
+    });
+
+    it('should fail auto-update if settings have changed', async () => {
+      // 1. Install initial version with autoUpdate: true
+      const oldSourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-auto-update-ext',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 'OLD_SETTING',
+            envVar: 'OLD_SETTING',
+            description: 'An old setting',
+          },
+        ],
+      });
+      await extensionManager.installOrUpdateExtension({
+        source: oldSourceExtDir,
+        type: 'local',
+        autoUpdate: true,
+      });
+
+      // 2. Create new version with different settings
+      const newSourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-auto-update-ext',
+        version: '1.1.0',
+        settings: [
+          {
+            name: 'NEW_SETTING',
+            envVar: 'NEW_SETTING',
+            description: 'A new setting',
+          },
+        ],
+      });
+
+      const previousExtensionConfig = extensionManager.loadExtensionConfig(
+        path.join(userExtensionsDir, 'my-auto-update-ext'),
+      );
+
+      // 3. Attempt to update and assert it fails
+      await expect(
+        extensionManager.installOrUpdateExtension(
+          { source: newSourceExtDir, type: 'local', autoUpdate: true },
+          previousExtensionConfig,
+        ),
+      ).rejects.toThrow(
+        'Extension "my-auto-update-ext" has settings changes and cannot be auto-updated. Please update manually.',
+      );
     });
 
     it('should throw an error for invalid extension names', async () => {

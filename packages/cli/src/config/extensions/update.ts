@@ -65,7 +65,6 @@ export async function updateExtension(
       installMetadata,
       previousExtensionConfig,
     );
-
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = extensionManager.loadExtension(
       updatedExtensionStorage.getExtensionDir(),

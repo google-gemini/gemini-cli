@@ -11,6 +11,7 @@ import type {
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { INSTALL_METADATA_FILENAME } from './extensions/variables.js';
+import type { ExtensionSetting } from './extensions/extensionSettings.js';
 
 /**
  * Extension definition as written to disk in gemini-extension.json files.
@@ -25,6 +26,7 @@ export interface ExtensionConfig {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
+  settings?: ExtensionSetting[];
 }
 
 export interface ExtensionUpdateInfo {

@@ -45,11 +45,17 @@ import {
   recursivelyHydrateStrings,
   type JsonObject,
 } from './extensions/variables.js';
+import {
+  getEnvContents,
+  maybePromptForSettings,
+  type ExtensionSetting,
+} from './extensions/extensionSettings.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides: string[];
   loadedSettings: LoadedSettings;
   requestConsent: (consent: string) => Promise<boolean>;
+  requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;
   workspaceDir: string;
 }
 
@@ -57,6 +63,9 @@ export class ExtensionManager {
   private extensionEnablementManager: ExtensionEnablementManager;
   private loadedSettings: LoadedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
+  private requestSetting:
+    | ((setting: ExtensionSetting) => Promise<string>)
+    | null;
   private telemetryConfig: Config;
   private workspaceDir: string;
 
@@ -76,6 +85,7 @@ export class ExtensionManager {
       debugMode: false,
     });
     this.requestConsent = options.requestConsent;
+    this.requestSetting = options.requestSetting;
   }
 
   async installOrUpdateExtension(
@@ -157,6 +167,25 @@ export class ExtensionManager {
       try {
         newExtensionConfig = this.loadExtensionConfig(localSourcePath);
 
+        if (isUpdate && installMetadata.autoUpdate) {
+          const oldSettings = new Set(
+            previousExtensionConfig.settings?.map((s) => s.name) || [],
+          );
+          const newSettings = new Set(
+            newExtensionConfig.settings?.map((s) => s.name) || [],
+          );
+
+          const settingsAreEqual =
+            oldSettings.size === newSettings.size &&
+            [...oldSettings].every((value) => newSettings.has(value));
+
+          if (!settingsAreEqual && installMetadata.autoUpdate) {
+            throw new Error(
+              `Extension "${newExtensionConfig.name}" has settings changes and cannot be auto-updated. Please update manually.`,
+            );
+          }
+        }
+
         const newExtensionName = newExtensionConfig.name;
         if (!isUpdate) {
           const installedExtensions = this.loadExtensions();
@@ -179,12 +208,28 @@ export class ExtensionManager {
 
         const extensionStorage = new ExtensionStorage(newExtensionName);
         const destinationPath = extensionStorage.getExtensionDir();
-
+        let previousSettings: Record<string, string> | undefined;
         if (isUpdate) {
+          previousSettings = getEnvContents(extensionStorage);
           await this.uninstallExtension(newExtensionName, isUpdate);
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
+        if (this.requestSetting) {
+          if (isUpdate) {
+            await maybePromptForSettings(
+              newExtensionConfig,
+              this.requestSetting,
+              previousExtensionConfig,
+              previousSettings,
+            );
+          } else {
+            await maybePromptForSettings(
+              newExtensionConfig,
+              this.requestSetting,
+            );
+          }
+        }
 
         if (
           installMetadata.type === 'local' ||
@@ -354,7 +399,8 @@ export class ExtensionManager {
     try {
       let config = this.loadExtensionConfig(effectiveExtensionPath);
 
-      config = resolveEnvVarsInObject(config);
+      const customEnv = getEnvContents(new ExtensionStorage(config.name));
+      config = resolveEnvVarsInObject(config, customEnv);
 
       if (config.mcpServers) {
         config.mcpServers = Object.fromEntries(

@@ -17,6 +17,7 @@ import {
 } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface InstallArgs {
   source: string;
@@ -73,6 +74,7 @@ export async function handleInstall(args: InstallArgs) {
       workspaceDir,
       enabledExtensionOverrides: [],
       requestConsent,
+      requestSetting: promptForSetting,
       loadedSettings: loadSettings(workspaceDir),
     });
     const name =

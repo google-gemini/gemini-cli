@@ -11,6 +11,7 @@ import { GEMINI_DIR } from '@google/gemini-cli-core';
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
+export const EXTENSION_SETTINGS_FILENAME = '.env';
 
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = JsonValue[];
