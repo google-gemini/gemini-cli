@@ -76,6 +76,25 @@ jobs:
             const repo_name = String(fs.readFileSync(path.join(temp, 'repo_name')));
             core.setOutput('repo_name', repo_name);
 
+  parse_run_context:
+    name: 'Parse run context'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    needs: 'download_repo_name'
+    if: 'always()'
+    outputs:
+      repository: '${{ steps.set_context.outputs.REPO }}'
+      sha: '${{ steps.set_context.outputs.SHA }}'
+    steps:
+      - id: 'set_context'
+        name: 'Set dynamic repository and SHA'
+        env:
+          REPO: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
+          SHA: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
+        shell: 'bash'
+        run: |
+          echo "REPO=$REPO" >> $GITHUB_OUTPUT
+          echo "SHA=$SHA" >> $GITHUB_OUTPUT
+
   set_pending_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
