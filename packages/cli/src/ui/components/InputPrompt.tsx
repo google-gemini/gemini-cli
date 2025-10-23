@@ -120,7 +120,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const isShellFocused = useShellFocusState();
   const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-  const [escPressCount, setEscPressCount] = useState(0);
+  const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
@@ -184,7 +184,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       clearTimeout(escapeTimerRef.current);
       escapeTimerRef.current = null;
     }
-    setEscPressCount(0);
+    escPressCount.current = 0;
     setShowEscapePrompt(false);
   }, []);
 
@@ -401,7 +401,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Reset ESC count and hide prompt on any non-ESC key
       if (key.name !== 'escape') {
-        if (escPressCount > 0 || showEscapePrompt) {
+        if (escPressCount.current > 0 || showEscapePrompt) {
           resetEscapeState();
         }
       }
@@ -462,11 +462,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         // Handle double ESC for clearing input
-        if (escPressCount === 0) {
+        if (escPressCount.current === 0) {
           if (buffer.text === '') {
             return;
           }
-          setEscPressCount(1);
+          escPressCount.current = 1;
           setShowEscapePrompt(true);
           if (escapeTimerRef.current) {
             clearTimeout(escapeTimerRef.current);
@@ -774,7 +774,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchCompletion,
       handleClipboardImage,
       resetCompletionState,
-      escPressCount,
       showEscapePrompt,
       resetEscapeState,
       vimHandleInput,
