@@ -120,7 +120,7 @@ jobs:
       - 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: |
-      always() && (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
     strategy:
       fail-fast: false
       matrix:
@@ -172,7 +172,7 @@ jobs:
       - 'parse_run_context'
     runs-on: 'macos-latest'
     if: |
-      always() && (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -210,7 +210,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     if: |
-      always() && (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -268,7 +268,7 @@ jobs:
   e2e:
     name: 'E2E'
     if: |
-      always() && (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
+      always() && (needs.merge_queue_skipper.result.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false')
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
