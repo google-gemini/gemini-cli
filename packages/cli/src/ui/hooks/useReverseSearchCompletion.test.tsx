@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
-import { describe, it, expect } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { useReverseSearchCompletion } from './useReverseSearchCompletion.js';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 
@@ -101,7 +100,7 @@ describe('useReverseSearchCompletion', () => {
           expect(result.current.activeSuggestionIndex).toBe(-1);
         });
 
-        it('should navigate up through suggestions with wrap-around', () => {
+        it('should navigate up through suggestions with wrap-around', async () => {
           const mockShellHistory = [
             'ls -l',
             'ls -la',
@@ -118,18 +117,20 @@ describe('useReverseSearchCompletion', () => {
               true,
             ),
           );
-
-          expect(result.current.suggestions.length).toBe(2);
-          expect(result.current.activeSuggestionIndex).toBe(0);
+          await vi.waitFor(() => {
+            expect(result.current.suggestions.length).toBe(2);
+            expect(result.current.activeSuggestionIndex).toBe(0);
+          });
 
           act(() => {
             result.current.navigateUp();
           });
 
-          expect(result.current.activeSuggestionIndex).toBe(1);
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(1);
+          });
         });
-
-        it('should navigate down through suggestions with wrap-around', () => {
+        it('should navigate down through suggestions with wrap-around', async () => {
           const mockShellHistory = [
             'ls -l',
             'ls -la',
@@ -145,18 +146,20 @@ describe('useReverseSearchCompletion', () => {
               true,
             ),
           );
-
-          expect(result.current.suggestions.length).toBe(2);
-          expect(result.current.activeSuggestionIndex).toBe(0);
+          await vi.waitFor(() => {
+            expect(result.current.suggestions.length).toBe(2);
+            expect(result.current.activeSuggestionIndex).toBe(0);
+          });
 
           act(() => {
             result.current.navigateDown();
           });
 
-          expect(result.current.activeSuggestionIndex).toBe(1);
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(1);
+          });
         });
-
-        it('should handle navigation with multiple suggestions', () => {
+        it('should handle navigation with multiple suggestions', async () => {
           const mockShellHistory = [
             'ls -l',
             'ls -la',
@@ -173,37 +176,47 @@ describe('useReverseSearchCompletion', () => {
               true,
             ),
           );
-
-          expect(result.current.suggestions.length).toBe(5);
-          expect(result.current.activeSuggestionIndex).toBe(0);
+          await vi.waitFor(() => {
+            expect(result.current.suggestions.length).toBe(5);
+            expect(result.current.activeSuggestionIndex).toBe(0);
+          });
 
           act(() => {
             result.current.navigateDown();
           });
-          expect(result.current.activeSuggestionIndex).toBe(1);
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(1);
+          });
 
           act(() => {
             result.current.navigateDown();
           });
-          expect(result.current.activeSuggestionIndex).toBe(2);
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(2);
+          });
 
           act(() => {
             result.current.navigateUp();
           });
-          expect(result.current.activeSuggestionIndex).toBe(1);
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(1);
+          });
 
           act(() => {
             result.current.navigateUp();
           });
-          expect(result.current.activeSuggestionIndex).toBe(0);
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(0);
+          });
 
           act(() => {
             result.current.navigateUp();
           });
-          expect(result.current.activeSuggestionIndex).toBe(4);
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(4);
+          });
         });
-
-        it('should handle navigation with large suggestion lists and scrolling', () => {
+        it('should handle navigation with large suggestion lists and scrolling', async () => {
           const largeMockCommands = Array.from(
             { length: 15 },
             (_, i) => `echo ${i}`,
@@ -216,35 +229,40 @@ describe('useReverseSearchCompletion', () => {
               true,
             ),
           );
-
-          expect(result.current.suggestions.length).toBe(15);
-          expect(result.current.activeSuggestionIndex).toBe(0);
-          expect(result.current.visibleStartIndex).toBe(0);
+          await vi.waitFor(() => {
+            expect(result.current.suggestions.length).toBe(15);
+            expect(result.current.activeSuggestionIndex).toBe(0);
+            expect(result.current.visibleStartIndex).toBe(0);
+          });
 
           act(() => {
             result.current.navigateUp();
           });
 
-          expect(result.current.activeSuggestionIndex).toBe(14);
-          expect(result.current.visibleStartIndex).toBe(Math.max(0, 15 - 8));
+          await vi.waitFor(() => {
+            expect(result.current.activeSuggestionIndex).toBe(14);
+            expect(result.current.visibleStartIndex).toBe(Math.max(0, 15 - 8));
+          });
         });
       });
     });
   });
 
   describe('Filtering', () => {
-    it('filters history by buffer.text and sets showSuggestions', () => {
+    it('filters history by buffer.text and sets showSuggestions', async () => {
       const history = ['foo', 'barfoo', 'baz'];
       const { result } = renderHook(() =>
         useReverseSearchCompletion(useTextBufferForTest('foo'), history, true),
       );
 
       // should only return the two entries containing "foo"
-      expect(result.current.suggestions.map((s) => s.value)).toEqual([
-        'foo',
-        'barfoo',
-      ]);
-      expect(result.current.showSuggestions).toBe(true);
+      await vi.waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'foo',
+          'barfoo',
+        ]);
+        expect(result.current.showSuggestions).toBe(true);
+      });
     });
 
     it('hides suggestions when there are no matches', () => {

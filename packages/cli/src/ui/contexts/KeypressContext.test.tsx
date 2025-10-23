@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import type React from 'react';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import type { Mock } from 'vitest';
 import { vi } from 'vitest';
 import type { Key } from './KeypressContext.js';
@@ -370,7 +369,7 @@ describe('KeypressContext - Kitty Protocol', () => {
         stdin.write(PASTE_END);
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         // Expect the handler to be called exactly once for the entire paste
         expect(keyHandler).toHaveBeenCalledTimes(1);
       });
@@ -399,7 +398,7 @@ describe('KeypressContext - Kitty Protocol', () => {
         stdin.write(PASTE_END);
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(keyHandler).toHaveBeenCalledTimes(1);
       });
 
@@ -427,7 +426,7 @@ describe('KeypressContext - Kitty Protocol', () => {
         stdin.write(PASTE_END.slice(3));
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(keyHandler).toHaveBeenCalledTimes(1);
       });
 
@@ -1193,7 +1192,7 @@ describe('Kitty Sequence Parsing', () => {
     }
 
     // Should parse once complete
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'escape',

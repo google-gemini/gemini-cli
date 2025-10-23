@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor, act } from '@testing-library/react';
+import { act } from 'react';
 import { vi } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import * as processUtils from '../../utils/processUtils.js';
@@ -56,12 +54,12 @@ describe('FolderTrustDialog', () => {
       stdin.write('\u001b[27u'); // Press kitty escape key
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(lastFrame()).toContain(
         'A folder trust level must be selected to continue. Exiting since escape was pressed.',
       );
     });
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockedExit).toHaveBeenCalledWith(1);
     });
     expect(onSelect).not.toHaveBeenCalled();
@@ -95,7 +93,7 @@ describe('FolderTrustDialog', () => {
       stdin.write('r');
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockedExit).not.toHaveBeenCalled();
     });
   });
