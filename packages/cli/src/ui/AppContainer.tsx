@@ -93,9 +93,13 @@ import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
-import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
+import {
+  useConfirmUpdateRequests,
+  useExtensionUpdates,
+} from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
-import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
+import { ExtensionManager } from '../config/extension-manager.js';
+import { requestConsentInteractive } from '../config/extensions/consent.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -165,21 +169,28 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const extensions = config.getExtensions();
-  const [extensionEnablementManager] = useState<ExtensionEnablementManager>(
-    new ExtensionEnablementManager(config.getEnabledExtensions()),
+  const [extensionManager] = useState<ExtensionManager>(
+    new ExtensionManager({
+      enabledExtensionOverrides: config.getEnabledExtensions(),
+      workspaceDir: config.getWorkingDir(),
+      requestConsent: (description) =>
+        requestConsentInteractive(
+          description,
+          addConfirmUpdateExtensionRequest,
+        ),
+      // TODO: Support requesting settings in the interactive CLI
+      requestSetting: null,
+      loadedSettings: settings,
+    }),
   );
+
+  const { addConfirmUpdateExtensionRequest, confirmUpdateExtensionRequests } =
+    useConfirmUpdateRequests();
   const {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
-    confirmUpdateExtensionRequests,
-    addConfirmUpdateExtensionRequest,
-  } = useExtensionUpdates(
-    extensions,
-    extensionEnablementManager,
-    historyManager.addItem,
-    config.getWorkingDir(),
-  );
+  } = useExtensionUpdates(extensions, extensionManager, historyManager.addItem);
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const openPermissionsDialog = useCallback(

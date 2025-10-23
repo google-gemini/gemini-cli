@@ -32,8 +32,7 @@ import {
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
-import { disableExtension } from './extension.js';
-import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+import type { ExtensionManager } from './extension-manager.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -750,7 +749,7 @@ export function loadSettings(
 
 export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
-  workspaceDir: string = process.cwd(),
+  extensionManager: ExtensionManager,
 ): void {
   const processScope = (scope: SettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
@@ -758,14 +757,8 @@ export function migrateDeprecatedSettings(
       debugLogger.log(
         `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
       );
-      const extensionEnablementManager = new ExtensionEnablementManager();
       for (const extension of settings.extensions.disabled ?? []) {
-        disableExtension(
-          extension,
-          scope,
-          extensionEnablementManager,
-          workspaceDir,
-        );
+        extensionManager.disableExtension(extension, scope);
       }
 
       const newExtensionsValue = { ...settings.extensions };

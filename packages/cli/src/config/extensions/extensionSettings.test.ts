@@ -13,7 +13,7 @@ import {
   type ExtensionSetting,
 } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
-import { ExtensionStorage } from '../extension.js';
+import { ExtensionStorage } from './storage.js';
 import prompts from 'prompts';
 import * as fsPromises from 'node:fs/promises';
 import * as fs from 'node:fs';
