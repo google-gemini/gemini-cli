@@ -99,22 +99,22 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
     needs:
-      - 'download_repo_name'
+      - 'parse_run_context'
     steps:
       - name: 'Set pending status'
         uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
-          sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
+          repo: '${{ needs.parse_run_context.outputs.repository }}'
+          sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
           status: 'pending'
           context: 'Set e2e pending Status'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
-    needs: 'download_repo_name'
+    needs: 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -129,8 +129,8 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
-          repository: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
+          ref: '${{ needs.parse_run_context.outputs.sha }}'
+          repository: '${{ needs.parse_run_context.outputs.repository }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -162,14 +162,14 @@ jobs:
 
   e2e_mac:
     name: 'E2E Test (macOS)'
-    needs: 'download_repo_name'
+    needs: 'parse_run_context'
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
-          repository: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
+          ref: '${{ needs.parse_run_context.outputs.sha }}'
+          repository: '${{ needs.parse_run_context.outputs.repository }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -199,7 +199,7 @@ jobs:
     name: 'Slow E2E - Win'
     needs:
       - 'merge_queue_skipper'
-      - 'download_repo_name'
+      - 'parse_run_context'
     if: |
       needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-windows-16-core'
@@ -209,8 +209,8 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
-          repository: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
+          ref: '${{ needs.parse_run_context.outputs.sha }}'
+          repository: '${{ needs.parse_run_context.outputs.repository }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -279,7 +279,7 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
     needs:
-      - 'download_repo_name'
+      - 'parse_run_context'
       - 'e2e'
     steps:
       - name: 'Set workflow status'
@@ -287,8 +287,8 @@ jobs:
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ needs.download_repo_name.outputs.repo_name }}'
-          sha: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          repo: '${{ needs.parse_run_context.outputs.repository }}'
+          sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GITHUB_TOKEN }}'
           status: '${{ job.status }}'
           context: 'Set E2E Status'
