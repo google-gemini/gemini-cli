@@ -57,9 +57,9 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it.each([
-    { desc: 'userMemory is empty string', userMemory: '' },
-    { desc: 'userMemory is whitespace only', userMemory: '   \n  \t ' },
-  ])('should return the base prompt when $desc', ({ userMemory }) => {
+    ['empty string', ''],
+    ['whitespace only', '   \n  \t '],
+  ])('should return the base prompt when userMemory is %s', (_, userMemory) => {
     vi.stubEnv('SANDBOX', undefined);
     const prompt = getCoreSystemPrompt(mockConfig, userMemory);
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
@@ -174,12 +174,9 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
-    it.each([
-      { desc: '"false"', value: 'false' },
-      { desc: '"0"', value: '0' },
-    ])(
-      'should use default prompt when GEMINI_SYSTEM_MD is $desc',
-      ({ value }) => {
+    it.each(['false', '0'])(
+      'should use default prompt when GEMINI_SYSTEM_MD is "%s"',
+      (value) => {
         vi.stubEnv('GEMINI_SYSTEM_MD', value);
         const prompt = getCoreSystemPrompt(mockConfig);
         expect(fs.readFileSync).not.toHaveBeenCalled();
@@ -196,12 +193,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
     });
 
-    it.each([
-      { desc: '"true"', value: 'true' },
-      { desc: '"1"', value: '1' },
-    ])(
-      'should read from default path when GEMINI_SYSTEM_MD is $desc',
-      ({ value }) => {
+    it.each(['true', '1'])(
+      'should read from default path when GEMINI_SYSTEM_MD is "%s"',
+      (value) => {
         const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
         vi.stubEnv('GEMINI_SYSTEM_MD', value);
         vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -243,24 +237,18 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   describe('GEMINI_WRITE_SYSTEM_MD environment variable', () => {
-    it.each([
-      { desc: '"false"', value: 'false' },
-      { desc: '"0"', value: '0' },
-    ])(
-      'should not write to file when GEMINI_WRITE_SYSTEM_MD is $desc',
-      ({ value }) => {
+    it.each(['false', '0'])(
+      'should not write to file when GEMINI_WRITE_SYSTEM_MD is "%s"',
+      (value) => {
         vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
         getCoreSystemPrompt(mockConfig);
         expect(fs.writeFileSync).not.toHaveBeenCalled();
       },
     );
 
-    it.each([
-      { desc: '"true"', value: 'true' },
-      { desc: '"1"', value: '1' },
-    ])(
-      'should write to default path when GEMINI_WRITE_SYSTEM_MD is $desc',
-      ({ value }) => {
+    it.each(['true', '1'])(
+      'should write to default path when GEMINI_WRITE_SYSTEM_MD is "%s"',
+      (value) => {
         const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
         vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
         getCoreSystemPrompt(mockConfig);
@@ -316,10 +304,10 @@ describe('resolvePathFromEnv helper function', () => {
 
   describe('when envVar is undefined, empty, or whitespace', () => {
     it.each([
-      { desc: 'undefined', input: undefined },
-      { desc: 'empty string', input: '' },
-      { desc: 'whitespace only', input: '   \n\t  ' },
-    ])('should return null for $desc', ({ input }) => {
+      ['undefined', undefined],
+      ['empty string', ''],
+      ['whitespace only', '   \n\t  '],
+    ])('should return null for %s', (_, input) => {
       const result = resolvePathFromEnv(input);
       expect(result).toEqual({
         isSwitch: false,
@@ -331,43 +319,13 @@ describe('resolvePathFromEnv helper function', () => {
 
   describe('when envVar is a boolean-like string', () => {
     it.each([
-      {
-        desc: '"0" as disabled switch',
-        input: '0',
-        expectedValue: '0',
-        isDisabled: true,
-      },
-      {
-        desc: '"false" as disabled switch',
-        input: 'false',
-        expectedValue: 'false',
-        isDisabled: true,
-      },
-      {
-        desc: '"1" as enabled switch',
-        input: '1',
-        expectedValue: '1',
-        isDisabled: false,
-      },
-      {
-        desc: '"true" as enabled switch',
-        input: 'true',
-        expectedValue: 'true',
-        isDisabled: false,
-      },
-      {
-        desc: '"FALSE" (case-insensitive)',
-        input: 'FALSE',
-        expectedValue: 'false',
-        isDisabled: true,
-      },
-      {
-        desc: '"TRUE" (case-insensitive)',
-        input: 'TRUE',
-        expectedValue: 'true',
-        isDisabled: false,
-      },
-    ])('should handle $desc', ({ input, expectedValue, isDisabled }) => {
+      ['"0" as disabled switch', '0', '0', true],
+      ['"false" as disabled switch', 'false', 'false', true],
+      ['"1" as enabled switch', '1', '1', false],
+      ['"true" as enabled switch', 'true', 'true', false],
+      ['"FALSE" (case-insensitive)', 'FALSE', 'false', true],
+      ['"TRUE" (case-insensitive)', 'TRUE', 'true', false],
+    ])('should handle %s', (_, input, expectedValue, isDisabled) => {
       const result = resolvePathFromEnv(input);
       expect(result).toEqual({
         isSwitch: true,

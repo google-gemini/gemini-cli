@@ -125,27 +125,15 @@ describe('BaseTokenStorage', () => {
 
   describe('isTokenExpired', () => {
     it.each([
-      {
-        desc: 'tokens without expiry',
-        expiresAt: undefined,
-        expected: false,
-      },
-      {
-        desc: 'valid tokens',
-        expiresAt: Date.now() + 3600000,
-        expected: false,
-      },
-      {
-        desc: 'expired tokens',
-        expiresAt: Date.now() - 3600000,
-        expected: true,
-      },
-      {
-        desc: 'tokens within 5-minute buffer (4 minutes from now)',
-        expiresAt: Date.now() + 4 * 60 * 1000,
-        expected: true,
-      },
-    ])('should return $expected for $desc', ({ expiresAt, expected }) => {
+      ['tokens without expiry', undefined, false],
+      ['valid tokens', Date.now() + 3600000, false],
+      ['expired tokens', Date.now() - 3600000, true],
+      [
+        'tokens within 5-minute buffer (4 minutes from now)',
+        Date.now() + 4 * 60 * 1000,
+        true,
+      ],
+    ])('should return %s for %s', (_, expiresAt, expected) => {
       const credentials: OAuthCredentials = {
         serverName: 'test-server',
         token: {
@@ -162,22 +150,22 @@ describe('BaseTokenStorage', () => {
 
   describe('sanitizeServerName', () => {
     it.each([
-      {
-        desc: 'valid characters',
-        input: 'test-server.example_123',
-        expected: 'test-server.example_123',
-      },
-      {
-        desc: 'invalid characters with underscore replacement',
-        input: 'test@server#example',
-        expected: 'test_server_example',
-      },
-      {
-        desc: 'special characters',
-        input: 'test server/example:123',
-        expected: 'test_server_example_123',
-      },
-    ])('should handle $desc', ({ input, expected }) => {
+      [
+        'valid characters',
+        'test-server.example_123',
+        'test-server.example_123',
+      ],
+      [
+        'invalid characters with underscore replacement',
+        'test@server#example',
+        'test_server_example',
+      ],
+      [
+        'special characters',
+        'test server/example:123',
+        'test_server_example_123',
+      ],
+    ])('should handle %s', (_, input, expected) => {
       expect(storage.sanitizeServerName(input)).toBe(expected);
     });
   });
