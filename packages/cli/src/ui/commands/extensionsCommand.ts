@@ -145,7 +145,17 @@ async function exploreAction(context: CommandContext) {
       },
       Date.now(),
     );
-    await open(extensionsUrl);
+    try {
+      await open(extensionsUrl);
+    } catch (_error) {
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to open browser. Please open this URL manually: ${extensionsUrl}`,
+        },
+        Date.now(),
+      );
+    }
   }
 }
 

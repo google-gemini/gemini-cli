@@ -382,5 +382,21 @@ describe('extensionsCommand', () => {
       // Ensure 'open' was not called in test environment
       expect(open).not.toHaveBeenCalled();
     });
+
+    it('should handle errors when opening the browser', async () => {
+      const extensionsUrl = 'https://geminicli.com/extensions/';
+      const errorMessage = 'Failed to open browser';
+      vi.mocked(open).mockRejectedValue(new Error(errorMessage));
+
+      await exploreAction(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to open browser. Please open this URL manually: ${extensionsUrl}`,
+        },
+        expect.any(Number),
+      );
+    });
   });
 });
