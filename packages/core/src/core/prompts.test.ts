@@ -57,7 +57,6 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it.each([
-    { desc: 'no userMemory is provided', userMemory: '' },
     { desc: 'userMemory is empty string', userMemory: '' },
     { desc: 'userMemory is whitespace only', userMemory: '   \n  \t ' },
   ])('should return the base prompt when $desc', ({ userMemory }) => {
