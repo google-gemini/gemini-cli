@@ -233,6 +233,7 @@ export async function main() {
       loadedSettings: settings,
       enabledExtensionOverrides: [],
       requestConsent: requestConsentNonInteractive,
+      requestSetting: null,
     }),
   );
   await cleanupCheckpoints();
@@ -376,7 +377,8 @@ export async function main() {
       workspaceDir: process.cwd(),
       // At this stage, we still don't have an interactive UI.
       requestConsent: requestConsentNonInteractive,
-      enabledExtensionOverrides: argv.extensions ?? [],
+      requestSetting: null,
+      enabledExtensionOverrides: argv.extensions,
     });
     const extensions = extensionManager.loadExtensions();
     const config = await loadCliConfig(
