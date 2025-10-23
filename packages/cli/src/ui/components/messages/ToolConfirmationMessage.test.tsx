@@ -100,6 +100,7 @@ describe('ToolConfirmationMessage', () => {
       serverName: 'test-server',
       toolName: 'test-tool',
       toolDisplayName: 'Test Tool',
+      args: {},
       onConfirm: vi.fn(),
     };
 

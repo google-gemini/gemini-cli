@@ -86,6 +86,7 @@ describe('textUtils', () => {
             serverName: '\u001b[31mmy-server\u001b[0m',
             toolName: '\u001b[32mdeploy\u001b[0m',
             toolDisplayName: '\u001b[33mDeploy Service\u001b[0m',
+            args: { a: '\u001b[35mvalue\u001b[0m' },
             onConfirm: async () => {},
           };
 
@@ -97,6 +98,9 @@ describe('textUtils', () => {
             expect(sanitized.toolName).toBe('\\u001b[32mdeploy\\u001b[0m');
             expect(sanitized.toolDisplayName).toBe(
               '\\u001b[33mDeploy Service\\u001b[0m',
+            );
+            expect((sanitized.args as { a: string }).a).toBe(
+              '\\u001b[35mvalue\\u001b[0m',
             );
           }
         });
