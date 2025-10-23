@@ -12,7 +12,7 @@ Dressing Room, which is Google's system for managing NPM packages in the
 `@google/**` namespace. The packages are all named `@google/**`.
 
 More information can be found about these systems in the
-[maintainer repo guide](npm.md)
+[maintainer repo guide](https://github.com/google-gemini/maintainers-gemini-cli/blob/main/npm.md)
 
 ### Package scopes
 
