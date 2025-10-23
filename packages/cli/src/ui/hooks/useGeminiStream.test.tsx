@@ -182,7 +182,7 @@ describe('useGeminiStream', () => {
       targetDir: '/test/dir',
       debugMode: false,
       question: undefined,
-      fullContext: false,
+
       coreTools: [],
       toolDiscoveryCommand: undefined,
       toolCallCommand: undefined,
@@ -1207,6 +1207,39 @@ describe('useGeminiStream', () => {
         );
       });
     });
+
+    it('should not call handleSlashCommand is shell mode is active', async () => {
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          () => {},
+          mockHandleSlashCommand,
+          true,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('/about');
+      });
+
+      await waitFor(() => {
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('Memory Refresh on save_memory', () => {
@@ -1363,10 +1396,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirm,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1389,10 +1426,10 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'info',
+            title: 'Read File',
             onConfirm: mockOnConfirm,
-            onCancel: vi.fn(),
-            message: 'Read file?',
-            displayedText: 'Read /test/file.txt',
+            prompt: 'Read /test/file.txt?',
           },
           tool: {
             name: 'read_file',
@@ -1441,10 +1478,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmReplace,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1467,10 +1508,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmWrite,
-            onCancel: vi.fn(),
-            message: 'Write file?',
-            displayedText: 'Write to /test/new.txt',
+            fileName: 'new.txt',
+            filePath: '/test/new.txt',
+            fileDiff: 'fake diff',
+            originalContent: null,
+            newContent: 'content',
           },
           tool: {
             name: 'write_file',
@@ -1493,10 +1538,10 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'info',
+            title: 'Read File',
             onConfirm: mockOnConfirmRead,
-            onCancel: vi.fn(),
-            message: 'Read file?',
-            displayedText: 'Read /test/file.txt',
+            prompt: 'Read /test/file.txt?',
           },
           tool: {
             name: 'read_file',
@@ -1544,10 +1589,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirm,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1564,9 +1613,7 @@ describe('useGeminiStream', () => {
       const { result } = renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
-        await result.current.handleApprovalModeChange(
-          ApprovalMode.REQUIRE_CONFIRMATION,
-        );
+        await result.current.handleApprovalModeChange(ApprovalMode.DEFAULT);
       });
 
       // No tools should be auto-approved
@@ -1594,10 +1641,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmSuccess,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1620,10 +1671,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmError,
-            onCancel: vi.fn(),
-            message: 'Write file?',
-            displayedText: 'Write to /test/file.txt',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: null,
+            newContent: 'content',
           },
           tool: {
             name: 'write_file',
@@ -1678,7 +1733,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1702,10 +1757,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            type: 'edit',
+            title: 'Confirm Edit',
             // No onConfirm method
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           } as any,
           tool: {
             name: 'replace',
@@ -1743,10 +1802,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmAwaiting,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1768,12 +1831,6 @@ describe('useGeminiStream', () => {
           },
           status: 'executing',
           responseSubmittedToGemini: false,
-          confirmationDetails: {
-            onConfirm: mockOnConfirmExecuting,
-            onCancel: vi.fn(),
-            message: 'Write file?',
-            displayedText: 'Write to /test/file.txt',
-          },
           tool: {
             name: 'write_file',
             displayName: 'write_file',
@@ -2620,10 +2677,25 @@ describe('useGeminiStream', () => {
       };
       mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
 
-      mockSendMessageStream.mockReturnValue(
+      // Mock for the initial request
+      mockSendMessageStream.mockReturnValueOnce(
         (async function* () {
           yield {
             type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      // Mock for the retry request
+      mockSendMessageStream.mockReturnValueOnce(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Retry successful',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
           };
         })(),
       );
@@ -2658,10 +2730,21 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'Loop detection has been disabled for this session. Please try your request again.',
+          text: 'Loop detection has been disabled for this session. Retrying request...',
         },
         expect.any(Number),
       );
+
+      // Verify that the request was retried
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+        expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+          2,
+          'test query',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
     });
 
     it('should keep loop detection enabled and show message when user selects "keep"', async () => {
@@ -2714,6 +2797,9 @@ describe('useGeminiStream', () => {
         },
         expect.any(Number),
       );
+
+      // Verify that the request was NOT retried
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
 
     it('should handle multiple loop detection events properly', async () => {
@@ -2764,6 +2850,20 @@ describe('useGeminiStream', () => {
         })(),
       );
 
+      // Mock for the retry request
+      mockSendMessageStream.mockReturnValueOnce(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Retry successful',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
       // Second loop detection
       await act(async () => {
         await result.current.submitQuery('second query');
@@ -2786,10 +2886,21 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'Loop detection has been disabled for this session. Please try your request again.',
+          text: 'Loop detection has been disabled for this session. Retrying request...',
         },
         expect.any(Number),
       );
+
+      // Verify that the request was retried
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(3); // 1st query, 2nd query, retry of 2nd query
+        expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+          3,
+          'second query',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
     });
 
     it('should process LoopDetected event after moving pending history to history', async () => {

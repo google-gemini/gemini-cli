@@ -223,9 +223,11 @@ describe('extensionsCommand', () => {
 
       const extensionOne: GeminiCLIExtension = {
         name: 'ext-one',
+        id: 'ext-one-id',
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/ext-one',
+        contextFiles: [],
         installMetadata: {
           type: 'git',
           autoUpdate: false,
@@ -234,9 +236,11 @@ describe('extensionsCommand', () => {
       };
       const extensionTwo: GeminiCLIExtension = {
         name: 'another-ext',
+        id: 'another-ext-id',
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/another-ext',
+        contextFiles: [],
         installMetadata: {
           type: 'git',
           autoUpdate: false,
@@ -245,9 +249,11 @@ describe('extensionsCommand', () => {
       };
       const allExt: GeminiCLIExtension = {
         name: 'all-ext',
+        id: 'all-ext-id',
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/all-ext',
+        contextFiles: [],
         installMetadata: {
           type: 'git',
           autoUpdate: false,

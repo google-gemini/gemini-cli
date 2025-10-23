@@ -289,7 +289,7 @@ describe('Gemini Client (client.ts)', () => {
       getVertexAI: vi.fn().mockReturnValue(false),
       getUserAgent: vi.fn().mockReturnValue('test-agent'),
       getUserMemory: vi.fn().mockReturnValue(''),
-      getFullContext: vi.fn().mockReturnValue(false),
+
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
@@ -590,16 +590,37 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).toBe(initialChat);
     });
 
+    it('should return NOOP if history is too short to compress', async () => {
+      const { client } = setup({
+        chatHistory: [{ role: 'user', parts: [{ text: 'hi' }] }],
+        originalTokenCount: 50,
+      });
+
+      const result = await client.tryCompressChat('prompt-id-noop', false);
+
+      expect(result).toEqual({
+        compressionStatus: CompressionStatus.NOOP,
+        originalTokenCount: 50,
+        newTokenCount: 50,
+      });
+      expect(mockGenerateContentFn).not.toHaveBeenCalled();
+    });
+
     it('logs a telemetry event when compressing', async () => {
       vi.spyOn(ClearcutLogger.prototype, 'logChatCompressionEvent');
-
       const MOCKED_TOKEN_LIMIT = 1000;
       const MOCKED_CONTEXT_PERCENTAGE_THRESHOLD = 0.5;
-      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
       vi.spyOn(client['config'], 'getChatCompression').mockReturnValue({
         contextPercentageThreshold: MOCKED_CONTEXT_PERCENTAGE_THRESHOLD,
       });
-      const history = [{ role: 'user', parts: [{ text: '...history...' }] }];
+      const history = [
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+      ];
       mockGetHistory.mockReturnValue(history);
 
       const originalTokenCount =
@@ -674,7 +695,14 @@ describe('Gemini Client (client.ts)', () => {
       vi.spyOn(client['config'], 'getChatCompression').mockReturnValue({
         contextPercentageThreshold: MOCKED_CONTEXT_PERCENTAGE_THRESHOLD,
       });
-      const history = [{ role: 'user', parts: [{ text: '...history...' }] }];
+      const history = [
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+      ];
       mockGetHistory.mockReturnValue(history);
 
       const originalTokenCount =
@@ -838,7 +866,14 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should always trigger summarization when force is true, regardless of token count', async () => {
-      const history = [{ role: 'user', parts: [{ text: '...history...' }] }];
+      const history = [
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+      ];
       mockGetHistory.mockReturnValue(history);
 
       const originalTokenCount = 100; // Well below threshold, but > estimated new count
@@ -1350,33 +1385,10 @@ ${JSON.stringify(
       // Assert
       expect(finalResult).toBeInstanceOf(Turn);
 
-      // Debug: Check how many times checkNextSpeaker was called
-      const callCount = mockCheckNextSpeaker.mock.calls.length;
-
       // If infinite loop protection is working, checkNextSpeaker should be called many times
       // but stop at MAX_TURNS (100). Since each recursive call should trigger checkNextSpeaker,
       // we expect it to be called multiple times before hitting the limit
       expect(mockCheckNextSpeaker).toHaveBeenCalled();
-
-      // The test should demonstrate that the infinite loop protection works:
-      // - If checkNextSpeaker is called many times (close to MAX_TURNS), it shows the loop was happening
-      // - If it's only called once, the recursive behavior might not be triggered
-      if (callCount === 0) {
-        throw new Error(
-          'checkNextSpeaker was never called - the recursive condition was not met',
-        );
-      } else if (callCount === 1) {
-        // This might be expected behavior if the turn has pending tool calls or other conditions prevent recursion
-        console.log(
-          'checkNextSpeaker called only once - no infinite loop occurred',
-        );
-      } else {
-        console.log(
-          `checkNextSpeaker called ${callCount} times - infinite loop protection worked`,
-        );
-        // If called multiple times, we expect it to be stopped before MAX_TURNS
-        expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
-      }
 
       // The stream should produce events and eventually terminate
       expect(eventCount).toBeGreaterThanOrEqual(1);
@@ -1490,9 +1502,8 @@ ${JSON.stringify(
             break;
           }
         }
-      } catch (error) {
+      } catch (_) {
         // If the test framework times out, that also demonstrates the infinite loop
-        console.error('Test timed out or errored:', error);
       }
 
       // Assert that the fix works - the loop should stop at MAX_TURNS
@@ -1502,11 +1513,6 @@ ${JSON.stringify(
       // the loop should stop at MAX_TURNS (100)
       expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
       expect(eventCount).toBeLessThanOrEqual(200); // Should have reasonable number of events
-
-      console.log(
-        `Infinite loop protection working: checkNextSpeaker called ${callCount} times, ` +
-          `${eventCount} events generated (properly bounded by MAX_TURNS)`,
-      );
     });
 
     it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {

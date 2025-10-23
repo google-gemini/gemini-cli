@@ -185,6 +185,8 @@ export const useGeminiStream = (
     return undefined;
   }, [toolCalls]);
 
+  const lastQueryRef = useRef<PartListUnion | null>(null);
+  const lastPromptIdRef = useRef<string | null>(null);
   const loopDetectedRef = useRef(false);
   const [
     loopDetectionConfirmationRequest,
@@ -327,41 +329,43 @@ export const useGeminiStream = (
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
-        // Handle UI-only commands first
-        const slashCommandResult = isSlashCommand(trimmedQuery)
-          ? await handleSlashCommand(trimmedQuery)
-          : false;
+        if (!shellModeActive) {
+          // Handle UI-only commands first
+          const slashCommandResult = isSlashCommand(trimmedQuery)
+            ? await handleSlashCommand(trimmedQuery)
+            : false;
 
-        if (slashCommandResult) {
-          switch (slashCommandResult.type) {
-            case 'schedule_tool': {
-              const { toolName, toolArgs } = slashCommandResult;
-              const toolCallRequest: ToolCallRequestInfo = {
-                callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                name: toolName,
-                args: toolArgs,
-                isClientInitiated: true,
-                prompt_id,
-              };
-              scheduleToolCalls([toolCallRequest], abortSignal);
-              return { queryToSend: null, shouldProceed: false };
-            }
-            case 'submit_prompt': {
-              localQueryToSendToGemini = slashCommandResult.content;
+          if (slashCommandResult) {
+            switch (slashCommandResult.type) {
+              case 'schedule_tool': {
+                const { toolName, toolArgs } = slashCommandResult;
+                const toolCallRequest: ToolCallRequestInfo = {
+                  callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                  name: toolName,
+                  args: toolArgs,
+                  isClientInitiated: true,
+                  prompt_id,
+                };
+                scheduleToolCalls([toolCallRequest], abortSignal);
+                return { queryToSend: null, shouldProceed: false };
+              }
+              case 'submit_prompt': {
+                localQueryToSendToGemini = slashCommandResult.content;
 
-              return {
-                queryToSend: localQueryToSendToGemini,
-                shouldProceed: true,
-              };
-            }
-            case 'handled': {
-              return { queryToSend: null, shouldProceed: false };
-            }
-            default: {
-              const unreachable: never = slashCommandResult;
-              throw new Error(
-                `Unhandled slash command result type: ${unreachable}`,
-              );
+                return {
+                  queryToSend: localQueryToSendToGemini,
+                  shouldProceed: true,
+                };
+              }
+              case 'handled': {
+                return { queryToSend: null, shouldProceed: false };
+              }
+              default: {
+                const unreachable: never = slashCommandResult;
+                throw new Error(
+                  `Unhandled slash command result type: ${unreachable}`,
+                );
+              }
             }
           }
         }
@@ -666,39 +670,6 @@ export const useGeminiStream = (
     [addItem, onCancelSubmit, config],
   );
 
-  const handleLoopDetectionConfirmation = useCallback(
-    (result: { userSelection: 'disable' | 'keep' }) => {
-      setLoopDetectionConfirmationRequest(null);
-
-      if (result.userSelection === 'disable') {
-        config.getGeminiClient().getLoopDetectionService().disableForSession();
-        addItem(
-          {
-            type: 'info',
-            text: `Loop detection has been disabled for this session. Please try your request again.`,
-          },
-          Date.now(),
-        );
-      } else {
-        addItem(
-          {
-            type: 'info',
-            text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
-          },
-          Date.now(),
-        );
-      }
-    },
-    [config, addItem],
-  );
-
-  const handleLoopDetectedEvent = useCallback(() => {
-    // Show the confirmation dialog to choose whether to disable loop detection
-    setLoopDetectionConfirmationRequest({
-      onComplete: handleLoopDetectionConfirmation,
-    });
-  }, [handleLoopDetectionConfirmation]);
-
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -848,6 +819,10 @@ export const useGeminiStream = (
         setIsResponding(true);
         setInitError(null);
 
+        // Store query and prompt_id for potential retry on loop detection
+        lastQueryRef.current = queryToSend;
+        lastPromptIdRef.current = prompt_id;
+
         try {
           const stream = geminiClient.sendMessageStream(
             queryToSend,
@@ -870,7 +845,42 @@ export const useGeminiStream = (
           }
           if (loopDetectedRef.current) {
             loopDetectedRef.current = false;
-            handleLoopDetectedEvent();
+            // Show the confirmation dialog to choose whether to disable loop detection
+            setLoopDetectionConfirmationRequest({
+              onComplete: (result: { userSelection: 'disable' | 'keep' }) => {
+                setLoopDetectionConfirmationRequest(null);
+
+                if (result.userSelection === 'disable') {
+                  config
+                    .getGeminiClient()
+                    .getLoopDetectionService()
+                    .disableForSession();
+                  addItem(
+                    {
+                      type: 'info',
+                      text: `Loop detection has been disabled for this session. Retrying request...`,
+                    },
+                    Date.now(),
+                  );
+
+                  if (lastQueryRef.current && lastPromptIdRef.current) {
+                    submitQuery(
+                      lastQueryRef.current,
+                      { isContinuation: true },
+                      lastPromptIdRef.current,
+                    );
+                  }
+                } else {
+                  addItem(
+                    {
+                      type: 'info',
+                      text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+                    },
+                    Date.now(),
+                  );
+                }
+              },
+            });
           }
         } catch (error: unknown) {
           if (error instanceof UnauthorizedError) {
@@ -909,7 +919,6 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
-      handleLoopDetectedEvent,
     ],
   );
 
