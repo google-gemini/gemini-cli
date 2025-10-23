@@ -35,7 +35,6 @@ import {
   type JsonObject,
 } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID, createHash } from 'node:crypto';
 import {
   cloneFromGit,
@@ -45,15 +44,24 @@ import {
 import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import chalk from 'chalk';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import type { ConfirmationRequest } from '../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
+import {
+  getEnvContents,
+  maybePromptForSettings,
+  type ExtensionSetting,
+} from './extensions/extensionSettings.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
+export const EXTENSION_SETTINGS_FILENAME = '.env';
+
 export const INSTALL_WARNING_MESSAGE =
   '**The extension you are about to install may have been created by a third-party developer and sourced from a public repository. Google does not vet, endorse, or guarantee the functionality or security of extensions. Please carefully inspect any extension and its source code before installing to understand the permissions it requires and the actions it may perform.**';
+
 /**
  * Extension definition as written to disk in gemini-extension.json files.
  * This should *not* be referenced outside of the logic for reading files.
@@ -61,12 +69,13 @@ export const INSTALL_WARNING_MESSAGE =
  * outside of the loading process that data needs to be stored on the
  * GeminiCLIExtension class defined in Core.
  */
-interface ExtensionConfig {
+export interface ExtensionConfig {
   name: string;
   version: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
+  settings?: ExtensionSetting[];
 }
 
 export interface ExtensionUpdateInfo {
@@ -91,6 +100,10 @@ export class ExtensionStorage {
 
   getConfigPath(): string {
     return path.join(this.getExtensionDir(), EXTENSIONS_CONFIG_FILENAME);
+  }
+
+  getEnvFilePath(): string {
+    return path.join(this.getExtensionDir(), EXTENSION_SETTINGS_FILENAME);
   }
 
   static getUserExtensionsDir(): string {
@@ -182,7 +195,8 @@ export function loadExtension(
       extensionEnablementManager,
     });
 
-    config = resolveEnvVarsInObject(config);
+    const customEnv = getEnvContents(new ExtensionStorage(config.name));
+    config = resolveEnvVarsInObject(config, customEnv);
 
     if (config.mcpServers) {
       config.mcpServers = Object.fromEntries(
@@ -371,13 +385,14 @@ export async function installOrUpdateExtension(
   requestConsent: (consent: string) => Promise<boolean>,
   cwd: string = process.cwd(),
   previousExtensionConfig?: ExtensionConfig,
+  requestSetting?: (setting: ExtensionSetting) => Promise<string>,
 ): Promise<string> {
   const isUpdate = !!previousExtensionConfig;
   const telemetryConfig = getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
   const extensionEnablementManager = new ExtensionEnablementManager();
-
+  // path.join(tempDir, EXTENSION_SETTINGS_FILENAME)
   try {
     const settings = loadSettings(cwd).merged;
     if (!isWorkspaceTrusted(settings).isTrusted) {
@@ -451,6 +466,25 @@ export async function installOrUpdateExtension(
         extensionEnablementManager,
       });
 
+      if (isUpdate && previousExtensionConfig && installMetadata.autoUpdate) {
+        const oldSettings = new Set(
+          previousExtensionConfig.settings?.map((s) => s.name) || [],
+        );
+        const newSettings = new Set(
+          newExtensionConfig.settings?.map((s) => s.name) || [],
+        );
+
+        const settingsAreEqual =
+          oldSettings.size === newSettings.size &&
+          [...oldSettings].every((value) => newSettings.has(value));
+
+        if (!settingsAreEqual) {
+          throw new Error(
+            `Extension "${newExtensionConfig.name}" has settings changes and cannot be auto-updated. Please update manually.`,
+          );
+        }
+      }
+
       const newExtensionName = newExtensionConfig.name;
       if (!isUpdate) {
         const installedExtensions = loadExtensions(
@@ -476,12 +510,25 @@ export async function installOrUpdateExtension(
 
       const extensionStorage = new ExtensionStorage(newExtensionName);
       const destinationPath = extensionStorage.getExtensionDir();
-
+      let previousSettings: Record<string, string> | undefined;
       if (isUpdate) {
+        previousSettings = getEnvContents(extensionStorage);
         await uninstallExtension(newExtensionName, isUpdate, cwd);
       }
 
       await fs.promises.mkdir(destinationPath, { recursive: true });
+      if (requestSetting !== undefined) {
+        if (isUpdate && previousExtensionConfig) {
+          await maybePromptForSettings(
+            newExtensionConfig,
+            requestSetting,
+            previousExtensionConfig,
+            previousSettings,
+          );
+        } else if (!isUpdate) {
+          await maybePromptForSettings(newExtensionConfig, requestSetting);
+        }
+      }
 
       if (
         installMetadata.type === 'local' ||

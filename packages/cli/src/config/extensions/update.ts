@@ -22,6 +22,7 @@ import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import { getErrorMessage } from '../../utils/errors.js';
 import { type ExtensionEnablementManager } from './extensionEnablement.js';
+import { promptForSetting } from './extensionSettings.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -66,18 +67,19 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    const previousExtensionConfig = await loadExtensionConfig({
+    const previousExtensionConfig = loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
       extensionEnablementManager,
     });
+
     await installOrUpdateExtension(
       installMetadata,
       requestConsent,
       cwd,
       previousExtensionConfig,
+      promptForSetting,
     );
-
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = loadExtension({
       extensionDir: updatedExtensionStorage.getExtensionDir(),
