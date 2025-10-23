@@ -252,6 +252,8 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
   listExtensions?: boolean;
+  listSessions?: boolean;
+  deleteSession?: string;
   extensions?: GeminiCLIExtension[];
   enabledExtensions?: string[];
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
@@ -291,7 +293,7 @@ export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
   private agentRegistry!: AgentRegistry;
-  private readonly sessionId: string;
+  private sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
@@ -340,6 +342,8 @@ export class Config {
   private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
+  private readonly listSessions: boolean;
+  private readonly deleteSession: string | undefined;
   private readonly _extensions: GeminiCLIExtension[];
   private readonly _enabledExtensions: string[];
   private readonly _blockedMcpServers: Array<{
@@ -442,6 +446,8 @@ export class Config {
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
     this.listExtensions = params.listExtensions ?? false;
+    this.listSessions = params.listSessions ?? false;
+    this.deleteSession = params.deleteSession;
     this._extensions = params.extensions ?? [];
     this._enabledExtensions = params.enabledExtensions ?? [];
     this._blockedMcpServers = params.blockedMcpServers ?? [];
@@ -602,6 +608,10 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
+  }
+
+  setSessionId(sessionId: string): void {
+    this.sessionId = sessionId;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
@@ -882,6 +892,14 @@ export class Config {
 
   getListExtensions(): boolean {
     return this.listExtensions;
+  }
+
+  getListSessions(): boolean {
+    return this.listSessions;
+  }
+
+  getDeleteSession(): string | undefined {
+    return this.deleteSession;
   }
 
   getExtensionManagement(): boolean {

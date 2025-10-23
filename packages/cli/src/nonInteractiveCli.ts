@@ -7,6 +7,7 @@
 import type {
   Config,
   ToolCallRequestInfo,
+  ResumedSessionData,
   CompletedToolCall,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
@@ -28,6 +29,7 @@ import {
 
 import type { Content, Part } from '@google/genai';
 
+import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -43,6 +45,7 @@ export async function runNonInteractive(
   settings: LoadedSettings,
   input: string,
   prompt_id: string,
+  resumedSessionData?: ResumedSessionData,
 ): Promise<void> {
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
@@ -67,6 +70,16 @@ export async function runNonInteractive(
       });
 
       const geminiClient = config.getGeminiClient();
+
+      // Initialize chat.  Resume if resume data is passed.
+      if (resumedSessionData) {
+        await geminiClient.resumeChat(
+          convertSessionToHistoryFormats(
+            resumedSessionData.conversation.messages,
+          ).clientHistory,
+          resumedSessionData,
+        );
+      }
 
       // Emit init event for streaming JSON
       if (streamFormatter) {
