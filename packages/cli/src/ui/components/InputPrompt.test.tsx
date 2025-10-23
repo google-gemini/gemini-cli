@@ -808,7 +808,7 @@ describe('InputPrompt', () => {
         name: 'should handle multiline text correctly',
         text: 'first line\n/memory',
         cursor: [1, 7],
-        showSuggestions: false, // Assuming completion doesn't trigger mid-line in multiline
+        showSuggestions: false,
       },
       {
         name: 'should handle Unicode characters (emojis) correctly in paths',
