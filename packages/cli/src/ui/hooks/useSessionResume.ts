@@ -70,12 +70,13 @@ export function useSessionResume({
   );
 
   // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
-  // Only if we're not authenticating, though.
+  // Only if we're not authenticating and the client is initialized, though.
   const hasLoadedResumedSession = useRef(false);
   useEffect(() => {
     if (
       resumedSessionData &&
       !isAuthenticating &&
+      isGeminiClientInitialized &&
       !hasLoadedResumedSession.current
     ) {
       hasLoadedResumedSession.current = true;
@@ -88,7 +89,12 @@ export function useSessionResume({
         resumedSessionData,
       );
     }
-  }, [resumedSessionData, isAuthenticating, loadHistoryForResume]);
+  }, [
+    resumedSessionData,
+    isAuthenticating,
+    isGeminiClientInitialized,
+    loadHistoryForResume,
+  ]);
 
   return { loadHistoryForResume };
 }

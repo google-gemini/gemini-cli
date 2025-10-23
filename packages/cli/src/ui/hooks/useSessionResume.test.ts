@@ -253,6 +253,38 @@ describe('useSessionResume', () => {
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
     });
 
+    it('should not resume when Gemini client is not initialized', () => {
+      const conversation: ConversationRecord = {
+        sessionId: 'auto-resume-123',
+        projectHash: 'project-123',
+        startTime: '2025-01-01T00:00:00Z',
+        lastUpdated: '2025-01-01T01:00:00Z',
+        messages: [
+          {
+            id: 'msg-1',
+            timestamp: '2025-01-01T00:01:00Z',
+            content: 'Test message',
+            type: 'user',
+          },
+        ] as MessageRecord[],
+      };
+
+      renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          resumedSessionData: {
+            conversation,
+            filePath: '/path/to/session.json',
+          },
+          isGeminiClientInitialized: false,
+        }),
+      );
+
+      expect(mockHistoryManager.clearItems).not.toHaveBeenCalled();
+      expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
+      expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
+    });
+
     it('should automatically resume session when resumedSessionData is provided', async () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-123',
