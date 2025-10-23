@@ -71,6 +71,7 @@ export async function runNonInteractive(
         ? new StreamJsonFormatter()
         : null;
 
+    let errorToHandle: unknown | undefined;
     try {
       consolePatcher.patch();
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
@@ -304,13 +305,17 @@ export async function runNonInteractive(
         }
       }
     } catch (error) {
-      handleError(error, config);
+      errorToHandle = error;
     } finally {
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
       if (isTelemetrySdkInitialized()) {
         await shutdownTelemetry(config);
       }
+    }
+
+    if (errorToHandle) {
+      handleError(errorToHandle, config);
     }
   });
 }
