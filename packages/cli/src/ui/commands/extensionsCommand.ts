@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { listExtensions } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemExtensionsList } from '../types.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -14,12 +15,14 @@ import {
 } from './types.js';
 
 async function listAction(context: CommandContext) {
-  context.ui.addItem(
-    {
-      type: MessageType.EXTENSIONS_LIST,
-    },
-    Date.now(),
-  );
+  const historyItem: HistoryItemExtensionsList = {
+    type: MessageType.EXTENSIONS_LIST,
+    extensions: context.services.config
+      ? listExtensions(context.services.config)
+      : [],
+  };
+
+  context.ui.addItem(historyItem, Date.now());
 }
 
 function updateAction(context: CommandContext, args: string): Promise<void> {
@@ -42,6 +45,14 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
   const updateComplete = new Promise<ExtensionUpdateInfo[]>(
     (resolve) => (resolveUpdateComplete = resolve),
   );
+
+  const historyItem: HistoryItemExtensionsList = {
+    type: MessageType.EXTENSIONS_LIST,
+    extensions: context.services.config
+      ? listExtensions(context.services.config)
+      : [],
+  };
+
   updateComplete.then((updateInfos) => {
     if (updateInfos.length === 0) {
       context.ui.addItem(
@@ -52,19 +63,13 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
         Date.now(),
       );
     }
-    context.ui.addItem(
-      {
-        type: MessageType.EXTENSIONS_LIST,
-      },
-      Date.now(),
-    );
+
+    context.ui.addItem(historyItem, Date.now());
     context.ui.setPendingItem(null);
   });
 
   try {
-    context.ui.setPendingItem({
-      type: MessageType.EXTENSIONS_LIST,
-    });
+    context.ui.setPendingItem(historyItem);
 
     context.ui.dispatchExtensionStateUpdate({
       type: 'SCHEDULE_UPDATE',
@@ -77,7 +82,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
       },
     });
     if (names?.length) {
-      const extensions = context.services.config!.getExtensions();
+      const extensions = listExtensions(context.services.config!);
       for (const name of names) {
         const extension = extensions.find(
           (extension) => extension.name === name,
@@ -120,7 +125,9 @@ const updateExtensionsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   action: updateAction,
   completion: async (context, partialArg) => {
-    const extensions = context.services.config?.getExtensions() ?? [];
+    const extensions = context.services.config
+      ? listExtensions(context.services.config)
+      : [];
     const extensionNames = extensions.map((ext) => ext.name);
     const suggestions = extensionNames.filter((name) =>
       name.startsWith(partialArg),
