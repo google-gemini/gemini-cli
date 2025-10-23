@@ -755,6 +755,7 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(result).toBe(false);
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
+
   it('should prepend user message if history starts with a function call', async () => {
     const functionCallHistory: Content[] = [
       {
