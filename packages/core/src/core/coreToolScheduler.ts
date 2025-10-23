@@ -339,7 +339,6 @@ export class CoreToolScheduler {
     (request: ToolConfirmationRequest) => void
   >();
 
-  private toolRegistry: ToolRegistry;
   private toolCalls: ToolCall[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
