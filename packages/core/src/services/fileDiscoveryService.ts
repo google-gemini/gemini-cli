@@ -115,11 +115,4 @@ export class FileDiscoveryService {
     }
     return false;
   }
-
-  /**
-   * Returns loaded patterns from .geminiignore
-   */
-  getGeminiIgnorePatterns(): string[] {
-    return this.geminiIgnoreFilter?.getPatterns() ?? [];
-  }
 }
