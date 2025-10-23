@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path';
 import { TestRig } from './test-helper.js';
 
 // Windows skip (Option A: avoid infra scope)
-const d = process.platform === 'win32' ? describe.skip : describe;
+const d = describe;
 
 // BOM encoders
 const utf8BOM = (s: string) =>
