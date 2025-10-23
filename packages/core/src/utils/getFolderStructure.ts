@@ -173,7 +173,7 @@ async function readFullStructure(
         const isIgnored =
           options.fileService?.shouldIgnoreFile(
             subFolderPath,
-            options.fileFilteringOptions,
+            filterFileOptions,
           ) ?? false;
 
         if (options.ignoredFolders.has(subFolderName) || isIgnored) {
