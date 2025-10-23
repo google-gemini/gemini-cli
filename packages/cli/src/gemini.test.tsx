@@ -159,6 +159,7 @@ describe('gemini.tsx main function', () => {
       callOrder.push('loadCliConfig');
       return {
         isInteractive: () => false,
+        getContentGeneratorConfig: () => ({}),
         getQuestion: () => '',
         getSandbox: () => false,
         getDebugMode: () => false,
@@ -174,6 +175,7 @@ describe('gemini.tsx main function', () => {
         getMessageBus: () => ({
           subscribe: vi.fn(),
         }),
+        getUsageStatisticsEnabled: () => false,
       } as unknown as Config;
     });
     vi.mocked(loadSettings).mockReturnValue({
@@ -414,6 +416,7 @@ describe('startInteractiveUI', () => {
   vi.mock('./utils/cleanup.js', () => ({
     cleanupCheckpoints: vi.fn(() => Promise.resolve()),
     registerCleanup: vi.fn(),
+    runExitCleanup: vi.fn(),
   }));
 
   vi.mock('ink', () => ({

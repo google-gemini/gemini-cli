@@ -38,12 +38,21 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 
-export async function runNonInteractive(
-  config: Config,
-  settings: LoadedSettings,
-  input: string,
-  prompt_id: string,
-): Promise<void> {
+interface RunNonInteractiveParams {
+  config: Config;
+  settings: LoadedSettings;
+  input: string;
+  prompt_id: string;
+  hasDeprecatedPromptArg?: boolean;
+}
+
+export async function runNonInteractive({
+  config,
+  settings,
+  input,
+  prompt_id,
+  hasDeprecatedPromptArg,
+}: RunNonInteractiveParams): Promise<void> {
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
@@ -58,6 +67,7 @@ export async function runNonInteractive(
 
     try {
       consolePatcher.patch();
+
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
@@ -130,6 +140,25 @@ export async function runNonInteractive(
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
+      const deprecateText =
+        'Use the positional prompt instead. This flag will be removed in a future version.\n';
+      if (hasDeprecatedPromptArg) {
+        if (streamFormatter) {
+          streamFormatter.emitEvent({
+            type: JsonStreamEventType.MESSAGE,
+            timestamp: new Date().toISOString(),
+            role: 'assistant',
+            content: deprecateText,
+            delta: true,
+          });
+        } else if (config.getOutputFormat() === OutputFormat.JSON) {
+          const formatter = new JsonFormatter();
+          const stats = uiTelemetryService.getMetrics();
+          process.stdout.write(formatter.format(deprecateText, stats));
+        } else {
+          process.stdout.write(deprecateText);
+        }
+      }
       while (true) {
         turnCount++;
         if (
