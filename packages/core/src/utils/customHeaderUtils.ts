@@ -15,7 +15,9 @@ export function parseCustomHeaders(
     return headers;
   }
 
-  for (const entry of envValue.split(',')) {
+  // Split the string on commas that are followed by a header key (key:),
+  // but ignore commas that are part of a header value (including values with colons or commas)
+  for (const entry of envValue.split(/,(?=\s*[^,:]+:)/)) {
     const trimmedEntry = entry.trim();
     if (!trimmedEntry) {
       continue;
