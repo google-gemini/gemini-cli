@@ -24,6 +24,14 @@ vi.mock('./fakeContentGenerator.js');
 const mockConfig = {} as unknown as Config;
 
 describe('createContentGenerator', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should create a FakeContentGenerator', async () => {
     const mockGenerator = {} as unknown as ContentGenerator;
     vi.mocked(FakeContentGenerator.fromFile).mockResolvedValue(
@@ -86,6 +94,78 @@ describe('createContentGenerator', () => {
           'User-Agent': expect.any(String),
           'x-gemini-api-privileged-user-id': expect.any(String),
         },
+      },
+    });
+    expect(generator).toEqual(
+      new LoggingContentGenerator(
+        (mockGenerator as GoogleGenAI).models,
+        mockConfig,
+      ),
+    );
+  });
+
+  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS for Code Assist requests', async () => {
+    const mockGenerator = {} as unknown as ContentGenerator;
+    vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
+      mockGenerator as never,
+    );
+    vi.stubEnv(
+      'GEMINI_CLI_CUSTOM_HEADERS',
+      'X-Test-Header: test-value, Another-Header: another value',
+    );
+
+    await createContentGenerator(
+      {
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      },
+      mockConfig,
+    );
+
+    expect(createCodeAssistContentGenerator).toHaveBeenCalledWith(
+      {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+          'X-Test-Header': 'test-value',
+          'Another-Header': 'another value',
+        }),
+      },
+      AuthType.LOGIN_WITH_GOOGLE,
+      mockConfig,
+      undefined,
+    );
+  });
+
+  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS for GoogleGenAI requests', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv(
+      'GEMINI_CLI_CUSTOM_HEADERS',
+      'X-Test-Header: test, Another: value',
+    );
+
+    const generator = await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+          'X-Test-Header': 'test',
+          Another: 'value',
+        }),
       },
     });
     expect(generator).toEqual(
