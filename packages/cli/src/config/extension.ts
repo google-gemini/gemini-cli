@@ -29,7 +29,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SettingScope, loadSettings } from '../config/settings.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { ExtensionNotFoundError, getErrorMessage } from '../utils/errors.js';
 import {
   recursivelyHydrateStrings,
   type JsonObject,
@@ -750,7 +750,7 @@ export async function uninstallExtension(
         extensionIdentifier.toLowerCase(),
   );
   if (!extension) {
-    throw new Error(`Extension not found.`);
+    throw new ExtensionNotFoundError(extensionIdentifier);
   }
   const storage = new ExtensionStorage(extension.name);
 
