@@ -65,11 +65,12 @@ locations for these files:
     controls over users' Gemini CLI setups.
 
 **Note on environment variables in settings:** String values within your
-`settings.json` files can reference environment variables using either
-`$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically
-resolved when the settings are loaded. For example, if you have an environment
-variable `MY_API_TOKEN`, you could use it in `settings.json` like this:
-`"apiKey": "$MY_API_TOKEN"`.
+`settings.json` and `gemini-extension.json` files can reference environment
+variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
+be automatically resolved when the settings are loaded. For example, if you have
+an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
+this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
 > **Note for Enterprise Users:** For guidance on deploying and managing Gemini
 > CLI in a corporate environment, please see the
@@ -128,7 +129,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`output.format`** (string):
   - **Description:** The format of the CLI output.
   - **Default:** `"text"`
-  - **Values:** `"text"`, `"json"`
+  - **Values:** `"text"`, `"json"`, `"stream-json"`
 
 #### `ui`
 
@@ -400,6 +401,18 @@ their corresponding top-level category object in your `settings.json` file.
 - **`mcp.excluded`** (array of strings):
   - **Description:** A denylist of MCP servers to exclude.
   - **Default:** `undefined`
+
+#### `useSmartEdit`
+
+- **`useSmartEdit`** (boolean):
+  - **Description:** Enable the smart-edit tool instead of the replace tool.
+  - **Default:** `true`
+
+#### `useWriteTodos`
+
+- **`useWriteTodos`** (boolean):
+  - **Description:** Enable the write_todos tool.
+  - **Default:** `false`
 
 #### `security`
 
@@ -718,17 +731,16 @@ for that specific session.
   - **Values:**
     - `text`: (Default) The standard human-readable output.
     - `json`: A machine-readable JSON output.
+    - `stream-json`: A streaming JSON output that emits real-time events.
   - **Note:** For structured output and scripting, use the
-    `--output-format json` flag.
+    `--output-format json` or `--output-format stream-json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
   - Sets the sandbox image URI.
 - **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
-- **`--all-files`** (**`-a`**):
-  - If set, recursively includes all files within the current directory as
-    context for the prompt.
+
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
 - **`--show-memory-usage`**:

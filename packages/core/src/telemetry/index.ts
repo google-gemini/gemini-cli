@@ -62,6 +62,7 @@ export {
   KittySequenceOverflowEvent,
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
+  ToolCallDecision,
 } from './types.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
@@ -87,6 +88,13 @@ export {
   isUserActive,
 } from './activity-detector.js';
 export {
+  ActivityMonitor,
+  initializeActivityMonitor,
+  getActivityMonitor,
+  startGlobalActivityMonitoring,
+  stopGlobalActivityMonitoring,
+} from './activity-monitor.js';
+export {
   // Core metrics functions
   recordToolCallMetrics,
   recordTokenUsageMetrics,
@@ -100,6 +108,7 @@ export {
   // Custom metrics for token usage and API responses
   recordCustomTokenUsageMetrics,
   recordCustomApiResponseMetrics,
+  recordExitFail,
   // OpenTelemetry GenAI semantic convention for token usage and operation duration
   recordGenAiClientTokenUsage,
   recordGenAiClientOperationDuration,

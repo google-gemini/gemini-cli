@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { ExtensionStorage } from '../extension.js';
 
 export interface ExtensionEnablementConfig {
   overrides: string[];
@@ -112,9 +113,12 @@ export class ExtensionEnablementManager {
   // only the ones in this list.
   private enabledExtensionNamesOverride: string[];
 
-  constructor(configDir: string, enabledExtensionNames?: string[]) {
-    this.configDir = configDir;
-    this.configFilePath = path.join(configDir, 'extension-enablement.json');
+  constructor(enabledExtensionNames?: string[]) {
+    this.configDir = ExtensionStorage.getUserExtensionsDir();
+    this.configFilePath = path.join(
+      this.configDir,
+      'extension-enablement.json',
+    );
     this.enabledExtensionNamesOverride =
       enabledExtensionNames?.map((name) => name.toLowerCase()) ?? [];
   }

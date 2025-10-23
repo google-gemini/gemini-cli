@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createRequire as createModuleRequire } from 'node:module';
 import type { AnyToolInvocation } from '../index.js';
 import type { Config } from '../config/config.js';
 import os from 'node:os';
@@ -17,6 +16,7 @@ import {
 } from 'node:child_process';
 import type { Node } from 'web-tree-sitter';
 import { Language, Parser } from 'web-tree-sitter';
+import { loadWasmBinary } from './fileUtils.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -39,43 +39,72 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
-const requireModule = createModuleRequire(import.meta.url);
-
 let bashLanguage: Language | null = null;
 let treeSitterInitialization: Promise<void> | null = null;
+let treeSitterInitializationError: Error | null = null;
+
+class ShellParserInitializationError extends Error {
+  constructor(cause: Error) {
+    super(`Failed to initialize bash parser: ${cause.message}`, { cause });
+    this.name = 'ShellParserInitializationError';
+  }
+}
+
+function toError(value: unknown): Error {
+  if (value instanceof Error) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return new Error(value);
+  }
+  return new Error('Unknown tree-sitter initialization error', {
+    cause: value,
+  });
+}
 
 async function loadBashLanguage(): Promise<void> {
   try {
-    const treeSitterWasmPath = requireModule.resolve(
-      'web-tree-sitter/tree-sitter.wasm',
-    );
-    const bashWasmPath = requireModule.resolve(
-      'tree-sitter-bash/tree-sitter-bash.wasm',
-    );
+    treeSitterInitializationError = null;
+    const [treeSitterBinary, bashBinary] = await Promise.all([
+      loadWasmBinary(
+        () =>
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore resolved by esbuild-plugin-wasm during bundling
+          import('web-tree-sitter/tree-sitter.wasm?binary'),
+        'web-tree-sitter/tree-sitter.wasm',
+      ),
+      loadWasmBinary(
+        () =>
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore resolved by esbuild-plugin-wasm during bundling
+          import('tree-sitter-bash/tree-sitter-bash.wasm?binary'),
+        'tree-sitter-bash/tree-sitter-bash.wasm',
+      ),
+    ]);
 
-    await Parser.init({
-      locateFile() {
-        return treeSitterWasmPath;
-      },
-    });
-    bashLanguage = await Language.load(bashWasmPath);
-  } catch {
+    await Parser.init({ wasmBinary: treeSitterBinary });
+    bashLanguage = await Language.load(bashBinary);
+  } catch (error) {
     bashLanguage = null;
+    const normalized = toError(error);
+    const initializationError =
+      normalized instanceof ShellParserInitializationError
+        ? normalized
+        : new ShellParserInitializationError(normalized);
+    treeSitterInitializationError = initializationError;
+    throw initializationError;
   }
 }
 
 export async function initializeShellParsers(): Promise<void> {
   if (!treeSitterInitialization) {
-    treeSitterInitialization = loadBashLanguage().catch(() => {
-      // Swallow errors; bashLanguage will remain null.
+    treeSitterInitialization = loadBashLanguage().catch((error) => {
+      treeSitterInitialization = null;
+      throw error;
     });
   }
 
-  try {
-    await treeSitterInitialization;
-  } catch {
-    // Initialization errors are non-fatal; parsing will gracefully fall back.
-  }
+  await treeSitterInitialization;
 }
 
 interface ParsedCommandDetail {
@@ -129,6 +158,9 @@ foreach ($commandAst in $commandAsts) {
 
 function createParser(): Parser | null {
   if (!bashLanguage) {
+    if (treeSitterInitializationError) {
+      throw treeSitterInitializationError;
+    }
     return null;
   }
 
@@ -225,8 +257,15 @@ function collectCommandDetails(
 }
 
 function parseBashCommandDetails(command: string): CommandParseResult | null {
+  if (treeSitterInitializationError) {
+    throw treeSitterInitializationError;
+  }
+
   if (!bashLanguage) {
-    void initializeShellParsers();
+    initializeShellParsers().catch(() => {
+      // The failure path is surfaced via treeSitterInitializationError.
+    });
+    return null;
   }
 
   const tree = parseCommandTree(command);
@@ -269,7 +308,6 @@ function parsePowerShellCommandDetails(
           [POWERSHELL_COMMAND_ENV]: command,
         },
         encoding: 'utf-8',
-        maxBuffer: 1024 * 1024,
       },
     );
 
@@ -699,4 +737,76 @@ export function isCommandAllowed(
     return { allowed: true };
   }
   return { allowed: false, reason: blockReason };
+}
+
+/**
+ * Determines whether a shell invocation should be auto-approved based on an allowlist.
+ *
+ * This reuses the same parsing logic as command-permission enforcement so that
+ * chained commands must be individually covered by the allowlist.
+ *
+ * @param invocation The shell tool invocation being evaluated.
+ * @param allowedPatterns The configured allowlist patterns (e.g. `run_shell_command(git)`).
+ * @returns True if every parsed command segment is allowed by the patterns; false otherwise.
+ */
+export function isShellInvocationAllowlisted(
+  invocation: AnyToolInvocation,
+  allowedPatterns: string[],
+): boolean {
+  if (!allowedPatterns.length) {
+    return false;
+  }
+
+  const hasShellWildcard = allowedPatterns.some((pattern) =>
+    SHELL_TOOL_NAMES.includes(pattern),
+  );
+  const hasShellSpecificPattern = allowedPatterns.some((pattern) =>
+    SHELL_TOOL_NAMES.some((name) => pattern.startsWith(`${name}(`)),
+  );
+
+  if (!hasShellWildcard && !hasShellSpecificPattern) {
+    return false;
+  }
+
+  if (hasShellWildcard) {
+    return true;
+  }
+
+  if (
+    !('params' in invocation) ||
+    typeof invocation.params !== 'object' ||
+    invocation.params === null ||
+    !('command' in invocation.params)
+  ) {
+    return false;
+  }
+
+  const commandValue = (invocation.params as { command?: unknown }).command;
+  if (typeof commandValue !== 'string' || !commandValue.trim()) {
+    return false;
+  }
+
+  const command = commandValue.trim();
+
+  const parseResult = parseCommandDetails(command);
+  if (!parseResult || parseResult.hasError) {
+    return false;
+  }
+
+  const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
+  const commandsToValidate = parseResult.details
+    .map((detail) => normalize(detail.text))
+    .filter(Boolean);
+
+  if (commandsToValidate.length === 0) {
+    return false;
+  }
+
+  return commandsToValidate.every((commandSegment) =>
+    doesToolInvocationMatch(
+      SHELL_TOOL_NAMES[0],
+      { params: { command: commandSegment } } as AnyToolInvocation,
+      allowedPatterns,
+    ),
+  );
 }

@@ -44,6 +44,7 @@ import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { SHELL_TOOL_NAME } from './tool-names.js';
 
 const originalComSpec = process.env['ComSpec'];
 const itWindowsOnly = process.platform === 'win32' ? it : it.skip;
@@ -58,6 +59,8 @@ describe('ShellTool', () => {
     vi.clearAllMocks();
 
     mockConfig = {
+      getAllowedTools: vi.fn().mockReturnValue([]),
+      getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
       getExcludeTools: vi.fn().mockReturnValue([]),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -304,7 +307,7 @@ describe('ShellTool', () => {
 
     it('should summarize output when configured', async () => {
       (mockConfig.getSummarizeToolOutputConfig as Mock).mockReturnValue({
-        [shellTool.name]: { tokenBudget: 1000 },
+        [SHELL_TOOL_NAME]: { tokenBudget: 1000 },
       });
       vi.mocked(summarizer.summarizeToolOutput).mockResolvedValue(
         'summarized output',
@@ -431,6 +434,52 @@ describe('ShellTool', () => {
 
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
+    });
+
+    describe('in non-interactive mode', () => {
+      beforeEach(() => {
+        (mockConfig.isInteractive as Mock).mockReturnValue(false);
+      });
+
+      it('should not throw an error or block for an allowed command', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue(['ShellTool(wc)']);
+        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
+        const confirmation = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        expect(confirmation).toBe(false);
+      });
+
+      it('should not throw an error or block for an allowed command with arguments', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          'ShellTool(wc -l)',
+        ]);
+        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
+        const confirmation = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        expect(confirmation).toBe(false);
+      });
+
+      it('should throw an error for command that is not allowed', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          'ShellTool(wc -l)',
+        ]);
+        const invocation = shellTool.build({ command: 'madeupcommand' });
+        await expect(
+          invocation.shouldConfirmExecute(new AbortController().signal),
+        ).rejects.toThrow('madeupcommand');
+      });
+
+      it('should throw an error for a command that is a prefix of an allowed command', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          'ShellTool(wc -l)',
+        ]);
+        const invocation = shellTool.build({ command: 'wc' });
+        await expect(
+          invocation.shouldConfirmExecute(new AbortController().signal),
+        ).rejects.toThrow('wc');
+      });
     });
   });
 

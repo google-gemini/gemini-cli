@@ -26,7 +26,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { ExtensionStorage, loadExtensions } from './config/extension.js';
+import { loadExtensions } from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -40,6 +40,7 @@ import {
   AuthType,
   getOauthClient,
   UserPromptEvent,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -66,6 +67,7 @@ import {
   relaunchOnExitCode,
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { createPolicyUpdater } from './config/policy.js';
 import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
 
 export function validateDnsResolutionOrder(
@@ -79,7 +81,7 @@ export function validateDnsResolutionOrder(
     return order;
   }
   // We don't want to throw here, just warn and use the default.
-  console.warn(
+  debugLogger.warn(
     `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
   );
   return defaultValue;
@@ -95,7 +97,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   // Set target to 50% of total memory
   const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
   if (isDebugMode) {
-    console.debug(
+    debugLogger.debug(
       `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
     );
   }
@@ -106,7 +108,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
-      console.debug(
+      debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
@@ -145,7 +147,7 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
 ) {
-  // Disable line wrapping.
+  // When not in screen reader mode, disable line wrapping.
   // We rely on Ink to manage all line wrapping by forcing all content to be
   // narrower than the terminal width so there is no need for the terminal to
   // also attempt line wrapping.
@@ -154,12 +156,14 @@ export async function startInteractiveUI(
   // such as Ghostty. Some terminals such as Iterm2 only respect line wrapping
   // when using the alternate buffer, which Gemini CLI does not use because we
   // do not yet have support for scrolling in that mode.
-  process.stdout.write('\x1b[?7l');
+  if (!config.getScreenReader()) {
+    process.stdout.write('\x1b[?7l');
 
-  registerCleanup(() => {
-    // Re-enable line wrapping on exit.
-    process.stdout.write('\x1b[?7h');
-  });
+    registerCleanup(() => {
+      // Re-enable line wrapping on exit.
+      process.stdout.write('\x1b[?7h');
+    });
+  }
 
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -204,14 +208,14 @@ export async function startInteractiveUI(
     },
   );
 
-  checkForUpdates()
+  checkForUpdates(settings)
     .then((info) => {
       handleAutoUpdate(info, settings, config.getProjectRoot());
     })
     .catch((err) => {
       // Silently ignore update check errors.
       if (config.getDebugMode()) {
-        console.error('Update check failed:', err);
+        debugLogger.warn('Update check failed:', err);
       }
     });
 
@@ -228,7 +232,7 @@ export async function main() {
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
-    console.error(
+    debugLogger.error(
       'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
     );
     process.exit(1);
@@ -264,7 +268,9 @@ export async function main() {
     if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
+      debugLogger.warn(
+        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
+      );
     }
   }
 
@@ -274,7 +280,7 @@ export async function main() {
       ? getNodeMemoryArgs(isDebugMode)
       : [];
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
-    // We intentially omit the list of extensions here because extensions
+    // We intentionally omit the list of extensions here because extensions
     // should not impact auth or setting up the sandbox.
     // TODO(jacobr): refactor loadCliConfig so there is a minimal version
     // that only initializes enough config to enable refreshAuth or find
@@ -284,7 +290,6 @@ export async function main() {
       const partialConfig = await loadCliConfig(
         settings.merged,
         [],
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
         sessionId,
         argv,
       );
@@ -306,7 +311,7 @@ export async function main() {
             settings.merged.security.auth.selectedType,
           );
         } catch (err) {
-          console.error('Error authenticating:', err);
+          debugLogger.error('Error authenticating:', err);
           process.exit(1);
         }
       }
@@ -356,25 +361,27 @@ export async function main() {
   // may have side effects.
   {
     const extensionEnablementManager = new ExtensionEnablementManager(
-      ExtensionStorage.getUserExtensionsDir(),
       argv.extensions,
     );
     const extensions = loadExtensions(extensionEnablementManager);
     const config = await loadCliConfig(
       settings.merged,
       extensions,
-      extensionEnablementManager,
       sessionId,
       argv,
     );
+
+    const policyEngine = config.getPolicyEngine();
+    const messageBus = config.getMessageBus();
+    createPolicyUpdater(policyEngine, messageBus);
 
     // Cleanup sessions after config initialization
     await cleanupExpiredSessions(config, settings.merged);
 
     if (config.getListExtensions()) {
-      console.log('Installed extensions:');
+      debugLogger.log('Installed extensions:');
       for (const extension of extensions) {
-        console.log(`- ${extension.name}`);
+        debugLogger.log(`- ${extension.name}`);
       }
       process.exit(0);
     }
@@ -442,7 +449,7 @@ export async function main() {
       }
     }
     if (!input) {
-      console.error(
+      debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
       process.exit(1);
@@ -467,7 +474,7 @@ export async function main() {
     );
 
     if (config.getDebugMode()) {
-      console.log('Session ID: %s', sessionId);
+      debugLogger.log('Session ID: %s', sessionId);
     }
 
     await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);

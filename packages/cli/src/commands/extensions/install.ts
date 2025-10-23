@@ -6,18 +6,24 @@
 
 import type { CommandModule } from 'yargs';
 import {
+  INSTALL_WARNING_MESSAGE,
   installOrUpdateExtension,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { stat } from 'node:fs/promises';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface InstallArgs {
   source: string;
   ref?: string;
   autoUpdate?: boolean;
   allowPreRelease?: boolean;
+  consent?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -54,13 +60,23 @@ export async function handleInstall(args: InstallArgs) {
       }
     }
 
+    const requestConsent = args.consent
+      ? () => Promise.resolve(true)
+      : requestConsentNonInteractive;
+    if (args.consent) {
+      debugLogger.log('You have consented to the following:');
+      debugLogger.log(INSTALL_WARNING_MESSAGE);
+    }
     const name = await installOrUpdateExtension(
       installMetadata,
-      requestConsentNonInteractive,
+      requestConsent,
+      process.cwd(),
+      undefined,
+      promptForSetting,
     );
-    console.log(`Extension "${name}" installed successfully and enabled.`);
+    debugLogger.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }
@@ -87,6 +103,12 @@ export const installCommand: CommandModule = {
         describe: 'Enable pre-release versions for this extension.',
         type: 'boolean',
       })
+      .option('consent', {
+        describe:
+          'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -99,6 +121,7 @@ export const installCommand: CommandModule = {
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
       allowPreRelease: argv['pre-release'] as boolean | undefined,
+      consent: argv['consent'] as boolean | undefined,
     });
   },
 };

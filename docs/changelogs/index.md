@@ -3,6 +3,48 @@
 Wondering what's new in Gemini CLI? This document provides key highlights and
 notable changes to Gemini CLI.
 
+## v0.10.0 - Gemini CLI weekly update - 2025-10-13
+
+- **Polish:** The team has been heads down bug fixing and investing heavily into
+  polishing existing flows, tools, and interactions.
+- **Interactive Shell Tool calling:** Gemini CLI can now also execute
+  interactive tools if needed
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/11225) by
+  [@galz10](https://github.com/galz10)).
+- **Alt+Key support:** Enables broader support for Alt+Key keyboard shortcuts
+  across different terminals.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10767) by
+  [@srivatsj](https://github.com/srivatsj)).
+- **Telemetry Diff stats:** Track line changes made by the model and user during
+  file operations via OTEL.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10819) by
+  [@jerop](https://github.com/jerop)).
+
+## v0.9.0 - Gemini CLI weekly update - 2025-10-06
+
+- 🎉 **Interactive Shell:** Run interactive commands like `vim`, `rebase -i`, or
+  even `gemini` 😎 directly in Gemini CLI:
+  - Blog:
+    [https://developers.googleblog.com/en/say-hello-to-a-new-level-of-interactivity-in-gemini-cli/](https://developers.googleblog.com/en/say-hello-to-a-new-level-of-interactivity-in-gemini-cli/)
+- **Install pre-release extensions:** Install the latest `--pre-release`
+  versions of extensions. Used for when an extension’s release hasn’t been
+  marked as "latest".
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10752) by
+  [@jakemac53](https://github.com/jakemac53))
+- **Simplified extension creation:** Create a new, empty extension. Templates
+  are no longer required.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10629) by
+  [@chrstnb](https://github.com/chrstnb))
+- **OpenTelemetry GenAI metrics:** Aligns telemetry with industry-standard
+  semantic conventions for improved interoperability.
+  ([spec](https://opentelemetry.io/docs/concepts/semantic-conventions/),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/10343) by
+  [@jerop](https://github.com/jerop))
+- **List memory files:** Quickly find the location of your long-term memory
+  files with `/memory list`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10108) by
+  [@sgnagnarella](https://github.com/sgnagnarella))
+
 ## v0.8.0 - Gemini CLI weekly update - 2025-09-29
 
 - 🎉 **Announcing Gemini CLI Extensions** 🎉
@@ -246,7 +288,7 @@ notable changes to Gemini CLI.
   `"showCitations": true`
   ([pr](https://github.com/google-gemini/gemini-cli/pull/7350) by
   [@scidomino](https://github.com/scidomino))
-- **Pro Quota Ddalog:** Handle daily Pro model usage limits with an interactive
+- **Pro Quota Dialog:** Handle daily Pro model usage limits with an interactive
   dialog that lets you immediately switch auth or fallback.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/7094) by
   [@JayadityaGit](https://github.com/JayadityaGit))

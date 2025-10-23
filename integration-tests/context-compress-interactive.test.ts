@@ -8,7 +8,7 @@ import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
 
-describe.skip('Interactive Mode', () => {
+describe('Interactive Mode', () => {
   let rig: TestRig;
 
   beforeEach(() => {
@@ -35,8 +35,6 @@ describe.skip('Interactive Mode', () => {
     await run.expectText('The initial response from the model', 5000);
 
     await run.type('/compress');
-    // A small delay to allow React to re-render the command list.
-    await new Promise((resolve) => setTimeout(resolve, 100));
     await run.type('\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
@@ -51,10 +49,10 @@ describe.skip('Interactive Mode', () => {
   });
 
   it('should handle compression failure on token inflation', async () => {
-    await rig.setup('interactive-compress-test', {
+    await rig.setup('interactive-compress-failure', {
       mockResponsesPath: join(
         import.meta.dirname,
-        'context-compress-interactive.no-compress.json',
+        'context-compress-interactive.compress-failure.json',
       ),
     });
 
@@ -66,9 +64,42 @@ describe.skip('Interactive Mode', () => {
     await run.expectText('The initial response from the model', 25000);
 
     await run.type('/compress');
-    // A small delay to allow React to re-render the command list.
-    await new Promise((resolve) => setTimeout(resolve, 100));
     await run.type('\r');
     await run.expectText('compression was not beneficial', 5000);
+
+    // Verify no telemetry event is logged for NOOP
+    const foundEvent = await rig.waitForTelemetryEvent(
+      'chat_compression',
+      5000,
+    );
+    expect(
+      foundEvent,
+      'chat_compression telemetry event should be found for failures',
+    ).toBe(true);
+  });
+
+  it('should handle /compress command on empty history', async () => {
+    rig.setup('interactive-compress-empty', {
+      mockResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress-empty.json',
+      ),
+    });
+
+    const run = await rig.runInteractive();
+    await run.type('/compress');
+    await run.type('\r');
+
+    await run.expectText('Nothing to compress.', 5000);
+
+    // Verify no telemetry event is logged for NOOP
+    const foundEvent = await rig.waitForTelemetryEvent(
+      'chat_compression',
+      5000, // Short timeout as we expect it not to happen
+    );
+    expect(
+      foundEvent,
+      'chat_compression telemetry event should not be found for NOOP',
+    ).toBe(false);
   });
 });

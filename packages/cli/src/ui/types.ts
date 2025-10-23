@@ -6,6 +6,7 @@
 
 import type {
   CompressionStatus,
+  GeminiCLIExtension,
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
@@ -163,6 +164,7 @@ export type HistoryItemCompression = HistoryItemBase & {
 
 export type HistoryItemExtensionsList = HistoryItemBase & {
   type: 'extensions_list';
+  extensions: GeminiCLIExtension[];
 };
 
 export interface ChatDetail {
@@ -219,7 +221,6 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
-  showTips: boolean;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's

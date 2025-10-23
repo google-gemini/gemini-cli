@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { type Config } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getAllSessionFiles, type SessionFileEntry } from './sessionUtils.js';
 
@@ -88,11 +88,11 @@ export async function cleanupExpiredSessions(
 
         if (config.getDebugMode()) {
           if (sessionToDelete.sessionInfo === null) {
-            console.debug(
+            debugLogger.debug(
               `Deleted corrupted session file: ${sessionToDelete.fileName}`,
             );
           } else {
-            console.debug(
+            debugLogger.debug(
               `Deleted expired session: ${sessionToDelete.sessionInfo.id} (${sessionToDelete.sessionInfo.lastUpdated})`,
             );
           }
@@ -125,7 +125,7 @@ export async function cleanupExpiredSessions(
     result.skipped = result.scanned - result.deleted - result.failed;
 
     if (config.getDebugMode() && result.deleted > 0) {
-      console.debug(
+      debugLogger.debug(
         `Session cleanup: deleted ${result.deleted}, skipped ${result.skipped}, failed ${result.failed}`,
       );
     }
