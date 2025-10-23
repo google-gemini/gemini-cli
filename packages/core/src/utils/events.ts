@@ -39,11 +39,10 @@ export enum CoreEvent {
 
 export class CoreEventEmitter extends EventEmitter {
   private _feedbackBacklog: UserFeedbackPayload[] = [];
-  private static readonly MAX_BACKLOG_SIZE = 100;
+  private static readonly MAX_BACKLOG_SIZE = 10000;
 
   constructor() {
     super();
-    this.setMaxListeners(20);
   }
 
   /**
@@ -72,14 +71,13 @@ export class CoreEventEmitter extends EventEmitter {
    * subscribes.
    */
   drainFeedbackBacklog(): void {
-    let item = this._feedbackBacklog.shift();
-    while (item) {
-      this.emit(CoreEvent.UserFeedback, item);
-      item = this._feedbackBacklog.shift();
+    const backlog = [...this._feedbackBacklog];
+    this._feedbackBacklog.length = 0; // Clear in-place
+    for (const payload of backlog) {
+      this.emit(CoreEvent.UserFeedback, payload);
     }
   }
 
-  // --- Minimal Type Overrides ---
   override on(
     event: CoreEvent.UserFeedback,
     listener: (payload: UserFeedbackPayload) => void,

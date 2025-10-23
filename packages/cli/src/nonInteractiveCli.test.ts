@@ -90,6 +90,7 @@ describe('runNonInteractive', () => {
   let mockShutdownTelemetry: Mock;
   let consoleErrorSpy: MockInstance;
   let processStdoutSpy: MockInstance;
+  let processStderrSpy: MockInstance;
   let mockGeminiClient: {
     sendMessageStream: Mock;
     getChatRecordingService: Mock;
@@ -106,6 +107,9 @@ describe('runNonInteractive', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processStdoutSpy = vi
       .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    processStderrSpy = vi
+      .spyOn(process.stderr, 'write')
       .mockImplementation(() => true);
     vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`process.exit(${code}) called`);
@@ -1122,7 +1126,7 @@ describe('runNonInteractive', () => {
       );
     });
 
-    it('logs to console.error when UserFeedback event is received', async () => {
+    it('logs to process.stderr when UserFeedback event is received', async () => {
       const events: ServerGeminiStreamEvent[] = [
         {
           type: GeminiEventType.Finished,
@@ -1153,12 +1157,12 @@ describe('runNonInteractive', () => {
       };
       handler(payload);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[ERROR] Test error message',
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[ERROR] Test error message\n',
       );
     });
 
-    it('logs optional error object to console.error in debug mode', async () => {
+    it('logs optional error object to process.stderr in debug mode', async () => {
       vi.mocked(mockConfig.getDebugMode).mockReturnValue(true);
       const events: ServerGeminiStreamEvent[] = [
         {
@@ -1185,6 +1189,8 @@ describe('runNonInteractive', () => {
 
       // Simulate an event with error object
       const errorObj = new Error('Original error');
+      // Mock stack for deterministic testing
+      errorObj.stack = 'Error: Original error\n    at test';
       const payload: UserFeedbackPayload = {
         severity: 'warning',
         message: 'Test warning message',
@@ -1192,10 +1198,12 @@ describe('runNonInteractive', () => {
       };
       handler(payload);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[WARNING] Test warning message',
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[WARNING] Test warning message\n',
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(errorObj);
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        'Error: Original error\n    at test\n',
+      );
     });
   });
 });

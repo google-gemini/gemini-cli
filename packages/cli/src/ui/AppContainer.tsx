@@ -1080,9 +1080,12 @@ Logging in with Google... Please restart Gemini CLI to continue.
           type = MessageType.WARNING;
           break;
         case 'info':
-        default:
           type = MessageType.INFO;
           break;
+        default:
+          throw new Error(
+            `Unexpected severity for user feedback: ${payload.severity}`,
+          );
       }
 
       historyManager.addItem(

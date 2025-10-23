@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CoreEventEmitter, CoreEvent } from './events.js';
+import {
+  CoreEventEmitter,
+  CoreEvent,
+  type UserFeedbackPayload,
+} from './events.js';
 
 describe('CoreEventEmitter', () => {
   let events: CoreEventEmitter;
@@ -50,7 +54,7 @@ describe('CoreEventEmitter', () => {
 
   it('should respect the backlog size limit and maintain FIFO order', () => {
     const listener = vi.fn();
-    const MAX_BACKLOG_SIZE = 100;
+    const MAX_BACKLOG_SIZE = 10000;
 
     for (let i = 0; i < MAX_BACKLOG_SIZE + 10; i++) {
       events.emitFeedback('info', `Message ${i}`);
@@ -120,5 +124,36 @@ describe('CoreEventEmitter', () => {
     events.off(CoreEvent.UserFeedback, listener);
     events.emitFeedback('info', 'Second message');
     expect(listener).toHaveBeenCalledTimes(1); // Still 1
+  });
+
+  it('should handle re-entrant feedback emission during draining safely', () => {
+    events.emitFeedback('info', 'Buffered 1');
+    events.emitFeedback('info', 'Buffered 2');
+
+    const listener = vi.fn((payload: UserFeedbackPayload) => {
+      // When 'Buffered 1' is received, immediately emit another event.
+      if (payload.message === 'Buffered 1') {
+        events.emitFeedback('warning', 'Re-entrant message');
+      }
+    });
+
+    events.on(CoreEvent.UserFeedback, listener);
+    events.drainFeedbackBacklog();
+
+    // Expectation with atomic snapshot:
+    // 1. loop starts with ['Buffered 1', 'Buffered 2']
+    // 2. emits 'Buffered 1'
+    // 3. listener fires for 'Buffered 1', calls emitFeedback('Re-entrant')
+    // 4. emitFeedback sees listener attached, emits 'Re-entrant' synchronously
+    // 5. listener fires for 'Re-entrant'
+    // 6. loop continues, emits 'Buffered 2'
+    // 7. listener fires for 'Buffered 2'
+
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(listener.mock.calls[0][0]).toMatchObject({ message: 'Buffered 1' });
+    expect(listener.mock.calls[1][0]).toMatchObject({
+      message: 'Re-entrant message',
+    });
+    expect(listener.mock.calls[2][0]).toMatchObject({ message: 'Buffered 2' });
   });
 });

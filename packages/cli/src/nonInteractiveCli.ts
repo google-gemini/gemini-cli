@@ -55,9 +55,13 @@ export async function runNonInteractive(
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
-      console.error(`[${prefix}] ${payload.message}`);
+      process.stderr.write(`[${prefix}] ${payload.message}\n`);
       if (payload.error && config.getDebugMode()) {
-        console.error(payload.error);
+        const errorToLog =
+          payload.error instanceof Error
+            ? payload.error.stack || payload.error.message
+            : String(payload.error);
+        process.stderr.write(`${errorToLog}\n`);
       }
     };
 
