@@ -8,6 +8,7 @@ import type {
   Config,
   ToolCallRequestInfo,
   CompletedToolCall,
+  UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -24,6 +25,8 @@ import {
   JsonStreamEventType,
   uiTelemetryService,
   debugLogger,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -50,6 +53,14 @@ export async function runNonInteractive(
       debugMode: config.getDebugMode(),
     });
 
+    const handleUserFeedback = (payload: UserFeedbackPayload) => {
+      const prefix = payload.severity.toUpperCase();
+      console.error(`[${prefix}] ${payload.message}`);
+      if (payload.error && config.getDebugMode()) {
+        console.error(payload.error);
+      }
+    };
+
     const startTime = Date.now();
     const streamFormatter =
       config.getOutputFormat() === OutputFormat.STREAM_JSON
@@ -58,6 +69,9 @@ export async function runNonInteractive(
 
     try {
       consolePatcher.patch();
+      coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.drainFeedbackBacklog();
+
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
@@ -287,6 +301,7 @@ export async function runNonInteractive(
       handleError(error, config);
     } finally {
       consolePatcher.cleanup();
+      coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
       if (isTelemetrySdkInitialized()) {
         await shutdownTelemetry(config);
       }
