@@ -53,70 +53,49 @@ export class FakeContentGenerator implements ContentGenerator {
     return new FakeContentGenerator(responses);
   }
 
+  private getNextResponse<K extends keyof FakeResponses>(
+    method: K,
+    request: unknown,
+  ): FakeResponses[K][number] {
+    const response = this.responses[method][this.callCounters[method]++];
+    if (!response) {
+      throw new Error(
+        `No more mock responses for ${method}, got request:\n` +
+          safeJsonStringify(request),
+      );
+    }
+    return response;
+  }
+
   async generateContent(
     _request: GenerateContentParameters,
     _userPromptId: string,
   ): Promise<GenerateContentResponse> {
-    const response =
-      this.responses.generateContent[this.callCounters.generateContent++];
-    if (!response) {
-      throw new Error(
-        'No more mock responses for generateContent, got request:\n' +
-          safeJsonStringify(_request.contents),
-      );
-    }
-    return response;
+    return this.getNextResponse('generateContent', _request);
   }
 
   async generateContentStream(
     _request: GenerateContentParameters,
     _userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const responses =
-      this.responses.generateContentStream[
-        this.callCounters.generateContentStream++
-      ];
-    if (!responses) {
-      throw new Error(
-        'No more mock responses for generateContentStream, got request:\n' +
-          safeJsonStringify(_request.contents),
-      );
-    }
-
+    const responses = this.getNextResponse('generateContentStream', _request);
     async function* stream() {
       for (const response of responses) {
         yield response;
       }
     }
-
-    return Promise.resolve(stream());
+    return stream();
   }
 
   async countTokens(
     _request: CountTokensParameters,
   ): Promise<CountTokensResponse> {
-    const response =
-      this.responses.countTokens[this.callCounters.countTokens++];
-    if (!response) {
-      throw new Error(
-        'No more mock responses for countTokens, got request:\n' +
-          safeJsonStringify(_request.contents),
-      );
-    }
-    return response;
+    return this.getNextResponse('countTokens', _request);
   }
 
   async embedContent(
     _request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
-    const response =
-      this.responses.embedContent[this.callCounters.embedContent++];
-    if (!response) {
-      throw new Error(
-        'No more mock responses for embedContent, got request:\n' +
-          safeJsonStringify(_request.contents),
-      );
-    }
-    return response;
+    return this.getNextResponse('embedContent', _request);
   }
 }
