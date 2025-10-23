@@ -35,6 +35,7 @@ import {
   MockModifiableTool,
   MockTool,
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+  type MockModifiableToolShouldConfirmExecuteParams,
 } from '../test-utils/mock-tool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -415,8 +416,30 @@ describe('CoreToolScheduler', () => {
 
 describe('CoreToolScheduler with payload', () => {
   it('should update args and diff and execute tool when payload is provided', async () => {
-    const mockTool = new MockModifiableTool();
-    mockTool.executeFn = vi.fn();
+    const mockingParams: MockModifiableToolShouldConfirmExecuteParams = {
+      filePath: 'test.txt',
+      currentContent: 'old content',
+      proposedContent: 'new content',
+    };
+
+    const mockCreateUpdatesParamsFn = (
+      _oldContent: string,
+      modifiedProposedContent: string,
+      _originalParams: Record<string, unknown>,
+    ): Record<string, unknown> => ({
+      newContent: modifiedProposedContent,
+    });
+
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Mock Modifiable Tool executed successfully.',
+      returnDisplay: 'Mock Modifiable Tool executed successfully.',
+    });
+
+    const mockTool = new MockModifiableTool({
+      execute: executeFn,
+      createUpdatedParamsFn: mockCreateUpdatesParamsFn,
+      shouldConfirmExecuteParams: mockingParams,
+    });
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -505,9 +528,7 @@ describe('CoreToolScheduler with payload', () => {
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls[0].status).toBe('success');
-    expect(mockTool.executeFn).toHaveBeenCalledWith({
-      newContent: 'final version',
-    });
+    expect(executeFn).toHaveBeenCalledWith({ newContent: 'final version' });
   });
 });
 
