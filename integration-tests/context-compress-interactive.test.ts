@@ -6,6 +6,7 @@
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
+import { join } from 'node:path';
 
 describe('Interactive Mode', () => {
   let rig: TestRig;
@@ -18,50 +19,78 @@ describe('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  // TODO(#11062): Make this test reliable by not using the actual Gemini model
-  // We could not rely on the following mechanisms that have already shown to be
-  // flakey:
-  //    1. Asking a prompt like "Output 1000 tokens and the inventor of the lightbulb"
-  //        --> This was b/c the model occasionally did not output einstein and
-  //            we are not able to trigger the compression piece
-  //    2. Asking it to out a specific output and waiting for that.
-  //       --> The expect catches the input and thinks that is the output so the
-  //            /compress gets called too early
-  it.skip('should trigger chat compression with /compress command', async () => {
-    rig.setup('interactive-compress-success');
+  it('should trigger chat compression with /compress command', async () => {
+    await rig.setup('interactive-compress-test', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress.json',
+      ),
+    });
 
     const run = await rig.runInteractive();
 
-    // Generate a long context to make compression viable.
-    const longPrompt =
-      'Write a 200 word story about a robot. The story MUST end with the following output: THE_END';
+    await run.type('Initial prompt');
+    await run.type('\r');
 
-    await run.sendKeys(longPrompt);
-    await run.sendKeys('\r');
-
-    // Wait for the specific end marker.
-    await run.expectText('THE_END', 30000);
+    await run.expectText('The initial response from the model', 5000);
 
     await run.type('/compress');
-    await run.sendKeys('\r');
+    await run.type('\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
       'chat_compression',
-      90000,
+      5000,
     );
     expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
       true,
     );
+
+    await run.expectText('Chat history compressed', 5000);
   });
 
-  it('should handle /compress command on empty history', async () => {
-    rig.setup('interactive-compress-empty');
+  it('should handle compression failure on token inflation', async () => {
+    await rig.setup('interactive-compress-failure', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress-failure.json',
+      ),
+    });
 
     const run = await rig.runInteractive();
 
+    await run.type('Initial prompt');
+    await run.type('\r');
+
+    await run.expectText('The initial response from the model', 25000);
+
     await run.type('/compress');
     await run.type('\r');
-    await run.expectText('Nothing to compress.', 25000);
+    await run.expectText('compression was not beneficial', 5000);
+
+    // Verify no telemetry event is logged for NOOP
+    const foundEvent = await rig.waitForTelemetryEvent(
+      'chat_compression',
+      5000,
+    );
+    expect(
+      foundEvent,
+      'chat_compression telemetry event should be found for failures',
+    ).toBe(true);
+  });
+
+  it('should handle /compress command on empty history', async () => {
+    rig.setup('interactive-compress-empty', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress-empty.json',
+      ),
+    });
+
+    const run = await rig.runInteractive();
+    await run.type('/compress');
+    await run.type('\r');
+
+    await run.expectText('Nothing to compress.', 5000);
 
     // Verify no telemetry event is logged for NOOP
     const foundEvent = await rig.waitForTelemetryEvent(

@@ -255,6 +255,7 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  fakeResponsesPath?: string;
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -263,12 +264,19 @@ export class TestRig {
 
   setup(
     testName: string,
-    options: { settings?: Record<string, unknown> } = {},
+    options: {
+      settings?: Record<string, unknown>;
+      fakeResponsesPath?: string;
+    } = {},
   ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
     this.testDir = join(env['INTEGRATION_TEST_FILE_DIR']!, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
+    if (options.fakeResponsesPath) {
+      this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
+      fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+    }
 
     // Create a settings file to point the CLI to the local collector
     const geminiDir = join(this.testDir, GEMINI_DIR);
@@ -335,6 +343,9 @@ export class TestRig {
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
       : [this.bundlePath, ...extraInitialArgs];
+    if (this.fakeResponsesPath) {
+      initialArgs.push('--fake-responses', this.fakeResponsesPath);
+    }
     return { command, initialArgs };
   }
 
