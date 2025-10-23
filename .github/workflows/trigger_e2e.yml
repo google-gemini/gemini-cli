@@ -1,10 +1,6 @@
 name: 'Trigger E2E'
 
 on:
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
   workflow_dispatch:
     inputs:
       branch_ref:
@@ -19,7 +15,8 @@ jobs:
     steps:
       - name: 'Save Repo name'
         env:
-          REPO_NAME: '${{ github.event.pull_request.head.repo.full_name || github.repository }}'
+          # Replace with github.event.pull_request.head.repo.full_name when switched to listen on pull request events. This repo name does not contain the org which is needed for checkout.
+          REPO_NAME: '${{ github.event.repository.name }}'
         run: |
           mkdir -p ./pr
           echo '${{ env.REPO_NAME }}' > ./pr/repo_name
