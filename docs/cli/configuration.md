@@ -564,7 +564,7 @@ for that specific session.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
 - **`--telemetry`**:
-  - Enables [telemetry](../telemetry.md).
+  - Enables [telemetry](./telemetry.md).
 - **`--telemetry-target`**:
   - Sets the telemetry target. See [telemetry](../telemetry.md) for more
     information.
