@@ -14,6 +14,9 @@ export * from './policy/policy-engine.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 
+// Export Commands logic
+export * from './commands/extensions.js';
+
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
@@ -61,6 +64,7 @@ export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
 export * from './utils/debugLogger.js';
+export * from './utils/events.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
