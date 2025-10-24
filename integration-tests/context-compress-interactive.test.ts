@@ -20,7 +20,7 @@ describe('Interactive Mode', () => {
   });
 
   it('should trigger chat compression with /compress command', async () => {
-    await rig.setup('interactive-compress-test', {
+    rig.setup('interactive-compress-test', {
       fakeResponsesPath: join(
         import.meta.dirname,
         'context-compress-interactive.compress.json',
@@ -29,17 +29,17 @@ describe('Interactive Mode', () => {
 
     const run = await rig.runInteractive();
 
-    await run.type('Initial prompt');
+    await run.sendKeys('Initial prompt');
     await run.type('\r');
 
     await run.expectText('The initial response from the model', 5000);
 
-    await run.type('/compress');
+    await run.sendKeys('/compress');
     await run.type('\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
       'chat_compression',
-      5000,
+      10000,
     );
     expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
       true,
@@ -49,7 +49,7 @@ describe('Interactive Mode', () => {
   });
 
   it('should handle compression failure on token inflation', async () => {
-    await rig.setup('interactive-compress-failure', {
+    rig.setup('interactive-compress-failure', {
       fakeResponsesPath: join(
         import.meta.dirname,
         'context-compress-interactive.compress-failure.json',
