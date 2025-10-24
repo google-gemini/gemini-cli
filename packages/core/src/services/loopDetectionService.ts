@@ -200,7 +200,7 @@ export class LoopDetectionService {
    * 3. Analyzing content chunks for repetitive patterns using hashing
    * 4. Detecting loops when identical chunks appear frequently within a short distance
    * 5. Disabling loop detection within code blocks to prevent false positives,
-   *    as repetitive code structures are common and not necessarily loops.
+   * as repetitive code structures are common and not necessarily loops.
    */
   private checkContentLoop(content: string): boolean {
     // Different content elements can often contain repetitive syntax that is not indicative of a loop.
@@ -324,7 +324,7 @@ export class LoopDetectionService {
    * 2. Verify actual content matches to prevent hash collisions
    * 3. Track all positions where this chunk appears
    * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
-   *    within a small average distance (≤ 1.5 * chunk size)
+   * within a small average distance (≤ 1.5 * chunk size)
    */
   private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
     const existingIndices = this.contentStats.get(hash);
@@ -370,7 +370,7 @@ export class LoopDetectionService {
   }
 
   private trimRecentHistory(recentHistory: Content[]): Content[] {
-    // A function response must be preceded by a function call.
+    // A function response should be preceded by a function call.
     // Continuously removes dangling function calls from the end of the history
     // until the last turn is not a function call.
     while (
@@ -380,7 +380,7 @@ export class LoopDetectionService {
       recentHistory.pop();
     }
 
-    // A function response should follow a function call.
+    // A function response must follow a function call.
     // Continuously removes leading function responses from the beginning of history
     // until the first turn is not a function response.
     while (recentHistory.length > 0 && isFunctionResponse(recentHistory[0])) {
@@ -396,7 +396,10 @@ export class LoopDetectionService {
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
-    const trimmedHistory = this.trimRecentHistory(recentHistory);
+    let trimmedHistory = this.trimRecentHistory(recentHistory);
+
+    // Ensure that we don't have any turns with an empty "parts" field.
+    trimmedHistory = trimmedHistory.filter((turn) => (turn.parts?.length ?? 0) > 0);
 
     const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Provide your response in the requested JSON format.`;
 
