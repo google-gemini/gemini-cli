@@ -64,7 +64,6 @@ export function useHistory(
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
-      let wasAdded = false;
       setHistory((prevHistory) => {
         if (prevHistory.length > 0) {
           const lastItem = prevHistory[prevHistory.length - 1];
@@ -77,13 +76,10 @@ export function useHistory(
             return prevHistory; // Don't add the duplicate
           }
         }
-        wasAdded = true;
         return [...prevHistory, newItem];
       });
-      if (wasAdded) {
-        onItemAdded?.(newItem);
-      }
-      return id; // Return the generated ID (even if not added, to keep signature)
+      onItemAdded?.(newItem);
+      return id;
     },
     [getNextMessageId, onItemAdded],
   );
@@ -122,15 +118,9 @@ export function useHistory(
 
   // Clears the entire history state and resets the ID counter.
   const clearItems = useCallback(() => {
-    let hadItems = false;
-    setHistory((prevHistory) => {
-      hadItems = prevHistory.length > 0;
-      return [];
-    });
+    setHistory([]);
     messageIdCounterRef.current = 0;
-    if (hadItems) {
-      onHistoryCleared?.();
-    }
+    onHistoryCleared?.();
   }, [onHistoryCleared]);
 
   return useMemo(
