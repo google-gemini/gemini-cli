@@ -12,6 +12,7 @@ import { ExtensionEnablementManager } from './extensions/extensionEnablement.js'
 import { type LoadedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
+import { validateTags } from './validation.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   cloneFromGit,
@@ -485,6 +486,11 @@ export class ExtensionManager {
       ) as unknown as ExtensionConfig;
 
       validateName(config.name);
+      if (config.tags && !validateTags(config.tags)) {
+        throw new Error(
+          `Invalid tags in ${configFilePath}. Valid tags are: design, databases, cloud, services, devops, utilities.`,
+        );
+      }
       return config;
     } catch (e) {
       throw new Error(

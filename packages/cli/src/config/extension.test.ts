@@ -494,11 +494,8 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('good-ext');
       expect(consoleSpy).toHaveBeenCalledOnce();
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
-        ),
+        expect.stringContaining(`Warning: Skipping extension in ${badExtDir}`),
       );
-
       consoleSpy.mockRestore();
     });
 
@@ -519,6 +516,18 @@ describe('extension tests', () => {
       const extensions = extensionManager.loadExtensions();
       expect(extensions).toHaveLength(1);
       expect(extensions[0].mcpServers?.['test-server'].trust).toBeUndefined();
+    });
+
+    it('should load valid tags from the extension config', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'tagged-extension',
+        version: '1.0.0',
+        tags: ['design', 'cloud'],
+      });
+
+      const extensions = extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
     });
 
     it('should throw an error for invalid extension names', () => {

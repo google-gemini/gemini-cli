@@ -27,6 +27,7 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
   excludeTools?: string[];
   settings?: ExtensionSetting[];
+  tags: string[];
 }
 
 export interface ExtensionUpdateInfo {
