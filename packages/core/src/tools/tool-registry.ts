@@ -21,6 +21,7 @@ import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { EventEmitter } from 'node:events';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 type ToolParams = Record<string, unknown>;
@@ -162,6 +163,9 @@ Signal: Signal number or \`(none)\` if no signal was received.
 
   protected createInvocation(
     params: ToolParams,
+    _messageBus?: MessageBus,
+    _toolName?: string,
+    _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
     return new DiscoveredToolInvocation(this.config, this.name, params);
   }
