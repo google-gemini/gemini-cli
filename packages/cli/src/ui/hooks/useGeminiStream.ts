@@ -32,8 +32,6 @@ import {
   ApprovalMode,
   parseAndFormatApiError,
   ToolConfirmationOutcome,
-  getCodeAssistServer,
-  UserTierId,
   promptIdContext,
   WRITE_FILE_TOOL_NAME,
   tokenLimit,
@@ -77,13 +75,12 @@ enum StreamProcessingStatus {
 
 const EDIT_TOOL_NAMES = new Set(['replace', WRITE_FILE_TOOL_NAME]);
 
-function showCitations(settings: LoadedSettings, config: Config): boolean {
+function showCitations(settings: LoadedSettings): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
   if (enabled !== undefined) {
     return enabled;
   }
-  const server = getCodeAssistServer(config);
-  return (server && server.userTier !== UserTierId.FREE) ?? false;
+  return true;
 }
 
 /**
@@ -609,7 +606,7 @@ export const useGeminiStream = (
 
   const handleCitationEvent = useCallback(
     (text: string, userMessageTimestamp: number) => {
-      if (!showCitations(settings, config)) {
+      if (!showCitations(settings)) {
         return;
       }
 
@@ -619,7 +616,7 @@ export const useGeminiStream = (
       }
       addItem({ type: MessageType.INFO, text }, userMessageTimestamp);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings, config],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
   );
 
   const handleFinishedEvent = useCallback(
