@@ -176,6 +176,91 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS and GEMINI_AUTH_TOKEN for GoogleGenAI requests', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv(
+      'GEMINI_CLI_CUSTOM_HEADERS',
+      'X-Test-Header: test, Another: value',
+    );
+    vi.stubEnv('GEMINI_AUTH_TOKEN', 'test-api-token');
+
+    const generator = await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+          'X-Test-Header': 'test',
+          Authorization: 'Bearer test-api-token',
+          Another: 'value',
+        }),
+      },
+    });
+    expect(generator).toEqual(
+      new LoggingContentGenerator(
+        (mockGenerator as GoogleGenAI).models,
+        mockConfig,
+      ),
+    );
+  });
+
+  it('GEMINI_AUTH_TOKEN should take precedence over GEMINI_CLI_CUSTOM_HEADERS', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv(
+      'GEMINI_CLI_CUSTOM_HEADERS',
+      'Authorization: Bearer wrong-api-token, Another: value',
+    );
+    vi.stubEnv('GEMINI_AUTH_TOKEN', 'correct-api-token');
+
+    const generator = await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+          Authorization: 'Bearer correct-api-token',
+          Another: 'value',
+        }),
+      },
+    });
+    expect(generator).toEqual(
+      new LoggingContentGenerator(
+        (mockGenerator as GoogleGenAI).models,
+        mockConfig,
+      ),
+    );
+  });
+
   it('should create a GoogleGenAI content generator with client install id logging disabled', async () => {
     const mockConfig = {
       getUsageStatisticsEnabled: () => false,

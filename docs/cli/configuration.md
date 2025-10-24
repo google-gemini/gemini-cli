@@ -464,6 +464,10 @@ the `excludedProjectEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
+- ** `GEMINI_AUTH_TOKEN`**:
+  - Custom value for the `Authorization` header
+  - The value you set here will be prefixed with `Bearer`
+  - Example: `export GEMINI_AUTH_TOKEN="api-token-1234"`
 - **`GEMINI_CLI_CUSTOM_HEADERS`**:
   - Adds extra HTTP headers to Gemini API and Code Assist requests.
   - Accepts a comma-separated list of `Name: value` pairs.
