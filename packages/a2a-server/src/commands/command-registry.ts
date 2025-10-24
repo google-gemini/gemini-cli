@@ -31,6 +31,10 @@ class CommandRegistry {
   get(commandName: string): Command | undefined {
     return this.commands.get(commandName);
   }
+
+  getAllCommands(): Command[] {
+    return [...this.commands.values()];
+  }
 }
 
 export const commandRegistry = new CommandRegistry();

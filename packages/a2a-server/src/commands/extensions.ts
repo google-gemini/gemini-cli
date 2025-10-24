@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { listExtensions, type Config } from '@google/gemini-cli-core';
+import { listExtensions } from '@google/gemini-cli-core';
 import type {
   Command,
   CommandContext,
@@ -18,10 +18,10 @@ export class ExtensionsCommand implements Command {
   readonly topLevel = true;
 
   async execute(
-    config: Config,
+    context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    return new ListExtensionsCommand().execute(config, _);
+    return new ListExtensionsCommand().execute(context, _);
   }
 }
 
