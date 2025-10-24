@@ -1,0 +1,193 @@
+{
+  "name": "ink",
+  "version": "6.3.1",
+  "description": "React for CLI",
+  "license": "MIT",
+  "repository": "vadimdemedes/ink",
+  "author": {
+    "name": "Vadim Demedes",
+    "email": "vadimdemedes@hey.com",
+    "url": "https://github.com/vadimdemedes"
+  },
+  "type": "module",
+  "exports": {
+    "types": "./dist/build/index.d.ts",
+    "default": "./dist/build/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "test": "tsc --noEmit && xo && FORCE_COLOR=true ava",
+    "example": "NODE_NO_WARNINGS=1 node --loader ts-node/esm",
+    "benchmark": "NODE_NO_WARNINGS=1 node --loader ts-node/esm"
+  },
+  "files": [
+    "dist/build"
+  ],
+  "keywords": [
+    "react",
+    "cli",
+    "jsx",
+    "stdout",
+    "components",
+    "command-line",
+    "preact",
+    "redux",
+    "print",
+    "render",
+    "colors",
+    "text"
+  ],
+  "dependencies": {
+    "@alcalzone/ansi-tokenize": "^0.2.0",
+    "ansi-escapes": "^7.0.0",
+    "ansi-styles": "^6.2.1",
+    "auto-bind": "^5.0.1",
+    "chalk": "^5.6.0",
+    "cli-boxes": "^3.0.0",
+    "cli-cursor": "^4.0.0",
+    "cli-truncate": "^4.0.0",
+    "code-excerpt": "^4.0.0",
+    "es-toolkit": "^1.39.10",
+    "indent-string": "^5.0.0",
+    "is-in-ci": "^2.0.0",
+    "patch-console": "^2.0.0",
+    "react-reconciler": "^0.32.0",
+    "signal-exit": "^3.0.7",
+    "slice-ansi": "^7.1.0",
+    "stack-utils": "^2.0.6",
+    "string-width": "^8.1.0",
+    "type-fest": "^4.27.0",
+    "widest-line": "^5.0.0",
+    "wrap-ansi": "^9.0.0",
+    "ws": "^8.18.0",
+    "yoga-layout": "~3.2.1"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.8.0",
+    "@sindresorhus/tsconfig": "^7.0.0",
+    "@sinonjs/fake-timers": "^14.0.0",
+    "@types/ms": "^2.1.0",
+    "@types/node": "^22.15.24",
+    "@types/react": "^19.1.8",
+    "@types/react-reconciler": "^0.32.0",
+    "@types/signal-exit": "^3.0.0",
+    "@types/sinon": "^17.0.3",
+    "@types/stack-utils": "^2.0.2",
+    "@types/ws": "^8.18.1",
+    "@vdemedes/prettier-config": "^2.0.1",
+    "ava": "^5.1.1",
+    "boxen": "^8.0.1",
+    "delay": "^6.0.0",
+    "eslint-config-xo-react": "0.27.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "ms": "^2.1.3",
+    "node-pty": "^1.0.0",
+    "p-queue": "^8.0.0",
+    "prettier": "^3.3.3",
+    "react": "^19.1.0",
+    "react-devtools-core": "^6.1.2",
+    "sinon": "^20.0.0",
+    "strip-ansi": "^7.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "xo": "^0.59.3"
+  },
+  "peerDependencies": {
+    "@types/react": ">=19.0.0",
+    "react": ">=19.0.0",
+    "react-devtools-core": "^6.1.2"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    },
+    "react-devtools-core": {
+      "optional": true
+    }
+  },
+  "ava": {
+    "workerThreads": false,
+    "files": [
+      "test/**/*",
+      "!test/helpers/**/*",
+      "!test/fixtures/**/*"
+    ],
+    "extensions": {
+      "ts": "module",
+      "tsx": "module"
+    },
+    "nodeArguments": [
+      "--loader=ts-node/esm"
+    ]
+  },
+  "xo": {
+    "extends": [
+      "xo-react"
+    ],
+    "plugins": [
+      "react"
+    ],
+    "prettier": true,
+    "rules": {
+      "react/no-unescaped-entities": "off",
+      "react/state-in-constructor": "off",
+      "react/jsx-indent": "off",
+      "react/prop-types": "off",
+      "unicorn/import-index": "off",
+      "import/no-useless-path-segments": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "complexity": "off"
+    },
+    "ignores": [
+      "src/parse-keypress.ts"
+    ],
+    "overrides": [
+      {
+        "files": [
+          "src/**/*.{ts,tsx}",
+          "test/**/*.{ts,tsx}"
+        ],
+        "rules": {
+          "no-unused-expressions": "off",
+          "camelcase": [
+            "error",
+            {
+              "allow": [
+                "^unstable__",
+                "^internal_"
+              ]
+            }
+          ],
+          "unicorn/filename-case": "off",
+          "react/default-props-match-prop-types": "off",
+          "unicorn/prevent-abbreviations": "off",
+          "react/require-default-props": "off",
+          "react/jsx-curly-brace-presence": "off",
+          "@typescript-eslint/no-empty-function": "off",
+          "@typescript-eslint/promise-function-async": "warn",
+          "@typescript-eslint/explicit-function-return": "off",
+          "@typescript-eslint/explicit-function-return-type": "off",
+          "dot-notation": "off",
+          "react/boolean-prop-naming": "off",
+          "unicorn/prefer-dom-node-remove": "off",
+          "unicorn/prefer-event-target": "off"
+        }
+      },
+      {
+        "files": [
+          "examples/**/*.{ts,tsx}",
+          "benchmark/**/*.{ts,tsx}"
+        ],
+        "rules": {
+          "import/no-unassigned-import": "off"
+        }
+      }
+    ]
+  },
+  "prettier": "@vdemedes/prettier-config"
+}

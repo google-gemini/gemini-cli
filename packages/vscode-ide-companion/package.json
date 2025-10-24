@@ -111,7 +111,6 @@
     "build:dev": "npm run check-types && npm run lint && node esbuild.js",
     "build:prod": "node esbuild.js --production",
     "generate:notices": "node ./scripts/generate-notices.js",
-    "prepare": "npm run generate:notices",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "watch": "npm-run-all2 -p watch:*",

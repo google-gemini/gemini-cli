@@ -6,7 +6,8 @@
   },
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "!third_party/**"
   ],
   "private": "true",
   "repository": {
@@ -58,6 +59,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
+    "ink": "file:./third_party/ink",
     "wrap-ansi": "9.0.2",
     "ansi-regex": "5.0.1",
     "cliui": {
@@ -95,6 +97,7 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
+    "ink": "file:./third_party/ink",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
     "memfs": "^4.42.0",
@@ -108,12 +111,14 @@
     "strip-ansi": "^7.1.2",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
+    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
   },
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
-    "simple-git": "^3.28.0"
+    "simple-git": "^3.28.0",
+    "signal-exit": "^3.0.7"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",
@@ -127,7 +132,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --fix --max-warnings 0"
+      "eslint --fix --max-warnings 0 --no-warn-ignored"
     ],
     "*.{json,md}": [
       "prettier --write"

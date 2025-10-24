@@ -37,7 +37,9 @@ rmSync(join(root, 'bundle'), RMRF_OPTIONS);
 const rootPackageJson = JSON.parse(
   readFileSync(join(root, 'package.json'), 'utf-8'),
 );
-for (const workspace of rootPackageJson.workspaces) {
+for (const workspace of rootPackageJson.workspaces.filter(
+  (w) => !w.startsWith('!'),
+)) {
   // Note: this is a simple glob implementation that only supports "packages/*".
   const workspaceDir = join(root, dirname(workspace));
   const packageDirs = readdirSync(workspaceDir);
