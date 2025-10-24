@@ -62,8 +62,10 @@ export function PermissionsModifyTrustDialog({
         onExit();
       }
       if (needsRestart && key.name === 'r') {
-        commitTrustLevelChange();
-        relaunchApp();
+        const success = commitTrustLevelChange();
+        if (success) {
+          relaunchApp();
+        }
         onExit();
       }
     },
