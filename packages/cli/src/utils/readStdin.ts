@@ -8,6 +8,9 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 export async function readStdin(): Promise<string> {
   const MAX_STDIN_SIZE = 8 * 1024 * 1024; // 8MB
+  if (process.stdin.isTTY) {
+    return '';
+  }
   return new Promise((resolve, reject) => {
     let data = '';
     let totalSize = 0;
