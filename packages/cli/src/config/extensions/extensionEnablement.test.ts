@@ -36,7 +36,7 @@ function createTestDir() {
 let testDir: { path: string; cleanup: () => void };
 let manager: ExtensionEnablementManager;
 
-describe( 'ExtensionEnablementManager', () => {
+describe('ExtensionEnablementManager', () => {
   beforeEach(() => {
     testDir = createTestDir();
     vi.mocked(os.homedir).mockReturnValue(path.join(testDir.path, GEMINI_DIR));
