@@ -39,6 +39,7 @@ import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -165,9 +166,12 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
  * which should trigger a retry.
  */
 export class InvalidStreamError extends Error {
-  readonly type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT';
+  readonly type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT' | 'MALFORMED_RESPONSE';
 
-  constructor(message: string, type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT') {
+  constructor(
+    message: string,
+    type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT' | 'MALFORMED_RESPONSE',
+  ) {
     super(message);
     this.name = 'InvalidStreamError';
     this.type = type;
@@ -498,6 +502,23 @@ export class GeminiChat {
     let hasFinishReason = false;
 
     for await (const chunk of streamResponse) {
+      // Add a check for unexpected chunk format
+      if (
+        typeof chunk !== 'object' ||
+        chunk === null ||
+        !('candidates' in chunk)
+      ) {
+        debugLogger.error(
+          `Received unexpected chunk format from Gemini API: ${JSON.stringify(
+            chunk,
+          )}`,
+        );
+        throw new InvalidStreamError(
+          'Received unexpected API response format.',
+          'MALFORMED_RESPONSE',
+        );
+      }
+
       hasFinishReason =
         chunk?.candidates?.some((candidate) => candidate.finishReason) ?? false;
       if (isValidResponse(chunk)) {
