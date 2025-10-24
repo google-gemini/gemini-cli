@@ -193,14 +193,20 @@ export const AppContainer = (props: AppContainerProps) => {
   } = useExtensionUpdates(extensions, extensionManager, historyManager.addItem);
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [permissionsDialogProps, setPermissionsDialogProps] = useState<{
+    targetDirectory?: string;
+  } | null>(null);
   const openPermissionsDialog = useCallback(
-    () => setPermissionsDialogOpen(true),
+    (props?: { targetDirectory?: string }) => {
+      setPermissionsDialogOpen(true);
+      setPermissionsDialogProps(props ?? null);
+    },
     [],
   );
-  const closePermissionsDialog = useCallback(
-    () => setPermissionsDialogOpen(false),
-    [],
-  );
+  const closePermissionsDialog = useCallback(() => {
+    setPermissionsDialogOpen(false);
+    setPermissionsDialogProps(null);
+  }, []);
 
   const toggleDebugProfiler = useCallback(
     () => setShowDebugProfiler((prev) => !prev),
@@ -1187,6 +1193,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
+      permissionsDialogProps,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1268,6 +1275,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
+      permissionsDialogProps,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1354,6 +1362,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openPermissionsDialog,
       closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,
@@ -1380,6 +1389,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openPermissionsDialog,
       closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,

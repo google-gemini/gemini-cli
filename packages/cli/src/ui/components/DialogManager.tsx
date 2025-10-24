@@ -193,6 +193,7 @@ export const DialogManager = ({
       <PermissionsModifyTrustDialog
         onExit={uiActions.closePermissionsDialog}
         addItem={addItem}
+        targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
       />
     );
   }
