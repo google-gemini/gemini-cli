@@ -108,7 +108,7 @@ vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
 
-import { useHistoryWithActivityMonitoring } from './hooks/useHistoryManagerWithActivityMonitoring.js';
+import { useHistoryWithActivityMonitoring } from './hooks/useHistoryManagerWithActivity.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';

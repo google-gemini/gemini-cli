@@ -52,7 +52,7 @@ import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { getPolicyErrorsForUI } from '../config/policy.js';
 import process from 'node:process';
-import { useHistoryWithActivityMonitoring } from './hooks/useHistoryManagerWithActivityMonitoring.js';
+import { useHistoryWithActivityMonitoring } from './hooks/useHistoryManagerWithActivity.js';
 import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
