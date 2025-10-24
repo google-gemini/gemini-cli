@@ -254,11 +254,32 @@ export class ClearcutLogger {
     eventName: EventNames,
     data: EventValue[] = [],
   ): LogEvent {
+    const surface = determineSurface();
     return {
       console_type: 'GEMINI_CLI',
       application: 102, // GEMINI_CLI
       event_name: eventName as string,
-      event_metadata: [data],
+      event_metadata: [
+        [
+          ...data,
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+            value: surface,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+            value: CLI_VERSION,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+            value: GIT_COMMIT_INFO,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+            value: process.platform,
+          },
+        ],
+      ],
     };
   }
 
@@ -1214,8 +1235,6 @@ export class ClearcutLogger {
    * should exist on all log events.
    */
   addDefaultFields(data: EventValue[], totalAccounts: number): EventValue[] {
-    const surface = determineSurface();
-
     const defaultLogMetadata: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
@@ -1232,24 +1251,8 @@ export class ClearcutLogger {
         value: `${totalAccounts}`,
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: surface,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-        value: CLI_VERSION,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-        value: GIT_COMMIT_INFO,
-      },
-      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: this.promptId,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-        value: process.platform,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
