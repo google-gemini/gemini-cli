@@ -702,7 +702,7 @@ export function loadSettings(
     isTrusted,
   );
 
-  // loadEnviroment depends on settings so we have to create a temp version of
+  // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
