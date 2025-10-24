@@ -187,7 +187,71 @@ describe('useKeypress', () => {
       expect(onKeypress).toHaveBeenCalledTimes(3);
     });
 
-    it('should handle pastes split across writes', () => {
+    it('should handle lone pastes', () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      const pasteText = 'pasted';
+      act(() => {
+        stdin.write(PASTE_START);
+        stdin.write(pasteText);
+        stdin.write(PASTE_END);
+      });
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle paste false alarm', () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      act(() => {
+        stdin.write(PASTE_START.slice(0, 5));
+        stdin.write('do');
+      });
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ code: '[200d' }),
+      );
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: 'o' }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle back to back pastes', () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      const pasteText1 = 'herp';
+      const pasteText2 = 'derp';
+      act(() => {
+        stdin.write(
+          PASTE_START +
+            pasteText1 +
+            PASTE_END +
+            PASTE_START +
+            pasteText2 +
+            PASTE_END,
+        );
+      });
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText1 }),
+      );
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText2 }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle pastes split across writes', async () => {
       renderHook(() => useKeypress(onKeypress, { isActive: true }), {
         wrapper,
       });
@@ -199,10 +263,13 @@ describe('useKeypress', () => {
       );
 
       const pasteText = 'pasted';
-      act(() => {
+      await act(async () => {
         stdin.write(PASTE_START.slice(0, 3));
+        await new Promise((r) => setTimeout(r, 50));
         stdin.write(PASTE_START.slice(3) + pasteText.slice(0, 3));
+        await new Promise((r) => setTimeout(r, 50));
         stdin.write(pasteText.slice(3) + PASTE_END.slice(0, 3));
+        await new Promise((r) => setTimeout(r, 50));
         stdin.write(PASTE_END.slice(3));
       });
       expect(onKeypress).toHaveBeenCalledWith(

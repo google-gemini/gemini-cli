@@ -353,40 +353,33 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
   return null;
 }
 
-const PASTE_MODE_START_BUFER = Buffer.from(PASTE_MODE_START);
-const PASTE_MODE_END_BUFER = Buffer.from(PASTE_MODE_END);
-const PASTE_MODE_COMMON_BUFFER = Buffer.from(`${ESC}[20`);
-
-function matchesAt(a: Buffer, b: Buffer, pos: number): boolean {
-  return a.compare(b, pos, pos + a.length) === 0;
-}
+const PASTE_MODE_START_BUFFER = Buffer.from(PASTE_MODE_START);
+const PASTE_MODE_END_BUFFER = Buffer.from(PASTE_MODE_END);
 
 /**
  * Returns the first index before which we are certain there is no paste marker.
  */
 function earliestPossiblePasteMarker(data: Buffer): number {
   // Check data for full start-paste or end-paste markers.
-  let pos = 0;
-  const codeLength = PASTE_MODE_START_BUFER.length;
-  while (pos < data.length - codeLength) {
-    const index = data.indexOf(PASTE_MODE_COMMON_BUFFER, pos);
-    if (index === -1) {
-      break;
-    }
-    const isStart = matchesAt(PASTE_MODE_START_BUFER, data, index);
-    const isEnd = matchesAt(PASTE_MODE_END_BUFER, data, index);
-    if (isStart || isEnd) {
-      return index;
-    }
-    pos = index + PASTE_MODE_COMMON_BUFFER.length;
+  const startIndex = data.indexOf(PASTE_MODE_START_BUFFER);
+  const endIndex = data.indexOf(PASTE_MODE_END_BUFFER);
+  if (startIndex !== -1 && endIndex !== -1) {
+    return Math.min(startIndex, endIndex);
+  } else if (startIndex !== -1) {
+    return startIndex;
+  } else if (endIndex !== -1) {
+    return endIndex;
   }
+
   // data contains no full start-paste or end-paste.
   // Check if data ends with a prefix of start-paste or end-paste.
-  for (let i = 1; i < codeLength; i++) {
+  const codeLength = PASTE_MODE_START_BUFFER.length;
+  for (let i = Math.min(data.length, codeLength - 1); i > 0; i--) {
     const candidate = data.subarray(data.length - i);
-    const isStartPrefix = candidate.compare(PASTE_MODE_START_BUFER, 0, i) === 0;
-    const isEndPrefix = candidate.compare(PASTE_MODE_END_BUFER, 0, i) === 0;
-    if (isStartPrefix || isEndPrefix) {
+    if (
+      PASTE_MODE_START_BUFFER.indexOf(candidate) === 0 ||
+      PASTE_MODE_END_BUFFER.indexOf(candidate) === 0
+    ) {
       return data.length - i;
     }
   }
@@ -417,8 +410,11 @@ function* pasteMarkerParser(
         data = data.subarray(index);
       }
       // data starts with a possible paste marker
-      const possibleMarker = data.subarray(0, 6);
-      if (possibleMarker.compare(PASTE_MODE_START_BUFER) === 0) {
+      const codeLength = PASTE_MODE_START_BUFFER.length;
+      if (data.length < codeLength) {
+        // we have a prefix. Concat the next data and try again.
+        data = Buffer.concat([data, yield]);
+      } else if (PASTE_MODE_START_BUFFER.compare(data, 0, codeLength) === 0) {
         keypressHandler(undefined, {
           name: 'paste-start',
           ctrl: false,
@@ -427,8 +423,8 @@ function* pasteMarkerParser(
           paste: false,
           sequence: '',
         });
-        data = data.subarray(PASTE_MODE_START_BUFER.length);
-      } else if (possibleMarker.compare(PASTE_MODE_END_BUFER) === 0) {
+        data = data.subarray(PASTE_MODE_START_BUFFER.length);
+      } else if (PASTE_MODE_END_BUFFER.compare(data, 0, codeLength) === 0) {
         keypressHandler(undefined, {
           name: 'paste-end',
           ctrl: false,
@@ -437,10 +433,11 @@ function* pasteMarkerParser(
           paste: false,
           sequence: '',
         });
-        data = data.subarray(PASTE_MODE_END_BUFER.length);
+        data = data.subarray(PASTE_MODE_END_BUFFER.length);
       } else {
-        // we must have a prefix. Concat the next data and try again.
-        data = Buffer.concat([data, yield]);
+        // This should never happen.
+        passthrough.write(data);
+        break;
       }
     }
   }
@@ -868,9 +865,9 @@ export function KeypressProvider({
       });
       readline.emitKeypressEvents(keypressStream, rl);
 
-      const pmp = pasteMarkerParser(keypressStream, handleKeypress);
-      pmp.next(); // prime the generator so it starts listening.
-      const handleRawKeypress = (data: Buffer) => pmp.next(data);
+      const parser = pasteMarkerParser(keypressStream, handleKeypress);
+      parser.next(); // prime the generator so it starts listening.
+      const handleRawKeypress = (data: Buffer) => parser.next(data);
 
       keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
