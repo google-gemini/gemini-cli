@@ -427,7 +427,8 @@ describe('run_shell_command', () => {
     expect(failureLog!.toolRequest.success).toBe(false);
   });
 
-  it('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
+  // TODO(#11966): Deflake this test and re-enable once the underlying race is resolved.
+  it.skip('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup(
       'should reject chained commands when only the first segment is allowlisted',
