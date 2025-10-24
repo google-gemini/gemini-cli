@@ -34,6 +34,7 @@ import {
   type IdeInfo,
   type IdeContext,
   type UserTierId,
+  type UserFeedbackPayload,
   DEFAULT_GEMINI_FLASH_MODEL,
   IdeClient,
   ideContextStore,
@@ -44,6 +45,8 @@ import {
   recordExitFail,
   ShellExecutionService,
   debugLogger,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -90,9 +93,13 @@ import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
-import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
+import {
+  useConfirmUpdateRequests,
+  useExtensionUpdates,
+} from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
-import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
+import { ExtensionManager } from '../config/extension-manager.js';
+import { requestConsentInteractive } from '../config/extensions/consent.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -162,21 +169,28 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const extensions = config.getExtensions();
-  const [extensionEnablementManager] = useState<ExtensionEnablementManager>(
-    new ExtensionEnablementManager(config.getEnabledExtensions()),
+  const [extensionManager] = useState<ExtensionManager>(
+    new ExtensionManager({
+      enabledExtensionOverrides: config.getEnabledExtensions(),
+      workspaceDir: config.getWorkingDir(),
+      requestConsent: (description) =>
+        requestConsentInteractive(
+          description,
+          addConfirmUpdateExtensionRequest,
+        ),
+      // TODO: Support requesting settings in the interactive CLI
+      requestSetting: null,
+      loadedSettings: settings,
+    }),
   );
+
+  const { addConfirmUpdateExtensionRequest, confirmUpdateExtensionRequests } =
+    useConfirmUpdateRequests();
   const {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
-    confirmUpdateExtensionRequests,
-    addConfirmUpdateExtensionRequest,
-  } = useExtensionUpdates(
-    extensions,
-    extensionEnablementManager,
-    historyManager.addItem,
-    config.getWorkingDir(),
-  );
+  } = useExtensionUpdates(extensions, extensionManager, historyManager.addItem);
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const openPermissionsDialog = useCallback(
@@ -582,6 +596,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const cancelHandlerRef = useRef<() => void>(() => {});
 
+  const getPreferredEditor = useCallback(
+    () => settings.merged.general?.preferredEditor as EditorType,
+    [settings.merged.general?.preferredEditor],
+  );
+
+  const onCancelSubmit = useCallback(() => {
+    cancelHandlerRef.current();
+  }, []);
+
   const {
     streamingState,
     submitQuery,
@@ -601,13 +624,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setDebugMessage,
     handleSlashCommand,
     shellModeActive,
-    () => settings.merged.general?.preferredEditor as EditorType,
+    getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
     refreshStatic,
-    () => cancelHandlerRef.current(),
+    onCancelSubmit,
     setEmbeddedShellFocused,
     terminalWidth,
     terminalHeight,
@@ -1056,6 +1079,53 @@ Logging in with Google... Please restart Gemini CLI to continue.
     settings.merged.ui?.hideWindowTitle,
     stdout,
   ]);
+
+  useEffect(() => {
+    const handleUserFeedback = (payload: UserFeedbackPayload) => {
+      let type: MessageType;
+      switch (payload.severity) {
+        case 'error':
+          type = MessageType.ERROR;
+          break;
+        case 'warning':
+          type = MessageType.WARNING;
+          break;
+        case 'info':
+          type = MessageType.INFO;
+          break;
+        default:
+          throw new Error(
+            `Unexpected severity for user feedback: ${payload.severity}`,
+          );
+      }
+
+      historyManager.addItem(
+        {
+          type,
+          text: payload.message,
+        },
+        Date.now(),
+      );
+
+      // If there is an attached error object, log it to the debug drawer.
+      if (payload.error) {
+        debugLogger.warn(
+          `[Feedback Details for "${payload.message}"]`,
+          payload.error,
+        );
+      }
+    };
+
+    coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+
+    // Flush any messages that happened during startup before this component
+    // mounted.
+    coreEvents.drainFeedbackBacklog();
+
+    return () => {
+      coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
+    };
+  }, [historyManager]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {

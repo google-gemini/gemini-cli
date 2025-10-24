@@ -8,6 +8,7 @@ import type {
   Config,
   ToolCallRequestInfo,
   CompletedToolCall,
+  UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -24,6 +25,8 @@ import {
   JsonStreamEventType,
   uiTelemetryService,
   debugLogger,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -50,14 +53,30 @@ export async function runNonInteractive(
       debugMode: config.getDebugMode(),
     });
 
+    const handleUserFeedback = (payload: UserFeedbackPayload) => {
+      const prefix = payload.severity.toUpperCase();
+      process.stderr.write(`[${prefix}] ${payload.message}\n`);
+      if (payload.error && config.getDebugMode()) {
+        const errorToLog =
+          payload.error instanceof Error
+            ? payload.error.stack || payload.error.message
+            : String(payload.error);
+        process.stderr.write(`${errorToLog}\n`);
+      }
+    };
+
     const startTime = Date.now();
     const streamFormatter =
       config.getOutputFormat() === OutputFormat.STREAM_JSON
         ? new StreamJsonFormatter()
         : null;
 
+    let errorToHandle: unknown | undefined;
     try {
       consolePatcher.patch();
+      coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.drainFeedbackBacklog();
+
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
@@ -195,6 +214,8 @@ export async function runNonInteractive(
                 message: 'Maximum session turns exceeded',
               });
             }
+          } else if (event.type === GeminiEventType.Error) {
+            throw event.value.error;
           }
         }
 
@@ -284,12 +305,17 @@ export async function runNonInteractive(
         }
       }
     } catch (error) {
-      handleError(error, config);
+      errorToHandle = error;
     } finally {
       consolePatcher.cleanup();
+      coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
       if (isTelemetrySdkInitialized()) {
         await shutdownTelemetry(config);
       }
+    }
+
+    if (errorToHandle) {
+      handleError(errorToHandle, config);
     }
   });
 }

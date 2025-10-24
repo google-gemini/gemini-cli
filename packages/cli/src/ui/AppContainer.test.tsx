@@ -15,7 +15,29 @@ import {
 } from 'vitest';
 import { render, cleanup } from 'ink-testing-library';
 import { AppContainer } from './AppContainer.js';
-import { type Config, makeFakeConfig } from '@google/gemini-cli-core';
+import {
+  type Config,
+  makeFakeConfig,
+  CoreEvent,
+  type UserFeedbackPayload,
+} from '@google/gemini-cli-core';
+
+// Mock coreEvents
+const mockCoreEvents = vi.hoisted(() => ({
+  on: vi.fn(),
+  off: vi.fn(),
+  drainFeedbackBacklog: vi.fn(),
+  emit: vi.fn(),
+}));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    coreEvents: mockCoreEvents,
+  };
+});
 import type { LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
@@ -1291,6 +1313,75 @@ describe('AppContainer State Management', () => {
       // Verify that the actions are correctly passed through context
       capturedUIActions.closeModelDialog();
       expect(mockCloseModelDialog).toHaveBeenCalled();
+    });
+  });
+
+  describe('CoreEvents Integration', () => {
+    it('subscribes to UserFeedback and drains backlog on mount', () => {
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockCoreEvents.on).toHaveBeenCalledWith(
+        CoreEvent.UserFeedback,
+        expect.any(Function),
+      );
+      expect(mockCoreEvents.drainFeedbackBacklog).toHaveBeenCalledTimes(1);
+    });
+
+    it('unsubscribes from UserFeedback on unmount', () => {
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      unmount();
+
+      expect(mockCoreEvents.off).toHaveBeenCalledWith(
+        CoreEvent.UserFeedback,
+        expect.any(Function),
+      );
+    });
+
+    it('adds history item when UserFeedback event is received', () => {
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Get the registered handler
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.UserFeedback,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      // Simulate an event
+      const payload: UserFeedbackPayload = {
+        severity: 'error',
+        message: 'Test error message',
+      };
+      handler(payload);
+
+      expect(mockedUseHistory().addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          text: 'Test error message',
+        }),
+        expect.any(Number),
+      );
     });
   });
 });
