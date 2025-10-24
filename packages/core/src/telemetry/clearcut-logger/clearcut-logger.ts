@@ -114,6 +114,7 @@ export interface LogEvent {
   event_metadata: EventValue[][];
   client_email?: string;
   client_install_id?: string;
+  surface: string;
 }
 
 export interface LogRequest {
@@ -265,6 +266,7 @@ export class ClearcutLogger {
       application: 102, // GEMINI_CLI
       event_name: eventName as string,
       event_metadata: [data],
+      surface: determineSurface(),
     };
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id

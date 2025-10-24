@@ -222,6 +222,7 @@ describe('ClearcutLogger', () => {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'GitHub',
       });
+      expect(event?.surface).toBe('GitHub');
     });
 
     it('logs the current surface from Cloud Shell via EDITOR_IN_CLOUD_SHELL', () => {
@@ -235,6 +236,7 @@ describe('ClearcutLogger', () => {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'cloudshell',
       });
+      expect(event?.surface).toBe('cloudshell');
     });
 
     it('logs the current surface from Cloud Shell via CLOUD_SHELL', () => {
@@ -248,6 +250,7 @@ describe('ClearcutLogger', () => {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'cloudshell',
       });
+      expect(event?.surface).toBe('cloudshell');
     });
 
     it('logs default metadata', () => {
