@@ -293,8 +293,8 @@ describe('extension tests', () => {
         mcpServers: {
           'test-server': {
             command: 'node',
-            args: ['${extensionPath}/server/index.js'],
-            cwd: '${extensionPath}/server',
+            args: ['${extensionPath}${/}server${/}index.js'],
+            cwd: '${extensionPath}${/}server',
           },
         },
       });
