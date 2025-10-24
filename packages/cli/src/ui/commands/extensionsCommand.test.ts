@@ -12,7 +12,6 @@ import { type CommandContext } from './types.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { type ExtensionUpdateAction } from '../state/extensions.js';
 
-// Mock the 'open' library similar to docsCommand.test.ts
 import open from 'open';
 vi.mock('open', () => ({
   default: vi.fn(),
@@ -354,7 +353,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: `Please open the following URL in your browser to explore extensions:\\n${extensionsUrl}`,
+          text: `View available extensions at ${extensionsUrl}`,
         },
         expect.any(Number),
       );
@@ -383,6 +382,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should handle errors when opening the browser', async () => {
+      vi.stubEnv('NODE_ENV', '');
       const extensionsUrl = 'https://geminicli.com/extensions/';
       const errorMessage = 'Failed to open browser';
       vi.mocked(open).mockRejectedValue(new Error(errorMessage));
@@ -392,7 +392,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.ERROR,
-          text: `Failed to open browser. Please open this URL manually: ${extensionsUrl}`,
+          text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
         },
         expect.any(Number),
       );
