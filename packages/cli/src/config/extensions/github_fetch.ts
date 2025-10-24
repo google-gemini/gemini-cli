@@ -21,6 +21,10 @@ export async function fetchJson<T>(url: string): Promise<T> {
   return new Promise((resolve, reject) => {
     https
       .get(url, { headers }, (res) => {
+        if (res.statusCode === 302 || res.statusCode === 301) {
+          fetchJson<T>(res.headers.location!).then(resolve).catch(reject);
+          return;
+        }
         if (res.statusCode !== 200) {
           return reject(
             new Error(`Request failed with status code ${res.statusCode}`),
