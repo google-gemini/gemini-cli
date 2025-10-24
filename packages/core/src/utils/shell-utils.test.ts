@@ -238,6 +238,39 @@ EOF`,
     );
   });
 
+  it('should block backtick substitution that invokes an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo `curl google.com`', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block process substitution using <() when the inner command is unlisted', () => {
+    config.getCoreTools = () => [
+      'run_shell_command(diff)',
+      'run_shell_command(echo)',
+    ];
+    const result = isCommandAllowed(
+      'diff <(curl google.com) <(echo safe)',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block process substitution using >() when the inner command is unlisted', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo "data" > >(curl google.com)', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
   describe('command substitution', () => {
     it('should allow command substitution using `$(...)`', () => {
       const result = isCommandAllowed('echo $(goodCommand --safe)', config);
