@@ -11,10 +11,9 @@ import type {
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { GoogleAuth } from 'google-auth-library';
+import { OAuthUtils, FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
 import type { MCPServerConfig } from '../config/config.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-
-const fiveMinBufferMs = 5 * 60 * 1000;
 
 function createIamApiUrl(targetSA: string): string {
   return `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(targetSA)}:generateIdToken`;
@@ -78,7 +77,7 @@ export class ServiceAccountImpersonationProvider
     if (
       this.cachedToken &&
       this.tokenExpiryTime &&
-      Date.now() < this.tokenExpiryTime - fiveMinBufferMs
+      Date.now() < this.tokenExpiryTime - FIVE_MIN_BUFFER_MS
     ) {
       return this.cachedToken;
     }
@@ -112,7 +111,7 @@ export class ServiceAccountImpersonationProvider
       return undefined;
     }
 
-    const expiryTime = this.parseTokenExpiry(idToken);
+    const expiryTime = OAuthUtils.parseTokenExpiry(idToken);
     // Note: We are placing the OIDC ID Token into the `access_token` field.
     // This is because the CLI uses this field to construct the
     // `Authorization: Bearer <token>` header, which is the correct way to
@@ -145,27 +144,5 @@ export class ServiceAccountImpersonationProvider
   codeVerifier(): string {
     // No-op
     return '';
-  }
-
-  /**
-   * Parses a JWT string to extract its expiry time.
-   * @param idToken The JWT ID token.
-   * @returns The expiry time in **milliseconds**, or undefined if parsing fails.
-   */
-  private parseTokenExpiry(idToken: string): number | undefined {
-    try {
-      const payload = JSON.parse(
-        Buffer.from(idToken.split('.')[1], 'base64').toString(),
-      );
-
-      if (payload && typeof payload.exp === 'number') {
-        return payload.exp * 1000; // Convert seconds to milliseconds
-      }
-    } catch (e) {
-      console.error('Failed to parse ID token for expiry time with error:', e);
-    }
-
-    // Return undefined if try block fails or 'exp' is missing/invalid
-    return undefined;
   }
 }

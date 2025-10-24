@@ -325,4 +325,41 @@ describe('OAuthUtils', () => {
       expect(() => OAuthUtils.buildResourceParameter('not-a-url')).toThrow();
     });
   });
+
+  describe('parseTokenExpiry', () => {
+    it('should return the expiry time in milliseconds for a valid token', () => {
+      // Corresponds to a date of 2100-01-01T00:00:00Z
+      const expiry = 4102444800;
+      const payload = { exp: expiry };
+      const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBe(expiry * 1000);
+    });
+
+    it('should return undefined for a token without an expiry time', () => {
+      const payload = { iat: 1678886400 };
+      const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined for a token with an invalid expiry time', () => {
+      const payload = { exp: 'not-a-number' };
+      const token = `header.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined for a malformed token', () => {
+      const token = 'not-a-valid-token';
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined for a token with invalid JSON in payload', () => {
+      const token = `header.${Buffer.from('{ not valid json').toString('base64')}.signature`;
+      const result = OAuthUtils.parseTokenExpiry(token);
+      expect(result).toBeUndefined();
+    });
+  });
 });
