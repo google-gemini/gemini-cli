@@ -201,23 +201,14 @@ describe('FileExclusions', () => {
 });
 
 describe('BINARY_EXTENSIONS', () => {
-  it('should include common binary file extensions', () => {
-    expect(BINARY_EXTENSIONS).toContain('.exe');
-    expect(BINARY_EXTENSIONS).toContain('.dll');
-    expect(BINARY_EXTENSIONS).toContain('.jar');
-    expect(BINARY_EXTENSIONS).toContain('.zip');
-  });
-
-  it('should include additional binary extensions', () => {
-    expect(BINARY_EXTENSIONS).toContain('.dat');
-    expect(BINARY_EXTENSIONS).toContain('.obj');
-    expect(BINARY_EXTENSIONS).toContain('.wasm');
-  });
-
-  it('should include media file extensions', () => {
-    expect(BINARY_EXTENSIONS).toContain('.pdf');
-    expect(BINARY_EXTENSIONS).toContain('.png');
-    expect(BINARY_EXTENSIONS).toContain('.jpg');
+  it.each([
+    ['common binary file extensions', ['.exe', '.dll', '.jar', '.zip']],
+    ['additional binary extensions', ['.dat', '.obj', '.wasm']],
+    ['media file extensions', ['.pdf', '.png', '.jpg']],
+  ])('should include %s', (_, extensions) => {
+    extensions.forEach((ext) => {
+      expect(BINARY_EXTENSIONS).toContain(ext);
+    });
   });
 
   it('should be sorted', () => {
@@ -235,11 +226,25 @@ describe('BINARY_EXTENSIONS', () => {
 });
 
 describe('extractExtensionsFromPatterns', () => {
-  it('should extract simple extensions', () => {
-    const patterns = ['**/*.exe', '**/*.jar', '**/*.zip'];
+  it.each([
+    [
+      'simple extensions',
+      ['**/*.exe', '**/*.jar', '**/*.zip'],
+      ['.exe', '.jar', '.zip'],
+    ],
+    [
+      'compound extensions',
+      ['**/*.tar.gz', '**/*.min.js', '**/*.d.ts'],
+      ['.gz', '.js', '.ts'],
+    ],
+    [
+      'dotfiles',
+      ['**/*.gitignore', '**/*.profile', '**/*.bashrc'],
+      ['.bashrc', '.gitignore', '.profile'],
+    ],
+  ])('should extract %s', (_, patterns, expected) => {
     const result = extractExtensionsFromPatterns(patterns);
-
-    expect(result).toEqual(['.exe', '.jar', '.zip']);
+    expect(result).toEqual(expected);
   });
 
   it('should handle brace expansion patterns', () => {
@@ -291,22 +296,6 @@ describe('extractExtensionsFromPatterns', () => {
     const result = extractExtensionsFromPatterns(patterns);
 
     expect(result).toEqual(['.css', '.html', '.js', '.jsx', '.ts', '.tsx']);
-  });
-
-  it('should handle compound extensions correctly using path.extname', () => {
-    const patterns = ['**/*.tar.gz', '**/*.min.js', '**/*.d.ts'];
-    const result = extractExtensionsFromPatterns(patterns);
-
-    // Should extract the final extension part only
-    expect(result).toEqual(['.gz', '.js', '.ts']);
-  });
-
-  it('should handle dotfiles correctly', () => {
-    const patterns = ['**/*.gitignore', '**/*.profile', '**/*.bashrc'];
-    const result = extractExtensionsFromPatterns(patterns);
-
-    // Dotfiles should be extracted properly
-    expect(result).toEqual(['.bashrc', '.gitignore', '.profile']);
   });
 
   it('should handle edge cases with path.extname', () => {
