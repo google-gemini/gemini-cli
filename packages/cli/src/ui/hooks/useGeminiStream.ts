@@ -35,7 +35,7 @@ import {
   promptIdContext,
   WRITE_FILE_TOOL_NAME,
   tokenLimit,
-} from '@google/gemini-cli-core';
+ processSingleFileContent } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
   HistoryItem,
@@ -64,6 +64,11 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import {
+  clipboardHasImage,
+  saveClipboardImage,
+  cleanupOldClipboardImages,
+} from '../utils/clipboardUtils.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -414,6 +419,56 @@ export const useGeminiStream = (
         );
         return { queryToSend: null, shouldProceed: false };
       }
+
+      // Check for clipboard image and attach it to the message
+      try {
+        const hasImage = await clipboardHasImage();
+        if (hasImage) {
+          const projectRoot = config.getProjectRoot();
+          const imagePath = await saveClipboardImage(projectRoot);
+
+          if (imagePath) {
+            onDebugMessage(`Clipboard image detected and saved: ${imagePath}`);
+
+            // Process the image file to get the inline data part
+            const imageResult = await processSingleFileContent(
+              imagePath,
+              projectRoot,
+              config.getFileSystemService(),
+            );
+
+            // Clean up old clipboard images
+            cleanupOldClipboardImages(projectRoot);
+
+            // Convert string query to array with text and image parts
+            if (
+              typeof localQueryToSendToGemini === 'string' &&
+              typeof imageResult.llmContent !== 'string'
+            ) {
+              const parts: Part[] = [
+                { text: localQueryToSendToGemini },
+                imageResult.llmContent,
+              ];
+              localQueryToSendToGemini = parts;
+
+              // Add info message to show image was attached
+              addItem(
+                {
+                  type: MessageType.INFO,
+                  text: `📎 Attached screenshot from clipboard: ${path.basename(imagePath)}`,
+                },
+                userMessageTimestamp,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        // Silently ignore clipboard errors to avoid disrupting the normal flow
+        onDebugMessage(
+          `Error checking clipboard: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
       return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
     },
     [
