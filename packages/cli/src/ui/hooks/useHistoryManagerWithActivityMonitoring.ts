@@ -12,17 +12,17 @@ import {
   type UseHistoryManagerReturn,
 } from './useHistoryManager.js';
 
-export type UseHistoryManagerWithActivityReturn = UseHistoryManagerReturn;
+export type UseHistoryWithActivityMonitoringReturn = UseHistoryManagerReturn;
 
 /**
  * Enhanced version of useHistory that integrates activity monitoring
  *
  * Automatically records activity events when history items are added or updated.
  */
-export function useHistoryWithActivity(
+export function useHistoryWithActivityMonitoring(
   config: Config,
   enableActivityMonitoring = true,
-): UseHistoryManagerWithActivityReturn {
+): UseHistoryWithActivityMonitoringReturn {
   const { recordMessageAdded, recordHistoryUpdate } = useActivityRecorder(
     config,
     enableActivityMonitoring,
