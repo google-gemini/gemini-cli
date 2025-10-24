@@ -50,7 +50,6 @@ export const DOUBLE_QUOTE = '"';
 const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00E5': 'a',
   '\u222B': 'b',
-  '\u00E7': 'c',
   '\u2202': 'd',
   '\u00B4': 'e',
   '\u0192': 'f',
