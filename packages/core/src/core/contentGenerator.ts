@@ -20,6 +20,7 @@ import type { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
+import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -112,7 +113,11 @@ export async function createContentGenerator(
 
   const version = process.env['CLI_VERSION'] || process.version;
   const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
+  const customHeaders = parseCustomHeaders(
+    process.env['GEMINI_CLI_CUSTOM_HEADERS'],
+  );
   const baseHeaders: Record<string, string> = {
+    ...customHeaders,
     'User-Agent': userAgent,
   };
 
