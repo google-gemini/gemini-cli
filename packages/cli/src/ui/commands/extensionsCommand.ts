@@ -133,7 +133,7 @@ async function exploreAction(context: CommandContext) {
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `Please open the following URL in your browser to explore extensions:\\n${extensionsUrl}`,
+        text: `View available extensions at ${extensionsUrl}`,
       },
       Date.now(),
     );
@@ -151,7 +151,7 @@ async function exploreAction(context: CommandContext) {
       context.ui.addItem(
         {
           type: MessageType.ERROR,
-          text: `Failed to open browser. Please open this URL manually: ${extensionsUrl}`,
+          text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
         },
         Date.now(),
       );

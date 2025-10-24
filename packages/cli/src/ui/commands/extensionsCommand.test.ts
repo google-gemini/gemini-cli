@@ -32,7 +32,6 @@ describe('extensionsCommand', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockGetExtensions.mockReturnValue([]);
-    // Reset the `open` mock as done in docsCommand.test.ts
     vi.mocked(open).mockClear();
     mockContext = createMockCommandContext({
       services: {
