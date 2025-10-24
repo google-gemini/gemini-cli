@@ -9,8 +9,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Header } from './Header.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
 import { longAsciiLogo } from './AsciiArt.js';
+import * as semanticColors from '../semantic-colors.js';
 
 vi.mock('../hooks/useTerminalSize.js');
+vi.mock('ink-gradient', () => {
+  const MockGradient = ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  );
+  return {
+    default: vi.fn(MockGradient),
+  };
+});
+vi.mock('../semantic-colors.js');
 
 describe('<Header />', () => {
   beforeEach(() => {});
@@ -40,5 +50,19 @@ describe('<Header />', () => {
   it('does not display the version number when nightly is false', () => {
     const { lastFrame } = render(<Header version="1.0.0" nightly={false} />);
     expect(lastFrame()).not.toContain('v1.0.0');
+  });
+
+  it('uses fallback gradient colors when theme.ui.gradient is undefined', async () => {
+    vi.spyOn(semanticColors, 'theme', 'get').mockReturnValue({
+      ui: { gradient: undefined },
+    } as typeof semanticColors.theme);
+    const Gradient = await import('ink-gradient');
+    render(<Header version="1.0.0" nightly={false} />);
+    expect(Gradient.default).toHaveBeenCalledWith(
+      expect.objectContaining({
+        colors: ['#4285F4', '#34A853', '#FBBC05', '#EA4335'],
+      }),
+      undefined,
+    );
   });
 });

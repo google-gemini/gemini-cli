@@ -40,6 +40,15 @@ export const Header: React.FC<HeaderProps> = ({
 
   const artWidth = getAsciiArtWidth(displayTitle);
 
+  // Theming is not always reliable, and can return an array with a single
+  // (or no) color stops. The gradient library requires at least two, so this
+  // logic checks for that and provides a fallback.
+  const PALETTE = ['#4285F4', '#34A853', '#FBBC05', '#EA4335'];
+  const gradient =
+    theme.ui.gradient && theme.ui.gradient.length >= 2
+      ? theme.ui.gradient
+      : PALETTE;
+
   return (
     <Box
       alignItems="flex-start"
@@ -47,22 +56,14 @@ export const Header: React.FC<HeaderProps> = ({
       flexShrink={0}
       flexDirection="column"
     >
-      {theme.ui.gradient ? (
-        <Gradient colors={theme.ui.gradient}>
-          <Text>{displayTitle}</Text>
-        </Gradient>
-      ) : (
+      <Gradient colors={gradient}>
         <Text>{displayTitle}</Text>
-      )}
+      </Gradient>
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
-          {theme.ui.gradient ? (
-            <Gradient colors={theme.ui.gradient}>
-              <Text>v{version}</Text>
-            </Gradient>
-          ) : (
+          <Gradient colors={gradient}>
             <Text>v{version}</Text>
-          )}
+          </Gradient>
         </Box>
       )}
     </Box>
