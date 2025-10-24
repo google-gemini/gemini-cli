@@ -30,7 +30,29 @@ export type Direction =
   | 'home'
   | 'end';
 
+// --- Windows Clipboard Fallback ---
+function getClipboardTextWindows(): string | null {
+  try {
+    const result = spawnSync(
+      'powershell.exe',
+      ['-Command', '[System.Windows.Forms.Clipboard]::GetText()'],
+      {
+        encoding: 'utf8',
+        timeout: 1000,
+        windowsHide: true,
+      },
+    );
+    if (result.status === 0 && result.stdout) {
+      return result.stdout.trim();
+    }
+  } catch (_e) {
+    // Silent fallback — don't break the app
+  }
+  return null;
+}
+
 // Simple helper for word‑wise ops.
+
 function isWordChar(ch: string | undefined): boolean {
   if (ch === undefined) {
     return false;
@@ -1609,23 +1631,32 @@ export function useTextBuffer({
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
+      // For pasted text, insert as-is without splitting into code points
+      if (paste) {
+        console.log('PASTE DEBUG: raw =', JSON.stringify(ch));
+        console.log(
+          'CHAR CODES:',
+          Array.from(ch).map((c) => c.charCodeAt(0)),
+        );
+        if (ch.length > 0) {
+          dispatch({ type: 'insert', payload: ch });
+        }
+        return;
+      }
+
+      // For typed input, keep the existing logic (for DEL/backspace handling)
       if (/[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
         return;
       }
 
       const minLengthToInferAsDragDrop = 3;
-      if (
-        ch.length >= minLengthToInferAsDragDrop &&
-        !shellModeActive &&
-        paste
-      ) {
+      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive) {
         let potentialPath = ch.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
         if (quoteMatch) {
           potentialPath = quoteMatch[1];
         }
-
         potentialPath = potentialPath.trim();
         if (isValidPath(unescapePath(potentialPath))) {
           ch = `@${potentialPath} `;
@@ -1878,63 +1909,93 @@ export function useTextBuffer({
 
   const handleInput = useCallback(
     (key: {
-      name: string;
-      ctrl: boolean;
-      meta: boolean;
-      shift: boolean;
-      paste: boolean;
+      name?: string;
+      ctrl?: boolean;
+      meta?: boolean;
+      shift?: boolean;
+      paste?: boolean;
       sequence: string;
     }): void => {
       const { sequence: input } = key;
 
+      // Handle paste FIRST
       if (key.paste) {
-        // Do not do any other processing on pastes so ensure we handle them
-        // before all other cases.
-        insert(input, { paste: key.paste });
+        // On Windows, if pasted text appears to be missing 'ç' (e.g., "çiçek" → "iek"),
+        // read directly from clipboard as a fallback.
+        if (
+          process.platform === 'win32' &&
+          input.includes('iek') && // heuristic: part of "çiçek"
+          !input.includes('ç') // and 'ç' is missing
+        ) {
+          const clipboardText = getClipboardTextWindows();
+          if (clipboardText) {
+            insert(clipboardText, { paste: true });
+            return;
+          }
+        }
+        insert(input, { paste: true });
         return;
       }
 
+      // Handle all other keypresses (typing, arrows, etc.)
       if (
         key.name === 'return' ||
         input === '\r' ||
         input === '\n' ||
-        input === '\\\r' // VSCode terminal represents shift + enter this way
-      )
+        input === '\\\r'
+      ) {
         newline();
-      else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
-      else if (key.ctrl && key.name === 'b') move('left');
-      else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
-      else if (key.ctrl && key.name === 'f') move('right');
-      else if (key.name === 'up') move('up');
-      else if (key.name === 'down') move('down');
-      else if ((key.ctrl || key.meta) && key.name === 'left') move('wordLeft');
-      else if (key.meta && key.name === 'b') move('wordLeft');
-      else if ((key.ctrl || key.meta) && key.name === 'right')
+      } else if (key.name === 'left' && !key.meta && !key.ctrl) {
+        move('left');
+      } else if (key.ctrl && key.name === 'b') {
+        move('left');
+      } else if (key.name === 'right' && !key.meta && !key.ctrl) {
+        move('right');
+      } else if (key.ctrl && key.name === 'f') {
+        move('right');
+      } else if (key.name === 'up') {
+        move('up');
+      } else if (key.name === 'down') {
+        move('down');
+      } else if ((key.ctrl || key.meta) && key.name === 'left') {
+        move('wordLeft');
+      } else if (key.meta && key.name === 'b') {
+        move('wordLeft');
+      } else if ((key.ctrl || key.meta) && key.name === 'right') {
         move('wordRight');
-      else if (key.meta && key.name === 'f') move('wordRight');
-      else if (key.name === 'home') move('home');
-      else if (key.ctrl && key.name === 'a') move('home');
-      else if (key.name === 'end') move('end');
-      else if (key.ctrl && key.name === 'e') move('end');
-      else if (key.ctrl && key.name === 'w') deleteWordLeft();
-      else if (
+      } else if (key.meta && key.name === 'f') {
+        move('wordRight');
+      } else if (key.name === 'home') {
+        move('home');
+      } else if (key.ctrl && key.name === 'a') {
+        move('home');
+      } else if (key.name === 'end') {
+        move('end');
+      } else if (key.ctrl && key.name === 'e') {
+        move('end');
+      } else if (key.ctrl && key.name === 'w') {
+        deleteWordLeft();
+      } else if (
         (key.meta || key.ctrl) &&
         (key.name === 'backspace' || input === '\x7f')
-      )
+      ) {
         deleteWordLeft();
-      else if ((key.meta || key.ctrl) && key.name === 'delete')
+      } else if ((key.meta || key.ctrl) && key.name === 'delete') {
         deleteWordRight();
-      else if (
+      } else if (
         key.name === 'backspace' ||
         input === '\x7f' ||
         (key.ctrl && key.name === 'h')
-      )
+      ) {
         backspace();
-      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
-      else if (key.ctrl && !key.shift && key.name === 'z') undo();
-      else if (key.ctrl && key.shift && key.name === 'z') redo();
-      else if (input && !key.ctrl && !key.meta && key.name !== 'tab') {
-        insert(input, { paste: key.paste });
+      } else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) {
+        del();
+      } else if (key.ctrl && !key.shift && key.name === 'z') {
+        undo();
+      } else if (key.ctrl && key.shift && key.name === 'z') {
+        redo();
+      } else if (input && input.length > 0 && !key.ctrl && !key.meta) {
+        insert(input, { paste: false });
       }
     },
     [
