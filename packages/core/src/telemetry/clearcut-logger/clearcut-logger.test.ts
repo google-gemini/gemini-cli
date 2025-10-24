@@ -413,7 +413,7 @@ describe('ClearcutLogger', () => {
           vi.stubEnv('CURSOR_TRACE_ID', '');
         }
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-        expect(event?.event_metadata[0][3]).toEqual({
+        expect(event?.event_metadata[0]).toContainEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
           value: expectedValue,
         });
