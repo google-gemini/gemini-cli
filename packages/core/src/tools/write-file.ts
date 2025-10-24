@@ -86,24 +86,122 @@ export async function getCorrectedFileContent(
   let fileExists = false;
   let correctedContent = proposedContent;
 
+  // Validate file path
+  if (!filePath || typeof filePath !== 'string') {
+    return {
+      originalContent: '',
+      correctedContent: proposedContent,
+      fileExists: false,
+      error: {
+        message: 'Invalid file path provided',
+        code: 'INVALID_PATH',
+      },
+    };
+  }
+
+  // Check file size before reading (if file exists)
+  try {
+    const stats = await fs.promises.stat(filePath);
+    if (stats.size > 50 * 1024 * 1024) {
+      // 50MB limit
+      return {
+        originalContent: '',
+        correctedContent: proposedContent,
+        fileExists: true,
+        error: {
+          message: `File too large (${(stats.size / (1024 * 1024)).toFixed(2)}MB). Maximum size is 50MB`,
+          code: 'FILE_TOO_LARGE',
+        },
+      };
+    }
+  } catch (_statErr) {
+    // File doesn't exist or can't stat, continue with read attempt
+  }
+
   try {
     originalContent = await config
       .getFileSystemService()
       .readTextFile(filePath);
     fileExists = true; // File exists and was read
   } catch (err) {
-    if (isNodeError(err) && err.code === 'ENOENT') {
-      fileExists = false;
-      originalContent = '';
+    if (isNodeError(err)) {
+      switch (err.code) {
+        case 'ENOENT':
+          fileExists = false;
+          originalContent = '';
+          break;
+        case 'EACCES':
+          return {
+            originalContent: '',
+            correctedContent: proposedContent,
+            fileExists: true,
+            error: {
+              message: `Permission denied reading file '${filePath}'`,
+              code: 'EACCES',
+            },
+          };
+        case 'EISDIR':
+          return {
+            originalContent: '',
+            correctedContent: proposedContent,
+            fileExists: false,
+            error: {
+              message: `Path is a directory, not a file: '${filePath}'`,
+              code: 'EISDIR',
+            },
+          };
+        case 'ENOSPC':
+          return {
+            originalContent: '',
+            correctedContent: proposedContent,
+            fileExists: true,
+            error: {
+              message: `No space left on device for file '${filePath}'`,
+              code: 'ENOSPC',
+            },
+          };
+        case 'EIO':
+          return {
+            originalContent: '',
+            correctedContent: proposedContent,
+            fileExists: true,
+            error: {
+              message: `I/O error reading file '${filePath}'`,
+              code: 'EIO',
+            },
+          };
+        case 'EMFILE':
+        case 'ENFILE': {
+          return {
+            originalContent: '',
+            correctedContent: proposedContent,
+            fileExists: true,
+            error: {
+              message: `Too many open files. Cannot read '${filePath}'`,
+              code: err.code,
+            },
+          };
+        }
+        default: {
+          // File exists but could not be read (permissions, etc.)
+          fileExists = true; // Mark as existing but problematic
+          originalContent = ''; // Can't use its content
+          const error = {
+            message: `File read error for '${filePath}': ${getErrorMessage(err)}`,
+            code: err.code,
+          };
+          // Return early as we can't proceed with content correction meaningfully
+          return { originalContent, correctedContent, fileExists, error };
+        }
+      }
     } else {
-      // File exists but could not be read (permissions, etc.)
-      fileExists = true; // Mark as existing but problematic
-      originalContent = ''; // Can't use its content
+      // Non-Node.js error
+      fileExists = true;
+      originalContent = '';
       const error = {
-        message: getErrorMessage(err),
-        code: isNodeError(err) ? err.code : undefined,
+        message: `Unknown error reading file '${filePath}': ${getErrorMessage(err)}`,
+        code: 'UNKNOWN',
       };
-      // Return early as we can't proceed with content correction meaningfully
       return { originalContent, correctedContent, fileExists, error };
     }
   }
@@ -233,6 +331,19 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   async execute(abortSignal: AbortSignal): Promise<ToolResult> {
     const { file_path, content, ai_proposed_content, modified_by_user } =
       this.params;
+
+    // Validate parameters before processing
+    const validation = validateWriteFileParams(file_path, content);
+    if (!validation.valid) {
+      return {
+        llmContent: `Error: ${validation.error}`,
+        returnDisplay: validation.error!,
+        error: {
+          message: validation.error!,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       file_path,
@@ -268,9 +379,51 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         !correctedContentResult.fileExists);
 
     try {
+      // Validate file path before writing
+      if (!file_path || typeof file_path !== 'string') {
+        throw new Error('Invalid file path provided');
+      }
+
+      // Check if file path is within workspace
+      if (!this.config.getWorkspaceContext().isPathWithinWorkspace(file_path)) {
+        throw new Error(
+          `File path '${file_path}' is outside the allowed workspace`,
+        );
+      }
+
+      // Check file size before writing
+      if (fileContent.length > 100 * 1024 * 1024) {
+        // 100MB limit
+        throw new Error(
+          `Content too large (${(fileContent.length / (1024 * 1024)).toFixed(2)}MB). Maximum size is 100MB`,
+        );
+      }
+
       const dirName = path.dirname(file_path);
       if (!fs.existsSync(dirName)) {
-        fs.mkdirSync(dirName, { recursive: true });
+        try {
+          fs.mkdirSync(dirName, { recursive: true });
+        } catch (mkdirErr) {
+          if (isNodeError(mkdirErr)) {
+            switch (mkdirErr.code) {
+              case 'EACCES':
+                throw new Error(
+                  `Permission denied creating directory '${dirName}'`,
+                );
+              case 'ENOSPC':
+                throw new Error(
+                  `No space left on device. Cannot create directory '${dirName}'`,
+                );
+              case 'ENAMETOOLONG':
+                throw new Error(`Directory path too long: '${dirName}'`);
+              default:
+                throw new Error(
+                  `Failed to create directory '${dirName}': ${mkdirErr.message}`,
+                );
+            }
+          }
+          throw mkdirErr;
+        }
       }
 
       await this.config
@@ -351,18 +504,48 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
       if (isNodeError(error)) {
         // Handle specific Node.js errors with their error codes
-        errorMsg = `Error writing to file '${file_path}': ${error.message} (${error.code})`;
-
-        // Log specific error types for better debugging
-        if (error.code === 'EACCES') {
-          errorMsg = `Permission denied writing to file: ${file_path} (${error.code})`;
-          errorType = ToolErrorType.PERMISSION_DENIED;
-        } else if (error.code === 'ENOSPC') {
-          errorMsg = `No space left on device: ${file_path} (${error.code})`;
-          errorType = ToolErrorType.NO_SPACE_LEFT;
-        } else if (error.code === 'EISDIR') {
-          errorMsg = `Target is a directory, not a file: ${file_path} (${error.code})`;
-          errorType = ToolErrorType.TARGET_IS_DIRECTORY;
+        switch (error.code) {
+          case 'EACCES':
+            errorMsg = `Permission denied writing to file: ${file_path}`;
+            errorType = ToolErrorType.PERMISSION_DENIED;
+            break;
+          case 'ENOSPC':
+            errorMsg = `No space left on device: ${file_path}`;
+            errorType = ToolErrorType.NO_SPACE_LEFT;
+            break;
+          case 'EISDIR':
+            errorMsg = `Target is a directory, not a file: ${file_path}`;
+            errorType = ToolErrorType.TARGET_IS_DIRECTORY;
+            break;
+          case 'ENAMETOOLONG':
+            errorMsg = `File path too long: ${file_path}`;
+            errorType = ToolErrorType.INVALID_TOOL_PARAMS;
+            break;
+          case 'EIO':
+            errorMsg = `I/O error writing to file: ${file_path}`;
+            errorType = ToolErrorType.FILE_WRITE_FAILURE;
+            break;
+          case 'EMFILE':
+          case 'ENFILE': {
+            errorMsg = `Too many open files. Cannot write to: ${file_path}`;
+            errorType = ToolErrorType.FILE_WRITE_FAILURE;
+            break;
+          }
+          case 'ENOTDIR':
+            errorMsg = `Path component is not a directory: ${file_path}`;
+            errorType = ToolErrorType.PATH_NOT_IN_WORKSPACE;
+            break;
+          case 'EROFS':
+            errorMsg = `Read-only file system. Cannot write to: ${file_path}`;
+            errorType = ToolErrorType.PERMISSION_DENIED;
+            break;
+          case 'EEXIST':
+            errorMsg = `File already exists and cannot be overwritten: ${file_path}`;
+            errorType = ToolErrorType.FILE_WRITE_FAILURE;
+            break;
+          default:
+            errorMsg = `Error writing to file '${file_path}': ${error.message} (${error.code})`;
+            errorType = ToolErrorType.FILE_WRITE_FAILURE;
         }
 
         // Include stack trace in debug mode for better troubleshooting
@@ -370,9 +553,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
           console.error('Write file error stack:', error.stack);
         }
       } else if (error instanceof Error) {
-        errorMsg = `Error writing to file: ${error.message}`;
+        errorMsg = `Error writing to file '${file_path}': ${error.message}`;
       } else {
-        errorMsg = `Error writing to file: ${String(error)}`;
+        errorMsg = `Error writing to file '${file_path}': ${String(error)}`;
       }
 
       return {
@@ -385,6 +568,43 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       };
     }
   }
+}
+
+/**
+ * Validates file path and content for write operations
+ */
+function validateWriteFileParams(
+  filePath: string,
+  content: string,
+): { valid: boolean; error?: string } {
+  // Validate file path
+  if (!filePath || typeof filePath !== 'string') {
+    return { valid: false, error: 'Invalid file path provided' };
+  }
+
+  // Check for path traversal attempts
+  if (filePath.includes('..') || filePath.includes('~')) {
+    return {
+      valid: false,
+      error: 'File path contains potentially unsafe characters',
+    };
+  }
+
+  // Validate content
+  if (typeof content !== 'string') {
+    return { valid: false, error: 'Content must be a string' };
+  }
+
+  // Check content size
+  if (content.length > 100 * 1024 * 1024) {
+    // 100MB limit
+    return {
+      valid: false,
+      error: `Content too large (${(content.length / (1024 * 1024)).toFixed(2)}MB). Maximum size is 100MB`,
+    };
+  }
+
+  return { valid: true };
 }
 
 /**
