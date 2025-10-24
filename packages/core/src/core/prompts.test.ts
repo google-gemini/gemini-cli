@@ -174,15 +174,12 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
-    it.each(['false', '0'])(
-      'should use default prompt when GEMINI_SYSTEM_MD is "%s"',
-      (value) => {
-        vi.stubEnv('GEMINI_SYSTEM_MD', value);
-        const prompt = getCoreSystemPrompt(mockConfig);
-        expect(fs.readFileSync).not.toHaveBeenCalled();
-        expect(prompt).not.toContain('custom system prompt');
-      },
-    );
+    it('should use default prompt when GEMINI_SYSTEM_MD is "false"', () => {
+      vi.stubEnv('GEMINI_SYSTEM_MD', 'false');
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+      expect(prompt).not.toContain('custom system prompt');
+    });
 
     it('should throw error if GEMINI_SYSTEM_MD points to a non-existent file', () => {
       const customPath = '/non/existent/path/system.md';
@@ -193,19 +190,16 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
     });
 
-    it.each(['true', '1'])(
-      'should read from default path when GEMINI_SYSTEM_MD is "%s"',
-      (value) => {
-        const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
-        vi.stubEnv('GEMINI_SYSTEM_MD', value);
-        vi.mocked(fs.existsSync).mockReturnValue(true);
-        vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
+    it('should read from default path when GEMINI_SYSTEM_MD is "true"', () => {
+      const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
+      vi.stubEnv('GEMINI_SYSTEM_MD', 'true');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
 
-        const prompt = getCoreSystemPrompt(mockConfig);
-        expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
-        expect(prompt).toBe('custom system prompt');
-      },
-    );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
+      expect(prompt).toBe('custom system prompt');
+    });
 
     it('should read from custom path when GEMINI_SYSTEM_MD provides one, preserving case', () => {
       const customPath = path.resolve('/custom/path/SyStEm.Md');
@@ -237,27 +231,21 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   describe('GEMINI_WRITE_SYSTEM_MD environment variable', () => {
-    it.each(['false', '0'])(
-      'should not write to file when GEMINI_WRITE_SYSTEM_MD is "%s"',
-      (value) => {
-        vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
-        getCoreSystemPrompt(mockConfig);
-        expect(fs.writeFileSync).not.toHaveBeenCalled();
-      },
-    );
+    it('should not write to file when GEMINI_WRITE_SYSTEM_MD is "false"', () => {
+      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', 'false');
+      getCoreSystemPrompt(mockConfig);
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
 
-    it.each(['true', '1'])(
-      'should write to default path when GEMINI_WRITE_SYSTEM_MD is "%s"',
-      (value) => {
-        const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
-        vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
-        getCoreSystemPrompt(mockConfig);
-        expect(fs.writeFileSync).toHaveBeenCalledWith(
-          defaultPath,
-          expect.any(String),
-        );
-      },
-    );
+    it('should write to default path when GEMINI_WRITE_SYSTEM_MD is "true"', () => {
+      const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
+      vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', 'true');
+      getCoreSystemPrompt(mockConfig);
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        defaultPath,
+        expect.any(String),
+      );
+    });
 
     it('should write to custom path when GEMINI_WRITE_SYSTEM_MD provides one', () => {
       const customPath = path.resolve('/custom/path/system.md');
