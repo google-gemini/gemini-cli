@@ -250,6 +250,18 @@ export class ClearcutLogger {
     }
   }
 
+  createBasicLogEvent(
+    eventName: EventNames,
+    data: EventValue[] = [],
+  ): LogEvent {
+    return {
+      console_type: 'GEMINI_CLI',
+      application: 102, // GEMINI_CLI
+      event_name: eventName as string,
+      event_metadata: [data],
+    };
+  }
+
   createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
     const email = this.userAccountManager.getCachedGoogleAccount();
 
@@ -260,12 +272,7 @@ export class ClearcutLogger {
 
     data = this.addDefaultFields(data, totalAccounts);
 
-    const logEvent: LogEvent = {
-      console_type: 'GEMINI_CLI',
-      application: 102, // GEMINI_CLI
-      event_name: eventName as string,
-      event_metadata: [data],
-    };
+    const logEvent = this.createBasicLogEvent(eventName, data);
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
     if (email) {
@@ -921,7 +928,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -945,7 +952,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -981,7 +988,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_UPDATE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1070,7 +1077,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1109,7 +1116,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
