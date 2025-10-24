@@ -1749,14 +1749,14 @@ describe('InputPrompt', () => {
       stdin.write('\x12');
       await vi.waitFor(() => {
         expect(stdout.lastFrame()).toMatchSnapshot(
-          'command-search-collapsed-match',
+          'command-search-render-collapsed-match',
         );
       });
 
       stdin.write('\u001B[C');
       await vi.waitFor(() => {
         expect(stdout.lastFrame()).toMatchSnapshot(
-          'command-search-expanded-match',
+          'command-search-render-expanded-match',
         );
       });
 
