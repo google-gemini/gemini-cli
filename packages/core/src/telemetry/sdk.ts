@@ -243,11 +243,6 @@ export async function initializeTelemetry(
     const otlpHeaders = config.getTelemetryOtlpHeaders() ?? {};
     const hasHeaders = Object.keys(otlpHeaders).length > 0;
 
-    if (hasHeaders) {
-      const headerCount = Object.keys(otlpHeaders).length;
-      diag.debug(`Applying ${headerCount} OTLP header(s)`);
-    }
-
     if (otlpProtocol === 'http') {
       spanExporter = new OTLPTraceExporterHttp({
         url: parsedEndpoint,
