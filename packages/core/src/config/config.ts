@@ -49,6 +49,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
 } from './models.js';
+export * from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';

@@ -23,6 +23,7 @@ const mockConfig = {
   getTargetDir: () =>
     '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
   getDebugMode: () => false,
+  isInFallbackMode: () => false,
 };
 
 const configProxy = new Proxy(mockConfig, {
