@@ -379,11 +379,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         !correctedContentResult.fileExists);
 
     try {
-      // Validate file path before writing
-      if (!file_path || typeof file_path !== 'string') {
-        throw new Error('Invalid file path provided');
-      }
-
       // Check if file path is within workspace
       if (!this.config.getWorkspaceContext().isPathWithinWorkspace(file_path)) {
         throw new Error(
@@ -580,14 +575,6 @@ function validateWriteFileParams(
   // Validate file path
   if (!filePath || typeof filePath !== 'string') {
     return { valid: false, error: 'Invalid file path provided' };
-  }
-
-  // Check for path traversal attempts
-  if (filePath.includes('..') || filePath.includes('~')) {
-    return {
-      valid: false,
-      error: 'File path contains potentially unsafe characters',
-    };
   }
 
   // Validate content
