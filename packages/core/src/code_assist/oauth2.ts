@@ -65,43 +65,7 @@ export interface OauthWebLogin {
   loginCompletePromise: Promise<void>;
 }
 
-const authClientPromises = new Map<AuthType, Promise<AuthClient>>();
-
-let loadedCredentialsPromise: Promise<{
-  creds: Credentials;
-  keyFile: string;
-} | null> | null = null;
-
-function getLoadedCredentials(): Promise<{
-  creds: Credentials;
-  keyFile: string;
-} | null> {
-  if (loadedCredentialsPromise) {
-    return loadedCredentialsPromise;
-  }
-  loadedCredentialsPromise = (async () => {
-    const pathsToTry = [
-      Storage.getOAuthCredsPath(),
-      process.env['GOOGLE_APPLICATION_CREDENTIALS'],
-    ].filter((p): p is string => !!p);
-
-    for (const keyFile of pathsToTry) {
-      try {
-        const credsStr = await fs.readFile(keyFile, 'utf-8');
-        const creds = JSON.parse(credsStr) as Credentials;
-        return { creds, keyFile };
-      } catch (error) {
-        // Log specific error for debugging, but continue trying other paths
-        debugLogger.debug(
-          `Failed to load credentials from ${keyFile}:`,
-          getErrorMessage(error),
-        );
-      }
-    }
-    return null;
-  })();
-  return loadedCredentialsPromise;
-}
+const oauthClientPromises = new Map<AuthType, Promise<AuthClient>>();
 
 function getUseEncryptedStorageFlag() {
   return process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
@@ -110,7 +74,6 @@ function getUseEncryptedStorageFlag() {
 async function initOauthClient(
   authType: AuthType,
   config: Config,
-  loaded?: { creds: Credentials; keyFile: string } | null,
 ): Promise<AuthClient> {
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
@@ -141,19 +104,23 @@ async function initOauthClient(
   });
 
   // If there are cached creds on disk, they always take precedence
-  if (await loadCachedCredentials(client, loaded)) {
-    // Found valid cached credentials.
-    // Check if we need to retrieve Google Account ID or Email
-    if (!userAccountManager.getCachedGoogleAccount()) {
+  const loadedClient = await loadCachedCredentials(client);
+  if (loadedClient) {
+    // For BYOID, we don't fetch user info from Google's endpoint, so we only
+    // do this for OAuth2Client.
+    if (
+      loadedClient instanceof OAuth2Client &&
+      !userAccountManager.getCachedGoogleAccount()
+    ) {
       try {
-        await fetchAndCacheUserInfo(client);
+        await fetchAndCacheUserInfo(loadedClient);
       } catch (error) {
         // Non-fatal, continue with existing auth.
         debugLogger.warn('Failed to fetch user info:', getErrorMessage(error));
       }
     }
     debugLogger.log('Loaded cached credentials.');
-    return client;
+    return loadedClient;
   }
 
   // In Google Cloud Shell, we can use Application Default Credentials (ADC)
@@ -257,55 +224,12 @@ export async function getOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
-  if (!authClientPromises.has(authType)) {
-    authClientPromises.set(authType, initAuthClient(authType, config));
+  if (!oauthClientPromises.has(authType)) {
+    oauthClientPromises.set(authType, initOauthClient(authType, config));
   }
-  return authClientPromises.get(authType)!;
+  return oauthClientPromises.get(authType)!;
 }
 
-async function initAuthClient(
-  authType: AuthType,
-  config: Config,
-): Promise<AuthClient> {
-  // Read from disk once (or get from cache).
-  const loaded = await getLoadedCredentials();
-
-  // Check for BYOID credentials first.
-  if (
-    loaded &&
-    (loaded.creds as { type?: string }).type ===
-      'external_account_authorized_user'
-  ) {
-    try {
-      const auth = new GoogleAuth({
-        scopes: OAUTH_SCOPE,
-        clientOptions: {
-          transporterOptions: {
-            proxy: config.getProxy(),
-          },
-        },
-      });
-      const externalAccountAuthorizedUserClient = await auth.fromJSON(
-        loaded.creds as Parameters<GoogleAuth['fromJSON']>[0],
-      );
-      const { token } =
-        await externalAccountAuthorizedUserClient.getAccessToken();
-      if (token) {
-        // Successfully created a BYOID client.
-        return externalAccountAuthorizedUserClient;
-      }
-    } catch (error) {
-      console.debug(
-        `Failed to create BYOID client from credentials:`,
-        getErrorMessage(error),
-      );
-    }
-  }
-
-  return await initOauthClient(authType, config, loaded);
-}
-
-// Make getAuthClient lazy again
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   const redirectUri = 'https://codeassist.google.com/authcode';
   const codeVerifier = await client.generateCodeVerifierAsync();
@@ -515,39 +439,53 @@ export function getAvailablePort(): Promise<number> {
 
 async function loadCachedCredentials(
   client: OAuth2Client,
-  loaded?: { creds: Credentials; keyFile: string } | null,
-): Promise<boolean> {
+): Promise<AuthClient | null> {
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
     const credentials = await OAuthCredentialStorage.loadCredentials();
     if (credentials) {
       client.setCredentials(credentials);
-      return true;
+      return client;
     }
-    return false;
+    return null;
   }
 
-  // If credentials were not passed in, load them.
-  if (loaded === undefined) {
-    loaded = await getLoadedCredentials(); // Uses the cached promise
-  }
-  if (!loaded) {
-    return false;
-  }
+  const pathsToTry = [
+    Storage.getOAuthCredsPath(),
+    process.env['GOOGLE_APPLICATION_CREDENTIALS'],
+  ].filter((p): p is string => !!p);
 
-  try {
-    client.setCredentials(loaded.creds);
+  for (const keyFile of pathsToTry) {
+    try {
+      const credsStr = await fs.readFile(keyFile, 'utf-8');
+      const creds = JSON.parse(credsStr);
+      if (creds.type === 'external_account_authorized_user') {
+        const auth = new GoogleAuth({
+          scopes: OAUTH_SCOPE,
+        });
+        const externalAccountAuthorizedUserClient = await auth.fromJSON(creds);
+        const token =
+          await externalAccountAuthorizedUserClient.getAccessToken();
+        // We must return the client itself, not just set credentials on the generic client.
+        if (!token) {
+          return null;
+        }
+        debugLogger.log('Loaded external account credentials.');
+        return externalAccountAuthorizedUserClient;
+      } else {
+        client.setCredentials(creds);
+      }
 
-    // This will verify locally that the credentials look good.
-    const { token } = await client.getAccessToken();
-    if (!token) {
-      return false;
-    }
+      // This will verify locally that the credentials look good.
+      const { token } = await client.getAccessToken();
+      if (!token) {
+        continue;
+      }
 
-    // This will check with the server to see if it hasn't been revoked.
-    await client.getTokenInfo(token);
+      // This will check with the server to see if it hasn't been revoked.
+      await client.getTokenInfo(token);
 
-      return true;
+      return client;
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
       debugLogger.debug(
@@ -557,7 +495,7 @@ async function loadCachedCredentials(
     }
   }
 
-  return false;
+  return null;
 }
 
 async function cacheCredentials(credentials: Credentials) {
@@ -574,7 +512,7 @@ async function cacheCredentials(credentials: Credentials) {
 }
 
 export function clearOauthClientCache() {
-  authClientPromises.clear();
+  oauthClientPromises.clear();
 }
 
 export async function clearCachedCredentialFile() {
@@ -628,6 +566,5 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
 
 // Helper to ensure test isolation
 export function resetOauthClientForTesting() {
-  authClientPromises.clear();
-  loadedCredentialsPromise = null;
+  oauthClientPromises.clear();
 }

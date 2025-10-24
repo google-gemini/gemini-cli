@@ -273,44 +273,6 @@ describe('oauth2', () => {
       consoleLogSpy.mockRestore();
     });
 
-    describe('BYOID workflow', () => {
-      it('should use BYOID credentials from GOOGLE_APPLICATION_CREDENTIALS if available', async () => {
-        // No default creds file exists
-        const byoidCredentials = {
-          type: 'external_account_authorized_user',
-          client_id: 'mock-client-id',
-        };
-        const envCredsPath = path.join(tempHomeDir, 'env_creds.json');
-        await fs.promises.writeFile(
-          envCredsPath,
-          JSON.stringify(byoidCredentials),
-        );
-        vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
-
-        const mockExternalClient = {
-          getAccessToken: vi
-            .fn()
-            .mockResolvedValue({ token: 'fake-byoid-token' }),
-        };
-
-        const mockFromJSON = vi.fn().mockResolvedValue(mockExternalClient);
-        (GoogleAuth as unknown as Mock).mockImplementation(() => ({
-          fromJSON: mockFromJSON,
-        }));
-
-        const client = await getOauthClient(
-          AuthType.LOGIN_WITH_GOOGLE,
-          mockConfig,
-        );
-
-        expect(mockFromJSON).toHaveBeenCalledWith(byoidCredentials);
-        expect(client).toBe(mockExternalClient);
-        expect(mockExternalClient.getAccessToken).toHaveBeenCalled();
-        // make sure no OAuthClient is created
-        expect(OAuth2Client).not.toHaveBeenCalled();
-      });
-    });
-
     describe('in Cloud Shell', () => {
       const mockGetAccessToken = vi.fn();
       let mockComputeClient: Compute;
@@ -328,7 +290,6 @@ describe('oauth2', () => {
       });
 
       it('should attempt to load cached credentials first', async () => {
-        vi.clearAllMocks();
         const cachedCreds = { refresh_token: 'cached-token' };
         const credsPath = path.join(
           tempHomeDir,
@@ -458,6 +419,53 @@ describe('oauth2', () => {
 
         // Assert the correct credentials were used
         expect(mockClient.setCredentials).toHaveBeenCalledWith(envCreds);
+      });
+
+      it('should use GoogleAuth for BYOID credentials from GOOGLE_APPLICATION_CREDENTIALS', async () => {
+        // Setup BYOID credentials via environment variable
+        const byoidCredentials = {
+          type: 'external_account_authorized_user',
+          client_id: 'mock-client-id',
+        };
+        const envCredsPath = path.join(tempHomeDir, 'byoid_creds.json');
+        await fs.promises.writeFile(
+          envCredsPath,
+          JSON.stringify(byoidCredentials),
+        );
+        vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+        // Mock GoogleAuth and its chain of calls
+        const mockExternalAccountClient = {
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'byoid-token' }),
+        };
+        const mockFromJSON = vi
+          .fn()
+          .mockResolvedValue(mockExternalAccountClient);
+        const mockGoogleAuthInstance = {
+          fromJSON: mockFromJSON,
+        };
+        (GoogleAuth as unknown as Mock).mockImplementation(
+          () => mockGoogleAuthInstance,
+        );
+
+        const mockOAuth2Client = {
+          on: vi.fn(),
+        };
+        (OAuth2Client as unknown as Mock).mockImplementation(
+          () => mockOAuth2Client,
+        );
+
+        const client = await getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        // Assert that GoogleAuth was used and the correct client was returned
+        expect(GoogleAuth).toHaveBeenCalledWith({
+          scopes: expect.any(Array),
+        });
+        expect(mockFromJSON).toHaveBeenCalledWith(byoidCredentials);
+        expect(client).toBe(mockExternalAccountClient);
       });
     });
 
