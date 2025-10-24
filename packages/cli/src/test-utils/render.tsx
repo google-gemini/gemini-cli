@@ -23,7 +23,6 @@ const mockConfig = {
   getTargetDir: () =>
     '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
   getDebugMode: () => false,
-  isInFallbackMode: () => false,
 };
 
 const configProxy = new Proxy(mockConfig, {
@@ -65,6 +64,7 @@ const baseMockUiState = {
   streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  currentModel: 'gemini-pro',
 };
 
 export const renderWithProviders = (

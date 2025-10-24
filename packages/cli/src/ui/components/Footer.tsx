@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { shortenPath, tildeifyPath , getEffectiveModel } from '@google/gemini-cli-core';
+import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import Gradient from 'ink-gradient';
@@ -40,7 +40,7 @@ export const Footer: React.FC = () => {
     isTrustedFolder,
     mainAreaWidth,
   } = {
-    model: getEffectiveModel(config.isInFallbackMode(), config.getModel()),
+    model: uiState.currentModel,
     targetDir: config.getTargetDir(),
     debugMode: config.getDebugMode(),
     branchName: uiState.branchName,

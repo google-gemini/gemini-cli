@@ -9,12 +9,7 @@ import {
   createMockSettings,
 } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
-import type {
-  Config} from '@google/gemini-cli-core';
-import {
-  tildeifyPath,
-  ToolCallDecision
-} from '@google/gemini-cli-core';
+import { tildeifyPath, ToolCallDecision } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -264,17 +259,12 @@ describe('<Footer />', () => {
 
 describe('fallback mode display', () => {
   it('should display Flash model when in fallback mode, not the configured Pro model', () => {
-    const fallbackConfig = {
-      getModel: () => 'gemini-2.5-pro', // Config still says Pro
-      getTargetDir: () => '/test/dir',
-      getDebugMode: () => false,
-      isInFallbackMode: () => true, // But we're in fallback mode
-    };
-
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
-      config: fallbackConfig as unknown as Config,
-      uiState: { sessionStats: mockSessionStats },
+      uiState: {
+        sessionStats: mockSessionStats,
+        currentModel: 'gemini-2.5-flash', // Fallback active, showing Flash
+      },
     });
 
     // Footer should show the effective model (Flash), not the config model (Pro)
@@ -283,17 +273,12 @@ describe('fallback mode display', () => {
   });
 
   it('should display Pro model when NOT in fallback mode', () => {
-    const normalConfig = {
-      getModel: () => 'gemini-2.5-pro',
-      getTargetDir: () => '/test/dir',
-      getDebugMode: () => false,
-      isInFallbackMode: () => false,
-    };
-
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
-      config: normalConfig as unknown as Config,
-      uiState: { sessionStats: mockSessionStats },
+      uiState: {
+        sessionStats: mockSessionStats,
+        currentModel: 'gemini-2.5-pro', // Normal mode, showing Pro
+      },
     });
 
     expect(lastFrame()).toContain('gemini-2.5-pro');
