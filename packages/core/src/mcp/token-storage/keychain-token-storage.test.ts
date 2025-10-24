@@ -348,5 +348,54 @@ describe('KeychainTokenStorage', () => {
         );
       });
     });
+
+    describe('Secrets', () => {
+      it('should set and get a secret', async () => {
+        mockKeytar.setPassword.mockResolvedValue(undefined);
+        mockKeytar.getPassword.mockResolvedValue('secret-value');
+
+        await storage.setSecret('secret-key', 'secret-value');
+        const value = await storage.getSecret('secret-key');
+
+        expect(mockKeytar.setPassword).toHaveBeenCalledWith(
+          mockServiceName,
+          '__secret__secret-key',
+          'secret-value',
+        );
+        expect(mockKeytar.getPassword).toHaveBeenCalledWith(
+          mockServiceName,
+          '__secret__secret-key',
+        );
+        expect(value).toBe('secret-value');
+      });
+
+      it('should delete a secret', async () => {
+        mockKeytar.deletePassword.mockResolvedValue(true);
+        await storage.deleteSecret('secret-key');
+        expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
+          mockServiceName,
+          '__secret__secret-key',
+        );
+      });
+
+      it('should list secrets', async () => {
+        mockKeytar.findCredentials.mockResolvedValue([
+          { account: '__secret__secret1', password: '' },
+          { account: '__secret__secret2', password: '' },
+          { account: 'server1', password: '' },
+        ]);
+        const secrets = await storage.listSecrets();
+        expect(secrets).toEqual(['secret1', 'secret2']);
+      });
+
+      it('should not list secrets in listServers', async () => {
+        mockKeytar.findCredentials.mockResolvedValue([
+          { account: '__secret__secret1', password: '' },
+          { account: 'server1', password: '' },
+        ]);
+        const servers = await storage.listServers();
+        expect(servers).toEqual(['server1']);
+      });
+    });
   });
 });

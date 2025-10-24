@@ -188,7 +188,7 @@ export class ExtensionManager {
 
         const newExtensionName = newExtensionConfig.name;
         if (!isUpdate) {
-          const installedExtensions = this.loadExtensions();
+          const installedExtensions = await this.loadExtensions();
           if (
             installedExtensions.some(
               (installed) => installed.name === newExtensionName,
@@ -205,12 +205,16 @@ export class ExtensionManager {
           this.requestConsent,
           previousExtensionConfig,
         );
-
-        const extensionStorage = new ExtensionStorage(newExtensionName);
-        const destinationPath = extensionStorage.getExtensionDir();
+        const extensionId = getExtensionId(newExtensionConfig, installMetadata);
+        const destinationPath = new ExtensionStorage(
+          newExtensionName,
+        ).getExtensionDir();
         let previousSettings: Record<string, string> | undefined;
         if (isUpdate) {
-          previousSettings = getEnvContents(extensionStorage);
+          previousSettings = await getEnvContents(
+            previousExtensionConfig,
+            extensionId,
+          );
           await this.uninstallExtension(newExtensionName, isUpdate);
         }
 
@@ -219,6 +223,7 @@ export class ExtensionManager {
           if (isUpdate) {
             await maybePromptForSettings(
               newExtensionConfig,
+              extensionId,
               this.requestSetting,
               previousExtensionConfig,
               previousSettings,
@@ -226,6 +231,7 @@ export class ExtensionManager {
           } else {
             await maybePromptForSettings(
               newExtensionConfig,
+              extensionId,
               this.requestSetting,
             );
           }
@@ -324,7 +330,7 @@ export class ExtensionManager {
     extensionIdentifier: string,
     isUpdate: boolean,
   ): Promise<void> {
-    const installedExtensions = this.loadExtensions();
+    const installedExtensions = await this.loadExtensions();
     const extension = installedExtensions.find(
       (installed) =>
         installed.name.toLowerCase() === extensionIdentifier.toLowerCase() ||
@@ -357,26 +363,22 @@ export class ExtensionManager {
     );
   }
 
-  loadExtensions(): GeminiCLIExtension[] {
+  async loadExtensions(): Promise<GeminiCLIExtension[]> {
     const extensionsDir = ExtensionStorage.getUserExtensionsDir();
     if (!fs.existsSync(extensionsDir)) {
       return [];
     }
 
-    const extensions: GeminiCLIExtension[] = [];
-    for (const subdir of fs.readdirSync(extensionsDir)) {
-      const extensionDir = path.join(extensionsDir, subdir);
-
-      const extension = this.loadExtension(extensionDir);
-      if (extension != null) {
-        extensions.push(extension);
-      }
-    }
+    const extensions: Array<GeminiCLIExtension | null> = await Promise.all(
+      fs
+        .readdirSync(extensionsDir)
+        .map((subdir) => this.loadExtension(path.join(extensionsDir, subdir))),
+    );
 
     const uniqueExtensions = new Map<string, GeminiCLIExtension>();
 
     for (const extension of extensions) {
-      if (!uniqueExtensions.has(extension.name)) {
+      if (extension && !uniqueExtensions.has(extension.name)) {
         uniqueExtensions.set(extension.name, extension);
       }
     }
@@ -384,7 +386,9 @@ export class ExtensionManager {
     return Array.from(uniqueExtensions.values());
   }
 
-  loadExtension(extensionDir: string): GeminiCLIExtension | null {
+  async loadExtension(
+    extensionDir: string,
+  ): Promise<GeminiCLIExtension | null> {
     if (!fs.statSync(extensionDir).isDirectory()) {
       return null;
     }
@@ -399,7 +403,10 @@ export class ExtensionManager {
     try {
       let config = this.loadExtensionConfig(effectiveExtensionPath);
 
-      const customEnv = getEnvContents(new ExtensionStorage(config.name));
+      const customEnv = await getEnvContents(
+        config,
+        getExtensionId(config, installMetadata),
+      );
       config = resolveEnvVarsInObject(config, customEnv);
 
       if (config.mcpServers) {
@@ -441,7 +448,7 @@ export class ExtensionManager {
     }
   }
 
-  loadExtensionByName(name: string): GeminiCLIExtension | null {
+  async loadExtensionByName(name: string): Promise<GeminiCLIExtension | null> {
     const userExtensionsDir = ExtensionStorage.getUserExtensionsDir();
     if (!fs.existsSync(userExtensionsDir)) {
       return null;
@@ -452,7 +459,7 @@ export class ExtensionManager {
       if (!fs.statSync(extensionDir).isDirectory()) {
         continue;
       }
-      const extension = this.loadExtension(extensionDir);
+      const extension = await this.loadExtension(extensionDir);
       if (extension && extension.name.toLowerCase() === name.toLowerCase()) {
         return extension;
       }
@@ -542,14 +549,14 @@ export class ExtensionManager {
     return output;
   }
 
-  disableExtension(name: string, scope: SettingScope) {
+  async disableExtension(name: string, scope: SettingScope) {
     if (
       scope === SettingScope.System ||
       scope === SettingScope.SystemDefaults
     ) {
       throw new Error('System and SystemDefaults scopes are not supported.');
     }
-    const extension = this.loadExtensionByName(name);
+    const extension = await this.loadExtensionByName(name);
     if (!extension) {
       throw new Error(`Extension with name ${name} does not exist.`);
     }
@@ -563,14 +570,14 @@ export class ExtensionManager {
     );
   }
 
-  enableExtension(name: string, scope: SettingScope) {
+  async enableExtension(name: string, scope: SettingScope) {
     if (
       scope === SettingScope.System ||
       scope === SettingScope.SystemDefaults
     ) {
       throw new Error('System and SystemDefaults scopes are not supported.');
     }
-    const extension = this.loadExtensionByName(name);
+    const extension = await this.loadExtensionByName(name);
     if (!extension) {
       throw new Error(`Extension with name ${name} does not exist.`);
     }

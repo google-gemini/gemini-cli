@@ -190,8 +190,8 @@ Each object in the array should have the following properties:
 - `description`: A description of the setting and what it's used for.
 - `envVar`: The name of the environment variable that the setting will be stored
   as.
-
-**Example**
+- `sensitive`: Optional boolean. If true, obfuscates the input the user provides
+  and stores the secret in keychain storage. **Example**
 
 ```json
 {

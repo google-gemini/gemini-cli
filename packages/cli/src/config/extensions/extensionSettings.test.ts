@@ -59,7 +59,7 @@ describe('extensionSettings', () => {
 
     it('should do nothing if settings are undefined', async () => {
       const config: ExtensionConfig = { name: 'test-ext', version: '1.0.0' };
-      await maybePromptForSettings(config, mockRequestSetting);
+      await maybePromptForSettings(config, '12345', mockRequestSetting);
       expect(mockRequestSetting).not.toHaveBeenCalled();
     });
 
@@ -69,7 +69,7 @@ describe('extensionSettings', () => {
         version: '1.0.0',
         settings: [],
       };
-      await maybePromptForSettings(config, mockRequestSetting);
+      await maybePromptForSettings(config, '12345', mockRequestSetting);
       expect(mockRequestSetting).not.toHaveBeenCalled();
     });
 
@@ -82,7 +82,7 @@ describe('extensionSettings', () => {
           { name: 's2', description: 'd2', envVar: 'VAR2' },
         ],
       };
-      await maybePromptForSettings(config, mockRequestSetting);
+      await maybePromptForSettings(config, '12345', mockRequestSetting);
       expect(mockRequestSetting).toHaveBeenCalledTimes(2);
       expect(mockRequestSetting).toHaveBeenCalledWith(config.settings![0]);
       expect(mockRequestSetting).toHaveBeenCalledWith(config.settings![1]);
@@ -97,7 +97,7 @@ describe('extensionSettings', () => {
           { name: 's2', description: 'd2', envVar: 'VAR2' },
         ],
       };
-      await maybePromptForSettings(config, mockRequestSetting);
+      await maybePromptForSettings(config, '12345', mockRequestSetting);
 
       const expectedEnvPath = path.join(extensionDir, '.env');
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
@@ -108,24 +108,24 @@ describe('extensionSettings', () => {
   });
 
   describe('promptForSetting', () => {
-    // it('should use prompts with type "password" for sensitive settings', async () => {
-    //   const setting: ExtensionSetting = {
-    //     name: 'API Key',
-    //     description: 'Your secret key',
-    //     envVar: 'API_KEY',
-    //     sensitive: true,
-    //   };
-    //   vi.mocked(prompts).mockResolvedValue({ value: 'secret-key' });
+    it('should use prompts with type "password" for sensitive settings', async () => {
+      const setting: ExtensionSetting = {
+        name: 'API Key',
+        description: 'Your secret key',
+        envVar: 'API_KEY',
+        sensitive: true,
+      };
+      vi.mocked(prompts).mockResolvedValue({ value: 'secret-key' });
 
-    //   const result = await promptForSetting(setting);
+      const result = await promptForSetting(setting);
 
-    //   expect(prompts).toHaveBeenCalledWith({
-    //     type: 'password',
-    //     name: 'value',
-    //     message: 'API Key\nYour secret key',
-    //   });
-    //   expect(result).toBe('secret-key');
-    // });
+      expect(prompts).toHaveBeenCalledWith({
+        type: 'password',
+        name: 'value',
+        message: 'API Key\nYour secret key',
+      });
+      expect(result).toBe('secret-key');
+    });
 
     it('should use prompts with type "text" for non-sensitive settings', async () => {
       const setting: ExtensionSetting = {

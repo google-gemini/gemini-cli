@@ -17,7 +17,7 @@ interface DisableArgs {
   scope?: string;
 }
 
-export function handleDisable(args: DisableArgs) {
+export async function handleDisable(args: DisableArgs) {
   const workspaceDir = process.cwd();
   const extensionManager = new ExtensionManager({
     workspaceDir,
@@ -28,9 +28,12 @@ export function handleDisable(args: DisableArgs) {
 
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      extensionManager.disableExtension(args.name, SettingScope.Workspace);
+      await extensionManager.disableExtension(
+        args.name,
+        SettingScope.Workspace,
+      );
     } else {
-      extensionManager.disableExtension(args.name, SettingScope.User);
+      await extensionManager.disableExtension(args.name, SettingScope.User);
     }
     debugLogger.log(
       `Extension "${args.name}" successfully disabled for scope "${args.scope}".`,

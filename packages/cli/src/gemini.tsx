@@ -380,7 +380,7 @@ export async function main() {
       requestSetting: null,
       enabledExtensionOverrides: argv.extensions,
     });
-    const extensions = extensionManager.loadExtensions();
+    const extensions = await extensionManager.loadExtensions();
     const config = await loadCliConfig(
       settings.merged,
       extensions,

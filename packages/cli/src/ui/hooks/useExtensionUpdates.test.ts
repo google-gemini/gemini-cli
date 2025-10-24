@@ -126,7 +126,8 @@ describe('useExtensionUpdates', () => {
         autoUpdate: true,
       },
     });
-    const extension = extensionManager.loadExtension(extensionDir)!;
+    const extension = await extensionManager.loadExtension(extensionDir);
+    expect(extension).not.toBeNull();
 
     const addItem = vi.fn();
 
@@ -149,7 +150,7 @@ describe('useExtensionUpdates', () => {
     });
 
     renderHook(() =>
-      useExtensionUpdates([extension], extensionManager, addItem),
+      useExtensionUpdates([extension!], extensionManager, addItem),
     );
 
     await waitFor(
@@ -188,10 +189,13 @@ describe('useExtensionUpdates', () => {
       },
     });
 
-    const extensions = [
-      extensionManager.loadExtension(extensionDir1)!,
-      extensionManager.loadExtension(extensionDir2)!,
-    ];
+    const extensions = await Promise.all([
+      extensionManager.loadExtension(extensionDir1),
+      extensionManager.loadExtension(extensionDir2),
+    ]);
+    const validExtensions = extensions.filter(
+      (e): e is GeminiCLIExtension => e !== null,
+    );
 
     const addItem = vi.fn();
 
@@ -227,7 +231,7 @@ describe('useExtensionUpdates', () => {
       });
 
     renderHook(() =>
-      useExtensionUpdates(extensions, extensionManager, addItem),
+      useExtensionUpdates(validExtensions, extensionManager, addItem),
     );
 
     await waitFor(

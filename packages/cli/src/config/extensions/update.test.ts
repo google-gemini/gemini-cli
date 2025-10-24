@@ -143,9 +143,10 @@ describe('update tests', () => {
         );
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
-      const extension = extensionManager.loadExtension(targetExtDir)!;
+      const extension = await extensionManager.loadExtension(targetExtDir);
+      expect(extension).not.toBeNull();
       const updateInfo = await updateExtension(
-        extension,
+        extension!,
         extensionManager,
         ExtensionUpdateState.UPDATE_AVAILABLE,
         () => {},
@@ -190,9 +191,10 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extension = await extensionManager.loadExtension(extensionDir);
+      expect(extension).not.toBeNull();
       await updateExtension(
-        extension,
+        extension!,
         extensionManager,
         ExtensionUpdateState.UPDATE_AVAILABLE,
         dispatch,
@@ -230,10 +232,11 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extension = await extensionManager.loadExtension(extensionDir);
+      expect(extension).not.toBeNull();
       await expect(
         updateExtension(
-          extension,
+          extension!,
           extensionManager,
           ExtensionUpdateState.UPDATE_AVAILABLE,
           dispatch,
@@ -268,7 +271,8 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extension = await extensionManager.loadExtension(extensionDir);
+      expect(extension).not.toBeNull();
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -278,7 +282,7 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        [extension!],
         extensionManager,
         dispatch,
       );
@@ -301,7 +305,8 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extension = await extensionManager.loadExtension(extensionDir);
+      expect(extension).not.toBeNull();
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -311,7 +316,7 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        [extension!],
         extensionManager,
         dispatch,
       );
@@ -338,10 +343,13 @@ describe('update tests', () => {
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = extensionManager.loadExtension(installedExtensionDir)!;
+      const extension = await extensionManager.loadExtension(
+        installedExtensionDir,
+      );
+      expect(extension).not.toBeNull();
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        [extension!],
         extensionManager,
         dispatch,
       );
@@ -368,10 +376,13 @@ describe('update tests', () => {
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = extensionManager.loadExtension(installedExtensionDir)!;
+      const extension = await extensionManager.loadExtension(
+        installedExtensionDir,
+      );
+      expect(extension).not.toBeNull();
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        [extension!],
         extensionManager,
         dispatch,
       );
@@ -394,13 +405,14 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extension = await extensionManager.loadExtension(extensionDir);
+      expect(extension).not.toBeNull();
 
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        [extension!],
         extensionManager,
         dispatch,
       );

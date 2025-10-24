@@ -2442,7 +2442,7 @@ describe('Settings Loading and Merging', () => {
         extensionManager,
         'disableExtension',
       );
-      mockDisableExtension.mockImplementation(() => {});
+      mockDisableExtension.mockImplementation(async () => {});
 
       migrateDeprecatedSettings(loadedSettings, extensionManager);
 
@@ -2515,7 +2515,7 @@ describe('Settings Loading and Merging', () => {
         extensionManager,
         'disableExtension',
       );
-      mockDisableExtension.mockImplementation(() => {});
+      mockDisableExtension.mockImplementation(async () => {});
 
       migrateDeprecatedSettings(loadedSettings, extensionManager);
 

@@ -37,7 +37,7 @@ export async function handleUpdate(args: UpdateArgs) {
     loadedSettings: loadSettings(workspaceDir),
   });
 
-  const extensions = extensionManager.loadExtensions();
+  const extensions = await extensionManager.loadExtensions();
   if (args.name) {
     try {
       const extension = extensions.find(

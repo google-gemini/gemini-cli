@@ -58,7 +58,7 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    const previousExtensionConfig = await extensionManager.loadExtensionConfig(
+    const previousExtensionConfig = extensionManager.loadExtensionConfig(
       extension.path,
     );
     await extensionManager.installOrUpdateExtension(
@@ -66,7 +66,7 @@ export async function updateExtension(
       previousExtensionConfig,
     );
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = extensionManager.loadExtension(
+    const updatedExtension = await extensionManager.loadExtension(
       updatedExtensionStorage.getExtensionDir(),
     );
     if (!updatedExtension) {
