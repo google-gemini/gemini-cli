@@ -15,6 +15,7 @@ import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
 import { XCode } from './xcode.js';
+import { TokyoNight } from './tokyo-night.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -55,6 +56,7 @@ class ThemeManager {
       XCode,
       ANSI,
       ANSILight,
+      TokyoNight,
     ];
     this.activeTheme = DEFAULT_THEME;
   }
