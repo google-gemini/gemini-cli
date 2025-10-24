@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { KeychainTokenStorage } from './keychain-token-storage.js';
 import type { OAuthCredentials } from './types.js';
+import { coreEvents } from '../../utils/events.js';
 
 // Hoist the mock to be available in the vi.mock factory
 const mockKeytar = vi.hoisted(() => ({
@@ -28,6 +29,12 @@ vi.mock('node:crypto', () => ({
   randomBytes: vi.fn(() => ({
     toString: vi.fn(() => mockCryptoRandomBytesString),
   })),
+}));
+
+vi.mock('../../utils/events.js', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
+  },
 }));
 
 describe('KeychainTokenStorage', () => {
@@ -82,7 +89,8 @@ describe('KeychainTokenStorage', () => {
     });
 
     it('should return false if keytar fails to set password', async () => {
-      mockKeytar.setPassword.mockRejectedValue(new Error('write error'));
+      const error = new Error('write error');
+      mockKeytar.setPassword.mockRejectedValue(error);
       const isAvailable = await storage.checkKeychainAvailability();
       expect(isAvailable).toBe(false);
     });
@@ -265,14 +273,20 @@ describe('KeychainTokenStorage', () => {
       });
 
       it('should return an empty array on error', async () => {
-        mockKeytar.findCredentials.mockRejectedValue(new Error('find error'));
+        const error = new Error('find error');
+        mockKeytar.findCredentials.mockRejectedValue(error);
         const result = await storage.listServers();
         expect(result).toEqual([]);
+        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+          'error',
+          'Failed to list servers from keychain',
+          error,
+        );
       });
     });
 
     describe('getAllCredentials', () => {
-      it('should return a map of all valid credentials', async () => {
+      it('should return a map of all valid credentials and emit feedback for invalid ones', async () => {
         const creds2 = {
           ...validCredentials,
           serverName: 'server2',
@@ -310,6 +324,30 @@ describe('KeychainTokenStorage', () => {
         expect(result.has('expired-server')).toBe(false);
         expect(result.has('bad-server')).toBe(false);
         expect(result.has('invalid-server')).toBe(false);
+
+        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+          'error',
+          'Failed to parse credentials for bad-server',
+          expect.any(SyntaxError),
+        );
+        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+          'error',
+          'Failed to parse credentials for invalid-server',
+          expect.any(Error),
+        );
+      });
+
+      it('should emit feedback and return empty map if findCredentials fails', async () => {
+        const error = new Error('find all error');
+        mockKeytar.findCredentials.mockRejectedValue(error);
+
+        const result = await storage.getAllCredentials();
+        expect(result.size).toBe(0);
+        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+          'error',
+          'Failed to get all credentials from keychain',
+          error,
+        );
       });
     });
 

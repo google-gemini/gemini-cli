@@ -7,6 +7,7 @@
 import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials } from './types.js';
+import { coreEvents } from '../../utils/events.js';
 
 interface Keytar {
   getPassword(service: string, account: string): Promise<string | null>;
@@ -42,7 +43,7 @@ export class KeychainTokenStorage extends BaseTokenStorage {
       const module = await import(moduleName);
       this.keytarModule = module.default || module;
     } catch (error) {
-      console.error(error);
+      coreEvents.emitFeedback('error', "Failed to load 'keytar' module", error);
     }
     return this.keytarModule;
   }
@@ -139,7 +140,11 @@ export class KeychainTokenStorage extends BaseTokenStorage {
         .filter((cred) => !cred.account.startsWith(KEYCHAIN_TEST_PREFIX))
         .map((cred: { account: string }) => cred.account);
     } catch (error) {
-      console.error('Failed to list servers from keychain:', error);
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to list servers from keychain',
+        error,
+      );
       return [];
     }
   }
@@ -167,14 +172,19 @@ export class KeychainTokenStorage extends BaseTokenStorage {
             result.set(cred.account, data);
           }
         } catch (error) {
-          console.error(
-            `Failed to parse credentials for ${cred.account}:`,
+          coreEvents.emitFeedback(
+            'error',
+            `Failed to parse credentials for ${cred.account}`,
             error,
           );
         }
       }
     } catch (error) {
-      console.error('Failed to get all credentials from keychain:', error);
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to get all credentials from keychain',
+        error,
+      );
     }
 
     return result;
