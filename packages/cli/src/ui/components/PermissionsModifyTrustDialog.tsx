@@ -65,8 +65,9 @@ export function PermissionsModifyTrustDialog({
         const success = commitTrustLevelChange();
         if (success) {
           relaunchApp();
+        } else {
+          onExit();
         }
-        onExit();
       }
     },
     { isActive: true },
