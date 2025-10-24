@@ -309,6 +309,9 @@ describe('extension tests', () => {
       expect(extensions[0].mcpServers?.['test-server'].cwd).toBe(
         path.join(sourceExtDir, 'server'),
       );
+      expect(extensions[0].mcpServers?.['test-server'].args).toEqual([
+        path.join(sourceExtDir, 'server', 'index.js'),
+      ]);
     });
 
     it('should resolve environment variables in extension configuration', () => {
