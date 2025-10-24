@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.11.0-nightly.20251021.e72c00cf",
+  "version": "0.12.0-nightly.20251022.0542de95",
   "description": "Gemini CLI",
   "repository": {
     "type": "git",
@@ -25,7 +25,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.11.0-nightly.20251021.e72c00cf"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.12.0-nightly.20251022.0542de95"
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
@@ -38,6 +38,7 @@
     "comment-json": "^4.2.5",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
+    "extract-zip": "^2.0.1",
     "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "highlight.js": "^11.11.1",
@@ -47,6 +48,7 @@
     "lowlight": "^3.3.0",
     "mnemonist": "^0.40.3",
     "open": "^10.1.2",
+    "prompts": "^2.4.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
@@ -56,7 +58,6 @@
     "strip-json-comments": "^3.1.1",
     "tar": "^7.5.1",
     "undici": "^7.10.0",
-    "extract-zip": "^2.0.1",
     "update-notifier": "^7.3.1",
     "wrap-ansi": "9.0.2",
     "yargs": "^17.7.2",

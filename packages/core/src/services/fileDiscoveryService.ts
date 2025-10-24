@@ -18,8 +18,7 @@ export interface FilterFilesOptions {
 
 export interface FilterReport {
   filteredPaths: string[];
-  gitIgnoredCount: number;
-  geminiIgnoredCount: number;
+  ignoredCount: number;
 }
 
 export class FileDiscoveryService {
@@ -70,28 +69,12 @@ export class FileDiscoveryService {
       respectGeminiIgnore: true,
     },
   ): FilterReport {
-    const filteredPaths: string[] = [];
-    let gitIgnoredCount = 0;
-    let geminiIgnoredCount = 0;
-
-    for (const filePath of filePaths) {
-      if (opts.respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
-        gitIgnoredCount++;
-        continue;
-      }
-
-      if (opts.respectGeminiIgnore && this.shouldGeminiIgnoreFile(filePath)) {
-        geminiIgnoredCount++;
-        continue;
-      }
-
-      filteredPaths.push(filePath);
-    }
+    const filteredPaths = this.filterFiles(filePaths, opts);
+    const ignoredCount = filePaths.length - filteredPaths.length;
 
     return {
       filteredPaths,
-      gitIgnoredCount,
-      geminiIgnoredCount,
+      ignoredCount,
     };
   }
 
@@ -131,12 +114,5 @@ export class FileDiscoveryService {
       return true;
     }
     return false;
-  }
-
-  /**
-   * Returns loaded patterns from .geminiignore
-   */
-  getGeminiIgnorePatterns(): string[] {
-    return this.geminiIgnoreFilter?.getPatterns() ?? [];
   }
 }
