@@ -58,10 +58,17 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
+    "ink": "npm:@jrichman/ink@6.3.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "wrap-ansi": "9.0.2",
     "ansi-regex": "5.0.1",
     "cliui": {
       "wrap-ansi": "7.0.0"
+    },
+    "ink-testing-library": {
+      "react": "^19.1.0",
+      "react-dom": "^19.1.0"
     }
   },
   "bin": {
@@ -95,6 +102,8 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
+    "ink": "npm:@jrichman/ink@6.3.1",
+    "ink-testing-library": "^4.0.0",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
     "memfs": "^4.42.0",
@@ -103,7 +112,7 @@
     "msw": "^2.10.4",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
-    "react-devtools-core": "^4.28.5",
+    "react-devtools-core": "^6.1.2",
     "semver": "^7.7.2",
     "strip-ansi": "^7.1.2",
     "tsx": "^4.20.3",

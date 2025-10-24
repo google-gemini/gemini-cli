@@ -67,8 +67,7 @@ describe('SubagentToolWrapper', () => {
     it('should call convertInputConfigToJsonSchema with the correct agent inputConfig', () => {
       new SubagentToolWrapper(mockDefinition, mockConfig);
 
-      expect(convertInputConfigToJsonSchema).toHaveBeenCalledOnce();
-      expect(convertInputConfigToJsonSchema).toHaveBeenCalledWith(
+      expect(convertInputConfigToJsonSchema).toHaveBeenCalledExactlyOnceWith(
         mockDefinition.inputConfig,
       );
     });
@@ -115,8 +114,7 @@ describe('SubagentToolWrapper', () => {
       const invocation = wrapper.build(params);
 
       expect(invocation).toBeInstanceOf(SubagentInvocation);
-      expect(MockedSubagentInvocation).toHaveBeenCalledOnce();
-      expect(MockedSubagentInvocation).toHaveBeenCalledWith(
+      expect(MockedSubagentInvocation).toHaveBeenCalledExactlyOnceWith(
         params,
         mockDefinition,
         mockConfig,

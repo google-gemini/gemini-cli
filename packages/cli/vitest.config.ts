@@ -6,15 +6,33 @@
 
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
+import tsconfigPaths from 'vite-tsconfig-paths';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  plugins: [tsconfigPaths()],
+  resolve: {
+    dedupe: ['react', 'react-dom', 'ink'],
+    alias: {
+      react: path.resolve(__dirname, '../../node_modules/react'),
+      'react-dom': path.resolve(__dirname, '../../node_modules/react-dom'),
+      ink: path.resolve(__dirname, '../../node_modules/ink'),
+      'ink-testing-library': path.resolve(
+        __dirname,
+        '../../node_modules/ink-testing-library',
+      ),
+    },
+  },
   test: {
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', 'config.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
-    environment: 'jsdom',
+    environment: 'node',
     globals: true,
     reporters: ['default', 'junit'],
-    silent: true,
+    silent: false,
     outputFile: {
       junit: 'junit.xml',
     },

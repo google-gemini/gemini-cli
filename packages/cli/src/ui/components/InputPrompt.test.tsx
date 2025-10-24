@@ -5,7 +5,7 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor, act } from '@testing-library/react';
+import { act } from 'react-test-renderer';
 import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -1214,7 +1214,7 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this should set the paste protection)
-      act(() => {
+      await act(async () => {
         stdin.write(`\x1b[200~pasted content\x1b[201~`);
       });
 
@@ -1239,7 +1239,7 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this sets the protection)
-      act(() => {
+      await act(async () => {
         stdin.write('\x1b[200~pasted text\x1b[201~');
       });
       await vi.runAllTimersAsync();
@@ -1350,13 +1350,13 @@ describe('InputPrompt', () => {
 
       stdin.write('\x1B');
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(onEscapePromptChange).toHaveBeenCalledWith(true);
       });
 
       stdin.write('a');
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(onEscapePromptChange).toHaveBeenCalledWith(false);
       });
       unmount();
@@ -1468,11 +1468,11 @@ describe('InputPrompt', () => {
       await wait();
 
       // Trigger reverse search with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const frame = stdout.lastFrame();
         expect(frame).toContain('(r:)');
         expect(frame).toContain('echo hello');
@@ -1494,7 +1494,7 @@ describe('InputPrompt', () => {
       stdin.write('\x1B');
       stdin.write('\u001b[27u'); // Press kitty escape key
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
       });
 
@@ -1530,17 +1530,17 @@ describe('InputPrompt', () => {
       );
 
       // Enter reverse search mode with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
       // Verify reverse search is active
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).toContain('(r:)');
       });
 
       // Press Tab to complete the highlighted entry
-      act(() => {
+      await act(async () => {
         stdin.write('\t');
       });
       await wait();
@@ -1567,19 +1567,19 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).toContain('(r:)');
       });
 
-      act(() => {
+      await act(async () => {
         stdin.write('\r');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
       });
 
@@ -1611,20 +1611,20 @@ describe('InputPrompt', () => {
       await wait();
 
       // reverse search with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).toContain('(r:)');
       });
 
       // Press kitty escape key
-      act(() => {
+      await act(async () => {
         stdin.write('\u001b[27u');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
         expect(props.buffer.text).toBe(initialText);
         expect(props.buffer.cursor).toEqual(initialCursor);
@@ -1695,7 +1695,7 @@ describe('InputPrompt', () => {
       );
       await wait();
 
-      act(() => {
+      await act(async () => {
         stdin.write('\x12'); // Ctrl+R
       });
       await wait();
@@ -1827,7 +1827,7 @@ describe('InputPrompt', () => {
       expect(mockPopAllMessages).toHaveBeenCalled();
       const callback = mockPopAllMessages.mock.calls[0][0];
 
-      act(() => {
+      await act(async () => {
         callback('Message 1\n\nMessage 2\n\nMessage 3');
       });
       expect(props.buffer.setText).toHaveBeenCalledWith(
@@ -1868,7 +1868,7 @@ describe('InputPrompt', () => {
 
       expect(mockPopAllMessages).toHaveBeenCalled();
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback(undefined);
       });
 
@@ -1910,7 +1910,7 @@ describe('InputPrompt', () => {
       await wait();
 
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback('Single message');
       });
 
@@ -1967,7 +1967,7 @@ describe('InputPrompt', () => {
       expect(mockPopAllMessages).toHaveBeenCalled();
 
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback(undefined);
       });
 

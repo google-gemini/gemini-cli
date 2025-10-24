@@ -117,6 +117,17 @@ async function main() {
     const packageJson = JSON.parse(packageJsonContent);
 
     const packageLockJsonPath = path.join(projectRoot, 'package-lock.json');
+    if (!(await fs.stat(packageLockJsonPath).catch(() => false))) {
+      console.warn(
+        'Warning: package-lock.json not found. Skipping NOTICES.txt generation.',
+      );
+      await fs.writeFile(
+        noticeFilePath,
+        'Notices will be generated when package-lock.json is available.',
+      );
+      return;
+    }
+
     const packageLockJsonContent = await fs.readFile(
       packageLockJsonPath,
       'utf-8',
