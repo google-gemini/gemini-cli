@@ -74,7 +74,7 @@ vi.mock('./App.js', () => ({
 }));
 
 vi.mock('./hooks/useQuotaAndFallback.js');
-vi.mock('./hooks/useHistoryManager.js');
+vi.mock('./hooks/useHistoryManagerWithActivityMonitoring.js');
 vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
 vi.mock('./hooks/useEditorSettings.js');
@@ -107,7 +107,7 @@ vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
 
-import { useHistory } from './hooks/useHistoryManager.js';
+import { useHistoryWithActivityMonitoring } from './hooks/useHistoryManagerWithActivityMonitoring.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
@@ -139,7 +139,7 @@ describe('AppContainer State Management', () => {
 
   // Create typed mocks for all hooks
   const mockedUseQuotaAndFallback = useQuotaAndFallback as Mock;
-  const mockedUseHistory = useHistory as Mock;
+  const mockedUseHistory = useHistoryWithActivityMonitoring as Mock;
   const mockedUseThemeCommand = useThemeCommand as Mock;
   const mockedUseAuthCommand = useAuthCommand as Mock;
   const mockedUseEditorSettings = useEditorSettings as Mock;
