@@ -28,6 +28,7 @@ import {
 import type { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
+import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 
 interface StructuredError {
   status: number;
@@ -107,47 +108,74 @@ export class LoggingContentGenerator implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
-    const startTime = Date.now();
-    this.logApiRequest(toContents(req.contents), req.model, userPromptId);
-    try {
-      const response = await this.wrapped.generateContent(req, userPromptId);
-      const durationMs = Date.now() - startTime;
-      this._logApiResponse(
-        durationMs,
-        response.modelVersion || req.model,
-        userPromptId,
-        response.usageMetadata,
-        JSON.stringify(response),
-      );
-      return response;
-    } catch (error) {
-      const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, req.model, userPromptId);
-      throw error;
-    }
+    return runInDevTraceSpan(
+      {
+        name: 'generateContent',
+      },
+      async ({ metadata: spanMetadata }) => {
+        spanMetadata.input = { request: req, userPromptId, model: req.model };
+
+        const startTime = Date.now();
+        this.logApiRequest(toContents(req.contents), req.model, userPromptId);
+        try {
+          const response = await this.wrapped.generateContent(
+            req,
+            userPromptId,
+          );
+          spanMetadata.output = {
+            response,
+            usageMetadata: response.usageMetadata,
+          };
+          const durationMs = Date.now() - startTime;
+          this._logApiResponse(
+            durationMs,
+            response.modelVersion || req.model,
+            userPromptId,
+            response.usageMetadata,
+            JSON.stringify(response),
+          );
+          return response;
+        } catch (error) {
+          const durationMs = Date.now() - startTime;
+          this._logApiError(durationMs, error, req.model, userPromptId);
+          throw error;
+        }
+      },
+    );
   }
 
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const startTime = Date.now();
-    this.logApiRequest(toContents(req.contents), req.model, userPromptId);
+    return runInDevTraceSpan(
+      {
+        name: 'generateContentStream',
+        noAutoEnd: true,
+      },
+      async ({ metadata: spanMetadata, endSpan }) => {
+        spanMetadata.input = { request: req, userPromptId, model: req.model };
+        const startTime = Date.now();
+        this.logApiRequest(toContents(req.contents), req.model, userPromptId);
 
-    let stream: AsyncGenerator<GenerateContentResponse>;
-    try {
-      stream = await this.wrapped.generateContentStream(req, userPromptId);
-    } catch (error) {
-      const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, req.model, userPromptId);
-      throw error;
-    }
+        let stream: AsyncGenerator<GenerateContentResponse>;
+        try {
+          stream = await this.wrapped.generateContentStream(req, userPromptId);
+        } catch (error) {
+          const durationMs = Date.now() - startTime;
+          this._logApiError(durationMs, error, req.model, userPromptId);
+          throw error;
+        }
 
-    return this.loggingStreamWrapper(
-      stream,
-      startTime,
-      userPromptId,
-      req.model,
+        return this.loggingStreamWrapper(
+          stream,
+          startTime,
+          userPromptId,
+          req.model,
+          spanMetadata,
+          endSpan,
+        );
+      },
     );
   }
 
@@ -156,6 +184,8 @@ export class LoggingContentGenerator implements ContentGenerator {
     startTime: number,
     userPromptId: string,
     model: string,
+    spanMetadata: SpanMetadata,
+    endSpan: () => void,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
@@ -177,7 +207,15 @@ export class LoggingContentGenerator implements ContentGenerator {
         lastUsageMetadata,
         JSON.stringify(responses),
       );
+      spanMetadata.output = {
+        streamChunks: responses.map((r) => ({
+          content: r.candidates?.[0]?.content ?? null,
+        })),
+        usageMetadata: lastUsageMetadata,
+        durationMs,
+      };
     } catch (error) {
+      spanMetadata.error = error;
       const durationMs = Date.now() - startTime;
       this._logApiError(
         durationMs,
@@ -186,6 +224,8 @@ export class LoggingContentGenerator implements ContentGenerator {
         userPromptId,
       );
       throw error;
+    } finally {
+      endSpan();
     }
   }
 
@@ -196,6 +236,16 @@ export class LoggingContentGenerator implements ContentGenerator {
   async embedContent(
     req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
-    return this.wrapped.embedContent(req);
+    return runInDevTraceSpan(
+      {
+        name: 'embedContent',
+      },
+      async ({ metadata: spanMetadata }) => {
+        spanMetadata.input = { request: req };
+        const output = await this.wrapped.embedContent(req);
+        spanMetadata.output = output;
+        return output;
+      },
+    );
   }
 }
