@@ -40,8 +40,8 @@ import {
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 
 const ESC = '\u001B';
-export const PASTE_MODE_PREFIX = `${ESC}[200~`;
-export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
+export const PASTE_MODE_START = `${ESC}[200~`;
+export const PASTE_MODE_END = `${ESC}[201~`;
 export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
 export const KITTY_SEQUENCE_TIMEOUT_MS = 50; // Flush incomplete kitty sequences after 50ms
 export const SINGLE_QUOTE = "'";
@@ -353,6 +353,99 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
   return null;
 }
 
+const PASTE_MODE_START_BUFER = Buffer.from(PASTE_MODE_START);
+const PASTE_MODE_END_BUFER = Buffer.from(PASTE_MODE_END);
+const PASTE_MODE_COMMON_BUFFER = Buffer.from(`${ESC}[20`);
+
+function matchesAt(a: Buffer, b: Buffer, pos: number): boolean {
+  return a.compare(b, pos, pos + a.length) === 0;
+}
+
+/**
+ * Returns the first index before which we are certain there is no paste marker.
+ */
+function earliestPossiblePasteMarker(data: Buffer): number {
+  // Check data for full start-paste or end-paste markers.
+  let pos = 0;
+  const codeLength = PASTE_MODE_START_BUFER.length;
+  while (pos < data.length - codeLength) {
+    const index = data.indexOf(PASTE_MODE_COMMON_BUFFER, pos);
+    if (index === -1) {
+      break;
+    }
+    const isStart = matchesAt(PASTE_MODE_START_BUFER, data, index);
+    const isEnd = matchesAt(PASTE_MODE_END_BUFER, data, index);
+    if (isStart || isEnd) {
+      return index;
+    }
+    pos = index + PASTE_MODE_COMMON_BUFFER.length;
+  }
+  // data contains no full start-paste or end-paste.
+  // Check if data ends with a prefix of start-paste or end-paste.
+  for (let i = 1; i < codeLength; i++) {
+    const candidate = data.subarray(data.length - i);
+    const isStartPrefix = candidate.compare(PASTE_MODE_START_BUFER, 0, i) === 0;
+    const isEndPrefix = candidate.compare(PASTE_MODE_END_BUFER, 0, i) === 0;
+    if (isStartPrefix || isEndPrefix) {
+      return data.length - i;
+    }
+  }
+  return data.length;
+}
+
+/**
+ * A generator that takes in data chunks and spits out paste-start and
+ * paste-end keypresses. All non-paste marker data is passed to passthrough.
+ */
+function* pasteMarkerParser(
+  passthrough: PassThrough,
+  keypressHandler: (_: unknown, key: Key) => void,
+): Generator<void, void, Buffer> {
+  while (true) {
+    let data = yield;
+
+    while (true) {
+      const index = earliestPossiblePasteMarker(data);
+      if (index === data.length) {
+        // no possible paste markers were found
+        passthrough.write(data);
+        break;
+      }
+      if (index > 0) {
+        // snip off and send the part that doesn't have a paste marker
+        passthrough.write(data.subarray(0, index));
+        data = data.subarray(index);
+      }
+      // data starts with a possible paste marker
+      const possibleMarker = data.subarray(0, 6);
+      if (possibleMarker.compare(PASTE_MODE_START_BUFER) === 0) {
+        keypressHandler(undefined, {
+          name: 'paste-start',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: '',
+        });
+        data = data.subarray(PASTE_MODE_START_BUFER.length);
+      } else if (possibleMarker.compare(PASTE_MODE_END_BUFER) === 0) {
+        keypressHandler(undefined, {
+          name: 'paste-end',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: '',
+        });
+        data = data.subarray(PASTE_MODE_END_BUFER.length);
+      } else {
+        // we must have a prefix. Concat the next data and try again.
+        data = Buffer.concat([data, yield]);
+      }
+    }
+  }
+}
+
 export interface Key {
   name: string;
   ctrl: boolean;
@@ -621,8 +714,8 @@ export function KeypressProvider({
         // Check if this could start a kitty sequence
         const startsWithEsc = key.sequence.startsWith(ESC);
         const isExcluded = [
-          PASTE_MODE_PREFIX,
-          PASTE_MODE_SUFFIX,
+          PASTE_MODE_START,
+          PASTE_MODE_END,
           FOCUS_IN,
           FOCUS_OUT,
         ].some((prefix) => key.sequence.startsWith(prefix));
@@ -766,57 +859,7 @@ export function KeypressProvider({
       broadcast({ ...key, paste: pasteBuffer !== null });
     };
 
-    const handleRawKeypress = (data: Buffer) => {
-      const pasteModePrefixBuffer = Buffer.from(PASTE_MODE_PREFIX);
-      const pasteModeSuffixBuffer = Buffer.from(PASTE_MODE_SUFFIX);
-
-      let pos = 0;
-      while (pos < data.length) {
-        const prefixPos = data.indexOf(pasteModePrefixBuffer, pos);
-        const suffixPos = data.indexOf(pasteModeSuffixBuffer, pos);
-        const isPrefixNext =
-          prefixPos !== -1 && (suffixPos === -1 || prefixPos < suffixPos);
-        const isSuffixNext =
-          suffixPos !== -1 && (prefixPos === -1 || suffixPos < prefixPos);
-
-        let nextMarkerPos = -1;
-        let markerLength = 0;
-
-        if (isPrefixNext) {
-          nextMarkerPos = prefixPos;
-        } else if (isSuffixNext) {
-          nextMarkerPos = suffixPos;
-        }
-        markerLength = pasteModeSuffixBuffer.length;
-
-        if (nextMarkerPos === -1) {
-          keypressStream!.write(data.slice(pos));
-          return;
-        }
-
-        const nextData = data.slice(pos, nextMarkerPos);
-        if (nextData.length > 0) {
-          keypressStream!.write(nextData);
-        }
-        const createPasteKeyEvent = (
-          name: 'paste-start' | 'paste-end',
-        ): Key => ({
-          name,
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: '',
-        });
-        if (isPrefixNext) {
-          handleKeypress(undefined, createPasteKeyEvent('paste-start'));
-        } else if (isSuffixNext) {
-          handleKeypress(undefined, createPasteKeyEvent('paste-end'));
-        }
-        pos = nextMarkerPos + markerLength;
-      }
-    };
-
+    let cleanup = () => {};
     let rl: readline.Interface;
     if (keypressStream !== null) {
       rl = readline.createInterface({
@@ -824,22 +867,29 @@ export function KeypressProvider({
         escapeCodeTimeout: 0,
       });
       readline.emitKeypressEvents(keypressStream, rl);
+
+      const pmp = pasteMarkerParser(keypressStream, handleKeypress);
+      pmp.next(); // prime the generator so it starts listening.
+      const handleRawKeypress = (data: Buffer) => pmp.next(data);
+
       keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
+
+      cleanup = () => {
+        keypressStream.removeListener('keypress', handleKeypress);
+        stdin.removeListener('data', handleRawKeypress);
+      };
     } else {
       rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 0 });
       readline.emitKeypressEvents(stdin, rl);
+
       stdin.on('keypress', handleKeypress);
+
+      cleanup = () => stdin.removeListener('keypress', handleKeypress);
     }
 
     return () => {
-      if (keypressStream !== null) {
-        keypressStream.removeListener('keypress', handleKeypress);
-        stdin.removeListener('data', handleRawKeypress);
-      } else {
-        stdin.removeListener('keypress', handleKeypress);
-      }
-
+      cleanup();
       rl.close();
 
       // Restore the terminal to its original state.

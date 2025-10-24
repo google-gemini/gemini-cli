@@ -187,6 +187,37 @@ describe('useKeypress', () => {
       expect(onKeypress).toHaveBeenCalledTimes(3);
     });
 
+    it('should handle pastes split across writes', () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      const keyA = { name: 'a', sequence: 'a' };
+      act(() => stdin.write('a'));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ ...keyA, paste: false }),
+      );
+
+      const pasteText = 'pasted';
+      act(() => {
+        stdin.write(PASTE_START.slice(0, 3));
+        stdin.write(PASTE_START.slice(3) + pasteText.slice(0, 3));
+        stdin.write(pasteText.slice(3) + PASTE_END.slice(0, 3));
+        stdin.write(PASTE_END.slice(3));
+      });
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText }),
+      );
+
+      const keyB = { name: 'b', sequence: 'b' };
+      act(() => stdin.write('b'));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ ...keyB, paste: false }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(3);
+    });
+
     it('should emit partial paste content if unmounted mid-paste', () => {
       const { unmount } = renderHook(
         () => useKeypress(onKeypress, { isActive: true }),
