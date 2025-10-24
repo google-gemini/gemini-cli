@@ -2159,7 +2159,7 @@ describe('Settings Loading and Merging', () => {
         },
         ui: {},
         model: {
-          name: 'gemini-1.5-pro',
+          name: 'gemini-2.5-pro',
         },
         unrecognized: 'value',
       };
@@ -2168,7 +2168,7 @@ describe('Settings Loading and Merging', () => {
 
       expect(v1Settings).toEqual({
         vimMode: false,
-        model: 'gemini-1.5-pro',
+        model: 'gemini-2.5-pro',
         unrecognized: 'value',
       });
     });

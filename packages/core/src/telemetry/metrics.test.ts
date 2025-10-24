@@ -335,14 +335,14 @@ describe('Telemetry Metrics', () => {
       mockCounterAddFn.mockClear();
 
       recordTokenUsageMetricsModule(mockConfig, 200, {
-        model: 'gemini-ultra',
+        model: 'gemini-different-model',
         type: 'input',
       });
       expect(mockCounterAddFn).toHaveBeenCalledWith(200, {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
-        model: 'gemini-ultra',
+        model: 'gemini-different-model',
         type: 'input',
       });
     });

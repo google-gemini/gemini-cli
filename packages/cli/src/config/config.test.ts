@@ -235,13 +235,13 @@ describe('parseArguments', () => {
       '@path',
       './file.md',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
     ];
     const argv = await parseArguments({} as Settings);
     expect(argv.query).toBe('@path ./file.md');
     expect(argv.prompt).toBe('@path ./file.md'); // Should map to one-shot
     expect(argv.promptInteractive).toBeUndefined();
-    expect(argv.model).toBe('gemini-1.5-pro');
+    expect(argv.model).toBe('gemini-2.5-pro');
   });
 
   it('maps unquoted positional @path + arg to prompt (one-shot)', async () => {
@@ -1347,7 +1347,7 @@ describe('loadCliConfig model selection', () => {
     const config = await loadCliConfig(
       {
         model: {
-          name: 'gemini-9001-ultra',
+          name: 'gemini-2.5-pro',
         },
       },
       [],
@@ -1355,7 +1355,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-9001-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-pro');
   });
 
   it('uses the default gemini model if nothing is set', async () => {
@@ -1374,12 +1374,12 @@ describe('loadCliConfig model selection', () => {
   });
 
   it('always prefers model from argv', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       {
         model: {
-          name: 'gemini-9001-ultra',
+          name: 'gemini-2.5-pro',
         },
       },
       [],
@@ -1387,11 +1387,11 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-8675309-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 
   it('selects the model from argv if provided', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       {
@@ -1402,7 +1402,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-8675309-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 });
 
@@ -1923,7 +1923,7 @@ describe('loadCliConfig interactive', () => {
 
   it('should not be interactive if positional prompt words are provided with other flags', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro', 'Hello'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro', 'Hello'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
@@ -1935,7 +1935,7 @@ describe('loadCliConfig interactive', () => {
       'node',
       'script.js',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
       '--yolo',
       'Hello world',
     ];
@@ -1973,7 +1973,7 @@ describe('loadCliConfig interactive', () => {
       'node',
       'script.js',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
       'write',
       'a',
       'function',
@@ -1985,7 +1985,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
     expect(argv.query).toBe('write a function to sort array');
-    expect(argv.model).toBe('gemini-1.5-pro');
+    expect(argv.model).toBe('gemini-2.5-pro');
   });
 
   it('should handle empty positional arguments', async () => {
@@ -2019,7 +2019,7 @@ describe('loadCliConfig interactive', () => {
 
   it('should be interactive if no positional prompt words are provided with flags', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(true);
