@@ -20,8 +20,8 @@ import type {
   Status as CoreStatus,
   EditorType,
 } from '@google/gemini-cli-core';
-import { CoreToolScheduler } from '@google/gemini-cli-core';
-import { useCallback, useState, useMemo } from 'react';
+import { CoreToolScheduler, debugLogger } from '@google/gemini-cli-core';
+import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
@@ -72,6 +72,23 @@ export function useReactToolScheduler(
     TrackedToolCall[]
   >([]);
 
+  // Store callbacks in refs to keep them up-to-date without causing re-renders.
+  const onCompleteRef = useRef(onComplete);
+  const getPreferredEditorRef = useRef(getPreferredEditor);
+  const onEditorCloseRef = useRef(onEditorClose);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    getPreferredEditorRef.current = getPreferredEditor;
+  }, [getPreferredEditor]);
+
+  useEffect(() => {
+    onEditorCloseRef.current = onEditorClose;
+  }, [onEditorClose]);
+
   const outputUpdateHandler: OutputUpdateHandler = useCallback(
     (toolCallId, outputChunk) => {
       setToolCallsForDisplay((prevCalls) =>
@@ -89,9 +106,9 @@ export function useReactToolScheduler(
 
   const allToolCallsCompleteHandler: AllToolCallsCompleteHandler = useCallback(
     async (completedToolCalls) => {
-      await onComplete(completedToolCalls);
+      await onCompleteRef.current(completedToolCalls);
     },
-    [onComplete],
+    [],
   );
 
   const toolCallsUpdateHandler: ToolCallsUpdateHandler = useCallback(
@@ -130,24 +147,29 @@ export function useReactToolScheduler(
     [setToolCallsForDisplay],
   );
 
+  const stableGetPreferredEditor = useCallback(
+    () => getPreferredEditorRef.current(),
+    [],
+  );
+  const stableOnEditorClose = useCallback(() => onEditorCloseRef.current(), []);
+
   const scheduler = useMemo(
     () =>
       new CoreToolScheduler({
         outputUpdateHandler,
         onAllToolCallsComplete: allToolCallsCompleteHandler,
         onToolCallsUpdate: toolCallsUpdateHandler,
-        getPreferredEditor,
+        getPreferredEditor: stableGetPreferredEditor,
         config,
-        onEditorClose,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any),
+        onEditorClose: stableOnEditorClose,
+      }),
     [
       config,
       outputUpdateHandler,
       allToolCallsCompleteHandler,
       toolCallsUpdateHandler,
-      getPreferredEditor,
-      onEditorClose,
+      stableGetPreferredEditor,
+      stableOnEditorClose,
     ],
   );
 
@@ -198,7 +220,7 @@ function mapCoreStatusToDisplayStatus(coreStatus: CoreStatus): ToolCallStatus {
       return ToolCallStatus.Pending;
     default: {
       const exhaustiveCheck: never = coreStatus;
-      console.warn(`Unknown core status encountered: ${exhaustiveCheck}`);
+      debugLogger.warn(`Unknown core status encountered: ${exhaustiveCheck}`);
       return ToolCallStatus.Error;
     }
   }
