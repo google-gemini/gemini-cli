@@ -8,76 +8,31 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { escapePath, unescapePath, isSubpath } from './paths.js';
 
 describe('escapePath', () => {
-  it('should escape spaces', () => {
-    expect(escapePath('my file.txt')).toBe('my\\ file.txt');
-  });
-
-  it('should escape tabs', () => {
-    expect(escapePath('file\twith\ttabs.txt')).toBe('file\\\twith\\\ttabs.txt');
-  });
-
-  it('should escape parentheses', () => {
-    expect(escapePath('file(1).txt')).toBe('file\\(1\\).txt');
-  });
-
-  it('should escape square brackets', () => {
-    expect(escapePath('file[backup].txt')).toBe('file\\[backup\\].txt');
-  });
-
-  it('should escape curly braces', () => {
-    expect(escapePath('file{temp}.txt')).toBe('file\\{temp\\}.txt');
-  });
-
-  it('should escape semicolons', () => {
-    expect(escapePath('file;name.txt')).toBe('file\\;name.txt');
-  });
-
-  it('should escape ampersands', () => {
-    expect(escapePath('file&name.txt')).toBe('file\\&name.txt');
-  });
-
-  it('should escape pipes', () => {
-    expect(escapePath('file|name.txt')).toBe('file\\|name.txt');
-  });
-
-  it('should escape asterisks', () => {
-    expect(escapePath('file*.txt')).toBe('file\\*.txt');
-  });
-
-  it('should escape question marks', () => {
-    expect(escapePath('file?.txt')).toBe('file\\?.txt');
-  });
-
-  it('should escape dollar signs', () => {
-    expect(escapePath('file$name.txt')).toBe('file\\$name.txt');
-  });
-
-  it('should escape backticks', () => {
-    expect(escapePath('file`name.txt')).toBe('file\\`name.txt');
-  });
-
-  it('should escape single quotes', () => {
-    expect(escapePath("file'name.txt")).toBe("file\\'name.txt");
-  });
-
-  it('should escape double quotes', () => {
-    expect(escapePath('file"name.txt')).toBe('file\\"name.txt');
-  });
-
-  it('should escape hash symbols', () => {
-    expect(escapePath('file#name.txt')).toBe('file\\#name.txt');
-  });
-
-  it('should escape exclamation marks', () => {
-    expect(escapePath('file!name.txt')).toBe('file\\!name.txt');
-  });
-
-  it('should escape tildes', () => {
-    expect(escapePath('file~name.txt')).toBe('file\\~name.txt');
-  });
-
-  it('should escape less than and greater than signs', () => {
-    expect(escapePath('file<name>.txt')).toBe('file\\<name\\>.txt');
+  it.each([
+    ['spaces', 'my file.txt', 'my\\ file.txt'],
+    ['tabs', 'file\twith\ttabs.txt', 'file\\\twith\\\ttabs.txt'],
+    ['parentheses', 'file(1).txt', 'file\\(1\\).txt'],
+    ['square brackets', 'file[backup].txt', 'file\\[backup\\].txt'],
+    ['curly braces', 'file{temp}.txt', 'file\\{temp\\}.txt'],
+    ['semicolons', 'file;name.txt', 'file\\;name.txt'],
+    ['ampersands', 'file&name.txt', 'file\\&name.txt'],
+    ['pipes', 'file|name.txt', 'file\\|name.txt'],
+    ['asterisks', 'file*.txt', 'file\\*.txt'],
+    ['question marks', 'file?.txt', 'file\\?.txt'],
+    ['dollar signs', 'file$name.txt', 'file\\$name.txt'],
+    ['backticks', 'file`name.txt', 'file\\`name.txt'],
+    ['single quotes', "file'name.txt", "file\\'name.txt"],
+    ['double quotes', 'file"name.txt', 'file\\"name.txt'],
+    ['hash symbols', 'file#name.txt', 'file\\#name.txt'],
+    ['exclamation marks', 'file!name.txt', 'file\\!name.txt'],
+    ['tildes', 'file~name.txt', 'file\\~name.txt'],
+    [
+      'less than and greater than signs',
+      'file<name>.txt',
+      'file\\<name\\>.txt',
+    ],
+  ])('should escape %s', (_, input, expected) => {
+    expect(escapePath(input)).toBe(expected);
   });
 
   it('should handle multiple special characters', () => {
@@ -135,26 +90,14 @@ describe('escapePath', () => {
 });
 
 describe('unescapePath', () => {
-  it('should unescape spaces', () => {
-    expect(unescapePath('my\\ file.txt')).toBe('my file.txt');
-  });
-
-  it('should unescape tabs', () => {
-    expect(unescapePath('file\\\twith\\\ttabs.txt')).toBe(
-      'file\twith\ttabs.txt',
-    );
-  });
-
-  it('should unescape parentheses', () => {
-    expect(unescapePath('file\\(1\\).txt')).toBe('file(1).txt');
-  });
-
-  it('should unescape square brackets', () => {
-    expect(unescapePath('file\\[backup\\].txt')).toBe('file[backup].txt');
-  });
-
-  it('should unescape curly braces', () => {
-    expect(unescapePath('file\\{temp\\}.txt')).toBe('file{temp}.txt');
+  it.each([
+    ['spaces', 'my\\ file.txt', 'my file.txt'],
+    ['tabs', 'file\\\twith\\\ttabs.txt', 'file\twith\ttabs.txt'],
+    ['parentheses', 'file\\(1\\).txt', 'file(1).txt'],
+    ['square brackets', 'file\\[backup\\].txt', 'file[backup].txt'],
+    ['curly braces', 'file\\{temp\\}.txt', 'file{temp}.txt'],
+  ])('should unescape %s', (_, input, expected) => {
+    expect(unescapePath(input)).toBe(expected);
   });
 
   it('should unescape multiple special characters', () => {
