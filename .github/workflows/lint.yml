@@ -1,0 +1,30 @@
+# .github/workflows/lint.yml
+name: 'Linting'
+
+on:
+  workflow_call:
+
+permissions:
+  contents: 'read'
+
+jobs:
+  lint:
+    name: 'Lint All'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci --only=dev'
+
+      - name: 'Run linting'
+        run: 'npm run lint:all'

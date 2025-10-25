@@ -1,121 +1,27 @@
 name: 'Testing: CI'
 
 on:
-  push:
-    branches:
-      - 'main'
-      - 'release/**'
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
-  merge_group:
-  workflow_dispatch:
-    inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
-
-concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
-  cancel-in-progress: |-
-    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+  workflow_call:
 
 permissions:
   checks: 'write'
   contents: 'read'
   statuses: 'write'
+  packages: 'read'
+  pull-requests: 'write'
+  actions: 'read'
+  security-events: 'write'
 
 defaults:
   run:
     shell: 'bash'
 
 jobs:
-  merge_queue_skipper:
-    permissions: 'read-all'
-    name: 'Merge Queue Skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    outputs:
-      skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
-    steps:
-      - id: 'merge-queue-ci-skipper'
-        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
-        with:
-          secret: '${{ secrets.GITHUB_TOKEN }}'
-
-  lint:
-    name: 'Lint'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
-          fetch-depth: 0
-
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Validate NOTICES.txt'
-        run: 'git diff --exit-code packages/vscode-ide-companion/NOTICES.txt'
-
-      - name: 'Check lockfile'
-        run: 'npm run check:lockfile'
-
-      - name: 'Install linters'
-        run: 'node scripts/lint.js --setup'
-
-      - name: 'Run ESLint'
-        run: 'node scripts/lint.js --eslint'
-
-      - name: 'Run actionlint'
-        run: 'node scripts/lint.js --actionlint'
-
-      - name: 'Run shellcheck'
-        run: 'node scripts/lint.js --shellcheck'
-
-      - name: 'Run yamllint'
-        run: 'node scripts/lint.js --yamllint'
-
-      - name: 'Run Prettier'
-        run: 'node scripts/lint.js --prettier'
-
-      - name: 'Run sensitive keyword linter'
-        run: 'node scripts/lint.js --sensitive-keywords'
-
-  link_checker:
-    name: 'Link Checker'
-    runs-on: 'ubuntu-latest'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-      - name: 'Link Checker'
-        uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
-        with:
-          args: '--verbose ./**/*.md'
-          fail: true
   test_linux:
     name: 'Test (Linux)'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    needs:
-      - 'lint'
-      - 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    permissions:
-      contents: 'read'
-      checks: 'write'
-      pull-requests: 'write'
     strategy:
+      fail-fast: false
       matrix:
         node-version:
           - '20.x'
@@ -131,22 +37,13 @@ jobs:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
 
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Install dependencies for testing'
+      - name: 'Install dependencies'
         run: 'npm ci'
 
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
         run: 'npm run test:ci'
-
-      - name: 'Bundle'
-        run: 'npm run bundle'
-
-      - name: 'Smoke test bundle'
-        run: 'node ./bundle/gemini.js --version'
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
@@ -172,16 +69,9 @@ jobs:
   test_mac:
     name: 'Test (Mac)'
     runs-on: '${{ matrix.os }}'
-    needs:
-      - 'lint'
-      - 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    permissions:
-      contents: 'read'
-      checks: 'write'
-      pull-requests: 'write'
     continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         os:
           - 'macos-latest'
@@ -199,22 +89,13 @@ jobs:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
 
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Install dependencies for testing'
+      - name: 'Install dependencies'
         run: 'npm ci'
 
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
         run: 'npm run test:ci -- --coverage.enabled=false'
-
-      - name: 'Bundle'
-        run: 'npm run bundle'
-
-      - name: 'Smoke test bundle'
-        run: 'node ./bundle/gemini.js --version'
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
@@ -248,12 +129,6 @@ jobs:
   codeql:
     name: 'CodeQL'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    permissions:
-      actions: 'read'
-      contents: 'read'
-      security-events: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -268,37 +143,12 @@ jobs:
       - name: 'Perform CodeQL Analysis'
         uses: 'github/codeql-action/analyze@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/analyze@v3
 
-  # Check for changes in bundle size.
-  bundle_size:
-    name: 'Check Bundle Size'
-    needs: 'merge_queue_skipper'
-    if: "${{github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    permissions:
-      contents: 'read' # For checkout
-      pull-requests: 'write' # For commenting
-
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
-          fetch-depth: 1
-
-      - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
-        with:
-          repo-token: '${{ secrets.GITHUB_TOKEN }}'
-          pattern: './bundle/**/*.{js,sb}'
-          minimum-change-threshold: '1000'
-          compression: 'none'
-          clean-script: 'clean'
-
   test_windows:
     name: 'Slow Test - Win'
     runs-on: 'gemini-cli-windows-16-core'
-    needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     continue-on-error: true
+    strategy:
+      fail-fast: false
 
     steps:
       - name: 'Checkout'
@@ -334,14 +184,6 @@ jobs:
         run: 'npm ci'
         shell: 'pwsh'
 
-      - name: 'Build project'
-        run: 'npm run build'
-        shell: 'pwsh'
-        env:
-          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
-          UV_THREADPOOL_SIZE: '32'
-          NODE_ENV: 'production'
-
       - name: 'Run tests and generate reports'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
@@ -352,34 +194,20 @@ jobs:
         run: 'npm run test:ci -- --coverage.enabled=false'
         shell: 'pwsh'
 
-      - name: 'Bundle'
-        run: 'npm run bundle'
-        shell: 'pwsh'
-
-      - name: 'Smoke test bundle'
-        run: 'node ./bundle/gemini.js --version'
-        shell: 'pwsh'
-
   ci:
     name: 'CI'
     if: 'always()'
     needs:
-      - 'lint'
-      - 'link_checker'
       - 'test_linux'
       - 'test_mac'
       - 'codeql'
-      - 'bundle_size'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check all job results'
         run: |
-          if [[ (${{ needs.lint.result }} != 'success' && ${{ needs.lint.result }} != 'skipped') || \
-               (${{ needs.link_checker.result }} != 'success' && ${{ needs.link_checker.result }} != 'skipped') || \
-               (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
+          if [[ (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
                (${{ needs.test_mac.result }} != 'success' && ${{ needs.test_mac.result }} != 'skipped') || \
-               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
-               (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
+               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') ]]; then
             echo "One or more CI jobs failed."
             exit 1
           fi

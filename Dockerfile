@@ -1,11 +1,38 @@
+# --- Builder Stage ---
+FROM docker.io/library/node:20-slim AS builder
+
+ARG CLI_VERSION
+ARG NPM_REGISTRY_SCOPE
+ARG NPM_REGISTRY_URL
+ARG CLI_PACKAGE_NAME
+
+# Set up npm global package folder
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=$PATH:/usr/local/share/npm-global/bin
+
+# Ensure the node user has permissions to write to the global npm directory
+RUN mkdir -p /usr/local/share/npm-global && chown -R node:node /usr/local/share/npm-global
+
+# Configure npm to use GitHub Packages
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    echo "${NPM_REGISTRY_SCOPE}:registry=${NPM_REGISTRY_URL}" > /home/node/.npmrc && \
+    echo "//npm.pkg.github.com/:_authToken=$(cat /run/secrets/GITHUB_TOKEN)" >> /home/node/.npmrc && \
+    chown -R node:node /home/node/.npmrc
+
+# Switch to non-root user
+USER node
+
+# Install the Gemini CLI package
+RUN npm install -g ${CLI_PACKAGE_NAME}@${CLI_VERSION} && \
+    npm cache clean --force
+
+# --- Final Stage ---
 FROM docker.io/library/node:20-slim
 
 ARG SANDBOX_NAME="gemini-cli-sandbox"
-ARG CLI_VERSION_ARG
 ENV SANDBOX="$SANDBOX_NAME"
-ENV CLI_VERSION=$CLI_VERSION_ARG
 
-# install minimal set of packages, then clean up
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   make \
@@ -29,22 +56,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# set up npm global package folder under /usr/local/share
-# give it to non-root user node, already set up in base image
+# Set up npm global package folder and user
 RUN mkdir -p /usr/local/share/npm-global \
   && chown -R node:node /usr/local/share/npm-global
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
-
-# switch to non-root user node
 USER node
 
-# install gemini-cli and clean up
-COPY packages/cli/dist/google-gemini-cli-*.tgz /tmp/gemini-cli.tgz
-COPY packages/core/dist/google-gemini-cli-core-*.tgz /tmp/gemini-core.tgz
-RUN npm install -g /tmp/gemini-cli.tgz /tmp/gemini-core.tgz \
-  && npm cache clean --force \
-  && rm -f /tmp/gemini-{cli,core}.tgz
+# Copy installed package from the builder stage
+COPY --from=builder /usr/local/share/npm-global /usr/local/share/npm-global
 
-# default entrypoint when none specified
+# Default entrypoint
 CMD ["gemini"]

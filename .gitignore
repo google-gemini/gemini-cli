@@ -54,3 +54,6 @@ gha-creds-*.json
 
 # Log files
 patch_output.log
+
+# Local npm configuration
+.npmrc

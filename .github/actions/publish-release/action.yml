@@ -69,6 +69,11 @@ inputs:
   a2a-package-name:
     description: 'The name of the a2a package.'
     required: true
+  use-bundle-release:
+    description: 'Whether to use the new bundle-based release process.'
+    type: 'string'
+    required: false
+    default: 'false'
 runs:
   using: 'composite'
   steps:
@@ -89,16 +94,20 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       id: 'release_branch'
       shell: 'bash'
+      env:
+        RELEASE_TAG: '${{ inputs.release-tag }}'
       run: |
-        BRANCH_NAME="release/${{ inputs.release-tag }}"
+        BRANCH_NAME="release/${RELEASE_TAG}"
         git switch -c "${BRANCH_NAME}"
         echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
 
     - name: '⬆️ Update package versions'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
+      env:
+        RELEASE_VERSION: '${{ inputs.release-version }}'
       run: |
-        npm run release:version "${{ inputs.release-version }}"
+        npm run release:version "${RELEASE_VERSION}"
 
     - name: '💾 Commit and Conditionally Push package versions'
       working-directory: '${{ inputs.working-directory }}'
@@ -119,6 +128,7 @@ runs:
         fi
 
     - name: '🛠️ Build and Prepare Packages'
+      if: "${{ inputs.use-bundle-release == 'false' }}"
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
@@ -126,6 +136,7 @@ runs:
         npm run prepare:package
 
     - name: '🎁 Bundle'
+      if: "${{ inputs.use-bundle-release == 'true' }}"
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
@@ -139,7 +150,8 @@ runs:
       run: |
         node ${{ github.workspace }}/scripts/prepare-github-release.js
 
-    - name: 'Configure npm for publishing to npm'
+    - name: 'Configure npm for publishing to npm (non-bundle release)'
+      if: "inputs.use-bundle-release == 'false'"
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
         node-version-file: '${{ inputs.working-directory }}/.nvmrc'
@@ -150,35 +162,39 @@ runs:
       uses: './.github/actions/npm-auth-token'
       id: 'core-token'
       with:
-        package-name: '${{ inputs.core-package-name }}'
-        github-token: '${{ inputs.github-token }}'
-        wombat-token-core: '${{ inputs.wombat-token-core }}'
-        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
-        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
     - name: '📦 Publish CORE to NPM'
+      if: "${{ inputs.use-bundle-release == 'false' }}"
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
+        DRY_RUN: '${{ inputs.dry-run }}'
+        CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
       shell: 'bash'
       run: |
         npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.core-package-name }}" \
+          --dry-run="${DRY_RUN}" \
+          --workspace="${CORE_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${{ inputs.core-package-name }} false --silent
+        npm dist-tag rm ${CORE_PACKAGE_NAME} false --silent
 
     - name: '🔗 Install latest core package'
+      if: "${{ inputs.dry-run == 'false' && inputs.use-bundle-release == 'false' }}"
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
+      env:
+        CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
+        RELEASE_VERSION: '${{ inputs.release-version }}'
+        CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
       run: |
-        npm install "${{ inputs.core-package-name }}@${{ inputs.release-version }}" \
-        --workspace="${{ inputs.cli-package-name }}" \
-        --workspace="${{ inputs.a2a-package-name }}" \
+        npm install "${CORE_PACKAGE_NAME}@${RELEASE_VERSION}" \
+        --workspace="${CLI_PACKAGE_NAME}" \
+        --workspace="${A2A_PACKAGE_NAME}" \
         --save-exact
 
     - name: 'Get CLI Token'
+      if: "${{ inputs.use-bundle-release == 'false' }}"
       uses: './.github/actions/npm-auth-token'
       id: 'cli-token'
       with:
@@ -189,18 +205,21 @@ runs:
         wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
     - name: '📦 Publish CLI'
+      if: "${{ inputs.use-bundle-release == 'false' }}"
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
+        DRY_RUN: '${{ inputs.dry-run }}'
+        CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
       shell: 'bash'
       run: |
         npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.cli-package-name }}" \
+          --dry-run="${DRY_RUN}" \
           --no-tag
-        npm dist-tag rm ${{ inputs.cli-package-name }} false --silent
+        npm dist-tag rm ${CLI_PACKAGE_NAME} false --silent
 
     - name: 'Get a2a-server Token'
+      if: "${{ inputs.use-bundle-release == 'false' }}"
       uses: './.github/actions/npm-auth-token'
       id: 'a2a-token'
       with:
@@ -211,21 +230,24 @@ runs:
         wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
     - name: '📦 Publish a2a'
+      if: "${{ inputs.use-bundle-release == 'false' }}"
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
+        DRY_RUN: '${{ inputs.dry-run }}'
+        A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
       shell: 'bash'
       # Tag staging for initial release
       run: |
         npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.a2a-package-name }}" \
+          --dry-run="${DRY_RUN}" \
+          --workspace="${A2A_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${{ inputs.a2a-package-name }} false --silent
+        npm dist-tag rm ${A2A_PACKAGE_NAME} false --silent
 
     - name: '🔬 Verify NPM release by version'
+      if: "${{ inputs.dry-run == 'false' && inputs.force-skip-tests == 'false' && inputs.use-bundle-release == 'false' }}"
       uses: './.github/actions/verify-release'
-      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
       with:
         npm-package: '${{ inputs.cli-package-name }}@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
@@ -250,25 +272,40 @@ runs:
         a2a-package-name: '${{ inputs.a2a-package-name }}'
         working-directory: '${{ inputs.working-directory }}'
 
+    - name: '🔬 Verify Bundled NPM release by version'
+      if: "${{ inputs.dry-run == 'false' && inputs.force-skip-tests == 'false' && inputs.use-bundle-release == 'true' }}"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      env:
+        CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        RELEASE_VERSION: '${{ inputs.release-version }}'
+      run: |
+        npx -y ${CLI_PACKAGE_NAME}@${RELEASE_VERSION} --version
+
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.npm-registry-url != 'https://npm.pkg.github.com/' }}"
+      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' && inputs.npm-tag != 'dev' && inputs.npm-registry-url != 'https://npm.pkg.github.com/' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
+        RELEASE_TAG: '${{ inputs.release-tag }}'
+        BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        PREVIOUS_TAG: '${{ inputs.previous-tag }}'
       shell: 'bash'
       run: |
-        gh release create "${{ inputs.release-tag }}" \
+        gh release create "${RELEASE_TAG}" \
           bundle/gemini.js \
-          --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
-          --title "Release ${{ inputs.release-tag }}" \
-          --notes-start-tag "${{ inputs.previous-tag }}" \
+          --target "${BRANCH_NAME}" \
+          --title "Release ${RELEASE_TAG}" \
+          --notes-start-tag "${PREVIOUS_TAG}" \
           --generate-notes
 
     - name: '🧹 Clean up release branch'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run != 'true' && inputs.skip-branch-cleanup != 'true' }}"
+      if: "${{ inputs.dry-run == 'false' && inputs.skip-branch-cleanup == 'false' }}"
       continue-on-error: true
       shell: 'bash'
+      env:
+        BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
       run: |
-        echo "Cleaning up release branch ${{ steps.release_branch.outputs.BRANCH_NAME }}..."
-        git push origin --delete "${{ steps.release_branch.outputs.BRANCH_NAME }}"
+        echo "Cleaning up release branch ${BRANCH_NAME}..."
+        git push origin --delete "${BRANCH_NAME}"

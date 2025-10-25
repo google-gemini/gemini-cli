@@ -11,48 +11,21 @@ const rootDir = process.cwd();
 
 function updatePackageJson(packagePath, updateFn) {
   const packageJsonPath = path.resolve(rootDir, packagePath);
+  if (!fs.existsSync(packageJsonPath)) {
+    console.error(`Error: package.json not found at ${packageJsonPath}`);
+    process.exit(1);
+  }
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
   updateFn(packageJson);
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  console.log(`Updated ${packagePath}`);
 }
 
-// Copy bundle directory into packages/cli
-const sourceBundleDir = path.resolve(rootDir, 'bundle');
-const destBundleDir = path.resolve(rootDir, 'packages/cli/bundle');
+console.log('Preparing packages for GitHub release...');
 
-if (fs.existsSync(sourceBundleDir)) {
-  fs.rmSync(destBundleDir, { recursive: true, force: true });
-  fs.cpSync(sourceBundleDir, destBundleDir, { recursive: true });
-  console.log('Copied bundle/ directory to packages/cli/');
-} else {
-  console.error(
-    'Error: bundle/ directory not found at project root. Please run `npm run bundle` first.',
-  );
-  process.exit(1);
-}
-
-// Overwrite the .npmrc in the core package to point to the GitHub registry.
-const coreNpmrcPath = path.resolve(rootDir, 'packages/core/.npmrc');
-fs.writeFileSync(
-  coreNpmrcPath,
-  '@google-gemini:registry=https://npm.pkg.github.com/',
-);
-console.log('Wrote .npmrc for @google-gemini scope to packages/core/');
-
-// Update @google/gemini-cli
-updatePackageJson('packages/cli/package.json', (pkg) => {
+// Update root package.json
+updatePackageJson('package.json', (pkg) => {
   pkg.name = '@google-gemini/gemini-cli';
-  pkg.files = ['bundle/'];
-  pkg.bin = {
-    gemini: 'bundle/gemini.js',
-  };
-
-  // Remove fields that are not relevant to the bundled package.
-  delete pkg.dependencies;
-  delete pkg.devDependencies;
-  delete pkg.scripts;
-  delete pkg.main;
-  delete pkg.config; // Deletes the sandboxImageUri
 });
 
 // Update @google/gemini-cli-a2a-server

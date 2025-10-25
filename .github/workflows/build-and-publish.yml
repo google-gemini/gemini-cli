@@ -1,0 +1,134 @@
+# .github/workflows/build-and-publish.yml
+name: 'Build and Publish Bundle'
+
+on:
+  workflow_call:
+    inputs:
+      cli-package-name:
+        description: 'The name of the CLI package.'
+        required: true
+        type: 'string'
+      npm-registry-scope:
+        description: 'NPM registry scope'
+        required: true
+        type: 'string'
+      npm-registry-url:
+        description: 'NPM registry URL'
+        required: true
+        type: 'string'
+    outputs:
+      version:
+        description: 'The version of the published package'
+        value: '${{ jobs.publish-bundle.outputs.version }}'
+      image-uri:
+        description: 'The URI of the built sandbox image.'
+        value: '${{ jobs.build-and-publish-sandbox.outputs.image-uri }}'
+
+jobs:
+  publish-bundle:
+    name: 'Publish Bundle'
+    runs-on: 'ubuntu-latest'
+    outputs:
+      version: '${{ steps.version.outputs.version }}'
+    permissions:
+      contents: 'read'
+      packages: 'write'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Setup NPMRC'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Prepare for GitHub release'
+        run: 'node scripts/prepare-github-release.js'
+
+      - name: 'Set CI Version'
+        id: 'version'
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          NEW_VERSION="${CURRENT_VERSION}-ci.${{ github.run_number }}.${{ github.sha }}"
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          npm version --no-git-tag-version "${NEW_VERSION}"
+
+      - name: 'Publish to GitHub Packages'
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            npm publish --tag="pr-${{ github.event.pull_request.number }}"
+          else
+            npm publish --tag="ci"
+          fi
+
+  build-and-publish-sandbox:
+    name: 'Build and Publish Sandbox'
+    runs-on: 'ubuntu-latest'
+    needs: 'publish-bundle'
+    outputs:
+      image-uri: '${{ steps.docker_build.outputs.uri }}'
+    permissions:
+      contents: 'read'
+      packages: 'write'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Setup NPMRC'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Log in to GitHub Container Registry'
+        uses: 'docker/login-action@v3'
+        with:
+          registry: 'ghcr.io'
+          username: '${{ github.repository_owner }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Set up Docker Buildx'
+        uses: 'docker/setup-buildx-action@v3'
+
+      - name: 'Build and Push Sandbox Image'
+        id: 'docker_build'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          IMAGE_TAG="ghcr.io/${{ github.repository }}/sandbox:${{ needs.publish-bundle.outputs.version }}"
+          docker build . \
+            --file Dockerfile \
+            --tag "${IMAGE_TAG}" \
+            --build-arg CLI_VERSION=${{ needs.publish-bundle.outputs.version }} \
+            --build-arg NPM_REGISTRY_SCOPE=${{ inputs.npm-registry-scope }} \
+            --build-arg NPM_REGISTRY_URL=${{ inputs.npm-registry-url }} \
+            --build-arg CLI_PACKAGE_NAME=${{ inputs.cli-package-name }} \
+            --secret id=GITHUB_TOKEN
+          docker push "${IMAGE_TAG}"
+          echo "uri=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
