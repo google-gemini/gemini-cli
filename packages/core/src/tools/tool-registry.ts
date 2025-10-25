@@ -176,10 +176,19 @@ export class ToolRegistry {
   private tools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
   private mcpClientManager: McpClientManager;
+  private messageBus?: MessageBus;
 
   constructor(config: Config, eventEmitter?: EventEmitter) {
     this.config = config;
     this.mcpClientManager = new McpClientManager(this, eventEmitter);
+  }
+
+  setMessageBus(messageBus: MessageBus): void {
+    this.messageBus = messageBus;
+  }
+
+  getMessageBus(): MessageBus | undefined {
+    return this.messageBus;
   }
 
   /**

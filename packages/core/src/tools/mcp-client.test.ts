@@ -82,6 +82,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
         'test-server',
@@ -145,6 +146,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
         'test-server',
@@ -186,12 +188,16 @@ describe('mcp-client', () => {
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () => Promise.resolve({ functionDeclarations: [] }),
       } as unknown as GenAiLib.CallableTool);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
       const client = new McpClient(
         'test-server',
         {
           command: 'test-command',
         },
-        {} as ToolRegistry,
+        mockedToolRegistry,
         {} as PromptRegistry,
         workspaceContext,
         false,
@@ -226,6 +232,7 @@ describe('mcp-client', () => {
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
         'test-server',
@@ -274,6 +281,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
         'test-server',

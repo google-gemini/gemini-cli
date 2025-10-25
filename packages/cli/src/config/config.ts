@@ -495,7 +495,24 @@ export async function loadCliConfig(
     throw err;
   }
 
-  const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
+  const policyEngineConfig = await createPolicyEngineConfig(
+    settings,
+    approvalMode,
+  );
+
+  // Debug: Log the merged policy configuration
+  debugLogger.log('=== Policy Engine Configuration ===');
+  debugLogger.log(`Default decision: ${policyEngineConfig.defaultDecision}`);
+  debugLogger.log(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
+  if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
+    debugLogger.log('Rules (sorted by priority):');
+    policyEngineConfig.rules.forEach((rule, index) => {
+      debugLogger.log(
+        `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
+      );
+    });
+  }
+  debugLogger.log('===================================');
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);

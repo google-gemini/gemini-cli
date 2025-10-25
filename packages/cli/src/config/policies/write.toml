@@ -1,0 +1,37 @@
+
+[[rule]]
+toolName = "replace"
+decision = "ask_user"
+priority = 10
+
+[[rule]]
+toolName = "replace"
+decision = "allow"
+priority = 15
+modes = ["autoEdit"]
+
+[[rule]]
+toolName = "save_memory"
+decision = "ask_user"
+priority = 10
+
+[[rule]]
+toolName = "run_shell_command"
+decision = "ask_user"
+priority = 10
+
+[[rule]]
+toolName = "write_file"
+decision = "ask_user"
+priority = 10
+
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 15
+modes = ["autoEdit"]
+
+[[rule]]
+toolName = "web_fetch"
+decision = "ask_user"
+priority = 10
