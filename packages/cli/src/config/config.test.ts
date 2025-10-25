@@ -16,6 +16,7 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
@@ -88,6 +89,10 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actualServer,
+    DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD:
+      actualServer.DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+    DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES:
+      actualServer.DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     IdeClient: {
       getInstance: vi.fn().mockResolvedValue({
         getConnectionStatus: vi.fn(),
@@ -2495,5 +2500,133 @@ describe('Telemetry configuration via environment variables', () => {
       argv,
     );
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
+  });
+});
+
+describe('loadCliConfig extension MCP server environment variable resolution', () => {
+  const originalArgv = process.argv;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    process.env.GEMINI_API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    vi.restoreAllMocks();
+  });
+
+  it('should resolve environment variables in extension MCP server headers', async () => {
+    process.env.GITHUB_MCP_PAT = 'test-github-token-123';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    
+    const extensions: GeminiCLIExtension[] = [
+      {
+        id: 'github-extension',
+        name: 'github-extension',
+        version: '1.0.0',
+        isActive: true,
+        path: '/path/to/extension',
+        contextFiles: [],
+        mcpServers: {
+          github: new MCPServerConfig(
+            'docker',
+            ['run', '-i', '--rm'],
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            { Authorization: 'Bearer $GITHUB_MCP_PAT' },
+          ),
+        },
+      },
+    ];
+
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, extensions, 'test-session', argv);
+    const mcpServers = config.getMcpServers();
+    
+    expect(mcpServers.github).toBeDefined();
+    expect(mcpServers.github.headers).toBeDefined();
+    expect(mcpServers.github.headers?.Authorization).toBe('Bearer test-github-token-123');
+    
+    delete process.env.GITHUB_MCP_PAT;
+  });
+
+  it('should resolve environment variables in extension MCP server env', async () => {
+    process.env.MY_API_KEY = 'test-api-key-456';
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    
+    const extensions: GeminiCLIExtension[] = [
+      {
+        id: 'custom-extension',
+        name: 'custom-extension',
+        version: '1.0.0',
+        isActive: true,
+        path: '/path/to/extension',
+        contextFiles: [],
+        mcpServers: {
+          customServer: new MCPServerConfig(
+            'node',
+            ['server.js'],
+            {
+              API_KEY: '$MY_API_KEY',
+              SERVER_URL: 'https://api.example.com/${MY_API_KEY}',
+            },
+          ),
+        },
+      },
+    ];
+
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, extensions, 'test-session', argv);
+    const mcpServers = config.getMcpServers();
+    
+    expect(mcpServers.customServer).toBeDefined();
+    expect(mcpServers.customServer.env).toBeDefined();
+    expect(mcpServers.customServer.env?.API_KEY).toBe('test-api-key-456');
+    expect(mcpServers.customServer.env?.SERVER_URL).toBe('https://api.example.com/test-api-key-456');
+    
+    delete process.env.MY_API_KEY;
+  });
+
+  it('should keep original value if environment variable is not set', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    
+    const extensions: GeminiCLIExtension[] = [
+      {
+        id: 'test-extension',
+        name: 'test-extension',
+        version: '1.0.0',
+        isActive: true,
+        path: '/path/to/extension',
+        contextFiles: [],
+        mcpServers: {
+          testServer: new MCPServerConfig(
+            'node',
+            ['server.js'],
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            { Authorization: 'Bearer $UNDEFINED_VAR' },
+          ),
+        },
+      },
+    ];
+
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, extensions, 'test-session', argv);
+    const mcpServers = config.getMcpServers();
+    
+    expect(mcpServers.testServer).toBeDefined();
+    expect(mcpServers.testServer.headers).toBeDefined();
+    expect(mcpServers.testServer.headers?.Authorization).toBe('Bearer $UNDEFINED_VAR');
   });
 });

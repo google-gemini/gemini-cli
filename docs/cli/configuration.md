@@ -518,6 +518,25 @@ the `excludedProjectEnvVars` setting in your `settings.json` file.
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
+- **`GITHUB_PERSONAL_ACCESS_TOKEN`**:
+  - Your GitHub Personal Access Token (PAT) for accessing GitHub APIs.
+  - Required when using the GitHub MCP server directly via `settings.json`.
+  - Create a token at https://github.com/settings/tokens
+  - Example: `export GITHUB_PERSONAL_ACCESS_TOKEN="pat_YourTokenHere"`
+  - See the [MCP Server tutorial](./tutorials.md#setting-up-a-model-context-protocol-mcp-server)
+    for setup details.
+- **`GITHUB_MCP_PAT`**:
+  - Alternative GitHub Personal Access Token variable used by some extensions.
+  - Required when using the official GitHub MCP extension (installed via
+    `gemini extensions install https://github.com/github/github-mcp-server`) or
+    any other extension that expects this variable.
+  - Should be set in your `~/.gemini/.env` file for persistent configuration:
+    ```bash
+    # In ~/.gemini/.env
+    GITHUB_MCP_PAT=pat_YourTokenHere
+    ```
+  - Different extensions may use different variable names—check the
+    extension's `gemini-extension.json` to confirm which variables it expects.
 - **`GEMINI_SYSTEM_MD`**:
   - Overrides the base system prompt with the contents of a Markdown file.
   - If set to `1` or `true`, it uses the file at `.gemini/system.md`.

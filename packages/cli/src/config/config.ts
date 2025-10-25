@@ -40,6 +40,7 @@ import {
   debugLogger,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -714,8 +715,9 @@ function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
         );
         return;
       }
+      const resolvedServer = resolveEnvVarsInObject(server);
       mcpServers[key] = {
-        ...server,
+        ...resolvedServer,
         extension,
       };
     });
