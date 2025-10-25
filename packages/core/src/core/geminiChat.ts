@@ -377,7 +377,7 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => await handleFallback(this.config, model, authType, error);
+    ) => handleFallback(this.config, model, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
