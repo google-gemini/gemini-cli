@@ -104,24 +104,22 @@ export abstract class BaseToolInvocation<
       }
 
       if (decision === 'ASK_USER') {
-        const confirmationDetails: ToolCallConfirmationDetails = {
-          type: 'info',
-          title: `Confirm: ${this._toolDisplayName || this._toolName}`,
-          prompt: this.getDescription(),
-          onConfirm: async (outcome: ToolConfirmationOutcome) => {
-            if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-              if (this.messageBus && this._toolName) {
-                this.messageBus.publish({
-                  type: MessageBusType.UPDATE_POLICY,
-                  toolName: this._toolName,
-                });
-              }
-            }
-          },
-        };
-        return confirmationDetails;
+        return this.getConfirmationDetails(abortSignal);
       }
     }
+    // When no message bus, use default confirmation flow
+    return this.getConfirmationDetails(abortSignal);
+  }
+
+  /**
+   * Subclasses should override this method to provide custom confirmation UI
+   * when the policy engine's decision is 'ASK_USER'.
+   * The base implementation returns false (no confirmation needed).
+   * Only tools that need confirmation (e.g., write, execute tools) should override this.
+   */
+  protected async getConfirmationDetails(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
     return false;
   }
 

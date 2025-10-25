@@ -15,13 +15,36 @@ import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import { FakeContentGenerator } from './fakeContentGenerator.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
+vi.mock('./fakeContentGenerator.js');
 
 const mockConfig = {} as unknown as Config;
 
 describe('createContentGenerator', () => {
+  it('should create a FakeContentGenerator', async () => {
+    const mockGenerator = {} as unknown as ContentGenerator;
+    vi.mocked(FakeContentGenerator.fromFile).mockResolvedValue(
+      mockGenerator as never,
+    );
+    const fakeResponsesFile = 'fake/responses.yaml';
+    const mockConfigWithFake = {
+      fakeResponses: fakeResponsesFile,
+    } as unknown as Config;
+    const generator = await createContentGenerator(
+      {
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfigWithFake,
+    );
+    expect(FakeContentGenerator.fromFile).toHaveBeenCalledWith(
+      fakeResponsesFile,
+    );
+    expect(generator).toEqual(mockGenerator);
+  });
+
   it('should create a CodeAssistContentGenerator', async () => {
     const mockGenerator = {} as unknown as ContentGenerator;
     vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(

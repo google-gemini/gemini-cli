@@ -70,6 +70,13 @@ export class FatalCancellationError extends FatalError {
   }
 }
 
+export class CanceledError extends Error {
+  constructor(message = 'The operation was canceled.') {
+    super(message);
+    this.name = 'CanceledError';
+  }
+}
+
 export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}

@@ -56,6 +56,7 @@ const REGRESSION_PERCENTAGE_CHANGE =
   'gemini_cli.performance.regression.percentage_change';
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
 const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
+const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
 
 const baseMetricDefinition = {
   getCommonAttributes,
@@ -173,6 +174,12 @@ const COUNTER_DEFINITIONS = {
       'Counts UI frames that flicker (render taller than the terminal).',
     valueType: ValueType.INT,
     assign: (c: Counter) => (flickerFrameCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EXIT_FAIL_COUNT]: {
+    description: 'Counts CLI exit failures.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (exitFailCounter = c),
     attributes: {} as Record<string, never>,
   },
 } as const;
@@ -458,6 +465,7 @@ let agentRunCounter: Counter | undefined;
 let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
+let exitFailCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -621,6 +629,14 @@ export function recordFileOperationMetric(
 export function recordFlickerFrame(config: Config): void {
   if (!flickerFrameCounter || !isMetricsInitialized) return;
   flickerFrameCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when user failed to exit
+ */
+export function recordExitFail(config: Config): void {
+  if (!exitFailCounter || !isMetricsInitialized) return;
+  exitFailCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
 }
 
 /**

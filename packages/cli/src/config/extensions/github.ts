@@ -16,11 +16,11 @@ import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
 import * as tar from 'tar';
 import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
-import { type ExtensionEnablementManager } from './extensionEnablement.js';
+import type { ExtensionManager } from '../extension-manager.js';
+import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
 /**
  * Clones a Git repository to a specified local path.
@@ -153,16 +153,11 @@ export async function fetchReleaseFromGithub(
 
 export async function checkForExtensionUpdate(
   extension: GeminiCLIExtension,
-  extensionEnablementManager: ExtensionEnablementManager,
-  cwd: string = process.cwd(),
+  extensionManager: ExtensionManager,
 ): Promise<ExtensionUpdateState> {
   const installMetadata = extension.installMetadata;
   if (installMetadata?.type === 'local') {
-    const newExtension = loadExtension({
-      extensionDir: installMetadata.source,
-      workspaceDir: cwd,
-      extensionEnablementManager,
-    });
+    const newExtension = extensionManager.loadExtension(installMetadata.source);
     if (!newExtension) {
       debugLogger.error(
         `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,

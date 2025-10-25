@@ -10,7 +10,11 @@ import * as os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
 
-import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  GEMINI_DIR,
+  type GeminiCLIExtension,
+} from '@google/gemini-cli-core';
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
@@ -272,20 +276,20 @@ describe('ExtensionEnablementManager', () => {
   });
 
   describe('validateExtensionOverrides', () => {
-    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+    let coreEventsEmitSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      coreEventsEmitSpy = vi.spyOn(coreEvents, 'emitFeedback');
     });
 
     afterEach(() => {
-      consoleErrorSpy.mockRestore();
+      coreEventsEmitSpy.mockRestore();
     });
 
     it('should not log an error if enabledExtensionNamesOverride is empty', () => {
       const manager = new ExtensionEnablementManager([]);
       manager.validateExtensionOverrides([]);
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(coreEventsEmitSpy).not.toHaveBeenCalled();
     });
 
     it('should not log an error if all enabledExtensionNamesOverride are valid', () => {
@@ -295,7 +299,7 @@ describe('ExtensionEnablementManager', () => {
         { name: 'ext-two' },
       ] as GeminiCLIExtension[];
       manager.validateExtensionOverrides(extensions);
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(coreEventsEmitSpy).not.toHaveBeenCalled();
     });
 
     it('should log an error for each invalid extension name in enabledExtensionNamesOverride', () => {
@@ -309,11 +313,13 @@ describe('ExtensionEnablementManager', () => {
         { name: 'ext-two' },
       ] as GeminiCLIExtension[];
       manager.validateExtensionOverrides(extensions);
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(coreEventsEmitSpy).toHaveBeenCalledTimes(2);
+      expect(coreEventsEmitSpy).toHaveBeenCalledWith(
+        'error',
         'Extension not found: ext-invalid',
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(coreEventsEmitSpy).toHaveBeenCalledWith(
+        'error',
         'Extension not found: ext-another-invalid',
       );
     });
@@ -321,7 +327,7 @@ describe('ExtensionEnablementManager', () => {
     it('should not log an error if "none" is in enabledExtensionNamesOverride', () => {
       const manager = new ExtensionEnablementManager(['none']);
       manager.validateExtensionOverrides([]);
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(coreEventsEmitSpy).not.toHaveBeenCalled();
     });
   });
 });

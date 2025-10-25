@@ -404,6 +404,12 @@ export class LoopDetectionService {
       ...trimmedHistory,
       { role: 'user', parts: [{ text: taskPrompt }] },
     ];
+    if (contents.length > 0 && isFunctionCall(contents[0])) {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Recent conversation history:' }],
+      });
+    }
     const schema: Record<string, unknown> = {
       type: 'object',
       properties: {
@@ -432,7 +438,7 @@ export class LoopDetectionService {
       });
     } catch (e) {
       // Do nothing, treat it as a non-loop.
-      this.config.getDebugMode() ? console.error(e) : debugLogger.debug(e);
+      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
       return false;
     }
 

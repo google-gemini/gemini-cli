@@ -250,6 +250,39 @@ export class ClearcutLogger {
     }
   }
 
+  createBasicLogEvent(
+    eventName: EventNames,
+    data: EventValue[] = [],
+  ): LogEvent {
+    const surface = determineSurface();
+    return {
+      console_type: 'GEMINI_CLI',
+      application: 102, // GEMINI_CLI
+      event_name: eventName as string,
+      event_metadata: [
+        [
+          ...data,
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+            value: surface,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+            value: CLI_VERSION,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+            value: GIT_COMMIT_INFO,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+            value: process.platform,
+          },
+        ],
+      ],
+    };
+  }
+
   createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
     const email = this.userAccountManager.getCachedGoogleAccount();
 
@@ -260,12 +293,7 @@ export class ClearcutLogger {
 
     data = this.addDefaultFields(data, totalAccounts);
 
-    const logEvent: LogEvent = {
-      console_type: 'GEMINI_CLI',
-      application: 102, // GEMINI_CLI
-      event_name: eventName as string,
-      event_metadata: [data],
-    };
+    const logEvent = this.createBasicLogEvent(eventName, data);
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
     if (email) {
@@ -921,7 +949,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -945,7 +973,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -981,7 +1009,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_UPDATE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1070,7 +1098,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1109,7 +1137,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
@@ -1207,8 +1235,6 @@ export class ClearcutLogger {
    * should exist on all log events.
    */
   addDefaultFields(data: EventValue[], totalAccounts: number): EventValue[] {
-    const surface = determineSurface();
-
     const defaultLogMetadata: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
@@ -1225,24 +1251,8 @@ export class ClearcutLogger {
         value: `${totalAccounts}`,
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: surface,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-        value: CLI_VERSION,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-        value: GIT_COMMIT_INFO,
-      },
-      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: this.promptId,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-        value: process.platform,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
@@ -1269,8 +1279,6 @@ export class ClearcutLogger {
   }
 
   getConfigJson() {
-    const configJson = safeJsonStringifyBooleanValuesOnly(this.config);
-    debugLogger.debug(configJson);
     return safeJsonStringifyBooleanValuesOnly(this.config);
   }
 
