@@ -1163,6 +1163,26 @@ Logging in with Google... Please restart Gemini CLI to continue.
     showIdeRestartPrompt ||
     !!proQuotaRequest;
 
+  const needsBell = useRef(false);
+  useEffect(() => {
+    switch (streamingState) {
+      case StreamingState.Idle:
+      case StreamingState.WaitingForConfirmation:
+        if (needsBell.current) {
+          if (config.getEnableTerminalBell()) {
+            process.stdout.write('\u0007');
+          }
+          needsBell.current = false;
+        }
+        break;
+      case StreamingState.Responding:
+        needsBell.current = true;
+        break;
+      default:
+        break;
+    }
+  }, [streamingState, config]);
+
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
