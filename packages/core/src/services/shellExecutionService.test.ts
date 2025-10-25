@@ -350,7 +350,9 @@ describe('ShellExecutionService', () => {
     });
 
     it('should not throw when resizing a pty that has already exited (Windows)', () => {
-      const resizeError = new Error('Cannot resize a pty that has already exited');
+      const resizeError = new Error(
+        'Cannot resize a pty that has already exited',
+      );
       mockPtyProcess.resize.mockImplementation(() => {
         throw resizeError;
       });
@@ -361,7 +363,7 @@ describe('ShellExecutionService', () => {
       }).not.toThrow();
 
       expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
-      expect(mockHeadlessTerminal.resize).toHaveBeenCalledWith(100, 40);
+      expect(mockHeadlessTerminal.resize).not.toHaveBeenCalled();
     });
   });
 
