@@ -101,7 +101,17 @@ export const usePermissionsModifyTrust = (
         setNeedsRestart(true);
       } else {
         const folders = loadTrustedFolders();
-        folders.setValue(cwd, trustLevel);
+        try {
+          folders.setValue(cwd, trustLevel);
+        } catch (_e) {
+          addItem(
+            {
+              type: MessageType.WARNING,
+              text: 'Failed to save trust settings. Your changes may not persist.',
+            },
+            Date.now(),
+          );
+        }
         onExit();
       }
     },
@@ -111,9 +121,24 @@ export const usePermissionsModifyTrust = (
   const commitTrustLevelChange = useCallback(() => {
     if (pendingTrustLevel) {
       const folders = loadTrustedFolders();
-      folders.setValue(cwd, pendingTrustLevel);
+      try {
+        folders.setValue(cwd, pendingTrustLevel);
+        return true;
+      } catch (_e) {
+        addItem(
+          {
+            type: MessageType.WARNING,
+            text: 'Failed to save trust settings. Your changes may not persist.',
+          },
+          Date.now(),
+        );
+        setNeedsRestart(false);
+        setPendingTrustLevel(undefined);
+        return false;
+      }
     }
-  }, [cwd, pendingTrustLevel]);
+    return true;
+  }, [cwd, pendingTrustLevel, addItem]);
 
   return {
     cwd,
