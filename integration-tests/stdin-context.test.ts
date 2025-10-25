@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
-describe.skip('stdin context', () => {
+describe('stdin context', () => {
   it('should be able to use stdin as context for a prompt', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to use stdin as context for a prompt');
