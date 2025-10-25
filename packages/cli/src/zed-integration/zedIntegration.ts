@@ -12,6 +12,7 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   GeminiCLIExtension,
+  FilterFilesOptions,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -26,9 +27,11 @@ import {
   MCPServerConfig,
   DiscoveredMCPTool,
   StreamEventType,
+  ToolCallEvent,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -41,10 +44,8 @@ import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import { ExtensionStorage } from '../config/extension.js';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
-import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
 
 /**
  * Resolves the model to use based on the current configuration.
@@ -158,7 +159,7 @@ class GeminiAgent {
         );
         isAuthenticated = true;
       } catch (e) {
-        console.error(`Authentication failed: ${e}`);
+        debugLogger.error(`Authentication failed: ${e}`);
       }
     }
 
@@ -206,10 +207,6 @@ class GeminiAgent {
     const config = await loadCliConfig(
       settings,
       this.extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        this.argv.extensions,
-      ),
       sessionId,
       this.argv,
       cwd,
@@ -369,20 +366,21 @@ class Session {
 
     const errorResponse = (error: Error) => {
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        prompt_id: promptId,
-        function_name: fc.name ?? '',
-        function_args: args,
-        duration_ms: durationMs,
-        success: false,
-        error: error.message,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          false,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+          error.message,
+        ),
+      );
 
       return [
         {
@@ -488,19 +486,20 @@ class Session {
       });
 
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: fc.name,
-        function_args: args,
-        duration_ms: durationMs,
-        success: true,
-        prompt_id: promptId,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          true,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+        ),
+      );
 
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
     } catch (e) {
@@ -573,7 +572,8 @@ class Session {
 
     // Get centralized file discovery service
     const fileDiscovery = this.config.getFileService();
-    const respectGitIgnore = this.config.getFileFilteringRespectGitIgnore();
+    const fileFilteringOptions: FilterFilesOptions =
+      this.config.getFileFilteringOptions();
 
     const pathSpecsToRead: string[] = [];
     const contentLabelsForDisplay: string[] = [];
@@ -589,13 +589,10 @@ class Session {
 
     for (const atPathPart of atPathCommandParts) {
       const pathName = atPathPart.fileData!.fileUri;
-      // Check if path should be ignored by git
-      if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
+      // Check if path should be ignored
+      if (fileDiscovery.shouldIgnoreFile(pathName, fileFilteringOptions)) {
         ignoredPaths.push(pathName);
-        const reason = respectGitIgnore
-          ? 'git-ignored and will be skipped'
-          : 'ignored by custom patterns';
-        console.warn(`Path ${pathName} is ${reason}.`);
+        debugLogger.warn(`Path ${pathName} is ignored and will be skipped.`);
         continue;
       }
       let currentPathSpec = pathName;
@@ -662,7 +659,7 @@ class Session {
                 );
               }
             } catch (globError) {
-              console.error(
+              debugLogger.error(
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
             }
@@ -672,7 +669,7 @@ class Session {
             );
           }
         } else {
-          console.error(
+          debugLogger.error(
             `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
@@ -732,9 +729,8 @@ class Session {
     initialQueryText = initialQueryText.trim();
     // Inform user about ignored paths
     if (ignoredPaths.length > 0) {
-      const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
       this.debug(
-        `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
+        `Ignored ${ignoredPaths.length} files: ${ignoredPaths.join(', ')}`,
       );
     }
 
@@ -742,14 +738,13 @@ class Session {
 
     if (pathSpecsToRead.length === 0 && embeddedContext.length === 0) {
       // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-      console.warn('No valid file paths found in @ commands to read.');
+      debugLogger.warn('No valid file paths found in @ commands to read.');
       return [{ text: initialQueryText }];
     }
 
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
         paths: pathSpecsToRead,
-        respectGitIgnore, // Use configuration setting
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;
@@ -805,7 +800,7 @@ class Session {
             }
           }
         } else {
-          console.warn(
+          debugLogger.warn(
             'read_many_files tool returned no content or empty content.',
           );
         }
@@ -858,7 +853,7 @@ class Session {
 
   debug(msg: string) {
     if (this.config.getDebugMode()) {
-      console.warn(msg);
+      debugLogger.warn(msg);
     }
   }
 }

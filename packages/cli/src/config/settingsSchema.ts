@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// --------------------------------------------------------------------------
+// IMPORTANT: When adding a new setting, especially one with `showInDialog: true`,
+// please ensure it is also documented in `docs/get-started/configuration.md`.
+// --------------------------------------------------------------------------
+
 import type {
   MCPServerConfig,
   BugCommandSettings,
@@ -14,6 +19,7 @@ import type {
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -177,6 +183,16 @@ const SETTINGS_SCHEMA = {
         description:
           'Enable AI-powered prompt completion suggestions while typing.',
         showInDialog: true,
+      },
+      retryFetchErrors: {
+        type: 'boolean',
+        label: 'Retry Fetch Errors',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Retry on "exception TypeError: fetch failed sending request" errors.',
+        showInDialog: false,
       },
       debugKeystrokeLogging: {
         type: 'boolean',
@@ -411,6 +427,15 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      useFullWidth: {
+        type: 'boolean',
+        label: 'Use Full Width',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Use the entire width of the terminal for output.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -443,7 +468,7 @@ const SETTINGS_SCHEMA = {
             label: 'Screen Reader Mode',
             category: 'UI',
             requiresRestart: true,
-            default: undefined as boolean | undefined,
+            default: false,
             description:
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
@@ -890,7 +915,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use Smart Edit',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
+    default: true,
     description: 'Enable the smart-edit tool instead of the replace tool.',
     showInDialog: false,
   },
@@ -912,6 +937,15 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      disableYoloMode: {
+        type: 'boolean',
+        label: 'Disable YOLO Mode',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
       folderTrust: {
         type: 'object',
         label: 'Folder Trust',
@@ -1046,19 +1080,70 @@ const SETTINGS_SCHEMA = {
         label: 'Use Model Router',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
       },
-      enableSubagents: {
-        type: 'boolean',
-        label: 'Enable Subagents',
+      codebaseInvestigatorSettings: {
+        type: 'object',
+        label: 'Codebase Investigator Settings',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable experimental subagents.',
+        default: {},
+        description: 'Configuration for Codebase Investigator.',
         showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Codebase Investigator',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable the Codebase Investigator agent.',
+            showInDialog: true,
+          },
+          maxNumTurns: {
+            type: 'number',
+            label: 'Codebase Investigator Max Num Turns',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 15,
+            description:
+              'Maximum number of turns for the Codebase Investigator agent.',
+            showInDialog: true,
+          },
+          maxTimeMinutes: {
+            type: 'number',
+            label: 'Max Time (Minutes)',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 5,
+            description:
+              'Maximum time for the Codebase Investigator agent (in minutes).',
+            showInDialog: false,
+          },
+          thinkingBudget: {
+            type: 'number',
+            label: 'Thinking Budget',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: -1,
+            description:
+              'The thinking budget for the Codebase Investigator agent.',
+            showInDialog: false,
+          },
+          model: {
+            type: 'string',
+            label: 'Model',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: DEFAULT_GEMINI_MODEL,
+            description:
+              'The model to use for the Codebase Investigator agent.',
+            showInDialog: false,
+          },
+        },
       },
     },
   },

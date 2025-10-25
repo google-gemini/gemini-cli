@@ -1,0 +1,18 @@
+{
+  "generateContent": [
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "This is more than the 5 tokens we return below which will trigger an error"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -35,12 +35,17 @@ import type {
   SmartEditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
+  ExtensionUpdateEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
 import { InstallationManager } from '../../utils/installationManager.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
-import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
+import {
+  safeJsonStringify,
+  safeJsonStringifyBooleanValuesOnly,
+} from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import {
@@ -48,6 +53,7 @@ import {
   detectIdeFromEnv,
   isCloudShell,
 } from '../../ide/detect-ide.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -76,6 +82,7 @@ export enum EventNames {
   EXTENSION_DISABLE = 'extension_disable',
   EXTENSION_INSTALL = 'extension_install',
   EXTENSION_UNINSTALL = 'extension_uninstall',
+  EXTENSION_UPDATE = 'extension_update',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
   MODEL_ROUTING = 'model_routing',
   MODEL_SLASH_COMMAND = 'model_slash_command',
@@ -83,6 +90,7 @@ export enum EventNames {
   SMART_EDIT_CORRECTION = 'smart_edit_correction',
   AGENT_START = 'agent_start',
   AGENT_FINISH = 'agent_finish',
+  WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
 }
 
 export interface LogResponse {
@@ -231,7 +239,7 @@ export class ClearcutLogger {
       ]);
 
       if (wasAtCapacity && this.config?.getDebugMode()) {
-        console.debug(
+        debugLogger.debug(
           `ClearcutLogger: Dropped old event to prevent memory leak (queue size: ${this.events.size})`,
         );
       }
@@ -240,6 +248,39 @@ export class ClearcutLogger {
         console.error('ClearcutLogger: Failed to enqueue log event.', error);
       }
     }
+  }
+
+  createBasicLogEvent(
+    eventName: EventNames,
+    data: EventValue[] = [],
+  ): LogEvent {
+    const surface = determineSurface();
+    return {
+      console_type: 'GEMINI_CLI',
+      application: 102, // GEMINI_CLI
+      event_name: eventName as string,
+      event_metadata: [
+        [
+          ...data,
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+            value: surface,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+            value: CLI_VERSION,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+            value: GIT_COMMIT_INFO,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+            value: process.platform,
+          },
+        ],
+      ],
+    };
   }
 
   createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
@@ -252,12 +293,7 @@ export class ClearcutLogger {
 
     data = this.addDefaultFields(data, totalAccounts);
 
-    const logEvent: LogEvent = {
-      console_type: 'GEMINI_CLI',
-      application: 102, // GEMINI_CLI
-      event_name: eventName as string,
-      event_metadata: [data],
-    };
+    const logEvent = this.createBasicLogEvent(eventName, data);
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
     if (email) {
@@ -275,14 +311,14 @@ export class ClearcutLogger {
     }
 
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
   async flushToClearcut(): Promise<LogResponse> {
     if (this.flushing) {
       if (this.config?.getDebugMode()) {
-        console.debug(
+        debugLogger.debug(
           'ClearcutLogger: Flush already in progress, marking pending flush.',
         );
       }
@@ -292,7 +328,7 @@ export class ClearcutLogger {
     this.flushing = true;
 
     if (this.config?.getDebugMode()) {
-      console.log('Flushing log events to Clearcut.');
+      debugLogger.log('Flushing log events to Clearcut.');
     }
     const eventsToSend = this.events.toArray() as LogEventEntry[][];
     this.events.clear();
@@ -352,7 +388,7 @@ export class ClearcutLogger {
       // Fire and forget the pending flush
       this.flushToClearcut().catch((error) => {
         if (this.config?.getDebugMode()) {
-          console.debug('Error in pending flush to Clearcut:', error);
+          debugLogger.debug('Error in pending flush to Clearcut:', error);
         }
       });
     }
@@ -438,13 +474,22 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_TOOLS,
         value: event.mcp_tools ? event.mcp_tools : '',
       },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT,
+        value: event.extensions_count.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
+        value: event.extension_ids.toString(),
+      },
     ];
     this.sessionData = data;
 
     // Flush start event immediately
     this.enqueueLogEvent(this.createLogEvent(EventNames.START_SESSION, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -661,14 +706,14 @@ export class ClearcutLogger {
   logFlashFallbackEvent(): void {
     this.enqueueLogEvent(this.createLogEvent(EventNames.FLASH_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
   logRipgrepFallbackEvent(): void {
     this.enqueueLogEvent(this.createLogEvent(EventNames.RIPGREP_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -804,7 +849,7 @@ export class ClearcutLogger {
     // Flush immediately on session end.
     this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, []));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -886,6 +931,10 @@ export class ClearcutLogger {
         value: event.extension_name,
       },
       {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_VERSION,
         value: event.extension_version,
       },
@@ -900,9 +949,11 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logExtensionUninstallEvent(event: ExtensionUninstallEvent): void {
@@ -912,15 +963,57 @@ export class ClearcutLogger {
         value: event.extension_name,
       },
       {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_UNINSTALL_STATUS,
         value: event.status,
       },
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
+  }
+
+  logExtensionUpdateEvent(event: ExtensionUpdateEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_VERSION,
+        value: event.extension_version,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_PREVIOUS_VERSION,
+        value: event.extension_previous_version,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_SOURCE,
+        value: event.extension_source,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_UPDATE_STATUS,
+        value: event.status,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
+    );
+    this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logToolOutputTruncatedEvent(event: ToolOutputTruncatedEvent): void {
@@ -994,6 +1087,10 @@ export class ClearcutLogger {
         value: event.extension_name,
       },
       {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE,
         value: event.setting_scope,
@@ -1001,9 +1098,11 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logModelSlashCommandEvent(event: ModelSlashCommandEvent): void {
@@ -1027,6 +1126,10 @@ export class ClearcutLogger {
         value: event.extension_name,
       },
       {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE,
         value: event.setting_scope,
@@ -1034,9 +1137,11 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logSmartEditStrategyEvent(event: SmartEditStrategyEvent): void {
@@ -1111,13 +1216,25 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logWebFetchFallbackAttemptEvent(event: WebFetchFallbackAttemptEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_WEB_FETCH_FALLBACK_REASON,
+        value: event.reason,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.WEB_FETCH_FALLBACK_ATTEMPT, data),
+    );
+    this.flushIfNeeded();
+  }
+
   /**
    * Adds default fields to data, and returns a new data array.  This fields
    * should exist on all log events.
    */
   addDefaultFields(data: EventValue[], totalAccounts: number): EventValue[] {
-    const surface = determineSurface();
-
     const defaultLogMetadata: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
@@ -1134,24 +1251,8 @@ export class ClearcutLogger {
         value: `${totalAccounts}`,
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: surface,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-        value: CLI_VERSION,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-        value: GIT_COMMIT_INFO,
-      },
-      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
         value: this.promptId,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-        value: process.platform,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
@@ -1159,12 +1260,7 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
-        value: safeJsonStringify([
-          {
-            smart_edit_enabled: this.config?.getUseSmartEdit() ?? false,
-            model_router_enabled: this.config?.getUseModelRouter() ?? false,
-          },
-        ]),
+        value: this.getConfigJson(),
       },
     ];
     return [...data, ...defaultLogMetadata];
@@ -1182,6 +1278,10 @@ export class ClearcutLogger {
     }
   }
 
+  getConfigJson() {
+    return safeJsonStringifyBooleanValuesOnly(this.config);
+  }
+
   shutdown() {
     this.logEndSessionEvent();
   }
@@ -1192,7 +1292,7 @@ export class ClearcutLogger {
 
     // Log a warning if we're dropping events
     if (eventsToSend.length > MAX_RETRY_EVENTS && this.config?.getDebugMode()) {
-      console.warn(
+      debugLogger.warn(
         `ClearcutLogger: Dropping ${
           eventsToSend.length - MAX_RETRY_EVENTS
         } events due to retry queue limit. Total events: ${
@@ -1207,7 +1307,7 @@ export class ClearcutLogger {
 
     if (numEventsToRequeue === 0) {
       if (this.config?.getDebugMode()) {
-        console.debug(
+        debugLogger.debug(
           `ClearcutLogger: No events re-queued (queue size: ${this.events.size})`,
         );
       }
@@ -1230,7 +1330,7 @@ export class ClearcutLogger {
     }
 
     if (this.config?.getDebugMode()) {
-      console.debug(
+      debugLogger.debug(
         `ClearcutLogger: Re-queued ${numEventsToRequeue} events for retry (queue size: ${this.events.size})`,
       );
     }

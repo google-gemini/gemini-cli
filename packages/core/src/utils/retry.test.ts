@@ -11,6 +11,7 @@ import { AuthType } from '../core/contentGenerator.js';
 import type { HttpError } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
+import { debugLogger } from './debugLogger.js';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
@@ -48,7 +49,7 @@ describe('retryWithBackoff', () => {
     // Disable 429 simulation for tests
     setSimulate429(false);
     // Suppress unhandled promise rejection warnings for tests that expect errors
-    console.warn = vi.fn();
+    debugLogger.warn = vi.fn();
   });
 
   afterEach(() => {
@@ -96,34 +97,34 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 5 maxAttempts if no options are provided', async () => {
-    // This function will fail more than 5 times to ensure all retries are used.
+  it('should default to 3 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
     const mockFn = createFailingFunction(10);
 
     const promise = retryWithBackoff(mockFn);
 
     // Expect it to fail with the error from the 5th attempt.
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 10'),
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(10);
+    expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 10 maxAttempts if options.maxAttempts is undefined', async () => {
-    // This function will fail more than 5 times to ensure all retries are used.
+  it('should default to 3 maxAttempts if options.maxAttempts is undefined', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
     const mockFn = createFailingFunction(10);
 
     const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
 
     // Expect it to fail with the error from the 5th attempt.
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 10'),
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(10);
+    expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
   it('should not retry if shouldRetry returns false', async () => {
@@ -304,6 +305,41 @@ describe('retryWithBackoff', () => {
     });
   });
 
+  describe('Fetch error retries', () => {
+    const fetchErrorMsg = 'exception TypeError: fetch failed sending request';
+
+    it('should retry on specific fetch error when retryFetchErrors is true', async () => {
+      const mockFn = vi.fn();
+      mockFn.mockRejectedValueOnce(new Error(fetchErrorMsg));
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([false, undefined])(
+      'should not retry on specific fetch error when retryFetchErrors is %s',
+      async (retryFetchErrors) => {
+        const mockFn = vi.fn().mockRejectedValue(new Error(fetchErrorMsg));
+
+        const promise = retryWithBackoff(mockFn, {
+          retryFetchErrors,
+        });
+
+        await expect(promise).rejects.toThrow(fetchErrorMsg);
+        expect(mockFn).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
   describe('Flash model fallback for OAuth users', () => {
     it('should trigger fallback for OAuth personal users on TerminalQuotaError', async () => {
       const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
@@ -375,5 +411,26 @@ describe('retryWithBackoff', () => {
         expect(mockFn).toHaveBeenCalledTimes(1);
       },
     );
+  });
+  it('should abort the retry loop when the signal is aborted', async () => {
+    const abortController = new AbortController();
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error: HttpError = new Error('Server error');
+      error.status = 500;
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 5,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    abortController.abort();
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(mockFn).toHaveBeenCalledTimes(1);
   });
 });

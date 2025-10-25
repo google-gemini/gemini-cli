@@ -5,9 +5,15 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { FatalConfigError, getErrorMessage } from '@google/gemini-cli-core';
-import { enableExtension } from '../../config/extension.js';
-import { SettingScope } from '../../config/settings.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  debugLogger,
+  FatalConfigError,
+  getErrorMessage,
+} from '@google/gemini-cli-core';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface EnableArgs {
   name: string;
@@ -15,18 +21,25 @@ interface EnableArgs {
 }
 
 export function handleEnable(args: EnableArgs) {
+  const workingDir = process.cwd();
+  const extensionManager = new ExtensionManager({
+    workspaceDir: workingDir,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    loadedSettings: loadSettings(workingDir),
+  });
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      enableExtension(args.name, SettingScope.Workspace);
+      extensionManager.enableExtension(args.name, SettingScope.Workspace);
     } else {
-      enableExtension(args.name, SettingScope.User);
+      extensionManager.enableExtension(args.name, SettingScope.User);
     }
     if (args.scope) {
-      console.log(
+      debugLogger.log(
         `Extension "${args.name}" successfully enabled for scope "${args.scope}".`,
       );
     } else {
-      console.log(
+      debugLogger.log(
         `Extension "${args.name}" successfully enabled in all scopes.`,
       );
     }
@@ -46,7 +59,7 @@ export const enableCommand: CommandModule = {
       })
       .option('scope', {
         describe:
-          'The scope to enable the extenison in. If not set, will be enabled in all scopes.',
+          'The scope to enable the extension in. If not set, will be enabled in all scopes.',
         type: 'string',
       })
       .check((argv) => {

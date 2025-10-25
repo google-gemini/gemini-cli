@@ -6,7 +6,8 @@
 
 import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
 import { diag, metrics, ValueType } from '@opentelemetry/api';
-import { SERVICE_NAME, EVENT_CHAT_COMPRESSION } from './constants.js';
+import { SERVICE_NAME } from './constants.js';
+import { EVENT_CHAT_COMPRESSION } from './types.js';
 import type { Config } from '../config/config.js';
 import type {
   ModelRoutingEvent,
@@ -14,6 +15,7 @@ import type {
   AgentFinishEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { getCommonAttributes } from './telemetryAttributes.js';
 
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 const TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
@@ -53,11 +55,11 @@ const REGRESSION_DETECTION = 'gemini_cli.performance.regression';
 const REGRESSION_PERCENTAGE_CHANGE =
   'gemini_cli.performance.regression.percentage_change';
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
+const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
+const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
 
 const baseMetricDefinition = {
-  getCommonAttributes: (config: Config): Attributes => ({
-    'session.id': config.getSessionId(),
-  }),
+  getCommonAttributes,
 };
 
 const COUNTER_DEFINITIONS = {
@@ -70,6 +72,11 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
       decision?: 'accept' | 'reject' | 'modify' | 'auto_accept';
       tool_type?: 'native' | 'mcp';
+      // Optional diff statistics for file-modifying tools
+      model_added_lines?: number;
+      model_removed_lines?: number;
+      user_added_lines?: number;
+      user_removed_lines?: number;
     },
   },
   [API_REQUEST_COUNT]: {
@@ -161,6 +168,19 @@ const COUNTER_DEFINITIONS = {
       agent_name: string;
       terminate_reason: string;
     },
+  },
+  [FLICKER_FRAME_COUNT]: {
+    description:
+      'Counts UI frames that flicker (render taller than the terminal).',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (flickerFrameCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EXIT_FAIL_COUNT]: {
+    description: 'Counts CLI exit failures.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (exitFailCounter = c),
+    attributes: {} as Record<string, never>,
   },
 } as const;
 
@@ -444,6 +464,8 @@ let modelSlashCommandCallCounter: Counter | undefined;
 let agentRunCounter: Counter | undefined;
 let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
+let flickerFrameCounter: Counter | undefined;
+let exitFailCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -600,6 +622,22 @@ export function recordFileOperationMetric(
 }
 
 // --- New Metric Recording Functions ---
+
+/**
+ * Records a metric for when a UI frame flickers.
+ */
+export function recordFlickerFrame(config: Config): void {
+  if (!flickerFrameCounter || !isMetricsInitialized) return;
+  flickerFrameCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when user failed to exit
+ */
+export function recordExitFail(config: Config): void {
+  if (!exitFailCounter || !isMetricsInitialized) return;
+  exitFailCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
 
 /**
  * Records a metric for when an invalid chunk is received from a stream.

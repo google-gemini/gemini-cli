@@ -8,8 +8,14 @@
 export * from './config/config.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
+export * from './output/stream-json-formatter.js';
 export * from './policy/types.js';
 export * from './policy/policy-engine.js';
+export * from './confirmation-bus/types.js';
+export * from './confirmation-bus/message-bus.js';
+
+// Export Commands logic
+export * from './commands/extensions.js';
 
 // Export Core Logic
 export * from './core/client.js';
@@ -37,10 +43,12 @@ export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
+export * from './utils/getPty.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/gitUtils.js';
 export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
+export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
@@ -56,6 +64,8 @@ export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
+export * from './utils/debugLogger.js';
+export * from './utils/events.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -78,6 +88,7 @@ export * from './services/shellExecutionService.js';
 export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
+export * from './tools/tool-names.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';

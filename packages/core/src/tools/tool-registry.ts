@@ -21,6 +21,8 @@ import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { EventEmitter } from 'node:events';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -161,6 +163,9 @@ Signal: Signal number or \`(none)\` if no signal was received.
 
   protected createInvocation(
     params: ToolParams,
+    _messageBus?: MessageBus,
+    _toolName?: string,
+    _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
     return new DiscoveredToolInvocation(this.config, this.name, params);
   }
@@ -174,15 +179,7 @@ export class ToolRegistry {
 
   constructor(config: Config, eventEmitter?: EventEmitter) {
     this.config = config;
-    this.mcpClientManager = new McpClientManager(
-      this.config.getMcpServers() ?? {},
-      this.config.getMcpServerCommand(),
-      this,
-      this.config.getPromptRegistry(),
-      this.config.getDebugMode(),
-      this.config.getWorkspaceContext(),
-      eventEmitter,
-    );
+    this.mcpClientManager = new McpClientManager(this, eventEmitter);
   }
 
   /**
@@ -195,7 +192,7 @@ export class ToolRegistry {
         tool = tool.asFullyQualifiedTool();
       } else {
         // Decide on behavior: throw error, log warning, or allow overwrite
-        console.warn(
+        debugLogger.warn(
           `Tool with name "${tool.name}" is already registered. Overwriting.`,
         );
       }
@@ -387,7 +384,7 @@ export class ToolRegistry {
       // register each function as a tool
       for (const func of functions) {
         if (!func.name) {
-          console.warn('Discovered a tool with no name. Skipping.');
+          debugLogger.warn('Discovered a tool with no name. Skipping.');
           continue;
         }
         const parameters =

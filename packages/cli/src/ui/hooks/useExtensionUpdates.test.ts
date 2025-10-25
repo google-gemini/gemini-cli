@@ -8,22 +8,18 @@ import { vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  ExtensionStorage,
-  annotateActiveExtensions,
-  loadExtension,
-} from '../../config/extension.js';
 import { createExtension } from '../../test-utils/createExtension.js';
 import { useExtensionUpdates } from './useExtensionUpdates.js';
 import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { renderHook, waitFor } from '@testing-library/react';
 import { MessageType } from '../types.js';
-import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 import {
   checkForAllExtensionUpdates,
   updateExtension,
 } from '../../config/extensions/update.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
@@ -40,17 +36,29 @@ vi.mock('../../config/extensions/update.js', () => ({
 
 describe('useExtensionUpdates', () => {
   let tempHomeDir: string;
+  let tempWorkspaceDir: string;
   let userExtensionsDir: string;
+  let extensionManager: ExtensionManager;
 
   beforeEach(() => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
+    );
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     fs.mkdirSync(userExtensionsDir, { recursive: true });
     vi.mocked(checkForAllExtensionUpdates).mockReset();
     vi.mocked(updateExtension).mockReset();
+    extensionManager = new ExtensionManager({
+      workspaceDir: tempHomeDir,
+      requestConsent: vi.fn(),
+      requestSetting: vi.fn(),
+      loadedSettings: loadSettings(),
+    });
   });
 
   afterEach(() => {
@@ -61,6 +69,7 @@ describe('useExtensionUpdates', () => {
     const extensions = [
       {
         name: 'test-extension',
+        id: 'test-extension-id',
         type: 'git',
         version: '1.0.0',
         path: '/some/path',
@@ -74,10 +83,9 @@ describe('useExtensionUpdates', () => {
       },
     ];
     const addItem = vi.fn();
-    const cwd = '/test/cwd';
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (_extensions, dispatch, _cwd) => {
+      async (_extensions, _extensionManager, dispatch) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -89,7 +97,11 @@ describe('useExtensionUpdates', () => {
     );
 
     renderHook(() =>
-      useExtensionUpdates(extensions as GeminiCLIExtension[], addItem, cwd),
+      useExtensionUpdates(
+        extensions as GeminiCLIExtension[],
+        extensionManager,
+        addItem,
+      ),
     );
 
     await waitFor(() => {
@@ -114,16 +126,12 @@ describe('useExtensionUpdates', () => {
         autoUpdate: true,
       },
     });
-    const extension = annotateActiveExtensions(
-      [loadExtension({ extensionDir, workspaceDir: tempHomeDir })!],
-      tempHomeDir,
-      new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-    )[0];
+    const extension = extensionManager.loadExtension(extensionDir)!;
 
     const addItem = vi.fn();
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (_extensions, dispatch, _cwd) => {
+      async (_extensions, _extensionManager, dispatch) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -140,7 +148,9 @@ describe('useExtensionUpdates', () => {
       name: '',
     });
 
-    renderHook(() => useExtensionUpdates([extension], addItem, tempHomeDir));
+    renderHook(() =>
+      useExtensionUpdates([extension], extensionManager, addItem),
+    );
 
     await waitFor(
       () => {
@@ -178,25 +188,15 @@ describe('useExtensionUpdates', () => {
       },
     });
 
-    const extensions = annotateActiveExtensions(
-      [
-        loadExtension({
-          extensionDir: extensionDir1,
-          workspaceDir: tempHomeDir,
-        })!,
-        loadExtension({
-          extensionDir: extensionDir2,
-          workspaceDir: tempHomeDir,
-        })!,
-      ],
-      tempHomeDir,
-      new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-    );
+    const extensions = [
+      extensionManager.loadExtension(extensionDir1)!,
+      extensionManager.loadExtension(extensionDir2)!,
+    ];
 
     const addItem = vi.fn();
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (_extensions, dispatch, _cwd) => {
+      async (_extensions, _extensionManager, dispatch) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -226,7 +226,9 @@ describe('useExtensionUpdates', () => {
         name: '',
       });
 
-    renderHook(() => useExtensionUpdates(extensions, addItem, tempHomeDir));
+    renderHook(() =>
+      useExtensionUpdates(extensions, extensionManager, addItem),
+    );
 
     await waitFor(
       () => {
@@ -254,6 +256,7 @@ describe('useExtensionUpdates', () => {
     const extensions = [
       {
         name: 'test-extension-1',
+        id: 'test-extension-1-id',
         type: 'git',
         version: '1.0.0',
         path: '/some/path1',
@@ -267,6 +270,8 @@ describe('useExtensionUpdates', () => {
       },
       {
         name: 'test-extension-2',
+        id: 'test-extension-2-id',
+
         type: 'git',
         version: '2.0.0',
         path: '/some/path2',
@@ -280,10 +285,9 @@ describe('useExtensionUpdates', () => {
       },
     ];
     const addItem = vi.fn();
-    const cwd = '/test/cwd';
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (_extensions, dispatch, _cwd) => {
+      async (_extensions, _extensionManager, dispatch) => {
         dispatch({ type: 'BATCH_CHECK_START' });
         dispatch({
           type: 'SET_STATE',
@@ -305,7 +309,11 @@ describe('useExtensionUpdates', () => {
     );
 
     renderHook(() =>
-      useExtensionUpdates(extensions as GeminiCLIExtension[], addItem, cwd),
+      useExtensionUpdates(
+        extensions as GeminiCLIExtension[],
+        extensionManager,
+        addItem,
+      ),
     );
 
     await waitFor(() => {

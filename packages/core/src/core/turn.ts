@@ -27,6 +27,7 @@ import {
   toFriendlyError,
 } from '../utils/errors.js';
 import type { GeminiChat } from './geminiChat.js';
+import { InvalidStreamError } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
 
@@ -59,10 +60,24 @@ export enum GeminiEventType {
   LoopDetected = 'loop_detected',
   Citation = 'citation',
   Retry = 'retry',
+  ContextWindowWillOverflow = 'context_window_will_overflow',
+  InvalidStream = 'invalid_stream',
 }
 
 export type ServerGeminiRetryEvent = {
   type: GeminiEventType.Retry;
+};
+
+export type ServerGeminiContextWindowWillOverflowEvent = {
+  type: GeminiEventType.ContextWindowWillOverflow;
+  value: {
+    estimatedRequestTokenCount: number;
+    remainingTokenCount: number;
+  };
+};
+
+export type ServerGeminiInvalidStreamEvent = {
+  type: GeminiEventType.InvalidStream;
 };
 
 export interface StructuredError {
@@ -105,11 +120,13 @@ export interface ServerToolCallConfirmationDetails {
 export type ServerGeminiContentEvent = {
   type: GeminiEventType.Content;
   value: string;
+  traceId?: string;
 };
 
 export type ServerGeminiThoughtEvent = {
   type: GeminiEventType.Thought;
   value: ThoughtSummary;
+  traceId?: string;
 };
 
 export type ServerGeminiToolCallRequestEvent = {
@@ -193,7 +210,9 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiToolCallRequestEvent
   | ServerGeminiToolCallResponseEvent
   | ServerGeminiUserCancelledEvent
-  | ServerGeminiRetryEvent;
+  | ServerGeminiRetryEvent
+  | ServerGeminiContextWindowWillOverflowEvent
+  | ServerGeminiInvalidStreamEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
@@ -244,19 +263,22 @@ export class Turn {
 
         this.debugResponses.push(resp);
 
+        const traceId = resp.responseId;
+
         const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
         if (thoughtPart?.thought) {
           const thought = parseThought(thoughtPart.text ?? '');
           yield {
             type: GeminiEventType.Thought,
             value: thought,
+            traceId,
           };
           continue;
         }
 
         const text = getResponseText(resp);
         if (text) {
-          yield { type: GeminiEventType.Content, value: text };
+          yield { type: GeminiEventType.Content, value: text, traceId };
         }
 
         // Handle function calls (requesting tool execution)
@@ -299,6 +321,11 @@ export class Turn {
       if (signal.aborted) {
         yield { type: GeminiEventType.UserCancelled };
         // Regular cancellation error, fail gracefully.
+        return;
+      }
+
+      if (e instanceof InvalidStreamError) {
+        yield { type: GeminiEventType.InvalidStream };
         return;
       }
 

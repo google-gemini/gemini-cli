@@ -12,8 +12,6 @@ import type {
 } from './googleErrors.js';
 import { parseGoogleApiError } from './googleErrors.js';
 
-const FIVE_MINUTES_IN_SECONDS = 5 * 60;
-
 /**
  * A non-retryable error indicating a hard quota limit has been reached (e.g., daily limit).
  */
@@ -63,8 +61,8 @@ function parseDurationInSeconds(duration: string): number | null {
  * It decides whether an error is a `TerminalQuotaError` or a `RetryableQuotaError` based on
  * the following logic:
  * - If the error indicates a daily limit, it's a `TerminalQuotaError`.
- * - If the error suggests a retry delay of more than 5 minutes, it's a `TerminalQuotaError`.
- * - If the error suggests a retry delay of 5 minutes or less, it's a `RetryableQuotaError`.
+ * - If the error suggests a retry delay of more than 2 minutes, it's a `TerminalQuotaError`.
+ * - If the error suggests a retry delay of 2 minutes or less, it's a `RetryableQuotaError`.
  * - If the error indicates a per-minute limit, it's a `RetryableQuotaError`.
  *
  * @param error The error to classify.
@@ -98,7 +96,7 @@ export function classifyGoogleError(error: unknown): unknown {
       const quotaId = violation.quotaId ?? '';
       if (quotaId.includes('PerDay') || quotaId.includes('Daily')) {
         return new TerminalQuotaError(
-          `Reached a daily quota limit: ${violation.description}`,
+          `${googleApiError.message}\nExpected quota reset within 24h.`,
           googleApiError,
         );
       }
@@ -106,10 +104,42 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   if (errorInfo) {
+    // New Cloud Code API quota handling
+    if (errorInfo.domain) {
+      const validDomains = [
+        'cloudcode-pa.googleapis.com',
+        'staging-cloudcode-pa.googleapis.com',
+        'autopush-cloudcode-pa.googleapis.com',
+      ];
+      if (validDomains.includes(errorInfo.domain)) {
+        if (errorInfo.reason === 'RATE_LIMIT_EXCEEDED') {
+          let delaySeconds = 10; // Default retry of 10s
+          if (retryInfo?.retryDelay) {
+            const parsedDelay = parseDurationInSeconds(retryInfo.retryDelay);
+            if (parsedDelay) {
+              delaySeconds = parsedDelay;
+            }
+          }
+          return new RetryableQuotaError(
+            `${googleApiError.message}`,
+            googleApiError,
+            delaySeconds,
+          );
+        }
+        if (errorInfo.reason === 'QUOTA_EXHAUSTED') {
+          return new TerminalQuotaError(
+            `${googleApiError.message}`,
+            googleApiError,
+          );
+        }
+      }
+    }
+
+    // Existing Cloud Code API quota handling
     const quotaLimit = errorInfo.metadata?.['quota_limit'] ?? '';
     if (quotaLimit.includes('PerDay') || quotaLimit.includes('Daily')) {
       return new TerminalQuotaError(
-        `Reached a daily quota limit: ${errorInfo.reason}`,
+        `${googleApiError.message}\nExpected quota reset within 24h.`,
         googleApiError,
       );
     }
@@ -118,16 +148,16 @@ export function classifyGoogleError(error: unknown): unknown {
   // 2. Check for long delays in RetryInfo
   if (retryInfo?.retryDelay) {
     const delaySeconds = parseDurationInSeconds(retryInfo.retryDelay);
-    if (delaySeconds !== null) {
-      if (delaySeconds > FIVE_MINUTES_IN_SECONDS) {
+    if (delaySeconds) {
+      if (delaySeconds > 120) {
         return new TerminalQuotaError(
-          `Quota limit requires a long delay of ${retryInfo.retryDelay}.`,
+          `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
           googleApiError,
         );
       }
       // This is a retryable error with a specific delay.
       return new RetryableQuotaError(
-        `Quota limit hit. Retrying after ${retryInfo.retryDelay}.`,
+        `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
         googleApiError,
         delaySeconds,
       );
@@ -140,7 +170,7 @@ export function classifyGoogleError(error: unknown): unknown {
       const quotaId = violation.quotaId ?? '';
       if (quotaId.includes('PerMinute')) {
         return new RetryableQuotaError(
-          `Quota limit hit: ${violation.description}. Retrying after 60s.`,
+          `${googleApiError.message}\nSuggested retry after 60s.`,
           googleApiError,
           60,
         );
@@ -152,7 +182,7 @@ export function classifyGoogleError(error: unknown): unknown {
     const quotaLimit = errorInfo.metadata?.['quota_limit'] ?? '';
     if (quotaLimit.includes('PerMinute')) {
       return new RetryableQuotaError(
-        `Quota limit hit: ${errorInfo.reason}. Retrying after 60s.`,
+        `${errorInfo.reason}\nSuggested retry after 60s.`,
         googleApiError,
         60,
       );

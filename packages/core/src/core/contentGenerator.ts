@@ -19,6 +19,7 @@ import type { Config } from '../config/config.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
+import { FakeContentGenerator } from './fakeContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -61,7 +62,10 @@ export function createContentGeneratorConfig(
 ): ContentGeneratorConfig {
   const geminiApiKey = process.env['GEMINI_API_KEY'] || undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
-  const googleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'] || undefined;
+  const googleCloudProject =
+    process.env['GOOGLE_CLOUD_PROJECT'] ||
+    process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+    undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
@@ -102,6 +106,10 @@ export async function createContentGenerator(
   gcConfig: Config,
   sessionId?: string,
 ): Promise<ContentGenerator> {
+  if (gcConfig.fakeResponses) {
+    return FakeContentGenerator.fromFile(gcConfig.fakeResponses);
+  }
+
   const version = process.env['CLI_VERSION'] || process.version;
   const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
   const baseHeaders: Record<string, string> = {
