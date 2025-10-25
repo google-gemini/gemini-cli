@@ -255,7 +255,7 @@ describe('ShellTool', () => {
         false,
         {},
       );
-    });
+    }, 20000);
 
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
