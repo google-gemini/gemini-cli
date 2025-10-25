@@ -44,6 +44,8 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { CompressionStatus } from '../core/turn.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -63,6 +65,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly toolRegistry: ToolRegistry;
   private readonly runtimeContext: Config;
   private readonly onActivity?: ActivityCallback;
+  private readonly compressionService: ChatCompressionService;
 
   /**
    * Creates and validates a new `AgentExecutor` instance.
@@ -138,6 +141,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     this.runtimeContext = runtimeContext;
     this.toolRegistry = toolRegistry;
     this.onActivity = onActivity;
+    this.compressionService = new ChatCompressionService();
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -158,6 +162,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
+    let hasFailedCompressionAttempt = false;
 
     logAgentStart(
       this.runtimeContext,
@@ -186,6 +191,27 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         const promptId = `${this.agentId}#${turnCounter++}`;
+
+        // Try to compress chat history before calling the model.
+        const { newHistory, info } = await this.compressionService.compress(
+          chat,
+          promptId,
+          false, // force
+          this.definition.modelConfig.model,
+          this.runtimeContext,
+          hasFailedCompressionAttempt,
+        );
+
+        if (
+          info.compressionStatus ===
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
+        ) {
+          hasFailedCompressionAttempt = true;
+        } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+          if (newHistory) {
+            chat.setHistory(newHistory);
+          }
+        }
 
         const { functionCalls } = await promptIdContext.run(
           promptId,

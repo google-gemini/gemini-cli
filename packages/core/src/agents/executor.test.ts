@@ -18,6 +18,7 @@ import {
 import {
   type FunctionCall,
   type Part,
+  type Content,
   type GenerateContentResponse,
   type GenerateContentConfig,
 } from '@google/genai';
@@ -36,10 +37,18 @@ import type {
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
+import { CompressionStatus } from '../core/turn.js';
 
-const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
+const {
+  mockSendMessageStream,
+  mockExecuteToolCall,
+  mockSetHistory,
+  mockCompress,
+} = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
   mockExecuteToolCall: vi.fn(),
+  mockSetHistory: vi.fn(),
+  mockCompress: vi.fn(),
 }));
 
 vi.mock('../core/geminiChat.js', async (importOriginal) => {
@@ -48,6 +57,7 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
     ...actual,
     GeminiChat: vi.fn().mockImplementation(() => ({
       sendMessageStream: mockSendMessageStream,
+      setHistory: mockSetHistory,
     })),
   };
 });
@@ -57,6 +67,11 @@ vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
 }));
 
 vi.mock('../utils/environmentContext.js');
+vi.mock('../services/chatCompressionService.js', () => ({
+  ChatCompressionService: vi.fn(() => ({
+    compress: mockCompress,
+  })),
+}));
 
 vi.mock('../telemetry/loggers.js', () => ({
   logAgentStart: vi.fn(),
@@ -185,6 +200,8 @@ describe('AgentExecutor', () => {
     vi.resetAllMocks();
     mockSendMessageStream.mockReset();
     mockExecuteToolCall.mockReset();
+    mockSetHistory.mockReset();
+    mockCompress.mockReset();
     mockedLogAgentStart.mockReset();
     mockedLogAgentFinish.mockReset();
     mockedPromptIdContext.getStore.mockReset();
@@ -194,8 +211,18 @@ describe('AgentExecutor', () => {
       () =>
         ({
           sendMessageStream: mockSendMessageStream,
+          setHistory: mockSetHistory,
         }) as unknown as GeminiChat,
     );
+
+    mockCompress.mockResolvedValue({
+      newHistory: null,
+      info: {
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.NOOP,
+      },
+    });
 
     vi.useFakeTimers();
 
@@ -862,6 +889,64 @@ describe('AgentExecutor', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('run (Compression)', () => {
+    it('should attempt compression before each turn', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Normal
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      await executor.run({ goal: 'Compression test' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(1);
+    });
+
+    it('should update chat history if compression succeeds', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const newHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'compressed' }] },
+      ];
+      mockCompress.mockResolvedValueOnce({
+        newHistory,
+        info: {
+          originalTokenCount: 1000,
+          newTokenCount: 500,
+          compressionStatus: CompressionStatus.COMPRESSED,
+        },
+      });
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      await executor.run({ goal: 'Compression success test' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledWith(newHistory);
     });
   });
 
