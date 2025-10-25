@@ -752,7 +752,7 @@ describe('InputPrompt', () => {
     await wait();
 
     stdin.write('\x03'); // Ctrl+C character
-    await wait();
+    await wait(60);
 
     expect(props.buffer.setText).toHaveBeenCalledWith('');
     expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
@@ -766,7 +766,7 @@ describe('InputPrompt', () => {
     await wait();
 
     stdin.write('\x03'); // Ctrl+C character
-    await wait();
+    await wait(60);
 
     expect(props.buffer.setText).not.toHaveBeenCalled();
     unmount();
@@ -940,7 +940,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x1B[200~pasted text\x1B[201~');
-      await wait();
+      await wait(60);
 
       expect(mockBuffer.handleInput).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1331,7 +1331,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x1B');
-      await wait(100);
+      await wait(60);
 
       expect(props.buffer.setText).toHaveBeenCalledWith('');
       expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
@@ -1392,7 +1392,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x1B');
-      await wait(100);
+      await wait(60);
 
       expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
       unmount();

@@ -481,19 +481,8 @@ export function useKeypressContext() {
   return context;
 }
 
-/**
- * Determines if the passthrough stream workaround should be used.
- * This is necessary for Node.js versions older than 20 or when the
- * PASTE_WORKAROUND environment variable is set, to correctly handle
- * paste events.
- */
 function shouldUsePassthrough(): boolean {
-  const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
-  return (
-    nodeMajorVersion < 20 ||
-    process.env['PASTE_WORKAROUND'] === '1' ||
-    process.env['PASTE_WORKAROUND'] === 'true'
-  );
+  return process.env['PASTE_WORKAROUND'] !== 'false';
 }
 
 export function KeypressProvider({
