@@ -9,37 +9,72 @@ import * as path from 'node:path';
 import { spawnAsync } from '@google/gemini-cli-core';
 
 /**
- * Checks if the system clipboard contains an image (macOS only for now)
+ * Checks if the system clipboard contains an image (supports macOS, Windows, and Linux)
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
-  if (process.platform !== 'darwin') {
-    return false;
-  }
-
   try {
-    // Use osascript to check clipboard type
-    const { stdout } = await spawnAsync('osascript', ['-e', 'clipboard info']);
-    const imageRegex =
-      /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
-    return imageRegex.test(stdout);
+    if (process.platform === 'darwin') {
+      // macOS: Use osascript to check clipboard type
+      const { stdout } = await spawnAsync('osascript', [
+        '-e',
+        'clipboard info',
+      ]);
+      const imageRegex =
+        /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
+      return imageRegex.test(stdout);
+    } else if (process.platform === 'win32') {
+      // Windows: Use PowerShell to check clipboard
+      const script = `
+        Add-Type -AssemblyName System.Windows.Forms
+        if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+          Write-Output "true"
+        } else {
+          Write-Output "false"
+        }
+      `;
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        script,
+      ]);
+      return stdout.trim() === 'true';
+    } else if (process.platform === 'linux') {
+      // Linux: Use xclip to check clipboard (requires xclip to be installed)
+      try {
+        const { stdout } = await spawnAsync('xclip', [
+          '-selection',
+          'clipboard',
+          '-t',
+          'TARGETS',
+          '-o',
+        ]);
+        // Check if any image MIME types are available
+        return /image\/(png|jpeg|jpg|gif|bmp|tiff)/.test(stdout);
+      } catch {
+        // Try wl-paste for Wayland
+        try {
+          const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+          return /image\/(png|jpeg|jpg|gif|bmp|tiff)/.test(stdout);
+        } catch {
+          return false;
+        }
+      }
+    }
+    return false;
   } catch {
     return false;
   }
 }
 
 /**
- * Saves the image from clipboard to a temporary file (macOS only for now)
+ * Saves the image from clipboard to a temporary file (supports macOS, Windows, and Linux)
  * @param targetDir The target directory to create temp files within
  * @returns The path to the saved image file, or null if no image or error
  */
 export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin') {
-    return null;
-  }
-
   try {
     // Create a temporary directory for clipboard images within the target directory
     // This avoids security restrictions on paths outside the target directory
@@ -50,37 +85,78 @@ export async function saveClipboardImage(
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
 
-    // Try different image formats in order of preference
-    const formats = [
-      { class: 'PNGf', extension: 'png' },
-      { class: 'JPEG', extension: 'jpg' },
-      { class: 'TIFF', extension: 'tiff' },
-      { class: 'GIFf', extension: 'gif' },
-    ];
+    if (process.platform === 'darwin') {
+      // macOS: Use osascript to save clipboard image
+      const formats = [
+        { class: 'PNGf', extension: 'png' },
+        { class: 'JPEG', extension: 'jpg' },
+        { class: 'TIFF', extension: 'tiff' },
+        { class: 'GIFf', extension: 'gif' },
+      ];
 
-    for (const format of formats) {
-      const tempFilePath = path.join(
-        tempDir,
-        `clipboard-${timestamp}.${format.extension}`,
-      );
+      for (const format of formats) {
+        const tempFilePath = path.join(
+          tempDir,
+          `clipboard-${timestamp}.${format.extension}`,
+        );
 
-      // Try to save clipboard as this format
-      const script = `
-        try
-          set imageData to the clipboard as «class ${format.class}»
-          set fileRef to open for access POSIX file "${tempFilePath}" with write permission
-          write imageData to fileRef
-          close access fileRef
-          return "success"
-        on error errMsg
+        // Try to save clipboard as this format
+        const script = `
           try
-            close access POSIX file "${tempFilePath}"
+            set imageData to the clipboard as «class ${format.class}»
+            set fileRef to open for access POSIX file "${tempFilePath}" with write permission
+            write imageData to fileRef
+            close access fileRef
+            return "success"
+          on error errMsg
+            try
+              close access POSIX file "${tempFilePath}"
+            end try
+            return "error"
           end try
-          return "error"
-        end try
+        `;
+
+        const { stdout } = await spawnAsync('osascript', ['-e', script]);
+
+        if (stdout.trim() === 'success') {
+          // Verify the file was created and has content
+          try {
+            const stats = await fs.stat(tempFilePath);
+            if (stats.size > 0) {
+              return tempFilePath;
+            }
+          } catch {
+            // File doesn't exist, continue to next format
+          }
+        }
+
+        // Clean up failed attempt
+        try {
+          await fs.unlink(tempFilePath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } else if (process.platform === 'win32') {
+      // Windows: Use PowerShell to save clipboard image
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      const script = `
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+        if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+          $image = [System.Windows.Forms.Clipboard]::GetImage()
+          $image.Save("${tempFilePath.replace(/\\/g, '\\\\')}", [System.Drawing.Imaging.ImageFormat]::Png)
+          Write-Output "success"
+        } else {
+          Write-Output "error"
+        }
       `;
 
-      const { stdout } = await spawnAsync('osascript', ['-e', script]);
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        script,
+      ]);
 
       if (stdout.trim() === 'success') {
         // Verify the file was created and has content
@@ -90,15 +166,63 @@ export async function saveClipboardImage(
             return tempFilePath;
           }
         } catch {
-          // File doesn't exist, continue to next format
+          // File doesn't exist
         }
       }
+    } else if (process.platform === 'linux') {
+      // Linux: Try xclip first, then wl-paste for Wayland
+      const formats = [
+        { mimeType: 'image/png', extension: 'png' },
+        { mimeType: 'image/jpeg', extension: 'jpg' },
+        { mimeType: 'image/bmp', extension: 'bmp' },
+        { mimeType: 'image/gif', extension: 'gif' },
+      ];
 
-      // Clean up failed attempt
-      try {
-        await fs.unlink(tempFilePath);
-      } catch {
-        // Ignore cleanup errors
+      for (const format of formats) {
+        const tempFilePath = path.join(
+          tempDir,
+          `clipboard-${timestamp}.${format.extension}`,
+        );
+
+        try {
+          // Try xclip (X11)
+          await spawnAsync(
+            'sh',
+            [
+              '-c',
+              `xclip -selection clipboard -t ${format.mimeType} -o > "${tempFilePath}"`,
+            ],
+            { shell: true },
+          );
+
+          const stats = await fs.stat(tempFilePath);
+          if (stats.size > 0) {
+            return tempFilePath;
+          }
+        } catch {
+          // Try wl-paste (Wayland)
+          try {
+            await spawnAsync(
+              'sh',
+              ['-c', `wl-paste --type ${format.mimeType} > "${tempFilePath}"`],
+              { shell: true },
+            );
+
+            const stats = await fs.stat(tempFilePath);
+            if (stats.size > 0) {
+              return tempFilePath;
+            }
+          } catch {
+            // Continue to next format
+          }
+        }
+
+        // Clean up failed attempt
+        try {
+          await fs.unlink(tempFilePath);
+        } catch {
+          // Ignore cleanup errors
+        }
       }
     }
 
