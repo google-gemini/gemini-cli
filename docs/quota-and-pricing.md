@@ -8,7 +8,8 @@ account you use to authenticate.
 See [privacy and terms](./tos-privacy.md) for details on Privacy policy and
 Terms of Service.
 
-> [!NOTE] Published prices are list price; additional negotiated commercial
+> [!NOTE]
+> Published prices are list price; additional negotiated commercial
 > discounting may apply.
 
 This article outlines the specific quotas and pricing applicable to the Gemini
@@ -83,7 +84,7 @@ Gemini CLI by upgrading to one of the following subscriptions:
 
 - [Purchase a Gemini Code Assist Subscription through Google Cloud ](https://cloud.google.com/gemini/docs/codeassist/overview)
   by signing up in the Google Cloud console. Learn more at [Set up Gemini Code
-  Assist] (https://cloud.google.com/gemini/docs/discover/set-up-gemini) Quotas
+  Assist](https://cloud.google.com/gemini/docs/discover/set-up-gemini) Quotas
   and pricing are based on a fixed price subscription with assigned license
   seats. For predictable costs, you can sign in with Google.
 
