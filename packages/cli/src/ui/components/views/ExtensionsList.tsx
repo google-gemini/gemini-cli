@@ -4,20 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionUpdateState } from '../../state/extensions.js';
-import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 
-interface ExtensionsList {
-  extensions: readonly GeminiCLIExtension[];
-}
+export const ExtensionsList = () => {
+  const { commandContext, extensionsUpdateState } = useUIState();
+  const allExtensions = commandContext.services.config!.getExtensions();
 
-export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
-  const { extensionsUpdateState } = useUIState();
-
-  if (extensions.length === 0) {
+  if (allExtensions.length === 0) {
     return <Text>No extensions installed.</Text>;
   }
 
@@ -25,7 +20,7 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
       <Text>Installed extensions:</Text>
       <Box flexDirection="column" paddingLeft={2}>
-        {extensions.map((ext) => {
+        {allExtensions.map((ext) => {
           const state = extensionsUpdateState.get(ext.name);
           const isActive = ext.isActive;
           const activeString = isActive ? 'active' : 'disabled';
@@ -50,10 +45,8 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
             case ExtensionUpdateState.NOT_UPDATABLE:
               stateColor = 'green';
               break;
-            case undefined:
-              break;
             default:
-              debugLogger.warn(`Unhandled ExtensionUpdateState ${state}`);
+              console.error(`Unhandled ExtensionUpdateState ${state}`);
               break;
           }
 

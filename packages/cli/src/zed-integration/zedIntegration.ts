@@ -12,7 +12,6 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   GeminiCLIExtension,
-  FilterFilesOptions,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -159,7 +158,7 @@ class GeminiAgent {
         );
         isAuthenticated = true;
       } catch (e) {
-        debugLogger.error(`Authentication failed: ${e}`);
+        console.error(`Authentication failed: ${e}`);
       }
     }
 
@@ -572,8 +571,7 @@ class Session {
 
     // Get centralized file discovery service
     const fileDiscovery = this.config.getFileService();
-    const fileFilteringOptions: FilterFilesOptions =
-      this.config.getFileFilteringOptions();
+    const respectGitIgnore = this.config.getFileFilteringRespectGitIgnore();
 
     const pathSpecsToRead: string[] = [];
     const contentLabelsForDisplay: string[] = [];
@@ -589,10 +587,13 @@ class Session {
 
     for (const atPathPart of atPathCommandParts) {
       const pathName = atPathPart.fileData!.fileUri;
-      // Check if path should be ignored
-      if (fileDiscovery.shouldIgnoreFile(pathName, fileFilteringOptions)) {
+      // Check if path should be ignored by git
+      if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
         ignoredPaths.push(pathName);
-        debugLogger.warn(`Path ${pathName} is ignored and will be skipped.`);
+        const reason = respectGitIgnore
+          ? 'git-ignored and will be skipped'
+          : 'ignored by custom patterns';
+        debugLogger.warn(`Path ${pathName} is ${reason}.`);
         continue;
       }
       let currentPathSpec = pathName;
@@ -659,7 +660,7 @@ class Session {
                 );
               }
             } catch (globError) {
-              debugLogger.error(
+              console.error(
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
             }
@@ -669,7 +670,7 @@ class Session {
             );
           }
         } else {
-          debugLogger.error(
+          console.error(
             `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
@@ -729,8 +730,9 @@ class Session {
     initialQueryText = initialQueryText.trim();
     // Inform user about ignored paths
     if (ignoredPaths.length > 0) {
+      const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
       this.debug(
-        `Ignored ${ignoredPaths.length} files: ${ignoredPaths.join(', ')}`,
+        `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
       );
     }
 
@@ -745,6 +747,7 @@ class Session {
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
         paths: pathSpecsToRead,
+        respectGitIgnore, // Use configuration setting
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;

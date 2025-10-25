@@ -13,14 +13,11 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { GoogleAuth } from 'google-auth-library';
 import type { MCPServerConfig } from '../config/config.js';
-import { FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
 
 const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
 
 export class GoogleCredentialProvider implements OAuthClientProvider {
   private readonly auth: GoogleAuth;
-  private cachedToken?: OAuthTokens;
-  private tokenExpiryTime?: number;
 
   // Properties required by OAuthClientProvider, with no-op values
   readonly redirectUrl = '';
@@ -68,19 +65,6 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
   }
 
   async tokens(): Promise<OAuthTokens | undefined> {
-    // check for a valid, non-expired cached token.
-    if (
-      this.cachedToken &&
-      this.tokenExpiryTime &&
-      Date.now() < this.tokenExpiryTime - FIVE_MIN_BUFFER_MS
-    ) {
-      return this.cachedToken;
-    }
-
-    // Clear invalid/expired cache.
-    this.cachedToken = undefined;
-    this.tokenExpiryTime = undefined;
-
     const client = await this.auth.getClient();
     const accessTokenResponse = await client.getAccessToken();
 
@@ -89,18 +73,11 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
       return undefined;
     }
 
-    const newToken: OAuthTokens = {
+    const tokens: OAuthTokens = {
       access_token: accessTokenResponse.token,
       token_type: 'Bearer',
     };
-
-    const expiryTime = client.credentials?.expiry_date;
-    if (expiryTime) {
-      this.tokenExpiryTime = expiryTime;
-      this.cachedToken = newToken;
-    }
-
-    return newToken;
+    return tokens;
   }
 
   saveTokens(_tokens: OAuthTokens): void {

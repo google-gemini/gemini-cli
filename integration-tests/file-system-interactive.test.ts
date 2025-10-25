@@ -20,16 +20,7 @@ describe('Interactive file system', () => {
 
   it('should perform a read-then-write sequence', async () => {
     const fileName = 'version.txt';
-    await rig.setup('interactive-read-then-write', {
-      settings: {
-        security: {
-          auth: {
-            selectedType: 'gemini-api-key',
-          },
-          disableYoloMode: false,
-        },
-      },
-    });
+    await rig.setup('interactive-read-then-write');
     rig.createFile(fileName, '1.0.0');
 
     const run = await rig.runInteractive();

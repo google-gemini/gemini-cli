@@ -1502,8 +1502,9 @@ ${JSON.stringify(
             break;
           }
         }
-      } catch (_) {
+      } catch (error) {
         // If the test framework times out, that also demonstrates the infinite loop
+        console.error('Test timed out or errored:', error);
       }
 
       // Assert that the fix works - the loop should stop at MAX_TURNS

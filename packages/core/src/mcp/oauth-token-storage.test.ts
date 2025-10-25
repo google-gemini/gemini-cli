@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { coreEvents } from '@google/gemini-cli-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
@@ -31,12 +30,6 @@ vi.mock('node:path', () => ({
 vi.mock('../config/storage.js', () => ({
   Storage: {
     getMcpOAuthTokensPath: vi.fn(),
-  },
-}));
-
-vi.mock('@google/gemini-cli-core', () => ({
-  coreEvents: {
-    emitFeedback: vi.fn(),
   },
 }));
 
@@ -79,6 +72,7 @@ describe('MCPOAuthTokenStorage', () => {
       tokenStorage = new MCPOAuthTokenStorage();
 
       vi.clearAllMocks();
+      vi.spyOn(console, 'error');
     });
 
     afterEach(() => {
@@ -93,7 +87,7 @@ describe('MCPOAuthTokenStorage', () => {
         const tokens = await tokenStorage.getAllCredentials();
 
         expect(tokens.size).toBe(0);
-        expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+        expect(console.error).not.toHaveBeenCalled();
       });
 
       it('should load tokens from file successfully', async () => {
@@ -116,10 +110,8 @@ describe('MCPOAuthTokenStorage', () => {
         const tokens = await tokenStorage.getAllCredentials();
 
         expect(tokens.size).toBe(0);
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
+        expect(console.error).toHaveBeenCalledWith(
           expect.stringContaining('Failed to load MCP OAuth tokens'),
-          expect.any(Error),
         );
       });
 
@@ -130,10 +122,8 @@ describe('MCPOAuthTokenStorage', () => {
         const tokens = await tokenStorage.getAllCredentials();
 
         expect(tokens.size).toBe(0);
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to load MCP OAuth tokens: Permission denied',
-          error,
+        expect(console.error).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to load MCP OAuth tokens'),
         );
       });
     });
@@ -198,10 +188,8 @@ describe('MCPOAuthTokenStorage', () => {
           tokenStorage.saveToken('test-server', mockToken),
         ).rejects.toThrow('Disk full');
 
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to save MCP OAuth token: Disk full',
-          writeError,
+        expect(console.error).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to save MCP OAuth token'),
         );
       });
     });
@@ -289,15 +277,12 @@ describe('MCPOAuthTokenStorage', () => {
         vi.mocked(fs.readFile).mockResolvedValue(
           JSON.stringify([mockCredentials]),
         );
-        const unlinkError = new Error('Permission denied');
-        vi.mocked(fs.unlink).mockRejectedValue(unlinkError);
+        vi.mocked(fs.unlink).mockRejectedValue(new Error('Permission denied'));
 
         await tokenStorage.deleteCredentials('test-server');
 
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to remove MCP OAuth token: Permission denied',
-          unlinkError,
+        expect(console.error).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to remove MCP OAuth token'),
         );
       });
     });
@@ -362,19 +347,16 @@ describe('MCPOAuthTokenStorage', () => {
 
         await tokenStorage.clearAll();
 
-        expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+        expect(console.error).not.toHaveBeenCalled();
       });
 
       it('should handle other file errors gracefully', async () => {
-        const unlinkError = new Error('Permission denied');
-        vi.mocked(fs.unlink).mockRejectedValue(unlinkError);
+        vi.mocked(fs.unlink).mockRejectedValue(new Error('Permission denied'));
 
         await tokenStorage.clearAll();
 
-        expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-          'error',
-          'Failed to clear MCP OAuth tokens: Permission denied',
-          unlinkError,
+        expect(console.error).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to clear MCP OAuth tokens'),
         );
       });
     });
@@ -386,6 +368,7 @@ describe('MCPOAuthTokenStorage', () => {
       tokenStorage = new MCPOAuthTokenStorage();
 
       vi.clearAllMocks();
+      vi.spyOn(console, 'error');
     });
 
     afterEach(() => {

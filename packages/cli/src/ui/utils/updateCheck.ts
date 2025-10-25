@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import latestVersion from 'latest-version';
+import type { UpdateInfo } from 'update-notifier';
+import updateNotifier from 'update-notifier';
 import semver from 'semver';
 import { getPackageJson } from '../../utils/package.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -12,35 +13,32 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 export const FETCH_TIMEOUT_MS = 2000;
 
-// Replicating the bits of UpdateInfo we need from update-notifier
-export interface UpdateInfo {
-  latest: string;
-  current: string;
-  name: string;
-  type?: semver.ReleaseType;
-}
-
 export interface UpdateObject {
   message: string;
   update: UpdateInfo;
 }
 
 /**
- * From a nightly and stable version, determines which is the "best" one to offer.
+ * From a nightly and stable update, determines which is the "best" one to offer.
  * The rule is to always prefer nightly if the base versions are the same.
  */
 function getBestAvailableUpdate(
-  nightly?: string,
-  stable?: string,
-): string | null {
+  nightly?: UpdateInfo,
+  stable?: UpdateInfo,
+): UpdateInfo | null {
   if (!nightly) return stable || null;
   if (!stable) return nightly || null;
 
-  if (semver.coerce(stable)?.version === semver.coerce(nightly)?.version) {
+  const nightlyVer = nightly.latest;
+  const stableVer = stable.latest;
+
+  if (
+    semver.coerce(stableVer)?.version === semver.coerce(nightlyVer)?.version
+  ) {
     return nightly;
   }
 
-  return semver.gt(stable, nightly) ? stable : nightly;
+  return semver.gt(stableVer, nightlyVer) ? stable : nightly;
 }
 
 export async function checkForUpdates(
@@ -61,42 +59,43 @@ export async function checkForUpdates(
 
     const { name, version: currentVersion } = packageJson;
     const isNightly = currentVersion.includes('nightly');
+    const createNotifier = (distTag: 'latest' | 'nightly') =>
+      updateNotifier({
+        pkg: {
+          name,
+          version: currentVersion,
+        },
+        updateCheckInterval: 0,
+        shouldNotifyInNpmScript: true,
+        distTag,
+      });
 
     if (isNightly) {
-      const [nightlyUpdate, latestUpdate] = await Promise.all([
-        latestVersion(name, { version: 'nightly' }),
-        latestVersion(name),
+      const [nightlyUpdateInfo, latestUpdateInfo] = await Promise.all([
+        createNotifier('nightly').fetchInfo(),
+        createNotifier('latest').fetchInfo(),
       ]);
 
-      const bestUpdate = getBestAvailableUpdate(nightlyUpdate, latestUpdate);
+      const bestUpdate = getBestAvailableUpdate(
+        nightlyUpdateInfo,
+        latestUpdateInfo,
+      );
 
-      if (bestUpdate && semver.gt(bestUpdate, currentVersion)) {
-        const message = `A new version of Gemini CLI is available! ${currentVersion} → ${bestUpdate}`;
-        const type = semver.diff(bestUpdate, currentVersion) || undefined;
+      if (bestUpdate && semver.gt(bestUpdate.latest, currentVersion)) {
+        const message = `A new version of Gemini CLI is available! ${currentVersion} → ${bestUpdate.latest}`;
         return {
           message,
-          update: {
-            latest: bestUpdate,
-            current: currentVersion,
-            name,
-            type,
-          },
+          update: { ...bestUpdate, current: currentVersion },
         };
       }
     } else {
-      const latestUpdate = await latestVersion(name);
+      const updateInfo = await createNotifier('latest').fetchInfo();
 
-      if (latestUpdate && semver.gt(latestUpdate, currentVersion)) {
-        const message = `Gemini CLI update available! ${currentVersion} → ${latestUpdate}`;
-        const type = semver.diff(latestUpdate, currentVersion) || undefined;
+      if (updateInfo && semver.gt(updateInfo.latest, currentVersion)) {
+        const message = `Gemini CLI update available! ${currentVersion} → ${updateInfo.latest}`;
         return {
           message,
-          update: {
-            latest: latestUpdate,
-            current: currentVersion,
-            name,
-            type,
-          },
+          update: { ...updateInfo, current: currentVersion },
         };
       }
     }

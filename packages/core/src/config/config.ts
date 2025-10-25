@@ -283,9 +283,7 @@ export interface ConfigParameters {
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
-  fakeResponses?: string;
   ptyInfo?: string;
-  disableYoloMode?: boolean;
 }
 
 export class Config {
@@ -382,8 +380,6 @@ export class Config {
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
-  readonly fakeResponses?: string;
-  private readonly disableYoloMode: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -491,7 +487,6 @@ export class Config {
       params.enableShellOutputEfficiency ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
-    this.fakeResponses = params.fakeResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
@@ -501,7 +496,6 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
-    this.disableYoloMode = params.disableYoloMode ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -765,10 +759,6 @@ export class Config {
       );
     }
     this.approvalMode = mode;
-  }
-
-  isYoloModeDisabled(): boolean {
-    return this.disableYoloMode || !this.isTrustedFolder();
   }
 
   getShowMemoryUsage(): boolean {
@@ -1202,13 +1192,24 @@ export class Config {
           !allowedTools || allowedTools.includes(definition.name);
 
         if (isAllowed && !isExcluded) {
-          const messageBusEnabled = this.getEnableMessageBusIntegration();
-          const wrapper = new SubagentToolWrapper(
-            definition,
-            this,
-            messageBusEnabled ? this.getMessageBus() : undefined,
+          try {
+            const messageBusEnabled = this.getEnableMessageBusIntegration();
+            const wrapper = new SubagentToolWrapper(
+              definition,
+              this,
+              messageBusEnabled ? this.getMessageBus() : undefined,
+            );
+            registry.registerTool(wrapper);
+          } catch (error) {
+            console.error(
+              `Failed to wrap agent '${definition.name}' as a tool:`,
+              error,
+            );
+          }
+        } else if (this.getDebugMode()) {
+          debugLogger.log(
+            `[Config] Skipping registration of agent '${definition.name}' due to allow/exclude configuration.`,
           );
-          registry.registerTool(wrapper);
         }
       }
     }

@@ -24,7 +24,6 @@ import type {
 } from './modifiable-tool.js';
 import { ToolErrorType } from './tool-error.js';
 import { MEMORY_TOOL_NAME } from './tool-names.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: MEMORY_TOOL_NAME,
@@ -59,7 +58,8 @@ Do NOT use this tool:
 
 ## Parameters
 
-- \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".`;
+- \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".
+`;
 
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
@@ -177,21 +177,12 @@ class MemoryToolInvocation extends BaseToolInvocation<
 > {
   private static readonly allowlist: Set<string> = new Set();
 
-  constructor(
-    params: SaveMemoryParams,
-    messageBus?: MessageBus,
-    toolName?: string,
-    displayName?: string,
-  ) {
-    super(params, messageBus, toolName, displayName);
-  }
-
   getDescription(): string {
     const memoryFilePath = getGlobalMemoryFilePath();
     return `in ${tildeifyPath(memoryFilePath)}`;
   }
 
-  protected override async getConfirmationDetails(
+  override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
     const memoryFilePath = getGlobalMemoryFilePath();
@@ -276,7 +267,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.warn(
+      console.error(
         `[MemoryTool] Error executing save_memory for fact "${fact}": ${errorMessage}`,
       );
       return {
@@ -300,16 +291,13 @@ export class MemoryTool
 {
   static readonly Name = MEMORY_TOOL_NAME;
 
-  constructor(messageBus?: MessageBus) {
+  constructor() {
     super(
       MemoryTool.Name,
       'Save Memory',
       memoryToolDescription,
       Kind.Think,
       memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
-      true,
-      false,
-      messageBus,
     );
   }
 
@@ -323,18 +311,8 @@ export class MemoryTool
     return null;
   }
 
-  protected createInvocation(
-    params: SaveMemoryParams,
-    messageBus?: MessageBus,
-    toolName?: string,
-    displayName?: string,
-  ) {
-    return new MemoryToolInvocation(
-      params,
-      messageBus ?? this.messageBus,
-      toolName ?? this.name,
-      displayName ?? this.displayName,
-    );
+  protected createInvocation(params: SaveMemoryParams) {
+    return new MemoryToolInvocation(params);
   }
 
   static async performAddMemoryEntry(

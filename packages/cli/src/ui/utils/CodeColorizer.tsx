@@ -21,7 +21,6 @@ import {
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { debugLogger } from '@google/gemini-cli-core';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -192,7 +191,7 @@ export function colorizeCode(
       </MaxSizedBox>
     );
   } catch (error) {
-    debugLogger.warn(
+    console.error(
       `[colorizeCode] Error highlighting code for language "${language}":`,
       error,
     );

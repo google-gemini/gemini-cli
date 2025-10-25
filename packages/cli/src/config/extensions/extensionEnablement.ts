@@ -6,8 +6,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { coreEvents, type GeminiCLIExtension } from '@google/gemini-cli-core';
-import { ExtensionStorage } from './storage.js';
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { ExtensionStorage } from '../extension.js';
 
 export interface ExtensionEnablementConfig {
   overrides: string[];
@@ -129,7 +129,7 @@ export class ExtensionEnablementManager {
       if (
         !extensions.some((ext) => ext.name.toLowerCase() === name.toLowerCase())
       ) {
-        coreEvents.emitFeedback('error', `Extension not found: ${name}`);
+        console.error(`Extension not found: ${name}`);
       }
     }
   }
@@ -188,11 +188,7 @@ export class ExtensionEnablementManager {
       ) {
         return {};
       }
-      coreEvents.emitFeedback(
-        'error',
-        'Failed to read extension enablement config.',
-        error,
-      );
+      console.error('Error reading extension enablement config:', error);
       return {};
     }
   }

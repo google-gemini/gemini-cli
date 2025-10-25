@@ -17,16 +17,10 @@
  * resolveEnvVarsInString("URL: ${BASE_URL}/api") // Returns "URL: https://api.example.com/api"
  * resolveEnvVarsInString("Missing: $UNDEFINED_VAR") // Returns "Missing: $UNDEFINED_VAR"
  */
-export function resolveEnvVarsInString(
-  value: string,
-  customEnv?: Record<string, string>,
-): string {
+export function resolveEnvVarsInString(value: string): string {
   const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
   return value.replace(envVarRegex, (match, varName1, varName2) => {
     const varName = varName1 || varName2;
-    if (customEnv && typeof customEnv[varName] === 'string') {
-      return customEnv[varName]!;
-    }
     if (process && process.env && typeof process.env[varName] === 'string') {
       return process.env[varName]!;
     }
@@ -53,11 +47,8 @@ export function resolveEnvVarsInString(
  * };
  * const resolved = resolveEnvVarsInObject(config);
  */
-export function resolveEnvVarsInObject<T>(
-  obj: T,
-  customEnv?: Record<string, string>,
-): T {
-  return resolveEnvVarsInObjectInternal(obj, new WeakSet(), customEnv);
+export function resolveEnvVarsInObject<T>(obj: T): T {
+  return resolveEnvVarsInObjectInternal(obj, new WeakSet());
 }
 
 /**
@@ -70,7 +61,6 @@ export function resolveEnvVarsInObject<T>(
 function resolveEnvVarsInObjectInternal<T>(
   obj: T,
   visited: WeakSet<object>,
-  customEnv?: Record<string, string>,
 ): T {
   if (
     obj === null ||
@@ -82,7 +72,7 @@ function resolveEnvVarsInObjectInternal<T>(
   }
 
   if (typeof obj === 'string') {
-    return resolveEnvVarsInString(obj, customEnv) as unknown as T;
+    return resolveEnvVarsInString(obj) as unknown as T;
   }
 
   if (Array.isArray(obj)) {
@@ -94,7 +84,7 @@ function resolveEnvVarsInObjectInternal<T>(
 
     visited.add(obj);
     const result = obj.map((item) =>
-      resolveEnvVarsInObjectInternal(item, visited, customEnv),
+      resolveEnvVarsInObjectInternal(item, visited),
     ) as unknown as T;
     visited.delete(obj);
     return result;
@@ -111,11 +101,7 @@ function resolveEnvVarsInObjectInternal<T>(
     const newObj = { ...obj } as T;
     for (const key in newObj) {
       if (Object.prototype.hasOwnProperty.call(newObj, key)) {
-        newObj[key] = resolveEnvVarsInObjectInternal(
-          newObj[key],
-          visited,
-          customEnv,
-        );
+        newObj[key] = resolveEnvVarsInObjectInternal(newObj[key], visited);
       }
     }
     visited.delete(obj as object);

@@ -224,11 +224,37 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
   },
 } as unknown as SettingsSchemaType;
 
+// Helper function to simulate key presses (commented out for now)
+// const simulateKeyPress = async (keyData: Partial<Key> & { name: string }) => {
+//   if (currentKeypressHandler) {
+//     const key: Key = {
+//       ctrl: false,
+//       meta: false,
+//       shift: false,
+//       paste: false,
+//       sequence: keyData.sequence || keyData.name,
+//       ...keyData,
+//     };
+//     currentKeypressHandler(key);
+//     // Allow React to process the state update
+//     await new Promise(resolve => setTimeout(resolve, 10));
+//   }
+// };
+
+// Mock console.log to avoid noise in tests
+// const originalConsoleLog = console.log;
+// const originalConsoleError = console.error;
+
 describe('SettingsDialog', () => {
   // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
   beforeEach(() => {
+    // Reset keypress mock state (variables are commented out)
+    // currentKeypressHandler = null;
+    // isKeypressActive = false;
+    // console.log = vi.fn();
+    // console.error = vi.fn();
     mockToggleVimEnabled.mockResolvedValue(true);
   });
 
@@ -236,6 +262,11 @@ describe('SettingsDialog', () => {
     TEST_ONLY.clearFlattenedSchema();
     vi.clearAllMocks();
     vi.resetAllMocks();
+    // Reset keypress mock state (variables are commented out)
+    // currentKeypressHandler = null;
+    // isKeypressActive = false;
+    // console.log = originalConsoleLog;
+    // console.error = originalConsoleError;
   });
 
   describe('Initial Rendering', () => {
@@ -1348,7 +1379,7 @@ describe('SettingsDialog', () => {
 
       // Press Escape to exit
       stdin.write('\u001B');
-      await wait(60);
+      await wait();
 
       expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
 

@@ -49,13 +49,6 @@ function getPlatformArch() {
 
 const platformArch = getPlatformArch();
 
-const PYTHON_VENV_PATH = join(TEMP_DIR, 'python_venv');
-
-const yamllintCheck =
-  process.platform === 'win32'
-    ? `if exist "${PYTHON_VENV_PATH}\\Scripts\\yamllint.exe" (exit 0) else (exit 1)`
-    : `test -x "${PYTHON_VENV_PATH}/bin/yamllint"`;
-
 /**
  * @typedef {{
  *   check: string;
@@ -104,11 +97,8 @@ const LINTERS = {
     `,
   },
   yamllint: {
-    check: yamllintCheck,
-    installer: `
-    python3 -m venv "${PYTHON_VENV_PATH}" && \
-    "${PYTHON_VENV_PATH}/bin/pip" install "yamllint==${YAMLLINT_VERSION}"
-  `,
+    check: 'command -v yamllint',
+    installer: `pip3 install --user "yamllint==${YAMLLINT_VERSION}"`,
     run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
   },
 };
@@ -117,7 +107,12 @@ function runCommand(command, stdio = 'inherit') {
   try {
     const env = { ...process.env };
     const nodeBin = join(process.cwd(), 'node_modules', '.bin');
-    env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${PYTHON_VENV_PATH}/bin:${env.PATH}`;
+    env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${env.PATH}`;
+    if (process.platform === 'darwin') {
+      env.PATH = `${env.PATH}:${process.env.HOME}/Library/Python/3.12/bin`;
+    } else if (process.platform === 'linux') {
+      env.PATH = `${env.PATH}:${process.env.HOME}/.local/bin`;
+    }
     execSync(command, { stdio, env });
     return true;
   } catch (_e) {
@@ -147,7 +142,7 @@ export function setupLinters() {
 
 export function runESLint() {
   console.log('\nRunning ESLint...');
-  if (!runCommand('npm run lint')) {
+  if (!runCommand('npm run lint:ci')) {
     process.exit(1);
   }
 }

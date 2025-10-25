@@ -5,15 +5,14 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { loadSettings, SettingScope } from '../../config/settings.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
 import {
   debugLogger,
   FatalConfigError,
   getErrorMessage,
 } from '@google/gemini-cli-core';
-import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { enableExtension } from '../../config/extension.js';
+import { SettingScope } from '../../config/settings.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 
 interface EnableArgs {
   name: string;
@@ -21,18 +20,16 @@ interface EnableArgs {
 }
 
 export function handleEnable(args: EnableArgs) {
-  const workingDir = process.cwd();
-  const extensionManager = new ExtensionManager({
-    workspaceDir: workingDir,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    loadedSettings: loadSettings(workingDir),
-  });
+  const extensionEnablementManager = new ExtensionEnablementManager();
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      extensionManager.enableExtension(args.name, SettingScope.Workspace);
+      enableExtension(
+        args.name,
+        SettingScope.Workspace,
+        extensionEnablementManager,
+      );
     } else {
-      extensionManager.enableExtension(args.name, SettingScope.User);
+      enableExtension(args.name, SettingScope.User, extensionEnablementManager);
     }
     if (args.scope) {
       debugLogger.log(
