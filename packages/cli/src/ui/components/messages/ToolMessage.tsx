@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
@@ -22,6 +22,7 @@ import {
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { parseOrRaw } from '../../../utils/jsonoutput.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -67,6 +68,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const [lastUpdateTime, setLastUpdateTime] = React.useState<Date | null>(null);
   const [userHasFocused, setUserHasFocused] = React.useState(false);
   const [showFocusHint, setShowFocusHint] = React.useState(false);
+  const [isJSONvisible, setIsJSONvisible] = React.useState(false);
 
   React.useEffect(() => {
     if (resultDisplay) {
@@ -91,6 +93,12 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       setUserHasFocused(true);
     }
   }, [isThisShellFocused]);
+
+  useInput((input, key) => {
+    if (key.ctrl && input === 't') {
+      setIsJSONvisible((prev) => !prev);
+    }
+  });
 
   const isThisShellFocusable =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
@@ -122,6 +130,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
     }
   }
+
+  const formatted =
+    typeof resultDisplay === 'string' ? parseOrRaw(resultDisplay) : null;
+  const isJSON = formatted !== null && formatted !== resultDisplay;
+
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
@@ -144,7 +157,17 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       {resultDisplay && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
-            {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
+            {typeof resultDisplay === 'string' && isJSON ? (
+              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+                <Box>
+                  <Text wrap="wrap" color={theme.text.primary}>
+                    {isJSONvisible
+                      ? formatted
+                      : `JSON output (${formatted.split('\n').length} lines) (ctrl + t to toggle details)`}
+                  </Text>
+                </Box>
+              </MaxSizedBox>
+            ) : typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
               <Box flexDirection="column">
                 <MarkdownDisplay
                   text={resultDisplay}
