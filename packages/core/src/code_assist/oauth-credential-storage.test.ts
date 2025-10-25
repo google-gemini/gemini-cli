@@ -8,6 +8,7 @@ import { type Credentials } from 'google-auth-library';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import type { OAuthCredentials } from '../mcp/token-storage/types.js';
+import { coreEvents } from '@google/gemini-cli-core';
 
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -30,6 +31,11 @@ vi.mock('node:fs', () => ({
 }));
 vi.mock('node:os');
 vi.mock('node:path');
+vi.mock('@google/gemini-cli-core', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
+  },
+}));
 
 describe('OAuthCredentialStorage', () => {
   const mockCredentials: Credentials = {
@@ -119,12 +125,13 @@ describe('OAuthCredentialStorage', () => {
     });
 
     it('should throw an error if loading fails', async () => {
-      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockRejectedValue(
-        new Error('Loading error'),
-      );
-
       await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
         'Failed to load OAuth credentials',
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Failed to load OAuth credentials',
+        expect.any(Error),
       );
     });
 
@@ -138,6 +145,11 @@ describe('OAuthCredentialStorage', () => {
 
       await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
         'Failed to load OAuth credentials',
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Failed to load OAuth credentials',
+        expect.any(Error),
       );
     });
 
@@ -211,6 +223,11 @@ describe('OAuthCredentialStorage', () => {
 
       await expect(OAuthCredentialStorage.clearCredentials()).rejects.toThrow(
         'Failed to clear OAuth credentials',
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Failed to clear OAuth credentials',
+        expect.any(Error),
       );
     });
   });

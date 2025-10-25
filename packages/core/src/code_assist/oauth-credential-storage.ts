@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 import { GEMINI_DIR } from '../utils/paths.js';
+import { coreEvents } from '@google/gemini-cli-core';
 
 const KEYCHAIN_SERVICE_NAME = 'gemini-cli-oauth';
 const MAIN_ACCOUNT_KEY = 'main-account';
@@ -49,7 +50,11 @@ export class OAuthCredentialStorage {
       // Fallback: Try to migrate from old file-based storage
       return await this.migrateFromFileStorage();
     } catch (error: unknown) {
-      console.error(error);
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to load OAuth credentials',
+        error,
+      );
       throw new Error('Failed to load OAuth credentials');
     }
   }
@@ -89,7 +94,11 @@ export class OAuthCredentialStorage {
       const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
       await fs.rm(oldFilePath, { force: true }).catch(() => {});
     } catch (error: unknown) {
-      console.error(error);
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to clear OAuth credentials',
+        error,
+      );
       throw new Error('Failed to clear OAuth credentials');
     }
   }
