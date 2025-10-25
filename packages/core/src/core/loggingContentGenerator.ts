@@ -5,15 +5,18 @@
  */
 
 import type {
+  Candidate,
   Content,
   CountTokensParameters,
   CountTokensResponse,
   EmbedContentParameters,
   EmbedContentResponse,
+  GenerateContentConfig,
   GenerateContentParameters,
   GenerateContentResponseUsageMetadata,
   GenerateContentResponse,
 } from '@google/genai';
+import type { ServerDetails } from '../telemetry/types.js';
 import {
   ApiRequestEvent,
   ApiResponseEvent,
@@ -26,6 +29,7 @@ import {
   logApiResponse,
 } from '../telemetry/loggers.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 
@@ -58,19 +62,66 @@ export class LoggingContentGenerator implements ContentGenerator {
     );
   }
 
+  private _getEndpointUrl(
+    req: GenerateContentParameters,
+    method: 'generateContent' | 'generateContentStream',
+  ): ServerDetails {
+    // Case 1: Authenticated with a Google account (`gcloud auth login`).
+    // Requests are routed through the internal CodeAssistServer.
+    if (this.wrapped instanceof CodeAssistServer) {
+      const url = new URL(this.wrapped.getMethodUrl(method));
+      const port = url.port
+        ? parseInt(url.port, 10)
+        : url.protocol === 'https:'
+          ? 443
+          : 80;
+      return { address: url.hostname, port };
+    }
+
+    const genConfig = this.config.getContentGeneratorConfig();
+
+    // Case 2: Using an API key for Vertex AI.
+    if (genConfig?.vertexai) {
+      const location = process.env['GOOGLE_CLOUD_LOCATION'];
+      if (location) {
+        return { address: `${location}-aiplatform.googleapis.com`, port: 443 };
+      } else {
+        return { address: 'unknown', port: 0 };
+      }
+    }
+
+    // Case 3: Default to the public Gemini API endpoint.
+    // This is used when an API key is provided but not for Vertex AI.
+    return { address: `generativelanguage.googleapis.com`, port: 443 };
+  }
+
   private _logApiResponse(
+    requestContents: Content[],
     durationMs: number,
     model: string,
     prompt_id: string,
+    responseId: string | undefined,
+    responseCandidates?: Candidate[],
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
+    generationConfig?: GenerateContentConfig,
+    serverDetails?: ServerDetails,
   ): void {
     logApiResponse(
       this.config,
       new ApiResponseEvent(
         model,
         durationMs,
-        prompt_id,
+        {
+          prompt_id,
+          contents: requestContents,
+          generate_content_config: generationConfig,
+          server: serverDetails,
+        },
+        {
+          candidates: responseCandidates,
+          response_id: responseId,
+        },
         this.config.getContentGeneratorConfig()?.authType,
         usageMetadata,
         responseText,
@@ -83,6 +134,9 @@ export class LoggingContentGenerator implements ContentGenerator {
     error: unknown,
     model: string,
     prompt_id: string,
+    requestContents: Content[],
+    generationConfig?: GenerateContentConfig,
+    serverDetails?: ServerDetails,
   ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorType = error instanceof Error ? error.name : 'unknown';
@@ -93,7 +147,12 @@ export class LoggingContentGenerator implements ContentGenerator {
         model,
         errorMessage,
         durationMs,
-        prompt_id,
+        {
+          prompt_id,
+          contents: requestContents,
+          generate_content_config: generationConfig,
+          server: serverDetails,
+        },
         this.config.getContentGeneratorConfig()?.authType,
         errorType,
         isStructuredError(error)
@@ -108,21 +167,36 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const startTime = Date.now();
+    const contents: Content[] = toContents(req.contents);
     this.logApiRequest(toContents(req.contents), req.model, userPromptId);
+    const serverDetails = this._getEndpointUrl(req, 'generateContent');
     try {
       const response = await this.wrapped.generateContent(req, userPromptId);
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
+        contents,
         durationMs,
         response.modelVersion || req.model,
         userPromptId,
+        response.responseId,
+        response.candidates,
         response.usageMetadata,
         JSON.stringify(response),
+        req.config,
+        serverDetails,
       );
       return response;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, req.model, userPromptId);
+      this._logApiError(
+        durationMs,
+        error,
+        req.model,
+        userPromptId,
+        contents,
+        req.config,
+        serverDetails,
+      );
       throw error;
     }
   }
@@ -133,33 +207,39 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const startTime = Date.now();
     this.logApiRequest(toContents(req.contents), req.model, userPromptId);
+    const serverDetails = this._getEndpointUrl(req, 'generateContentStream');
 
     let stream: AsyncGenerator<GenerateContentResponse>;
     try {
       stream = await this.wrapped.generateContentStream(req, userPromptId);
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, req.model, userPromptId);
+      this._logApiError(
+        durationMs,
+        error,
+        req.model,
+        userPromptId,
+        toContents(req.contents),
+        req.config,
+        serverDetails,
+      );
       throw error;
     }
 
-    return this.loggingStreamWrapper(
-      stream,
-      startTime,
-      userPromptId,
-      req.model,
-    );
+    return this.loggingStreamWrapper(req, stream, startTime, userPromptId);
   }
 
   private async *loggingStreamWrapper(
+    req: GenerateContentParameters,
     stream: AsyncGenerator<GenerateContentResponse>,
     startTime: number,
     userPromptId: string,
-    model: string,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
     let lastUsageMetadata: GenerateContentResponseUsageMetadata | undefined;
+    const serverDetails = this._getEndpointUrl(req, 'generateContentStream');
+    const requestContents: Content[] = toContents(req.contents);
     try {
       for await (const response of stream) {
         responses.push(response);
@@ -171,19 +251,27 @@ export class LoggingContentGenerator implements ContentGenerator {
       // Only log successful API response if no error occurred
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
+        requestContents,
         durationMs,
-        responses[0]?.modelVersion || model,
+        responses[0]?.modelVersion || req.model,
         userPromptId,
+        responses[0]?.responseId,
+        responses.flatMap((response) => response.candidates || []),
         lastUsageMetadata,
         JSON.stringify(responses),
+        req.config,
+        serverDetails,
       );
     } catch (error) {
       const durationMs = Date.now() - startTime;
       this._logApiError(
         durationMs,
         error,
-        responses[0]?.modelVersion || model,
+        responses[0]?.modelVersion || req.model,
         userPromptId,
+        requestContents,
+        req.config,
+        serverDetails,
       );
       throw error;
     }
