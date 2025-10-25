@@ -404,6 +404,12 @@ export class LoopDetectionService {
       ...trimmedHistory,
       { role: 'user', parts: [{ text: taskPrompt }] },
     ];
+    if (contents.length > 0 && isFunctionCall(contents[0])) {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Recent conversation history:' }],
+      });
+    }
     const schema: Record<string, unknown> = {
       type: 'object',
       properties: {
