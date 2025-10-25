@@ -75,6 +75,7 @@ export interface CliArgs {
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
   const yargsInstance = yargs(rawArgv)
+    .parserConfiguration({ 'boolean-negation': false })
     .locale('en')
     .scriptName('gemini')
     .usage(
