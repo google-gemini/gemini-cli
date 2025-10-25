@@ -83,7 +83,7 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(directories).toHaveLength(2);
     });
 
-    it('should handle symbolic links correctly', () => {
+    it.skipIf(os.platform() === 'win32')('should handle symbolic links correctly', () => {
       const realDir = path.join(tempDir, 'real');
       fs.mkdirSync(realDir, { recursive: true });
       const symlinkDir = path.join(tempDir, 'symlink-to-real');
@@ -158,7 +158,7 @@ describe('WorkspaceContext with real filesystem', () => {
       );
     });
 
-    describe('with symbolic link', () => {
+    describe.skipIf(os.platform() === 'win32')('with symbolic link', () => {
       describe('in the workspace', () => {
         let realDir: string;
         let symlinkDir: string;
