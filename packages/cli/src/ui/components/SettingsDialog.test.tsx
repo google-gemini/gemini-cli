@@ -1348,7 +1348,7 @@ describe('SettingsDialog', () => {
 
       // Press Escape to exit
       stdin.write('\u001B');
-      await wait(100);
+      await wait(60);
 
       expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
 
