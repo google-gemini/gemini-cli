@@ -4,20 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  type Mock,
-  type MockInstance,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { listMcpServers } from './list.js';
 import { loadSettings } from '../../config/settings.js';
 import { ExtensionStorage, loadExtensions } from '../../config/extension.js';
-import { createTransport } from '@google/gemini-cli-core';
+import { createTransport, debugLogger } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 vi.mock('../../config/settings.js', () => ({
@@ -43,6 +34,12 @@ vi.mock('@google/gemini-cli-core', () => ({
   })),
   GEMINI_DIR: '.gemini',
   getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
+  debugLogger: {
+    log: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 
@@ -64,14 +61,11 @@ interface MockTransport {
 }
 
 describe('mcp list command', () => {
-  let consoleSpy: MockInstance;
   let mockClient: MockClient;
   let mockTransport: MockTransport;
 
   beforeEach(() => {
     vi.resetAllMocks();
-
-    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     mockTransport = { close: vi.fn() };
     mockClient = {
@@ -86,16 +80,12 @@ describe('mcp list command', () => {
     mockedGetUserExtensionsDir.mockReturnValue('/mocked/extensions/dir');
   });
 
-  afterEach(() => {
-    consoleSpy.mockRestore();
-  });
-
   it('should display message when no servers configured', async () => {
     mockedLoadSettings.mockReturnValue({ merged: { mcpServers: {} } });
 
     await listMcpServers();
 
-    expect(consoleSpy).toHaveBeenCalledWith('No MCP servers configured.');
+    expect(debugLogger.log).toHaveBeenCalledWith('No MCP servers configured.');
   });
 
   it('should display different server types with connected status', async () => {
@@ -114,18 +104,18 @@ describe('mcp list command', () => {
 
     await listMcpServers();
 
-    expect(consoleSpy).toHaveBeenCalledWith('Configured MCP servers:\n');
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(debugLogger.log).toHaveBeenCalledWith('Configured MCP servers:\n');
+    expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'stdio-server: /path/to/server arg1 (stdio) - Connected',
       ),
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'sse-server: https://example.com/sse (sse) - Connected',
       ),
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'http-server: https://example.com/http (http) - Connected',
       ),
@@ -145,7 +135,7 @@ describe('mcp list command', () => {
 
     await listMcpServers();
 
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'test-server: /test/server  (stdio) - Disconnected',
       ),
@@ -171,12 +161,12 @@ describe('mcp list command', () => {
 
     await listMcpServers();
 
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'config-server: /config/server  (stdio) - Connected',
       ),
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
+    expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'extension-server (from test-extension): /ext/server  (stdio) - Connected',
       ),

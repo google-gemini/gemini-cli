@@ -263,7 +263,7 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 - **`checkpointing`** (object):
   - **Description:** Configures the checkpointing feature, which allows you to
     save and restore conversation and file states. See the
-    [Checkpointing documentation](../checkpointing.md) for more details.
+    [Checkpointing documentation](./checkpointing.md) for more details.
   - **Default:** `{"enabled": false}`
   - **Properties:**
     - **`enabled`** (boolean): When `true`, the `/restore` command is available.
@@ -575,7 +575,7 @@ for that specific session.
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md)
     for more information.
 - **`--checkpointing`**:
-  - Enables [checkpointing](../checkpointing.md).
+  - Enables [checkpointing](./checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all
     available extensions are used.

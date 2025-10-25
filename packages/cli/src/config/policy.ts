@@ -22,8 +22,12 @@ import {
   EDIT_TOOL_NAME,
   MEMORY_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
+  type PolicyEngine,
+  type MessageBus,
+  MessageBusType,
+  type UpdatePolicy,
 } from '@google/gemini-cli-core';
-import type { Settings } from './settings.js';
+import { type Settings } from './settings.js';
 
 // READ_ONLY_TOOLS is a list of built-in tools that do not modify the user's
 // files or system state.
@@ -69,6 +73,7 @@ export function createPolicyEngineConfig(
   //   90: MCP servers with trust=true
   //   100: Explicitly allowed individual tools
   //   195: Explicitly excluded MCP servers
+  //   199: Tools that the user has selected as "Always Allow" in the interactive UI.
   //   200: Explicitly excluded individual tools (highest priority)
 
   // MCP servers that are explicitly allowed in settings.mcp.allowed
@@ -137,16 +142,14 @@ export function createPolicyEngineConfig(
     }
   }
 
-  // If auto-accept is enabled, allow all read-only tools.
+  // Allow all read-only tools.
   // Priority: 50
-  if (settings.tools?.autoAccept) {
-    for (const tool of READ_ONLY_TOOLS) {
-      rules.push({
-        toolName: tool,
-        decision: PolicyDecision.ALLOW,
-        priority: 50,
-      });
-    }
+  for (const tool of READ_ONLY_TOOLS) {
+    rules.push({
+      toolName: tool,
+      decision: PolicyDecision.ALLOW,
+      priority: 50,
+    });
   }
 
   // Only add write tool rules if not in YOLO mode
@@ -178,4 +181,22 @@ export function createPolicyEngineConfig(
     rules,
     defaultDecision: PolicyDecision.ASK_USER,
   };
+}
+
+export function createPolicyUpdater(
+  policyEngine: PolicyEngine,
+  messageBus: MessageBus,
+) {
+  messageBus.subscribe(
+    MessageBusType.UPDATE_POLICY,
+    (message: UpdatePolicy) => {
+      const toolName = message.toolName;
+
+      policyEngine.addRule({
+        toolName,
+        decision: PolicyDecision.ALLOW,
+        priority: 199, // High priority, but lower than explicit DENY (200)
+      });
+    },
+  );
 }

@@ -1,63 +1,62 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<TodoTray /> > renders a single todo item when full view is on 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 📝 Todo:(ctrl+t to collapse)                                                                     │
-│                                                                                                  │
-│     ☐ Single task                                                                                │"
-`;
-
 exports[`<TodoTray /> > renders a todo list with long descriptions that wrap when full view is on 1`] = `
-"┌────────────────────────────┐
-│ 📝 Todo:(ctrl+t to         │
-│ collapse)                  │
-│                            │
-│     ☐ This is a very long  │
-│        description for a   │
-│       pending task that    │
-│       should wrap around   │
-│       multiple lines when  │
-│        the terminal width  │
-│        is constrained.     │
-│                            │
-│     ✓ Another completed    │
-│       task with an         │
-│       equally verbose      │
-│       description to       │
-│       test wrapping        │
-│       behavior.            │"
+"──────────────────────────────────────────────────
+ 📝 Todo  1/2 (ctrl+t to toggle)
+
+ » This is a very long description for a pending
+   task that should wrap around multiple lines
+   when the terminal width is constrained.
+ ✓ Another completed task with an equally verbose
+   description to test wrapping behavior."
 `;
 
-exports[`<TodoTray /> > renders a todo list with various statuses when full view is on 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 📝 Todo:(ctrl+t to collapse)                                                                     │
-│                                                                                                  │
-│     ☐ Task 1                                                                                     │
-│     » Task 2                                                                                     │
-│     ✓ Task 3                                                                                     │
-│     ✗ Task 4                                                                                     │"
-`;
-
-exports[`<TodoTray /> > renders an empty todo list when full view is on 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 📝 Todo:(ctrl+t to collapse)                                                                     │
-│                                                                                                  │"
+exports[`<TodoTray /> > renders a todo list with long descriptions that wrap when full view is on 2`] = `
+"──────────────────────────────────────────────────
+ 📝 Todo  1/2 (ctrl+t to toggle) » This is a ver…"
 `;
 
 exports[`<TodoTray /> > renders null when no todos are in the history 1`] = `""`;
 
-exports[`<TodoTray /> > renders null when todos exist but none are in progress and full view is off 1`] = `""`;
+exports[`<TodoTray /> > renders null when no todos are in the history 2`] = `""`;
 
-exports[`<TodoTray /> > renders only the in-progress task when full view is off 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 📝 Todo:(ctrl+t to expand)» In Progress Task                                                     │"
+exports[`<TodoTray /> > renders null when todo list is empty 1`] = `""`;
+
+exports[`<TodoTray /> > renders null when todo list is empty 2`] = `""`;
+
+exports[`<TodoTray /> > renders the most recent todo list when multiple write_todos calls are in history 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ 📝 Todo  0/2 (ctrl+t to toggle)
+
+ ☐ Newer Task 1
+ » Newer Task 2"
 `;
 
-exports[`<TodoTray /> > renders the full todo list when full view is on 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 📝 Todo:(ctrl+t to collapse)                                                                     │
-│                                                                                                  │
-│     ☐ Pending Task                                                                               │
-│     » In Progress Task                                                                           │
-│     ✓ Completed Task                                                                             │"
+exports[`<TodoTray /> > renders when todos exist and one is in progress 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ 📝 Todo  1/3 (ctrl+t to toggle)
+
+ ☐ Pending Task
+ » Task 2
+ ✗ In Progress Task
+ ✓ Completed Task"
+`;
+
+exports[`<TodoTray /> > renders when todos exist and one is in progress 2`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ 📝 Todo  1/3 (ctrl+t to toggle) » Task 2"
+`;
+
+exports[`<TodoTray /> > renders when todos exist but none are in progress 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ 📝 Todo  1/2 (ctrl+t to toggle)
+
+ ☐ Pending Task
+ ✗ In Progress Task
+ ✓ Completed Task"
+`;
+
+exports[`<TodoTray /> > renders when todos exist but none are in progress 2`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ 📝 Todo  1/2 (ctrl+t to toggle)"
 `;

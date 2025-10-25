@@ -34,13 +34,13 @@ on:
         type: 'choice'
         options:
           - 'prod'
-          ## - 'dev' # TODO(richieforeman) - support dev
+          - 'dev'
         default: 'prod'
 
 jobs:
   release:
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       packages: 'write'
@@ -66,7 +66,17 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'configure .npmrc'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Install Script Dependencies'
+        run: |-
+          npm ci
+
       - name: 'Install Dependencies'
+        working-directory: './release'
         run: |-
           npm ci
 
@@ -80,10 +90,12 @@ jobs:
         id: 'patch_version'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          PATCH_FROM: '${{ github.event.inputs.type }}'
+          CLI_PACKAGE_NAME: '${{vars.CLI_PACKAGE_NAME}}'
         run: |
           # Use the existing get-release-version.js script to calculate patch version
           # Run from main checkout which has full git history and access to npm
-          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
+          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --cli-package-name="${CLI_PACKAGE_NAME}" --patch-from="${PATCH_FROM}")
           echo "Patch version calculation result: ${PATCH_JSON}"
 
           RELEASE_VERSION=$(echo "${PATCH_JSON}" | jq -r .releaseVersion)
@@ -100,14 +112,13 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           CHANNEL: '${{ github.event.inputs.type }}'
+          ORIGINAL_RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          ORIGINAL_RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          ORIGINAL_PREVIOUS_TAG: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
         run: |
           echo "🔍 Verifying no concurrent patch releases have occurred..."
 
           # Store original calculation for comparison
-          ORIGINAL_RELEASE_VERSION="${{ steps.patch_version.outputs.RELEASE_VERSION }}"
-          ORIGINAL_RELEASE_TAG="${{ steps.patch_version.outputs.RELEASE_TAG }}"
-          ORIGINAL_PREVIOUS_TAG="${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
-
           echo "Original calculation:"
           echo "  Release version: ${ORIGINAL_RELEASE_VERSION}"
           echo "  Release tag: ${ORIGINAL_RELEASE_TAG}"
@@ -115,7 +126,7 @@ jobs:
 
           # Re-run the same version calculation script
           echo "Re-calculating version to check for changes..."
-          CURRENT_PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from="${CHANNEL}")
+          CURRENT_PATCH_JSON=$(node scripts/get-release-version.js --cli-package-name="${{vars.CLI_PACKAGE_NAME}}" --type=patch --patch-from="${CHANNEL}")
           CURRENT_RELEASE_VERSION=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseVersion)
           CURRENT_RELEASE_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseTag)
           CURRENT_PREVIOUS_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .previousReleaseTag)
@@ -172,7 +183,6 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
-          working-directory: './release'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           npm-registry-publish-url: '${{ vars.NPM_REGISTRY_PUBLISH_URL }}'
           npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
@@ -180,6 +190,7 @@ jobs:
           cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
           core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
+          working-directory: './release'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
