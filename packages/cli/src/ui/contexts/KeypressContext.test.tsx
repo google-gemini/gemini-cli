@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** @vitest-environment jsdom */
+
 import type React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { Mock } from 'vitest';
@@ -46,7 +48,7 @@ class MockStdin extends EventEmitter {
   pause = vi.fn();
 
   write(text: string) {
-    this.emit('data', Buffer.from(text));
+    this.emit('data', text);
   }
 }
 
@@ -374,6 +376,61 @@ describe('KeypressContext - Kitty Protocol', () => {
       });
 
       // Verify the single event contains the full pasted text
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: pastedText,
+        }),
+      );
+    });
+    it('should paste start code split over multiple writes', async () => {
+      const keyHandler = vi.fn();
+      const pastedText = 'pasted content';
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        // Split PASTE_START into two parts
+        stdin.write(PASTE_START.slice(0, 3));
+        stdin.write(PASTE_START.slice(3));
+        stdin.write(pastedText);
+        stdin.write(PASTE_END);
+      });
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: pastedText,
+        }),
+      );
+    });
+
+    it('should paste end code split over multiple writes', async () => {
+      const keyHandler = vi.fn();
+      const pastedText = 'pasted content';
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.write(PASTE_START);
+        stdin.write(pastedText);
+        // Split PASTE_END into two parts
+        stdin.write(PASTE_END.slice(0, 3));
+        stdin.write(PASTE_END.slice(3));
+      });
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledTimes(1);
+      });
+
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           paste: true,
