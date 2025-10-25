@@ -1331,7 +1331,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x1B');
-      await wait();
+      await wait(100);
 
       expect(props.buffer.setText).toHaveBeenCalledWith('');
       expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
@@ -1372,7 +1372,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x1B');
-      await wait();
+      await wait(100);
 
       expect(props.setShellModeActive).toHaveBeenCalledWith(false);
       unmount();
@@ -1392,7 +1392,7 @@ describe('InputPrompt', () => {
       await wait();
 
       stdin.write('\x1B');
-      await wait();
+      await wait(100);
 
       expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
       unmount();
