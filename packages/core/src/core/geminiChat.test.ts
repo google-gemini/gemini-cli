@@ -24,6 +24,7 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import { ChatRecordingService } from '../services/chatRecordingService.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -67,6 +68,8 @@ vi.mock('../utils/retry.js', () => ({
 vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
 }));
+
+vi.mock('../services/chatRecordingService.js');
 
 const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
   mockLogContentRetry: vi.fn(),
@@ -964,9 +967,9 @@ describe('GeminiChat', () => {
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
-      // History should still contain the user message.
+      // History should contain the user message and the final failed model turn.
       const history = chat.getHistory();
-      expect(history.length).toBe(1);
+      expect(history.length).toBe(2);
       expect(history[0]).toEqual({
         role: 'user',
         parts: [{ text: 'test' }],
@@ -1675,6 +1678,165 @@ describe('GeminiChat', () => {
           ],
         },
       ]);
+    });
+  });
+
+  describe('GeminiChat cancellation and abort behavior', () => {
+    let mockConfig: Config;
+    let mockChatRecordingService: ChatRecordingService;
+    let chat: GeminiChat;
+
+    beforeEach(() => {
+      // Reset mocks before each test
+      vi.clearAllMocks();
+
+      // Mock the config object
+      mockConfig = {
+        getToolRegistry: vi.fn(),
+        getGeminiClient: vi.fn(),
+        getProjectRoot: vi.fn().mockReturnValue('/test/project'),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        // Add mocks for any other methods called on config
+        getContentGenerator: vi.fn().mockReturnValue({
+          generateContentStream: vi.fn(),
+        }),
+        getContentGeneratorConfig: vi.fn(),
+        getRetryFetchErrors: vi.fn().mockReturnValue(true),
+        isInFallbackMode: vi.fn().mockReturnValue(false),
+        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+      } as unknown as Config;
+
+      // Create an instance of GeminiChat and inject the mocked service
+      chat = new GeminiChat(mockConfig);
+      mockChatRecordingService = new ChatRecordingService(mockConfig);
+      (
+        chat as unknown as {
+          chatRecordingService: ChatRecordingService;
+        }
+      ).chatRecordingService = mockChatRecordingService;
+    });
+
+    async function* createMockStream(
+      chunks: string[],
+      error?: Error,
+    ): AsyncGenerator<GenerateContentResponse> {
+      for (const text of chunks) {
+        yield {
+          candidates: [{ content: { role: 'model', parts: [{ text }] } }],
+        } as GenerateContentResponse;
+      }
+      if (error) {
+        if (error.message === 'AbortError') {
+          const abortError = new Error('AbortError');
+          abortError.name = 'AbortError';
+          throw abortError;
+        }
+        throw error;
+      }
+    }
+
+    it('should save partial response to history and service when stream is aborted', async () => {
+      const abortController = new AbortController();
+
+      // 1. Setup a mock stream that can be aborted partway through
+      const mockApiStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'This is a partial message.' }],
+              },
+            },
+          ],
+        } as GenerateContentResponse;
+        // Simulate a delay where an abort can occur
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        // The stream will simply end here if aborted, without throwing inside the generator
+      })();
+
+      vi.mocked(
+        mockConfig.getContentGenerator().generateContentStream,
+      ).mockResolvedValue(mockApiStream);
+
+      // 2. Call sendMessageStream with the abort signal
+      const streamPromise = chat.sendMessageStream(
+        'gemini-pro',
+        { message: 'test', config: { abortSignal: abortController.signal } },
+        'prompt-id-1',
+      );
+
+      // Abort after a short delay to simulate user cancellation
+      setTimeout(() => abortController.abort(), 100);
+
+      // We expect the stream processing to complete gracefully without throwing an error
+      await expect(
+        (async () => {
+          const stream = await streamPromise;
+          // The loop will just finish when the stream is aborted and ends.
+          for await (const _ of stream) {
+            // Consuming the stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      // 3. Assert that the partial message was recorded
+      expect(mockChatRecordingService.recordMessage).toHaveBeenCalledWith({
+        model: 'gemini-pro',
+        type: 'gemini',
+        content: 'This is a partial message.',
+      });
+
+      // 4. Assert that the in-memory history was updated
+      const history = chat.getHistory();
+      const lastMessage = history[history.length - 1];
+      expect(lastMessage.role).toBe('model');
+      expect(lastMessage.parts?.[0].text).toBe('This is a partial message.');
+    });
+
+    it('should save partial response even when stream ends without a finish reason', async () => {
+      // 1. Setup a mock stream that ends prematurely (no finishReason)
+      vi.mocked(
+        mockConfig.getContentGenerator().generateContentStream,
+      ).mockImplementation(async () =>
+        createMockStream(['This ', 'is another ', 'test.']),
+      );
+
+      // 2. Call sendMessageStream and process it
+      const streamPromise = chat.sendMessageStream(
+        'gemini-pro',
+        { message: 'test 2' },
+        'prompt-id-2',
+      );
+
+      // Expect the specific InvalidStreamError because a retry will fail with another invalid stream
+      await expect(async () => {
+        const stream = await streamPromise;
+        for await (const _ of stream) {
+          // Consuming the stream
+        }
+      }).rejects.toThrow(
+        new InvalidStreamError(
+          'Model stream ended without a finish reason.',
+          'NO_FINISH_REASON',
+        ),
+      );
+
+      // 3. Assert that the partial message was still recorded
+      expect(mockChatRecordingService.recordMessage).toHaveBeenCalledWith({
+        model: 'gemini-pro',
+        type: 'gemini',
+        content: 'This is another test.',
+      });
+
+      // 4. Assert that the in-memory history was still updated
+      const history = chat.getHistory();
+      const lastMessage = history[history.length - 1];
+      expect(lastMessage.role).toBe('model');
+      expect(lastMessage.parts?.[0].text).toBe('This is another test.');
     });
   });
 });

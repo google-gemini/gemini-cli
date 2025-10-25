@@ -298,9 +298,19 @@ export class GeminiChat {
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
 
+            if (error instanceof Error && error.name === 'AbortError') {
+              throw error;
+            }
+
             if (isContentError) {
               // Check if we have more attempts left.
               if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
+                // On a content error, the failed model turn was already added to the history.
+                // We need to remove it before the next attempt.
+                if (self.history[self.history.length - 1]?.role === 'model') {
+                  self.history.pop();
+                }
+
                 logContentRetry(
                   self.config,
                   new ContentRetryEvent(
@@ -386,7 +396,7 @@ export class GeminiChat {
       signal: params.config?.abortSignal,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    return this.processStreamResponse(model, streamResponse, params);
   }
 
   /**
@@ -491,97 +501,111 @@ export class GeminiChat {
   private async *processStreamResponse(
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    params: SendMessageParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
     let hasFinishReason = false;
 
-    for await (const chunk of streamResponse) {
-      hasFinishReason =
-        chunk?.candidates?.some((candidate) => candidate.finishReason) ?? false;
-      if (isValidResponse(chunk)) {
-        const content = chunk.candidates?.[0]?.content;
-        if (content?.parts) {
-          if (content.parts.some((part) => part.thought)) {
-            // Record thoughts
-            this.recordThoughtFromContent(content);
-          }
-          if (content.parts.some((part) => part.functionCall)) {
-            hasToolCall = true;
-          }
+    try {
+      for await (const chunk of streamResponse) {
+        hasFinishReason =
+          chunk?.candidates?.some((candidate) => candidate.finishReason) ??
+          false;
+        if (isValidResponse(chunk)) {
+          const content = chunk.candidates?.[0]?.content;
+          if (content?.parts) {
+            if (content.parts.some((part) => part.thought)) {
+              // Record thoughts
+              this.recordThoughtFromContent(content);
+            }
+            if (content.parts.some((part) => part.functionCall)) {
+              hasToolCall = true;
+            }
 
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
-          );
+            modelResponseParts.push(
+              ...content.parts.filter((part) => !part.thought),
+            );
+          }
+        }
+
+        // Record token usage if this chunk has usageMetadata
+        if (chunk.usageMetadata) {
+          this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+          if (chunk.usageMetadata.promptTokenCount !== undefined) {
+            uiTelemetryService.setLastPromptTokenCount(
+              chunk.usageMetadata.promptTokenCount,
+            );
+          }
+        }
+
+        yield chunk; // Yield every chunk to the UI immediately.
+      }
+    } finally {
+      // String thoughts and consolidate text parts.
+      const consolidatedParts: Part[] = [];
+      for (const part of modelResponseParts) {
+        const lastPart = consolidatedParts[consolidatedParts.length - 1];
+        if (
+          lastPart?.text &&
+          isValidNonThoughtTextPart(lastPart) &&
+          isValidNonThoughtTextPart(part)
+        ) {
+          lastPart.text += part.text;
+        } else {
+          consolidatedParts.push(part);
         }
       }
 
-      // Record token usage if this chunk has usageMetadata
-      if (chunk.usageMetadata) {
-        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
-        if (chunk.usageMetadata.promptTokenCount !== undefined) {
-          uiTelemetryService.setLastPromptTokenCount(
-            chunk.usageMetadata.promptTokenCount,
+      const responseText = consolidatedParts
+        .filter((part) => part.text)
+        .map((part) => part.text)
+        .join('')
+        .trim();
+
+      // Record model response text from the collected parts
+      if (responseText) {
+        this.chatRecordingService.recordMessage({
+          model,
+          type: 'gemini',
+          content: responseText,
+        });
+      }
+
+      // Record the consolidated parts before throwing the error, or else,
+      // something like an incomplete model response would not get added
+      // causing issues like when attempting to save chat history to file
+      this.history.push({ role: 'model', parts: consolidatedParts });
+
+      // Stream validation logic: A stream is considered successful if:
+      // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
+      // 2. There's a finish reason AND we have non-empty response text
+      //
+      // We throw an error only when there's no tool call AND:
+      // - No finish reason, OR
+      // - Empty response text (e.g., only thoughts with no actual content)
+      if (!hasToolCall && (!hasFinishReason || !responseText)) {
+        // We don't want to throw an error if the stream was aborted.
+        if (params.config?.abortSignal?.aborted) {
+          // eslint-disable-next-line no-unsafe-finally
+          return;
+        }
+        if (!hasFinishReason) {
+          // eslint-disable-next-line no-unsafe-finally
+          throw new InvalidStreamError(
+            'Model stream ended without a finish reason.',
+            'NO_FINISH_REASON',
+          );
+        } else {
+          // eslint-disable-next-line no-unsafe-finally
+          throw new InvalidStreamError(
+            'Model stream ended with empty response text.',
+            'NO_RESPONSE_TEXT',
           );
         }
       }
-
-      yield chunk; // Yield every chunk to the UI immediately.
     }
-
-    // String thoughts and consolidate text parts.
-    const consolidatedParts: Part[] = [];
-    for (const part of modelResponseParts) {
-      const lastPart = consolidatedParts[consolidatedParts.length - 1];
-      if (
-        lastPart?.text &&
-        isValidNonThoughtTextPart(lastPart) &&
-        isValidNonThoughtTextPart(part)
-      ) {
-        lastPart.text += part.text;
-      } else {
-        consolidatedParts.push(part);
-      }
-    }
-
-    const responseText = consolidatedParts
-      .filter((part) => part.text)
-      .map((part) => part.text)
-      .join('')
-      .trim();
-
-    // Record model response text from the collected parts
-    if (responseText) {
-      this.chatRecordingService.recordMessage({
-        model,
-        type: 'gemini',
-        content: responseText,
-      });
-    }
-
-    // Stream validation logic: A stream is considered successful if:
-    // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
-    // 2. There's a finish reason AND we have non-empty response text
-    //
-    // We throw an error only when there's no tool call AND:
-    // - No finish reason, OR
-    // - Empty response text (e.g., only thoughts with no actual content)
-    if (!hasToolCall && (!hasFinishReason || !responseText)) {
-      if (!hasFinishReason) {
-        throw new InvalidStreamError(
-          'Model stream ended without a finish reason.',
-          'NO_FINISH_REASON',
-        );
-      } else {
-        throw new InvalidStreamError(
-          'Model stream ended with empty response text.',
-          'NO_RESPONSE_TEXT',
-        );
-      }
-    }
-
-    this.history.push({ role: 'model', parts: consolidatedParts });
   }
 
   /**
