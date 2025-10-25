@@ -66,13 +66,6 @@ describe('useKeypress', () => {
     });
   });
 
-  const setNodeVersion = (version: string) => {
-    Object.defineProperty(process.versions, 'node', {
-      value: version,
-      configurable: true,
-    });
-  };
-
   it('should not listen if isActive is false', () => {
     renderHook(() => useKeypress(onKeypress, { isActive: false }), {
       wrapper,
@@ -124,19 +117,12 @@ describe('useKeypress', () => {
 
   describe.each([
     {
-      description: 'Modern Node (>= v20)',
-      setup: () => setNodeVersion('20.0.0'),
+      description: 'PASTE_WORKAROUND true',
+      setup: () => vi.stubEnv('PASTE_WORKAROUND', 'true'),
     },
     {
-      description: 'Legacy Node (< v20)',
-      setup: () => setNodeVersion('18.0.0'),
-    },
-    {
-      description: 'Workaround Env Var',
-      setup: () => {
-        setNodeVersion('20.0.0');
-        vi.stubEnv('PASTE_WORKAROUND', 'true');
-      },
+      description: 'PASTE_WORKAROUND false',
+      setup: () => vi.stubEnv('PASTE_WORKAROUND', 'false'),
     },
   ])('in $description', ({ setup }) => {
     beforeEach(() => {
