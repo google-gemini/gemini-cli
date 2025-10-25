@@ -38,6 +38,10 @@ describe('ReadFileTool', () => {
       getFileSystemService: () => new StandardFileSystemService(),
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
       storage: {
         getProjectTempDir: () => path.join(tempRootDir, '.temp'),
       },
@@ -462,7 +466,7 @@ describe('ReadFileTool', () => {
         const params: ReadFileToolParams = {
           absolute_path: ignoredFilePath,
         };
-        const expectedError = `File path '${ignoredFilePath}' is ignored by .geminiignore pattern(s).`;
+        const expectedError = `File path '${ignoredFilePath}' is ignored by configured ignore patterns.`;
         expect(() => tool.build(params)).toThrow(expectedError);
       });
 
@@ -474,7 +478,7 @@ describe('ReadFileTool', () => {
         const params: ReadFileToolParams = {
           absolute_path: ignoredFilePath,
         };
-        const expectedError = `File path '${ignoredFilePath}' is ignored by .geminiignore pattern(s).`;
+        const expectedError = `File path '${ignoredFilePath}' is ignored by configured ignore patterns.`;
         expect(() => tool.build(params)).toThrow(expectedError);
       });
 
