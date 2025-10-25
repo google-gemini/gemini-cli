@@ -357,6 +357,7 @@ export class TestRig {
           stdin?: string;
           stdinDoesNotEnd?: boolean;
           yolo?: boolean;
+          cwd?: string;
         },
     ...args: string[]
   ): Promise<string> {
@@ -371,7 +372,9 @@ export class TestRig {
       encoding: 'utf-8';
       input?: string;
     } = {
-      cwd: this.testDir!,
+      cwd:
+        (typeof promptOrOptions === 'object' && promptOrOptions?.cwd) ||
+        this.testDir!,
       encoding: 'utf-8',
     };
 
@@ -392,7 +395,9 @@ export class TestRig {
     commandArgs.push(...args);
 
     const child = spawn(command, commandArgs, {
-      cwd: this.testDir!,
+      cwd:
+        (typeof promptOrOptions === 'object' && promptOrOptions?.cwd) ||
+        this.testDir!,
       stdio: 'pipe',
       env: env,
     });
@@ -499,7 +504,9 @@ export class TestRig {
     const commandArgs = [...initialArgs, ...args];
 
     const child = spawn(command, commandArgs, {
-      cwd: this.testDir!,
+      cwd:
+        (typeof promptOrOptions === 'object' && promptOrOptions?.cwd) ||
+        this.testDir!,
       stdio: 'pipe',
     });
 
@@ -980,7 +987,9 @@ export class TestRig {
       name: 'xterm-color',
       cols: 80,
       rows: 24,
-      cwd: this.testDir!,
+      cwd:
+        (typeof promptOrOptions === 'object' && promptOrOptions?.cwd) ||
+        this.testDir!,
       env: Object.fromEntries(
         Object.entries(env).filter(([, v]) => v !== undefined),
       ) as { [key: string]: string },
