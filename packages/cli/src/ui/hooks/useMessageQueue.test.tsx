@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { render } from 'ink-testing-library';
 import { useMessageQueue } from './useMessageQueue.js';
 import { StreamingState } from '../types.js';
 
@@ -22,27 +23,45 @@ describe('useMessageQueue', () => {
     vi.clearAllMocks();
   });
 
+  const renderMessageQueueHook = (initialProps: {
+    isConfigInitialized: boolean;
+    streamingState: StreamingState;
+    submitQuery: (query: string) => void;
+  }) => {
+    let hookResult: ReturnType<typeof useMessageQueue>;
+    function TestComponent(props: typeof initialProps) {
+      hookResult = useMessageQueue(props);
+      return null;
+    }
+    const { rerender } = render(<TestComponent {...initialProps} />);
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      rerender: (newProps: Partial<typeof initialProps>) =>
+        rerender(<TestComponent {...initialProps} {...newProps} />),
+    };
+  };
+
   it('should initialize with empty queue', () => {
-    const { result } = renderHook(() =>
-      useMessageQueue({
-        isConfigInitialized: true,
-        streamingState: StreamingState.Idle,
-        submitQuery: mockSubmitQuery,
-      }),
-    );
+    const { result } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Idle,
+      submitQuery: mockSubmitQuery,
+    });
 
     expect(result.current.messageQueue).toEqual([]);
     expect(result.current.getQueuedMessagesText()).toBe('');
   });
 
   it('should add messages to queue', () => {
-    const { result } = renderHook(() =>
-      useMessageQueue({
-        isConfigInitialized: true,
-        streamingState: StreamingState.Responding,
-        submitQuery: mockSubmitQuery,
-      }),
-    );
+    const { result } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+    });
 
     act(() => {
       result.current.addMessage('Test message 1');
@@ -56,13 +75,11 @@ describe('useMessageQueue', () => {
   });
 
   it('should filter out empty messages', () => {
-    const { result } = renderHook(() =>
-      useMessageQueue({
-        isConfigInitialized: true,
-        streamingState: StreamingState.Responding,
-        submitQuery: mockSubmitQuery,
-      }),
-    );
+    const { result } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+    });
 
     act(() => {
       result.current.addMessage('Valid message');
@@ -78,13 +95,11 @@ describe('useMessageQueue', () => {
   });
 
   it('should clear queue', () => {
-    const { result } = renderHook(() =>
-      useMessageQueue({
-        isConfigInitialized: true,
-        streamingState: StreamingState.Responding,
-        submitQuery: mockSubmitQuery,
-      }),
-    );
+    const { result } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+    });
 
     act(() => {
       result.current.addMessage('Test message');
@@ -100,13 +115,11 @@ describe('useMessageQueue', () => {
   });
 
   it('should return queued messages as text with double newlines', () => {
-    const { result } = renderHook(() =>
-      useMessageQueue({
-        isConfigInitialized: true,
-        streamingState: StreamingState.Responding,
-        submitQuery: mockSubmitQuery,
-      }),
-    );
+    const { result } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+    });
 
     act(() => {
       result.current.addMessage('Message 1');
@@ -119,18 +132,12 @@ describe('useMessageQueue', () => {
     );
   });
 
-  it('should auto-submit queued messages when transitioning to Idle', () => {
-    const { result, rerender } = renderHook(
-      ({ streamingState }) =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState,
-          submitQuery: mockSubmitQuery,
-        }),
-      {
-        initialProps: { streamingState: StreamingState.Responding },
-      },
-    );
+  it('should auto-submit queued messages when transitioning to Idle', async () => {
+    const { result, rerender } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+    });
 
     // Add some messages
     act(() => {
@@ -143,22 +150,18 @@ describe('useMessageQueue', () => {
     // Transition to Idle
     rerender({ streamingState: StreamingState.Idle });
 
-    expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
-    expect(result.current.messageQueue).toEqual([]);
+    await vi.waitFor(() => {
+      expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
+      expect(result.current.messageQueue).toEqual([]);
+    });
   });
 
   it('should not auto-submit when queue is empty', () => {
-    const { rerender } = renderHook(
-      ({ streamingState }) =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState,
-          submitQuery: mockSubmitQuery,
-        }),
-      {
-        initialProps: { streamingState: StreamingState.Responding },
-      },
-    );
+    const { rerender } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+    });
 
     // Transition to Idle with empty queue
     rerender({ streamingState: StreamingState.Idle });
@@ -167,17 +170,11 @@ describe('useMessageQueue', () => {
   });
 
   it('should not auto-submit when not transitioning to Idle', () => {
-    const { result, rerender } = renderHook(
-      ({ streamingState }) =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState,
-          submitQuery: mockSubmitQuery,
-        }),
-      {
-        initialProps: { streamingState: StreamingState.Responding },
-      },
-    );
+    const { result, rerender } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+    });
 
     // Add messages
     act(() => {
@@ -191,18 +188,12 @@ describe('useMessageQueue', () => {
     expect(result.current.messageQueue).toEqual(['Message 1']);
   });
 
-  it('should handle multiple state transitions correctly', () => {
-    const { result, rerender } = renderHook(
-      ({ streamingState }) =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState,
-          submitQuery: mockSubmitQuery,
-        }),
-      {
-        initialProps: { streamingState: StreamingState.Idle },
-      },
-    );
+  it('should handle multiple state transitions correctly', async () => {
+    const { result, rerender } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Idle,
+      submitQuery: mockSubmitQuery,
+    });
 
     // Start responding
     rerender({ streamingState: StreamingState.Responding });
@@ -215,8 +206,10 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit
     rerender({ streamingState: StreamingState.Idle });
 
-    expect(mockSubmitQuery).toHaveBeenCalledWith('First batch');
-    expect(result.current.messageQueue).toEqual([]);
+    await vi.waitFor(() => {
+      expect(mockSubmitQuery).toHaveBeenCalledWith('First batch');
+      expect(result.current.messageQueue).toEqual([]);
+    });
 
     // Start responding again
     rerender({ streamingState: StreamingState.Responding });
@@ -229,19 +222,19 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit again
     rerender({ streamingState: StreamingState.Idle });
 
-    expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
-    expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => {
+      expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
+      expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('popAllMessages', () => {
     it('should pop all messages and return them joined with double newlines', () => {
-      const { result } = renderHook(() =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState: StreamingState.Responding,
-          submitQuery: mockSubmitQuery,
-        }),
-      );
+      const { result } = renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Responding,
+        submitQuery: mockSubmitQuery,
+      });
 
       // Add multiple messages
       act(() => {
@@ -269,13 +262,11 @@ describe('useMessageQueue', () => {
     });
 
     it('should return undefined when queue is empty', () => {
-      const { result } = renderHook(() =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState: StreamingState.Responding,
-          submitQuery: mockSubmitQuery,
-        }),
-      );
+      const { result } = renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Responding,
+        submitQuery: mockSubmitQuery,
+      });
 
       let poppedMessages: string | undefined = 'not-undefined';
       act(() => {
@@ -289,13 +280,11 @@ describe('useMessageQueue', () => {
     });
 
     it('should handle single message correctly', () => {
-      const { result } = renderHook(() =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState: StreamingState.Responding,
-          submitQuery: mockSubmitQuery,
-        }),
-      );
+      const { result } = renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Responding,
+        submitQuery: mockSubmitQuery,
+      });
 
       act(() => {
         result.current.addMessage('Single message');
@@ -313,13 +302,11 @@ describe('useMessageQueue', () => {
     });
 
     it('should clear the entire queue after popping', () => {
-      const { result } = renderHook(() =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState: StreamingState.Responding,
-          submitQuery: mockSubmitQuery,
-        }),
-      );
+      const { result } = renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Responding,
+        submitQuery: mockSubmitQuery,
+      });
 
       act(() => {
         result.current.addMessage('Message 1');
@@ -346,13 +333,11 @@ describe('useMessageQueue', () => {
     });
 
     it('should work correctly with state updates', () => {
-      const { result } = renderHook(() =>
-        useMessageQueue({
-          isConfigInitialized: true,
-          streamingState: StreamingState.Responding,
-          submitQuery: mockSubmitQuery,
-        }),
-      );
+      const { result } = renderMessageQueueHook({
+        isConfigInitialized: true,
+        streamingState: StreamingState.Responding,
+        submitQuery: mockSubmitQuery,
+      });
 
       // Add messages
       act(() => {
