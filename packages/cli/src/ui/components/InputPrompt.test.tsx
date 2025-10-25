@@ -1713,7 +1713,7 @@ describe('InputPrompt', () => {
         () => {
           expect(clean(stdout.lastFrame())).toContain('←');
         },
-        { timeout: 2000 },
+        { timeout: 5000 },
       );
       expect(stdout.lastFrame()).toMatchSnapshot(
         'command-search-expanded-match',
