@@ -1,0 +1,22 @@
+name: 'Setup NPMRC'
+description: 'Sets up NPMRC with all the correct repos for readonly access.'
+
+inputs:
+  github-token:
+    description: 'the github token'
+    required: true
+
+outputs:
+  auth-token:
+    description: 'The generated NPM auth token'
+    value: '${{ steps.npm_auth_token.outputs.auth-token }}'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Configure .npmrc'
+      shell: 'bash'
+      run: |-
+        echo ""@google-gemini:registry=https://npm.pkg.github.com"" > ~/.npmrc
+        echo ""//npm.pkg.github.com/:_authToken=${{ inputs.github-token }}"" >> ~/.npmrc
+        echo ""@google:registry=https://wombat-dressing-room.appspot.com"" >> ~/.npmrc

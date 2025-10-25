@@ -23,6 +23,7 @@ import {
   isFunctionCall,
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -403,6 +404,12 @@ export class LoopDetectionService {
       ...trimmedHistory,
       { role: 'user', parts: [{ text: taskPrompt }] },
     ];
+    if (contents.length > 0 && isFunctionCall(contents[0])) {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Recent conversation history:' }],
+      });
+    }
     const schema: Record<string, unknown> = {
       type: 'object',
       properties: {
@@ -431,14 +438,14 @@ export class LoopDetectionService {
       });
     } catch (e) {
       // Do nothing, treat it as a non-loop.
-      this.config.getDebugMode() ? console.error(e) : console.debug(e);
+      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
       return false;
     }
 
     if (typeof result['confidence'] === 'number') {
       if (result['confidence'] > 0.9) {
         if (typeof result['reasoning'] === 'string' && result['reasoning']) {
-          console.warn(result['reasoning']);
+          debugLogger.warn(result['reasoning']);
         }
         logLoopDetected(
           this.config,

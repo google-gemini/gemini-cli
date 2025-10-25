@@ -11,6 +11,7 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
+import { getShellConfiguration } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
@@ -20,6 +21,7 @@ import {
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
+const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 /** A structured result from a shell command execution. */
 export interface ShellExecutionResult {
@@ -241,6 +243,36 @@ export class ShellExecutionService {
     );
   }
 
+  private static appendAndTruncate(
+    currentBuffer: string,
+    chunk: string,
+    maxSize: number,
+  ): { newBuffer: string; truncated: boolean } {
+    const chunkLength = chunk.length;
+    const currentLength = currentBuffer.length;
+    const newTotalLength = currentLength + chunkLength;
+
+    if (newTotalLength <= maxSize) {
+      return { newBuffer: currentBuffer + chunk, truncated: false };
+    }
+
+    // Truncation is needed.
+    if (chunkLength >= maxSize) {
+      // The new chunk is larger than or equal to the max buffer size.
+      // The new buffer will be the tail of the new chunk.
+      return {
+        newBuffer: chunk.substring(chunkLength - maxSize),
+        truncated: true,
+      };
+    }
+
+    // The combined buffer exceeds the max size, but the new chunk is smaller than it.
+    // We need to truncate the current buffer from the beginning to make space.
+    const charsToTrim = newTotalLength - maxSize;
+    const truncatedBuffer = currentBuffer.substring(charsToTrim);
+    return { newBuffer: truncatedBuffer + chunk, truncated: true };
+  }
+
   private static childProcessFallback(
     commandToExecute: string,
     cwd: string,
@@ -250,14 +282,12 @@ export class ShellExecutionService {
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const cols = shellExecutionConfig.terminalWidth ?? 80;
-      const rows = shellExecutionConfig.terminalHeight ?? 30;
 
-      const child = cpSpawn(commandToExecute, [], {
+      const child = cpSpawn(executable, spawnArgs, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
-        windowsVerbatimArguments: true,
-        shell: isWindows ? true : 'bash',
+        windowsVerbatimArguments: isWindows ? false : undefined,
+        shell: false,
         detached: !isWindows,
         env: {
           ...process.env,
@@ -275,8 +305,6 @@ export class ShellExecutionService {
         });
         headlessTerminal.scrollToTop();
 
-        let processingChain = Promise.resolve();
-        let decoder: TextDecoder | null = null;
         const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
@@ -328,28 +356,6 @@ export class ShellExecutionService {
                     onOutputEvent({ type: 'binary_detected' });
                   }
                 }
-
-                if (renderState.isStreamingRawContent) {
-                  const decodedChunk = decoder.decode(data, { stream: true });
-                  isWriting = true;
-                  headlessTerminal.write(decodedChunk, () => {
-                    render();
-                    isWriting = false;
-                    resolve();
-                  });
-                } else {
-                  const totalBytes = outputChunks.reduce(
-                    (sum, chunk) => sum + chunk.length,
-                    0,
-                  );
-                  onOutputEvent({
-                    type: 'binary_progress',
-                    bytesReceived: totalBytes,
-                  });
-                  resolve();
-                }
-              }),
-          );
         };
 
         const handleExit = (
@@ -357,8 +363,6 @@ export class ShellExecutionService {
           signal: NodeJS.Signals | null,
         ) => {
           const { finalBuffer } = cleanup();
-          
-          render(true);
 
           resolve({
             rawOutput: finalBuffer,
@@ -456,13 +460,10 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const isWindows = os.platform() === 'win32';
-      const shell = isWindows ? 'cmd.exe' : 'bash';
-      const args = isWindows
-        ? `/c ${commandToExecute}`
-        : ['-c', commandToExecute];
+      const { executable, argsPrefix } = getShellConfiguration();
+      const args = [...argsPrefix, commandToExecute];
 
-      const ptyProcess = ptyInfo.module.spawn(shell, args, {
+      const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
         name: 'xterm',
         cols,
@@ -494,12 +495,7 @@ export class ShellExecutionService {
 
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
-        let isWriting = false;
-
-        const renderState: TerminalRenderState = {
-          isStreamingRawContent: true,
-          hasStartedOutput: false,
-          renderTimeout: null,
+        let isWriting = false;+
         };
 
         const render = createTerminalRenderer(
@@ -542,6 +538,10 @@ export class ShellExecutionService {
 
                 if (renderState.isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
+                  if (decodedChunk.length === 0) {
+                    resolve();
+                    return;
+                  }
                   isWriting = true;
                   headlessTerminal.write(decodedChunk, () => {
                     render();
@@ -574,7 +574,7 @@ export class ShellExecutionService {
             abortSignal.removeEventListener('abort', abortHandler);
             this.activePtys.delete(ptyProcess.pid);
 
-            processingChain.then(() => {
+            const finalize = () => {
               render(true);
               const finalBuffer = Buffer.concat(outputChunks);
 
@@ -590,6 +590,26 @@ export class ShellExecutionService {
                   (ptyInfo?.name as 'node-pty' | 'lydell-node-pty') ??
                   'node-pty',
               });
+            };
+
+            if (abortSignal.aborted) {
+              finalize();
+              return;
+            }
+
+            const processingComplete = processingChain.then(() => 'processed');
+            const abortFired = new Promise<'aborted'>((res) => {
+              if (abortSignal.aborted) {
+                res('aborted');
+                return;
+              }
+              abortSignal.addEventListener('abort', () => res('aborted'), {
+                once: true,
+              });
+            });
+
+            Promise.race([processingComplete, abortFired]).then(() => {
+              finalize();
             });
           },
         );
@@ -601,10 +621,18 @@ export class ShellExecutionService {
             } else {
               try {
                 // Kill the entire process group
-                process.kill(-ptyProcess.pid, 'SIGINT');
+                process.kill(-ptyProcess.pid, 'SIGTERM');
+                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
+                if (!exited) {
+                  process.kill(-ptyProcess.pid, 'SIGKILL');
+                }
               } catch (_e) {
                 // Fallback to killing just the process if the group kill fails
-                ptyProcess.kill('SIGINT');
+                ptyProcess.kill('SIGTERM');
+                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
+                if (!exited) {
+                  ptyProcess.kill('SIGKILL');
+                }
               }
             }
           }
@@ -616,19 +644,28 @@ export class ShellExecutionService {
       return { pid: ptyProcess.pid, result };
     } catch (e) {
       const error = e as Error;
-      return {
-        pid: undefined,
-        result: Promise.resolve({
-          error,
-          rawOutput: Buffer.from(''),
-          output: '',
-          exitCode: 1,
-          signal: null,
-          aborted: false,
+      if (error.message.includes('posix_spawnp failed')) {
+        onOutputEvent({
+          type: 'data',
+          chunk:
+            '[GEMINI_CLI_WARNING] PTY execution failed, falling back to child_process. This may be due to sandbox restrictions.\n',
+        });
+        throw e;
+      } else {
+        return {
           pid: undefined,
-          executionMethod: 'none',
-        }),
-      };
+          result: Promise.resolve({
+            error,
+            rawOutput: Buffer.from(''),
+            output: '',
+            exitCode: 1,
+            signal: null,
+            aborted: false,
+            pid: undefined,
+            executionMethod: 'none',
+          }),
+        };
+      }
     }
   }
 
@@ -679,7 +716,11 @@ export class ShellExecutionService {
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
-        if (e instanceof Error && 'code' in e && e.code === 'ESRCH') {
+        if (
+          e instanceof Error &&
+          (('code' in e && e.code === 'ESRCH') ||
+            e.message === 'Cannot resize a pty that has already exited')
+        ) {
           // ignore
         } else {
           throw e;

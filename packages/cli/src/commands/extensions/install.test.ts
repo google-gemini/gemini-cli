@@ -8,46 +8,42 @@ import { describe, it, expect, vi, type MockInstance } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
-const mockInstallExtension = vi.hoisted(() => vi.fn());
+const mockInstallOrUpdateExtension = vi.hoisted(() => vi.fn());
 const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
+const mockStat = vi.hoisted(() => vi.fn());
 
-vi.mock('../../config/extension.js', () => ({
-  installExtension: mockInstallExtension,
+vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
 }));
 
+vi.mock('../../config/extension-manager.ts', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/extension-manager.js')>();
+  return {
+    ...actual,
+    ExtensionManager: vi.fn().mockImplementation(() => ({
+      installOrUpdateExtension: mockInstallOrUpdateExtension,
+    })),
+  };
+});
+
 vi.mock('../../utils/errors.js', () => ({
   getErrorMessage: vi.fn((error: Error) => error.message),
+}));
+
+vi.mock('node:fs/promises', () => ({
+  stat: mockStat,
+  default: {
+    stat: mockStat,
+  },
 }));
 
 describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() => validationParser.parse('install')).toThrow(
-      'Either source or --path must be provided.',
+      'Not enough non-option arguments: got 0, need at least 1',
     );
-  });
-
-  it('should fail if both git source and local path are provided', () => {
-    const validationParser = yargs([])
-      .command(installCommand)
-      .fail(false)
-      .locale('en');
-    expect(() =>
-      validationParser.parse('install some-url --path /some/path'),
-    ).toThrow('Arguments source and path are mutually exclusive');
-  });
-
-  it('should fail if both auto update and local path are provided', () => {
-    const validationParser = yargs([])
-      .command(installCommand)
-      .fail(false)
-      .locale('en');
-    expect(() =>
-      validationParser.parse(
-        'install some-url --path /some/path --auto-update',
-      ),
-    ).toThrow('Arguments path and auto-update are mutually exclusive');
   });
 });
 
@@ -65,13 +61,14 @@ describe('handleInstall', () => {
   });
 
   afterEach(() => {
-    mockInstallExtension.mockClear();
+    mockInstallOrUpdateExtension.mockClear();
     mockRequestConsentNonInteractive.mockClear();
-    vi.resetAllMocks();
+    mockStat.mockClear();
+    vi.clearAllMocks();
   });
 
   it('should install an extension from a http source', async () => {
-    mockInstallExtension.mockResolvedValue('http-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue('http-extension');
 
     await handleInstall({
       source: 'http://google.com',
@@ -83,7 +80,7 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a https source', async () => {
-    mockInstallExtension.mockResolvedValue('https-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue('https-extension');
 
     await handleInstall({
       source: 'https://google.com',
@@ -95,7 +92,7 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a git source', async () => {
-    mockInstallExtension.mockResolvedValue('git-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue('git-extension');
 
     await handleInstall({
       source: 'git@some-url',
@@ -107,18 +104,17 @@ describe('handleInstall', () => {
   });
 
   it('throws an error from an unknown source', async () => {
+    mockStat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
     await handleInstall({
       source: 'test://google.com',
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'The source "test://google.com" is not a valid URL format.',
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Install source not found.');
     expect(processSpy).toHaveBeenCalledWith(1);
   });
 
   it('should install an extension from a sso source', async () => {
-    mockInstallExtension.mockResolvedValue('sso-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue('sso-extension');
 
     await handleInstall({
       source: 'sso://google.com',
@@ -130,10 +126,10 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a local path', async () => {
-    mockInstallExtension.mockResolvedValue('local-extension');
-
+    mockInstallOrUpdateExtension.mockResolvedValue('local-extension');
+    mockStat.mockResolvedValue({});
     await handleInstall({
-      path: '/some/path',
+      source: '/some/path',
     });
 
     expect(consoleLogSpy).toHaveBeenCalledWith(
@@ -141,17 +137,8 @@ describe('handleInstall', () => {
     );
   });
 
-  it('should throw an error if no source or path is provided', async () => {
-    await handleInstall({});
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Either --source or --path must be provided.',
-    );
-    expect(processSpy).toHaveBeenCalledWith(1);
-  });
-
   it('should throw an error if install extension fails', async () => {
-    mockInstallExtension.mockRejectedValue(
+    mockInstallOrUpdateExtension.mockRejectedValue(
       new Error('Install extension failed'),
     );
 

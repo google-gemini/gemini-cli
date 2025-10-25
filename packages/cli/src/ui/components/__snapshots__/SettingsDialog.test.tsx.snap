@@ -14,13 +14,13 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -30,7 +30,7 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -49,13 +49,13 @@ exports[`SettingsDialog > Snapshot Tests > should render focused on scope select
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -65,7 +65,7 @@ exports[`SettingsDialog > Snapshot Tests > should render focused on scope select
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -84,13 +84,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -100,7 +100,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -119,13 +119,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 │                                                                                                  │
 │   Debug Keystroke Logging                              false*                                    │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false*                                    │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -135,7 +135,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -154,13 +154,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -170,7 +170,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -189,13 +189,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │   Debug Keystroke Logging (Modified in Workspace)      false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -205,7 +205,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -224,13 +224,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -240,7 +240,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -259,13 +259,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false*                                    │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -275,7 +275,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -294,13 +294,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -310,7 +310,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -329,13 +329,13 @@ exports[`SettingsDialog > Snapshot Tests > should render with various boolean se
 │                                                                                                  │
 │   Debug Keystroke Logging                              true*                                     │
 │                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    true*                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            true*                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -345,7 +345,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with various boolean se
 │   Workspace Settings                                                                             │
 │   System Settings                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

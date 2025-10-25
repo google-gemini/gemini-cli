@@ -11,47 +11,115 @@ inputs:
   dry-run:
     description: 'Whether to run in dry-run mode.'
     required: true
+  github-token:
+    description: 'The GitHub token for creating the release.'
+    required: true
   wombat-token-core:
     description: 'The npm token for the wombat @google/gemini-cli-core'
     required: true
   wombat-token-cli:
     description: 'The npm token for wombat @google/gemini-cli'
+    required: true
+  wombat-token-a2a-server:
+    description: 'The npm token for the @google/gemini-cli-a2a-server package.'
+    required: true
+  cli-package-name:
+    description: 'The name of the cli package.'
+    required: true
+  core-package-name:
+    description: 'The name of the core package.'
+    required: true
+  a2a-package-name:
+    description: 'The name of the a2a package.'
+    required: true
+  working-directory:
+    description: 'The working directory to run the commands in.'
+    required: false
+    default: '.'
 
 runs:
   using: 'composite'
   steps:
     - name: '📝 Print Inputs'
       shell: 'bash'
-      run: 'echo "${{ toJSON(inputs) }}"'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
 
     - name: 'Setup Node.js'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
-        node-version-file: '.nvmrc'
-        registry-url: 'https://wombat-dressing-room.appspot.com'
-        scope: '@google'
+        node-version-file: '${{ inputs.working-directory }}/.nvmrc'
 
-    - name: 'Change tag for @google/gemini-cli-core'
+    - name: 'configure .npmrc'
+      uses: './.github/actions/setup-npmrc'
+      with:
+        github-token: '${{ inputs.github-token }}'
+
+    - name: 'Get core Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'core-token'
+      with:
+        package-name: '${{ inputs.core-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: 'Change tag for CORE'
       if: |-
         ${{ inputs.dry-run != 'true' }}
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
+        NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
       shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
       run: |
-        npm dist-tag add @google/gemini-cli-core@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add ${{ inputs.core-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
 
-    - name: 'Change tag for @google/gemini-cli'
+    - name: 'Get cli Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'cli-token'
+      with:
+        package-name: '${{ inputs.cli-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: 'Change tag for CLI'
       if: |-
         ${{ inputs.dry-run != 'true' }}
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
+        NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
       shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
       run: |
-        npm dist-tag add @google/gemini-cli@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add ${{ inputs.cli-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
+
+    - name: 'Get a2a Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'a2a-token'
+      with:
+        package-name: '${{ inputs.a2a-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: 'Change tag for a2a'
+      if: |-
+        ${{ inputs.dry-run == 'false' }}
+      env:
+        NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
+      shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
+      run: |
+        npm dist-tag add ${{ inputs.a2a-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
 
     - name: 'Log dry run'
       if: |-
         ${{ inputs.dry-run == 'true' }}
       shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
       run: |
-        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
+        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for ${{ inputs.cli-package-name }}, ${{ inputs.core-package-name }}, and ${{ inputs.a2a-package-name }}."

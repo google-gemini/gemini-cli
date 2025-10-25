@@ -131,7 +131,7 @@ export const ToolConfirmationMessage: React.FC<
     if (confirmationDetails.isModifying) {
       return (
         <Box
-          minWidth="90%"
+          width={terminalWidth}
           borderStyle="round"
           borderColor={theme.border.default}
           justifyContent="space-around"

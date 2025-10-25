@@ -6,6 +6,6 @@
     "composite": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.d.ts", "src/**/*.json"],
   "exclude": ["node_modules", "dist"]
 }

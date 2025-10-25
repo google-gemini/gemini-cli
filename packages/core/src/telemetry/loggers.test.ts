@@ -23,23 +23,6 @@ import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import type { Config } from '../config/config.js';
 import {
-  EVENT_API_REQUEST,
-  EVENT_API_RESPONSE,
-  EVENT_CLI_CONFIG,
-  EVENT_TOOL_CALL,
-  EVENT_USER_PROMPT,
-  EVENT_FLASH_FALLBACK,
-  EVENT_MALFORMED_JSON_RESPONSE,
-  EVENT_FILE_OPERATION,
-  EVENT_RIPGREP_FALLBACK,
-  EVENT_MODEL_ROUTING,
-  EVENT_EXTENSION_ENABLE,
-  EVENT_EXTENSION_DISABLE,
-  EVENT_EXTENSION_INSTALL,
-  EVENT_EXTENSION_UNINSTALL,
-  EVENT_TOOL_OUTPUT_TRUNCATED,
-} from './constants.js';
-import {
   logApiRequest,
   logApiResponse,
   logCliConfiguration,
@@ -56,9 +39,31 @@ import {
   logExtensionDisable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logAgentStart,
+  logAgentFinish,
+  logWebFetchFallbackAttempt,
+  logExtensionUpdateEvent,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
+  EVENT_API_REQUEST,
+  EVENT_API_RESPONSE,
+  EVENT_CLI_CONFIG,
+  EVENT_TOOL_CALL,
+  EVENT_USER_PROMPT,
+  EVENT_FLASH_FALLBACK,
+  EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
+  EVENT_MODEL_ROUTING,
+  EVENT_EXTENSION_ENABLE,
+  EVENT_EXTENSION_DISABLE,
+  EVENT_EXTENSION_INSTALL,
+  EVENT_EXTENSION_UNINSTALL,
+  EVENT_TOOL_OUTPUT_TRUNCATED,
+  EVENT_AGENT_START,
+  EVENT_AGENT_FINISH,
+  EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
   ApiRequestEvent,
   ApiResponseEvent,
   StartSessionEvent,
@@ -75,6 +80,11 @@ import {
   ExtensionDisableEvent,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  AgentStartEvent,
+  AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
+  ExtensionUpdateEvent,
+  EVENT_EXTENSION_UPDATE,
 } from './types.js';
 import * as metrics from './metrics.js';
 import {
@@ -93,6 +103,8 @@ import * as uiTelemetry from './uiTelemetry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
+import { InstallationManager } from '../utils/installationManager.js';
+import { AgentTerminateMode } from '../agents/types.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -113,6 +125,10 @@ describe('loggers', () => {
       UserAccountManager.prototype,
       'getCachedGoogleAccount',
     ).mockReturnValue('test-user@example.com');
+    vi.spyOn(
+      InstallationManager.prototype,
+      'getInstallationId',
+    ).mockReturnValue('test-installation-id');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
   });
@@ -185,6 +201,7 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
         getOutputFormat: () => OutputFormat.JSON,
+        getExtensions: () => [],
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -195,6 +212,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_CLI_CONFIG,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -212,6 +230,8 @@ describe('loggers', () => {
           mcp_tools: undefined,
           mcp_tools_count: undefined,
           output_format: 'json',
+          extension_ids: '',
+          extensions_count: 0,
         },
       });
     });
@@ -240,6 +260,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
@@ -272,6 +293,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
@@ -338,6 +360,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_API_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           [SemanticAttributes.HTTP_STATUS_CODE]: 200,
@@ -433,6 +456,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -452,6 +476,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -477,6 +502,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_FLASH_FALLBACK,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           auth_type: 'vertex-ai',
@@ -510,6 +536,7 @@ describe('loggers', () => {
         expect.objectContaining({
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_RIPGREP_FALLBACK,
           error: undefined,
         }),
@@ -531,6 +558,7 @@ describe('loggers', () => {
         expect.objectContaining({
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_RIPGREP_FALLBACK,
           error: 'rg not found',
         }),
@@ -567,7 +595,7 @@ describe('loggers', () => {
       }),
       getQuestion: () => 'test-question',
       getToolRegistry: () => new ToolRegistry(cfg1),
-      getFullContext: () => false,
+
       getUserMemory: () => 'user-memory',
     } as unknown as Config;
 
@@ -643,6 +671,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -684,6 +713,10 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           tool_type: 'native',
+          model_added_lines: 1,
+          model_removed_lines: 2,
+          user_added_lines: 5,
+          user_removed_lines: 6,
         },
       );
 
@@ -726,6 +759,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -802,6 +836,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -877,6 +912,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -951,6 +987,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -1008,6 +1045,10 @@ describe('loggers', () => {
           },
           required: ['arg1', 'arg2'],
         },
+        false,
+        undefined,
+        undefined,
+        'test-extension',
       );
 
       const call: CompletedToolCall = {
@@ -1039,8 +1080,10 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          extension_id: 'test-extension',
           function_name: 'mock_mcp_tool',
           function_args: JSON.stringify(
             {
@@ -1059,6 +1102,7 @@ describe('loggers', () => {
           error: undefined,
           error_type: undefined,
           metadata: undefined,
+          content_length: undefined,
         },
       });
     });
@@ -1084,6 +1128,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_MALFORMED_JSON_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -1128,6 +1173,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_FILE_OPERATION,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           tool_name: 'test-tool',
@@ -1174,6 +1220,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_OUTPUT_TRUNCATED,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           eventName: 'tool_output_truncated',
@@ -1220,6 +1267,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
         },
@@ -1256,6 +1304,9 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      getContentGeneratorConfig: () => null,
+      getUseSmartEdit: () => null,
+      getUseModelRouter: () => null,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1268,7 +1319,8 @@ describe('loggers', () => {
 
     it('should log extension install event', () => {
       const event = new ExtensionInstallEvent(
-        'vscode',
+        'testing',
+        'testing-id',
         '0.1.0',
         'git',
         'success',
@@ -1281,14 +1333,66 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Installed extension vscode',
+        body: 'Installed extension testing',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_INSTALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
-          extension_name: 'vscode',
+          extension_name: 'testing',
           extension_version: '0.1.0',
+          extension_source: 'git',
+          status: 'success',
+        },
+      });
+    });
+  });
+
+  describe('logExtensionUpdate', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getContentGeneratorConfig: () => null,
+      getUseSmartEdit: () => null,
+      getUseModelRouter: () => null,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logExtensionUpdateEvent');
+    });
+
+    afterEach(() => {
+      vi.resetAllMocks();
+    });
+
+    it('should log extension update event', () => {
+      const event = new ExtensionUpdateEvent(
+        'testing',
+        'testing-id',
+        '0.1.0',
+        '0.1.1',
+        'git',
+        'success',
+      );
+
+      logExtensionUpdateEvent(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logExtensionUpdateEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Updated extension testing',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_EXTENSION_UPDATE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          extension_name: 'testing',
+          extension_version: '0.1.0',
+          extension_previous_version: '0.1.1',
           extension_source: 'git',
           status: 'success',
         },
@@ -1300,6 +1404,9 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      getContentGeneratorConfig: () => null,
+      getUseSmartEdit: () => null,
+      getUseModelRouter: () => null,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1311,7 +1418,11 @@ describe('loggers', () => {
     });
 
     it('should log extension uninstall event', () => {
-      const event = new ExtensionUninstallEvent('vscode', 'success');
+      const event = new ExtensionUninstallEvent(
+        'testing',
+        'testing-id',
+        'success',
+      );
 
       logExtensionUninstall(mockConfig, event);
 
@@ -1320,13 +1431,14 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Uninstalled extension vscode',
+        body: 'Uninstalled extension testing',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_UNINSTALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
-          extension_name: 'vscode',
+          extension_name: 'testing',
           status: 'success',
         },
       });
@@ -1348,7 +1460,7 @@ describe('loggers', () => {
     });
 
     it('should log extension enable event', () => {
-      const event = new ExtensionEnableEvent('vscode', 'user');
+      const event = new ExtensionEnableEvent('testing', 'testing-id', 'user');
 
       logExtensionEnable(mockConfig, event);
 
@@ -1357,13 +1469,14 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Enabled extension vscode',
+        body: 'Enabled extension testing',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_ENABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
-          extension_name: 'vscode',
+          extension_name: 'testing',
           setting_scope: 'user',
         },
       });
@@ -1385,7 +1498,7 @@ describe('loggers', () => {
     });
 
     it('should log extension disable event', () => {
-      const event = new ExtensionDisableEvent('vscode', 'user');
+      const event = new ExtensionDisableEvent('testing', 'testing-id', 'user');
 
       logExtensionDisable(mockConfig, event);
 
@@ -1394,14 +1507,131 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Disabled extension vscode',
+        body: 'Disabled extension testing',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_DISABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
-          extension_name: 'vscode',
+          extension_name: 'testing',
           setting_scope: 'user',
+        },
+      });
+    });
+  });
+
+  describe('logAgentStart', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logAgentStartEvent');
+    });
+
+    it('should log agent start event', () => {
+      const event = new AgentStartEvent('agent-123', 'TestAgent');
+
+      logAgentStart(mockConfig, event);
+
+      expect(ClearcutLogger.prototype.logAgentStartEvent).toHaveBeenCalledWith(
+        event,
+      );
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Agent TestAgent started. ID: agent-123',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_AGENT_START,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          agent_id: 'agent-123',
+          agent_name: 'TestAgent',
+        },
+      });
+    });
+  });
+
+  describe('logAgentFinish', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logAgentFinishEvent');
+      vi.spyOn(metrics, 'recordAgentRunMetrics');
+    });
+
+    it('should log agent finish event and record metrics', () => {
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+      );
+
+      logAgentFinish(mockConfig, event);
+
+      expect(ClearcutLogger.prototype.logAgentFinishEvent).toHaveBeenCalledWith(
+        event,
+      );
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Agent TestAgent finished. Reason: GOAL. Duration: 1000ms. Turns: 5.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_AGENT_FINISH,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          agent_id: 'agent-123',
+          agent_name: 'TestAgent',
+          duration_ms: 1000,
+          turn_count: 5,
+          terminate_reason: 'GOAL',
+        },
+      });
+
+      expect(metrics.recordAgentRunMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        event,
+      );
+    });
+  });
+
+  describe('logWebFetchFallbackAttempt', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logWebFetchFallbackAttemptEvent');
+    });
+
+    it('should log web fetch fallback attempt event', () => {
+      const event = new WebFetchFallbackAttemptEvent('private_ip');
+
+      logWebFetchFallbackAttempt(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logWebFetchFallbackAttemptEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Web fetch fallback attempt. Reason: private_ip',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          reason: 'private_ip',
         },
       });
     });

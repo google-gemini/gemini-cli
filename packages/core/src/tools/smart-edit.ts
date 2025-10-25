@@ -6,9 +6,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
+  BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
@@ -18,12 +20,12 @@ import {
   type ToolResult,
   type ToolResultDisplay,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { type Config, ApprovalMode } from '../config/config.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
-import { ReadFileTool } from './read-file.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -37,6 +39,9 @@ import { logSmartEditStrategy } from '../telemetry/loggers.js';
 import { SmartEditCorrectionEvent } from '../telemetry/types.js';
 import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
+import { correctPath } from '../utils/pathCorrector.js';
+import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -48,6 +53,15 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+}
+
+/**
+ * Creates a SHA256 hash of the given content.
+ * @param content The string content to hash.
+ * @returns A hex-encoded hash string.
+ */
+function hashContent(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 function restoreTrailingNewline(
@@ -291,7 +305,7 @@ export function getErrorReplaceResult(
   if (occurrences === 0) {
     error = {
       display: `Failed to edit, could not find the string to replace.`,
-      raw: `Failed to edit, 0 occurrences found for old_string (${finalOldString}). Original old_string was (${params.old_string}) in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
+      raw: `Failed to edit, 0 occurrences found for old_string (${finalOldString}). Original old_string was (${params.old_string}) in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
   } else if (occurrences !== expectedReplacements) {
@@ -357,13 +371,21 @@ interface CalculatedEdit {
   originalLineEnding: '\r\n' | '\n';
 }
 
-class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
+class EditToolInvocation
+  extends BaseToolInvocation<EditToolParams, ToolResult>
+  implements ToolInvocation<EditToolParams, ToolResult>
+{
   constructor(
     private readonly config: Config,
-    public params: EditToolParams,
-  ) {}
+    params: EditToolParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
+  ) {
+    super(params, messageBus, toolName, displayName);
+  }
 
-  toolLocations(): ToolLocation[] {
+  override toolLocations(): ToolLocation[] {
     return [{ path: this.params.file_path }];
   }
 
@@ -374,12 +396,30 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     abortSignal: AbortSignal,
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
+    // In order to keep from clobbering edits made outside our system,
+    // check if the file has been modified since we first read it.
+    let errorForLlmEditFixer = initialError.raw;
+    let contentForLlmEditFixer = currentContent;
+
+    const initialContentHash = hashContent(currentContent);
+    const onDiskContent = await this.config
+      .getFileSystemService()
+      .readTextFile(params.file_path);
+    const onDiskContentHash = hashContent(onDiskContent.replace(/\r\n/g, '\n'));
+
+    if (initialContentHash !== onDiskContentHash) {
+      // The file has changed on disk since we first read it.
+      // Use the latest content for the correction attempt.
+      contentForLlmEditFixer = onDiskContent.replace(/\r\n/g, '\n');
+      errorForLlmEditFixer = `The initial edit attempt failed with the following error: "${initialError.raw}". However, the file has been modified by either the user or an external process since that edit attempt. The file content provided to you is the latest version. Please base your correction on this new content.`;
+    }
+
     const fixedEdit = await FixLLMEditWithInstruction(
       params.instruction,
       params.old_string,
       params.new_string,
-      initialError.raw,
-      currentContent,
+      errorForLlmEditFixer,
+      contentForLlmEditFixer,
       this.config.getBaseLlmClient(),
       abortSignal,
     );
@@ -405,7 +445,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         old_string: fixedEdit.search,
         new_string: fixedEdit.replace,
       },
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       abortSignal,
     });
 
@@ -423,7 +463,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       logSmartEditCorrectionEvent(this.config, event);
 
       return {
-        currentContent,
+        currentContent: contentForLlmEditFixer,
         newContent: currentContent,
         occurrences: 0,
         isNewFile: false,
@@ -436,7 +476,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     logSmartEditCorrectionEvent(this.config, event);
 
     return {
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       newContent: secondAttemptResult.newContent,
       occurrences: secondAttemptResult.occurrences,
       isNewFile: false,
@@ -572,7 +612,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
    * Handles the confirmation prompt for the Edit tool in the CLI.
    * It needs to calculate the diff to show the user.
    */
-  async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
@@ -587,12 +627,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         throw error;
       }
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.log(`Error preparing edit: ${errorMsg}`);
+      debugLogger.log(`Error preparing edit: ${errorMsg}`);
       return false;
     }
 
     if (editData.error) {
-      console.log(`Error: ${editData.error.display}`);
+      debugLogger.log(`Error: ${editData.error.display}`);
       return false;
     }
 
@@ -786,13 +826,16 @@ export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  static readonly Name = 'replace';
+  static readonly Name = EDIT_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       SmartEditTool.Name,
       'Edit',
-      `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
+      `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
       
@@ -845,59 +888,10 @@ A good instruction should concisely answer:
         required: ['file_path', 'instruction', 'old_string', 'new_string'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
-  }
-
-  /**
-   * Quickly checks if the file path can be resolved directly against the workspace root.
-   * @param filePath The relative file path to check.
-   * @returns The absolute path if the file exists, otherwise null.
-   */
-  private findDirectPath(filePath: string): string | null {
-    const directPath = path.join(this.config.getTargetDir(), filePath);
-    return fs.existsSync(directPath) ? directPath : null;
-  }
-
-  /**
-   * Searches for a file across all configured workspace directories.
-   * @param filePath The file path (can be partial) to search for.
-   * @returns A list of absolute paths for all matching files found.
-   */
-  private findAmbiguousPaths(filePath: string): string[] {
-    const workspaceContext = this.config.getWorkspaceContext();
-    const fileSystem = this.config.getFileSystemService();
-    const searchPaths = workspaceContext.getDirectories();
-    return fileSystem.findFiles(filePath, searchPaths);
-  }
-
-  /**
-   * Attempts to correct a relative file path to an absolute path.
-   * This function modifies `params.file_path` in place if successful.
-   * @param params The tool parameters containing the file_path to correct.
-   * @returns An error message string if correction fails, otherwise null.
-   */
-  private correctPath(params: EditToolParams): string | null {
-    const directPath = this.findDirectPath(params.file_path);
-    if (directPath) {
-      params.file_path = directPath;
-      return null;
-    }
-
-    const foundFiles = this.findAmbiguousPaths(params.file_path);
-
-    if (foundFiles.length === 0) {
-      return `File not found for '${params.file_path}' and path is not absolute.`;
-    }
-
-    if (foundFiles.length > 1) {
-      return (
-        `The file path '${params.file_path}' is too ambiguous and matches multiple files. ` +
-        `Please provide a more specific path. Matches: ${foundFiles.join(', ')}`
-      );
-    }
-
-    params.file_path = foundFiles[0];
-    return null;
   }
 
   /**
@@ -912,11 +906,17 @@ A good instruction should concisely answer:
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    if (!path.isAbsolute(params.file_path)) {
+    let filePath = params.file_path;
+    if (!path.isAbsolute(filePath)) {
       // Attempt to auto-correct to an absolute path
-      const error = this.correctPath(params);
-      if (error) return error;
+      const result = correctPath(filePath, this.config);
+      if (result.success) {
+        filePath = result.correctedPath;
+      } else {
+        return result.error;
+      }
     }
+    params.file_path = filePath;
 
     const workspaceContext = this.config.getWorkspaceContext();
     if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {
@@ -930,7 +930,13 @@ A good instruction should concisely answer:
   protected createInvocation(
     params: EditToolParams,
   ): ToolInvocation<EditToolParams, ToolResult> {
-    return new EditToolInvocation(this.config, params);
+    return new EditToolInvocation(
+      this.config,
+      params,
+      this.messageBus,
+      this.name,
+      this.displayName,
+    );
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {

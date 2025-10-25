@@ -66,6 +66,7 @@ export interface CommandContext {
     loadHistory: UseHistoryManagerReturn['loadHistory'];
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     setGeminiMdFileCount: (count: number) => void;
     reloadCommands: () => void;
@@ -195,6 +196,7 @@ export interface SlashCommand {
 
   // Optional metadata for extension commands
   extensionName?: string;
+  extensionId?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
