@@ -9,6 +9,7 @@ import {
   parseBooleanEnvFlag,
   parseTelemetryTargetValue,
   resolveTelemetrySettings,
+  parseOtlpHeaders,
 } from './config.js';
 import { TelemetryTarget } from './index.js';
 
@@ -150,6 +151,146 @@ describe('telemetry/config helpers', () => {
       await expect(resolveTelemetrySettings({ env })).rejects.toThrow(
         /Invalid telemetry target/i,
       );
+    });
+  });
+
+  describe('parseOtlpHeaders', () => {
+    it('returns undefined for empty or undefined values', async () => {
+      expect(parseOtlpHeaders(undefined)).toBeUndefined();
+      expect(parseOtlpHeaders('')).toBeUndefined();
+      expect(parseOtlpHeaders('   ')).toBeUndefined();
+    });
+
+    it('parses JSON format', async () => {
+      const result = parseOtlpHeaders(
+        '{"Authorization":"Bearer token","x-api-key":"abc123"}',
+      );
+      expect(result).toEqual({
+        Authorization: 'Bearer token',
+        'x-api-key': 'abc123',
+      });
+    });
+
+    it('parses comma-delimited key=value pairs', async () => {
+      const result = parseOtlpHeaders(
+        'Authorization=Bearer token,x-api-key=abc123',
+      );
+      expect(result).toEqual({
+        Authorization: 'Bearer token',
+        'x-api-key': 'abc123',
+      });
+    });
+
+    it('parses semicolon-delimited key=value pairs', async () => {
+      const result = parseOtlpHeaders(
+        'Authorization=Bearer token; x-api-key=abc123',
+      );
+      expect(result).toEqual({
+        Authorization: 'Bearer token',
+        'x-api-key': 'abc123',
+      });
+    });
+
+    it('ignores malformed pairs', async () => {
+      const result = parseOtlpHeaders('Good=Yes,BadPair,Another=Ok');
+      expect(result).toEqual({
+        Good: 'Yes',
+        Another: 'Ok',
+      });
+    });
+
+    it('ignores empty keys or values', async () => {
+      const result = parseOtlpHeaders('=value,key=,valid=yes');
+      expect(result).toEqual({
+        valid: 'yes',
+      });
+    });
+
+    it('handles whitespace in key=value format', async () => {
+      const result = parseOtlpHeaders('  key1 = value1  ,  key2=value2  ');
+      expect(result).toEqual({
+        key1: 'value1',
+        key2: 'value2',
+      });
+    });
+
+    it('returns undefined for invalid JSON', async () => {
+      const result = parseOtlpHeaders('{invalid json}');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('resolveTelemetrySettings with headers', () => {
+    it('merges headers from settings, env, and argv with correct precedence', async () => {
+      const settings = {
+        otlpHeaders: {
+          header1: 'from-settings',
+          header2: 'from-settings',
+        },
+      };
+      const env = {
+        GEMINI_TELEMETRY_OTLP_HEADERS:
+          '{"header2":"from-env","header3":"from-env"}',
+      } as Record<string, string>;
+      const argv = {
+        telemetryOtlpHeader: ['header3=from-argv', 'header4=from-argv'],
+      };
+
+      const resolved = await resolveTelemetrySettings({ argv, env, settings });
+      expect(resolved.otlpHeaders).toEqual({
+        header1: 'from-settings',
+        header2: 'from-env',
+        header3: 'from-argv',
+        header4: 'from-argv',
+      });
+    });
+
+    it('returns undefined otlpHeaders when none are provided', async () => {
+      const resolved = await resolveTelemetrySettings({});
+      expect(resolved.otlpHeaders).toBeUndefined();
+    });
+
+    it('handles headers from settings only', async () => {
+      const settings = {
+        otlpHeaders: {
+          Authorization: 'Bearer token',
+        },
+      };
+      const resolved = await resolveTelemetrySettings({ settings });
+      expect(resolved.otlpHeaders).toEqual({
+        Authorization: 'Bearer token',
+      });
+    });
+
+    it('handles headers from env only with JSON format', async () => {
+      const env = {
+        GEMINI_TELEMETRY_OTLP_HEADERS: '{"x-api-key":"abc123"}',
+      } as Record<string, string>;
+      const resolved = await resolveTelemetrySettings({ env });
+      expect(resolved.otlpHeaders).toEqual({
+        'x-api-key': 'abc123',
+      });
+    });
+
+    it('handles headers from env only with comma-delimited format', async () => {
+      const env = {
+        GEMINI_TELEMETRY_OTLP_HEADERS: 'Authorization=Bearer XYZ,x-api-key=abc',
+      } as Record<string, string>;
+      const resolved = await resolveTelemetrySettings({ env });
+      expect(resolved.otlpHeaders).toEqual({
+        Authorization: 'Bearer XYZ',
+        'x-api-key': 'abc',
+      });
+    });
+
+    it('handles headers from argv only', async () => {
+      const argv = {
+        telemetryOtlpHeader: ['Authorization=Bearer token'],
+      };
+      const resolved = await resolveTelemetrySettings({ argv });
+      expect(resolved.otlpHeaders).toEqual({
+        Authorization: 'Bearer token',
+      });
     });
   });
 });

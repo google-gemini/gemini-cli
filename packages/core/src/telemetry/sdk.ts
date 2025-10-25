@@ -12,6 +12,7 @@ import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/expor
 import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
 import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
+import { Metadata } from '@grpc/grpc-js';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -127,33 +128,49 @@ export function initializeTelemetry(config: Config): void {
       exportIntervalMillis: 30000,
     });
   } else if (useOtlp) {
+    const otlpHeaders = config.getTelemetryOtlpHeaders() ?? {};
+    const hasHeaders = Object.keys(otlpHeaders).length > 0;
+
     if (otlpProtocol === 'http') {
       spanExporter = new OTLPTraceExporterHttp({
         url: parsedEndpoint,
+        headers: hasHeaders ? otlpHeaders : undefined,
       });
       logExporter = new OTLPLogExporterHttp({
         url: parsedEndpoint,
+        headers: hasHeaders ? otlpHeaders : undefined,
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterHttp({
           url: parsedEndpoint,
+          headers: hasHeaders ? otlpHeaders : undefined,
         }),
         exportIntervalMillis: 10000,
       });
     } else {
-      // grpc
+      // grpc - convert headers to Metadata
+      let metadata: Metadata | undefined;
+      if (hasHeaders) {
+        metadata = new Metadata();
+        for (const [key, value] of Object.entries(otlpHeaders)) {
+          metadata.set(key, value);
+        }
+      }
       spanExporter = new OTLPTraceExporter({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
+        metadata,
       });
       logExporter = new OTLPLogExporter({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
+        metadata,
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({
           url: parsedEndpoint,
           compression: CompressionAlgorithm.GZIP,
+          metadata,
         }),
         exportIntervalMillis: 10000,
       });

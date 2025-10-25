@@ -42,6 +42,7 @@ describe('Telemetry SDK', () => {
       getTelemetryEnabled: () => true,
       getTelemetryOtlpEndpoint: () => 'http://localhost:4317',
       getTelemetryOtlpProtocol: () => 'grpc',
+      getTelemetryOtlpHeaders: () => ({}),
       getTelemetryTarget: () => 'local',
       getTelemetryUseCollector: () => false,
       getTelemetryOutfile: () => undefined,
@@ -235,5 +236,110 @@ describe('Telemetry SDK', () => {
     expect(OTLPLogExporterHttp).not.toHaveBeenCalled();
     expect(OTLPMetricExporterHttp).not.toHaveBeenCalled();
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
+  });
+
+
+  it('should pass headers to HTTP exporters', () => {
+    const headers = {
+      Authorization: 'Bearer token123',
+      'x-api-key': 'abc456',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('http');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4318',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(headers);
+
+    initializeTelemetry(mockConfig);
+
+    expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      headers,
+    });
+    expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      headers,
+    });
+    expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      headers,
+    });
+  });
+
+  it('should pass metadata to gRPC exporters', () => {
+    const headers = {
+      Authorization: 'Bearer token123',
+      'x-api-key': 'abc456',
+    };
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue(headers);
+
+    initializeTelemetry(mockConfig);
+
+    expect(OTLPTraceExporter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'http://localhost:4317',
+        compression: 'gzip',
+        metadata: expect.any(Object),
+      }),
+    );
+    expect(OTLPLogExporter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'http://localhost:4317',
+        compression: 'gzip',
+        metadata: expect.any(Object),
+      }),
+    );
+    expect(OTLPMetricExporter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'http://localhost:4317',
+        compression: 'gzip',
+        metadata: expect.any(Object),
+      }),
+    );
+  });
+
+  it('should not pass headers when none are configured', () => {
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('http');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4318',
+    );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue({});
+
+    initializeTelemetry(mockConfig);
+
+    expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      headers: undefined,
+    });
+    expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      headers: undefined,
+    });
+    expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      headers: undefined,
+    });
+  });
+
+  it('should not pass metadata to gRPC exporters when no headers configured', () => {
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue({});
+
+    initializeTelemetry(mockConfig);
+
+    expect(OTLPTraceExporter).toHaveBeenCalledWith({
+      url: 'http://localhost:4317',
+      compression: 'gzip',
+      metadata: undefined,
+    });
+    expect(OTLPLogExporter).toHaveBeenCalledWith({
+      url: 'http://localhost:4317',
+      compression: 'gzip',
+      metadata: undefined,
+    });
+    expect(OTLPMetricExporter).toHaveBeenCalledWith({
+      url: 'http://localhost:4317',
+      compression: 'gzip',
+      metadata: undefined,
+    });
   });
 });
