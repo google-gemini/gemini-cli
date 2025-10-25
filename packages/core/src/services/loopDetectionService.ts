@@ -164,7 +164,7 @@ export class LoopDetectionService {
       this.turnsInCurrentPrompt - this.lastCheckTurn >= this.llmCheckInterval
     ) {
       this.lastCheckTurn = this.turnsInCurrentPrompt;
-      return await this.checkForLoopWithLLM(signal);
+      return this.checkForLoopWithLLM(signal);
     }
 
     return false;

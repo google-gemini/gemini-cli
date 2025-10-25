@@ -85,6 +85,10 @@ export default tseslint.config(
         ...globals.node,
         ...globals.es2021,
       },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: projectRoot,
+      },
     },
     rules: {
       // General Best Practice Rules (subset adapted for flat config)
@@ -159,6 +163,8 @@ export default tseslint.config(
       'prefer-const': ['error', { destructuring: 'all' }],
       radix: 'error',
       'default-case': 'error',
+      // Prevent redundant async/await patterns
+      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
     },
   },
   {
