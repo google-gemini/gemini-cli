@@ -485,6 +485,10 @@ function shouldUsePassthrough(): boolean {
   return process.env['PASTE_WORKAROUND'] !== 'false';
 }
 
+function isMacOS(): boolean {
+  return process.platform === 'darwin';
+}
+
 export function KeypressProvider({
   children,
   kittyProtocolEnabled,
@@ -616,7 +620,7 @@ export function KeypressProvider({
       }
 
       const mappedLetter = ALT_KEY_CHARACTER_MAP[key.sequence];
-      if (mappedLetter && !key.meta && process.platform === 'darwin') {
+      if (mappedLetter && !key.meta && isMacOS()) {
         broadcast({
           name: mappedLetter,
           ctrl: false,
