@@ -941,29 +941,81 @@ describe('Kitty Sequence Parsing', () => {
       chunk,
       expected,
       kitty = true,
+      terminal,
     }: {
       chunk: string;
       expected: Partial<Key>;
       kitty?: boolean;
+      terminal: string;
     }) => {
-      const keyHandler = vi.fn();
-      const testWrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider kittyProtocolEnabled={kitty}>
-          {children}
-        </KeypressProvider>
-      );
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: testWrapper,
-      });
-      act(() => result.current.subscribe(keyHandler));
+      const previousTermProgram = process.env.TERM_PROGRAM;
+      try {
+        if (terminal === 'VSCodeTerminal') {
+          process.env.TERM_PROGRAM = 'vscode';
+        } else if (terminal === 'iTerm2') {
+          process.env.TERM_PROGRAM = 'iTerm.app';
+        } else {
+          delete process.env.TERM_PROGRAM;
+        }
 
-      act(() => stdin.write(chunk));
+        const keyHandler = vi.fn();
+        const testWrapper = ({ children }: { children: React.ReactNode }) => (
+          <KeypressProvider kittyProtocolEnabled={kitty}>
+            {children}
+          </KeypressProvider>
+        );
+        const { result } = renderHook(() => useKeypressContext(), {
+          wrapper: testWrapper,
+        });
+        act(() => result.current.subscribe(keyHandler));
 
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining(expected),
-      );
+        act(() => stdin.write(chunk));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      } finally {
+        if (previousTermProgram === undefined) {
+          delete process.env.TERM_PROGRAM;
+        } else {
+          process.env.TERM_PROGRAM = previousTermProgram;
+        }
+      }
     },
   );
+
+  it('should leave literal lowercase å untouched when meta is not pressed', () => {
+    const previousTermProgram = process.env.TERM_PROGRAM;
+    delete process.env.TERM_PROGRAM;
+
+    const keyHandler = vi.fn();
+    const nonKittyWrapper = ({ children }: { children: React.ReactNode }) => (
+      <KeypressProvider kittyProtocolEnabled={false}>
+        {children}
+      </KeypressProvider>
+    );
+
+    const { result } = renderHook(() => useKeypressContext(), {
+      wrapper: nonKittyWrapper,
+    });
+    act(() => result.current.subscribe(keyHandler));
+
+    act(() => stdin.write('å'));
+
+    expect(keyHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sequence: 'å',
+        meta: false,
+        paste: false,
+      }),
+    );
+
+    if (previousTermProgram === undefined) {
+      delete process.env.TERM_PROGRAM;
+    } else {
+      process.env.TERM_PROGRAM = previousTermProgram;
+    }
+  });
 
   describe('Backslash key handling', () => {
     beforeEach(() => {

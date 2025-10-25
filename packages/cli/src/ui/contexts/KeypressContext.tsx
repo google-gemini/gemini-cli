@@ -77,6 +77,14 @@ const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u03A9': 'z',
 };
 
+function altKeyRemappingEnabled(): boolean {
+  if (process.platform === 'darwin') {
+    return true;
+  }
+  const termProgram = process.env['TERM_PROGRAM']?.toLowerCase() ?? '';
+  return termProgram.includes('vscode') || termProgram.includes('iterm');
+}
+
 /**
  * Check if a buffer could potentially be a valid kitty sequence or its prefix.
  */
@@ -616,7 +624,7 @@ export function KeypressProvider({
       }
 
       const mappedLetter = ALT_KEY_CHARACTER_MAP[key.sequence];
-      if (mappedLetter && !key.meta) {
+      if (mappedLetter && !key.meta && altKeyRemappingEnabled()) {
         broadcast({
           name: mappedLetter,
           ctrl: false,
