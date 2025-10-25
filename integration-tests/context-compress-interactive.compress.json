@@ -1,0 +1,40 @@
+{
+  "generateContent": [
+    {
+      "candidates": [
+        {
+          "content": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "A summary of the conversation."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "generateContentStream": [
+    [
+      {
+        "candidates": [
+          {
+            "content": {
+              "role": "model",
+              "parts": [
+                {
+                  "text": "The initial response from the model"
+                }
+              ]
+            },
+            "finishReason": "STOP"
+          }
+        ],
+        "usageMetadata": {
+          "promptTokenCount": 100000
+        }
+      }
+    ]
+  ]
+}

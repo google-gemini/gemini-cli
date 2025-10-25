@@ -953,6 +953,40 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
+    it('should do nothing for a tab key press', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'tab',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: '\t',
+        }),
+      );
+      expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should do nothing for a shift tab key press', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'tab',
+          ctrl: false,
+          meta: false,
+          shift: true,
+          paste: false,
+          sequence: '\u001b[9;2u',
+        }),
+      );
+      expect(getBufferState(result).text).toBe('');
+    });
+
     it('should handle "Backspace" key', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
