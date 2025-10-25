@@ -25,12 +25,13 @@ describe('GoogleCredentialProvider', () => {
       url: 'https://test.googleapis.com',
     } as MCPServerConfig;
     expect(() => new GoogleCredentialProvider(config)).toThrow(
-      'Scopes must be provided in the oauth config for Google Credentials provider',
+      'Scopes must be provided in the oauth config for Google Credentials provider (or enable allow_scoped_id_tokens_for_cloud_run to use ID tokens)',
     );
   });
 
   it('should use scopes from the config if provided', () => {
-    new GoogleCredentialProvider(validConfig);
+    const provider = new GoogleCredentialProvider(validConfig);
+    expect(provider.clientInformation()).toBeUndefined();
     expect(GoogleAuth).toHaveBeenCalledWith({
       scopes: ['scope1', 'scope2'],
     });
@@ -55,7 +56,8 @@ describe('GoogleCredentialProvider', () => {
         scopes: ['scope1', 'scope2'],
       },
     } as MCPServerConfig;
-    new GoogleCredentialProvider(config);
+    const provider = new GoogleCredentialProvider(config);
+    expect(provider.clientInformation()).toBeUndefined();
   });
 
   it('should allow sub.luci.app', () => {
@@ -152,6 +154,66 @@ describe('GoogleCredentialProvider', () => {
       expect(mockGetAccessToken).toHaveBeenCalledTimes(2); // new fetch
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('ID token flow (allow_scoped_id_tokens_cloud_run)', () => {
+    it('should return ID token when flag is enabled and derive audience from URL origin', async () => {
+      const config = {
+        url: 'https://test.run.app/path',
+        allow_scoped_id_tokens_cloud_run: true,
+      } as MCPServerConfig;
+
+      const mockIdClient = {
+        getRequestHeaders: vi
+          .fn()
+          .mockResolvedValue({ Authorization: 'Bearer test-id-token' }),
+      };
+      (GoogleAuth.prototype.getIdTokenClient as Mock).mockResolvedValue(
+        mockIdClient,
+      );
+
+      const provider = new GoogleCredentialProvider(config);
+      const tokens = await provider.tokens();
+      expect(tokens?.access_token).toBe('test-id-token');
+      expect(GoogleAuth.prototype.getIdTokenClient).toHaveBeenCalledWith(
+        'https://test.run.app',
+      );
+    });
+
+    it('should return undefined and log error when Authorization header is missing/invalid', async () => {
+      const config = {
+        url: 'https://test.run.app/path',
+        allow_scoped_id_tokens_cloud_run: true,
+      } as MCPServerConfig;
+
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const mockIdClient = {
+        getRequestHeaders: vi.fn().mockResolvedValue({}),
+      };
+      (GoogleAuth.prototype.getIdTokenClient as Mock).mockResolvedValue(
+        mockIdClient,
+      );
+
+      const provider = new GoogleCredentialProvider(config);
+      const tokens = await provider.tokens();
+      expect(tokens).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to obtain ID token from Google ADC',
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should not require scopes when flag s enabled', () => {
+      const config = {
+        url: 'https://test.run.app',
+        allow_scoped_id_tokens_cloud_run: true,
+      } as MCPServerConfig;
+
+      expect(() => new GoogleCredentialProvider(config)).not.toThrow();
     });
   });
 });

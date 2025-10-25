@@ -150,6 +150,12 @@ Each server configuration supports the following properties:
   server. Tools listed here will not be available to the model, even if they are
   exposed by the server. **Note:** `excludeTools` takes precedence over
   `includeTools` - if a tool is in both lists, it will be excluded.
+- **`allow_scoped_id_tokens_cloud_run`** (boolean): When `true` and the MCP
+  server host is a Cloud Run service (`*.run.app`), the CLI will use Google
+  Application Default Credentials (ADC) to generate an ID token and send it as
+  `Authorization: Bearer <token>`. The ID token audience is automatically
+  derived from the server URL (e.g., `https://my-service.run.app`). When using
+  this flag, do not set OAuth scopes; they are not needed.
 - **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access. Used with
   `authProviderType: 'service_account_impersonation'`.
@@ -280,6 +286,26 @@ property:
   }
 }
 ```
+
+#### Google Credential with Cloud Run ID tokens
+
+When connecting to a Cloud Run service endpoint (`*.run.app`), you can opt into
+ID token based authentication using ADC. The audience is derived from the MCP
+server URL automatically, and no scopes are required.
+
+```json
+{
+  "mcpServers": {
+    "googleCloudServer": {
+      "url": "https://my-gcp-service.run.app/sse",
+      "authProviderType": "google_credentials",
+      "allow_scoped_id_tokens_cloud_run": true
+    }
+  }
+}
+```
+
+Note: Only `*.run.app` hosts are supported for this flag.
 
 #### Service Account Impersonation
 
