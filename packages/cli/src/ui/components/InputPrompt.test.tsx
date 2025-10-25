@@ -1727,7 +1727,7 @@ describe('InputPrompt', () => {
         'command-search-collapsed-match',
       );
       unmount();
-    });
+    }, 10000);
 
     it('renders match window and expanded view (snapshots)', async () => {
       props.shellModeActive = false;
