@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, PartListUnion } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import { createHash } from 'node:crypto';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
@@ -76,6 +77,7 @@ For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distin
 export class LoopDetectionService {
   private readonly config: Config;
   private promptId = '';
+  private userPrompt: Content | null = null;
 
   // Tool call tracking
   private lastToolCallKey: string | null = null;
@@ -401,6 +403,7 @@ export class LoopDetectionService {
     const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Provide your response in the requested JSON format.`;
 
     const contents = [
+      ...(this.userPrompt ? [this.userPrompt] : []),
       ...trimmedHistory,
       { role: 'user', parts: [{ text: taskPrompt }] },
     ];
@@ -460,8 +463,9 @@ export class LoopDetectionService {
   /**
    * Resets all loop detection state.
    */
-  reset(promptId: string): void {
+  reset(promptId: string, userPrompt: PartListUnion): void {
     this.promptId = promptId;
+    this.userPrompt = createUserContent(userPrompt);
     this.resetToolCallCount();
     this.resetContentTracking();
     this.resetLlmCheckTracking();

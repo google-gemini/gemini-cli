@@ -112,6 +112,7 @@ vi.mock('../telemetry/index.js', () => ({
   logApiError: vi.fn(),
 }));
 vi.mock('../ide/ideContext.js');
+vi.mock('../services/loopDetectionService.js');
 vi.mock('../telemetry/uiTelemetry.js', () => ({
   uiTelemetryService: {
     setLastPromptTokenCount: vi.fn(),
@@ -938,6 +939,27 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should reset loop detector with prompt_id and request when prompt_id changes', async () => {
+      const request = [{ text: 'New prompt' }];
+      const promptId = 'new-prompt-id';
+      mockTurnRunFn.mockImplementation(async function* () {
+        yield { type: 'content', value: 'response' };
+      });
+      // Force a different prompt ID than the default one from initialization
+      client['lastPromptId'] = 'old-prompt-id';
+
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        promptId,
+      );
+      await fromAsync(stream);
+
+      expect(client['loopDetector'].reset).toHaveBeenCalledWith(
+        promptId,
+        request,
+      );
+    });
     it('emits a compression event when the context was automatically compressed', async () => {
       // Arrange
       mockTurnRunFn.mockReturnValue(

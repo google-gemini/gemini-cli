@@ -482,7 +482,7 @@ My setup is complete. I will provide my first command in the next turn.
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
-      this.loopDetector.reset(prompt_id);
+      this.loopDetector.reset(prompt_id, request);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
     }
