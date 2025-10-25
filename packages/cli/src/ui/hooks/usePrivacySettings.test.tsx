@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { render } from 'ink-testing-library';
 import type {
   Config,
   CodeAssistServer,
@@ -31,12 +31,28 @@ describe('usePrivacySettings', () => {
     vi.clearAllMocks();
   });
 
+  const renderPrivacySettingsHook = () => {
+    let hookResult: ReturnType<typeof usePrivacySettings>;
+    function TestComponent() {
+      hookResult = usePrivacySettings(mockConfig);
+      return null;
+    }
+    render(<TestComponent />);
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+    };
+  };
+
   it('should throw error when content generator is not a CodeAssistServer', async () => {
     vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
 
-    const { result } = renderHook(() => usePrivacySettings(mockConfig));
+    const { result } = renderPrivacySettingsHook();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
     });
 
@@ -53,9 +69,9 @@ describe('usePrivacySettings', () => {
         }) as unknown as LoadCodeAssistResponse,
     } as unknown as CodeAssistServer);
 
-    const { result } = renderHook(() => usePrivacySettings(mockConfig));
+    const { result } = renderPrivacySettingsHook();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
     });
 
@@ -72,9 +88,9 @@ describe('usePrivacySettings', () => {
         }) as unknown as LoadCodeAssistResponse,
     } as unknown as CodeAssistServer);
 
-    const { result } = renderHook(() => usePrivacySettings(mockConfig));
+    const { result } = renderPrivacySettingsHook();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
     });
 
@@ -99,10 +115,10 @@ describe('usePrivacySettings', () => {
     } as unknown as CodeAssistServer;
     vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer);
 
-    const { result } = renderHook(() => usePrivacySettings(mockConfig));
+    const { result } = renderPrivacySettingsHook();
 
     // Wait for initial load
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(result.current.privacyState.isLoading).toBe(false);
     });
 
@@ -110,7 +126,7 @@ describe('usePrivacySettings', () => {
     await result.current.updateDataCollectionOptIn(false);
 
     // Wait for update to complete
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(result.current.privacyState.dataCollectionOptIn).toBe(false);
     });
 

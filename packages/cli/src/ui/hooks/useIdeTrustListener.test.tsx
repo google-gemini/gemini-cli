@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
-import { renderHook, act } from '@testing-library/react';
+import { render } from 'ink-testing-library';
+import { act } from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   IdeClient,
@@ -79,13 +78,30 @@ describe('useIdeTrustListener', () => {
     );
   });
 
+  const renderTrustListenerHook = () => {
+    let hookResult: ReturnType<typeof useIdeTrustListener>;
+    function TestComponent() {
+      hookResult = useIdeTrustListener();
+      return null;
+    }
+    const { rerender } = render(<TestComponent />);
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      rerender: () => rerender(<TestComponent />),
+    };
+  };
+
   it('should initialize correctly with no trust information', () => {
     vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
       isTrusted: undefined,
       source: undefined,
     });
 
-    const { result } = renderHook(() => useIdeTrustListener());
+    const { result } = renderTrustListenerHook();
 
     expect(result.current.isIdeTrusted).toBe(undefined);
     expect(result.current.needsRestart).toBe(false);
@@ -100,7 +116,7 @@ describe('useIdeTrustListener', () => {
       isTrusted: true,
       source: 'ide',
     });
-    const { result } = renderHook(() => useIdeTrustListener());
+    const { result } = renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
@@ -134,7 +150,7 @@ describe('useIdeTrustListener', () => {
       source: 'ide',
     });
 
-    const { result } = renderHook(() => useIdeTrustListener());
+    const { result } = renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
@@ -172,7 +188,7 @@ describe('useIdeTrustListener', () => {
       source: 'ide',
     });
 
-    const { result } = renderHook(() => useIdeTrustListener());
+    const { result } = renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
@@ -208,7 +224,7 @@ describe('useIdeTrustListener', () => {
       source: 'ide',
     });
 
-    const { result, rerender } = renderHook(() => useIdeTrustListener());
+    const { result, rerender } = renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
