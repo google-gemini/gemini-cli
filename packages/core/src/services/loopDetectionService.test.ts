@@ -5,6 +5,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
@@ -753,5 +754,35 @@ describe('LoopDetectionService LLM Checks', () => {
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should prepend user message if history starts with a function call', async () => {
+    const functionCallHistory: Content[] = [
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'someTool', args: {} } }],
+      },
+      {
+        role: 'model',
+        parts: [{ text: 'Some follow up text' }],
+      },
+    ];
+    vi.mocked(mockGeminiClient.getHistory).mockReturnValue(functionCallHistory);
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ confidence: 0.1 });
+
+    await advanceTurns(30);
+
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    expect(calledArg.contents[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Recent conversation history:' }],
+    });
+    // Verify the original history follows
+    expect(calledArg.contents[1]).toEqual(functionCallHistory[0]);
   });
 });
