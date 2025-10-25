@@ -340,6 +340,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       useWriteTodos: undefined,
       outputFormat: undefined,
       fakeResponses: undefined,
+      recordResponses: undefined,
     });
 
     await main();
