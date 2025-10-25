@@ -27,6 +27,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
   WRITE_FILE_TOOL_NAME,
@@ -68,6 +69,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
+  fakeResponses: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -192,6 +194,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           nargs: 1,
           description: 'The format of the CLI output.',
           choices: ['text', 'json', 'stream-json'],
+        })
+        .option('fake-responses', {
+          type: 'string',
+          description: 'Path to a file with fake model responses for testing.',
         })
         .deprecateOption(
           'prompt',
@@ -369,6 +375,10 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const debugMode = isDebugMode(argv);
 
+  if (argv.sandbox) {
+    process.env['GEMINI_SANDBOX'] = 'true';
+  }
+
   const memoryImportFormat = settings.context?.importFormat || 'tree';
 
   const ideMode = settings.ide?.enabled ?? false;
@@ -389,8 +399,13 @@ export async function loadCliConfig(
 
   const fileService = new FileDiscoveryService(cwd);
 
-  const fileFiltering = {
+  const memoryFileFiltering = {
     ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+    ...settings.context?.fileFiltering,
+  };
+
+  const fileFiltering = {
+    ...DEFAULT_FILE_FILTERING_OPTIONS,
     ...settings.context?.fileFiltering,
   };
 
@@ -411,7 +426,7 @@ export async function loadCliConfig(
       allExtensions,
       trustedFolder,
       memoryImportFormat,
-      fileFiltering,
+      memoryFileFiltering,
     );
 
   let mcpServers = mergeMcpServers(settings, allExtensions);
@@ -440,6 +455,21 @@ export async function loadCliConfig(
     // Fallback to legacy --yolo flag behavior
     approvalMode =
       argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+  }
+
+  // Override approval mode if disableYoloMode is set.
+  if (settings.security?.disableYoloMode) {
+    if (approvalMode === ApprovalMode.YOLO) {
+      debugLogger.error('YOLO mode is disabled by the "disableYolo" setting.');
+      throw new FatalConfigError(
+        'Cannot start in YOLO mode when it is disabled by settings',
+      );
+    }
+    approvalMode = ApprovalMode.DEFAULT;
+  } else if (approvalMode === ApprovalMode.YOLO) {
+    debugLogger.warn(
+      'YOLO mode is enabled. All tool calls will be automatically approved.',
+    );
   }
 
   // Force approval mode to default if the folder is not trusted.
@@ -583,6 +613,7 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
+    disableYoloMode: settings.security?.disableYoloMode,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -633,6 +664,7 @@ export async function loadCliConfig(
       settings.tools?.enableMessageBusIntegration ?? false,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    fakeResponses: argv.fakeResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
   });

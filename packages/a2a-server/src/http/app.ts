@@ -16,6 +16,10 @@ import type { AgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
+import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
+import { loadSettings } from '../config/settings.js';
+import { loadExtensions } from '../config/extension.js';
+import { commandRegistry } from '../commands/command-registry.js';
 
 const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
@@ -61,6 +65,13 @@ export function updateCoderAgentCardUrl(port: number) {
 
 export async function createApp() {
   try {
+    // Load the server configuration once on startup.
+    const workspaceRoot = setTargetDir(undefined);
+    loadEnvironment();
+    const settings = loadSettings(workspaceRoot);
+    const extensions = loadExtensions(workspaceRoot);
+    const config = await loadConfig(settings, extensions, 'a2a-server');
+
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
     let taskStoreForExecutor: TaskStore;
@@ -116,6 +127,38 @@ export async function createApp() {
             ? error.message
             : 'Unknown error creating task';
         res.status(500).send({ error: errorMessage });
+      }
+    });
+
+    expressApp.post('/executeCommand', async (req, res) => {
+      try {
+        const { command, args } = req.body;
+
+        if (typeof command !== 'string') {
+          return res.status(400).json({ error: 'Invalid "command" field.' });
+        }
+
+        if (args && !Array.isArray(args)) {
+          return res
+            .status(400)
+            .json({ error: '"args" field must be an array.' });
+        }
+
+        const commandToExecute = commandRegistry.get(command);
+
+        if (!commandToExecute) {
+          return res
+            .status(404)
+            .json({ error: `Command not found: ${command}` });
+        }
+
+        const result = await commandToExecute.execute(config, args ?? []);
+        return res.status(200).json(result);
+      } catch (e) {
+        logger.error('Error executing /executeCommand:', e);
+        const errorMessage =
+          e instanceof Error ? e.message : 'Unknown error executing command';
+        return res.status(500).json({ error: errorMessage });
       }
     });
 

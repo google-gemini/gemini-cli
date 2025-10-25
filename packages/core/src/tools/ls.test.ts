@@ -149,7 +149,7 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
       // .git is always ignored by default.
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 git-ignored)');
+      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 ignored)');
     });
 
     it('should respect geminiignore patterns', async () => {
@@ -161,7 +161,7 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 gemini-ignored)');
+      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 ignored)');
     });
 
     it('should handle non-directory paths', async () => {

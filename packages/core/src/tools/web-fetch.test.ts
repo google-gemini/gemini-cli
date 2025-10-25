@@ -521,7 +521,7 @@ describe('WebFetchTool', () => {
 
       // Should reject with error when denied
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool execution denied by policy',
+        'Tool execution for "WebFetch" denied by policy.',
       );
     });
 
@@ -559,7 +559,7 @@ describe('WebFetchTool', () => {
       abortController.abort();
 
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool execution denied by policy.',
+        'Tool execution for "WebFetch" denied by policy.',
       );
     });
 
