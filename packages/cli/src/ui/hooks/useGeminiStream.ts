@@ -64,6 +64,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { useActivityRecorder } from './useActivityMonitoring.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -125,6 +126,13 @@ export const useGeminiStream = (
     }
     return new GitService(config.getProjectRoot(), storage);
   }, [config, storage]);
+
+  const {
+    recordToolCall,
+    recordUserInput,
+    recordStreamStart,
+    recordStreamEnd,
+  } = useActivityRecorder(config);
 
   const [toolCalls, scheduleToolCalls, markToolsAsSubmitted] =
     useReactToolScheduler(
@@ -347,6 +355,8 @@ export const useGeminiStream = (
                   prompt_id,
                 };
                 scheduleToolCalls([toolCallRequest], abortSignal);
+                // Record activity: tool call scheduled
+                recordToolCall();
                 return { queryToSend: null, shouldProceed: false };
               }
               case 'submit_prompt': {
@@ -401,6 +411,8 @@ export const useGeminiStream = (
             { type: MessageType.USER, text: trimmedQuery },
             userMessageTimestamp,
           );
+          // Record activity: user input received
+          recordUserInput();
           localQueryToSendToGemini = trimmedQuery;
         }
       } else {
@@ -425,6 +437,8 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      recordToolCall,
+      recordUserInput,
     ],
   );
 
@@ -818,6 +832,8 @@ export const useGeminiStream = (
 
         setIsResponding(true);
         setInitError(null);
+        // Record activity: stream starting
+        recordStreamStart();
 
         // Store query and prompt_id for potential retry on loop detection
         lastQueryRef.current = queryToSend;
@@ -902,6 +918,8 @@ export const useGeminiStream = (
           }
         } finally {
           setIsResponding(false);
+          // Record activity: stream ending
+          recordStreamEnd();
         }
       });
     },
@@ -919,6 +937,8 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      recordStreamStart,
+      recordStreamEnd,
     ],
   );
 

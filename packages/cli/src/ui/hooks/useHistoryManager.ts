@@ -23,15 +23,26 @@ export interface UseHistoryManagerReturn {
   loadHistory: (newHistory: HistoryItem[]) => void;
 }
 
+export interface UseHistoryOptions {
+  onItemAdded?: (item: HistoryItem) => void;
+  onItemUpdated?: (item: HistoryItem) => void;
+  onHistoryCleared?: () => void;
+  onHistoryLoaded?: (items: HistoryItem[]) => void;
+}
+
 /**
  * Custom hook to manage the chat history state.
  *
  * Encapsulates the history array, message ID generation, adding items,
  * updating items, and clearing the history.
  */
-export function useHistory(): UseHistoryManagerReturn {
+export function useHistory(
+  options?: UseHistoryOptions,
+): UseHistoryManagerReturn {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messageIdCounterRef = useRef(0);
+  const { onItemAdded, onItemUpdated, onHistoryCleared, onHistoryLoaded } =
+    options ?? {};
 
   // Generates a unique message ID based on a timestamp and a counter.
   const getNextMessageId = useCallback((baseTimestamp: number): number => {
@@ -39,9 +50,13 @@ export function useHistory(): UseHistoryManagerReturn {
     return baseTimestamp + messageIdCounterRef.current;
   }, []);
 
-  const loadHistory = useCallback((newHistory: HistoryItem[]) => {
-    setHistory(newHistory);
-  }, []);
+  const loadHistory = useCallback(
+    (newHistory: HistoryItem[]) => {
+      setHistory(newHistory);
+      onHistoryLoaded?.(newHistory);
+    },
+    [onHistoryLoaded],
+  );
 
   // Adds a new item to the history state with a unique ID.
   const addItem = useCallback(
@@ -63,9 +78,10 @@ export function useHistory(): UseHistoryManagerReturn {
         }
         return [...prevHistory, newItem];
       });
-      return id; // Return the generated ID (even if not added, to keep signature)
+      onItemAdded?.(newItem);
+      return id;
     },
-    [getNextMessageId],
+    [getNextMessageId, onItemAdded],
   );
 
   /**
@@ -80,26 +96,32 @@ export function useHistory(): UseHistoryManagerReturn {
       id: number,
       updates: Partial<Omit<HistoryItem, 'id'>> | HistoryItemUpdater,
     ) => {
+      let updatedItem: HistoryItem | undefined;
       setHistory((prevHistory) =>
         prevHistory.map((item) => {
           if (item.id === id) {
             // Apply updates based on whether it's an object or a function
             const newUpdates =
               typeof updates === 'function' ? updates(item) : updates;
-            return { ...item, ...newUpdates } as HistoryItem;
+            updatedItem = { ...item, ...newUpdates } as HistoryItem;
+            return updatedItem;
           }
           return item;
         }),
       );
+      if (updatedItem) {
+        onItemUpdated?.(updatedItem);
+      }
     },
-    [],
+    [onItemUpdated],
   );
 
   // Clears the entire history state and resets the ID counter.
   const clearItems = useCallback(() => {
     setHistory([]);
     messageIdCounterRef.current = 0;
-  }, []);
+    onHistoryCleared?.();
+  }, [onHistoryCleared]);
 
   return useMemo(
     () => ({

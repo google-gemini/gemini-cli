@@ -220,6 +220,78 @@ For local development and debugging, you can capture telemetry data locally:
 3. View traces at http://localhost:16686 and logs/metrics in the collector log
    file.
 
+## Performance Monitoring
+
+Gemini CLI ships a performance monitoring toolkit that rides on the telemetry
+stack. When telemetry is enabled, the toolkit can publish startup timings,
+activity-aware memory samples, and regression signals without flooding your
+backend.
+
+### Architecture
+
+- **Activity detection**: a global `ActivityDetector` tracks user interaction
+  state and goes idle after 30 seconds without input.
+- **Memory monitor**: `MemoryMonitor` samples V8/Node memory every 10 seconds,
+  but only records snapshots when the session is active and growth is
+  meaningful.
+- **Performance metrics API**: the metrics layer exposes counters and histograms
+  for startup phases, memory usage, CPU, tool execution, API request breakdowns,
+  token efficiency, and regression scoring.
+
+### Activity-Aware Memory Monitoring
+
+- **Activity triggers**: the CLI records user activity for prompt submission,
+  tool scheduling, and stream start/end. Idle sessions stop emitting memory
+  telemetry after ~30 seconds of inactivity.
+- **High-water marks**: snapshots are emitted when RSS or heap usage grows more
+  than 5 % beyond the previous maximum. Baseline snapshots still run so long as
+  the monitor remains active.
+- **Rate limiting**: routine snapshots are limited to once per minute. Growth
+  events bypass the routine limit but are capped at one every 30 seconds.
+- **Metrics recorded**: `heap_used`, `heap_total`, `external`, and `rss` metrics
+  are exported for each snapshot.
+
+### Enabling the Monitors in Integrations
+
+Telemetry initialization is automatic, but performance monitoring is opt-in so
+you can control when to start emitting data:
+
+```ts
+import {
+  startGlobalActivityMonitoring,
+  startGlobalMemoryMonitoring,
+  stopGlobalActivityMonitoring,
+  stopGlobalMemoryMonitoring,
+} from '@google/gemini-cli-core';
+
+// Once telemetry has been initialized:
+startGlobalActivityMonitoring(config);
+startGlobalMemoryMonitoring(config); // defaults to a 10 s sampling interval
+
+// On shutdown:
+stopGlobalActivityMonitoring();
+stopGlobalMemoryMonitoring(config);
+```
+
+Both monitors honour `isPerformanceMonitoringActive()`, so they only run when
+telemetry is enabled for the session.
+
+### Performance Scoring and Regression Detection
+
+The metrics layer also provides helpers such as `recordPerformanceScore`,
+`recordPerformanceRegression`, and `recordBaselineComparison`. Supply your own
+scores or baseline comparisons and the telemetry pipeline will publish them as
+histograms and counters. This keeps regression detection flexible while reusing
+the same OpenTelemetry exporters.
+
+### Configuration and Defaults
+
+There are no additional `settings.json` switches for activity monitoring yet.
+Use the existing telemetry settings (`enabled`, `target`, `otlpEndpoint`, etc.)
+to activate the pipeline. Snapshot throttling (1 s), buffer sizes (100 events),
+and trigger sets are currently fixed in code so that all environments share the
+same defaults.
+
 ## Logs and Metrics
 
 The following section describes the structure of logs and metrics generated for
