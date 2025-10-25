@@ -1703,12 +1703,16 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x12');
+      await act(async () => {
+        stdin.write('\x12');
+      });
       await vi.waitFor(() => {
         expect(clean(stdout.lastFrame())).toContain('→');
       });
 
-      stdin.write('\u001B[C');
+      await act(async () => {
+        stdin.write('\u001B[C');
+      });
       await vi.waitFor(
         () => {
           expect(clean(stdout.lastFrame())).toContain('←');
@@ -1719,7 +1723,9 @@ describe('InputPrompt', () => {
         'command-search-expanded-match',
       );
 
-      stdin.write('\u001B[D');
+      await act(async () => {
+        stdin.write('\u001B[D');
+      });
       await vi.waitFor(() => {
         expect(clean(stdout.lastFrame())).toContain('→');
       });
