@@ -12,7 +12,6 @@ import {
   type Todo,
   type ToolResult,
 } from './tools.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 
 const TODO_STATUSES = [
@@ -205,9 +204,6 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WriteTodosToolParams,
-    _messageBus?: MessageBus,
-    _toolName?: string,
-    _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
     return new WriteTodosToolInvocation(params);
   }

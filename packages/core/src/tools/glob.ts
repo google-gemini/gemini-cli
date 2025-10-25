@@ -169,7 +169,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         path.relative(this.config.getTargetDir(), p.fullpath()),
       );
 
-      const { filteredPaths, ignoredCount } =
+      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
             this.params?.respect_git_ignore ??
@@ -196,8 +196,11 @@ class GlobToolInvocation extends BaseToolInvocation<
         } else {
           message += ` within ${searchDirectories.length} workspace directories`;
         }
-        if (ignoredCount > 0) {
-          message += ` (${ignoredCount} files were ignored)`;
+        if (gitIgnoredCount > 0) {
+          message += ` (${gitIgnoredCount} files were git-ignored)`;
+        }
+        if (geminiIgnoredCount > 0) {
+          message += ` (${geminiIgnoredCount} files were gemini-ignored)`;
         }
         return {
           llmContent: message,
@@ -228,8 +231,11 @@ class GlobToolInvocation extends BaseToolInvocation<
       } else {
         resultMessage += ` across ${searchDirectories.length} workspace directories`;
       }
-      if (ignoredCount > 0) {
-        resultMessage += ` (${ignoredCount} additional files were ignored)`;
+      if (gitIgnoredCount > 0) {
+        resultMessage += ` (${gitIgnoredCount} additional files were git-ignored)`;
+      }
+      if (geminiIgnoredCount > 0) {
+        resultMessage += ` (${geminiIgnoredCount} additional files were gemini-ignored)`;
       }
       resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
 

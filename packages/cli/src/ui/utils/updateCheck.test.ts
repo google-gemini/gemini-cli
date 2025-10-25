@@ -13,9 +13,9 @@ vi.mock('../../utils/package.js', () => ({
   getPackageJson,
 }));
 
-const latestVersion = vi.hoisted(() => vi.fn());
-vi.mock('latest-version', () => ({
-  default: latestVersion,
+const updateNotifier = vi.hoisted(() => vi.fn());
+vi.mock('update-notifier', () => ({
+  default: updateNotifier,
 }));
 
 describe('checkForUpdates', () => {
@@ -46,7 +46,7 @@ describe('checkForUpdates', () => {
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
     expect(getPackageJson).not.toHaveBeenCalled();
-    expect(latestVersion).not.toHaveBeenCalled();
+    expect(updateNotifier).not.toHaveBeenCalled();
   });
 
   it('should return null when running from source (DEV=true)', async () => {
@@ -55,11 +55,15 @@ describe('checkForUpdates', () => {
       name: 'test-package',
       version: '1.0.0',
     });
-    latestVersion.mockResolvedValue('1.1.0');
+    updateNotifier.mockReturnValue({
+      fetchInfo: vi
+        .fn()
+        .mockResolvedValue({ current: '1.0.0', latest: '1.1.0' }),
+    });
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
     expect(getPackageJson).not.toHaveBeenCalled();
-    expect(latestVersion).not.toHaveBeenCalled();
+    expect(updateNotifier).not.toHaveBeenCalled();
   });
 
   it('should return null if package.json is missing', async () => {
@@ -73,7 +77,9 @@ describe('checkForUpdates', () => {
       name: 'test-package',
       version: '1.0.0',
     });
-    latestVersion.mockResolvedValue('1.0.0');
+    updateNotifier.mockReturnValue({
+      fetchInfo: vi.fn().mockResolvedValue(null),
+    });
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
@@ -83,13 +89,15 @@ describe('checkForUpdates', () => {
       name: 'test-package',
       version: '1.0.0',
     });
-    latestVersion.mockResolvedValue('1.1.0');
+    updateNotifier.mockReturnValue({
+      fetchInfo: vi
+        .fn()
+        .mockResolvedValue({ current: '1.0.0', latest: '1.1.0' }),
+    });
 
     const result = await checkForUpdates(mockSettings);
     expect(result?.message).toContain('1.0.0 → 1.1.0');
-    expect(result?.update.current).toEqual('1.0.0');
-    expect(result?.update.latest).toEqual('1.1.0');
-    expect(result?.update.name).toEqual('test-package');
+    expect(result?.update).toEqual({ current: '1.0.0', latest: '1.1.0' });
   });
 
   it('should return null if the latest version is the same as the current version', async () => {
@@ -97,7 +105,11 @@ describe('checkForUpdates', () => {
       name: 'test-package',
       version: '1.0.0',
     });
-    latestVersion.mockResolvedValue('1.0.0');
+    updateNotifier.mockReturnValue({
+      fetchInfo: vi
+        .fn()
+        .mockResolvedValue({ current: '1.0.0', latest: '1.0.0' }),
+    });
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
@@ -107,17 +119,23 @@ describe('checkForUpdates', () => {
       name: 'test-package',
       version: '1.1.0',
     });
-    latestVersion.mockResolvedValue('1.0.0');
+    updateNotifier.mockReturnValue({
+      fetchInfo: vi
+        .fn()
+        .mockResolvedValue({ current: '1.1.0', latest: '1.0.0' }),
+    });
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
 
-  it('should return null if latestVersion rejects', async () => {
+  it('should return null if fetchInfo rejects', async () => {
     getPackageJson.mockResolvedValue({
       name: 'test-package',
       version: '1.0.0',
     });
-    latestVersion.mockRejectedValue(new Error('Timeout'));
+    updateNotifier.mockReturnValue({
+      fetchInfo: vi.fn().mockRejectedValue(new Error('Timeout')),
+    });
 
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
@@ -136,12 +154,25 @@ describe('checkForUpdates', () => {
         version: '1.2.3-nightly.1',
       });
 
-      latestVersion.mockImplementation(async (name, options) => {
-        if (options?.version === 'nightly') {
-          return '1.2.3-nightly.2';
+      const fetchInfoMock = vi.fn().mockImplementation(({ distTag }) => {
+        if (distTag === 'nightly') {
+          return Promise.resolve({
+            latest: '1.2.3-nightly.2',
+            current: '1.2.3-nightly.1',
+          });
         }
-        return '1.2.3';
+        if (distTag === 'latest') {
+          return Promise.resolve({
+            latest: '1.2.3',
+            current: '1.2.3-nightly.1',
+          });
+        }
+        return Promise.resolve(null);
       });
+
+      updateNotifier.mockImplementation(({ pkg, distTag }) => ({
+        fetchInfo: () => fetchInfoMock({ pkg, distTag }),
+      }));
 
       const result = await checkForUpdates(mockSettings);
       expect(result?.message).toContain('1.2.3-nightly.1 → 1.2.3-nightly.2');

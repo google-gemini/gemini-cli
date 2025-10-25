@@ -4,22 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, type MockedFunction } from 'vitest';
+import { vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import {
+  EXTENSIONS_CONFIG_FILENAME,
+  INSTALL_METADATA_FILENAME,
+  loadExtension,
+} from '../extension.js';
 import { checkForAllExtensionUpdates, updateExtension } from './update.js';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from '../trustedFolders.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { createExtension } from '../../test-utils/createExtension.js';
-import {
-  EXTENSIONS_CONFIG_FILENAME,
-  INSTALL_METADATA_FILENAME,
-} from './variables.js';
-import { ExtensionManager } from '../extension-manager.js';
-import { loadSettings } from '../settings.js';
-import type { ExtensionSetting } from './extensionSettings.js';
+import { ExtensionEnablementManager } from './extensionEnablement.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -75,11 +74,6 @@ describe('update tests', () => {
   let tempHomeDir: string;
   let tempWorkspaceDir: string;
   let userExtensionsDir: string;
-  let extensionManager: ExtensionManager;
-  let mockRequestConsent: MockedFunction<(consent: string) => Promise<boolean>>;
-  let mockPromptForSettings: MockedFunction<
-    (setting: ExtensionSetting) => Promise<string>
-  >;
 
   beforeEach(() => {
     tempHomeDir = fs.mkdtempSync(
@@ -99,16 +93,6 @@ describe('update tests', () => {
     });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     Object.values(mockGit).forEach((fn) => fn.mockReset());
-    mockRequestConsent = vi.fn();
-    mockRequestConsent.mockResolvedValue(true);
-    mockPromptForSettings = vi.fn();
-    mockPromptForSettings.mockResolvedValue('');
-    extensionManager = new ExtensionManager({
-      workspaceDir: tempWorkspaceDir,
-      requestConsent: mockRequestConsent,
-      requestSetting: mockPromptForSettings,
-      loadedSettings: loadSettings(tempWorkspaceDir),
-    });
   });
 
   afterEach(() => {
@@ -143,10 +127,17 @@ describe('update tests', () => {
         );
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
-      const extension = extensionManager.loadExtension(targetExtDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir: targetExtDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
       const updateInfo = await updateExtension(
         extension,
-        extensionManager,
+        extensionEnablementManager,
+        tempHomeDir,
+        async (_) => true,
         ExtensionUpdateState.UPDATE_AVAILABLE,
         () => {},
       );
@@ -190,10 +181,17 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
       await updateExtension(
         extension,
-        extensionManager,
+        extensionEnablementManager,
+        tempHomeDir,
+        async (_) => true,
         ExtensionUpdateState.UPDATE_AVAILABLE,
         dispatch,
       );
@@ -230,11 +228,18 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
       await expect(
         updateExtension(
           extension,
-          extensionManager,
+          extensionEnablementManager,
+          tempHomeDir,
+          async (_) => true,
           ExtensionUpdateState.UPDATE_AVAILABLE,
           dispatch,
         ),
@@ -268,7 +273,12 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -279,8 +289,9 @@ describe('update tests', () => {
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
         [extension],
-        extensionManager,
+        extensionEnablementManager,
         dispatch,
+        tempWorkspaceDir,
       );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
@@ -301,7 +312,12 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -312,8 +328,9 @@ describe('update tests', () => {
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
         [extension],
-        extensionManager,
+        extensionEnablementManager,
         dispatch,
+        tempWorkspaceDir,
       );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
@@ -338,12 +355,18 @@ describe('update tests', () => {
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = extensionManager.loadExtension(installedExtensionDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir: installedExtensionDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
         [extension],
-        extensionManager,
+        extensionEnablementManager,
         dispatch,
+        tempWorkspaceDir,
       );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
@@ -368,12 +391,18 @@ describe('update tests', () => {
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = extensionManager.loadExtension(installedExtensionDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir: installedExtensionDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
         [extension],
-        extensionManager,
+        extensionEnablementManager,
         dispatch,
+        tempWorkspaceDir,
       );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
@@ -394,15 +423,21 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extensionEnablementManager = new ExtensionEnablementManager();
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+        extensionEnablementManager,
+      })!;
 
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
         [extension],
-        extensionManager,
+        extensionEnablementManager,
         dispatch,
+        tempWorkspaceDir,
       );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',

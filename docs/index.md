@@ -68,7 +68,6 @@ This documentation is organized into the following sections:
   `google_web_search` tool.
 - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory`
   tool.
-- **[Todo Tool](./tools/todos.md):** Documentation for the `write_todos` tool.
 
 ### Extensions
 

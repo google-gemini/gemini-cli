@@ -133,12 +133,19 @@ ${this.config.getTargetDir()}
     // Determine the final list of exclusion patterns exactly as in execute method
     const paramExcludes = this.params.exclude || [];
     const paramUseDefaultExcludes = this.params.useDefaultExcludes !== false;
+    const geminiIgnorePatterns = this.config
+      .getFileService()
+      .getGeminiIgnorePatterns();
     const finalExclusionPatternsForDescription: string[] =
       paramUseDefaultExcludes
-        ? [...getDefaultExcludes(this.config), ...paramExcludes]
-        : [...paramExcludes];
+        ? [
+            ...getDefaultExcludes(this.config),
+            ...paramExcludes,
+            ...geminiIgnorePatterns,
+          ]
+        : [...paramExcludes, ...geminiIgnorePatterns];
 
-    const excludeDesc = `Excluding: ${
+    let excludeDesc = `Excluding: ${
       finalExclusionPatternsForDescription.length > 0
         ? `patterns like 
 ${finalExclusionPatternsForDescription
@@ -148,6 +155,16 @@ ${finalExclusionPatternsForDescription
   )}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}`
         : 'none specified'
     }`;
+
+    // Add a note if .geminiignore patterns contributed to the final list of exclusions
+    if (geminiIgnorePatterns.length > 0) {
+      const geminiPatternsInEffect = geminiIgnorePatterns.filter((p) =>
+        finalExclusionPatternsForDescription.includes(p),
+      ).length;
+      if (geminiPatternsInEffect > 0) {
+        excludeDesc += ` (includes ${geminiPatternsInEffect} from .geminiignore)`;
+      }
+    }
 
     return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
       '{filePath}',
@@ -208,7 +225,7 @@ ${finalExclusionPatternsForDescription
       );
 
       const fileDiscovery = this.config.getFileService();
-      const { filteredPaths, ignoredCount } =
+      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
         fileDiscovery.filterFilesWithReport(relativeEntries, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
@@ -236,11 +253,19 @@ ${finalExclusionPatternsForDescription
         filesToConsider.add(fullPath);
       }
 
-      // Add info about ignored files if any were filtered
-      if (ignoredCount > 0) {
+      // Add info about git-ignored files if any were filtered
+      if (gitIgnoredCount > 0) {
         skippedFiles.push({
-          path: `${ignoredCount} file(s)`,
-          reason: 'ignored by project ignore files',
+          path: `${gitIgnoredCount} file(s)`,
+          reason: 'git ignored',
+        });
+      }
+
+      // Add info about gemini-ignored files if any were filtered
+      if (geminiIgnoredCount > 0) {
+        skippedFiles.push({
+          path: `${geminiIgnoredCount} file(s)`,
+          reason: 'gemini ignored',
         });
       }
     } catch (error) {

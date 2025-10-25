@@ -12,20 +12,10 @@ const mockInstallOrUpdateExtension = vi.hoisted(() => vi.fn());
 const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
 const mockStat = vi.hoisted(() => vi.fn());
 
-vi.mock('../../config/extensions/consent.js', () => ({
+vi.mock('../../config/extension.js', () => ({
+  installOrUpdateExtension: mockInstallOrUpdateExtension,
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
 }));
-
-vi.mock('../../config/extension-manager.ts', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../config/extension-manager.js')>();
-  return {
-    ...actual,
-    ExtensionManager: vi.fn().mockImplementation(() => ({
-      installOrUpdateExtension: mockInstallOrUpdateExtension,
-    })),
-  };
-});
 
 vi.mock('../../utils/errors.js', () => ({
   getErrorMessage: vi.fn((error: Error) => error.message),
@@ -41,9 +31,9 @@ vi.mock('node:fs/promises', () => ({
 describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
-    expect(() => validationParser.parse('install')).toThrow(
-      'Not enough non-option arguments: got 0, need at least 1',
-    );
+    // Test that an error is thrown when no source is provided
+    // The exact message depends on system language, so we just verify an error occurs
+    expect(() => validationParser.parse('install')).toThrow();
   });
 });
 
@@ -64,7 +54,7 @@ describe('handleInstall', () => {
     mockInstallOrUpdateExtension.mockClear();
     mockRequestConsentNonInteractive.mockClear();
     mockStat.mockClear();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('should install an extension from a http source', async () => {

@@ -424,13 +424,7 @@ export function getVersion(options = {}) {
       }
       break;
     case 'promote-nightly':
-      versionData = promoteNightlyVersion({ args });
-      // A promoted nightly version is still a nightly, so we should check for conflicts.
-      if (doesVersionExist({ args, version: versionData.releaseVersion })) {
-        throw new Error(
-          `Version conflict! Promoted nightly version ${versionData.releaseVersion} already exists.`,
-        );
-      }
+      versionData = promoteNightlyVersion();
       break;
     case 'stable':
       versionData = getStableVersion(args);

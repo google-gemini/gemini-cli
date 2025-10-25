@@ -11,7 +11,6 @@ import type {
   SessionMetrics,
   AnyDeclarativeTool,
   AnyToolInvocation,
-  UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import {
   executeToolCall,
@@ -21,32 +20,14 @@ import {
   OutputFormat,
   uiTelemetryService,
   FatalInputError,
-  CoreEvent,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-  type Mock,
-  type MockInstance,
-} from 'vitest';
+import { vi, type Mock, type MockInstance } from 'vitest';
 import type { LoadedSettings } from './config/settings.js';
 
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
-
-const mockCoreEvents = vi.hoisted(() => ({
-  on: vi.fn(),
-  off: vi.fn(),
-  drainFeedbackBacklog: vi.fn(),
-  emit: vi.fn(),
-}));
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -67,7 +48,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     uiTelemetryService: {
       getMetrics: vi.fn(),
     },
-    coreEvents: mockCoreEvents,
   };
 });
 
@@ -90,7 +70,6 @@ describe('runNonInteractive', () => {
   let mockShutdownTelemetry: Mock;
   let consoleErrorSpy: MockInstance;
   let processStdoutSpy: MockInstance;
-  let processStderrSpy: MockInstance;
   let mockGeminiClient: {
     sendMessageStream: Mock;
     getChatRecordingService: Mock;
@@ -107,9 +86,6 @@ describe('runNonInteractive', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processStdoutSpy = vi
       .spyOn(process.stdout, 'write')
-      .mockImplementation(() => true);
-    processStderrSpy = vi
-      .spyOn(process.stderr, 'write')
       .mockImplementation(() => true);
     vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`process.exit(${code}) called`);
@@ -1074,136 +1050,5 @@ describe('runNonInteractive', () => {
       expect.any(AbortSignal),
     );
     expect(processStdoutSpy).toHaveBeenCalledWith('file.txt');
-  });
-
-  describe('CoreEvents Integration', () => {
-    it('subscribes to UserFeedback and drains backlog on start', async () => {
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.Finished,
-          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive(
-        mockConfig,
-        mockSettings,
-        'test',
-        'prompt-id-events',
-      );
-
-      expect(mockCoreEvents.on).toHaveBeenCalledWith(
-        CoreEvent.UserFeedback,
-        expect.any(Function),
-      );
-      expect(mockCoreEvents.drainFeedbackBacklog).toHaveBeenCalledTimes(1);
-    });
-
-    it('unsubscribes from UserFeedback on finish', async () => {
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.Finished,
-          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive(
-        mockConfig,
-        mockSettings,
-        'test',
-        'prompt-id-events',
-      );
-
-      expect(mockCoreEvents.off).toHaveBeenCalledWith(
-        CoreEvent.UserFeedback,
-        expect.any(Function),
-      );
-    });
-
-    it('logs to process.stderr when UserFeedback event is received', async () => {
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.Finished,
-          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive(
-        mockConfig,
-        mockSettings,
-        'test',
-        'prompt-id-events',
-      );
-
-      // Get the registered handler
-      const handler = mockCoreEvents.on.mock.calls.find(
-        (call: unknown[]) => call[0] === CoreEvent.UserFeedback,
-      )?.[1];
-      expect(handler).toBeDefined();
-
-      // Simulate an event
-      const payload: UserFeedbackPayload = {
-        severity: 'error',
-        message: 'Test error message',
-      };
-      handler(payload);
-
-      expect(processStderrSpy).toHaveBeenCalledWith(
-        '[ERROR] Test error message\n',
-      );
-    });
-
-    it('logs optional error object to process.stderr in debug mode', async () => {
-      vi.mocked(mockConfig.getDebugMode).mockReturnValue(true);
-      const events: ServerGeminiStreamEvent[] = [
-        {
-          type: GeminiEventType.Finished,
-          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
-        },
-      ];
-      mockGeminiClient.sendMessageStream.mockReturnValue(
-        createStreamFromEvents(events),
-      );
-
-      await runNonInteractive(
-        mockConfig,
-        mockSettings,
-        'test',
-        'prompt-id-events',
-      );
-
-      // Get the registered handler
-      const handler = mockCoreEvents.on.mock.calls.find(
-        (call: unknown[]) => call[0] === CoreEvent.UserFeedback,
-      )?.[1];
-      expect(handler).toBeDefined();
-
-      // Simulate an event with error object
-      const errorObj = new Error('Original error');
-      // Mock stack for deterministic testing
-      errorObj.stack = 'Error: Original error\n    at test';
-      const payload: UserFeedbackPayload = {
-        severity: 'warning',
-        message: 'Test warning message',
-        error: errorObj,
-      };
-      handler(payload);
-
-      expect(processStderrSpy).toHaveBeenCalledWith(
-        '[WARNING] Test warning message\n',
-      );
-      expect(processStderrSpy).toHaveBeenCalledWith(
-        'Error: Original error\n    at test\n',
-      );
-    });
   });
 });

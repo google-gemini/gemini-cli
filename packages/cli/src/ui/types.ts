@@ -6,7 +6,6 @@
 
 import type {
   CompressionStatus,
-  GeminiCLIExtension,
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
@@ -164,7 +163,6 @@ export type HistoryItemCompression = HistoryItemBase & {
 
 export type HistoryItemExtensionsList = HistoryItemBase & {
   type: 'extensions_list';
-  extensions: GeminiCLIExtension[];
 };
 
 export interface ChatDetail {

@@ -23,13 +23,6 @@ export function handleAutoUpdate(
     return;
   }
 
-  if (settings.merged.tools?.sandbox || process.env['GEMINI_SANDBOX']) {
-    updateEventEmitter.emit('update-info', {
-      message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
-    });
-    return;
-  }
-
   if (settings.merged.general?.disableUpdateNag) {
     return;
   }
@@ -100,7 +93,7 @@ export function setUpdateHandler(
   setUpdateInfo: (info: UpdateObject | null) => void,
 ) {
   let successfullyInstalled = false;
-  const handleUpdateReceived = (info: UpdateObject) => {
+  const handleUpdateRecieved = (info: UpdateObject) => {
     setUpdateInfo(info);
     const savedMessage = info.message;
     setTimeout(() => {
@@ -150,13 +143,13 @@ export function setUpdateHandler(
     );
   };
 
-  updateEventEmitter.on('update-received', handleUpdateReceived);
+  updateEventEmitter.on('update-received', handleUpdateRecieved);
   updateEventEmitter.on('update-failed', handleUpdateFailed);
   updateEventEmitter.on('update-success', handleUpdateSuccess);
   updateEventEmitter.on('update-info', handleUpdateInfo);
 
   return () => {
-    updateEventEmitter.off('update-received', handleUpdateReceived);
+    updateEventEmitter.off('update-received', handleUpdateRecieved);
     updateEventEmitter.off('update-failed', handleUpdateFailed);
     updateEventEmitter.off('update-success', handleUpdateSuccess);
     updateEventEmitter.off('update-info', handleUpdateInfo);

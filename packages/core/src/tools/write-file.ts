@@ -42,7 +42,6 @@ import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -145,11 +144,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WriteFileToolParams,
-    messageBus?: MessageBus,
-    toolName?: string,
-    displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(params);
   }
 
   override toolLocations(): ToolLocation[] {
@@ -164,7 +160,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return `Writing to ${shortenPath(relativePath)}`;
   }
 
-  protected override async getConfirmationDetails(
+  override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
@@ -396,10 +392,7 @@ export class WriteFileTool
 {
   static readonly Name = WRITE_FILE_TOOL_NAME;
 
-  constructor(
-    private readonly config: Config,
-    messageBus?: MessageBus,
-  ) {
+  constructor(private readonly config: Config) {
     super(
       WriteFileTool.Name,
       'WriteFile',
@@ -422,9 +415,6 @@ export class WriteFileTool
         required: ['file_path', 'content'],
         type: 'object',
       },
-      true,
-      false,
-      messageBus,
     );
   }
 
@@ -468,13 +458,7 @@ export class WriteFileTool
   protected createInvocation(
     params: WriteFileToolParams,
   ): ToolInvocation<WriteFileToolParams, ToolResult> {
-    return new WriteFileToolInvocation(
-      this.config,
-      params,
-      this.messageBus,
-      this.name,
-      this.displayName,
-    );
+    return new WriteFileToolInvocation(this.config, params);
   }
 
   getModifyContext(

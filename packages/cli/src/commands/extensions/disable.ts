@@ -5,12 +5,11 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { loadSettings, SettingScope } from '../../config/settings.js';
+import { disableExtension } from '../../config/extension.js';
+import { SettingScope } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { ExtensionManager } from '../../config/extension-manager.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
-import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface DisableArgs {
   name: string;
@@ -18,19 +17,20 @@ interface DisableArgs {
 }
 
 export function handleDisable(args: DisableArgs) {
-  const workspaceDir = process.cwd();
-  const extensionManager = new ExtensionManager({
-    workspaceDir,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    loadedSettings: loadSettings(workspaceDir),
-  });
-
+  const extensionEnablementManager = new ExtensionEnablementManager();
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      extensionManager.disableExtension(args.name, SettingScope.Workspace);
+      disableExtension(
+        args.name,
+        SettingScope.Workspace,
+        extensionEnablementManager,
+      );
     } else {
-      extensionManager.disableExtension(args.name, SettingScope.User);
+      disableExtension(
+        args.name,
+        SettingScope.User,
+        extensionEnablementManager,
+      );
     }
     debugLogger.log(
       `Extension "${args.name}" successfully disabled for scope "${args.scope}".`,

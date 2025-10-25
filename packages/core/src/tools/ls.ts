@@ -173,7 +173,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       );
 
       const fileDiscovery = this.config.getFileService();
-      const { filteredPaths, ignoredCount } =
+      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
@@ -222,13 +222,20 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         .join('\n');
 
       let resultMessage = `Directory listing for ${this.params.path}:\n${directoryContent}`;
-      if (ignoredCount > 0) {
-        resultMessage += `\n\n(${ignoredCount} ignored)`;
+      const ignoredMessages = [];
+      if (gitIgnoredCount > 0) {
+        ignoredMessages.push(`${gitIgnoredCount} git-ignored`);
+      }
+      if (geminiIgnoredCount > 0) {
+        ignoredMessages.push(`${geminiIgnoredCount} gemini-ignored`);
+      }
+      if (ignoredMessages.length > 0) {
+        resultMessage += `\n\n(${ignoredMessages.join(', ')})`;
       }
 
       let displayMessage = `Listed ${entries.length} item(s).`;
-      if (ignoredCount > 0) {
-        displayMessage += ` (${ignoredCount} ignored)`;
+      if (ignoredMessages.length > 0) {
+        displayMessage += ` (${ignoredMessages.join(', ')})`;
       }
 
       return {

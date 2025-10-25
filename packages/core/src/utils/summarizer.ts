@@ -13,7 +13,6 @@ import type {
 import type { GeminiClient } from '../core/client.js';
 import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import { getResponseText, partToString } from './partUtils.js';
-import { debugLogger } from './debugLogger.js';
 
 /**
  * A function that summarizes the result of a tool execution.
@@ -91,7 +90,7 @@ export async function summarizeToolOutput(
     )) as unknown as GenerateContentResponse;
     return getResponseText(parsedResponse) || textToSummarize;
   } catch (error) {
-    debugLogger.warn('Failed to summarize tool output.', error);
+    console.error('Failed to summarize tool output.', error);
     return textToSummarize;
   }
 }

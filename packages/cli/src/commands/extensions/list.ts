@@ -5,32 +5,24 @@
  */
 
 import type { CommandModule } from 'yargs';
+import { loadExtensions, toOutputString } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { ExtensionManager } from '../../config/extension-manager.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
-import { loadSettings } from '../../config/settings.js';
-import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 export async function handleList() {
   try {
-    const workspaceDir = process.cwd();
-    const extensionManager = new ExtensionManager({
-      workspaceDir,
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: promptForSetting,
-      loadedSettings: loadSettings(workspaceDir),
-    });
-    const extensions = extensionManager.loadExtensions();
+    const extensions = loadExtensions(
+      new ExtensionEnablementManager(),
+      process.cwd(),
+    );
     if (extensions.length === 0) {
       debugLogger.log('No extensions installed.');
       return;
     }
     debugLogger.log(
       extensions
-        .map((extension, _): string =>
-          extensionManager.toOutputString(extension),
-        )
+        .map((extension, _): string => toOutputString(extension, process.cwd()))
         .join('\n\n'),
     );
   } catch (error) {

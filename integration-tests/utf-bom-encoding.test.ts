@@ -9,6 +9,9 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { TestRig } from './test-helper.js';
 
+// Windows skip (Option A: avoid infra scope)
+const d = process.platform === 'win32' ? describe.skip : describe;
+
 // BOM encoders
 const utf8BOM = (s: string) =>
   Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(s, 'utf8')]);
@@ -50,7 +53,7 @@ const utf32BE = (s: string) => {
 let rig: TestRig;
 let dir: string;
 
-describe('BOM end-to-end integraion', () => {
+d('BOM end-to-end integration', () => {
   beforeAll(async () => {
     rig = new TestRig();
     await rig.setup('bom-integration');

@@ -205,9 +205,21 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  protected override async getConfirmationDetails(
-    _abortSignal: AbortSignal,
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
+    // Try message bus confirmation first if available
+    if (this.messageBus) {
+      const decision = await this.getMessageBusDecision(abortSignal);
+      if (decision === 'ALLOW') {
+        return false; // No confirmation needed
+      }
+      if (decision === 'DENY') {
+        throw new Error('Tool execution denied by policy.');
+      }
+      // if 'ASK_USER', fall through to legacy logic
+    }
+
     // Legacy confirmation flow (no message bus OR policy decision was ASK_USER)
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;

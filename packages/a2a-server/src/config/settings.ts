@@ -10,7 +10,6 @@ import { homedir } from 'node:os';
 
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
-  debugLogger,
   GEMINI_DIR,
   getErrorMessage,
   type TelemetrySettings,
@@ -98,10 +97,10 @@ export function loadSettings(workspaceDir: string): Settings {
   }
 
   if (settingsErrors.length > 0) {
-    debugLogger.error('Errors loading settings:');
+    console.error('Errors loading settings:');
     for (const error of settingsErrors) {
-      debugLogger.error(`  Path: ${error.path}`);
-      debugLogger.error(`  Message: ${error.message}`);
+      console.error(`  Path: ${error.path}`);
+      console.error(`  Message: ${error.message}`);
     }
   }
 
