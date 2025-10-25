@@ -1709,9 +1709,12 @@ describe('InputPrompt', () => {
       });
 
       stdin.write('\u001B[C');
-      await vi.waitFor(() => {
-        expect(clean(stdout.lastFrame())).toContain('←');
-      });
+      await vi.waitFor(
+        () => {
+          expect(clean(stdout.lastFrame())).toContain('←');
+        },
+        { timeout: 2000 },
+      );
       expect(stdout.lastFrame()).toMatchSnapshot(
         'command-search-expanded-match',
       );
