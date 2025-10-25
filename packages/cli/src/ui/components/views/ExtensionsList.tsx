@@ -8,7 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionUpdateState } from '../../state/extensions.js';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 
 interface ExtensionsList {
   extensions: readonly GeminiCLIExtension[];
@@ -50,8 +50,10 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
             case ExtensionUpdateState.NOT_UPDATABLE:
               stateColor = 'green';
               break;
+            case undefined:
+              break;
             default:
-              console.error(`Unhandled ExtensionUpdateState ${state}`);
+              debugLogger.warn(`Unhandled ExtensionUpdateState ${state}`);
               break;
           }
 
