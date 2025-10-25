@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** @vitest-environment jsdom */
+
 /// <reference types="vitest/globals" />
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

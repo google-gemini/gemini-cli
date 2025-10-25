@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** @vitest-environment jsdom */
+
 import { vi, type Mock, type MockInstance } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFolderTrust } from './useFolderTrust.js';

@@ -7,7 +7,7 @@
 import type { MockedFunction } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { render } from 'ink-testing-library';
 import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs';
 import * as fsPromises from 'node:fs/promises';
@@ -54,13 +54,31 @@ describe('useGitBranchName', () => {
     vi.restoreAllMocks();
   });
 
+  const renderGitBranchNameHook = (cwd: string) => {
+    let hookResult: ReturnType<typeof useGitBranchName>;
+    function TestComponent() {
+      hookResult = useGitBranchName(cwd);
+      return null;
+    }
+    const { rerender, unmount } = render(<TestComponent />);
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      rerender: () => rerender(<TestComponent />),
+      unmount,
+    };
+  };
+
   it('should return branch name', async () => {
     (mockSpawnAsync as MockedFunction<typeof mockSpawnAsync>).mockResolvedValue(
       {
         stdout: 'main\n',
       } as { stdout: string; stderr: string },
     );
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderGitBranchNameHook(CWD);
 
     await act(async () => {
       rerender(); // Rerender to get the updated state
@@ -74,7 +92,7 @@ describe('useGitBranchName', () => {
       new Error('Git error'),
     );
 
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderGitBranchNameHook(CWD);
     expect(result.current).toBeUndefined();
 
     await act(async () => {
@@ -95,7 +113,7 @@ describe('useGitBranchName', () => {
       return { stdout: '' } as { stdout: string; stderr: string };
     });
 
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderGitBranchNameHook(CWD);
     await act(async () => {
       rerender();
     });
@@ -114,7 +132,7 @@ describe('useGitBranchName', () => {
       return { stdout: '' } as { stdout: string; stderr: string };
     });
 
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderGitBranchNameHook(CWD);
     await act(async () => {
       rerender();
     });
@@ -135,7 +153,7 @@ describe('useGitBranchName', () => {
         stderr: string;
       });
 
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderGitBranchNameHook(CWD);
 
     await act(async () => {
       rerender();
@@ -143,7 +161,7 @@ describe('useGitBranchName', () => {
     expect(result.current).toBe('main');
 
     // Wait for watcher to be set up
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(watchSpy).toHaveBeenCalled();
     });
 
@@ -153,7 +171,7 @@ describe('useGitBranchName', () => {
       rerender();
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(result.current).toBe('develop');
     });
   });
@@ -168,7 +186,7 @@ describe('useGitBranchName', () => {
       } as { stdout: string; stderr: string },
     );
 
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderGitBranchNameHook(CWD);
 
     await act(async () => {
       rerender();
@@ -211,14 +229,14 @@ describe('useGitBranchName', () => {
       } as { stdout: string; stderr: string },
     );
 
-    const { unmount, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { unmount, rerender } = renderGitBranchNameHook(CWD);
 
     await act(async () => {
       rerender();
     });
 
     // Wait for watcher to be set up BEFORE unmounting
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(watchMock).toHaveBeenCalledWith(
         GIT_LOGS_HEAD_PATH,
         expect.any(Function),

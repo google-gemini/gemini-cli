@@ -12,7 +12,6 @@ import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import { DEFAULT_THEME, themeManager } from '../themes/theme-manager.js';
 import { act } from 'react';
-import { waitFor } from '@testing-library/react';
 
 const createMockSettings = (
   userSettings = {},
@@ -127,7 +126,7 @@ describe('ThemeDialog Snapshots', () => {
       stdin.write('\x1b');
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockOnCancel).toHaveBeenCalled();
     });
   });

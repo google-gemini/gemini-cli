@@ -5,7 +5,7 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { act } from '@testing-library/react';
+import { act } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -1936,7 +1936,7 @@ describe('InputPrompt', () => {
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       const callback = mockPopAllMessages.mock.calls[0][0];
 
-      act(() => {
+      await act(async () => {
         callback('Message 1\n\nMessage 2\n\nMessage 3');
       });
       expect(props.buffer.setText).toHaveBeenCalledWith(
@@ -1978,7 +1978,7 @@ describe('InputPrompt', () => {
       });
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback(undefined);
       });
 
@@ -2021,7 +2021,7 @@ describe('InputPrompt', () => {
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
 
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback('Single message');
       });
 
@@ -2077,7 +2077,7 @@ describe('InputPrompt', () => {
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
 
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback(undefined);
       });
 
