@@ -46,7 +46,7 @@ class MockStdin extends EventEmitter {
   pause = vi.fn();
 
   write(text: string) {
-    this.emit('data', Buffer.from(text));
+    this.emit('data', text);
   }
 }
 

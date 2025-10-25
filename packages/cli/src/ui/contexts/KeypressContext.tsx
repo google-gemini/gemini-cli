@@ -44,6 +44,7 @@ export const PASTE_MODE_START = `${ESC}[200~`;
 export const PASTE_MODE_END = `${ESC}[201~`;
 export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
 export const KITTY_SEQUENCE_TIMEOUT_MS = 50; // Flush incomplete kitty sequences after 50ms
+export const PASTE_CODE_TIMEOUT_MS = 50; // Flush incomplete paste code after 50ms
 export const SINGLE_QUOTE = "'";
 export const DOUBLE_QUOTE = '"';
 
@@ -353,16 +354,13 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
   return null;
 }
 
-const PASTE_MODE_START_BUFFER = Buffer.from(PASTE_MODE_START);
-const PASTE_MODE_END_BUFFER = Buffer.from(PASTE_MODE_END);
-
 /**
  * Returns the first index before which we are certain there is no paste marker.
  */
-function earliestPossiblePasteMarker(data: Buffer): number {
+function earliestPossiblePasteMarker(data: string): number {
   // Check data for full start-paste or end-paste markers.
-  const startIndex = data.indexOf(PASTE_MODE_START_BUFFER);
-  const endIndex = data.indexOf(PASTE_MODE_END_BUFFER);
+  const startIndex = data.indexOf(PASTE_MODE_START);
+  const endIndex = data.indexOf(PASTE_MODE_END);
   if (startIndex !== -1 && endIndex !== -1) {
     return Math.min(startIndex, endIndex);
   } else if (startIndex !== -1) {
@@ -373,12 +371,12 @@ function earliestPossiblePasteMarker(data: Buffer): number {
 
   // data contains no full start-paste or end-paste.
   // Check if data ends with a prefix of start-paste or end-paste.
-  const codeLength = PASTE_MODE_START_BUFFER.length;
+  const codeLength = PASTE_MODE_START.length;
   for (let i = Math.min(data.length, codeLength - 1); i > 0; i--) {
-    const candidate = data.subarray(data.length - i);
+    const candidate = data.slice(data.length - i);
     if (
-      PASTE_MODE_START_BUFFER.indexOf(candidate) === 0 ||
-      PASTE_MODE_END_BUFFER.indexOf(candidate) === 0
+      PASTE_MODE_START.indexOf(candidate) === 0 ||
+      PASTE_MODE_END.indexOf(candidate) === 0
     ) {
       return data.length - i;
     }
@@ -393,9 +391,12 @@ function earliestPossiblePasteMarker(data: Buffer): number {
 function* pasteMarkerParser(
   passthrough: PassThrough,
   keypressHandler: (_: unknown, key: Key) => void,
-): Generator<void, void, Buffer> {
+): Generator<void, void, string> {
   while (true) {
     let data = yield;
+    if (data.length === 0) {
+      continue; // we timed out
+    }
 
     while (true) {
       const index = earliestPossiblePasteMarker(data);
@@ -406,15 +407,21 @@ function* pasteMarkerParser(
       }
       if (index > 0) {
         // snip off and send the part that doesn't have a paste marker
-        passthrough.write(data.subarray(0, index));
-        data = data.subarray(index);
+        passthrough.write(data.slice(0, index));
+        data = data.slice(index);
       }
       // data starts with a possible paste marker
-      const codeLength = PASTE_MODE_START_BUFFER.length;
+      const codeLength = PASTE_MODE_START.length;
       if (data.length < codeLength) {
         // we have a prefix. Concat the next data and try again.
-        data = Buffer.concat([data, yield]);
-      } else if (PASTE_MODE_START_BUFFER.compare(data, 0, codeLength) === 0) {
+        const newData = yield;
+        if (newData.length === 0) {
+          // we timed out. Just dump what we have and start over.
+          passthrough.write(data);
+          break;
+        }
+        data += newData;
+      } else if (data.startsWith(PASTE_MODE_START)) {
         keypressHandler(undefined, {
           name: 'paste-start',
           ctrl: false,
@@ -423,8 +430,8 @@ function* pasteMarkerParser(
           paste: false,
           sequence: '',
         });
-        data = data.subarray(PASTE_MODE_START_BUFFER.length);
-      } else if (PASTE_MODE_END_BUFFER.compare(data, 0, codeLength) === 0) {
+        data = data.slice(PASTE_MODE_START.length);
+      } else if (data.startsWith(PASTE_MODE_END)) {
         keypressHandler(undefined, {
           name: 'paste-end',
           ctrl: false,
@@ -433,7 +440,7 @@ function* pasteMarkerParser(
           paste: false,
           sequence: '',
         });
-        data = data.subarray(PASTE_MODE_END_BUFFER.length);
+        data = data.slice(PASTE_MODE_END.length);
       } else {
         // This should never happen.
         passthrough.write(data);
@@ -867,9 +874,15 @@ export function KeypressProvider({
 
       const parser = pasteMarkerParser(keypressStream, handleKeypress);
       parser.next(); // prime the generator so it starts listening.
-      const handleRawKeypress = (data: Buffer) => parser.next(data);
+      let timeoutId: NodeJS.Timeout;
+      const handleRawKeypress = (data: string) => {
+        clearTimeout(timeoutId);
+        parser.next(data);
+        timeoutId = setTimeout(() => parser.next(''), PASTE_CODE_TIMEOUT_MS);
+      };
 
       keypressStream.on('keypress', handleKeypress);
+      process.stdin.setEncoding('utf8'); // so handleRawKeypress gets strings
       stdin.on('data', handleRawKeypress);
 
       cleanup = () => {
