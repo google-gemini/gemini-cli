@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
@@ -68,6 +68,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const [lastUpdateTime, setLastUpdateTime] = React.useState<Date | null>(null);
   const [userHasFocused, setUserHasFocused] = React.useState(false);
   const [showFocusHint, setShowFocusHint] = React.useState(false);
+  const [isJSONvisible, setIsJSONvisible] = React.useState(false);
 
   React.useEffect(() => {
     if (resultDisplay) {
@@ -92,6 +93,12 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       setUserHasFocused(true);
     }
   }, [isThisShellFocused]);
+
+  useInput((input, key) => {
+    if (key.ctrl && input === 't') {
+      setIsJSONvisible((prev) => !prev);
+    }
+  });
 
   const isThisShellFocusable =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
@@ -154,7 +161,9 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
                 <Box>
                   <Text wrap="wrap" color={theme.text.primary}>
-                    {formatted}
+                    {isJSONvisible
+                      ? formatted
+                      : `JSON output (${formatted.split('\n').length} lines) (ctrl + t to toggle details)`}
                   </Text>
                 </Box>
               </MaxSizedBox>

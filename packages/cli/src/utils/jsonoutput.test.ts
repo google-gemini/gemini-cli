@@ -46,6 +46,11 @@ describe('check tools output', () => {
 
     expect(checkInput(text)).toBeFalsy();
   });
+
+  it('accepts JSON with leading/trailing whitespace', () => {
+    const testJSON = '  {"a": 1}  ';
+    expect(checkInput(testJSON)).toBeTruthy();
+  });
 });
 
 describe('check parsing json', () => {
@@ -97,6 +102,17 @@ describe('check parsing json', () => {
 
     expect(output).toBeFalsy();
   });
+
+  it('returns null for null and undefined input', () => {
+    expect(tryParseJSON(null)).toBeFalsy();
+    expect(tryParseJSON(undefined)).toBeFalsy();
+  });
+
+  it('returns parsed object for nested JSON', () => {
+    const nestedJSON = '{"a": 1, "b": {"c": 2, "d": [3, 4]}}';
+    const parsedJSON = JSON.parse(nestedJSON);
+    expect(tryParseJSON(nestedJSON)).toEqual(parsedJSON);
+  });
 });
 
 describe('parseOrRaw', () => {
@@ -119,5 +135,10 @@ describe('parseOrRaw', () => {
     const prettyTestJSON = JSON.stringify(JSON.parse(text), null, 2);
 
     expect(parseOrRaw(prettyTestJSON)).toEqual(prettyTestJSON);
+  });
+
+  it('returns original text for malformed JSON', () => {
+    const malformedJSON = '{"a":1,}';
+    expect(parseOrRaw(malformedJSON)).toEqual(malformedJSON);
   });
 });
