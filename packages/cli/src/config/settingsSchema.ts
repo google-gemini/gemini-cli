@@ -557,6 +557,15 @@ const SETTINGS_SCHEMA = {
         description: 'The Gemini model to use for conversations.',
         showInDialog: false,
       },
+      temperature: {
+        type: 'number',
+        label: 'Temperature',
+        category: 'Model',
+        requiresRestart: false,
+        default: undefined as number | undefined,
+        description: 'The temperature to use for conversations.',
+        showInDialog: false,
+      },
       maxSessionTurns: {
         type: 'number',
         label: 'Max Session Turns',

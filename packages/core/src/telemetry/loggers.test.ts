@@ -176,6 +176,7 @@ describe('loggers', () => {
     it('should log the cli configuration', () => {
       const mockConfig = {
         getSessionId: () => 'test-session-id',
+        getTemperature: () => 0.5,
         getModel: () => 'test-model',
         getEmbeddingModel: () => 'test-embedding-model',
         getSandbox: () => true,
@@ -595,7 +596,7 @@ describe('loggers', () => {
       }),
       getQuestion: () => 'test-question',
       getToolRegistry: () => new ToolRegistry(cfg1),
-
+      getTemperature: () => 0.5,
       getUserMemory: () => 'user-memory',
     } as unknown as Config;
 

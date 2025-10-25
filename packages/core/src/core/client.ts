@@ -129,10 +129,7 @@ const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
 export class GeminiClient {
   private chat?: GeminiChat;
-  private readonly generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
+  private readonly generateContentConfig: GenerateContentConfig;
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
@@ -148,6 +145,10 @@ export class GeminiClient {
   private hasFailedCompressionAttempt = false;
 
   constructor(private readonly config: Config) {
+    this.generateContentConfig = {
+      temperature: config.getTemperature(),
+      topP: 1,
+    };
     this.loopDetector = new LoopDetectionService(config);
     this.lastPromptId = this.config.getSessionId();
   }
@@ -265,7 +266,6 @@ My setup is complete. I will provide my first command in the next turn.
       const model = this.config.getModel();
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
-
       if (isThinkingSupported(model)) {
         config.thinkingConfig = {
           includeThoughts: true,

@@ -53,6 +53,7 @@ export function createMockConfig(
     getEnableMessageBusIntegration: vi.fn().mockReturnValue(false),
     getMessageBus: vi.fn(),
     getPolicyEngine: vi.fn(),
+    getTemperature: vi.fn().mockReturnValue(0.5),
     ...overrides,
   } as unknown as Config;
 
