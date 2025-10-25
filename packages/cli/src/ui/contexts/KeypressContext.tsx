@@ -616,7 +616,7 @@ export function KeypressProvider({
       }
 
       const mappedLetter = ALT_KEY_CHARACTER_MAP[key.sequence];
-      if (mappedLetter && !key.meta) {
+      if (mappedLetter && !key.meta && process.platform === 'darwin') {
         broadcast({
           name: mappedLetter,
           ctrl: false,
