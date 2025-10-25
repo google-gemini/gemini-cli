@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import stripAnsi from 'strip-ansi';
 import type { PtyImplementation } from '../utils/getPty.js';
 import { getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn } from 'node:child_process';
@@ -100,6 +99,97 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   return lines.join('\n').trimEnd();
 };
 
+interface TerminalRenderState {
+  isStreamingRawContent: boolean;
+  hasStartedOutput: boolean;
+  renderTimeout: NodeJS.Timeout | null;
+}
+
+const createTerminalRenderer = (
+  headlessTerminal: pkg.Terminal,
+  shellExecutionConfig: ShellExecutionConfig,
+  onOutputEvent: (event: ShellOutputEvent) => void,
+  state: TerminalRenderState,
+) => {
+  return (finalRender = false) => {
+    if (state.renderTimeout) {
+      clearTimeout(state.renderTimeout);
+    }
+
+    const renderFn = () => {
+      if (!state.isStreamingRawContent) {
+        return;
+      }
+
+      if (!shellExecutionConfig.disableDynamicLineTrimming) {
+        if (!state.hasStartedOutput) {
+          const bufferText = getFullBufferText(headlessTerminal);
+          if (bufferText.trim().length === 0) {
+            return;
+          }
+          state.hasStartedOutput = true;
+        }
+      }
+
+      let newOutput: AnsiOutput;
+      if (shellExecutionConfig.showColor) {
+        newOutput = serializeTerminalToObject(headlessTerminal);
+      } else {
+        const buffer = headlessTerminal.buffer.active;
+        const lines: AnsiOutput = [];
+        for (let y = 0; y < headlessTerminal.rows; y++) {
+          const line = buffer.getLine(buffer.viewportY + y);
+          const lineContent = line ? line.translateToString(true) : '';
+          lines.push([
+            {
+              text: lineContent,
+              bold: false,
+              italic: false,
+              underline: false,
+              dim: false,
+              inverse: false,
+              fg: '',
+              bg: '',
+            },
+          ]);
+        }
+        newOutput = lines;
+      }
+
+      let lastNonEmptyLine = -1;
+      for (let i = newOutput.length - 1; i >= 0; i--) {
+        const line = newOutput[i];
+        if (
+          line
+            .map((segment) => segment.text)
+            .join('')
+            .trim().length > 0
+        ) {
+          lastNonEmptyLine = i;
+          break;
+        }
+      }
+
+      const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
+
+      const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
+        ? newOutput
+        : trimmedOutput;
+
+      onOutputEvent({
+        type: 'data',
+        chunk: finalOutput,
+      });
+    };
+
+    if (finalRender) {
+      renderFn();
+    } else {
+      state.renderTimeout = setTimeout(renderFn, 17);
+    }
+  };
+};
+
 /**
  * A centralized service for executing shell commands with robust process
  * management, cross-platform compatibility, and streaming output capabilities.
@@ -149,6 +239,7 @@ export class ShellExecutionService {
       cwd,
       onOutputEvent,
       abortSignal,
+      shellExecutionConfig,
     );
   }
 
@@ -187,11 +278,10 @@ export class ShellExecutionService {
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
+    shellExecutionConfig: ShellExecutionConfig = {},
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix } = getShellConfiguration();
-      const spawnArgs = [...argsPrefix, commandToExecute];
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
@@ -203,75 +293,69 @@ export class ShellExecutionService {
           ...process.env,
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
-          PAGER: 'cat',
+          PAGER: shellExecutionConfig.pager ?? 'cat',
         },
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
-        let stdoutDecoder: TextDecoder | null = null;
-        let stderrDecoder: TextDecoder | null = null;
+        const headlessTerminal = new Terminal({
+          allowProposedApi: true,
+          cols,
+          rows,
+        });
+        headlessTerminal.scrollToTop();
 
-        let stdout = '';
-        let stderr = '';
-        let stdoutTruncated = false;
-        let stderrTruncated = false;
         const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
 
-        let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
+        let isWriting = false;
+
+        const renderState: TerminalRenderState = {
+          isStreamingRawContent: true,
+          hasStartedOutput: false,
+          renderTimeout: null,
+        };
+
+        const render = createTerminalRenderer(
+          headlessTerminal,
+          shellExecutionConfig,
+          onOutputEvent,
+          renderState,
+        );
+
+        headlessTerminal.onScroll(() => {
+          if (!isWriting) {
+            render();
+          }
+        });
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
-          if (!stdoutDecoder || !stderrDecoder) {
-            const encoding = getCachedEncodingForBuffer(data);
-            try {
-              stdoutDecoder = new TextDecoder(encoding);
-              stderrDecoder = new TextDecoder(encoding);
-            } catch {
-              stdoutDecoder = new TextDecoder('utf-8');
-              stderrDecoder = new TextDecoder('utf-8');
-            }
-          }
+          processingChain = processingChain.then(
+            () =>
+              new Promise<void>((resolve) => {
+                if (!decoder) {
+                  const encoding = getCachedEncodingForBuffer(data);
+                  try {
+                    decoder = new TextDecoder(encoding);
+                  } catch {
+                    decoder = new TextDecoder('utf-8');
+                  }
+                }
 
-          outputChunks.push(data);
+                outputChunks.push(data);
 
-          if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-            const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
-            sniffedBytes = sniffBuffer.length;
+                if (renderState.isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
+                  sniffedBytes = sniffBuffer.length;
 
-            if (isBinary(sniffBuffer)) {
-              isStreamingRawContent = false;
-            }
-          }
-
-          if (isStreamingRawContent) {
-            const decoder = stream === 'stdout' ? stdoutDecoder : stderrDecoder;
-            const decodedChunk = decoder.decode(data, { stream: true });
-
-            if (stream === 'stdout') {
-              const { newBuffer, truncated } = this.appendAndTruncate(
-                stdout,
-                decodedChunk,
-                MAX_CHILD_PROCESS_BUFFER_SIZE,
-              );
-              stdout = newBuffer;
-              if (truncated) {
-                stdoutTruncated = true;
-              }
-            } else {
-              const { newBuffer, truncated } = this.appendAndTruncate(
-                stderr,
-                decodedChunk,
-                MAX_CHILD_PROCESS_BUFFER_SIZE,
-              );
-              stderr = newBuffer;
-              if (truncated) {
-                stderrTruncated = true;
-              }
-            }
-          }
+                  if (isBinary(sniffBuffer)) {
+                    renderState.isStreamingRawContent = false;
+                    onOutputEvent({ type: 'binary_detected' });
+                  }
+                }
         };
 
         const handleExit = (
@@ -279,31 +363,10 @@ export class ShellExecutionService {
           signal: NodeJS.Signals | null,
         ) => {
           const { finalBuffer } = cleanup();
-          // Ensure we don't add an extra newline if stdout already ends with one.
-          const separator = stdout.endsWith('\n') ? '' : '\n';
-          let combinedOutput =
-            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
-
-          if (stdoutTruncated || stderrTruncated) {
-            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
-              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
-            }MB.]`;
-            combinedOutput += truncationMessage;
-          }
-
-          const finalStrippedOutput = stripAnsi(combinedOutput).trim();
-
-          if (isStreamingRawContent) {
-            if (finalStrippedOutput) {
-              onOutputEvent({ type: 'data', chunk: finalStrippedOutput });
-            }
-          } else {
-            onOutputEvent({ type: 'binary_detected' });
-          }
 
           resolve({
             rawOutput: finalBuffer,
-            output: finalStrippedOutput,
+            output: getFullBufferText(headlessTerminal),
             exitCode: code,
             signal: signal ? os.constants.signals[signal] : null,
             error,
@@ -341,31 +404,25 @@ export class ShellExecutionService {
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
         child.on('exit', (code, signal) => {
-          if (child.pid) {
-            this.activePtys.delete(child.pid);
-          }
           handleExit(code, signal);
         });
 
         function cleanup() {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
-          if (stdoutDecoder) {
-            const remaining = stdoutDecoder.decode();
-            if (remaining) {
-              stdout += remaining;
-            }
+          if (renderState.renderTimeout) {
+            clearTimeout(renderState.renderTimeout);
           }
-          if (stderrDecoder) {
-            const remaining = stderrDecoder.decode();
+          if (decoder) {
+            const remaining = decoder.decode();
             if (remaining) {
-              stderr += remaining;
+              headlessTerminal.write(remaining);
             }
           }
 
           const finalBuffer = Buffer.concat(outputChunks);
 
-          return { stdout, stderr, finalBuffer };
+          return { finalBuffer };
         }
       });
 
@@ -432,112 +489,21 @@ export class ShellExecutionService {
 
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
-        let output: string | AnsiOutput | null = null;
         const outputChunks: Buffer[] = [];
         const error: Error | null = null;
         let exited = false;
 
-        let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
-        let isWriting = false;
-        let hasStartedOutput = false;
-        let renderTimeout: NodeJS.Timeout | null = null;
-
-        const renderFn = () => {
-          renderTimeout = null;
-
-          if (!isStreamingRawContent) {
-            return;
-          }
-
-          if (!shellExecutionConfig.disableDynamicLineTrimming) {
-            if (!hasStartedOutput) {
-              const bufferText = getFullBufferText(headlessTerminal);
-              if (bufferText.trim().length === 0) {
-                return;
-              }
-              hasStartedOutput = true;
-            }
-          }
-
-          const buffer = headlessTerminal.buffer.active;
-          let newOutput: AnsiOutput;
-          if (shellExecutionConfig.showColor) {
-            newOutput = serializeTerminalToObject(headlessTerminal);
-          } else {
-            const lines: AnsiOutput = [];
-            for (let y = 0; y < headlessTerminal.rows; y++) {
-              const line = buffer.getLine(buffer.viewportY + y);
-              const lineContent = line ? line.translateToString(true) : '';
-              lines.push([
-                {
-                  text: lineContent,
-                  bold: false,
-                  italic: false,
-                  underline: false,
-                  dim: false,
-                  inverse: false,
-                  fg: '',
-                  bg: '',
-                },
-              ]);
-            }
-            newOutput = lines;
-          }
-
-          let lastNonEmptyLine = -1;
-          for (let i = newOutput.length - 1; i >= 0; i--) {
-            const line = newOutput[i];
-            if (
-              line
-                .map((segment) => segment.text)
-                .join('')
-                .trim().length > 0
-            ) {
-              lastNonEmptyLine = i;
-              break;
-            }
-          }
-
-          if (buffer.cursorY > lastNonEmptyLine) {
-            lastNonEmptyLine = buffer.cursorY;
-          }
-
-          const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
-
-          const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
-            ? newOutput
-            : trimmedOutput;
-
-          // Using stringify for a quick deep comparison.
-          if (JSON.stringify(output) !== JSON.stringify(finalOutput)) {
-            output = finalOutput;
-            onOutputEvent({
-              type: 'data',
-              chunk: finalOutput,
-            });
-          }
+        let isWriting = false;+
         };
 
-        const render = (finalRender = false) => {
-          if (finalRender) {
-            if (renderTimeout) {
-              clearTimeout(renderTimeout);
-            }
-            renderFn();
-            return;
-          }
-
-          if (renderTimeout) {
-            return;
-          }
-
-          renderTimeout = setTimeout(() => {
-            renderFn();
-            renderTimeout = null;
-          }, 68);
-        };
+        const render = createTerminalRenderer(
+          headlessTerminal,
+          shellExecutionConfig,
+          onOutputEvent,
+          renderState,
+        );
 
         headlessTerminal.onScroll(() => {
           if (!isWriting) {
@@ -560,17 +526,17 @@ export class ShellExecutionService {
 
                 outputChunks.push(data);
 
-                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                if (renderState.isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
                   const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
                   sniffedBytes = sniffBuffer.length;
 
                   if (isBinary(sniffBuffer)) {
-                    isStreamingRawContent = false;
+                    renderState.isStreamingRawContent = false;
                     onOutputEvent({ type: 'binary_detected' });
                   }
                 }
 
-                if (isStreamingRawContent) {
+                if (renderState.isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
                   if (decodedChunk.length === 0) {
                     resolve();
