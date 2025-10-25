@@ -97,6 +97,97 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   return lines.join('\n').trimEnd();
 };
 
+interface TerminalRenderState {
+  isStreamingRawContent: boolean;
+  hasStartedOutput: boolean;
+  renderTimeout: NodeJS.Timeout | null;
+}
+
+const createTerminalRenderer = (
+  headlessTerminal: pkg.Terminal,
+  shellExecutionConfig: ShellExecutionConfig,
+  onOutputEvent: (event: ShellOutputEvent) => void,
+  state: TerminalRenderState,
+) => {
+  return (finalRender = false) => {
+    if (state.renderTimeout) {
+      clearTimeout(state.renderTimeout);
+    }
+
+    const renderFn = () => {
+      if (!state.isStreamingRawContent) {
+        return;
+      }
+
+      if (!shellExecutionConfig.disableDynamicLineTrimming) {
+        if (!state.hasStartedOutput) {
+          const bufferText = getFullBufferText(headlessTerminal);
+          if (bufferText.trim().length === 0) {
+            return;
+          }
+          state.hasStartedOutput = true;
+        }
+      }
+
+      let newOutput: AnsiOutput;
+      if (shellExecutionConfig.showColor) {
+        newOutput = serializeTerminalToObject(headlessTerminal);
+      } else {
+        const buffer = headlessTerminal.buffer.active;
+        const lines: AnsiOutput = [];
+        for (let y = 0; y < headlessTerminal.rows; y++) {
+          const line = buffer.getLine(buffer.viewportY + y);
+          const lineContent = line ? line.translateToString(true) : '';
+          lines.push([
+            {
+              text: lineContent,
+              bold: false,
+              italic: false,
+              underline: false,
+              dim: false,
+              inverse: false,
+              fg: '',
+              bg: '',
+            },
+          ]);
+        }
+        newOutput = lines;
+      }
+
+      let lastNonEmptyLine = -1;
+      for (let i = newOutput.length - 1; i >= 0; i--) {
+        const line = newOutput[i];
+        if (
+          line
+            .map((segment) => segment.text)
+            .join('')
+            .trim().length > 0
+        ) {
+          lastNonEmptyLine = i;
+          break;
+        }
+      }
+
+      const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
+
+      const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
+        ? newOutput
+        : trimmedOutput;
+
+      onOutputEvent({
+        type: 'data',
+        chunk: finalOutput,
+      });
+    };
+
+    if (finalRender) {
+      renderFn();
+    } else {
+      state.renderTimeout = setTimeout(renderFn, 17);
+    }
+  };
+};
+
 /**
  * A centralized service for executing shell commands with robust process
  * management, cross-platform compatibility, and streaming output capabilities.
@@ -190,90 +281,22 @@ export class ShellExecutionService {
         let error: Error | null = null;
         let exited = false;
 
-        let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
         let isWriting = false;
-        let hasStartedOutput = false;
-        let renderTimeout: NodeJS.Timeout | null = null;
 
-        const render = (finalRender = false) => {
-          if (renderTimeout) {
-            clearTimeout(renderTimeout);
-          }
-
-          const renderFn = () => {
-            if (!isStreamingRawContent) {
-              return;
-            }
-
-            if (!shellExecutionConfig.disableDynamicLineTrimming) {
-              if (!hasStartedOutput) {
-                const bufferText = getFullBufferText(headlessTerminal);
-                if (bufferText.trim().length === 0) {
-                  return;
-                }
-                hasStartedOutput = true;
-              }
-            }
-
-            let newOutput: AnsiOutput;
-            if (shellExecutionConfig.showColor) {
-              newOutput = serializeTerminalToObject(headlessTerminal);
-            } else {
-              const buffer = headlessTerminal.buffer.active;
-              const lines: AnsiOutput = [];
-              for (let y = 0; y < headlessTerminal.rows; y++) {
-                const line = buffer.getLine(buffer.viewportY + y);
-                const lineContent = line ? line.translateToString(true) : '';
-                lines.push([
-                  {
-                    text: lineContent,
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                    dim: false,
-                    inverse: false,
-                    fg: '',
-                    bg: '',
-                  },
-                ]);
-              }
-              newOutput = lines;
-            }
-
-            let lastNonEmptyLine = -1;
-            for (let i = newOutput.length - 1; i >= 0; i--) {
-              const line = newOutput[i];
-              if (
-                line
-                  .map((segment) => segment.text)
-                  .join('')
-                  .trim().length > 0
-              ) {
-                lastNonEmptyLine = i;
-                break;
-              }
-            }
-
-            const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
-
-            const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
-              ? newOutput
-              : trimmedOutput;
-
-            onOutputEvent({
-              type: 'data',
-              chunk: finalOutput,
-            });
-          };
-
-          if (finalRender) {
-            renderFn();
-          } else {
-            renderTimeout = setTimeout(renderFn, 17);
-          }
+        const renderState: TerminalRenderState = {
+          isStreamingRawContent: true,
+          hasStartedOutput: false,
+          renderTimeout: null,
         };
+
+        const render = createTerminalRenderer(
+          headlessTerminal,
+          shellExecutionConfig,
+          onOutputEvent,
+          renderState,
+        );
 
         headlessTerminal.onScroll(() => {
           if (!isWriting) {
@@ -296,17 +319,17 @@ export class ShellExecutionService {
 
                 outputChunks.push(data);
 
-                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                if (renderState.isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
                   const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
                   sniffedBytes = sniffBuffer.length;
 
                   if (isBinary(sniffBuffer)) {
-                    isStreamingRawContent = false;
+                    renderState.isStreamingRawContent = false;
                     onOutputEvent({ type: 'binary_detected' });
                   }
                 }
 
-                if (isStreamingRawContent) {
+                if (renderState.isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
                   isWriting = true;
                   headlessTerminal.write(decodedChunk, () => {
@@ -383,8 +406,8 @@ export class ShellExecutionService {
         function cleanup() {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
-          if (renderTimeout) {
-            clearTimeout(renderTimeout);
+          if (renderState.renderTimeout) {
+            clearTimeout(renderState.renderTimeout);
           }
           if (decoder) {
             const remaining = decoder.decode();
@@ -469,90 +492,22 @@ export class ShellExecutionService {
         const error: Error | null = null;
         let exited = false;
 
-        let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
         let isWriting = false;
-        let hasStartedOutput = false;
-        let renderTimeout: NodeJS.Timeout | null = null;
 
-        const render = (finalRender = false) => {
-          if (renderTimeout) {
-            clearTimeout(renderTimeout);
-          }
-
-          const renderFn = () => {
-            if (!isStreamingRawContent) {
-              return;
-            }
-
-            if (!shellExecutionConfig.disableDynamicLineTrimming) {
-              if (!hasStartedOutput) {
-                const bufferText = getFullBufferText(headlessTerminal);
-                if (bufferText.trim().length === 0) {
-                  return;
-                }
-                hasStartedOutput = true;
-              }
-            }
-
-            let newOutput: AnsiOutput;
-            if (shellExecutionConfig.showColor) {
-              newOutput = serializeTerminalToObject(headlessTerminal);
-            } else {
-              const buffer = headlessTerminal.buffer.active;
-              const lines: AnsiOutput = [];
-              for (let y = 0; y < headlessTerminal.rows; y++) {
-                const line = buffer.getLine(buffer.viewportY + y);
-                const lineContent = line ? line.translateToString(true) : '';
-                lines.push([
-                  {
-                    text: lineContent,
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                    dim: false,
-                    inverse: false,
-                    fg: '',
-                    bg: '',
-                  },
-                ]);
-              }
-              newOutput = lines;
-            }
-
-            let lastNonEmptyLine = -1;
-            for (let i = newOutput.length - 1; i >= 0; i--) {
-              const line = newOutput[i];
-              if (
-                line
-                  .map((segment) => segment.text)
-                  .join('')
-                  .trim().length > 0
-              ) {
-                lastNonEmptyLine = i;
-                break;
-              }
-            }
-
-            const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
-
-            const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
-              ? newOutput
-              : trimmedOutput;
-
-            onOutputEvent({
-              type: 'data',
-              chunk: finalOutput,
-            });
-          };
-
-          if (finalRender) {
-            renderFn();
-          } else {
-            renderTimeout = setTimeout(renderFn, 17);
-          }
+        const renderState: TerminalRenderState = {
+          isStreamingRawContent: true,
+          hasStartedOutput: false,
+          renderTimeout: null,
         };
+
+        const render = createTerminalRenderer(
+          headlessTerminal,
+          shellExecutionConfig,
+          onOutputEvent,
+          renderState,
+        );
 
         headlessTerminal.onScroll(() => {
           if (!isWriting) {
@@ -575,17 +530,17 @@ export class ShellExecutionService {
 
                 outputChunks.push(data);
 
-                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                if (renderState.isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
                   const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
                   sniffedBytes = sniffBuffer.length;
 
                   if (isBinary(sniffBuffer)) {
-                    isStreamingRawContent = false;
+                    renderState.isStreamingRawContent = false;
                     onOutputEvent({ type: 'binary_detected' });
                   }
                 }
 
-                if (isStreamingRawContent) {
+                if (renderState.isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
                   isWriting = true;
                   headlessTerminal.write(decodedChunk, () => {
