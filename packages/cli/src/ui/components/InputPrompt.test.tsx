@@ -1713,14 +1713,11 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\u001B[C');
       });
-      await vi.waitFor(
-        () => {
-          expect(clean(stdout.lastFrame())).toContain('←');
-        },
-        { timeout: 5000 },
-      );
+      await vi.waitFor(() => {
+        expect(clean(stdout.lastFrame())).toContain('←');
+      });
       expect(stdout.lastFrame()).toMatchSnapshot(
-        'command-search-expanded-match',
+        'command-search-render-expanded-match',
       );
 
       await act(async () => {
@@ -1730,10 +1727,10 @@ describe('InputPrompt', () => {
         expect(clean(stdout.lastFrame())).toContain('→');
       });
       expect(stdout.lastFrame()).toMatchSnapshot(
-        'command-search-collapsed-match',
+        'command-search-render-collapsed-match',
       );
       unmount();
-    }, 10000);
+    });
 
     it('renders match window and expanded view (snapshots)', async () => {
       props.shellModeActive = false;
