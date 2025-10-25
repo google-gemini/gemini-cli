@@ -237,7 +237,9 @@ describe('InputPrompt', () => {
     props.shellModeActive = true;
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\u001B[A');
+    await act(async () => {
+      stdin.write('\u001B[A');
+    });
     await vi.waitFor(() =>
       expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled(),
     );
@@ -248,7 +250,9 @@ describe('InputPrompt', () => {
     props.shellModeActive = true;
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\u001B[B');
+    await act(async () => {
+      stdin.write('\u001B[B');
+    });
     await vi.waitFor(() =>
       expect(mockShellHistory.getNextCommand).toHaveBeenCalled(),
     );
@@ -262,7 +266,9 @@ describe('InputPrompt', () => {
     );
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\u001B[A');
+    await act(async () => {
+      stdin.write('\u001B[A');
+    });
     await vi.waitFor(() => {
       expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled();
       expect(props.buffer.setText).toHaveBeenCalledWith('previous command');
@@ -275,7 +281,9 @@ describe('InputPrompt', () => {
     props.buffer.setText('ls -l');
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\r');
+    await act(async () => {
+      stdin.write('\r');
+    });
     await vi.waitFor(() => {
       expect(mockShellHistory.addCommandToHistory).toHaveBeenCalledWith(
         'ls -l',
@@ -289,17 +297,23 @@ describe('InputPrompt', () => {
     props.buffer.setText('some text');
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\u001B[A'); // Up arrow
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
     await vi.waitFor(() =>
       expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
     );
 
-    stdin.write('\u001B[B'); // Down arrow
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
     await vi.waitFor(() =>
       expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
     );
 
-    stdin.write('\r'); // Enter
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
     await vi.waitFor(() =>
       expect(props.onSubmit).toHaveBeenCalledWith('some text'),
     );
@@ -325,12 +339,16 @@ describe('InputPrompt', () => {
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
     // Test up arrow
-    stdin.write('\u001B[A'); // Up arrow
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.navigateUp).toHaveBeenCalledTimes(1),
     );
 
-    stdin.write('\u0010'); // Ctrl+P
+    await act(async () => {
+      stdin.write('\u0010'); // Ctrl+P
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.navigateUp).toHaveBeenCalledTimes(2),
     );
@@ -353,12 +371,16 @@ describe('InputPrompt', () => {
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
     // Test down arrow
-    stdin.write('\u001B[B'); // Down arrow
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.navigateDown).toHaveBeenCalledTimes(1),
     );
 
-    stdin.write('\u000E'); // Ctrl+N
+    await act(async () => {
+      stdin.write('\u000E'); // Ctrl+N
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.navigateDown).toHaveBeenCalledTimes(2),
     );
@@ -376,17 +398,25 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\u001B[A'); // Up arrow
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
     await vi.waitFor(() =>
       expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
     );
-    stdin.write('\u001B[B'); // Down arrow
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
     await vi.waitFor(() =>
       expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
     );
-    stdin.write('\u0010'); // Ctrl+P
+    await act(async () => {
+      stdin.write('\u0010'); // Ctrl+P
+    });
     await vi.waitFor(() => {});
-    stdin.write('\u000E'); // Ctrl+N
+    await act(async () => {
+      stdin.write('\u000E'); // Ctrl+N
+    });
     await vi.waitFor(() => {});
 
     expect(mockCommandCompletion.navigateUp).not.toHaveBeenCalled();
@@ -414,7 +444,9 @@ describe('InputPrompt', () => {
       );
 
       // Send Ctrl+V
-      stdin.write('\x16'); // Ctrl+V
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
       await vi.waitFor(() => {
         expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
         expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
@@ -435,7 +467,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x16'); // Ctrl+V
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
       await vi.waitFor(() => {
         expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
       });
@@ -452,7 +486,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x16'); // Ctrl+V
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
       await vi.waitFor(() => {
         expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
       });
@@ -479,7 +515,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x16'); // Ctrl+V
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
       await vi.waitFor(() => {
         // Should insert at cursor position with spaces
         expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
@@ -508,7 +546,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x16'); // Ctrl+V
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
       await vi.waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           'Error handling clipboard image:',
@@ -534,7 +574,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\t'); // Press Tab
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
     );
@@ -556,7 +598,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\t'); // Press Tab
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(1),
     );
@@ -579,7 +623,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\t'); // Press Tab
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
     await vi.waitFor(() =>
       // It should NOT become '/show'. It should correctly become '/memory show'.
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
@@ -599,7 +645,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\t'); // Press Tab
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
     );
@@ -617,7 +665,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\r');
+    await act(async () => {
+      stdin.write('\r');
+    });
     await vi.waitFor(() => {
       // The app should autocomplete the text, NOT submit.
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
@@ -647,7 +697,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\t'); // Press Tab for autocomplete
+    await act(async () => {
+      stdin.write('\t'); // Press Tab for autocomplete
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
     );
@@ -659,7 +711,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\r'); // Press Enter
+    await act(async () => {
+      stdin.write('\r'); // Press Enter
+    });
     await vi.waitFor(() => {});
 
     expect(props.onSubmit).not.toHaveBeenCalled();
@@ -676,7 +730,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\r');
+    await act(async () => {
+      stdin.write('\r');
+    });
     await vi.waitFor(() =>
       expect(props.onSubmit).toHaveBeenCalledWith('/clear'),
     );
@@ -693,7 +749,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\r');
+    await act(async () => {
+      stdin.write('\r');
+    });
     await vi.waitFor(() =>
       expect(props.onSubmit).toHaveBeenCalledWith('/clear'),
     );
@@ -711,7 +769,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\r');
+    await act(async () => {
+      stdin.write('\r');
+    });
     await vi.waitFor(() =>
       expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
     );
@@ -727,7 +787,9 @@ describe('InputPrompt', () => {
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\r');
+    await act(async () => {
+      stdin.write('\r');
+    });
     await vi.waitFor(() => {
       expect(props.buffer.backspace).toHaveBeenCalled();
       expect(props.buffer.newline).toHaveBeenCalled();
@@ -741,7 +803,9 @@ describe('InputPrompt', () => {
     props.buffer.setText('some text to clear');
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\x03'); // Ctrl+C character
+    await act(async () => {
+      stdin.write('\x03'); // Ctrl+C character
+    });
     await vi.waitFor(() => {
       expect(props.buffer.setText).toHaveBeenCalledWith('');
       expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
@@ -754,7 +818,9 @@ describe('InputPrompt', () => {
     props.buffer.text = '';
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    stdin.write('\x03'); // Ctrl+C character
+    await act(async () => {
+      stdin.write('\x03'); // Ctrl+C character
+    });
     await vi.waitFor(() => {});
 
     expect(props.buffer.setText).not.toHaveBeenCalled();
@@ -880,7 +946,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('i');
+      await act(async () => {
+        stdin.write('i');
+      });
       await vi.waitFor(() => {
         expect(props.vimHandleInput).toHaveBeenCalled();
       });
@@ -894,7 +962,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('i');
+      await act(async () => {
+        stdin.write('i');
+      });
       await vi.waitFor(() => {
         expect(props.vimHandleInput).toHaveBeenCalled();
         expect(mockBuffer.handleInput).toHaveBeenCalled();
@@ -909,7 +979,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('i');
+      await act(async () => {
+        stdin.write('i');
+      });
       await vi.waitFor(() => {
         expect(props.vimHandleInput).toHaveBeenCalled();
         expect(mockBuffer.handleInput).toHaveBeenCalled();
@@ -925,7 +997,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x1B[200~pasted text\x1B[201~');
+      await act(async () => {
+        stdin.write('\x1B[200~pasted text\x1B[201~');
+      });
       await vi.waitFor(() => {
         expect(mockBuffer.handleInput).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -943,7 +1017,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('a');
+      await act(async () => {
+        stdin.write('a');
+      });
       await vi.waitFor(() => {});
 
       expect(mockBuffer.handleInput).not.toHaveBeenCalled();
@@ -1162,7 +1238,9 @@ describe('InputPrompt', () => {
       );
 
       // Simulate a bracketed paste event from the terminal
-      stdin.write(`\x1b[200~${pastedText}\x1b[201~`);
+      await act(async () => {
+        stdin.write(`\x1b[200~${pastedText}\x1b[201~`);
+      });
       await vi.waitFor(() => {
         // Verify that the buffer's handleInput was called once with the full text
         expect(props.buffer.handleInput).toHaveBeenCalledTimes(1);
@@ -1202,12 +1280,14 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this should set the paste protection)
-      act(() => {
+      await act(async () => {
         stdin.write(`\x1b[200~pasted content\x1b[201~`);
       });
 
       // Simulate an Enter key press immediately after paste
-      stdin.write('\r');
+      await act(async () => {
+        stdin.write('\r');
+      });
       await vi.runAllTimersAsync();
 
       // Verify that onSubmit was NOT called due to recent paste protection
@@ -1227,7 +1307,7 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this sets the protection)
-      act(() => {
+      await act(async () => {
         stdin.write('\x1b[200~pasted text\x1b[201~');
       });
       await vi.runAllTimersAsync();
@@ -1238,7 +1318,9 @@ describe('InputPrompt', () => {
       });
 
       // Now Enter should work normally
-      stdin.write('\r');
+      await act(async () => {
+        stdin.write('\r');
+      });
       await vi.runAllTimersAsync();
 
       expect(props.onSubmit).toHaveBeenCalledWith('pasted text');
@@ -1270,11 +1352,15 @@ describe('InputPrompt', () => {
         await vi.runAllTimersAsync();
 
         // Simulate a paste operation
-        stdin.write('\x1b[200~some pasted stuff\x1b[201~');
+        await act(async () => {
+          stdin.write('\x1b[200~some pasted stuff\x1b[201~');
+        });
         await vi.runAllTimersAsync();
 
         // Simulate an Enter key press immediately after paste
-        stdin.write('\r');
+        await act(async () => {
+          stdin.write('\r');
+        });
         await vi.runAllTimersAsync();
 
         // Verify that onSubmit was called
@@ -1293,7 +1379,9 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Press Enter without any recent paste
-      stdin.write('\r');
+      await act(async () => {
+        stdin.write('\r');
+      });
       await vi.runAllTimersAsync();
 
       // Verify that onSubmit was called normally
@@ -1314,12 +1402,16 @@ describe('InputPrompt', () => {
         { kittyProtocolEnabled: false },
       );
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
       await vi.waitFor(() => {
         expect(onEscapePromptChange).toHaveBeenCalledWith(true);
       });
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
       await vi.waitFor(() => {
         expect(props.buffer.setText).toHaveBeenCalledWith('');
         expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
@@ -1337,13 +1429,17 @@ describe('InputPrompt', () => {
         { kittyProtocolEnabled: false },
       );
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
 
       await vi.waitFor(() => {
         expect(onEscapePromptChange).toHaveBeenCalledWith(true);
       });
 
-      stdin.write('a');
+      await act(async () => {
+        stdin.write('a');
+      });
 
       await vi.waitFor(() => {
         expect(onEscapePromptChange).toHaveBeenCalledWith(false);
@@ -1359,7 +1455,9 @@ describe('InputPrompt', () => {
         { kittyProtocolEnabled: false },
       );
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
       await vi.waitFor(() =>
         expect(props.setShellModeActive).toHaveBeenCalledWith(false),
       );
@@ -1378,7 +1476,9 @@ describe('InputPrompt', () => {
         { kittyProtocolEnabled: false },
       );
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
       await vi.waitFor(() =>
         expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled(),
       );
@@ -1396,7 +1496,9 @@ describe('InputPrompt', () => {
       );
       await vi.runAllTimersAsync();
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
       await vi.runAllTimersAsync();
 
       vi.useRealTimers();
@@ -1409,10 +1511,14 @@ describe('InputPrompt', () => {
         { kittyProtocolEnabled: false },
       );
 
-      stdin.write('\x0C');
+      await act(async () => {
+        stdin.write('\x0C');
+      });
       await vi.waitFor(() => expect(props.onClearScreen).toHaveBeenCalled());
 
-      stdin.write('\x01');
+      await act(async () => {
+        stdin.write('\x01');
+      });
       await vi.waitFor(() =>
         expect(props.buffer.move).toHaveBeenCalledWith('home'),
       );
@@ -1451,7 +1557,7 @@ describe('InputPrompt', () => {
       );
 
       // Trigger reverse search with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
@@ -1471,10 +1577,16 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x12');
+      await act(async () => {
+        stdin.write('\x12');
+      });
       await vi.waitFor(() => {});
-      stdin.write('\x1B');
-      stdin.write('\u001b[27u'); // Press kitty escape key
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await act(async () => {
+        stdin.write('\u001b[27u'); // Press kitty escape key
+      });
 
       await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
@@ -1512,7 +1624,7 @@ describe('InputPrompt', () => {
       );
 
       // Enter reverse search mode with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
@@ -1522,7 +1634,7 @@ describe('InputPrompt', () => {
       });
 
       // Press Tab to complete the highlighted entry
-      act(() => {
+      await act(async () => {
         stdin.write('\t');
       });
       await vi.waitFor(() => {
@@ -1549,7 +1661,7 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
@@ -1557,7 +1669,7 @@ describe('InputPrompt', () => {
         expect(stdout.lastFrame()).toContain('(r:)');
       });
 
-      act(() => {
+      await act(async () => {
         stdin.write('\r');
       });
 
@@ -1592,7 +1704,7 @@ describe('InputPrompt', () => {
       );
 
       // reverse search with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
@@ -1601,7 +1713,7 @@ describe('InputPrompt', () => {
       });
 
       // Press kitty escape key
-      act(() => {
+      await act(async () => {
         stdin.write('\u001b[27u');
       });
 
@@ -1625,7 +1737,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x05'); // Ctrl+E
+      await act(async () => {
+        stdin.write('\x05'); // Ctrl+E
+      });
       await vi.waitFor(() => {
         expect(props.buffer.move).toHaveBeenCalledWith('end');
       });
@@ -1642,7 +1756,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x05'); // Ctrl+E
+      await act(async () => {
+        stdin.write('\x05'); // Ctrl+E
+      });
       await vi.waitFor(() => {
         expect(props.buffer.move).toHaveBeenCalledWith('end');
       });
@@ -1673,7 +1789,7 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      act(() => {
+      await act(async () => {
         stdin.write('\x12'); // Ctrl+R
       });
 
@@ -1752,14 +1868,18 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x12');
+      await act(async () => {
+        stdin.write('\x12');
+      });
       await vi.waitFor(() => {
         expect(stdout.lastFrame()).toMatchSnapshot(
           'command-search-render-collapsed-match',
         );
       });
 
-      stdin.write('\u001B[C');
+      await act(async () => {
+        stdin.write('\u001B[C');
+      });
       await vi.waitFor(() => {
         expect(stdout.lastFrame()).toMatchSnapshot(
           'command-search-render-expanded-match',
@@ -1786,7 +1906,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\x12');
+      await act(async () => {
+        stdin.write('\x12');
+      });
       await vi.waitFor(() => {
         const frame = clean(stdout.lastFrame());
         // Ensure it rendered the search mode
@@ -1808,7 +1930,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       const callback = mockPopAllMessages.mock.calls[0][0];
 
@@ -1830,7 +1954,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() =>
         expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
       );
@@ -1847,7 +1973,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       const callback = mockPopAllMessages.mock.calls[0][0];
       act(() => {
@@ -1871,7 +1999,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       unmount();
     });
@@ -1885,7 +2015,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
 
       const callback = mockPopAllMessages.mock.calls[0][0];
@@ -1906,7 +2038,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       unmount();
     });
@@ -1919,7 +2053,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() =>
         expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
       );
@@ -1935,7 +2071,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      stdin.write('\u001B[A');
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
       await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
 
       const callback = mockPopAllMessages.mock.calls[0][0];
@@ -1999,7 +2137,9 @@ describe('InputPrompt', () => {
       shellFocus: false,
     });
 
-    stdin.write('a');
+    await act(async () => {
+      stdin.write('a');
+    });
     await vi.waitFor(() => expect(mockBuffer.handleInput).toHaveBeenCalled());
     unmount();
   });
@@ -2041,7 +2181,9 @@ describe('InputPrompt', () => {
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
         );
-        stdin.write('\r');
+        await act(async () => {
+          stdin.write('\r');
+        });
         await vi.waitFor(() => {
           if (shouldSubmit) {
             expect(props.onSubmit).toHaveBeenCalledWith(bufferText);

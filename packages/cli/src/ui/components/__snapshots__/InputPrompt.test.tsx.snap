@@ -42,10 +42,24 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match window and expanded view (snapshots) > command-search-render-collapsed-match 2`] = `
+"╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ (r:)  commit                                                                                      │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ git commit -m "feat: add search" in src/app"
+`;
+
 exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match window and expanded view (snapshots) > command-search-render-expanded-match 1`] = `
 "╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ > commit                                                                                          │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match window and expanded view (snapshots) > command-search-render-expanded-match 2`] = `
+"╭────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ (r:)  commit                                                                                      │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ git commit -m "feat: add search" in src/app"
 `;
 
 exports[`InputPrompt > snapshots > should not show inverted cursor when shell is focused 1`] = `
