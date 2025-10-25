@@ -34,7 +34,7 @@ class MockStdin extends EventEmitter {
   pause = vi.fn();
 
   write(text: string) {
-    this.emit('data', Buffer.from(text));
+    this.emit('data', text);
   }
 }
 
@@ -174,6 +174,104 @@ describe('useKeypress', () => {
 
       const pasteText = 'pasted';
       act(() => stdin.write(PASTE_START + pasteText + PASTE_END));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText }),
+      );
+
+      const keyB = { name: 'b', sequence: 'b' };
+      act(() => stdin.write('b'));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ ...keyB, paste: false }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(3);
+    });
+
+    it('should handle lone pastes', () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      const pasteText = 'pasted';
+      act(() => {
+        stdin.write(PASTE_START);
+        stdin.write(pasteText);
+        stdin.write(PASTE_END);
+      });
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle paste false alarm', () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      act(() => {
+        stdin.write(PASTE_START.slice(0, 5));
+        stdin.write('do');
+      });
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ code: '[200d' }),
+      );
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: 'o' }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle back to back pastes', () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      const pasteText1 = 'herp';
+      const pasteText2 = 'derp';
+      act(() => {
+        stdin.write(
+          PASTE_START +
+            pasteText1 +
+            PASTE_END +
+            PASTE_START +
+            pasteText2 +
+            PASTE_END,
+        );
+      });
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText1 }),
+      );
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ paste: true, sequence: pasteText2 }),
+      );
+
+      expect(onKeypress).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle pastes split across writes', async () => {
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      const keyA = { name: 'a', sequence: 'a' };
+      act(() => stdin.write('a'));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ ...keyA, paste: false }),
+      );
+
+      const pasteText = 'pasted';
+      await act(async () => {
+        stdin.write(PASTE_START.slice(0, 3));
+        await new Promise((r) => setTimeout(r, 50));
+        stdin.write(PASTE_START.slice(3) + pasteText.slice(0, 3));
+        await new Promise((r) => setTimeout(r, 50));
+        stdin.write(pasteText.slice(3) + PASTE_END.slice(0, 3));
+        await new Promise((r) => setTimeout(r, 50));
+        stdin.write(PASTE_END.slice(3));
+      });
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ paste: true, sequence: pasteText }),
       );
