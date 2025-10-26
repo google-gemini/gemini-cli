@@ -29,8 +29,10 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
 
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
+  // More conservative regex - removed the greedy _.*?_ pattern
+  // Only match underscores when they're properly bounded for markdown
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*.*?\*\*|\*[^*]+?\*|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -59,15 +61,11 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         );
       } else if (
         fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
-        ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
-          (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
+        fullMatch.startsWith('*') &&
+        fullMatch.endsWith('*') &&
         !/\w/.test(text.substring(match.index - 1, match.index)) &&
         !/\w/.test(
           text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
-        ) &&
-        !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
-        !/[./\\]\S/.test(
-          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
         )
       ) {
         renderedNode = (
