@@ -47,7 +47,7 @@ import {
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { runACPIntegration } from './acp/acpIntegration.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
@@ -433,8 +433,8 @@ export async function main() {
       await getOauthClient(settings.merged.security.auth.selectedType, config);
     }
 
-    if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, extensions, argv);
+    if (config.getExperimentalACPIntegration()) {
+      return runACPIntegration(config, settings, extensions, argv);
     }
 
     let input = config.getQuestion();
