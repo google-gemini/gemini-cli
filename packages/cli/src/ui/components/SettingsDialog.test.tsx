@@ -253,10 +253,7 @@ describe('SettingsDialog', () => {
 
       const output = lastFrame();
       expect(output).toContain('Settings');
-      expect(output).toContain('Apply To');
-      expect(output).toContain(
-        'Use Enter to select, Tab to change focus, Esc to close',
-      );
+      expect(output).toContain('Use Enter to select, Tab to configure scope');
     });
 
     it('should accept availableTerminalHeight prop without errors', () => {
@@ -276,7 +273,7 @@ describe('SettingsDialog', () => {
       const output = lastFrame();
       // Should still render properly with the height prop
       expect(output).toContain('Settings');
-      expect(output).toContain('Use Enter to select, Esc to close');
+      expect(output).toContain('Use Enter to select');
     });
 
     it('should show settings list with default values', () => {
@@ -589,7 +586,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount } = render(
+      const { stdin, lastFrame, unmount } = render(
         <KeypressProvider kittyProtocolEnabled={false}>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
@@ -602,7 +599,9 @@ describe('SettingsDialog', () => {
 
       // The UI should show the settings section is active and scope section is inactive
       expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
-      expect(lastFrame()).toContain('  Apply To'); // Scope section inactive
+      stdin.write(TerminalKeys.TAB);
+      await wait();
+      expect(lastFrame()).toContain('Apply To'); // Scope section inactive
 
       // This test validates the initial state - scope selection behavior
       // is complex due to keypress handling, so we focus on state validation
@@ -661,7 +660,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount } = render(
+      const { lastFrame, unmount, stdin } = render(
         <KeypressProvider kittyProtocolEnabled={false}>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
@@ -674,6 +673,8 @@ describe('SettingsDialog', () => {
 
       // Verify the dialog is rendered properly
       expect(lastFrame()).toContain('Settings');
+      stdin.write(TerminalKeys.TAB);
+      await wait();
       expect(lastFrame()).toContain('Apply To');
 
       // This test validates rendering - escape key behavior depends on complex
@@ -1134,7 +1135,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount } = render(
+      const { lastFrame, unmount, stdin } = render(
         <KeypressProvider kittyProtocolEnabled={false}>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
@@ -1147,7 +1148,9 @@ describe('SettingsDialog', () => {
 
       // Verify initial state: settings section active, scope section inactive
       expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
-      expect(lastFrame()).toContain('  Apply To'); // Scope section inactive
+      stdin.write(TerminalKeys.TAB);
+      await wait();
+      expect(lastFrame()).toContain('Apply To'); // Scope section inactive
 
       // This test validates the rendered UI structure for tab navigation
       // Actual tab behavior testing is complex due to keypress handling
@@ -1196,7 +1199,7 @@ describe('SettingsDialog', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { lastFrame, unmount } = render(
+      const { lastFrame, unmount, stdin } = render(
         <KeypressProvider kittyProtocolEnabled={false}>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
@@ -1210,10 +1213,12 @@ describe('SettingsDialog', () => {
       // Verify the complete UI is rendered with all necessary sections
       expect(lastFrame()).toContain('Settings'); // Title
       expect(lastFrame()).toContain('● Vim Mode'); // Active setting
+      stdin.write(TerminalKeys.TAB);
+      await wait();
       expect(lastFrame()).toContain('Apply To'); // Scope section
       expect(lastFrame()).toContain('User Settings'); // Scope options (no numbers when settings focused)
       expect(lastFrame()).toContain(
-        '(Use Enter to select, Tab to change focus, Esc to close)',
+        '(Use Enter to apply scope, Tab to select setting, Esc to close)',
       ); // Help text
 
       // This test validates the complete UI structure is available for user workflow

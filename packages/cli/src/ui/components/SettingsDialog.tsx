@@ -9,11 +9,8 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { LoadedSettings, Settings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
-import {
-  getScopeItems,
-  getScopeMessageForSetting,
-} from '../../utils/dialogScopeUtils.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
+import { ScopeSelector } from './shared/ScopeSelector.js';
 import {
   getDialogSettingKeys,
   setPendingSettingValue,
@@ -57,10 +54,7 @@ export function SettingsDialog({
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
-  // Focus state: 'settings' or 'scope'
-  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
-    'settings',
-  );
+  const [mode, setMode] = useState<'settings' | 'scope'>('settings');
   // Scope selector state (User by default)
   const [selectedScope, setSelectedScope] = useState<SettingScope>(
     SettingScope.User,
@@ -351,98 +345,47 @@ export function SettingsDialog({
     setEditCursorPos(0);
   };
 
-  // Scope selector items
-  const scopeItems = getScopeItems().map((item) => ({
-    ...item,
-    key: item.value,
-  }));
-
   const handleScopeHighlight = (scope: SettingScope) => {
     setSelectedScope(scope);
   };
 
   const handleScopeSelect = (scope: SettingScope) => {
     handleScopeHighlight(scope);
-    setFocusSection('settings');
+    setMode('settings');
   };
 
   // Height constraint calculations similar to ThemeDialog
-  const DIALOG_PADDING = 4;
-  const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
-  const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
-  const SPACING_HEIGHT = 1; // Space between settings list and scope
-  const SCOPE_SELECTION_HEIGHT = 4; // Apply To section height
-  const BOTTOM_HELP_TEXT_HEIGHT = 1; // Help text
+  const DIALOG_PADDING = 2;
+  const SETTINGS_TITLE_HEIGHT = 1;
+  const SCROLL_ARROWS_HEIGHT = 2;
+  const BOTTOM_HELP_TEXT_HEIGHT = 1;
   const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
 
   let currentAvailableTerminalHeight =
     availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
   currentAvailableTerminalHeight -= 2; // Top and bottom borders
 
-  // Start with basic fixed height (without scope selection)
-  let totalFixedHeight =
+  const totalFixedHeight =
     DIALOG_PADDING +
     SETTINGS_TITLE_HEIGHT +
     SCROLL_ARROWS_HEIGHT +
-    SPACING_HEIGHT +
     BOTTOM_HELP_TEXT_HEIGHT +
     RESTART_PROMPT_HEIGHT;
 
-  // Calculate how much space we have for settings
-  let availableHeightForSettings = Math.max(
+  const availableHeightForSettings = Math.max(
     1,
     currentAvailableTerminalHeight - totalFixedHeight,
   );
 
   // Each setting item takes 2 lines (the setting row + spacing)
-  let maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+  const maxVisibleItems = Math.max(
+    1,
+    Math.floor(availableHeightForSettings / 2),
+  );
 
-  // Decide whether to show scope selection based on remaining space
-  let showScopeSelection = true;
-
-  // If we have limited height, prioritize showing more settings over scope selection
-  if (availableTerminalHeight && availableTerminalHeight < 25) {
-    // For very limited height, hide scope selection to show more settings
-    const totalWithScope = totalFixedHeight + SCOPE_SELECTION_HEIGHT;
-    const availableWithScope = Math.max(
-      1,
-      currentAvailableTerminalHeight - totalWithScope,
-    );
-    const maxItemsWithScope = Math.max(1, Math.floor(availableWithScope / 2));
-
-    // If hiding scope selection allows us to show significantly more settings, do it
-    if (maxVisibleItems > maxItemsWithScope + 1) {
-      showScopeSelection = false;
-    } else {
-      // Otherwise include scope selection and recalculate
-      totalFixedHeight += SCOPE_SELECTION_HEIGHT;
-      availableHeightForSettings = Math.max(
-        1,
-        currentAvailableTerminalHeight - totalFixedHeight,
-      );
-      maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
-    }
-  } else {
-    // For normal height, include scope selection
-    totalFixedHeight += SCOPE_SELECTION_HEIGHT;
-    availableHeightForSettings = Math.max(
-      1,
-      currentAvailableTerminalHeight - totalFixedHeight,
-    );
-    maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
-  }
-
-  // Use the calculated maxVisibleItems or fall back to the original maxItemsToShow
   const effectiveMaxItemsToShow = availableTerminalHeight
     ? Math.min(maxVisibleItems, items.length)
     : maxItemsToShow;
-
-  // Ensure focus stays on settings when scope selection is hidden
-  React.useEffect(() => {
-    if (!showScopeSelection && focusSection === 'scope') {
-      setFocusSection('settings');
-    }
-  }, [showScopeSelection, focusSection]);
 
   // Scroll logic for settings
   const visibleItems = items.slice(
@@ -456,10 +399,10 @@ export function SettingsDialog({
   useKeypress(
     (key) => {
       const { name, ctrl } = key;
-      if (name === 'tab' && showScopeSelection) {
-        setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
+      if (name === 'tab') {
+        setMode((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
-      if (focusSection === 'settings') {
+      if (mode === 'settings') {
         // If editing, capture input and control keys
         if (editingKey) {
           const definition = getSettingDefinition(editingKey);
@@ -741,167 +684,160 @@ export function SettingsDialog({
     <Box
       borderStyle="round"
       borderColor={theme.border.default}
-      flexDirection="row"
+      flexDirection="column"
       padding={1}
       width="100%"
       height="100%"
     >
-      <Box flexDirection="column" flexGrow={1}>
-        <Text bold={focusSection === 'settings'} wrap="truncate">
-          {focusSection === 'settings' ? '> ' : '  '}Settings
-        </Text>
-        <Box height={1} />
-        {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
-        {visibleItems.map((item, idx) => {
-          const isActive =
-            focusSection === 'settings' &&
-            activeSettingIndex === idx + scrollOffset;
+      {mode === 'settings' ? (
+        <Box flexDirection="column" flexGrow={1}>
+          <Text bold={mode === 'settings'} wrap="truncate">
+            {mode === 'settings' ? '> ' : '  '}Settings
+          </Text>
+          <Box height={1} />
+          {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
+          {visibleItems.map((item, idx) => {
+            const isActive =
+              mode === 'settings' && activeSettingIndex === idx + scrollOffset;
 
-          const scopeSettings = settings.forScope(selectedScope).settings;
-          const mergedSettings = settings.merged;
+            const scopeSettings = settings.forScope(selectedScope).settings;
+            const mergedSettings = settings.merged;
 
-          let displayValue: string;
-          if (editingKey === item.value) {
-            // Show edit buffer with advanced cursor highlighting
-            if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
-              // Cursor is in the middle or at start of text
-              const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
-              const atCursor = cpSlice(
-                editBuffer,
-                editCursorPos,
-                editCursorPos + 1,
+            let displayValue: string;
+            if (editingKey === item.value) {
+              // Show edit buffer with advanced cursor highlighting
+              if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
+                // Cursor is in the middle or at start of text
+                const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
+                const atCursor = cpSlice(
+                  editBuffer,
+                  editCursorPos,
+                  editCursorPos + 1,
+                );
+                const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
+                displayValue =
+                  beforeCursor + chalk.inverse(atCursor) + afterCursor;
+              } else if (cursorVisible && editCursorPos >= cpLen(editBuffer)) {
+                // Cursor is at the end - show inverted space
+                displayValue = editBuffer + chalk.inverse(' ');
+              } else {
+                // Cursor not visible
+                displayValue = editBuffer;
+              }
+            } else if (item.type === 'number' || item.type === 'string') {
+              // For numbers/strings, get the actual current value from pending settings
+              const path = item.value.split('.');
+              const currentValue = getNestedValue(pendingSettings, path);
+
+              const defaultValue = getDefaultValue(item.value);
+
+              if (currentValue !== undefined && currentValue !== null) {
+                displayValue = String(currentValue);
+              } else {
+                displayValue =
+                  defaultValue !== undefined && defaultValue !== null
+                    ? String(defaultValue)
+                    : '';
+              }
+
+              // Add * if value differs from default OR if currently being modified
+              const isModified = modifiedSettings.has(item.value);
+              const effectiveCurrentValue =
+                currentValue !== undefined && currentValue !== null
+                  ? currentValue
+                  : defaultValue;
+              const isDifferentFromDefault =
+                effectiveCurrentValue !== defaultValue;
+
+              if (isDifferentFromDefault || isModified) {
+                displayValue += '*';
+              }
+            } else {
+              // For booleans and other types, use existing logic
+              displayValue = getDisplayValue(
+                item.value,
+                scopeSettings,
+                mergedSettings,
+                modifiedSettings,
+                pendingSettings,
               );
-              const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
-              displayValue =
-                beforeCursor + chalk.inverse(atCursor) + afterCursor;
-            } else if (cursorVisible && editCursorPos >= cpLen(editBuffer)) {
-              // Cursor is at the end - show inverted space
-              displayValue = editBuffer + chalk.inverse(' ');
-            } else {
-              // Cursor not visible
-              displayValue = editBuffer;
             }
-          } else if (item.type === 'number' || item.type === 'string') {
-            // For numbers/strings, get the actual current value from pending settings
-            const path = item.value.split('.');
-            const currentValue = getNestedValue(pendingSettings, path);
+            const shouldBeGreyedOut = isDefaultValue(item.value, scopeSettings);
 
-            const defaultValue = getDefaultValue(item.value);
-
-            if (currentValue !== undefined && currentValue !== null) {
-              displayValue = String(currentValue);
-            } else {
-              displayValue =
-                defaultValue !== undefined && defaultValue !== null
-                  ? String(defaultValue)
-                  : '';
-            }
-
-            // Add * if value differs from default OR if currently being modified
-            const isModified = modifiedSettings.has(item.value);
-            const effectiveCurrentValue =
-              currentValue !== undefined && currentValue !== null
-                ? currentValue
-                : defaultValue;
-            const isDifferentFromDefault =
-              effectiveCurrentValue !== defaultValue;
-
-            if (isDifferentFromDefault || isModified) {
-              displayValue += '*';
-            }
-          } else {
-            // For booleans and other types, use existing logic
-            displayValue = getDisplayValue(
+            // Generate scope message for this setting
+            const scopeMessage = getScopeMessageForSetting(
               item.value,
-              scopeSettings,
-              mergedSettings,
-              modifiedSettings,
-              pendingSettings,
+              selectedScope,
+              settings,
             );
-          }
-          const shouldBeGreyedOut = isDefaultValue(item.value, scopeSettings);
 
-          // Generate scope message for this setting
-          const scopeMessage = getScopeMessageForSetting(
-            item.value,
-            selectedScope,
-            settings,
-          );
-
-          return (
-            <React.Fragment key={item.value}>
-              <Box flexDirection="row" alignItems="center">
-                <Box minWidth={2} flexShrink={0}>
+            return (
+              <React.Fragment key={item.value}>
+                <Box flexDirection="row" alignItems="center">
+                  <Box minWidth={2} flexShrink={0}>
+                    <Text
+                      color={
+                        isActive ? theme.status.success : theme.text.secondary
+                      }
+                    >
+                      {isActive ? '●' : ''}
+                    </Text>
+                  </Box>
+                  <Box minWidth={50}>
+                    <Text
+                      color={
+                        isActive ? theme.status.success : theme.text.primary
+                      }
+                    >
+                      {item.label}
+                      {scopeMessage && (
+                        <Text color={theme.text.secondary}>
+                          {' '}
+                          {scopeMessage}
+                        </Text>
+                      )}
+                    </Text>
+                  </Box>
+                  <Box minWidth={3} />
                   <Text
                     color={
-                      isActive ? theme.status.success : theme.text.secondary
+                      isActive
+                        ? theme.status.success
+                        : shouldBeGreyedOut
+                          ? theme.text.secondary
+                          : theme.text.primary
                     }
                   >
-                    {isActive ? '●' : ''}
+                    {displayValue}
                   </Text>
                 </Box>
-                <Box minWidth={50}>
-                  <Text
-                    color={isActive ? theme.status.success : theme.text.primary}
-                  >
-                    {item.label}
-                    {scopeMessage && (
-                      <Text color={theme.text.secondary}> {scopeMessage}</Text>
-                    )}
-                  </Text>
-                </Box>
-                <Box minWidth={3} />
-                <Text
-                  color={
-                    isActive
-                      ? theme.status.success
-                      : shouldBeGreyedOut
-                        ? theme.text.secondary
-                        : theme.text.primary
-                  }
-                >
-                  {displayValue}
-                </Text>
-              </Box>
-              <Box height={1} />
-            </React.Fragment>
-          );
-        })}
-        {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
+                <Box height={1} />
+              </React.Fragment>
+            );
+          })}
+          {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
+        </Box>
+      ) : (
+        <ScopeSelector
+          onSelect={handleScopeSelect}
+          onHighlight={handleScopeHighlight}
+          isFocused={mode === 'scope'}
+          initialScope={selectedScope}
+        />
+      )}
 
-        <Box height={1} />
-
-        {/* Scope Selection - conditionally visible based on height constraints */}
-        {showScopeSelection && (
-          <Box marginTop={1} flexDirection="column">
-            <Text bold={focusSection === 'scope'} wrap="truncate">
-              {focusSection === 'scope' ? '> ' : '  '}Apply To
-            </Text>
-            <RadioButtonSelect
-              items={scopeItems}
-              initialIndex={scopeItems.findIndex(
-                (item) => item.value === selectedScope,
-              )}
-              onSelect={handleScopeSelect}
-              onHighlight={handleScopeHighlight}
-              isFocused={focusSection === 'scope'}
-              showNumbers={focusSection === 'scope'}
-            />
-          </Box>
-        )}
-
-        <Box height={1} />
-        <Text color={theme.text.secondary}>
-          (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
+      <Box height={1} />
+      <Text color={theme.text.secondary}>
+        (Use Enter to {mode === 'settings' ? 'select' : 'apply scope'}, Tab to{' '}
+        {mode === 'settings' ? 'configure scope' : 'select setting'}, Esc to
+        close)
+      </Text>
+      {showRestartPrompt && (
+        <Text color={theme.status.warning}>
+          To see changes, Gemini CLI must be restarted. Press r to exit and
+          apply changes now.
         </Text>
-        {showRestartPrompt && (
-          <Text color={theme.status.warning}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
-          </Text>
-        )}
-      </Box>
+      )}
     </Box>
   );
 }
