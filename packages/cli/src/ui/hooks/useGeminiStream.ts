@@ -376,6 +376,12 @@ export const useGeminiStream = (
 
         // Handle @-commands (which might involve tool calls)
         if (isAtCommand(trimmedQuery)) {
+          // Add user\'s turn before @ command processing is done.
+          addItem(
+            { type: MessageType.USER, text: trimmedQuery },
+            userMessageTimestamp,
+          );
+
           const atCommandResult = await handleAtCommand({
             query: trimmedQuery,
             config,
@@ -384,12 +390,6 @@ export const useGeminiStream = (
             messageId: userMessageTimestamp,
             signal: abortSignal,
           });
-
-          // Add user's turn after @ command processing is done.
-          addItem(
-            { type: MessageType.USER, text: trimmedQuery },
-            userMessageTimestamp,
-          );
 
           if (!atCommandResult.shouldProceed) {
             return { queryToSend: null, shouldProceed: false };
