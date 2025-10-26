@@ -47,6 +47,8 @@ export const KITTY_SEQUENCE_TIMEOUT_MS = 50; // Flush incomplete kitty sequences
 export const SINGLE_QUOTE = "'";
 export const DOUBLE_QUOTE = '"';
 
+// Alt key character mapping for macOS - on macOS, Alt+letter combinations produce special characters
+// On other platforms like Linux, these characters are typed directly and should not be mapped
 const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00E5': 'a',
   '\u222B': 'b',
@@ -273,7 +275,8 @@ export function KeypressProvider({
           mods -= KITTY_MODIFIER_EVENT_TYPES_OFFSET;
         }
         const bits = mods - KITTY_MODIFIER_BASE;
-        const shift = (bits & MODIFIER_SHIFT_BIT) === MODIFIER_SHIFT_BIT;
+        const shift =
+          (bits & MODIFIER_SHIFT_BIT) === MODIFIER_SHIFT_BIT;
         const alt = (bits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
         const ctrl = (bits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
         const sym = m[2];
@@ -522,8 +525,10 @@ export function KeypressProvider({
         return;
       }
 
+      // Only apply Alt key character mapping on macOS (darwin platform)
+      // On Linux and other platforms, these characters are typed directly
       const mappedLetter = ALT_KEY_CHARACTER_MAP[key.sequence];
-      if (mappedLetter && !key.meta) {
+      if (mappedLetter && !key.meta && process.platform === 'darwin') {
         broadcast({
           name: mappedLetter,
           ctrl: false,
