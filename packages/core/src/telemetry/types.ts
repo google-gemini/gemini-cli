@@ -91,7 +91,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     const extensions = config.getExtensions();
     this.extensions_count = extensions.length;
     this.extension_ids = extensions.map((e) => e.id).join(',');
-    this.auth_type = generatorConfig?.authType ? generatorConfig.authType : '';
+    this.auth_type = generatorConfig?.authType;
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
