@@ -1,62 +1,82 @@
-# Local development guide
+# Local Development Guide
 
-## Dev Tracing with OpenTelemetry
+This guide provides instructions for setting up and using local development
+features, such as development tracing.
 
-Dev traces are OpenTelemetry (otel) traces that are used to instrument the code
-in various interesting places that are super useful for debugging: model calls,
-tool scheduler, tool calls, etc.
+## Development Tracing
 
-Dev traces are verbose, specifically meant for understanding agent behaviour and
-debugging issues. They are disabled by default.
+Development traces (dev traces) are OpenTelemetry (OTel) traces that help you
+debug your code by instrumenting interesting events like model calls, tool
+scheduler, tool calls, etc.
 
-To enable dev traces, you need to set the `GEMINI_DEV_TRACING=true` environment
-variable.
+Dev traces are verbose and are specifically meant for understanding agent
+behaviour and debugging issues. They are disabled by default.
+
+To enable dev traces, set the `GEMINI_DEV_TRACING=true` environment variable
+when running Gemini CLI.
 
 ### Viewing Dev Traces
 
-Dev traces can be viewed in the Jaeger UI. To get started, run the following
-command in your terminal:
+You can view dev traces in the Jaeger UI. To get started, follow these steps:
 
-```bash
-npm run telemetry -- --target=local
-```
+1.  **Start the telemetry collector:**
 
-This command will:
+    Run the following command in your terminal to download and start Jaeger and
+    an OTEL collector:
 
-- Download and start Jaeger and an OTEL collector.
-- Configure your workspace for local telemetry.
-- Provide a link to the Jaeger UI, which is usually at `http://localhost:16686`.
+    ```bash
+    npm run telemetry -- --target=local
+    ```
 
-Once the collector and Jaeger are running, you can run the Gemini CLI with dev
-tracing enabled in a separate terminal:
+    This command also configures your workspace for local telemetry and provides
+    a link to the Jaeger UI (usually `http://localhost:16686`).
 
-```bash
-GEMINI_DEV_TRACING=true gemini
-```
+2.  **Run Gemini CLI with dev tracing:**
 
-After running your commands, you can view the traces in the Jaeger UI.
+    In a separate terminal, run your Gemini CLI command with the
+    `GEMINI_DEV_TRACING` environment variable:
 
-For more detailed information on telemetry configuration, see the
-[OpenTelemetry documentation](./cli/telemetry.md).
+    ```bash
+    GEMINI_DEV_TRACING=true gemini [your-command]
+    ```
 
-### Instrumenting code with Dev Traces
+3.  **View the traces:**
 
-You can add dev traces to your own code to provide more detailed
-instrumentation. This is useful for debugging and understanding the flow of
-execution.
+    After running your command, open the Jaeger UI link in your browser to view
+    the traces.
 
-The `runInDevTraceSpan` function can be used to wrap any section of code in a
-trace span.
+For more detailed information on telemetry, see the
+[telemetry documentation](./cli/telemetry.md).
 
-Here is a basic example of how to use it:
+### Instrumenting Code with Dev Traces
+
+You can add dev traces to your own code for more detailed instrumentation. This
+is useful for debugging and understanding the flow of execution.
+
+Use the `runInDevTraceSpan` function to wrap any section of code in a trace
+span.
+
+Here is a basic example:
 
 ```typescript
 import { runInDevTraceSpan } from '@google/gemini-cli-core';
 
 await runInDevTraceSpan({ name: 'my-custom-span' }, async ({ metadata }) => {
+  // The `metadata` object allows you to record the input and output of the
+  // operation as well as other attributes.
   metadata.input = { key: 'value' };
+  // Set custom attributes.
+  metadata.attributes['gen_ai.request.model'] = 'gemini-4.0-mega';
+
   // Your code to be traced goes here
-  metadata.output = { result: 'success' };
+  try {
+    const output = await somethingRisky();
+    metadata.output = output;
+    return output;
+  } catch (e) {
+    metadata.error = e;
+    throw e;
+  }
 });
 ```
 
