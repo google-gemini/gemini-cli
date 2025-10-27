@@ -5,8 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
 import type React from 'react';
+import { act } from 'react';
+import { render } from 'ink-testing-library';
 import { useVim } from './vim.js';
 import type { VimMode } from './vim.js';
 import type { Key } from './useKeypress.js';
@@ -173,10 +174,25 @@ describe('useVim hook', () => {
     };
   };
 
-  const renderVimHook = (buffer?: Partial<TextBuffer>) =>
-    renderHook(() =>
-      useVim((buffer || mockBuffer) as TextBuffer, mockHandleFinalSubmit),
-    );
+  const renderVimHook = (buffer?: Partial<TextBuffer>) => {
+    let hookResult: ReturnType<typeof useVim>;
+    function TestComponent() {
+      hookResult = useVim(
+        (buffer || mockBuffer) as TextBuffer,
+        mockHandleFinalSubmit,
+      );
+      return null;
+    }
+    const { rerender } = render(<TestComponent />);
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      rerender: () => rerender(<TestComponent />),
+    };
+  };
 
   const exitInsertMode = (result: {
     current: {
@@ -1286,9 +1302,13 @@ describe('useVim hook', () => {
   });
 
   describe('Shell command pass-through', () => {
-    it('should pass through ctrl+r in INSERT mode', () => {
+    it('should pass through ctrl+r in INSERT mode', async () => {
       mockVimContext.vimMode = 'INSERT';
       const { result } = renderVimHook();
+
+      await vi.waitFor(() => {
+        expect(result.current.mode).toBe('INSERT');
+      });
 
       const handled = result.current.handleInput(
         createKey({ name: 'r', ctrl: true }),
@@ -1297,20 +1317,29 @@ describe('useVim hook', () => {
       expect(handled).toBe(false);
     });
 
-    it('should pass through ! in INSERT mode when buffer is empty', () => {
+    it('should pass through ! in INSERT mode when buffer is empty', async () => {
       mockVimContext.vimMode = 'INSERT';
       const emptyBuffer = createMockBuffer('');
       const { result } = renderVimHook(emptyBuffer);
+
+      await vi.waitFor(() => {
+        expect(result.current.mode).toBe('INSERT');
+      });
 
       const handled = result.current.handleInput(createKey({ sequence: '!' }));
 
       expect(handled).toBe(false);
     });
 
-    it('should handle ! as input in INSERT mode when buffer is not empty', () => {
+    it('should handle ! as input in INSERT mode when buffer is not empty', async () => {
       mockVimContext.vimMode = 'INSERT';
       const nonEmptyBuffer = createMockBuffer('not empty');
       const { result } = renderVimHook(nonEmptyBuffer);
+
+      await vi.waitFor(() => {
+        expect(result.current.mode).toBe('INSERT');
+      });
+
       const key = createKey({ sequence: '!', name: '!' });
 
       act(() => {

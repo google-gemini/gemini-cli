@@ -5,7 +5,7 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor, act } from '@testing-library/react';
+import { act } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -233,29 +233,29 @@ describe('InputPrompt', () => {
     };
   });
 
-  const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
-
   it('should call shellHistory.getPreviousCommand on up arrow in shell mode', async () => {
     props.shellModeActive = true;
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\u001B[A');
-    await wait();
-
-    expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled();
+    await act(async () => {
+      stdin.write('\u001B[A');
+    });
+    await vi.waitFor(() =>
+      expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled(),
+    );
     unmount();
   });
 
   it('should call shellHistory.getNextCommand on down arrow in shell mode', async () => {
     props.shellModeActive = true;
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\u001B[B');
-    await wait();
-
-    expect(mockShellHistory.getNextCommand).toHaveBeenCalled();
+    await act(async () => {
+      stdin.write('\u001B[B');
+    });
+    await vi.waitFor(() =>
+      expect(mockShellHistory.getNextCommand).toHaveBeenCalled(),
+    );
     unmount();
   });
 
@@ -265,13 +265,14 @@ describe('InputPrompt', () => {
       'previous command',
     );
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\u001B[A');
-    await wait();
-
-    expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled();
-    expect(props.buffer.setText).toHaveBeenCalledWith('previous command');
+    await act(async () => {
+      stdin.write('\u001B[A');
+    });
+    await vi.waitFor(() => {
+      expect(mockShellHistory.getPreviousCommand).toHaveBeenCalled();
+      expect(props.buffer.setText).toHaveBeenCalledWith('previous command');
+    });
     unmount();
   });
 
@@ -279,35 +280,47 @@ describe('InputPrompt', () => {
     props.shellModeActive = true;
     props.buffer.setText('ls -l');
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\r');
-    await wait();
-
-    expect(mockShellHistory.addCommandToHistory).toHaveBeenCalledWith('ls -l');
-    expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await vi.waitFor(() => {
+      expect(mockShellHistory.addCommandToHistory).toHaveBeenCalledWith(
+        'ls -l',
+      );
+      expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
+    });
     unmount();
   });
 
   it('should NOT call shell history methods when not in shell mode', async () => {
     props.buffer.setText('some text');
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\u001B[A'); // Up arrow
-    await wait();
-    stdin.write('\u001B[B'); // Down arrow
-    await wait();
-    stdin.write('\r'); // Enter
-    await wait();
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+    await vi.waitFor(() =>
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
+    );
+
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
+    await vi.waitFor(() =>
+      expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
+    );
+
+    await act(async () => {
+      stdin.write('\r'); // Enter
+    });
+    await vi.waitFor(() =>
+      expect(props.onSubmit).toHaveBeenCalledWith('some text'),
+    );
 
     expect(mockShellHistory.getPreviousCommand).not.toHaveBeenCalled();
     expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();
     expect(mockShellHistory.addCommandToHistory).not.toHaveBeenCalled();
-
-    expect(mockInputHistory.navigateUp).toHaveBeenCalled();
-    expect(mockInputHistory.navigateDown).toHaveBeenCalled();
-    expect(props.onSubmit).toHaveBeenCalledWith('some text');
     unmount();
   });
 
@@ -324,15 +337,21 @@ describe('InputPrompt', () => {
     props.buffer.setText('/mem');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
     // Test up arrow
-    stdin.write('\u001B[A'); // Up arrow
-    await wait();
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.navigateUp).toHaveBeenCalledTimes(1),
+    );
 
-    stdin.write('\u0010'); // Ctrl+P
-    await wait();
-    expect(mockCommandCompletion.navigateUp).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      stdin.write('\u0010'); // Ctrl+P
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.navigateUp).toHaveBeenCalledTimes(2),
+    );
     expect(mockCommandCompletion.navigateDown).not.toHaveBeenCalled();
 
     unmount();
@@ -350,15 +369,21 @@ describe('InputPrompt', () => {
     props.buffer.setText('/mem');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
     // Test down arrow
-    stdin.write('\u001B[B'); // Down arrow
-    await wait();
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.navigateDown).toHaveBeenCalledTimes(1),
+    );
 
-    stdin.write('\u000E'); // Ctrl+N
-    await wait();
-    expect(mockCommandCompletion.navigateDown).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      stdin.write('\u000E'); // Ctrl+N
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.navigateDown).toHaveBeenCalledTimes(2),
+    );
     expect(mockCommandCompletion.navigateUp).not.toHaveBeenCalled();
 
     unmount();
@@ -372,16 +397,27 @@ describe('InputPrompt', () => {
     props.buffer.setText('some text');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\u001B[A'); // Up arrow
-    await wait();
-    stdin.write('\u001B[B'); // Down arrow
-    await wait();
-    stdin.write('\u0010'); // Ctrl+P
-    await wait();
-    stdin.write('\u000E'); // Ctrl+N
-    await wait();
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+    await vi.waitFor(() =>
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
+    );
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
+    await vi.waitFor(() =>
+      expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
+    );
+    await act(async () => {
+      stdin.write('\u0010'); // Ctrl+P
+    });
+    await vi.waitFor(() => {});
+    await act(async () => {
+      stdin.write('\u000E'); // Ctrl+N
+    });
+    await vi.waitFor(() => {});
 
     expect(mockCommandCompletion.navigateUp).not.toHaveBeenCalled();
     expect(mockCommandCompletion.navigateDown).not.toHaveBeenCalled();
@@ -406,20 +442,21 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
       // Send Ctrl+V
-      stdin.write('\x16'); // Ctrl+V
-      await wait();
-
-      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
-      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
-        props.config.getTargetDir(),
-      );
-      expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
-        props.config.getTargetDir(),
-      );
-      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+      await vi.waitFor(() => {
+        expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
+          props.config.getTargetDir(),
+        );
+        expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
+          props.config.getTargetDir(),
+        );
+        expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+      });
       unmount();
     });
 
@@ -429,12 +466,13 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x16'); // Ctrl+V
-      await wait();
-
-      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+      await vi.waitFor(() => {
+        expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      });
       expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
       expect(mockBuffer.setText).not.toHaveBeenCalled();
       unmount();
@@ -447,12 +485,13 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x16'); // Ctrl+V
-      await wait();
-
-      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+      await vi.waitFor(() => {
+        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+      });
       expect(mockBuffer.setText).not.toHaveBeenCalled();
       unmount();
     });
@@ -475,13 +514,14 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x16'); // Ctrl+V
-      await wait();
-
-      // Should insert at cursor position with spaces
-      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+      await vi.waitFor(() => {
+        // Should insert at cursor position with spaces
+        expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+      });
 
       // Get the actual call to see what path was used
       const actualCall = vi.mocked(mockBuffer.replaceRangeByOffset).mock
@@ -505,15 +545,16 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x16'); // Ctrl+V
-      await wait();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error handling clipboard image:',
-        expect.any(Error),
-      );
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+      await vi.waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Error handling clipboard image:',
+          expect.any(Error),
+        );
+      });
       expect(mockBuffer.setText).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
@@ -532,12 +573,13 @@ describe('InputPrompt', () => {
     props.buffer.setText('/mem');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\t'); // Press Tab
-    await wait();
-
-    expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
+    );
     unmount();
   });
 
@@ -555,12 +597,13 @@ describe('InputPrompt', () => {
     props.buffer.setText('/memory ');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\t'); // Press Tab
-    await wait();
-
-    expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(1);
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(1),
+    );
     unmount();
   });
 
@@ -579,13 +622,14 @@ describe('InputPrompt', () => {
     props.buffer.setText('/memory');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\t'); // Press Tab
-    await wait();
-
-    // It should NOT become '/show'. It should correctly become '/memory show'.
-    expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
+    await vi.waitFor(() =>
+      // It should NOT become '/show'. It should correctly become '/memory show'.
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
+    );
     unmount();
   });
 
@@ -600,12 +644,13 @@ describe('InputPrompt', () => {
     props.buffer.setText('/chat resume fi-');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\t'); // Press Tab
-    await wait();
-
-    expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    await act(async () => {
+      stdin.write('\t'); // Press Tab
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
+    );
     unmount();
   });
 
@@ -619,13 +664,14 @@ describe('InputPrompt', () => {
     props.buffer.setText('/mem');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\r');
-    await wait();
-
-    // The app should autocomplete the text, NOT submit.
-    expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await vi.waitFor(() => {
+      // The app should autocomplete the text, NOT submit.
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    });
 
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
@@ -650,12 +696,13 @@ describe('InputPrompt', () => {
     props.buffer.setText('/?');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\t'); // Press Tab for autocomplete
-    await wait();
-
-    expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    await act(async () => {
+      stdin.write('\t'); // Press Tab for autocomplete
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
+    );
     unmount();
   });
 
@@ -663,10 +710,11 @@ describe('InputPrompt', () => {
     props.buffer.setText('   '); // Set buffer to whitespace
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\r'); // Press Enter
-    await wait();
+    await act(async () => {
+      stdin.write('\r'); // Press Enter
+    });
+    await vi.waitFor(() => {});
 
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
@@ -681,12 +729,13 @@ describe('InputPrompt', () => {
     props.buffer.setText('/clear');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\r');
-    await wait();
-
-    expect(props.onSubmit).toHaveBeenCalledWith('/clear');
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await vi.waitFor(() =>
+      expect(props.onSubmit).toHaveBeenCalledWith('/clear'),
+    );
     unmount();
   });
 
@@ -699,12 +748,13 @@ describe('InputPrompt', () => {
     props.buffer.setText('/clear');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\r');
-    await wait();
-
-    expect(props.onSubmit).toHaveBeenCalledWith('/clear');
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await vi.waitFor(() =>
+      expect(props.onSubmit).toHaveBeenCalledWith('/clear'),
+    );
     unmount();
   });
 
@@ -718,12 +768,13 @@ describe('InputPrompt', () => {
     props.buffer.setText('@src/components/');
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\r');
-    await wait();
-
-    expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await vi.waitFor(() =>
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
+    );
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
   });
@@ -735,27 +786,30 @@ describe('InputPrompt', () => {
     mockBuffer.lines = ['first line\\'];
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\r');
-    await wait();
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await vi.waitFor(() => {
+      expect(props.buffer.backspace).toHaveBeenCalled();
+      expect(props.buffer.newline).toHaveBeenCalled();
+    });
 
     expect(props.onSubmit).not.toHaveBeenCalled();
-    expect(props.buffer.backspace).toHaveBeenCalled();
-    expect(props.buffer.newline).toHaveBeenCalled();
     unmount();
   });
 
   it('should clear the buffer on Ctrl+C if it has text', async () => {
     props.buffer.setText('some text to clear');
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\x03'); // Ctrl+C character
-    await wait();
-
-    expect(props.buffer.setText).toHaveBeenCalledWith('');
-    expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+    await act(async () => {
+      stdin.write('\x03'); // Ctrl+C character
+    });
+    await vi.waitFor(() => {
+      expect(props.buffer.setText).toHaveBeenCalledWith('');
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+    });
     expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
   });
@@ -763,418 +817,123 @@ describe('InputPrompt', () => {
   it('should NOT clear the buffer on Ctrl+C if it is empty', async () => {
     props.buffer.text = '';
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
 
-    stdin.write('\x03'); // Ctrl+C character
-    await wait();
+    await act(async () => {
+      stdin.write('\x03'); // Ctrl+C character
+    });
+    await vi.waitFor(() => {});
 
     expect(props.buffer.setText).not.toHaveBeenCalled();
     unmount();
   });
 
   describe('cursor-based completion trigger', () => {
-    it('should trigger completion when cursor is after @ without spaces', async () => {
-      // Set up buffer state
-      mockBuffer.text = '@src/components';
-      mockBuffer.lines = ['@src/components'];
-      mockBuffer.cursor = [0, 15];
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+    it.each([
+      {
+        name: 'should trigger completion when cursor is after @ without spaces',
+        text: '@src/components',
+        cursor: [0, 15],
         showSuggestions: true,
-        suggestions: [{ label: 'Button.tsx', value: 'Button.tsx' }],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      // Verify useCompletion was called with correct signature
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should trigger completion when cursor is after / without spaces', async () => {
-      mockBuffer.text = '/memory';
-      mockBuffer.lines = ['/memory'];
-      mockBuffer.cursor = [0, 7];
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should trigger completion when cursor is after / without spaces',
+        text: '/memory',
+        cursor: [0, 7],
         showSuggestions: true,
-        suggestions: [{ label: 'show', value: 'show' }],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should NOT trigger completion when cursor is after space following @', async () => {
-      mockBuffer.text = '@src/file.ts hello';
-      mockBuffer.lines = ['@src/file.ts hello'];
-      mockBuffer.cursor = [0, 18];
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should NOT trigger completion when cursor is after space following @',
+        text: '@src/file.ts hello',
+        cursor: [0, 18],
         showSuggestions: false,
-        suggestions: [],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should NOT trigger completion when cursor is after space following /', async () => {
-      mockBuffer.text = '/memory add';
-      mockBuffer.lines = ['/memory add'];
-      mockBuffer.cursor = [0, 11];
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should NOT trigger completion when cursor is after space following /',
+        text: '/memory add',
+        cursor: [0, 11],
         showSuggestions: false,
-        suggestions: [],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should NOT trigger completion when cursor is not after @ or /', async () => {
-      mockBuffer.text = 'hello world';
-      mockBuffer.lines = ['hello world'];
-      mockBuffer.cursor = [0, 5];
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should NOT trigger completion when cursor is not after @ or /',
+        text: 'hello world',
+        cursor: [0, 5],
         showSuggestions: false,
-        suggestions: [],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle multiline text correctly', async () => {
-      mockBuffer.text = 'first line\n/memory';
-      mockBuffer.lines = ['first line', '/memory'];
-      mockBuffer.cursor = [1, 7];
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should handle multiline text correctly',
+        text: 'first line\n/memory',
+        cursor: [1, 7],
         showSuggestions: false,
-        suggestions: [],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      // Verify useCompletion was called with the buffer
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle single line slash command correctly', async () => {
-      mockBuffer.text = '/memory';
-      mockBuffer.lines = ['/memory'];
-      mockBuffer.cursor = [0, 7];
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should handle Unicode characters (emojis) correctly in paths',
+        text: '@src/file👍.txt',
+        cursor: [0, 14],
         showSuggestions: true,
-        suggestions: [{ label: 'show', value: 'show' }],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle Unicode characters (emojis) correctly in paths', async () => {
-      // Test with emoji in path after @
-      mockBuffer.text = '@src/file👍.txt';
-      mockBuffer.lines = ['@src/file👍.txt'];
-      mockBuffer.cursor = [0, 14]; // After the emoji character
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
-        showSuggestions: true,
-        suggestions: [{ label: 'file👍.txt', value: 'file👍.txt' }],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle Unicode characters with spaces after them', async () => {
-      // Test with emoji followed by space - should NOT trigger completion
-      mockBuffer.text = '@src/file👍.txt hello';
-      mockBuffer.lines = ['@src/file👍.txt hello'];
-      mockBuffer.cursor = [0, 20]; // After the space
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should handle Unicode characters with spaces after them',
+        text: '@src/file👍.txt hello',
+        cursor: [0, 20],
         showSuggestions: false,
-        suggestions: [],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle escaped spaces in paths correctly', async () => {
-      // Test with escaped space in path - should trigger completion
-      mockBuffer.text = '@src/my\\ file.txt';
-      mockBuffer.lines = ['@src/my\\ file.txt'];
-      mockBuffer.cursor = [0, 16]; // After the escaped space and filename
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should handle escaped spaces in paths correctly',
+        text: '@src/my\\ file.txt',
+        cursor: [0, 16],
         showSuggestions: true,
-        suggestions: [{ label: 'my file.txt', value: 'my file.txt' }],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should NOT trigger completion after unescaped space following escaped space', async () => {
-      // Test: @path/my\ file.txt hello (unescaped space after escaped space)
-      mockBuffer.text = '@path/my\\ file.txt hello';
-      mockBuffer.lines = ['@path/my\\ file.txt hello'];
-      mockBuffer.cursor = [0, 24]; // After "hello"
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
+      },
+      {
+        name: 'should NOT trigger completion after unescaped space following escaped space',
+        text: '@path/my\\ file.txt hello',
+        cursor: [0, 24],
         showSuggestions: false,
-        suggestions: [],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle multiple escaped spaces in paths', async () => {
-      // Test with multiple escaped spaces
-      mockBuffer.text = '@docs/my\\ long\\ file\\ name.md';
-      mockBuffer.lines = ['@docs/my\\ long\\ file\\ name.md'];
-      mockBuffer.cursor = [0, 29]; // At the end
+      },
+      {
+        name: 'should handle multiple escaped spaces in paths',
+        text: '@docs/my\\ long\\ file\\ name.md',
+        cursor: [0, 29],
+        showSuggestions: true,
+      },
+      {
+        name: 'should handle escaped spaces in slash commands',
+        text: '/memory\\ test',
+        cursor: [0, 13],
+        showSuggestions: true,
+      },
+      {
+        name: 'should handle Unicode characters with escaped spaces',
+        text: `@${path.join('files', 'emoji\\ 👍\\ test.txt')}`,
+        cursor: [0, 25],
+        showSuggestions: true,
+      },
+    ])('$name', async ({ text, cursor, showSuggestions }) => {
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.cursor = cursor as [number, number];
 
       mockedUseCommandCompletion.mockReturnValue({
         ...mockCommandCompletion,
-        showSuggestions: true,
-        suggestions: [
-          { label: 'my long file name.md', value: 'my long file name.md' },
-        ],
+        showSuggestions,
+        suggestions: showSuggestions
+          ? [{ label: 'suggestion', value: 'suggestion' }]
+          : [],
       });
 
       const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
 
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle escaped spaces in slash commands', async () => {
-      // Test escaped spaces with slash commands (though less common)
-      mockBuffer.text = '/memory\\ test';
-      mockBuffer.lines = ['/memory\\ test'];
-      mockBuffer.cursor = [0, 13]; // At the end
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
-        showSuggestions: true,
-        suggestions: [{ label: 'test-command', value: 'test-command' }],
+      await vi.waitFor(() => {
+        expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
+          mockBuffer,
+          ['/test/project/src'],
+          path.join('test', 'project', 'src'),
+          mockSlashCommands,
+          mockCommandContext,
+          false,
+          false,
+          expect.any(Object),
+        );
       });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
-
-      unmount();
-    });
-
-    it('should handle Unicode characters with escaped spaces', async () => {
-      // Test combining Unicode and escaped spaces
-      mockBuffer.text = '@' + path.join('files', 'emoji\\ 👍\\ test.txt');
-      mockBuffer.lines = ['@' + path.join('files', 'emoji\\ 👍\\ test.txt')];
-      mockBuffer.cursor = [0, 25]; // After the escaped space and emoji
-
-      mockedUseCommandCompletion.mockReturnValue({
-        ...mockCommandCompletion,
-        showSuggestions: true,
-        suggestions: [
-          { label: 'emoji 👍 test.txt', value: 'emoji 👍 test.txt' },
-        ],
-      });
-
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
-      await wait();
-
-      expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-        mockBuffer,
-        ['/test/project/src'],
-        path.join('test', 'project', 'src'),
-        mockSlashCommands,
-        mockCommandContext,
-        false,
-        false,
-        expect.any(Object),
-      );
 
       unmount();
     });
@@ -1186,12 +945,13 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('i');
-      await wait();
-
-      expect(props.vimHandleInput).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('i');
+      });
+      await vi.waitFor(() => {
+        expect(props.vimHandleInput).toHaveBeenCalled();
+      });
       expect(mockBuffer.handleInput).not.toHaveBeenCalled();
       unmount();
     });
@@ -1201,13 +961,14 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('i');
-      await wait();
-
-      expect(props.vimHandleInput).toHaveBeenCalled();
-      expect(mockBuffer.handleInput).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('i');
+      });
+      await vi.waitFor(() => {
+        expect(props.vimHandleInput).toHaveBeenCalled();
+        expect(mockBuffer.handleInput).toHaveBeenCalled();
+      });
       unmount();
     });
 
@@ -1217,13 +978,14 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('i');
-      await wait();
-
-      expect(props.vimHandleInput).toHaveBeenCalled();
-      expect(mockBuffer.handleInput).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('i');
+      });
+      await vi.waitFor(() => {
+        expect(props.vimHandleInput).toHaveBeenCalled();
+        expect(mockBuffer.handleInput).toHaveBeenCalled();
+      });
       unmount();
     });
   });
@@ -1234,17 +996,18 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x1B[200~pasted text\x1B[201~');
-      await wait();
-
-      expect(mockBuffer.handleInput).toHaveBeenCalledWith(
-        expect.objectContaining({
-          paste: true,
-          sequence: 'pasted text',
-        }),
-      );
+      await act(async () => {
+        stdin.write('\x1B[200~pasted text\x1B[201~');
+      });
+      await vi.waitFor(() => {
+        expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({
+            paste: true,
+            sequence: 'pasted text',
+          }),
+        );
+      });
       unmount();
     });
 
@@ -1253,10 +1016,11 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('a');
-      await wait();
+      await act(async () => {
+        stdin.write('a');
+      });
+      await vi.waitFor(() => {});
 
       expect(mockBuffer.handleInput).not.toHaveBeenCalled();
       unmount();
@@ -1264,226 +1028,159 @@ describe('InputPrompt', () => {
   });
 
   describe('Highlighting and Cursor Display', () => {
-    it('should display cursor mid-word by highlighting the character', async () => {
-      mockBuffer.text = 'hello world';
-      mockBuffer.lines = ['hello world'];
-      mockBuffer.viewportVisualLines = ['hello world'];
-      mockBuffer.visualCursor = [0, 3]; // cursor on the second 'l'
+    describe('single-line scenarios', () => {
+      it.each([
+        {
+          name: 'mid-word',
+          text: 'hello world',
+          visualCursor: [0, 3],
+          expected: `hel${chalk.inverse('l')}o world`,
+        },
+        {
+          name: 'at the beginning of the line',
+          text: 'hello',
+          visualCursor: [0, 0],
+          expected: `${chalk.inverse('h')}ello`,
+        },
+        {
+          name: 'at the end of the line',
+          text: 'hello',
+          visualCursor: [0, 5],
+          expected: `hello${chalk.inverse(' ')}`,
+        },
+        {
+          name: 'on a highlighted token',
+          text: 'run @path/to/file',
+          visualCursor: [0, 9],
+          expected: `@path/${chalk.inverse('t')}o/file`,
+        },
+        {
+          name: 'for multi-byte unicode characters',
+          text: 'hello 👍 world',
+          visualCursor: [0, 6],
+          expected: `hello ${chalk.inverse('👍')} world`,
+        },
+        {
+          name: 'at the end of a line with unicode characters',
+          text: 'hello 👍',
+          visualCursor: [0, 8],
+          expected: `hello 👍${chalk.inverse(' ')}`,
+        },
+        {
+          name: 'on an empty line',
+          text: '',
+          visualCursor: [0, 0],
+          expected: chalk.inverse(' '),
+        },
+        {
+          name: 'on a space between words',
+          text: 'hello world',
+          visualCursor: [0, 5],
+          expected: `hello${chalk.inverse(' ')}world`,
+        },
+      ])(
+        'should display cursor correctly $name',
+        async ({ text, visualCursor, expected }) => {
+          mockBuffer.text = text;
+          mockBuffer.lines = [text];
+          mockBuffer.viewportVisualLines = [text];
+          mockBuffer.visualCursor = visualCursor as [number, number];
 
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
+          const { stdout, unmount } = renderWithProviders(
+            <InputPrompt {...props} />,
+          );
+
+          await vi.waitFor(() => {
+            const frame = stdout.lastFrame();
+            expect(frame).toContain(expected);
+          });
+          unmount();
+        },
       );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      // The component will render the text with the character at the cursor inverted.
-      expect(frame).toContain(`hel${chalk.inverse('l')}o world`);
-      unmount();
     });
 
-    it('should display cursor at the beginning of the line', async () => {
-      mockBuffer.text = 'hello';
-      mockBuffer.lines = ['hello'];
-      mockBuffer.viewportVisualLines = ['hello'];
-      mockBuffer.visualCursor = [0, 0]; // cursor on 'h'
+    describe('multi-line scenarios', () => {
+      it.each([
+        {
+          name: 'in the middle of a line',
+          text: 'first line\nsecond line\nthird line',
+          visualCursor: [1, 3],
+          visualToLogicalMap: [
+            [0, 0],
+            [1, 0],
+            [2, 0],
+          ],
+          expected: `sec${chalk.inverse('o')}nd line`,
+        },
+        {
+          name: 'at the beginning of a line',
+          text: 'first line\nsecond line',
+          visualCursor: [1, 0],
+          visualToLogicalMap: [
+            [0, 0],
+            [1, 0],
+          ],
+          expected: `${chalk.inverse('s')}econd line`,
+        },
+        {
+          name: 'at the end of a line',
+          text: 'first line\nsecond line',
+          visualCursor: [0, 10],
+          visualToLogicalMap: [
+            [0, 0],
+            [1, 0],
+          ],
+          expected: `first line${chalk.inverse(' ')}`,
+        },
+      ])(
+        'should display cursor correctly $name in a multiline block',
+        async ({ text, visualCursor, expected, visualToLogicalMap }) => {
+          mockBuffer.text = text;
+          mockBuffer.lines = text.split('\n');
+          mockBuffer.viewportVisualLines = text.split('\n');
+          mockBuffer.visualCursor = visualCursor as [number, number];
+          mockBuffer.visualToLogicalMap = visualToLogicalMap as Array<
+            [number, number]
+          >;
 
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
+          const { stdout, unmount } = renderWithProviders(
+            <InputPrompt {...props} />,
+          );
+
+          await vi.waitFor(() => {
+            const frame = stdout.lastFrame();
+            expect(frame).toContain(expected);
+          });
+          unmount();
+        },
       );
-      await wait();
 
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`${chalk.inverse('h')}ello`);
-      unmount();
-    });
+      it('should display cursor on a blank line in a multiline block', async () => {
+        const text = 'first line\n\nthird line';
+        mockBuffer.text = text;
+        mockBuffer.lines = text.split('\n');
+        mockBuffer.viewportVisualLines = text.split('\n');
+        mockBuffer.visualCursor = [1, 0]; // cursor on the blank line
+        mockBuffer.visualToLogicalMap = [
+          [0, 0],
+          [1, 0],
+          [2, 0],
+        ];
 
-    it('should display cursor at the end of the line as an inverted space', async () => {
-      mockBuffer.text = 'hello';
-      mockBuffer.lines = ['hello'];
-      mockBuffer.viewportVisualLines = ['hello'];
-      mockBuffer.visualCursor = [0, 5]; // cursor after 'o'
+        const { stdout, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
 
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`hello${chalk.inverse(' ')}`);
-      unmount();
-    });
-
-    it('should display cursor correctly on a highlighted token', async () => {
-      mockBuffer.text = 'run @path/to/file';
-      mockBuffer.lines = ['run @path/to/file'];
-      mockBuffer.viewportVisualLines = ['run @path/to/file'];
-      mockBuffer.visualCursor = [0, 9]; // cursor on 't' in 'to'
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      // The token '@path/to/file' is colored, and the cursor highlights one char inside it.
-      expect(frame).toContain(`@path/${chalk.inverse('t')}o/file`);
-      unmount();
-    });
-
-    it('should display cursor correctly for multi-byte unicode characters', async () => {
-      const text = 'hello 👍 world';
-      mockBuffer.text = text;
-      mockBuffer.lines = [text];
-      mockBuffer.viewportVisualLines = [text];
-      mockBuffer.visualCursor = [0, 6]; // cursor on '👍'
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`hello ${chalk.inverse('👍')} world`);
-      unmount();
-    });
-
-    it('should display cursor at the end of a line with unicode characters', async () => {
-      const text = 'hello 👍';
-      mockBuffer.text = text;
-      mockBuffer.lines = [text];
-      mockBuffer.viewportVisualLines = [text];
-      mockBuffer.visualCursor = [0, 8]; // cursor after '👍' (length is 6 + 2 for emoji)
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`hello 👍${chalk.inverse(' ')}`);
-      unmount();
-    });
-
-    it('should display cursor on an empty line', async () => {
-      mockBuffer.text = '';
-      mockBuffer.lines = [''];
-      mockBuffer.viewportVisualLines = [''];
-      mockBuffer.visualCursor = [0, 0];
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(chalk.inverse(' '));
-      unmount();
-    });
-
-    it('should display cursor on a space between words', async () => {
-      mockBuffer.text = 'hello world';
-      mockBuffer.lines = ['hello world'];
-      mockBuffer.viewportVisualLines = ['hello world'];
-      mockBuffer.visualCursor = [0, 5]; // cursor on the space
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`hello${chalk.inverse(' ')}world`);
-      unmount();
-    });
-
-    it('should display cursor in the middle of a line in a multiline block', async () => {
-      const text = 'first line\nsecond line\nthird line';
-      mockBuffer.text = text;
-      mockBuffer.lines = text.split('\n');
-      mockBuffer.viewportVisualLines = text.split('\n');
-      mockBuffer.visualCursor = [1, 3]; // cursor on 'o' in 'second'
-      mockBuffer.visualToLogicalMap = [
-        [0, 0],
-        [1, 0],
-        [2, 0],
-      ];
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`sec${chalk.inverse('o')}nd line`);
-      unmount();
-    });
-
-    it('should display cursor at the beginning of a line in a multiline block', async () => {
-      const text = 'first line\nsecond line';
-      mockBuffer.text = text;
-      mockBuffer.lines = text.split('\n');
-      mockBuffer.viewportVisualLines = text.split('\n');
-      mockBuffer.visualCursor = [1, 0]; // cursor on 's' in 'second'
-      mockBuffer.visualToLogicalMap = [
-        [0, 0],
-        [1, 0],
-      ];
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`${chalk.inverse('s')}econd line`);
-      unmount();
-    });
-
-    it('should display cursor at the end of a line in a multiline block', async () => {
-      const text = 'first line\nsecond line';
-      mockBuffer.text = text;
-      mockBuffer.lines = text.split('\n');
-      mockBuffer.viewportVisualLines = text.split('\n');
-      mockBuffer.visualCursor = [0, 10]; // cursor after 'first line'
-      mockBuffer.visualToLogicalMap = [
-        [0, 0],
-        [1, 0],
-      ];
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      expect(frame).toContain(`first line${chalk.inverse(' ')}`);
-      unmount();
-    });
-
-    it('should display cursor on a blank line in a multiline block', async () => {
-      const text = 'first line\n\nthird line';
-      mockBuffer.text = text;
-      mockBuffer.lines = text.split('\n');
-      mockBuffer.viewportVisualLines = text.split('\n');
-      mockBuffer.visualCursor = [1, 0]; // cursor on the blank line
-      mockBuffer.visualToLogicalMap = [
-        [0, 0],
-        [1, 0],
-        [2, 0],
-      ];
-
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      const frame = stdout.lastFrame();
-      const lines = frame!.split('\n');
-      // The line with the cursor should just be an inverted space inside the box border
-      expect(
-        lines.find((l) => l.includes(chalk.inverse(' '))),
-      ).not.toBeUndefined();
-      unmount();
+        await vi.waitFor(() => {
+          const frame = stdout.lastFrame();
+          const lines = frame!.split('\n');
+          // The line with the cursor should just be an inverted space inside the box border
+          expect(
+            lines.find((l) => l.includes(chalk.inverse(' '))),
+          ).not.toBeUndefined();
+        });
+        unmount();
+      });
     });
   });
 
@@ -1505,17 +1202,18 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      const frame = stdout.lastFrame();
-      // Check that all lines, including the empty one, are rendered.
-      // This implicitly tests that the Box wrapper provides height for the empty line.
-      expect(frame).toContain('hello');
-      expect(frame).toContain(`world${chalk.inverse(' ')}`);
+      await vi.waitFor(() => {
+        const frame = stdout.lastFrame();
+        // Check that all lines, including the empty one, are rendered.
+        // This implicitly tests that the Box wrapper provides height for the empty line.
+        expect(frame).toContain('hello');
+        expect(frame).toContain(`world${chalk.inverse(' ')}`);
 
-      const outputLines = frame!.split('\n');
-      // The number of lines should be 2 for the border plus 3 for the content.
-      expect(outputLines.length).toBe(5);
+        const outputLines = frame!.split('\n');
+        // The number of lines should be 2 for the border plus 3 for the content.
+        expect(outputLines.length).toBe(5);
+      });
       unmount();
     });
   });
@@ -1538,20 +1236,21 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
       // Simulate a bracketed paste event from the terminal
-      stdin.write(`\x1b[200~${pastedText}\x1b[201~`);
-      await wait();
-
-      // Verify that the buffer's handleInput was called once with the full text
-      expect(props.buffer.handleInput).toHaveBeenCalledTimes(1);
-      expect(props.buffer.handleInput).toHaveBeenCalledWith(
-        expect.objectContaining({
-          paste: true,
-          sequence: pastedText,
-        }),
-      );
+      await act(async () => {
+        stdin.write(`\x1b[200~${pastedText}\x1b[201~`);
+      });
+      await vi.waitFor(() => {
+        // Verify that the buffer's handleInput was called once with the full text
+        expect(props.buffer.handleInput).toHaveBeenCalledTimes(1);
+        expect(props.buffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({
+            paste: true,
+            sequence: pastedText,
+          }),
+        );
+      });
 
       unmount();
     });
@@ -1581,11 +1280,14 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this should set the paste protection)
-      stdin.write(`\x1b[200~pasted content\x1b[201~`);
-      await vi.runAllTimersAsync();
+      await act(async () => {
+        stdin.write(`\x1b[200~pasted content\x1b[201~`);
+      });
 
       // Simulate an Enter key press immediately after paste
-      stdin.write('\r');
+      await act(async () => {
+        stdin.write('\r');
+      });
       await vi.runAllTimersAsync();
 
       // Verify that onSubmit was NOT called due to recent paste protection
@@ -1605,7 +1307,7 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this sets the protection)
-      act(() => {
+      await act(async () => {
         stdin.write('\x1b[200~pasted text\x1b[201~');
       });
       await vi.runAllTimersAsync();
@@ -1616,7 +1318,9 @@ describe('InputPrompt', () => {
       });
 
       // Now Enter should work normally
-      stdin.write('\r');
+      await act(async () => {
+        stdin.write('\r');
+      });
       await vi.runAllTimersAsync();
 
       expect(props.onSubmit).toHaveBeenCalledWith('pasted text');
@@ -1648,11 +1352,15 @@ describe('InputPrompt', () => {
         await vi.runAllTimersAsync();
 
         // Simulate a paste operation
-        stdin.write('\x1b[200~some pasted stuff\x1b[201~');
+        await act(async () => {
+          stdin.write('\x1b[200~some pasted stuff\x1b[201~');
+        });
         await vi.runAllTimersAsync();
 
         // Simulate an Enter key press immediately after paste
-        stdin.write('\r');
+        await act(async () => {
+          stdin.write('\r');
+        });
         await vi.runAllTimersAsync();
 
         // Verify that onSubmit was called
@@ -1671,7 +1379,9 @@ describe('InputPrompt', () => {
       await vi.runAllTimersAsync();
 
       // Press Enter without any recent paste
-      stdin.write('\r');
+      await act(async () => {
+        stdin.write('\r');
+      });
       await vi.runAllTimersAsync();
 
       // Verify that onSubmit was called normally
@@ -1691,16 +1401,21 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
         { kittyProtocolEnabled: false },
       );
-      await wait();
 
-      stdin.write('\x1B');
-      await wait();
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await vi.waitFor(() => {
+        expect(onEscapePromptChange).toHaveBeenCalledWith(true);
+      });
 
-      stdin.write('\x1B');
-      await wait();
-
-      expect(props.buffer.setText).toHaveBeenCalledWith('');
-      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await vi.waitFor(() => {
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      });
       unmount();
     });
 
@@ -1714,15 +1429,19 @@ describe('InputPrompt', () => {
         { kittyProtocolEnabled: false },
       );
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(onEscapePromptChange).toHaveBeenCalledWith(true);
       });
 
-      stdin.write('a');
+      await act(async () => {
+        stdin.write('a');
+      });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(onEscapePromptChange).toHaveBeenCalledWith(false);
       });
       unmount();
@@ -1735,12 +1454,13 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
         { kittyProtocolEnabled: false },
       );
-      await wait();
 
-      stdin.write('\x1B');
-      await wait();
-
-      expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await vi.waitFor(() =>
+        expect(props.setShellModeActive).toHaveBeenCalledWith(false),
+      );
       unmount();
     });
 
@@ -1755,12 +1475,13 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
         { kittyProtocolEnabled: false },
       );
-      await wait();
 
-      stdin.write('\x1B');
-      await wait();
-
-      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await vi.waitFor(() =>
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled(),
+      );
       unmount();
     });
 
@@ -1775,7 +1496,9 @@ describe('InputPrompt', () => {
       );
       await vi.runAllTimersAsync();
 
-      stdin.write('\x1B');
+      await act(async () => {
+        stdin.write('\x1B');
+      });
       await vi.runAllTimersAsync();
 
       vi.useRealTimers();
@@ -1787,17 +1510,18 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
         { kittyProtocolEnabled: false },
       );
-      await wait();
 
-      stdin.write('\x0C');
-      await wait();
+      await act(async () => {
+        stdin.write('\x0C');
+      });
+      await vi.waitFor(() => expect(props.onClearScreen).toHaveBeenCalled());
 
-      expect(props.onClearScreen).toHaveBeenCalled();
-
-      stdin.write('\x01');
-      await wait();
-
-      expect(props.buffer.move).toHaveBeenCalledWith('home');
+      await act(async () => {
+        stdin.write('\x01');
+      });
+      await vi.waitFor(() =>
+        expect(props.buffer.move).toHaveBeenCalledWith('home'),
+      );
       unmount();
     });
   });
@@ -1831,14 +1555,13 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
       // Trigger reverse search with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const frame = stdout.lastFrame();
         expect(frame).toContain('(r:)');
         expect(frame).toContain('echo hello');
@@ -1853,14 +1576,19 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x12');
-      await wait();
-      stdin.write('\x1B');
-      stdin.write('\u001b[27u'); // Press kitty escape key
+      await act(async () => {
+        stdin.write('\x12');
+      });
+      await vi.waitFor(() => {});
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await act(async () => {
+        stdin.write('\u001b[27u'); // Press kitty escape key
+      });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
       });
 
@@ -1896,23 +1624,23 @@ describe('InputPrompt', () => {
       );
 
       // Enter reverse search mode with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
       // Verify reverse search is active
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).toContain('(r:)');
       });
 
       // Press Tab to complete the highlighted entry
-      act(() => {
+      await act(async () => {
         stdin.write('\t');
       });
-      await wait();
-
-      expect(mockHandleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
+      await vi.waitFor(() => {
+        expect(mockHandleAutocomplete).toHaveBeenCalledWith(0);
+        expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
+      });
       unmount();
     }, 15000);
 
@@ -1933,19 +1661,19 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).toContain('(r:)');
       });
 
-      act(() => {
+      await act(async () => {
         stdin.write('\r');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
       });
 
@@ -1974,23 +1702,22 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
       // reverse search with Ctrl+R
-      act(() => {
+      await act(async () => {
         stdin.write('\x12');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).toContain('(r:)');
       });
 
       // Press kitty escape key
-      act(() => {
+      await act(async () => {
         stdin.write('\u001b[27u');
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
         expect(props.buffer.text).toBe(initialText);
         expect(props.buffer.cursor).toEqual(initialCursor);
@@ -2009,12 +1736,13 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x05'); // Ctrl+E
-      await wait();
-
-      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      await act(async () => {
+        stdin.write('\x05'); // Ctrl+E
+      });
+      await vi.waitFor(() => {
+        expect(props.buffer.move).toHaveBeenCalledWith('end');
+      });
       expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
       unmount();
     });
@@ -2027,12 +1755,13 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x05'); // Ctrl+E
-      await wait();
-
-      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      await act(async () => {
+        stdin.write('\x05'); // Ctrl+E
+      });
+      await vi.waitFor(() => {
+        expect(props.buffer.move).toHaveBeenCalledWith('end');
+      });
       expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
       unmount();
     });
@@ -2059,21 +1788,21 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      act(() => {
+      await act(async () => {
         stdin.write('\x12'); // Ctrl+R
       });
-      await wait();
 
-      const frame = stdout.lastFrame() ?? '';
-      expect(frame).toContain('(r:)');
-      expect(frame).toContain('git commit');
-      expect(frame).toContain('git push');
+      await vi.waitFor(() => {
+        const frame = stdout.lastFrame() ?? '';
+        expect(frame).toContain('(r:)');
+        expect(frame).toContain('git commit');
+        expect(frame).toContain('git push');
+      });
       unmount();
     });
 
-    it.skip('expands and collapses long suggestion via Right/Left arrows', async () => {
+    it('expands and collapses long suggestion via Right/Left arrows', async () => {
       props.shellModeActive = false;
       const longValue = 'l'.repeat(200);
 
@@ -2089,25 +1818,32 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x12');
-      await wait();
+      await act(async () => {
+        stdin.write('\x12');
+      });
+      await vi.waitFor(() => {
+        expect(clean(stdout.lastFrame())).toContain('→');
+      });
 
-      expect(clean(stdout.lastFrame())).toContain('→');
-
-      stdin.write('\u001B[C');
-      await wait(200);
-      expect(clean(stdout.lastFrame())).toContain('←');
+      await act(async () => {
+        stdin.write('\u001B[C');
+      });
+      await vi.waitFor(() => {
+        expect(clean(stdout.lastFrame())).toContain('←');
+      });
       expect(stdout.lastFrame()).toMatchSnapshot(
-        'command-search-expanded-match',
+        'command-search-render-expanded-match',
       );
 
-      stdin.write('\u001B[D');
-      await wait();
-      expect(clean(stdout.lastFrame())).toContain('→');
+      await act(async () => {
+        stdin.write('\u001B[D');
+      });
+      await vi.waitFor(() => {
+        expect(clean(stdout.lastFrame())).toContain('→');
+      });
       expect(stdout.lastFrame()).toMatchSnapshot(
-        'command-search-collapsed-match',
+        'command-search-render-collapsed-match',
       );
       unmount();
     });
@@ -2131,19 +1867,24 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x12');
-      await wait();
-      expect(stdout.lastFrame()).toMatchSnapshot(
-        'command-search-collapsed-match',
-      );
+      await act(async () => {
+        stdin.write('\x12');
+      });
+      await vi.waitFor(() => {
+        expect(stdout.lastFrame()).toMatchSnapshot(
+          'command-search-render-collapsed-match',
+        );
+      });
 
-      stdin.write('\u001B[C');
-      await wait();
-      expect(stdout.lastFrame()).toMatchSnapshot(
-        'command-search-expanded-match',
-      );
+      await act(async () => {
+        stdin.write('\u001B[C');
+      });
+      await vi.waitFor(() => {
+        expect(stdout.lastFrame()).toMatchSnapshot(
+          'command-search-render-expanded-match',
+        );
+      });
 
       unmount();
     });
@@ -2164,14 +1905,17 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\x12');
-      await wait();
-
-      const frame = clean(stdout.lastFrame());
-      expect(frame).not.toContain('→');
-      expect(frame).not.toContain('←');
+      await act(async () => {
+        stdin.write('\x12');
+      });
+      await vi.waitFor(() => {
+        const frame = clean(stdout.lastFrame());
+        // Ensure it rendered the search mode
+        expect(frame).toContain('(r:)');
+        expect(frame).not.toContain('→');
+        expect(frame).not.toContain('←');
+      });
       unmount();
     });
   });
@@ -2185,15 +1929,14 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
-
-      expect(mockPopAllMessages).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       const callback = mockPopAllMessages.mock.calls[0][0];
 
-      act(() => {
+      await act(async () => {
         callback('Message 1\n\nMessage 2\n\nMessage 3');
       });
       expect(props.buffer.setText).toHaveBeenCalledWith(
@@ -2210,12 +1953,14 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() =>
+        expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
+      );
       expect(mockPopAllMessages).not.toHaveBeenCalled();
-      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
       unmount();
     });
 
@@ -2227,14 +1972,13 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
-
-      expect(mockPopAllMessages).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback(undefined);
       });
 
@@ -2254,11 +1998,11 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
-      expect(mockPopAllMessages).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       unmount();
     });
 
@@ -2270,13 +2014,14 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
 
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback('Single message');
       });
 
@@ -2292,12 +2037,11 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
-
-      expect(mockPopAllMessages).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
       unmount();
     });
 
@@ -2308,12 +2052,13 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
-
-      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() =>
+        expect(mockInputHistory.navigateUp).toHaveBeenCalled(),
+      );
       unmount();
     });
 
@@ -2325,15 +2070,14 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
 
-      stdin.write('\u001B[A');
-      await wait();
-
-      expect(mockPopAllMessages).toHaveBeenCalled();
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+      await vi.waitFor(() => expect(mockPopAllMessages).toHaveBeenCalled());
 
       const callback = mockPopAllMessages.mock.calls[0][0];
-      act(() => {
+      await act(async () => {
         callback(undefined);
       });
 
@@ -2350,8 +2094,7 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
-      expect(stdout.lastFrame()).toMatchSnapshot();
+      await vi.waitFor(() => expect(stdout.lastFrame()).toMatchSnapshot());
       unmount();
     });
 
@@ -2360,8 +2103,7 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
-      expect(stdout.lastFrame()).toMatchSnapshot();
+      await vi.waitFor(() => expect(stdout.lastFrame()).toMatchSnapshot());
       unmount();
     });
 
@@ -2370,8 +2112,7 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
-      expect(stdout.lastFrame()).toMatchSnapshot();
+      await vi.waitFor(() => expect(stdout.lastFrame()).toMatchSnapshot());
       unmount();
     });
 
@@ -2381,11 +2122,12 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
-      expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
-      // This snapshot is good to make sure there was an input prompt but does
-      // not show the inverted cursor because snapshots do not show colors.
-      expect(stdout.lastFrame()).toMatchSnapshot();
+      await vi.waitFor(() => {
+        expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
+        // This snapshot is good to make sure there was an input prompt but does
+        // not show the inverted cursor because snapshots do not show colors.
+        expect(stdout.lastFrame()).toMatchSnapshot();
+      });
       unmount();
     });
   });
@@ -2394,63 +2136,68 @@ describe('InputPrompt', () => {
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
       shellFocus: false,
     });
-    await wait();
 
-    stdin.write('a');
-    await wait();
-
-    expect(mockBuffer.handleInput).toHaveBeenCalled();
+    await act(async () => {
+      stdin.write('a');
+    });
+    await vi.waitFor(() => expect(mockBuffer.handleInput).toHaveBeenCalled());
     unmount();
   });
-  it('should prevent slash commands from being queued while streaming', async () => {
-    props.onSubmit = vi.fn();
-    props.buffer.text = '/help';
-    props.setQueueErrorMessage = vi.fn();
-    props.streamingState = StreamingState.Responding;
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
-    stdin.write('/help');
-    stdin.write('\r');
-    await wait();
+  describe('command queuing while streaming', () => {
+    beforeEach(() => {
+      props.streamingState = StreamingState.Responding;
+      props.setQueueErrorMessage = vi.fn();
+      props.onSubmit = vi.fn();
+    });
 
-    expect(props.onSubmit).not.toHaveBeenCalled();
-    expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
-      'Slash commands cannot be queued',
+    it.each([
+      {
+        name: 'should prevent slash commands',
+        bufferText: '/help',
+        shellMode: false,
+        shouldSubmit: false,
+        errorMessage: 'Slash commands cannot be queued',
+      },
+      {
+        name: 'should prevent shell commands',
+        bufferText: 'ls',
+        shellMode: true,
+        shouldSubmit: false,
+        errorMessage: 'Shell commands cannot be queued',
+      },
+      {
+        name: 'should allow regular messages',
+        bufferText: 'regular message',
+        shellMode: false,
+        shouldSubmit: true,
+        errorMessage: null,
+      },
+    ])(
+      '$name',
+      async ({ bufferText, shellMode, shouldSubmit, errorMessage }) => {
+        props.buffer.text = bufferText;
+        props.shellModeActive = shellMode;
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+        await act(async () => {
+          stdin.write('\r');
+        });
+        await vi.waitFor(() => {
+          if (shouldSubmit) {
+            expect(props.onSubmit).toHaveBeenCalledWith(bufferText);
+            expect(props.setQueueErrorMessage).not.toHaveBeenCalled();
+          } else {
+            expect(props.onSubmit).not.toHaveBeenCalled();
+            expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+              errorMessage,
+            );
+          }
+        });
+        unmount();
+      },
     );
-    unmount();
-  });
-  it('should prevent shell commands from being queued while streaming', async () => {
-    props.onSubmit = vi.fn();
-    props.buffer.text = 'ls';
-    props.setQueueErrorMessage = vi.fn();
-    props.streamingState = StreamingState.Responding;
-    props.shellModeActive = true;
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
-    stdin.write('ls');
-    stdin.write('\r');
-    await wait();
-
-    expect(props.onSubmit).not.toHaveBeenCalled();
-    expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
-      'Shell commands cannot be queued',
-    );
-    unmount();
-  });
-  it('should allow regular messages to be queued while streaming', async () => {
-    props.onSubmit = vi.fn();
-    props.buffer.text = 'regular message';
-    props.setQueueErrorMessage = vi.fn();
-    props.streamingState = StreamingState.Responding;
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-    await wait();
-    stdin.write('regular message');
-    stdin.write('\r');
-    await wait();
-
-    expect(props.onSubmit).toHaveBeenCalledWith('regular message');
-    expect(props.setQueueErrorMessage).not.toHaveBeenCalled();
-    unmount();
   });
 });
 
