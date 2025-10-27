@@ -283,6 +283,7 @@ export interface ConfigParameters {
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
+  fakeResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
 }
@@ -381,6 +382,7 @@ export class Config {
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
+  readonly fakeResponses?: string;
   private readonly disableYoloMode: boolean;
 
   constructor(params: ConfigParameters) {
@@ -489,6 +491,7 @@ export class Config {
       params.enableShellOutputEfficiency ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
+    this.fakeResponses = params.fakeResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
