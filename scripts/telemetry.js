@@ -75,7 +75,7 @@ const scriptPath = join(projectRoot, 'scripts', targetScripts[target]);
 
 try {
   console.log(`🚀 Running telemetry script for target: ${target}.`);
-  execSync(`node ${scriptPath}`, { stdio: 'inherit', cwd: projectRoot });
+  execSync(`node "${scriptPath}"`, { stdio: 'inherit', cwd: projectRoot });
 } catch (error) {
   console.error(`🛑 Failed to run telemetry script for target: ${target}`);
   console.error(error);
