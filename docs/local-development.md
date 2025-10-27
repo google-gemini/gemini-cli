@@ -87,3 +87,6 @@ In this example:
   traced operation.
 - `metadata.output`: (Optional) An object containing the output data from the
   traced operation.
+- `metadata.attributes`: (Optional) A record of custom attributes to add to the
+  span.
+- `metadata.error`: (Optional) An error object to record if the operation fails.
