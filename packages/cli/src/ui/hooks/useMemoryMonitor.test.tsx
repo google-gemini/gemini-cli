@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderHook } from '@testing-library/react';
+import { render } from 'ink-testing-library';
 import { vi } from 'vitest';
 import {
   useMemoryMonitor,
@@ -27,11 +27,16 @@ describe('useMemoryMonitor', () => {
     vi.useRealTimers();
   });
 
+  function TestComponent() {
+    useMemoryMonitor({ addItem });
+    return null;
+  }
+
   it('should not warn when memory usage is below threshold', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD / 2,
     } as NodeJS.MemoryUsage);
-    renderHook(() => useMemoryMonitor({ addItem }));
+    render(<TestComponent />);
     vi.advanceTimersByTime(10000);
     expect(addItem).not.toHaveBeenCalled();
   });
@@ -40,7 +45,7 @@ describe('useMemoryMonitor', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    renderHook(() => useMemoryMonitor({ addItem }));
+    render(<TestComponent />);
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
     expect(addItem).toHaveBeenCalledWith(
@@ -56,7 +61,7 @@ describe('useMemoryMonitor', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    const { rerender } = renderHook(() => useMemoryMonitor({ addItem }));
+    const { rerender } = render(<TestComponent />);
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
 
@@ -64,7 +69,7 @@ describe('useMemoryMonitor', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    rerender();
+    rerender(<TestComponent />);
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
   });
