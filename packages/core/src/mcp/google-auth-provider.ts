@@ -13,17 +13,17 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { GoogleAuth } from 'google-auth-library';
 import type { MCPServerConfig } from '../config/config.js';
-import { FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
+import { OAuthUtils, FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
 
-const ALLOWED_HOSTS = [
-  /^.+\.googleapis\.com$/,
-  /^(.*\.)?luci\.app$/,
-  /^(.*\.)?run\.app$/,
-];
+const CLOUD_RUN_HOST_REGEX = /^(.*\.)?run\.app$/;
+
+// An array of hosts that are allowed to use the Google Credential provider.
+const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
 
 export class GoogleCredentialProvider implements OAuthClientProvider {
   private readonly auth: GoogleAuth;
-  private readonly useIdToken: boolean;
+  private readonly useIdToken: boolean = false;
+  private readonly audience?: string;
   private cachedToken?: OAuthTokens;
   private tokenExpiryTime?: number;
 
@@ -47,31 +47,36 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
     }
 
     const hostname = new URL(url).hostname;
-    if (!ALLOWED_HOSTS.some((pattern) => pattern.test(hostname))) {
+    const isRunAppHost = CLOUD_RUN_HOST_REGEX.test(hostname);
+    if (!this.config?.allow_unscoped_id_tokens_cloud_run && isRunAppHost) {
+      throw new Error(
+        `To enable the Cloud Run MCP Server at ${url} please set allow_unscoped_id_tokens_cloud_run:true in the MCP Server config.`,
+      );
+    }
+    if (this.config?.allow_unscoped_id_tokens_cloud_run && isRunAppHost) {
+      this.useIdToken = true;
+    }
+    this.audience = hostname;
+
+    if (
+      !this.useIdToken &&
+      !ALLOWED_HOSTS.some((pattern) => pattern.test(hostname))
+    ) {
       throw new Error(
         `Host "${hostname}" is not an allowed host for Google Credential provider.`,
       );
     }
 
-    // Use ID tokens only for Cloud Run when explicitly enabled via settings.
-    const isRunAppHost = /(^|\.)run\.app$/.test(hostname);
-    this.useIdToken =
-      !!this.config?.allow_scoped_id_tokens_cloud_run && isRunAppHost;
-
-    if (this.useIdToken) {
-      this.auth = new GoogleAuth();
-    } else {
-      // Access token support requires scopes
-      const scopes = this.config?.oauth?.scopes;
-      if (!scopes || scopes.length === 0) {
-        throw new Error(
-          'Scopes must be provided in the oauth config for Google Credentials provider (or enable allow_scoped_id_tokens_for_cloud_run to use ID tokens)',
-        );
-      }
-      this.auth = new GoogleAuth({
-        scopes,
-      });
+    // If we are using the access token flow, we MUST have scopes.
+    if (!this.useIdToken && !this.config?.oauth?.scopes) {
+      throw new Error(
+        'Scopes must be provided in the oauth config for Google Credentials provider (or enable allow_unscoped_id_tokens_for_cloud_run to use ID tokens)',
+      );
     }
+
+    this.auth = new GoogleAuth({
+      scopes: this.config?.oauth?.scopes,
+    });
   }
 
   clientInformation(): OAuthClientInformation | undefined {
@@ -96,25 +101,20 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
     this.cachedToken = undefined;
     this.tokenExpiryTime = undefined;
 
-    // If allow_scoped_id_tokens_for_cloud_run is configured, use ID tokens.
+    // If allow_unscoped_id_tokens_for_cloud_run is configured, use ID tokens.
     if (this.useIdToken) {
-      const baseUrl = this.config!.httpUrl || this.config!.url!;
-      const audience = new URL(baseUrl).origin; //Cloud Run origin
       try {
-        const idClient = await this.auth.getIdTokenClient(audience);
-        const headers = await idClient.getRequestHeaders();
-        const authHeader = (headers['Authorization'] ??
-          headers['authorization']) as string | undefined;
-        if (!authHeader?.startsWith('Bearer ')) {
-          console.error('Failed to obtain ID token from Google ADC');
-          return undefined;
-        }
-        const idToken = authHeader.slice('Bearer '.length);
+        const idClient = await this.auth.getIdTokenClient(this.audience!);
+        const idToken = await idClient.idTokenProvider.fetchIdToken(
+          this.audience!,
+        );
+
         const newToken: OAuthTokens = {
           access_token: idToken,
           token_type: 'Bearer',
         };
-        const expiryTime = idClient.credentials?.expiry_date;
+
+        const expiryTime = OAuthUtils.parseTokenExpiry(idToken);
         if (expiryTime) {
           this.tokenExpiryTime = expiryTime;
           this.cachedToken = newToken;
