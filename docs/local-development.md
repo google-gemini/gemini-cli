@@ -9,7 +9,7 @@ tool scheduler, tool calls, etc.
 Dev traces are verbose, specifically meant for understanding agent behaviour and
 debugging issues. They are disabled by default.
 
-To enable dev traces, you need to set the `ENABLE_DEV_TRACING=true` environment
+To enable dev traces, you need to set the `GEMINI_DEV_TRACING=true` environment
 variable.
 
 ### Viewing Dev Traces
@@ -31,7 +31,7 @@ Once the collector and Jaeger are running, you can run the Gemini CLI with dev
 tracing enabled in a separate terminal:
 
 ```bash
-ENABLE_DEV_TRACING=true gemini
+GEMINI_DEV_TRACING=true gemini
 ```
 
 After running your commands, you can view the traces in the Jaeger UI.

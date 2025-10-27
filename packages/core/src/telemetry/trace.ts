@@ -60,8 +60,8 @@ export async function runInDevTraceSpan<R>(
   }) => Promise<R>,
 ): Promise<R> {
   const { name: spanName, noAutoEnd, ...restOfSpanOpts } = opts;
-  if (process.env['ENABLE_DEV_TRACING'] !== 'true') {
-    // If ENABLE_DEV_TRACING env var not set, we do not trace.
+  if (process.env['GEMINI_DEV_TRACING'] !== 'true') {
+    // If GEMINI_DEV_TRACING env var not set, we do not trace.
     return await fn({
       metadata: {
         name: spanName,
