@@ -199,10 +199,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('fake-responses', {
           type: 'string',
           description: 'Path to a file with fake model responses for testing.',
+          hidden: true,
         })
         .option('record-responses', {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
+          hidden: true,
         })
         .deprecateOption(
           'prompt',
