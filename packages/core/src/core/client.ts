@@ -13,14 +13,13 @@ import type {
 } from '@google/genai';
 import {
   getDirectoryContextString,
-  getEnvironmentContext,
+  getInitialChatHistory,
 } from '../utils/environmentContext.js';
 import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
 import { CompressionStatus } from './turn.js';
 import { Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
-import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
-import { getResponseText } from '../utils/partUtils.js';
+import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
@@ -37,15 +36,14 @@ import {
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
-  logChatCompression,
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
 import {
   ContentRetryFailureEvent,
-  makeChatCompressionEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -65,67 +63,7 @@ export function isThinkingDefault(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
 }
 
-/**
- * Returns the index of the oldest item to keep when compressing. May return
- * contents.length which indicates that everything should be compressed.
- *
- * Exported for testing purposes.
- */
-export function findCompressSplitPoint(
-  contents: Content[],
-  fraction: number,
-): number {
-  if (fraction <= 0 || fraction >= 1) {
-    throw new Error('Fraction must be between 0 and 1');
-  }
-
-  const charCounts = contents.map((content) => JSON.stringify(content).length);
-  const totalCharCount = charCounts.reduce((a, b) => a + b, 0);
-  const targetCharCount = totalCharCount * fraction;
-
-  let lastSplitPoint = 0; // 0 is always valid (compress nothing)
-  let cumulativeCharCount = 0;
-  for (let i = 0; i < contents.length; i++) {
-    const content = contents[i];
-    if (
-      content.role === 'user' &&
-      !content.parts?.some((part) => !!part.functionResponse)
-    ) {
-      if (cumulativeCharCount >= targetCharCount) {
-        return i;
-      }
-      lastSplitPoint = i;
-    }
-    cumulativeCharCount += charCounts[i];
-  }
-
-  // We found no split points after targetCharCount.
-  // Check if it's safe to compress everything.
-  const lastContent = contents[contents.length - 1];
-  if (
-    lastContent?.role === 'model' &&
-    !lastContent?.parts?.some((part) => part.functionCall)
-  ) {
-    return contents.length;
-  }
-
-  // Can't compress everything so just compress at last splitpoint.
-  return lastSplitPoint;
-}
-
 const MAX_TURNS = 100;
-
-/**
- * Threshold for compression token count as a fraction of the model's token limit.
- * If the chat history exceeds this threshold, it will be compressed.
- */
-const COMPRESSION_TOKEN_THRESHOLD = 0.7;
-
-/**
- * The fraction of the latest chat history to keep. A value of 0.3
- * means that only the last 30% of the chat history will be kept after compression.
- */
-const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -136,6 +74,7 @@ export class GeminiClient {
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
+  private readonly compressionService: ChatCompressionService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -149,6 +88,7 @@ export class GeminiClient {
 
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
+    this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
   }
 
@@ -233,31 +173,7 @@ export class GeminiClient {
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
-    // 1. Get the environment context parts as an array
-    const envParts = await getEnvironmentContext(this.config);
-
-    // 2. Convert the array of parts into a single string
-    const envContextString = envParts
-      .map((part) => part.text || '')
-      .join('\n\n');
-
-    // 3. Combine the dynamic context with the static handshake instruction
-    const allSetupText = `
-${envContextString}
-
-Reminder: Do not return an empty response when a tool call is required.
-
-My setup is complete. I will provide my first command in the next turn.
-    `.trim();
-
-    // 4. Create the history with a single, comprehensive user turn
-    const history: Content[] = [
-      {
-        role: 'user',
-        parts: [{ text: allSetupText }],
-      },
-      ...(extraHistory ?? []),
-    ];
+    const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
       const userMemory = this.config.getUserMemory();
@@ -738,129 +654,27 @@ My setup is complete. I will provide my first command in the next turn.
     // before the model is chosen would result in an error.
     const model = this._getEffectiveModelForCurrentTurn();
 
-    const curatedHistory = this.getChat().getHistory(true);
+    const { newHistory, info } = await this.compressionService.compress(
+      this.getChat(),
+      prompt_id,
+      force,
+      model,
+      this.config,
+      this.hasFailedCompressionAttempt,
+    );
 
-    // Regardless of `force`, don't do anything if the history is empty.
     if (
-      curatedHistory.length === 0 ||
-      (this.hasFailedCompressionAttempt && !force)
+      info.compressionStatus ===
+      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
     ) {
-      return {
-        originalTokenCount: 0,
-        newTokenCount: 0,
-        compressionStatus: CompressionStatus.NOOP,
-      };
-    }
-
-    const originalTokenCount = uiTelemetryService.getLastPromptTokenCount();
-
-    const contextPercentageThreshold =
-      this.config.getChatCompression()?.contextPercentageThreshold;
-
-    // Don't compress if not forced and we are under the limit.
-    if (!force) {
-      const threshold =
-        contextPercentageThreshold ?? COMPRESSION_TOKEN_THRESHOLD;
-      if (originalTokenCount < threshold * tokenLimit(model)) {
-        return {
-          originalTokenCount,
-          newTokenCount: originalTokenCount,
-          compressionStatus: CompressionStatus.NOOP,
-        };
+      this.hasFailedCompressionAttempt = !force && true;
+    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+      if (newHistory) {
+        this.chat = await this.startChat(newHistory);
+        this.forceFullIdeContext = true;
       }
     }
 
-    const splitPoint = findCompressSplitPoint(
-      curatedHistory,
-      1 - COMPRESSION_PRESERVE_THRESHOLD,
-    );
-
-    const historyToCompress = curatedHistory.slice(0, splitPoint);
-    const historyToKeep = curatedHistory.slice(splitPoint);
-
-    if (historyToCompress.length === 0) {
-      return {
-        originalTokenCount,
-        newTokenCount: originalTokenCount,
-        compressionStatus: CompressionStatus.NOOP,
-      };
-    }
-
-    const summaryResponse = await this.config
-      .getContentGenerator()
-      .generateContent(
-        {
-          model,
-          contents: [
-            ...historyToCompress,
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
-                },
-              ],
-            },
-          ],
-          config: {
-            systemInstruction: { text: getCompressionPrompt() },
-          },
-        },
-        prompt_id,
-      );
-    const summary = getResponseText(summaryResponse) ?? '';
-
-    const chat = await this.startChat([
-      {
-        role: 'user',
-        parts: [{ text: summary }],
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the additional context!' }],
-      },
-      ...historyToKeep,
-    ]);
-    this.forceFullIdeContext = true;
-
-    // Estimate token count 1 token ≈ 4 characters
-    const newTokenCount = Math.floor(
-      chat
-        .getHistory()
-        .reduce((total, content) => total + JSON.stringify(content).length, 0) /
-        4,
-    );
-
-    logChatCompression(
-      this.config,
-      makeChatCompressionEvent({
-        tokens_before: originalTokenCount,
-        tokens_after: newTokenCount,
-      }),
-    );
-
-    if (newTokenCount > originalTokenCount) {
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount,
-        newTokenCount,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
-      };
-    } else {
-      this.chat = chat; // Chat compression successful, set new state.
-      uiTelemetryService.setLastPromptTokenCount(newTokenCount);
-    }
-
-    return {
-      originalTokenCount,
-      newTokenCount,
-      compressionStatus: CompressionStatus.COMPRESSED,
-    };
+    return info;
   }
 }
-
-export const TEST_ONLY = {
-  COMPRESSION_PRESERVE_THRESHOLD,
-  COMPRESSION_TOKEN_THRESHOLD,
-};
