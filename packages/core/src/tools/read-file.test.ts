@@ -22,6 +22,14 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
+interface ReadFileParameterSchema {
+  properties: {
+    absolute_path: {
+      description: string;
+    };
+  };
+}
+
 describe('ReadFileTool', () => {
   let tempRootDir: string;
   let tool: ReadFileTool;
@@ -193,6 +201,38 @@ describe('ReadFileTool', () => {
           invocation as ToolInvocation<ReadFileToolParams, ToolResult>
         ).getDescription(),
       ).toBe('.');
+    });
+  });
+
+  describe('constructor', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should use windows-style path examples on windows', () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+
+      const tool = new ReadFileTool({} as unknown as Config);
+      const schema = tool.schema;
+      expect(
+        (schema.parametersJsonSchema as ReadFileParameterSchema).properties
+          .absolute_path.description,
+      ).toBe(
+        "The absolute path to the file to read (e.g., 'C:\\Users\\project\\file.txt'). Relative paths are not supported. You must provide an absolute path.",
+      );
+    });
+
+    it('should use unix-style path examples on non-windows platforms', () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+
+      const tool = new ReadFileTool({} as unknown as Config);
+      const schema = tool.schema;
+      expect(
+        (schema.parametersJsonSchema as ReadFileParameterSchema).properties
+          .absolute_path.description,
+      ).toBe(
+        "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+      );
     });
   });
 

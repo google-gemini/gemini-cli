@@ -6,6 +6,7 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
+import process from 'node:process';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -155,7 +156,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
         properties: {
           absolute_path: {
             description:
-              "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+              process.platform === 'win32'
+                ? "The absolute path to the file to read (e.g., 'C:\\Users\\project\\file.txt'). Relative paths are not supported. You must provide an absolute path."
+                : "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
             type: 'string',
           },
           offset: {
