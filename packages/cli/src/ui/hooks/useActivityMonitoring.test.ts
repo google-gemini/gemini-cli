@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** @vitest-environment jsdom */
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   useActivityMonitoring,
   useActivityRecorder,
 } from './useActivityMonitoring.js';
-import { ActivityType } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
+import { ActivityType, type Config } from '@google/gemini-cli-core';
 
 // Mock the core package
 const mockRecordActivity = vi.fn();
@@ -150,18 +151,13 @@ describe('useActivityMonitoring', () => {
 });
 
 describe('useActivityRecorder', () => {
-  let mockConfig: Config;
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockRecordActivity.mockClear();
-    mockConfig = {
-      getSessionId: () => 'test-session',
-    } as Config;
   });
 
   it('should provide convenience recording functions', () => {
-    const { result } = renderHook(() => useActivityRecorder(mockConfig));
+    const { result } = renderHook(() => useActivityRecorder());
 
     expect(result.current.recordUserInput).toBeDefined();
     expect(result.current.recordUserInputEnd).toBeDefined();
@@ -173,7 +169,7 @@ describe('useActivityRecorder', () => {
   });
 
   it('should record user input activity', async () => {
-    const { result } = renderHook(() => useActivityRecorder(mockConfig));
+    const { result } = renderHook(() => useActivityRecorder());
 
     await act(() => {
       result.current.recordUserInput();
@@ -183,7 +179,7 @@ describe('useActivityRecorder', () => {
   });
 
   it('should record message added activity with metadata', async () => {
-    const { result } = renderHook(() => useActivityRecorder(mockConfig));
+    const { result } = renderHook(() => useActivityRecorder());
 
     await act(() => {
       result.current.recordMessageAdded();
@@ -193,7 +189,7 @@ describe('useActivityRecorder', () => {
   });
 
   it('should record tool call activity', async () => {
-    const { result } = renderHook(() => useActivityRecorder(mockConfig));
+    const { result } = renderHook(() => useActivityRecorder());
 
     await act(() => {
       result.current.recordToolCall();
@@ -203,7 +199,7 @@ describe('useActivityRecorder', () => {
   });
 
   it('should record stream events', async () => {
-    const { result } = renderHook(() => useActivityRecorder(mockConfig));
+    const { result } = renderHook(() => useActivityRecorder());
 
     await act(() => {
       result.current.recordStreamStart();
@@ -214,7 +210,7 @@ describe('useActivityRecorder', () => {
   });
 
   it('should record history updates', async () => {
-    const { result } = renderHook(() => useActivityRecorder(mockConfig));
+    const { result } = renderHook(() => useActivityRecorder());
 
     await act(() => {
       result.current.recordHistoryUpdate();
@@ -224,7 +220,7 @@ describe('useActivityRecorder', () => {
   });
 
   it('should not record activities when disabled', async () => {
-    const { result } = renderHook(() => useActivityRecorder(mockConfig, false));
+    const { result } = renderHook(() => useActivityRecorder(false));
 
     await act(() => {
       result.current.recordUserInput();

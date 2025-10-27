@@ -75,7 +75,7 @@ vi.mock('./App.js', () => ({
 }));
 
 vi.mock('./hooks/useQuotaAndFallback.js');
-vi.mock('./hooks/useHistoryManagerWithActivityMonitoring.js');
+vi.mock('./hooks/useHistoryManagerWithActivity.js');
 vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
 vi.mock('./hooks/useEditorSettings.js');

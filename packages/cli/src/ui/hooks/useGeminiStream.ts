@@ -134,7 +134,7 @@ export const useGeminiStream = (
     recordUserInput,
     recordStreamStart,
     recordStreamEnd,
-  } = useActivityRecorder(config);
+  } = useActivityRecorder();
 
   const [
     toolCalls,

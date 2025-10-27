@@ -140,12 +140,16 @@ export function useActivityMonitoring(
  * Simplified activity recorder hook
  * Provides convenient functions for recording specific activity types
  */
-export function useActivityRecorder(_config: Config, enabled: boolean = true) {
+export function useActivityRecorder(enabled: boolean = true) {
   const record = useCallback(
     (type: ActivityType) => {
       if (enabled) {
-        const monitor = getActivityMonitor();
-        monitor?.recordActivity(type);
+        try {
+          const monitor = getActivityMonitor();
+          monitor?.recordActivity(type);
+        } catch {
+          // Silent failure - activity monitoring should never break app functionality
+        }
       }
     },
     [enabled],

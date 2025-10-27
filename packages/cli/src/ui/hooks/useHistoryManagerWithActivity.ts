@@ -5,7 +5,6 @@
  */
 
 import { useCallback } from 'react';
-import type { Config } from '@google/gemini-cli-core';
 import { useActivityRecorder } from './useActivityMonitoring.js';
 import {
   useHistory,
@@ -20,11 +19,9 @@ export type UseHistoryWithActivityMonitoringReturn = UseHistoryManagerReturn;
  * Automatically records activity events when history items are added or updated.
  */
 export function useHistoryWithActivityMonitoring(
-  config: Config,
   enableActivityMonitoring = true,
 ): UseHistoryWithActivityMonitoringReturn {
   const { recordMessageAdded, recordHistoryUpdate } = useActivityRecorder(
-    config,
     enableActivityMonitoring,
   );
 

@@ -138,7 +138,7 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { settings, config, initializationResult } = props;
-  const historyManager = useHistoryWithActivityMonitoring(config);
+  const historyManager = useHistoryWithActivityMonitoring();
   useMemoryMonitor(historyManager);
   const [corgiMode, setCorgiMode] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
