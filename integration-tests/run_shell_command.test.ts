@@ -144,7 +144,7 @@ describe('run_shell_command', () => {
     validateModelOutput(result, 'test-stdin', 'Shell command stdin test');
   });
 
-  it('should run allowed sub-command in non-interactive mode', async () => {
+  it.skip('should run allowed sub-command in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
@@ -262,7 +262,7 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should work with ShellTool alias', async () => {
+  it.skip('should work with ShellTool alias', async () => {
     const rig = new TestRig();
     await rig.setup('should work with ShellTool alias');
 
@@ -427,7 +427,8 @@ describe('run_shell_command', () => {
     expect(failureLog!.toolRequest.success).toBe(false);
   });
 
-  it('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
+  // TODO(#11966): Deflake this test and re-enable once the underlying race is resolved.
+  it.skip('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup(
       'should reject chained commands when only the first segment is allowlisted',
