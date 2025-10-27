@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { coreEvents } from '@google/gemini-cli-core';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
@@ -68,8 +69,10 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     } catch (error) {
       // File doesn't exist or is invalid, return empty map
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(
+        coreEvents.emitFeedback(
+          'error',
           `Failed to load MCP OAuth tokens: ${getErrorMessage(error)}`,
+          error,
         );
       }
     }
@@ -102,8 +105,10 @@ export class MCPOAuthTokenStorage implements TokenStorage {
         { mode: 0o600 }, // Restrict file permissions
       );
     } catch (error) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `Failed to save MCP OAuth token: ${getErrorMessage(error)}`,
+        error,
       );
       throw error;
     }
@@ -181,8 +186,10 @@ export class MCPOAuthTokenStorage implements TokenStorage {
           });
         }
       } catch (error) {
-        console.error(
+        coreEvents.emitFeedback(
+          'error',
           `Failed to remove MCP OAuth token: ${getErrorMessage(error)}`,
+          error,
         );
       }
     }
@@ -216,8 +223,10 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       await fs.unlink(tokenFile);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(
+        coreEvents.emitFeedback(
+          'error',
           `Failed to clear MCP OAuth tokens: ${getErrorMessage(error)}`,
+          error,
         );
       }
     }
