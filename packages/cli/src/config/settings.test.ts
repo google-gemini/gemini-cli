@@ -50,7 +50,6 @@ import {
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { disableExtension, ExtensionStorage } from './extension.js';
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
@@ -64,9 +63,12 @@ import {
   loadEnvironment,
   migrateDeprecatedSettings,
   SettingScope,
+  saveSettings,
+  type SettingsFile,
 } from './settings.js';
-import { FatalConfigError, GEMINI_DIR, Storage } from '@google/gemini-cli-core';
-import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import { ExtensionManager } from './extension-manager.js';
+import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) GEMINI_DIR for consistency
@@ -95,6 +97,23 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 vi.mock('./extension.js');
+
+const mockCoreEvents = vi.hoisted(() => ({
+  emitFeedback: vi.fn(),
+}));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    coreEvents: mockCoreEvents,
+  };
+});
+
+vi.mock('../utils/commentJson.js', () => ({
+  updateSettingsFilePreservingFormat: vi.fn(),
+}));
 
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
@@ -607,6 +626,40 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
+    });
+
+    it('should not allow user or workspace to override system disableYoloMode', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        security: {
+          disableYoloMode: false,
+        },
+      };
+      const workspaceSettingsContent = {
+        security: {
+          disableYoloMode: false, // This should be ignored
+        },
+      };
+      const systemSettingsContent = {
+        security: {
+          disableYoloMode: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
     });
 
     it('should handle contextFileName correctly when only in user settings', () => {
@@ -2106,7 +2159,7 @@ describe('Settings Loading and Merging', () => {
         },
         ui: {},
         model: {
-          name: 'gemini-1.5-pro',
+          name: 'gemini-2.5-pro',
         },
         unrecognized: 'value',
       };
@@ -2115,7 +2168,7 @@ describe('Settings Loading and Merging', () => {
 
       expect(v1Settings).toEqual({
         vimMode: false,
-        model: 'gemini-1.5-pro',
+        model: 'gemini-2.5-pro',
         unrecognized: 'value',
       });
     });
@@ -2338,18 +2391,13 @@ describe('Settings Loading and Merging', () => {
   describe('migrateDeprecatedSettings', () => {
     let mockFsExistsSync: Mock;
     let mockFsReadFileSync: Mock;
-    let mockDisableExtension: Mock;
 
     beforeEach(() => {
       vi.resetAllMocks();
-
       mockFsExistsSync = vi.mocked(fs.existsSync);
-      mockFsReadFileSync = vi.mocked(fs.readFileSync);
-      mockDisableExtension = vi.mocked(disableExtension);
-      vi.mocked(ExtensionStorage.getUserExtensionsDir).mockReturnValue(
-        new Storage(osActual.homedir()).getExtensionsDir(),
-      );
       (mockFsExistsSync as Mock).mockReturnValue(true);
+      mockFsReadFileSync = vi.mocked(fs.readFileSync);
+      mockFsReadFileSync.mockReturnValue('{}');
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: true,
         source: undefined,
@@ -2384,35 +2432,38 @@ describe('Settings Loading and Merging', () => {
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        loadedSettings,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+      const mockDisableExtension = vi.spyOn(
+        extensionManager,
+        'disableExtension',
+      );
+      mockDisableExtension.mockImplementation(() => {});
 
-      migrateDeprecatedSettings(loadedSettings, MOCK_WORKSPACE_DIR);
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
 
       // Check user settings migration
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'user-ext-1',
         SettingScope.User,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.User,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
 
       // Check workspace settings migration
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'workspace-ext-1',
         SettingScope.Workspace,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
       expect(mockDisableExtension).toHaveBeenCalledWith(
         'shared-ext',
         SettingScope.Workspace,
-        expect.any(ExtensionEnablementManager),
-        MOCK_WORKSPACE_DIR,
       );
 
       // Check that setValue was called to remove the deprecated setting
@@ -2454,11 +2505,80 @@ describe('Settings Loading and Merging', () => {
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        loadedSettings,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+      const mockDisableExtension = vi.spyOn(
+        extensionManager,
+        'disableExtension',
+      );
+      mockDisableExtension.mockImplementation(() => {});
 
-      migrateDeprecatedSettings(loadedSettings, MOCK_WORKSPACE_DIR);
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
 
       expect(mockDisableExtension).not.toHaveBeenCalled();
       expect(setValueSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveSettings', () => {
+    it('should save settings using updateSettingsFilePreservingFormat', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const settingsFile = {
+        path: '/mock/settings.json',
+        settings: { ui: { theme: 'dark' } },
+        originalSettings: { ui: { theme: 'dark' } },
+      } as unknown as SettingsFile;
+
+      saveSettings(settingsFile);
+
+      expect(mockUpdateSettings).toHaveBeenCalledWith('/mock/settings.json', {
+        ui: { theme: 'dark' },
+      });
+    });
+
+    it('should create directory if it does not exist', () => {
+      const mockFsExistsSync = vi.mocked(fs.existsSync);
+      const mockFsMkdirSync = vi.mocked(fs.mkdirSync);
+      mockFsExistsSync.mockReturnValue(false);
+
+      const settingsFile = {
+        path: '/mock/new/dir/settings.json',
+        settings: {},
+        originalSettings: {},
+      } as unknown as SettingsFile;
+
+      saveSettings(settingsFile);
+
+      expect(mockFsExistsSync).toHaveBeenCalledWith('/mock/new/dir');
+      expect(mockFsMkdirSync).toHaveBeenCalledWith('/mock/new/dir', {
+        recursive: true,
+      });
+    });
+
+    it('should emit error feedback if saving fails', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const error = new Error('Write failed');
+      mockUpdateSettings.mockImplementation(() => {
+        throw error;
+      });
+
+      const settingsFile = {
+        path: '/mock/settings.json',
+        settings: {},
+        originalSettings: {},
+      } as unknown as SettingsFile;
+
+      saveSettings(settingsFile);
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'There was an error saving your latest settings changes.',
+        error,
+      );
     });
   });
 });

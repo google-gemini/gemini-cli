@@ -339,6 +339,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       useSmartEdit: undefined,
       useWriteTodos: undefined,
       outputFormat: undefined,
+      fakeResponses: undefined,
     });
 
     await main();
@@ -376,8 +377,7 @@ describe('validateDnsResolutionOrder', () => {
 
   it('should return the default "ipv4first" and log a warning for an invalid string', () => {
     expect(validateDnsResolutionOrder('invalid-value')).toBe('ipv4first');
-    expect(consoleWarnSpy).toHaveBeenCalledOnce();
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
+    expect(consoleWarnSpy).toHaveBeenCalledExactlyOnceWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
   });
