@@ -531,9 +531,10 @@ export class IdeClient {
           return decodeURIComponent(p);
         } catch (e) {
           logger.error('Failed to decode workspace path component:', e);
-          return p;
+          return '';
         }
-      });
+      })
+      .filter(e => !!e);
     const realCwd = getRealPath(cwd);
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
       const idePath = getRealPath(workspacePath);
