@@ -5,7 +5,6 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { uninstallExtension } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
