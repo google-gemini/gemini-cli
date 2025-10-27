@@ -57,6 +57,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
 
       - name: 'configure .npmrc'
         uses: './.github/actions/setup-npmrc'
