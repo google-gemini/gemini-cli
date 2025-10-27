@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { render } from 'ink-testing-library';
 import { useLoadingIndicator } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
 import {
@@ -24,11 +25,35 @@ describe('useLoadingIndicator', () => {
     vi.restoreAllMocks();
   });
 
+  const renderLoadingIndicatorHook = (
+    initialStreamingState: StreamingState,
+  ) => {
+    let hookResult: ReturnType<typeof useLoadingIndicator>;
+    function TestComponent({
+      streamingState,
+    }: {
+      streamingState: StreamingState;
+    }) {
+      hookResult = useLoadingIndicator(streamingState);
+      return null;
+    }
+    const { rerender } = render(
+      <TestComponent streamingState={initialStreamingState} />,
+    );
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      rerender: (newProps: { streamingState: StreamingState }) =>
+        rerender(<TestComponent {...newProps} />),
+    };
+  };
+
   it('should initialize with default values when Idle', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result } = renderHook(() =>
-      useLoadingIndicator(StreamingState.Idle),
-    );
+    const { result } = renderLoadingIndicatorHook(StreamingState.Idle);
     expect(result.current.elapsedTime).toBe(0);
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
@@ -37,9 +62,7 @@ describe('useLoadingIndicator', () => {
 
   it('should reflect values when Responding', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result } = renderHook(() =>
-      useLoadingIndicator(StreamingState.Responding),
-    );
+    const { result } = renderLoadingIndicatorHook(StreamingState.Responding);
 
     // Initial state before timers advance
     expect(result.current.elapsedTime).toBe(0);
@@ -58,9 +81,8 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should show waiting phrase and retain elapsedTime when WaitingForConfirmation', async () => {
-    const { result, rerender } = renderHook(
-      ({ streamingState }) => useLoadingIndicator(streamingState),
-      { initialProps: { streamingState: StreamingState.Responding } },
+    const { result, rerender } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
     );
 
     await act(async () => {
@@ -86,9 +108,8 @@ describe('useLoadingIndicator', () => {
 
   it('should reset elapsedTime and use a witty phrase when transitioning from WaitingForConfirmation to Responding', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result, rerender } = renderHook(
-      ({ streamingState }) => useLoadingIndicator(streamingState),
-      { initialProps: { streamingState: StreamingState.Responding } },
+    const { result, rerender } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
     );
 
     await act(async () => {
@@ -120,9 +141,8 @@ describe('useLoadingIndicator', () => {
 
   it('should reset timer and phrase when streamingState changes from Responding to Idle', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result, rerender } = renderHook(
-      ({ streamingState }) => useLoadingIndicator(streamingState),
-      { initialProps: { streamingState: StreamingState.Responding } },
+    const { result, rerender } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
     );
 
     await act(async () => {
