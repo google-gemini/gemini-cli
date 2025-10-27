@@ -1182,5 +1182,183 @@ describe('MCPOAuthProvider', () => {
       expect(url.hash).toBe('#login');
       expect(url.pathname).toBe('/authorize');
     });
+
+    it('should use user-configured scopes over discovered scopes', async () => {
+      let capturedUrl: string | undefined;
+      mockOpenBrowserSecurely.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve();
+      });
+
+      const configWithUserScopes: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        scopes: ['user-scope'],
+      };
+      delete configWithUserScopes.authorizationUrl;
+      delete configWithUserScopes.tokenUrl;
+
+      const mockResourceMetadata = {
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        scopes_supported: ['discovered-scope'],
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate(
+        'test-server',
+        configWithUserScopes,
+        'https://api.example.com',
+      );
+
+      expect(capturedUrl).toBeDefined();
+      const url = new URL(capturedUrl!);
+      expect(url.searchParams.get('scope')).toBe('user-scope');
+    });
+
+    it('should use discovered scopes when no user-configured scopes are provided', async () => {
+      let capturedUrl: string | undefined;
+      mockOpenBrowserSecurely.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve();
+      });
+
+      const configWithoutScopes: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+      };
+      delete configWithoutScopes.scopes;
+      delete configWithoutScopes.authorizationUrl;
+      delete configWithoutScopes.tokenUrl;
+
+      const mockResourceMetadata = {
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        scopes_supported: ['discovered-scope-1', 'discovered-scope-2'],
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate(
+        'test-server',
+        configWithoutScopes,
+        'https://api.example.com',
+      );
+
+      expect(capturedUrl).toBeDefined();
+      const url = new URL(capturedUrl!);
+      expect(url.searchParams.get('scope')).toBe(
+        'discovered-scope-1 discovered-scope-2',
+      );
+    });
   });
 });
