@@ -534,7 +534,7 @@ export class IdeClient {
           return '';
         }
       })
-      .filter(e => !!e);
+      .filter((e) => !!e);
     const realCwd = getRealPath(cwd);
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
       const idePath = getRealPath(workspacePath);
