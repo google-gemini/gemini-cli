@@ -256,3 +256,31 @@ describe('<Footer />', () => {
     });
   });
 });
+
+describe('fallback mode display', () => {
+  it('should display Flash model when in fallback mode, not the configured Pro model', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        currentModel: 'gemini-2.5-flash', // Fallback active, showing Flash
+      },
+    });
+
+    // Footer should show the effective model (Flash), not the config model (Pro)
+    expect(lastFrame()).toContain('gemini-2.5-flash');
+    expect(lastFrame()).not.toContain('gemini-2.5-pro');
+  });
+
+  it('should display Pro model when NOT in fallback mode', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        currentModel: 'gemini-2.5-pro', // Normal mode, showing Pro
+      },
+    });
+
+    expect(lastFrame()).toContain('gemini-2.5-pro');
+  });
+});

@@ -33,8 +33,19 @@ export interface UserFeedbackPayload {
   error?: unknown;
 }
 
+/**
+ * Payload for the 'fallback-mode-changed' event.
+ */
+export interface FallbackModeChangedPayload {
+  /**
+   * Whether fallback mode is now active.
+   */
+  isInFallbackMode: boolean;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
+  FallbackModeChanged = 'fallback-mode-changed',
 }
 
 export class CoreEventEmitter extends EventEmitter {
@@ -67,6 +78,15 @@ export class CoreEventEmitter extends EventEmitter {
   }
 
   /**
+   * Notifies subscribers that fallback mode has changed.
+   * This is synchronous and doesn't use backlog (UI should already be initialized).
+   */
+  emitFallbackModeChanged(isInFallbackMode: boolean): void {
+    const payload: FallbackModeChangedPayload = { isInFallbackMode };
+    this.emit(CoreEvent.FallbackModeChanged, payload);
+  }
+
+  /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
    */
@@ -83,6 +103,10 @@ export class CoreEventEmitter extends EventEmitter {
     listener: (payload: UserFeedbackPayload) => void,
   ): this;
   override on(
+    event: CoreEvent.FallbackModeChanged,
+    listener: (payload: FallbackModeChangedPayload) => void,
+  ): this;
+  override on(
     event: string | symbol,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     listener: (...args: any[]) => void,
@@ -95,6 +119,10 @@ export class CoreEventEmitter extends EventEmitter {
     listener: (payload: UserFeedbackPayload) => void,
   ): this;
   override off(
+    event: CoreEvent.FallbackModeChanged,
+    listener: (payload: FallbackModeChangedPayload) => void,
+  ): this;
+  override off(
     event: string | symbol,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     listener: (...args: any[]) => void,
@@ -105,6 +133,10 @@ export class CoreEventEmitter extends EventEmitter {
   override emit(
     event: CoreEvent.UserFeedback,
     payload: UserFeedbackPayload,
+  ): boolean;
+  override emit(
+    event: CoreEvent.FallbackModeChanged,
+    payload: FallbackModeChangedPayload,
   ): boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   override emit(event: string | symbol, ...args: any[]): boolean {

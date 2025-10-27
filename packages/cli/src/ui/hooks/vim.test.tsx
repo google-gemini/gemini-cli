@@ -14,6 +14,7 @@ import type { Key } from './useKeypress.js';
 import type {
   TextBuffer,
   TextBufferState,
+  TextBufferAction,
 } from '../components/shared/text-buffer.js';
 import { textBufferReducer } from '../components/shared/text-buffer.js';
 
@@ -1355,12 +1356,249 @@ describe('useVim hook', () => {
   // Line operations (dd, cc) are tested in text-buffer.test.ts
 
   describe('Reducer-based integration tests', () => {
-    describe('de (delete word end)', () => {
-      it('should delete from cursor to end of current word', () => {
+    type VimActionType =
+      | 'vim_delete_word_end'
+      | 'vim_delete_word_backward'
+      | 'vim_change_word_forward'
+      | 'vim_change_word_end'
+      | 'vim_change_word_backward'
+      | 'vim_change_line'
+      | 'vim_delete_line'
+      | 'vim_delete_to_end_of_line'
+      | 'vim_change_to_end_of_line';
+
+    type VimReducerTestCase = {
+      command: string;
+      desc: string;
+      lines: string[];
+      cursorRow: number;
+      cursorCol: number;
+      actionType: VimActionType;
+      count?: number;
+      expectedLines: string[];
+      expectedCursorRow: number;
+      expectedCursorCol: number;
+    };
+
+    const testCases: VimReducerTestCase[] = [
+      {
+        command: 'de',
+        desc: 'delete from cursor to end of current word',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 1,
+        actionType: 'vim_delete_word_end' as const,
+        count: 1,
+        expectedLines: ['h world test'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 1,
+      },
+      {
+        command: 'de',
+        desc: 'delete multiple word ends with count',
+        lines: ['hello world test more'],
+        cursorRow: 0,
+        cursorCol: 1,
+        actionType: 'vim_delete_word_end' as const,
+        count: 2,
+        expectedLines: ['h test more'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 1,
+      },
+      {
+        command: 'db',
+        desc: 'delete from cursor to start of previous word',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 11,
+        actionType: 'vim_delete_word_backward' as const,
+        count: 1,
+        expectedLines: ['hello  test'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 6,
+      },
+      {
+        command: 'db',
+        desc: 'delete multiple words backward with count',
+        lines: ['hello world test more'],
+        cursorRow: 0,
+        cursorCol: 17,
+        actionType: 'vim_delete_word_backward' as const,
+        count: 2,
+        expectedLines: ['hello more'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 6,
+      },
+      {
+        command: 'cw',
+        desc: 'delete from cursor to start of next word',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 0,
+        actionType: 'vim_change_word_forward' as const,
+        count: 1,
+        expectedLines: ['world test'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 0,
+      },
+      {
+        command: 'cw',
+        desc: 'change multiple words with count',
+        lines: ['hello world test more'],
+        cursorRow: 0,
+        cursorCol: 0,
+        actionType: 'vim_change_word_forward' as const,
+        count: 2,
+        expectedLines: ['test more'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 0,
+      },
+      {
+        command: 'ce',
+        desc: 'change from cursor to end of current word',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 1,
+        actionType: 'vim_change_word_end' as const,
+        count: 1,
+        expectedLines: ['h world test'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 1,
+      },
+      {
+        command: 'ce',
+        desc: 'change multiple word ends with count',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 1,
+        actionType: 'vim_change_word_end' as const,
+        count: 2,
+        expectedLines: ['h test'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 1,
+      },
+      {
+        command: 'cb',
+        desc: 'change from cursor to start of previous word',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 11,
+        actionType: 'vim_change_word_backward' as const,
+        count: 1,
+        expectedLines: ['hello  test'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 6,
+      },
+      {
+        command: 'cc',
+        desc: 'clear the line and place cursor at the start',
+        lines: ['  hello world'],
+        cursorRow: 0,
+        cursorCol: 5,
+        actionType: 'vim_change_line' as const,
+        count: 1,
+        expectedLines: [''],
+        expectedCursorRow: 0,
+        expectedCursorCol: 0,
+      },
+      {
+        command: 'dd',
+        desc: 'delete the current line',
+        lines: ['line1', 'line2', 'line3'],
+        cursorRow: 1,
+        cursorCol: 2,
+        actionType: 'vim_delete_line' as const,
+        count: 1,
+        expectedLines: ['line1', 'line3'],
+        expectedCursorRow: 1,
+        expectedCursorCol: 0,
+      },
+      {
+        command: 'dd',
+        desc: 'delete multiple lines with count',
+        lines: ['line1', 'line2', 'line3', 'line4'],
+        cursorRow: 1,
+        cursorCol: 2,
+        actionType: 'vim_delete_line' as const,
+        count: 2,
+        expectedLines: ['line1', 'line4'],
+        expectedCursorRow: 1,
+        expectedCursorCol: 0,
+      },
+      {
+        command: 'dd',
+        desc: 'handle deleting last line',
+        lines: ['only line'],
+        cursorRow: 0,
+        cursorCol: 3,
+        actionType: 'vim_delete_line' as const,
+        count: 1,
+        expectedLines: [''],
+        expectedCursorRow: 0,
+        expectedCursorCol: 0,
+      },
+      {
+        command: 'D',
+        desc: 'delete from cursor to end of line',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 6,
+        actionType: 'vim_delete_to_end_of_line' as const,
+        expectedLines: ['hello '],
+        expectedCursorRow: 0,
+        expectedCursorCol: 6,
+      },
+      {
+        command: 'D',
+        desc: 'handle D at end of line',
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 11,
+        actionType: 'vim_delete_to_end_of_line' as const,
+        expectedLines: ['hello world'],
+        expectedCursorRow: 0,
+        expectedCursorCol: 11,
+      },
+      {
+        command: 'C',
+        desc: 'change from cursor to end of line',
+        lines: ['hello world test'],
+        cursorRow: 0,
+        cursorCol: 6,
+        actionType: 'vim_change_to_end_of_line' as const,
+        expectedLines: ['hello '],
+        expectedCursorRow: 0,
+        expectedCursorCol: 6,
+      },
+      {
+        command: 'C',
+        desc: 'handle C at beginning of line',
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 0,
+        actionType: 'vim_change_to_end_of_line' as const,
+        expectedLines: [''],
+        expectedCursorRow: 0,
+        expectedCursorCol: 0,
+      },
+    ];
+
+    it.each(testCases)(
+      '$command: should $desc',
+      ({
+        lines,
+        cursorRow,
+        cursorCol,
+        actionType,
+        count,
+        expectedLines,
+        expectedCursorRow,
+        expectedCursorCol,
+      }: VimReducerTestCase) => {
         const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 1, // cursor on 'e' in "hello"
+          lines,
+          cursorRow,
+          cursorCol,
           preferredCol: null,
           undoStack: [],
           redoStack: [],
@@ -1368,394 +1606,18 @@ describe('useVim hook', () => {
           selectionAnchor: null,
         });
 
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_word_end',
-          payload: { count: 1 },
-        });
+        const action = (
+          count
+            ? { type: actionType, payload: { count } }
+            : { type: actionType }
+        ) as TextBufferAction;
 
-        // Should delete "ello" (from cursor to end of word), leaving "h world test"
-        expect(result.lines).toEqual(['h world test']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(1);
-      });
+        const result = textBufferReducer(initialState, action);
 
-      it('should delete multiple word ends with count', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test more'],
-          cursorRow: 0,
-          cursorCol: 1, // cursor on 'e' in "hello"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_word_end',
-          payload: { count: 2 },
-        });
-
-        // Should delete "ello world" (to end of second word), leaving "h test more"
-        expect(result.lines).toEqual(['h test more']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(1);
-      });
-    });
-
-    describe('db (delete word backward)', () => {
-      it('should delete from cursor to start of previous word', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 11, // cursor on 't' in "test"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_word_backward',
-          payload: { count: 1 },
-        });
-
-        // Should delete "world" (previous word only), leaving "hello  test"
-        expect(result.lines).toEqual(['hello  test']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(6);
-      });
-
-      it('should delete multiple words backward with count', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test more'],
-          cursorRow: 0,
-          cursorCol: 17, // cursor on 'm' in "more"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_word_backward',
-          payload: { count: 2 },
-        });
-
-        // Should delete "world test " (two words backward), leaving "hello more"
-        expect(result.lines).toEqual(['hello more']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(6);
-      });
-    });
-
-    describe('cw (change word forward)', () => {
-      it('should delete from cursor to start of next word', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 0, // cursor on 'h' in "hello"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_word_forward',
-          payload: { count: 1 },
-        });
-
-        // Should delete "hello " (word + space), leaving "world test"
-        expect(result.lines).toEqual(['world test']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(0);
-      });
-
-      it('should change multiple words with count', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test more'],
-          cursorRow: 0,
-          cursorCol: 0,
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_word_forward',
-          payload: { count: 2 },
-        });
-
-        // Should delete "hello world " (two words), leaving "test more"
-        expect(result.lines).toEqual(['test more']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(0);
-      });
-    });
-
-    describe('ce (change word end)', () => {
-      it('should change from cursor to end of current word', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 1, // cursor on 'e' in "hello"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_word_end',
-          payload: { count: 1 },
-        });
-
-        // Should delete "ello" (from cursor to end of word), leaving "h world test"
-        expect(result.lines).toEqual(['h world test']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(1);
-      });
-
-      it('should change multiple word ends with count', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 1, // cursor on 'e' in "hello"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_word_end',
-          payload: { count: 2 },
-        });
-
-        // Should delete "ello world" (to end of second word), leaving "h test"
-        expect(result.lines).toEqual(['h test']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(1);
-      });
-    });
-
-    describe('cb (change word backward)', () => {
-      it('should change from cursor to start of previous word', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 11, // cursor on 't' in "test"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_word_backward',
-          payload: { count: 1 },
-        });
-
-        // Should delete "world" (previous word only), leaving "hello  test"
-        expect(result.lines).toEqual(['hello  test']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(6);
-      });
-    });
-
-    describe('cc (change line)', () => {
-      it('should clear the line and place cursor at the start', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['  hello world'],
-          cursorRow: 0,
-          cursorCol: 5, // cursor on 'o'
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_line',
-          payload: { count: 1 },
-        });
-
-        expect(result.lines).toEqual(['']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(0);
-      });
-    });
-
-    describe('dd (delete line)', () => {
-      it('should delete the current line', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['line1', 'line2', 'line3'],
-          cursorRow: 1,
-          cursorCol: 2,
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_line',
-          payload: { count: 1 },
-        });
-
-        expect(result.lines).toEqual(['line1', 'line3']);
-        expect(result.cursorRow).toBe(1);
-        expect(result.cursorCol).toBe(0);
-      });
-
-      it('should delete multiple lines with count', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['line1', 'line2', 'line3', 'line4'],
-          cursorRow: 1,
-          cursorCol: 2,
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_line',
-          payload: { count: 2 },
-        });
-
-        // Should delete lines 1 and 2
-        expect(result.lines).toEqual(['line1', 'line4']);
-        expect(result.cursorRow).toBe(1);
-        expect(result.cursorCol).toBe(0);
-      });
-
-      it('should handle deleting last line', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['only line'],
-          cursorRow: 0,
-          cursorCol: 3,
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_line',
-          payload: { count: 1 },
-        });
-
-        // Should leave an empty line when deleting the only line
-        expect(result.lines).toEqual(['']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(0);
-      });
-    });
-
-    describe('D (delete to end of line)', () => {
-      it('should delete from cursor to end of line', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 6, // cursor on 'w' in "world"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_to_end_of_line',
-        });
-
-        // Should delete "world test", leaving "hello "
-        expect(result.lines).toEqual(['hello ']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(6);
-      });
-
-      it('should handle D at end of line', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world'],
-          cursorRow: 0,
-          cursorCol: 11, // cursor at end
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_delete_to_end_of_line',
-        });
-
-        // Should not change anything when at end of line
-        expect(result.lines).toEqual(['hello world']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(11);
-      });
-    });
-
-    describe('C (change to end of line)', () => {
-      it('should change from cursor to end of line', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world test'],
-          cursorRow: 0,
-          cursorCol: 6, // cursor on 'w' in "world"
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_to_end_of_line',
-        });
-
-        // Should delete "world test", leaving "hello "
-        expect(result.lines).toEqual(['hello ']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(6);
-      });
-
-      it('should handle C at beginning of line', () => {
-        const initialState = createMockTextBufferState({
-          lines: ['hello world'],
-          cursorRow: 0,
-          cursorCol: 0,
-          preferredCol: null,
-          undoStack: [],
-          redoStack: [],
-          clipboard: null,
-          selectionAnchor: null,
-        });
-
-        const result = textBufferReducer(initialState, {
-          type: 'vim_change_to_end_of_line',
-        });
-
-        // Should delete entire line content
-        expect(result.lines).toEqual(['']);
-        expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(0);
-      });
-    });
+        expect(result.lines).toEqual(expectedLines);
+        expect(result.cursorRow).toBe(expectedCursorRow);
+        expect(result.cursorCol).toBe(expectedCursorCol);
+      },
+    );
   });
 });
