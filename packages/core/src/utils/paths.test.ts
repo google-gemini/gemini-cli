@@ -194,23 +194,21 @@ describe('isSubpath', () => {
     expect(isSubpath('/a/b/', '/a/b/c/')).toBe(true);
   });
 
-  it('handles unicode normalization differences (NFC)',
-    () => {
-      const parent = '/Users/user/테스트';
-      const child = '/Users/user/테스트/gemini-cli';
+  it('handles unicode normalization differences (NFC)', () => {
+    const parent = '/Users/user/테스트';
+    const child = '/Users/user/테스트/gemini-cli';
 
-      const parentNFD = parent.normalize('NFD');
-      const childNFC = child.normalize('NFC');
+    const parentNFD = parent.normalize('NFD');
+    const childNFC = child.normalize('NFC');
 
-      expect(isSubpath(parentNFD, childNFC)).toBe(true);
-      expect(isSubpath(childNFC, parentNFD)).toBe(false);
+    expect(isSubpath(parentNFD, childNFC)).toBe(true);
+    expect(isSubpath(childNFC, parentNFD)).toBe(false);
 
-      const unrelated = '/Users/user/다른폴더';
+    const unrelated = '/Users/user/다른폴더';
 
-      const unrelatedNFC = unrelated.normalize('NFC');
-      expect(isSubpath(parentNFD, unrelatedNFC)).toBe(false);
-    },
-  );
+    const unrelatedNFC = unrelated.normalize('NFC');
+    expect(isSubpath(parentNFD, unrelatedNFC)).toBe(false);
+  });
 });
 
 describe('isSubpath on Windows', () => {
