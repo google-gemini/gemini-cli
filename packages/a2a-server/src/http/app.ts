@@ -21,6 +21,7 @@ import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
 import type { Command, CommandArgument } from '../commands/types.js';
+import { GitService } from '@google/gemini-cli-core';
 
 type CommandResponse = {
   name: string;
@@ -79,6 +80,11 @@ export async function createApp() {
     const settings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);
     const config = await loadConfig(settings, extensions, 'a2a-server');
+
+    const git = new GitService(config.getTargetDir(), config.storage);
+    git.initialize();
+
+    const context = { config, git };
 
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
@@ -160,7 +166,8 @@ export async function createApp() {
             .json({ error: `Command not found: ${command}` });
         }
 
-        const result = await commandToExecute.execute(config, args ?? []);
+        console.log('executing command', command);
+        const result = await commandToExecute.execute(context, args ?? []);
         return res.status(200).json(result);
       } catch (e) {
         logger.error('Error executing /executeCommand:', e);

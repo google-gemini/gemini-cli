@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs/promises';
-import path from 'node:path';
+import type { Config } from '@google/gemini-cli-core';
+import { restore, restoreCompletion } from '@google/gemini-cli-core';
 import {
   type CommandContext,
   type SlashCommand,
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { HistoryItem } from '../types.js';
 
 async function restoreAction(
   context: CommandContext,
@@ -22,9 +22,7 @@ async function restoreAction(
   const { config, git: gitService } = services;
   const { addItem, loadHistory } = ui;
 
-  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
-
-  if (!checkpointDir) {
+  if (!config) {
     return {
       type: 'message',
       messageType: 'error',
@@ -32,88 +30,27 @@ async function restoreAction(
     };
   }
 
-  try {
-    // Ensure the directory exists before trying to read it.
-    await fs.mkdir(checkpointDir, { recursive: true });
-    const files = await fs.readdir(checkpointDir);
-    const jsonFiles = files.filter((file) => file.endsWith('.json'));
+  const actions = await restore(config, gitService, args);
 
-    if (!args) {
-      if (jsonFiles.length === 0) {
-        return {
-          type: 'message',
-          messageType: 'info',
-          content: 'No restorable tool calls found.',
-        };
-      }
-      const truncatedFiles = jsonFiles.map((file) => {
-        const components = file.split('.');
-        if (components.length <= 1) {
-          return file;
-        }
-        components.pop();
-        return components.join('.');
-      });
-      const fileList = truncatedFiles.join('\n');
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `Available tool calls to restore:\n\n${fileList}`,
-      };
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    const isLast = i === actions.length - 1;
+
+    if (isLast) {
+      return action;
     }
 
-    const selectedFile = args.endsWith('.json') ? args : `${args}.json`;
-
-    if (!jsonFiles.includes(selectedFile)) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: `File not found: ${selectedFile}`,
-      };
-    }
-
-    const filePath = path.join(checkpointDir, selectedFile);
-    const data = await fs.readFile(filePath, 'utf-8');
-    const toolCallData = JSON.parse(data);
-
-    if (toolCallData.history) {
-      if (!loadHistory) {
-        // This should not happen
-        return {
-          type: 'message',
-          messageType: 'error',
-          content: 'loadHistory function is not available.',
-        };
-      }
-      loadHistory(toolCallData.history);
-    }
-
-    if (toolCallData.clientHistory) {
-      await config?.getGeminiClient()?.setHistory(toolCallData.clientHistory);
-    }
-
-    if (toolCallData.commitHash) {
-      await gitService?.restoreProjectFromSnapshot(toolCallData.commitHash);
+    if (action.type === 'message') {
       addItem(
         {
-          type: 'info',
-          text: 'Restored project to the state before the tool call.',
+          type: action.messageType,
+          text: action.content,
         },
         Date.now(),
       );
+    } else if (action.type === 'load_history' && loadHistory) {
+      loadHistory(action.history as HistoryItem[]);
     }
-
-    return {
-      type: 'tool',
-      toolName: toolCallData.toolCall.name,
-      toolArgs: toolCallData.toolCall.args,
-    };
-  } catch (error) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: `Could not read restorable tool calls. This is the error: ${error}`,
-    };
   }
 }
 
@@ -123,18 +60,11 @@ async function completion(
 ): Promise<string[]> {
   const { services } = context;
   const { config } = services;
-  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
-  if (!checkpointDir) {
+  if (!config) {
     return [];
   }
-  try {
-    const files = await fs.readdir(checkpointDir);
-    return files
-      .filter((file) => file.endsWith('.json'))
-      .map((file) => file.replace('.json', ''));
-  } catch (_err) {
-    return [];
-  }
+
+  return restoreCompletion(config);
 }
 
 export const restoreCommand = (config: Config | null): SlashCommand | null => {

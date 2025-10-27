@@ -16,6 +16,8 @@ export * from './confirmation-bus/message-bus.js';
 
 // Export Commands logic
 export * from './commands/extensions.js';
+export * from './commands/restore.js';
+export * from './commands/types.js';
 
 // Export Core Logic
 export * from './core/client.js';

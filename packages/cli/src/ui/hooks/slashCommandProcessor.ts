@@ -397,7 +397,7 @@ export const useSlashCommandProcessor = (
                   config?.getGeminiClient()?.setHistory(result.clientHistory);
                   config?.getGeminiClient()?.stripThoughtsFromHistory();
                   fullCommandContext.ui.clear();
-                  result.history.forEach((item, index) => {
+                  (result.history as HistoryItem[]).forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
                   });
                   return { type: 'handled' };

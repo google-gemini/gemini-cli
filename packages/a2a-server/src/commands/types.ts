@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
+import type { Config, GitService } from '@google/gemini-cli-core';
 
-enum CommandAction {
-  SUBMIT_PROMPT = 'submitPrompt',
+export interface CommandContext {
+  config: Config;
+  git: GitService;
 }
 
 export interface CommandArgument {
@@ -23,11 +24,13 @@ export interface Command {
   readonly subCommands?: Command[];
   readonly topLevel?: boolean;
 
-  execute(config: Config, args: string[]): Promise<CommandExecutionResponse>;
+  execute(
+    config: CommandContext,
+    args: string[],
+  ): Promise<CommandExecutionResponse>;
 }
 
 export interface CommandExecutionResponse {
   readonly name: string;
   readonly data: unknown;
-  readonly action?: CommandAction;
 }
