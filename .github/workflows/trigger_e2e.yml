@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: 'Save Repo name'
         env:
-          # Replace with github.event.pull_request.base.repo.full_name when switched to listen on pull request events. This repo name does not contain the org which is needed for checkout.
+          # Replace with github.event.pull_request.head.repo.full_name when switched to listen on pull request events. This repo name does not contain the org which is needed for checkout.
           REPO_NAME: '${{ github.event.repository.name }}'
         run: |
           mkdir -p ./pr
