@@ -29,6 +29,7 @@ import type { ToolRegistry } from './tool-registry.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { coreEvents } from '../utils/events.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -36,6 +37,12 @@ vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
+  },
+}));
 
 describe('mcp-client', () => {
   let workspaceContext: WorkspaceContext;
@@ -164,9 +171,6 @@ describe('mcp-client', () => {
     });
 
     it('should handle errors when discovering prompts', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -200,10 +204,11 @@ describe('mcp-client', () => {
       await expect(client.discover({} as Config)).rejects.toThrow(
         'No prompts or tools found on the server.',
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
         `Error discovering prompts from test-server: Test error`,
+        expect.any(Error),
       );
-      consoleErrorSpy.mockRestore();
     });
 
     it('should not discover tools if server does not support them', async () => {

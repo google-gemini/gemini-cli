@@ -23,6 +23,7 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { EventEmitter } from 'node:events';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -350,8 +351,11 @@ export class ToolRegistry {
           }
 
           if (code !== 0) {
-            console.error(`Command failed with code ${code}`);
-            console.error(stderr);
+            coreEvents.emitFeedback(
+              'error',
+              `Tool discovery command failed with code ${code}.`,
+              stderr,
+            );
             return reject(
               new Error(`Tool discovery command failed with exit code ${code}`),
             );
