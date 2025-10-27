@@ -1,14 +1,16 @@
 ## TLDR
 
+**IMPORTANT**: Before submitting your PR, please review our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).
+
 <!-- Add a brief description of what this pull request changes and why and any important things for reviewers to look at -->
 
 ## Dive Deeper
 
-<!-- more thoughts and in-depth discussion here -->
+<!-- More thoughts, context, links, and in-depth discussion -->
 
 ## Reviewer Test Plan
 
-<!-- when a person reviews your code they should ideally be pulling and running that code. How would they validate your change works and if relevant what are some good classes of example prompts and ways they can exercise your changes -->
+<!-- How did you validate your change? When a person reviews your code, they should be able pull and run your change locally to validate correctness. If relevant, what are some good classes of example prompts and ways they can exercise your changes? -->
 
 ## Testing Matrix
 
@@ -25,7 +27,7 @@
 ## Linked issues / bugs
 
 <!--
-Link to any related issues or bugs.
+Link to any related issues or bugs. Look up existing issues, or open and validate the problem: https://github.com/google-gemini/gemini-cli/issues
 
 **If this PR fully resolves the issue, use one of the following keywords to automatically close the issue when this PR is merged:**
 
