@@ -137,3 +137,4 @@ export {
   GenAiProviderName,
   GenAiTokenType,
 } from './metrics.js';
+export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
