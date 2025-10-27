@@ -884,12 +884,18 @@ describe('Kitty Sequence Parsing', () => {
   it.each(
     terminals.flatMap((terminal) =>
       Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
+        const isMacTerminal =
+          terminal === 'iTerm2' ||
+          terminal === 'VSCodeTerminal' ||
+          terminal === 'Ghostty' ||
+          terminal === 'MacTerminal';
+
         if (terminal === 'Ghostty') {
-          // Ghostty uses kitty protocol sequences
           return {
             terminal,
             key,
             chunk: `\x1b[${keycode};3u`,
+            isMacTerminal,
             expected: {
               name: key,
               ctrl: false,
@@ -900,12 +906,12 @@ describe('Kitty Sequence Parsing', () => {
             },
           };
         } else if (terminal === 'MacTerminal') {
-          // Mac Terminal sends ESC + letter
           return {
             terminal,
             key,
             kitty: false,
             chunk: `\x1b${key}`,
+            isMacTerminal,
             expected: {
               sequence: `\x1b${key}`,
               name: key,
@@ -916,17 +922,15 @@ describe('Kitty Sequence Parsing', () => {
             },
           };
         } else {
-          // iTerm2 and VSCode send accented characters (å, ø, µ)
-          // Note: µ (mu) is sent with meta:false on iTerm2/VSCode but
-          // gets converted to m with meta:true
           return {
             terminal,
             key,
             chunk: accentedChar,
+            isMacTerminal,
             expected: {
               name: key,
               ctrl: false,
-              meta: true, // Always expect meta:true after conversion
+              meta: true,
               shift: false,
               paste: false,
               sequence: accentedChar,
@@ -941,27 +945,48 @@ describe('Kitty Sequence Parsing', () => {
       chunk,
       expected,
       kitty = true,
+      isMacTerminal = false,
     }: {
       chunk: string;
       expected: Partial<Key>;
       kitty?: boolean;
+      isMacTerminal?: boolean;
     }) => {
-      const keyHandler = vi.fn();
-      const testWrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider kittyProtocolEnabled={kitty}>
-          {children}
-        </KeypressProvider>
-      );
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: testWrapper,
-      });
-      act(() => result.current.subscribe(keyHandler));
+      const originalPlatform = process.platform;
+      if (isMacTerminal) {
+        Object.defineProperty(process, 'platform', {
+          value: 'darwin',
+          writable: true,
+          configurable: true,
+        });
+      }
 
-      act(() => stdin.write(chunk));
+      try {
+        const keyHandler = vi.fn();
+        const testWrapper = ({ children }: { children: React.ReactNode }) => (
+          <KeypressProvider kittyProtocolEnabled={kitty}>
+            {children}
+          </KeypressProvider>
+        );
+        const { result } = renderHook(() => useKeypressContext(), {
+          wrapper: testWrapper,
+        });
+        act(() => result.current.subscribe(keyHandler));
 
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining(expected),
-      );
+        act(() => stdin.write(chunk));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      } finally {
+        if (isMacTerminal) {
+          Object.defineProperty(process, 'platform', {
+            value: originalPlatform,
+            writable: true,
+            configurable: true,
+          });
+        }
+      }
     },
   );
 
