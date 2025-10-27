@@ -14,7 +14,7 @@ import {
   clearOauthClientCache,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
-import { OAuth2Client, Compute } from 'google-auth-library';
+import { OAuth2Client, Compute, GoogleAuth } from 'google-auth-library';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import http from 'node:http';
@@ -419,6 +419,53 @@ describe('oauth2', () => {
 
         // Assert the correct credentials were used
         expect(mockClient.setCredentials).toHaveBeenCalledWith(envCreds);
+      });
+
+      it('should use GoogleAuth for BYOID credentials from GOOGLE_APPLICATION_CREDENTIALS', async () => {
+        // Setup BYOID credentials via environment variable
+        const byoidCredentials = {
+          type: 'external_account_authorized_user',
+          client_id: 'mock-client-id',
+        };
+        const envCredsPath = path.join(tempHomeDir, 'byoid_creds.json');
+        await fs.promises.writeFile(
+          envCredsPath,
+          JSON.stringify(byoidCredentials),
+        );
+        vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+        // Mock GoogleAuth and its chain of calls
+        const mockExternalAccountClient = {
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'byoid-token' }),
+        };
+        const mockFromJSON = vi
+          .fn()
+          .mockResolvedValue(mockExternalAccountClient);
+        const mockGoogleAuthInstance = {
+          fromJSON: mockFromJSON,
+        };
+        (GoogleAuth as unknown as Mock).mockImplementation(
+          () => mockGoogleAuthInstance,
+        );
+
+        const mockOAuth2Client = {
+          on: vi.fn(),
+        };
+        (OAuth2Client as unknown as Mock).mockImplementation(
+          () => mockOAuth2Client,
+        );
+
+        const client = await getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        // Assert that GoogleAuth was used and the correct client was returned
+        expect(GoogleAuth).toHaveBeenCalledWith({
+          scopes: expect.any(Array),
+        });
+        expect(mockFromJSON).toHaveBeenCalledWith(byoidCredentials);
+        expect(client).toBe(mockExternalAccountClient);
       });
     });
 
