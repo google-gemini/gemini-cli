@@ -30,28 +30,29 @@ async function restoreAction(
     };
   }
 
-  const actions = await restore(config, gitService, args);
+  const actionStream = restore(config, gitService, args);
+  let previousAction: SlashCommandActionReturn | undefined;
 
-  for (let i = 0; i < actions.length; i++) {
-    const action = actions[i];
-    const isLast = i === actions.length - 1;
-
-    if (isLast) {
-      return action;
+  for await (const currentAction of actionStream) {
+    if (previousAction) {
+      // This was not the last action, so process it now.
+      if (previousAction.type === 'message') {
+        addItem(
+          {
+            type: previousAction.messageType,
+            text: previousAction.content,
+          },
+          Date.now(),
+        );
+      } else if (previousAction.type === 'load_history' && loadHistory) {
+        loadHistory(previousAction.history as HistoryItem[]);
+      }
     }
-
-    if (action.type === 'message') {
-      addItem(
-        {
-          type: action.messageType,
-          text: action.content,
-        },
-        Date.now(),
-      );
-    } else if (action.type === 'load_history' && loadHistory) {
-      loadHistory(action.history as HistoryItem[]);
-    }
+    previousAction = currentAction;
   }
+
+  // After the loop, previousAction holds the last action, which we return.
+  return previousAction;
 }
 
 async function completion(
