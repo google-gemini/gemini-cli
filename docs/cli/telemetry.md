@@ -286,11 +286,35 @@ the same OpenTelemetry exporters.
 
 ### Configuration and Defaults
 
-There are no additional `settings.json` switches for activity monitoring yet.
-Use the existing telemetry settings (`enabled`, `target`, `otlpEndpoint`, etc.)
-to activate the pipeline. Snapshot throttling (1 s), buffer sizes (100 events),
-and trigger sets are currently fixed in code so that all environments share the
-same defaults.
+To enable activity monitoring, add these settings to `settings.json`:
+
+```json
+{
+  "telemetry": {
+    "enabled": true,
+    "target": "local"
+  }
+}
+```
+
+For production environments, use `"target": "google"` to send telemetry to
+Google's backend.
+
+Activity monitoring automatically activates when telemetry is enabled.
+
+**Verification:**
+
+- Check for activity events in telemetry logs
+- Monitor memory snapshots are emitted during active sessions
+- Observe idle sessions stop emitting after ~30 seconds of inactivity
+
+**Current defaults** (hardcoded in the implementation):
+
+- **Snapshot throttling**: 1 second for routine snapshots, 30 seconds for growth
+  events
+- **Activity buffer**: 100 events maximum
+- **Idle timeout**: 30 seconds without user activity
+- **High-water mark threshold**: 5% RSS or heap growth triggers snapshot
 
 ## Logs and Metrics
 
