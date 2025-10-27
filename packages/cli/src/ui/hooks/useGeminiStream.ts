@@ -35,6 +35,7 @@ import {
   promptIdContext,
   WRITE_FILE_TOOL_NAME,
   tokenLimit,
+  runInDevTraceSpan,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -64,7 +65,6 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { runInDevTraceSpan } from '@google/gemini-cli-core/src/telemetry/trace.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -908,7 +908,6 @@ export const useGeminiStream = (
                   userMessageTimestamp,
                 );
               }
-
             } finally {
               setIsResponding(false);
             }

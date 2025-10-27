@@ -306,6 +306,7 @@ gemini
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
 - [**Tools API Development**](./docs/core/tools-api.md) - Create custom tools.
+- [**Local development**](./docs/local-development.md) - Create custom tools.
 
 ### Troubleshooting & Support
 
