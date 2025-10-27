@@ -30,7 +30,10 @@ import { ShellTool } from '../tools/shell.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
-import { logRipgrepFallback } from '../telemetry/loggers.js';
+import {
+  logCliConfiguration,
+  logRipgrepFallback,
+} from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 
@@ -109,6 +112,7 @@ vi.mock('../telemetry/loggers.js', async (importOriginal) => {
   return {
     ...actual,
     logRipgrepFallback: vi.fn(),
+    logCliConfiguration: vi.fn(),
   };
 });
 
@@ -280,6 +284,12 @@ describe('Server Config (config.ts)', () => {
       expect(
         config.getGeminiClient().stripThoughtsFromHistory,
       ).not.toHaveBeenCalledWith();
+    });
+
+    it('should not log session start event', async () => {
+      const config = new Config(baseParams);
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(logCliConfiguration).not.toHaveBeenCalled();
     });
   });
 
