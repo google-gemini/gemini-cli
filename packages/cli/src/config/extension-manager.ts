@@ -474,11 +474,10 @@ export class ExtensionManager {
           `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
         );
       }
-      const installDir = new ExtensionStorage(rawConfig.name).getExtensionDir();
       const config = recursivelyHydrateStrings(
         rawConfig as unknown as JsonObject,
         {
-          extensionPath: installDir,
+          extensionPath: extensionDir,
           workspacePath: this.workspaceDir,
           '/': path.sep,
           pathSeparator: path.sep,

@@ -41,6 +41,7 @@ import {
   stripShellWrapper,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -58,8 +59,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: ShellToolParams,
     private readonly allowlist: Set<string>,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   getDescription(): string {
@@ -76,7 +78,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
-  override async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
@@ -372,7 +374,10 @@ export class ShellTool extends BaseDeclarativeTool<
 
   private allowlist: Set<string> = new Set();
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
@@ -403,6 +408,7 @@ export class ShellTool extends BaseDeclarativeTool<
       },
       false, // output is not markdown
       true, // output can be updated
+      messageBus,
     );
   }
 
@@ -444,7 +450,13 @@ export class ShellTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ShellToolParams,
+    messageBus?: MessageBus,
   ): ToolInvocation<ShellToolParams, ToolResult> {
-    return new ShellToolInvocation(this.config, params, this.allowlist);
+    return new ShellToolInvocation(
+      this.config,
+      params,
+      this.allowlist,
+      messageBus,
+    );
   }
 }
