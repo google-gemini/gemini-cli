@@ -4,11 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { Task } from './task.js';
-import type { Config, ToolCallRequestInfo } from '@google/gemini-cli-core';
+import {
+  GeminiEventType,
+  type Config,
+  type ToolCallRequestInfo,
+} from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
+import { CoderAgentEvent } from '../types.js';
 import type { ToolCall } from '@google/gemini-cli-core';
 
 describe('Task', () => {
@@ -93,6 +106,50 @@ describe('Task', () => {
           }),
         }),
       );
+    });
+
+    it('should handle Citation event and publish to event bus', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const citationText = 'Source: example.com';
+      const citationEvent = {
+        type: GeminiEventType.Citation,
+        value: citationText,
+      };
+
+      await task.acceptAgentMessage(citationEvent);
+
+      expect(mockEventBus.publish).toHaveBeenCalledOnce();
+      const publishedEvent = (mockEventBus.publish as Mock).mock.calls[0][0];
+
+      expect(publishedEvent.kind).toBe('status-update');
+      expect(publishedEvent.taskId).toBe('task-id');
+      expect(publishedEvent.metadata.coderAgent.kind).toBe(
+        CoderAgentEvent.CitationEvent,
+      );
+      expect(publishedEvent.status.message).toBeDefined();
+      expect(publishedEvent.status.message.parts).toEqual([
+        {
+          kind: 'text',
+          text: citationText,
+        },
+      ]);
     });
   });
 
