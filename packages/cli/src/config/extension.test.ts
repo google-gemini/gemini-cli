@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** @vitest-environment jsdom */
+
 import { vi, type MockedFunction } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -293,8 +295,8 @@ describe('extension tests', () => {
         mcpServers: {
           'test-server': {
             command: 'node',
-            args: ['${extensionPath}/server/index.js'],
-            cwd: '${extensionPath}/server',
+            args: ['${extensionPath}${/}server${/}index.js'],
+            cwd: '${extensionPath}${/}server',
           },
         },
       });
@@ -309,6 +311,9 @@ describe('extension tests', () => {
       expect(extensions[0].mcpServers?.['test-server'].cwd).toBe(
         path.join(sourceExtDir, 'server'),
       );
+      expect(extensions[0].mcpServers?.['test-server'].args).toEqual([
+        path.join(sourceExtDir, 'server', 'index.js'),
+      ]);
     });
 
     it('should resolve environment variables in extension configuration', () => {
@@ -457,8 +462,7 @@ describe('extension tests', () => {
 
       expect(extensions).toHaveLength(1);
       expect(extensions[0].name).toBe('good-ext');
-      expect(consoleSpy).toHaveBeenCalledOnce();
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
         expect.stringContaining(
           `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}`,
         ),
@@ -489,8 +493,7 @@ describe('extension tests', () => {
 
       expect(extensions).toHaveLength(1);
       expect(extensions[0].name).toBe('good-ext');
-      expect(consoleSpy).toHaveBeenCalledOnce();
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
         expect.stringContaining(
           `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
         ),

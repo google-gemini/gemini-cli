@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** @vitest-environment jsdom */
+
 import { CoreToolScheduler } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { renderHook } from '@testing-library/react';

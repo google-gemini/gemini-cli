@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials, AuthClient } from 'google-auth-library';
+import type { Credentials, AuthClient, JWTInput } from 'google-auth-library';
 import {
   OAuth2Client,
   Compute,
@@ -75,6 +75,27 @@ async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
+  const credentials = await fetchCachedCredentials();
+
+  if (
+    credentials &&
+    (credentials as { type?: string }).type ===
+      'external_account_authorized_user'
+  ) {
+    const auth = new GoogleAuth({
+      scopes: OAUTH_SCOPE,
+    });
+    const byoidClient = await auth.fromJSON({
+      ...credentials,
+      refresh_token: credentials.refresh_token ?? undefined,
+    });
+    const token = await byoidClient.getAccessToken();
+    if (token) {
+      debugLogger.debug('Created BYOID auth client.');
+      return byoidClient;
+    }
+  }
+
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
@@ -103,24 +124,35 @@ async function initOauthClient(
     }
   });
 
-  // If there are cached creds on disk, they always take precedence
-  const loadedClient = await loadCachedCredentials(client);
-  if (loadedClient) {
-    // For BYOID, we don't fetch user info from Google's endpoint, so we only
-    // do this for OAuth2Client.
-    if (
-      loadedClient instanceof OAuth2Client &&
-      !userAccountManager.getCachedGoogleAccount()
-    ) {
-      try {
-        await fetchAndCacheUserInfo(loadedClient);
-      } catch (error) {
-        // Non-fatal, continue with existing auth.
-        debugLogger.warn('Failed to fetch user info:', getErrorMessage(error));
+  if (credentials) {
+    client.setCredentials(credentials as Credentials);
+    try {
+      // This will verify locally that the credentials look good.
+      const { token } = await client.getAccessToken();
+      if (token) {
+        // This will check with the server to see if it hasn't been revoked.
+        await client.getTokenInfo(token);
+
+        if (!userAccountManager.getCachedGoogleAccount()) {
+          try {
+            await fetchAndCacheUserInfo(client);
+          } catch (error) {
+            // Non-fatal, continue with existing auth.
+            debugLogger.warn(
+              'Failed to fetch user info:',
+              getErrorMessage(error),
+            );
+          }
+        }
+        debugLogger.log('Loaded cached credentials.');
+        return client;
       }
+    } catch (error) {
+      debugLogger.debug(
+        `Cached credentials are not valid:`,
+        getErrorMessage(error),
+      );
     }
-    debugLogger.log('Loaded cached credentials.');
-    return loadedClient;
   }
 
   // In Google Cloud Shell, we can use Application Default Credentials (ADC)
@@ -437,17 +469,12 @@ export function getAvailablePort(): Promise<number> {
   });
 }
 
-async function loadCachedCredentials(
-  client: OAuth2Client,
-): Promise<AuthClient | null> {
+async function fetchCachedCredentials(): Promise<
+  Credentials | JWTInput | null
+> {
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
-    const credentials = await OAuthCredentialStorage.loadCredentials();
-    if (credentials) {
-      client.setCredentials(credentials);
-      return client;
-    }
-    return null;
+    return await OAuthCredentialStorage.loadCredentials();
   }
 
   const pathsToTry = [
@@ -457,35 +484,8 @@ async function loadCachedCredentials(
 
   for (const keyFile of pathsToTry) {
     try {
-      const credsStr = await fs.readFile(keyFile, 'utf-8');
-      const creds = JSON.parse(credsStr);
-      if (creds.type === 'external_account_authorized_user') {
-        const auth = new GoogleAuth({
-          scopes: OAUTH_SCOPE,
-        });
-        const externalAccountAuthorizedUserClient = await auth.fromJSON(creds);
-        const token =
-          await externalAccountAuthorizedUserClient.getAccessToken();
-        // We must return the client itself, not just set credentials on the generic client.
-        if (!token) {
-          return null;
-        }
-        debugLogger.log('Loaded external account credentials.');
-        return externalAccountAuthorizedUserClient;
-      } else {
-        client.setCredentials(creds);
-      }
-
-      // This will verify locally that the credentials look good.
-      const { token } = await client.getAccessToken();
-      if (!token) {
-        continue;
-      }
-
-      // This will check with the server to see if it hasn't been revoked.
-      await client.getTokenInfo(token);
-
-      return client;
+      const keyFileString = await fs.readFile(keyFile, 'utf-8');
+      return JSON.parse(keyFileString);
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
       debugLogger.debug(
