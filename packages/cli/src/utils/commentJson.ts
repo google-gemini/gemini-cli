@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
 import { parse, stringify } from 'comment-json';
+import * as fs from 'node:fs';
+import { safeWriteFileSync } from './safeFs.js';
 
 /**
  * Type representing an object that may contain Symbol keys for comments.
@@ -20,7 +21,7 @@ export function updateSettingsFilePreservingFormat(
   updates: Record<string, unknown>,
 ): void {
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
+    safeWriteFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
     return;
   }
 
@@ -40,7 +41,7 @@ export function updateSettingsFilePreservingFormat(
   const updatedStructure = applyUpdates(parsed, updates);
   const updatedContent = stringify(updatedStructure, null, 2);
 
-  fs.writeFileSync(filePath, updatedContent, 'utf-8');
+  safeWriteFileSync(filePath, updatedContent, 'utf-8');
 }
 
 /**
