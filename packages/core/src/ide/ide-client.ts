@@ -517,7 +517,19 @@ export class IdeClient {
       };
     }
 
-    const ideWorkspacePaths = ideWorkspacePath.split(path.delimiter);
+    const ideWorkspacePaths = ideWorkspacePath
+      .split(path.delimiter)
+      .map((p) => {
+        try {
+          if (p.startsWith('file://')) {
+            return new URL(p).pathname;
+          }
+          return decodeURIComponent(p);
+        } catch (e) {
+          logger.error('Failed to decode workspace path component:', e);
+          return p;
+        }
+      });
     const realCwd = getRealPath(cwd);
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
       const idePath = getRealPath(workspacePath);
