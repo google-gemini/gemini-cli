@@ -312,8 +312,11 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
   const isWindows = os.platform() === 'win32';
   const pathModule = isWindows ? path.win32 : path;
 
+  const normalizedParent = parentPath.normalize('NFC');
+  const normalizedChild = childPath.normalize('NFC');
+
   // On Windows, path.relative is case-insensitive. On POSIX, it's case-sensitive.
-  const relative = pathModule.relative(parentPath, childPath);
+  const relative = pathModule.relative(normalizedParent, normalizedChild);
 
   return (
     !relative.startsWith(`..${pathModule.sep}`) &&
