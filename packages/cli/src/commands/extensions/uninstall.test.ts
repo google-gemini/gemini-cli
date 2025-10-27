@@ -4,14 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { uninstallCommand, handleUninstall } from './uninstall.js';
+import { describe, it, expect } from 'vitest';
+import { uninstallCommand } from './uninstall.js';
 import yargs from 'yargs';
-import { uninstallExtension } from '../../config/extension.js';
-
-vi.mock('../../config/extension.js', () => ({
-  uninstallExtension: vi.fn(),
-}));
 
 describe('extensions uninstall command', () => {
   it('should fail if no source is provided', () => {
