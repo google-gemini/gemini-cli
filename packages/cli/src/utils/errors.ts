@@ -232,10 +232,3 @@ export function handleMaxTurnsExceededError(config: Config): never {
     process.exit(maxTurnsError.exitCode);
   }
 }
-
-export class ExtensionNotFoundError extends Error {
-  constructor(extensionName: string) {
-    super(`Extension "${extensionName}" not found.`);
-    this.name = 'ExtensionNotFoundError';
-  }
-}
