@@ -480,6 +480,18 @@ describe('ShellTool', () => {
           invocation.shouldConfirmExecute(new AbortController().signal),
         ).rejects.toThrow('wc');
       });
+
+      it('should require all segments of a chained command to be allowlisted', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          'ShellTool(echo)',
+        ]);
+        const invocation = shellTool.build({ command: 'echo "foo" && ls -l' });
+        await expect(
+          invocation.shouldConfirmExecute(new AbortController().signal),
+        ).rejects.toThrow(
+          'Command "echo "foo" && ls -l" is not in the list of allowed tools for non-interactive mode.',
+        );
+      });
     });
   });
 
