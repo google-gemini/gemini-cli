@@ -42,6 +42,7 @@ import {
   handleCancellationError,
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
+import { TextOutput } from './ui/utils/textOutput.js';
 
 export async function runNonInteractive(
   config: Config,
@@ -55,6 +56,7 @@ export async function runNonInteractive(
       stderr: true,
       debugMode: config.getDebugMode(),
     });
+    const textOutput = new TextOutput();
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -196,7 +198,9 @@ export async function runNonInteractive(
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
               responseText += event.value;
             } else {
-              process.stdout.write(event.value);
+              if (event.value) {
+                textOutput.write(event.value);
+              }
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
             if (streamFormatter) {
@@ -233,6 +237,7 @@ export async function runNonInteractive(
         }
 
         if (toolCallRequests.length > 0) {
+          textOutput.ensureTrailingNewline();
           const toolResponseParts: Part[] = [];
           const completedToolCalls: CompletedToolCall[] = [];
 
@@ -310,9 +315,9 @@ export async function runNonInteractive(
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
-            process.stdout.write(formatter.format(responseText, stats));
+            textOutput.write(formatter.format(responseText, stats));
           } else {
-            process.stdout.write('\n'); // Ensure a final newline
+            textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
           return;
         }
