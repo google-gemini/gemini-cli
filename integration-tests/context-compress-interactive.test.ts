@@ -29,12 +29,12 @@ describe('Interactive Mode', () => {
 
     const run = await rig.runInteractive();
 
-    await run.sendKeys('Initial prompt');
+    await run.type('Initial prompt');
     await run.type('\r');
 
     await run.expectText('The initial response from the model', 5000);
 
-    await run.sendKeys('/compress');
+    await run.type('/compress');
     await run.type('\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
