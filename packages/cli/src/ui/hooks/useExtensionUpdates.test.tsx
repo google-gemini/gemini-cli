@@ -124,7 +124,7 @@ describe('useExtensionUpdates', () => {
         autoUpdate: true,
       },
     });
-
+    await extensionManager.loadExtensions();
     const addItem = vi.fn();
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
@@ -145,7 +145,6 @@ describe('useExtensionUpdates', () => {
       name: '',
     });
 
-    extensionManager.loadExtensions();
     function TestComponent() {
       useExtensionUpdates(extensionManager, addItem);
       return null;
@@ -189,7 +188,7 @@ describe('useExtensionUpdates', () => {
       },
     });
 
-    extensionManager.loadExtensions();
+    await extensionManager.loadExtensions();
 
     const addItem = vi.fn();
 

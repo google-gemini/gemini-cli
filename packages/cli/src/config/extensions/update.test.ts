@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { checkForAllExtensionUpdates, updateExtension } from './update.js';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { GEMINI_DIR, KeychainTokenStorage } from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from '../trustedFolders.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { createExtension } from '../../test-utils/createExtension.js';
@@ -64,8 +64,23 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     logExtensionUninstall: mockLogExtensionUninstall,
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
+    KeychainTokenStorage: vi.fn().mockImplementation(() => ({
+      getSecret: vi.fn(),
+      setSecret: vi.fn(),
+      deleteSecret: vi.fn(),
+      listSecrets: vi.fn(),
+      isAvailable: vi.fn().mockResolvedValue(true),
+    })),
   };
 });
+
+interface MockKeychainStorage {
+  getSecret: ReturnType<typeof vi.fn>;
+  setSecret: ReturnType<typeof vi.fn>;
+  deleteSecret: ReturnType<typeof vi.fn>;
+  listSecrets: ReturnType<typeof vi.fn>;
+  isAvailable: ReturnType<typeof vi.fn>;
+}
 
 describe('update tests', () => {
   let tempHomeDir: string;
@@ -76,8 +91,32 @@ describe('update tests', () => {
   let mockPromptForSettings: MockedFunction<
     (setting: ExtensionSetting) => Promise<string>
   >;
+  let mockKeychainStorage: MockKeychainStorage;
+  let keychainData: Record<string, string>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    keychainData = {};
+    mockKeychainStorage = {
+      getSecret: vi
+        .fn()
+        .mockImplementation(async (key: string) => keychainData[key] || null),
+      setSecret: vi
+        .fn()
+        .mockImplementation(async (key: string, value: string) => {
+          keychainData[key] = value;
+        }),
+      deleteSecret: vi.fn().mockImplementation(async (key: string) => {
+        delete keychainData[key];
+      }),
+      listSecrets: vi
+        .fn()
+        .mockImplementation(async () => Object.keys(keychainData)),
+      isAvailable: vi.fn().mockResolvedValue(true),
+    };
+    (
+      KeychainTokenStorage as unknown as ReturnType<typeof vi.fn>
+    ).mockImplementation(() => mockKeychainStorage);
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
@@ -110,6 +149,7 @@ describe('update tests', () => {
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   describe('updateExtension', () => {
@@ -139,11 +179,10 @@ describe('update tests', () => {
         );
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
-      const extension = extensionManager
-        .loadExtensions()
-        .find((e) => e.name === extensionName)!;
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === extensionName)!;
       const updateInfo = await updateExtension(
-        extension,
+        extension!,
         extensionManager,
         ExtensionUpdateState.UPDATE_AVAILABLE,
         () => {},
@@ -189,11 +228,10 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
 
-      const extension = extensionManager
-        .loadExtensions()
-        .find((e) => e.name === extensionName)!;
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === extensionName)!;
       await updateExtension(
-        extension,
+        extension!,
         extensionManager,
         ExtensionUpdateState.UPDATE_AVAILABLE,
         dispatch,
@@ -231,12 +269,11 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = extensionManager
-        .loadExtensions()
-        .find((e) => e.name === extensionName)!;
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === extensionName)!;
       await expect(
         updateExtension(
-          extension,
+          extension!,
           extensionManager,
           ExtensionUpdateState.UPDATE_AVAILABLE,
           dispatch,
@@ -280,7 +317,7 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        extensionManager.loadExtensions(),
+        await extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -312,7 +349,7 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        extensionManager.loadExtensions(),
+        await extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -341,7 +378,7 @@ describe('update tests', () => {
       });
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        extensionManager.loadExtensions(),
+        await extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -370,7 +407,7 @@ describe('update tests', () => {
       });
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        extensionManager.loadExtensions(),
+        await extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -398,7 +435,7 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        extensionManager.loadExtensions(),
+        await extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );

@@ -33,7 +33,7 @@ async function getMcpServersFromConfig(): Promise<
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
   });
-  const extensions = extensionManager.loadExtensions();
+  const extensions = await extensionManager.loadExtensions();
   const mcpServers = { ...(settings.merged.mcpServers || {}) };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {

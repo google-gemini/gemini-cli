@@ -423,7 +423,7 @@ export async function loadCliConfig(
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
   });
-  extensionManager.loadExtensions();
+  await extensionManager.loadExtensions();
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =

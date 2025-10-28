@@ -37,7 +37,7 @@ export async function handleUpdate(args: UpdateArgs) {
     settings: loadSettings(workspaceDir).merged,
   });
 
-  const extensions = extensionManager.loadExtensions();
+  const extensions = await extensionManager.loadExtensions();
   if (args.name) {
     try {
       const extension = extensions.find(
