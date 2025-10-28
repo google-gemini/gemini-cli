@@ -1341,9 +1341,7 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
   let originalPlatform: string;
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <KeypressProvider kittyProtocolEnabled={false}>
-      {children}
-    </KeypressProvider>
+    <KeypressProvider kittyProtocolEnabled={false}>{children}</KeypressProvider>
   );
 
   beforeEach(() => {
@@ -1353,10 +1351,10 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
       stdin,
       setRawMode: mockSetRawMode,
     });
-    
+
     // Store the original platform
     originalPlatform = process.platform;
-    
+
     // Mock the keypress event emitter to work with new structure
     vi.spyOn(stdin, 'emit').mockImplementation((event, ...args) => {
       if (event === 'keypress') {
@@ -1386,7 +1384,7 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
     it('should apply Alt key character mapping for ç on macOS', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      
+
       act(() => {
         result.current.subscribe(keyHandler);
       });
@@ -1418,7 +1416,7 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
     it('should apply Alt key character mapping for å on macOS', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      
+
       act(() => {
         result.current.subscribe(keyHandler);
       });
@@ -1450,7 +1448,7 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
     it('should not apply mapping when key already has meta=true on macOS', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      
+
       act(() => {
         result.current.subscribe(keyHandler);
       });
@@ -1492,7 +1490,7 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
     it('should NOT apply Alt key character mapping for ç on Linux', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      
+
       act(() => {
         result.current.subscribe(keyHandler);
       });
@@ -1524,7 +1522,7 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
     it('should handle normal Alt+C combination on Linux', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      
+
       act(() => {
         result.current.subscribe(keyHandler);
       });
@@ -1566,7 +1564,7 @@ describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
     it('should NOT apply Alt key character mapping on Windows', async () => {
       const keyHandler = vi.fn();
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      
+
       act(() => {
         result.current.subscribe(keyHandler);
       });
