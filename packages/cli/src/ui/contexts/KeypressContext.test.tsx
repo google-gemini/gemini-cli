@@ -16,8 +16,8 @@ import {
   useKeypressContext,
   DRAG_COMPLETION_TIMEOUT_MS,
   KITTY_SEQUENCE_TIMEOUT_MS,
-  // CSI_END_O,
-  // SS3_END,
+  PASTE_MODE_START,
+  PASTE_MODE_END,
   SINGLE_QUOTE,
   DOUBLE_QUOTE,
 } from './KeypressContext.js';
@@ -33,8 +33,6 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
-const PASTE_START = '\x1B[200~';
-const PASTE_END = '\x1B[201~';
 // readline will not emit most incomplete kitty sequences but it will give
 // up on sequences like this where the modifier (135) has more than two digits.
 const INCOMPLETE_KITTY_SEQUENCE = '\x1b[97;135';
@@ -365,9 +363,9 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Simulate a bracketed paste event
       act(() => {
-        stdin.write(PASTE_START);
+        stdin.write(PASTE_MODE_START);
         stdin.write(pastedText);
-        stdin.write(PASTE_END);
+        stdin.write(PASTE_MODE_END);
       });
 
       await waitFor(() => {
@@ -392,11 +390,11 @@ describe('KeypressContext - Kitty Protocol', () => {
       act(() => result.current.subscribe(keyHandler));
 
       act(() => {
-        // Split PASTE_START into two parts
-        stdin.write(PASTE_START.slice(0, 3));
-        stdin.write(PASTE_START.slice(3));
+        // Split PASTE_MODE_START into two parts
+        stdin.write(PASTE_MODE_START.slice(0, 3));
+        stdin.write(PASTE_MODE_START.slice(3));
         stdin.write(pastedText);
-        stdin.write(PASTE_END);
+        stdin.write(PASTE_MODE_END);
       });
 
       await waitFor(() => {
@@ -420,11 +418,11 @@ describe('KeypressContext - Kitty Protocol', () => {
       act(() => result.current.subscribe(keyHandler));
 
       act(() => {
-        stdin.write(PASTE_START);
+        stdin.write(PASTE_MODE_START);
         stdin.write(pastedText);
-        // Split PASTE_END into two parts
-        stdin.write(PASTE_END.slice(0, 3));
-        stdin.write(PASTE_END.slice(3));
+        // Split PASTE_MODE_END into two parts
+        stdin.write(PASTE_MODE_END.slice(0, 3));
+        stdin.write(PASTE_MODE_END.slice(3));
       });
 
       await waitFor(() => {
@@ -878,9 +876,9 @@ describe('Kitty Sequence Parsing', () => {
 
   // Key mappings: letter -> [keycode, accented character]
   const keys: Record<string, [number, string]> = {
-    a: [97, 'å'],
-    o: [111, 'ø'],
-    m: [109, 'µ'],
+    a: [97, '\u00e5'],
+    o: [111, '\u00f8'],
+    m: [109, '\u00b5'],
   };
 
   it.each(
@@ -918,8 +916,8 @@ describe('Kitty Sequence Parsing', () => {
             },
           };
         } else {
-          // iTerm2 and VSCode send accented characters (å, ø, µ)
-          // Note: µ (mu) is sent with meta:false on iTerm2/VSCode but
+          // iTerm2 and VSCode send accented characters (\u00e5, \u00f8, \u00b5)
+          // Note: \u00b5 (mu) is sent with meta:false on iTerm2/VSCode but
           // gets converted to m with meta:true
           return {
             terminal,
