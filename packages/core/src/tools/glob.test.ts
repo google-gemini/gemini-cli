@@ -347,7 +347,7 @@ describe('GlobTool', () => {
         name: 'should respect .gitignore files by default',
         ignoreFile: { name: '.gitignore', content: '*.ignored.txt' },
         filesToCreate: ['a.ignored.txt', 'b.notignored.txt'],
-        params: { pattern: '*.txt' },
+        globToolParams: { pattern: '*.txt' },
         expectedCountMessage: 'Found 3 file(s)',
         notExpectedToContain: ['a.ignored.txt'],
       },
@@ -355,7 +355,7 @@ describe('GlobTool', () => {
         name: 'should respect .geminiignore files by default',
         ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
         filesToCreate: ['a.geminiignored.txt', 'b.notignored.txt'],
-        params: { pattern: '*.txt' },
+        globToolParams: { pattern: '*.txt' },
         expectedCountMessage: 'Found 3 file(s)',
         notExpectedToContain: ['a.geminiignored.txt'],
       },
@@ -363,7 +363,7 @@ describe('GlobTool', () => {
         name: 'should not respect .gitignore when respect_git_ignore is false',
         ignoreFile: { name: '.gitignore', content: '*.ignored.txt' },
         filesToCreate: ['a.ignored.txt'],
-        params: { pattern: '*.txt', respect_git_ignore: false },
+        globToolParams: { pattern: '*.txt', respect_git_ignore: false },
         expectedCountMessage: 'Found 3 file(s)',
         expectedToContain: ['a.ignored.txt'],
       },
@@ -371,7 +371,7 @@ describe('GlobTool', () => {
         name: 'should not respect .geminiignore when respect_gemini_ignore is false',
         ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
         filesToCreate: ['a.geminiignored.txt'],
-        params: { pattern: '*.txt', respect_gemini_ignore: false },
+        globToolParams: { pattern: '*.txt', respect_gemini_ignore: false },
         expectedCountMessage: 'Found 3 file(s)',
         expectedToContain: ['a.geminiignored.txt'],
       },
@@ -380,7 +380,7 @@ describe('GlobTool', () => {
       async ({
         ignoreFile,
         filesToCreate,
-        params,
+        globToolParams,
         expectedCountMessage,
         expectedToContain,
         notExpectedToContain,
@@ -393,7 +393,7 @@ describe('GlobTool', () => {
           await fs.writeFile(path.join(tempRootDir, file), 'content');
         }
 
-        const invocation = globTool.build(params);
+        const invocation = globTool.build(globToolParams);
         const result = await invocation.execute(abortSignal);
 
         expect(result.llmContent).toContain(expectedCountMessage);
@@ -510,12 +510,13 @@ describe('sortFileEntries', () => {
 
       if (expected) {
         expect(sortedPaths).toEqual(expected);
-      }
-      if (expectedUnordered) {
+      } else if (expectedUnordered) {
         expect(sortedPaths).toHaveLength(expectedUnordered.length);
         for (const path of expectedUnordered) {
           expect(sortedPaths).toContain(path);
         }
+      } else {
+        throw new Error('Test case must have expected or expectedUnordered');
       }
     },
   );
