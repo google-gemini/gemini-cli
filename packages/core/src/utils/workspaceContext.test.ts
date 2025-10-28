@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { WorkspaceContext } from './workspaceContext.js';
+import { normalizePath } from './paths.js';
 
 describe('WorkspaceContext with real filesystem', () => {
   let tempDir: string;
@@ -187,6 +188,24 @@ describe('WorkspaceContext with real filesystem', () => {
       // Test a path outside the workspace
       const pathOutside = path.join(tempDir, '다른폴더', 'file.txt');
       expect(workspaceContext.isPathWithinWorkspace(pathOutside)).toBe(false);
+    });
+
+    it('should not add duplicate directories with different unicode normalizations', () => {
+      const unicodeDirName = '테스트-중복방지';
+      const unicodeDirPath = path.join(tempDir, unicodeDirName);
+      fs.mkdirSync(unicodeDirPath, { recursive: true });
+
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      // Add the same directory with two different normalization forms
+      workspaceContext.addDirectory(unicodeDirPath.normalize('NFC'));
+      workspaceContext.addDirectory(unicodeDirPath.normalize('NFD'));
+
+      const directories = workspaceContext.getDirectories();
+
+      // There should be only one entry for the unicode directory, plus the initial cwd.
+      expect(directories).toHaveLength(2);
+      expect(directories).toContain(normalizePath(unicodeDirPath));
     });
 
     describe('with symbolic link', () => {
