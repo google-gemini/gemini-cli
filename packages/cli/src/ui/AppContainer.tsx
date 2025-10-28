@@ -261,20 +261,18 @@ export const AppContainer = (props: AppContainerProps) => {
     [historyManager.addItem],
   );
 
-  // Watch for model changes (e.g., from Flash fallback)
+  // Subscribe to fallback mode changes from core
   useEffect(() => {
-    const checkModelChange = () => {
+    const handleFallbackModeChanged = () => {
       const effectiveModel = getEffectiveModel();
-      if (effectiveModel !== currentModel) {
-        setCurrentModel(effectiveModel);
-      }
+      setCurrentModel(effectiveModel);
     };
 
-    checkModelChange();
-    const interval = setInterval(checkModelChange, 1000); // Check every second
-
-    return () => clearInterval(interval);
-  }, [config, currentModel, getEffectiveModel]);
+    coreEvents.on(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+    return () => {
+      coreEvents.off(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+    };
+  }, [getEffectiveModel]);
 
   const {
     consoleMessages,
@@ -590,7 +588,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         },
         Date.now(),
       );
-      console.error('Error refreshing memory:', error);
+      debugLogger.warn('Error refreshing memory:', error);
     }
   }, [config, historyManager, settings.merged]);
 
