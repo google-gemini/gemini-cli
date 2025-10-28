@@ -72,7 +72,6 @@ export class PolicyEngine {
       stringifiedArgs = stableStringify(toolCall.args);
     }
 
-    // Debug logging
     debugLogger.debug(
       `[PolicyEngine.check] toolCall.name: ${toolCall.name}, stringifiedArgs: ${stringifiedArgs}`,
     );
