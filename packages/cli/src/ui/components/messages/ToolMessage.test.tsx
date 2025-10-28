@@ -121,7 +121,7 @@ describe('<ToolMessage />', () => {
     it('pretty prints valid JSON', async () => {
       const testJSONstring = '{"a": 1, "b": [2, 3]}';
       const testJSON = JSON.parse(testJSONstring);
-      const { lastFrame, stdin } = renderWithContext(
+      const { lastFrame } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -130,20 +130,7 @@ describe('<ToolMessage />', () => {
         StreamingState.Idle,
       );
 
-      // Initially, the JSON is hidden
-      expect(lastFrame()).toContain('(ctrl + t to toggle details)');
-
-      // Simulate ctrl+t
-      stdin.write('\x14'); // ctrl+t
-
-      // Wait for the output to change
-      let output = lastFrame();
-      let retries = 10;
-      while (output.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        output = lastFrame();
-        retries--;
-      }
+      const output = lastFrame();
 
       const extractedOutput = JSON.parse(extractJSON(output));
 
@@ -152,25 +139,12 @@ describe('<ToolMessage />', () => {
     });
 
     it('renders pretty JSON in ink frame', async () => {
-      const { lastFrame, stdin } = renderWithContext(
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} resultDisplay='{"a":1,"b":2}' />,
         StreamingState.Idle,
       );
 
-      // Initially, the JSON is hidden
-      expect(lastFrame()).toContain('(ctrl + t to toggle details)');
-
-      // Simulate ctrl+t
-      stdin.write('\x14'); // ctrl+t
-
-      // Wait for the output to change
-      let frame = lastFrame();
-      let retries = 10;
-      while (frame.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        frame = lastFrame();
-        retries--;
-      }
+      const frame = lastFrame();
 
       expect(frame).toMatchSnapshot();
       expect(frame).not.toContain('MockMarkdown:');
@@ -181,7 +155,7 @@ describe('<ToolMessage />', () => {
     it('uses JSON renderer even when renderOutputAsMarkdown=true is true', async () => {
       const testJSONstring = '{"a": 1, "b": [2, 3]}';
       const testJSON = JSON.parse(testJSONstring);
-      const { lastFrame, stdin } = renderWithContext(
+      const { lastFrame } = renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -190,20 +164,7 @@ describe('<ToolMessage />', () => {
         StreamingState.Idle,
       );
 
-      // Initially, the JSON is hidden
-      expect(lastFrame()).toContain('(ctrl + t to toggle details)');
-
-      // Simulate ctrl+t
-      stdin.write('\x14'); // ctrl+t
-
-      // Wait for the output to change
-      let output = lastFrame();
-      let retries = 10;
-      while (output.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        output = lastFrame();
-        retries--;
-      }
+      const output = lastFrame();
 
       const extractedOutput = JSON.parse(extractJSON(output));
 
@@ -279,118 +240,18 @@ describe('<ToolMessage />', () => {
       expect(performance.now() - start).toBeLessThan(50);
     });
 
-    it('toggles JSON visibility on ctrl+t', async () => {
-      const { lastFrame, stdin } = renderWithContext(
-        <ToolMessage {...baseProps} resultDisplay='{"a":1,"b":2}' />,
-        StreamingState.Idle,
-      );
-
-      // Initially, the JSON is hidden
-      expect(lastFrame()).toContain('(ctrl + t to toggle details)');
-
-      // Simulate ctrl+t to show
-      stdin.write('\x14'); // ctrl+t
-
-      // Wait for the output to change
-      let frame = lastFrame();
-      let retries = 10;
-      while (frame.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        frame = lastFrame();
-        retries--;
-      }
-
-      // Now the JSON should be visible
-      expect(frame).not.toContain('(ctrl + t to toggle details)');
-      expect(frame).toContain('"a": 1');
-      expect(frame).toContain('"b": 2');
-
-      // Simulate ctrl+t to hide
-      stdin.write('\x14'); // ctrl+t
-
-      // Wait for the output to change
-      frame = lastFrame();
-      retries = 10;
-      while (!frame.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        frame = lastFrame();
-        retries--;
-      }
-
-      // Now the JSON should be hidden again
-      expect(frame).toContain('(ctrl + t to toggle details)');
-    });
-
     it('renders a JSON array', async () => {
       const testJSONArray = '[1, 2, 3]';
-      const { lastFrame, stdin } = renderWithContext(
+      const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} resultDisplay={testJSONArray} />,
         StreamingState.Idle,
       );
 
-      // Initially, the JSON is hidden
-      expect(lastFrame()).toContain('(ctrl + t to toggle details)');
+      const frame = lastFrame();
 
-      // Simulate ctrl+t to show
-      stdin.write('\x14'); // ctrl+t
-
-      // Wait for the output to change
-      let frame = lastFrame();
-      let retries = 10;
-      while (frame.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        frame = lastFrame();
-        retries--;
-      }
-
-      // Now the JSON should be visible
-      expect(frame).not.toContain('(ctrl + t to toggle details)');
       expect(frame).toContain('1,');
       expect(frame).toContain('2,');
       expect(frame).toContain('3');
-    });
-
-    it.skip('toggles large truncated JSON', async () => {
-      const largeJSON = '{"key": "' + 'x'.repeat(1000001) + '"}';
-      const { lastFrame, stdin } = renderWithContext(
-        <ToolMessage {...baseProps} resultDisplay={largeJSON} />,
-        StreamingState.Idle,
-      );
-
-      // Initially, the JSON is hidden
-      expect(lastFrame()).toContain('(ctrl + t to toggle details)');
-
-      // Simulate ctrl+t to show
-      stdin.write('\x14'); // ctrl+t
-
-      // Wait for the output to change
-      let frame = lastFrame();
-      let retries = 20;
-      while (frame.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        frame = lastFrame();
-        retries--;
-      }
-
-      // Now the JSON should be visible and truncated
-      expect(frame).not.toContain('(ctrl + t to toggle details)');
-      expect(frame).toContain('...');
-
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Give it a moment to settle
-
-      // Simulate ctrl+t to hide
-      stdin.write('\x14'); // ctrl+t
-      // Wait for the output to change
-      frame = lastFrame();
-      retries = 20;
-      while (!frame.includes('(ctrl + t to toggle details)') && retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        frame = lastFrame();
-        retries--;
-      }
-
-      // Now the JSON should be hidden again
-      expect(frame).toContain('(ctrl + t to toggle details)');
     });
   });
 
