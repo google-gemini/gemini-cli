@@ -650,7 +650,7 @@ export async function copyExtension(
   await fs.promises.cp(source, destination, { recursive: true });
 }
 
-export function getContextFileNames(config: ExtensionConfig): string[] {
+function getContextFileNames(config: ExtensionConfig): string[] {
   if (!config.contextFileName) {
     return ['GEMINI.md'];
   } else if (!Array.isArray(config.contextFileName)) {
