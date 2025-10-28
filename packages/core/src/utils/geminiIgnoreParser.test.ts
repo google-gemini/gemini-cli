@@ -140,7 +140,9 @@ describe('GeminiIgnoreParser', () => {
 
       const parser = new GeminiIgnoreParser(projectRoot);
 
-      const filePathNFD = path.join(unicodeDirName, 'file.txt').normalize('NFD');
+      const filePathNFD = path
+        .join(unicodeDirName, 'file.txt')
+        .normalize('NFD');
 
       // The parser should ignore the file even if the path has a different
       // normalization form than the pattern in .geminiignore.

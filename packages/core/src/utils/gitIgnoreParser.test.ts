@@ -174,7 +174,9 @@ src/*.tmp
       const gitignoreContent = `${unicodeDirName}/\n`;
       await createTestFile('.gitignore', gitignoreContent);
 
-      const filePathNFD = path.join(unicodeDirName, 'file.txt').normalize('NFD');
+      const filePathNFD = path
+        .join(unicodeDirName, 'file.txt')
+        .normalize('NFD');
 
       // The parser should ignore the file even if the path has a different
       // normalization form than the pattern in .gitignore.
