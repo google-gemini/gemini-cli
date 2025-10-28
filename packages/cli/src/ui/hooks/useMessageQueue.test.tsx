@@ -9,17 +9,16 @@ import { act } from 'react';
 import { render } from 'ink-testing-library';
 import { useMessageQueue } from './useMessageQueue.js';
 import { StreamingState } from '../types.js';
+import { waitFor } from '../../test-utils/async.js';
 
 describe('useMessageQueue', () => {
   let mockSubmitQuery: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockSubmitQuery = vi.fn();
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -33,15 +32,23 @@ describe('useMessageQueue', () => {
       hookResult = useMessageQueue(props);
       return null;
     }
-    const { rerender } = render(<TestComponent {...initialProps} />);
+    let renderResult: ReturnType<typeof render>;
+    act(() => {
+      renderResult = render(<TestComponent {...initialProps} />);
+    });
     return {
       result: {
         get current() {
-          return hookResult;
+          return hookResult!;
         },
       },
-      rerender: (newProps: Partial<typeof initialProps>) =>
-        rerender(<TestComponent {...initialProps} {...newProps} />),
+      rerender: (newProps: Partial<typeof initialProps>) => {
+        act(() => {
+          renderResult!.rerender(
+            <TestComponent {...initialProps} {...newProps} />,
+          );
+        });
+      },
     };
   };
 
@@ -148,9 +155,11 @@ describe('useMessageQueue', () => {
     expect(result.current.messageQueue).toEqual(['Message 1', 'Message 2']);
 
     // Transition to Idle
-    rerender({ streamingState: StreamingState.Idle });
+    act(() => {
+      rerender({ streamingState: StreamingState.Idle });
+    });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
       expect(result.current.messageQueue).toEqual([]);
     });
@@ -206,7 +215,7 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('First batch');
       expect(result.current.messageQueue).toEqual([]);
     });
@@ -222,7 +231,7 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit again
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
       expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
     });
