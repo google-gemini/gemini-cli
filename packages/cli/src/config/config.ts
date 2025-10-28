@@ -501,18 +501,23 @@ export async function loadCliConfig(
   );
 
   // Debug: Log the merged policy configuration
-  debugLogger.log('=== Policy Engine Configuration ===');
-  debugLogger.log(`Default decision: ${policyEngineConfig.defaultDecision}`);
-  debugLogger.log(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
-  if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
-    debugLogger.log('Rules (sorted by priority):');
-    policyEngineConfig.rules.forEach((rule, index) => {
-      debugLogger.log(
-        `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
-      );
-    });
+  // Only log when message bus integration is enabled (when policies are active)
+  const enableMessageBusIntegration =
+    settings.tools?.enableMessageBusIntegration ?? false;
+  if (enableMessageBusIntegration) {
+    debugLogger.log('=== Policy Engine Configuration ===');
+    debugLogger.log(`Default decision: ${policyEngineConfig.defaultDecision}`);
+    debugLogger.log(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
+    if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
+      debugLogger.log('Rules (sorted by priority):');
+      policyEngineConfig.rules.forEach((rule, index) => {
+        debugLogger.log(
+          `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
+        );
+      });
+    }
+    debugLogger.log('===================================');
   }
-  debugLogger.log('===================================');
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -677,8 +682,7 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
-    enableMessageBusIntegration:
-      settings.tools?.enableMessageBusIntegration ?? false,
+    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     fakeResponses: argv.fakeResponses,

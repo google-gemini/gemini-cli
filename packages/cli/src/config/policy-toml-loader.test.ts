@@ -845,5 +845,138 @@ priority = 100
       expect(result.rules).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
     });
+
+    it('should reject priority >= 1000 with helpful error message', async () => {
+      const actualFs =
+        await vi.importActual<typeof import('node:fs/promises')>(
+          'node:fs/promises',
+        );
+
+      const mockReaddir = vi.fn(
+        async (
+          path: string,
+          _options?: { withFileTypes: boolean },
+        ): Promise<Dirent[]> => {
+          if (nodePath.normalize(path) === nodePath.normalize('/policies')) {
+            return [
+              {
+                name: 'invalid.toml',
+                isFile: () => true,
+                isDirectory: () => false,
+              } as Dirent,
+            ];
+          }
+          return [];
+        },
+      );
+
+      const mockReadFile = vi.fn(async (path: string): Promise<string> => {
+        if (
+          nodePath.normalize(path) ===
+          nodePath.normalize(nodePath.join('/policies', 'invalid.toml'))
+        ) {
+          return `
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 1000
+`;
+        }
+        throw new Error('File not found');
+      });
+
+      vi.doMock('node:fs/promises', () => ({
+        ...actualFs,
+        default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+      }));
+
+      const { loadPoliciesFromToml: load } = await import(
+        './policy-toml-loader.js'
+      );
+
+      const getPolicyTier = (_dir: string) => 1;
+      const result = await load(
+        ApprovalMode.DEFAULT,
+        ['/policies'],
+        getPolicyTier,
+      );
+
+      expect(result.rules).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].errorType).toBe('schema_validation');
+      expect(result.errors[0].details).toContain('priority');
+      expect(result.errors[0].details).toContain('tier overflow');
+      expect(result.errors[0].details).toContain(
+        'Priorities >= 1000 would jump to the next tier',
+      );
+      expect(result.errors[0].details).toContain('<= 999');
+    });
+
+    it('should reject negative priority with helpful error message', async () => {
+      const actualFs =
+        await vi.importActual<typeof import('node:fs/promises')>(
+          'node:fs/promises',
+        );
+
+      const mockReaddir = vi.fn(
+        async (
+          path: string,
+          _options?: { withFileTypes: boolean },
+        ): Promise<Dirent[]> => {
+          if (nodePath.normalize(path) === nodePath.normalize('/policies')) {
+            return [
+              {
+                name: 'invalid.toml',
+                isFile: () => true,
+                isDirectory: () => false,
+              } as Dirent,
+            ];
+          }
+          return [];
+        },
+      );
+
+      const mockReadFile = vi.fn(async (path: string): Promise<string> => {
+        if (
+          nodePath.normalize(path) ===
+          nodePath.normalize(nodePath.join('/policies', 'invalid.toml'))
+        ) {
+          return `
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = -1
+`;
+        }
+        throw new Error('File not found');
+      });
+
+      vi.doMock('node:fs/promises', () => ({
+        ...actualFs,
+        default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+      }));
+
+      const { loadPoliciesFromToml: load } = await import(
+        './policy-toml-loader.js'
+      );
+
+      const getPolicyTier = (_dir: string) => 1;
+      const result = await load(
+        ApprovalMode.DEFAULT,
+        ['/policies'],
+        getPolicyTier,
+      );
+
+      expect(result.rules).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].errorType).toBe('schema_validation');
+      expect(result.errors[0].details).toContain('priority');
+      expect(result.errors[0].details).toContain('>= 0');
+      expect(result.errors[0].details).toContain('must be >= 0');
+    });
   });
 });

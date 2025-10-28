@@ -24,7 +24,22 @@ const PolicyRuleSchema = z.object({
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
   commandRegex: z.string().optional(),
   decision: z.nativeEnum(PolicyDecision),
-  priority: z.number(),
+  // Priority must be in range [0, 999] to prevent tier overflow.
+  // With tier transformation (tier + priority/1000), this ensures:
+  // - Tier 1 (default): range [1.000, 1.999]
+  // - Tier 2 (user): range [2.000, 2.999]
+  // - Tier 3 (admin): range [3.000, 3.999]
+  priority: z
+    .number({
+      required_error: 'priority is required',
+      invalid_type_error: 'priority must be a number',
+    })
+    .int({ message: 'priority must be an integer' })
+    .min(0, { message: 'priority must be >= 0' })
+    .max(999, {
+      message:
+        'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
+    }),
   modes: z.array(z.string()).optional(),
 });
 

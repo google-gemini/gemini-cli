@@ -26,6 +26,9 @@ import {
 // Get the directory name of the current module
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Store policy loading errors to be displayed after UI is ready
+let storedPolicyErrors: string[] = [];
+
 function getPolicyDirectories(): string[] {
   const DEFAULT_POLICIES_DIR = path.resolve(__dirname, 'policies');
   const USER_POLICIES_DIR = Storage.getUserPoliciesDir();
@@ -98,13 +101,10 @@ export async function createPolicyEngineConfig(
     getPolicyTier,
   );
 
-  // Log any errors encountered during TOML loading
+  // Store any errors encountered during TOML loading
+  // These will be emitted by getPolicyErrorsForUI() after the UI is ready.
   if (errors.length > 0) {
-    console.error('\nPolicy file errors:');
-    for (const error of errors) {
-      console.error(formatPolicyError(error));
-    }
-    console.error('');
+    storedPolicyErrors = errors.map((error) => formatPolicyError(error));
   }
 
   const rules: PolicyRule[] = [...tomlRules];
@@ -227,4 +227,16 @@ export function createPolicyUpdater(
       });
     },
   );
+}
+
+/**
+ * Gets and clears any policy errors that were stored during config loading.
+ * This should be called once the UI is ready to display errors.
+ *
+ * @returns Array of formatted error messages, or empty array if no errors
+ */
+export function getPolicyErrorsForUI(): string[] {
+  const errors = [...storedPolicyErrors];
+  storedPolicyErrors = []; // Clear after retrieving
+  return errors;
 }
