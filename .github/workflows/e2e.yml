@@ -44,7 +44,7 @@ jobs:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 'merge_queue_skipper'
     if: |
-      (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
@@ -106,7 +106,7 @@ jobs:
     name: 'E2E Test (macOS)'
     needs: 'merge_queue_skipper'
     if: |
-      (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
@@ -155,7 +155,7 @@ jobs:
     name: 'Slow E2E - Win'
     needs: 'merge_queue_skipper'
     if: |
-      (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
