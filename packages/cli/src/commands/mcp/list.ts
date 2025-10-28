@@ -28,7 +28,7 @@ async function getMcpServersFromConfig(): Promise<
 > {
   const settings = loadSettings();
   const extensionManager = new ExtensionManager({
-    loadedSettings: settings,
+    settings: settings.merged,
     workspaceDir: process.cwd(),
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,

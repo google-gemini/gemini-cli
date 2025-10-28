@@ -23,8 +23,9 @@ export async function handleDisable(args: DisableArgs) {
     workspaceDir,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
-    loadedSettings: loadSettings(workspaceDir),
+    settings: loadSettings(workspaceDir).merged,
   });
+  await extensionManager.loadExtensions();
 
   try {
     if (args.scope?.toLowerCase() === 'workspace') {

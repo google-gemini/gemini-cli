@@ -19,7 +19,7 @@ export async function handleList() {
       workspaceDir,
       requestConsent: requestConsentNonInteractive,
       requestSetting: promptForSetting,
-      loadedSettings: loadSettings(workspaceDir),
+      settings: loadSettings(workspaceDir).merged,
     });
     const extensions = await extensionManager.loadExtensions();
     if (extensions.length === 0) {

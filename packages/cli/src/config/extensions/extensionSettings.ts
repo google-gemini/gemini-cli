@@ -30,11 +30,6 @@ export async function maybePromptForSettings(
   previousSettings?: Record<string, string>,
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
-  console.log(settings);
-  console.log(settings?.length);
-  console.log(previousExtensionConfig);
-  console.log('HERE');
-
   if (
     (!settings || settings.length === 0) &&
     (!previousExtensionConfig?.settings ||
