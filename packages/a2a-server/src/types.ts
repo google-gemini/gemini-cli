@@ -37,6 +37,10 @@ export enum CoderAgentEvent {
    * An event that contains a thought from the agent.
    */
   ThoughtEvent = 'thought',
+  /**
+   * An event that contains citation from the agent.
+   */
+  CitationEvent = 'citation',
 }
 
 export interface AgentSettings {
@@ -64,6 +68,10 @@ export interface Thought {
   kind: CoderAgentEvent.ThoughtEvent;
 }
 
+export interface Citation {
+  kind: CoderAgentEvent.CitationEvent;
+}
+
 export type ThoughtSummary = {
   subject: string;
   description: string;
@@ -80,7 +88,8 @@ export type CoderAgentMessage =
   | ToolCallUpdate
   | TextContent
   | StateChange
-  | Thought;
+  | Thought
+  | Citation;
 
 export interface TaskMetadata {
   id: string;
