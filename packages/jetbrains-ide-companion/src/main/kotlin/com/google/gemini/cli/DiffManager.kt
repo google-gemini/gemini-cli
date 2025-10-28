@@ -20,6 +20,7 @@ import com.intellij.openapi.diff.DiffBundle
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.util.messages.Topic
 import io.modelcontextprotocol.kotlin.sdk.JSONRPCNotification
 import kotlinx.serialization.json.buildJsonObject
@@ -89,7 +90,17 @@ class DiffManager(private val project: Project) : Disposable {
     request.putUserData(DiffUserDataKeys.CONTEXT_ACTIONS, actions)
     request.putUserData(GEMINI_FILE_PATH_KEY, filePath)
 
+    // 1. Before showing the diff, get the component that currently has focus.
+    val lastFocusedComponent = IdeFocusManager.getInstance(project).focusOwner
+
     DiffManager.getInstance().showDiff(project, request)
+
+    // 2. After showing the diff, request focus to be returned to the component that had it before.
+    ApplicationManager.getApplication().invokeLater {
+      lastFocusedComponent?.let {
+        IdeFocusManager.getInstance(project).requestFocus(it, true)
+      }
+    }
 
     // Add state tracking
     val originalContent = file?.let { VfsUtil.loadText(it) }
