@@ -7,6 +7,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ignore from 'ignore';
+import { normalizePath } from './paths.js';
+
 
 export interface GitIgnoreFilter {
   isIgnored(filePath: string): boolean;
@@ -18,7 +20,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
   private globalPatterns: string[] | undefined;
 
   constructor(projectRoot: string) {
-    this.projectRoot = path.resolve(projectRoot);
+    this.projectRoot = normalizePath(path.resolve(projectRoot));
   }
 
   private loadPatternsForFile(patternsFilePath: string): string[] {
@@ -36,7 +38,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     const relativeBaseDir = isExcludeFile
       ? '.'
       : path
-          .dirname(path.relative(this.projectRoot, patternsFilePath))
+          .dirname(path.relative(this.projectRoot, normalizePath(patternsFilePath)))
           .split(path.sep)
           .join(path.posix.sep);
 
@@ -109,7 +111,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
 
     try {
       const resolved = path.resolve(this.projectRoot, filePath);
-      const relativePath = path.relative(this.projectRoot, resolved);
+      const relativePath = path.relative(this.projectRoot, normalizePath(resolved));
 
       if (relativePath === '' || relativePath.startsWith('..')) {
         return false;
@@ -152,7 +154,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
       }
 
       for (const dir of dirsToVisit) {
-        const relativeDir = path.relative(this.projectRoot, dir);
+        const relativeDir = path.relative(this.projectRoot, normalizePath(dir));
         if (relativeDir) {
           const normalizedRelativeDir = relativeDir.replace(/\\/g, '/');
           if (ig.ignores(normalizedRelativeDir)) {

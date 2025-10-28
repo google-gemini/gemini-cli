@@ -168,6 +168,22 @@ src/*.tmp
       expect(() => parser.isIgnored('/backslash-file-test.txt')).not.toThrow();
       expect(parser.isIgnored('/backslash-file-test.txt')).toBe(false);
     });
+
+    it('handles unicode normalization differences', async () => {
+      const unicodeDirName = '테스트';
+      const gitignoreContent = `${unicodeDirName}/\n`;
+      await createTestFile('.gitignore', gitignoreContent);
+
+      const filePathNFD = path.join(unicodeDirName, 'file.txt').normalize('NFD');
+
+      // The parser should ignore the file even if the path has a different
+      // normalization form than the pattern in .gitignore.
+      expect(parser.isIgnored(filePathNFD)).toBe(true);
+
+      // A file in a different unicode-named directory should not be ignored.
+      const otherFilePath = path.join('다른폴더', 'file.txt');
+      expect(parser.isIgnored(otherFilePath)).toBe(false);
+    });
   });
 
   describe('nested .gitignore files', () => {

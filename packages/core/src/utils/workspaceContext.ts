@@ -9,6 +9,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as process from 'node:process';
 import { debugLogger } from './debugLogger.js';
+import { normalizePath } from './paths.js';
+
 
 export type Unsubscribe = () => void;
 
@@ -179,7 +181,10 @@ export class WorkspaceContext {
     pathToCheck: string,
     rootDirectory: string,
   ): boolean {
-    const relative = path.relative(rootDirectory, pathToCheck);
+    const relative = path.relative(
+      normalizePath(rootDirectory),
+      normalizePath(pathToCheck),
+    );
     return (
       !relative.startsWith(`..${path.sep}`) &&
       relative !== '..' &&

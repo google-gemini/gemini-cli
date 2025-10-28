@@ -67,4 +67,24 @@ describe('GeminiIgnoreParser', () => {
       expect(parser.isIgnored('any_file.txt')).toBe(false);
     });
   });
+
+  describe('with unicode paths', () => {
+    it('handles unicode normalization differences', async () => {
+      const unicodeDirName = '테스트';
+      const geminiIgnoreContent = `${unicodeDirName}/\n`;
+      await createTestFile('.geminiignore', geminiIgnoreContent);
+
+      const parser = new GeminiIgnoreParser(projectRoot);
+
+      const filePathNFD = path.join(unicodeDirName, 'file.txt').normalize('NFD');
+
+      // The parser should ignore the file even if the path has a different
+      // normalization form than the pattern in .geminiignore.
+      expect(parser.isIgnored(filePathNFD)).toBe(true);
+
+      // A file in a different unicode-named directory should not be ignored.
+      const otherFilePath = path.join('다른폴더', 'file.txt');
+      expect(parser.isIgnored(otherFilePath)).toBe(false);
+    });
+  });
 });

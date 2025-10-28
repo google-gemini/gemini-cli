@@ -10,7 +10,7 @@ import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
 import type { Config } from '@google/gemini-cli-core';
-import { Storage } from '@google/gemini-cli-core';
+import { Storage, normalizePath } from '@google/gemini-cli-core';
 import type { ICommandLoader } from './types.js';
 import type {
   CommandContext,
@@ -212,7 +212,10 @@ export class FileCommandLoader implements ICommandLoader {
 
     const validDef = validationResult.data;
 
-    const relativePathWithExt = path.relative(baseDir, filePath);
+    const relativePathWithExt = path.relative(
+      normalizePath(baseDir),
+      normalizePath(filePath),
+    );
     const relativePath = relativePathWithExt.substring(
       0,
       relativePathWithExt.length - 5, // length of '.toml'

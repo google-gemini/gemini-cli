@@ -7,6 +7,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ignore from 'ignore';
+import { normalizePath } from './paths.js';
+
 
 export interface GeminiIgnoreFilter {
   isIgnored(filePath: string): boolean;
@@ -19,7 +21,7 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
   private ig = ignore();
 
   constructor(projectRoot: string) {
-    this.projectRoot = path.resolve(projectRoot);
+    this.projectRoot = normalizePath(path.resolve(projectRoot));
     this.loadPatterns();
   }
 
@@ -59,7 +61,7 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
     }
 
     const resolved = path.resolve(this.projectRoot, filePath);
-    const relativePath = path.relative(this.projectRoot, resolved);
+    const relativePath = path.relative(this.projectRoot, normalizePath(resolved));
 
     if (relativePath === '' || relativePath.startsWith('..')) {
       return false;

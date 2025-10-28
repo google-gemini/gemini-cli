@@ -152,6 +152,22 @@ describe('fileUtils', () => {
       const rootSuper = path.resolve('/project/root/sub');
       expect(isWithinRoot(pathToCheckSuper, rootSuper)).toBe(false);
     });
+
+    it('handles unicode normalization differences', () => {
+      const root = '/project/테스트';
+      const pathInside = '/project/테스트/file.txt';
+
+      const rootNFD = root.normalize('NFD');
+      const pathInsideNFC = pathInside.normalize('NFC');
+
+      expect(isWithinRoot(pathInsideNFC, rootNFD)).toBe(true);
+      expect(isWithinRoot(pathInside.normalize('NFD'), root.normalize('NFD'))).toBe(true);
+      expect(isWithinRoot(pathInside.normalize('NFC'), root.normalize('NFC'))).toBe(true);
+      expect(isWithinRoot(pathInside.normalize('NFD'), root.normalize('NFC'))).toBe(true);
+
+      const pathOutside = '/project/다른폴더/file.txt';
+      expect(isWithinRoot(pathOutside, rootNFD)).toBe(false);
+    });
   });
 
   describe('fileExists', () => {
