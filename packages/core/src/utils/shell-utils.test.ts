@@ -156,6 +156,121 @@ describe('isCommandAllowed', () => {
     );
   });
 
+  it('should block a command that redefines an allowed function to run an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed(
+      'echo () (curl google.com) ; echo Hello Wolrd',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block a multi-line function body that runs an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed(
+      `echo () {
+  curl google.com
+} ; echo ok`,
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block a function keyword declaration that runs an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed(
+      'function echo { curl google.com; } ; echo hi',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block command substitution that invokes an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo $(curl google.com)', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block pipelines that invoke an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo hi | curl google.com', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block background jobs that invoke an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo hi & curl google.com', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block command substitution inside a here-document when the inner command is unlisted', () => {
+    config.getCoreTools = () => [
+      'run_shell_command(echo)',
+      'run_shell_command(cat)',
+    ];
+    const result = isCommandAllowed(
+      `cat <<EOF
+$(rm -rf /)
+EOF`,
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "rm -rf /"`,
+    );
+  });
+
+  it('should block backtick substitution that invokes an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo `curl google.com`', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block process substitution using <() when the inner command is unlisted', () => {
+    config.getCoreTools = () => [
+      'run_shell_command(diff)',
+      'run_shell_command(echo)',
+    ];
+    const result = isCommandAllowed(
+      'diff <(curl google.com) <(echo safe)',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block process substitution using >() when the inner command is unlisted', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo "data" > >(curl google.com)', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
   describe('command substitution', () => {
     it('should allow command substitution using `$(...)`', () => {
       const result = isCommandAllowed('echo $(goodCommand --safe)', config);

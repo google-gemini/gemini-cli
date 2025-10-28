@@ -25,8 +25,6 @@ import {
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
-
 import { ShellTool } from '../tools/shell.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -180,10 +178,6 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
-    vi.spyOn(
-      ClearcutLogger.prototype,
-      'logStartSessionEvent',
-    ).mockImplementation(() => undefined);
   });
 
   describe('initialize', () => {
@@ -432,18 +426,6 @@ describe('Server Config (config.ts)', () => {
         expect(config.getUsageStatisticsEnabled()).toBe(enabled);
       },
     );
-
-    it('logs the session start event', async () => {
-      const config = new Config({
-        ...baseParams,
-        usageStatisticsEnabled: true,
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-
-      expect(
-        ClearcutLogger.prototype.logStartSessionEvent,
-      ).toHaveBeenCalledOnce();
-    });
   });
 
   describe('Telemetry Settings', () => {
@@ -992,6 +974,40 @@ describe('setApprovalMode with folder trust', () => {
       expect(canUseRipgrep).not.toHaveBeenCalled();
       expect(logRipgrepFallback).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('isYoloModeDisabled', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should return false when yolo mode is not disabled and folder is trusted', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    expect(config.isYoloModeDisabled()).toBe(false);
+  });
+
+  it('should return true when yolo mode is disabled by parameter', () => {
+    const config = new Config({ ...baseParams, disableYoloMode: true });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+
+  it('should return true when folder is untrusted', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+
+  it('should return true when yolo is disabled and folder is untrusted', () => {
+    const config = new Config({ ...baseParams, disableYoloMode: true });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
+    expect(config.isYoloModeDisabled()).toBe(true);
   });
 });
 

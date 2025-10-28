@@ -12,10 +12,20 @@ const mockInstallOrUpdateExtension = vi.hoisted(() => vi.fn());
 const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
 const mockStat = vi.hoisted(() => vi.fn());
 
-vi.mock('../../config/extension.js', () => ({
-  installOrUpdateExtension: mockInstallOrUpdateExtension,
+vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
 }));
+
+vi.mock('../../config/extension-manager.ts', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/extension-manager.js')>();
+  return {
+    ...actual,
+    ExtensionManager: vi.fn().mockImplementation(() => ({
+      installOrUpdateExtension: mockInstallOrUpdateExtension,
+    })),
+  };
+});
 
 vi.mock('../../utils/errors.js', () => ({
   getErrorMessage: vi.fn((error: Error) => error.message),
@@ -54,7 +64,7 @@ describe('handleInstall', () => {
     mockInstallOrUpdateExtension.mockClear();
     mockRequestConsentNonInteractive.mockClear();
     mockStat.mockClear();
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should install an extension from a http source', async () => {
