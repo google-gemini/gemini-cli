@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { vi, type MockedFunction } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -50,13 +48,9 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('../trustedFolders.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../trustedFolders.js')>();
-  return {
-    ...actual,
-    isWorkspaceTrusted: vi.fn(),
-  };
-});
+vi.mock('../trustedFolders.js', () => ({
+  isWorkspaceTrusted: vi.fn(),
+}));
 
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());

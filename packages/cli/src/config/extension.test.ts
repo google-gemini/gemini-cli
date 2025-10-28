@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { vi, type MockedFunction } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -61,11 +59,13 @@ vi.mock('simple-git', () => ({
   }),
 }));
 
+const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
+
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
   return {
     ...mockedOs,
-    homedir: vi.fn(),
+    homedir: mockHomedir,
   };
 });
 
