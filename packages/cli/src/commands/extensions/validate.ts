@@ -38,7 +38,7 @@ async function validateExtension(args: ValidateArgs) {
     workspaceDir,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
-    loadedSettings: loadSettings(workspaceDir),
+    settings: loadSettings(workspaceDir).merged,
   });
   const absoluteInputPath = path.resolve(args.path);
   const extensionConfig: ExtensionConfig =
@@ -61,11 +61,9 @@ async function validateExtension(args: ValidateArgs) {
       }
     }
     if (missingContextFiles.length > 0) {
-      debugLogger.error(
-        'The following context files referenced in gemini-extension.json are missing:',
+      throw new Error(
+        `The following context files referenced in gemini-extension.json are missing: ${missingContextFiles}`,
       );
-      missingContextFiles.forEach((f) => debugLogger.error(`  - ${f}`));
-      process.exit(1);
     }
   }
 
