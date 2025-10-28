@@ -50,6 +50,7 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
+import { getPolicyErrorsForUI } from '../config/policy.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
@@ -885,11 +886,23 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
     appEvents.on(AppEvent.LogError, logErrorHandler);
 
+    // Emit any policy errors that were stored during config loading
+    // Only show these when message bus integration is enabled, as policies
+    // are only active when the message bus is being used.
+    if (config.getEnableMessageBusIntegration()) {
+      const policyErrors = getPolicyErrorsForUI();
+      if (policyErrors.length > 0) {
+        for (const error of policyErrors) {
+          appEvents.emit(AppEvent.LogError, error);
+        }
+      }
+    }
+
     return () => {
       appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
       appEvents.off(AppEvent.LogError, logErrorHandler);
     };
-  }, [handleNewMessage]);
+  }, [handleNewMessage, config]);
 
   useEffect(() => {
     if (ctrlCTimerRef.current) {

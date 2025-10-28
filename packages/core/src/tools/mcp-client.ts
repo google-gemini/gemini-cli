@@ -42,6 +42,7 @@ import type {
 } from '../utils/workspaceContext.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
@@ -198,6 +199,7 @@ export class McpClient {
       this.serverConfig,
       this.client!,
       cliConfig,
+      this.toolRegistry.getMessageBus(),
     );
   }
 
@@ -545,6 +547,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       mcpClient,
       cliConfig,
+      toolRegistry.getMessageBus(),
     );
 
     // If we have neither prompts nor tools, it's a failed discovery
@@ -582,6 +585,8 @@ export async function connectAndDiscover(
  * @param mcpServerName The name of the MCP server.
  * @param mcpServerConfig The configuration for the MCP server.
  * @param mcpClient The active MCP client instance.
+ * @param cliConfig The CLI configuration object.
+ * @param messageBus Optional message bus for policy engine integration.
  * @returns A promise that resolves to an array of discovered and enabled tools.
  * @throws An error if no enabled tools are found or if the server provides invalid function declarations.
  */
@@ -590,6 +595,7 @@ export async function discoverTools(
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
   cliConfig: Config,
+  messageBus?: MessageBus,
 ): Promise<DiscoveredMCPTool[]> {
   try {
     // Only request tools if the server supports them.
@@ -612,19 +618,29 @@ export async function discoverTools(
           continue;
         }
 
-        discoveredTools.push(
-          new DiscoveredMCPTool(
-            mcpCallableTool,
-            mcpServerName,
-            funcDecl.name!,
-            funcDecl.description ?? '',
-            funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
-            mcpServerConfig.trust,
-            undefined,
-            cliConfig,
-            mcpServerConfig.extension?.id,
-          ),
+        const tool = new DiscoveredMCPTool(
+          mcpCallableTool,
+          mcpServerName,
+          funcDecl.name!,
+          funcDecl.description ?? '',
+          funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
+          mcpServerConfig.trust,
+          undefined,
+          cliConfig,
+          mcpServerConfig.extension?.id,
+          messageBus,
         );
+
+        if (
+          cliConfig.getDebugMode?.() &&
+          cliConfig.getEnableMessageBusIntegration?.()
+        ) {
+          debugLogger.log(
+            `[DEBUG] Discovered MCP tool '${funcDecl.name}' from server '${mcpServerName}' with messageBus: ${messageBus ? 'YES' : 'NO'}`,
+          );
+        }
+
+        discoveredTools.push(tool);
       } catch (error) {
         coreEvents.emitFeedback(
           'error',
