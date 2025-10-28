@@ -157,11 +157,18 @@ export function renderHook<Result, Props>(
 
   const Wrapper = options?.wrapper || (({ children }) => <>{children}</>);
 
-  const { rerender: inkRerender, unmount } = render(
-    <Wrapper>
-      <TestComponent renderCallback={renderCallback} props={currentProps} />
-    </Wrapper>,
-  );
+  let inkRerender: (tree: React.ReactElement) => void = () => {};
+  let unmount: () => void = () => {};
+
+  act(() => {
+    const renderResult = render(
+      <Wrapper>
+        <TestComponent renderCallback={renderCallback} props={currentProps} />
+      </Wrapper>,
+    );
+    inkRerender = renderResult.rerender;
+    unmount = renderResult.unmount;
+  });
 
   function rerender(props?: Props) {
     if (arguments.length > 0) {

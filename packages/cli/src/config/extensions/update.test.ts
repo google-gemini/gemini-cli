@@ -40,23 +40,17 @@ vi.mock('simple-git', () => ({
   }),
 }));
 
-const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
-
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
   return {
     ...mockedOs,
-    homedir: mockHomedir,
+    homedir: vi.fn(),
   };
 });
 
-vi.mock('../trustedFolders.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../trustedFolders.js')>();
-  return {
-    ...actual,
-    isWorkspaceTrusted: vi.fn(),
-  };
-});
+vi.mock('../trustedFolders.js', () => ({
+  isWorkspaceTrusted: vi.fn(),
+}));
 
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());

@@ -399,14 +399,12 @@ describe('useReactToolScheduler', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    await vi.waitFor(() => {
-      expect(onComplete).toHaveBeenCalledWith([
-        expect.objectContaining({
-          status: 'cancelled',
-          request,
-        }),
-      ]);
-    });
+    expect(onComplete).toHaveBeenCalledWith([
+      expect.objectContaining({
+        status: 'cancelled',
+        request,
+      }),
+    ]);
 
     // Clean up the pending promise to avoid open handles.
     resolveExecute({ llmContent: 'output', returnDisplay: 'display' });

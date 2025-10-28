@@ -392,7 +392,7 @@ describe('useSlashCompletion', () => {
       const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/memory',
+          '/memory ',
           slashCommands,
           mockCommandContext,
         ),
@@ -645,9 +645,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(0);
-      });
+      expect(result.current.suggestions).toHaveLength(0);
     });
   });
 
@@ -677,24 +675,22 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual(
-          expect.arrayContaining([
-            {
-              label: 'summarize',
-              value: 'summarize',
-              description: 'Summarize content',
-              commandKind: CommandKind.MCP_PROMPT,
-            },
-            {
-              label: 'help',
-              value: 'help',
-              description: 'Show help',
-              commandKind: CommandKind.BUILT_IN,
-            },
-          ]),
-        );
-      });
+      expect(result.current.suggestions).toEqual(
+        expect.arrayContaining([
+          {
+            label: 'summarize',
+            value: 'summarize',
+            description: 'Summarize content',
+            commandKind: CommandKind.MCP_PROMPT,
+          },
+          {
+            label: 'help',
+            value: 'help',
+            description: 'Show help',
+            commandKind: CommandKind.BUILT_IN,
+          },
+        ]),
+      );
     });
 
     it('should include commandKind when filtering MCP commands by prefix', async () => {
@@ -766,24 +762,22 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual(
-          expect.arrayContaining([
-            {
-              label: 'show',
-              value: 'show',
-              description: 'Show memory',
-              commandKind: CommandKind.BUILT_IN,
-            },
-            {
-              label: 'add',
-              value: 'add',
-              description: 'Add to memory',
-              commandKind: CommandKind.MCP_PROMPT,
-            },
-          ]),
-        );
-      });
+      expect(result.current.suggestions).toEqual(
+        expect.arrayContaining([
+          {
+            label: 'show',
+            value: 'show',
+            description: 'Show memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.MCP_PROMPT,
+          },
+        ]),
+      );
     });
 
     it('should include commandKind for file commands', async () => {
