@@ -505,18 +505,20 @@ export async function loadCliConfig(
   const enableMessageBusIntegration =
     settings.tools?.enableMessageBusIntegration ?? false;
   if (enableMessageBusIntegration) {
-    debugLogger.log('=== Policy Engine Configuration ===');
-    debugLogger.log(`Default decision: ${policyEngineConfig.defaultDecision}`);
-    debugLogger.log(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
+    debugLogger.debug('=== Policy Engine Configuration ===');
+    debugLogger.debug(
+      `Default decision: ${policyEngineConfig.defaultDecision}`,
+    );
+    debugLogger.debug(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
     if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
-      debugLogger.log('Rules (sorted by priority):');
+      debugLogger.debug('Rules (sorted by priority):');
       policyEngineConfig.rules.forEach((rule, index) => {
-        debugLogger.log(
+        debugLogger.debug(
           `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
         );
       });
     }
-    debugLogger.log('===================================');
+    debugLogger.debug('===================================');
   }
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
