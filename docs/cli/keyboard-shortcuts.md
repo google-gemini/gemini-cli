@@ -10,10 +10,10 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | `Ctrl+C` | Cancel the ongoing request and clear the input. Press twice to exit the application.                                  |
 | `Ctrl+D` | Exit the application if the input is empty. Press twice to confirm.                                                   |
 | `Ctrl+L` | Clear the screen.                                                                                                     |
-| `Ctrl+O` | Toggle the display of the debug console.                                                                              |
 | `Ctrl+S` | Allows long responses to print fully, disabling truncation. Use your terminal's scrollback to view the entire output. |
 | `Ctrl+T` | Toggle the display of the todo list.                                                                                  |
 | `Ctrl+Y` | Toggle auto-approval (YOLO mode) for all tool calls.                                                                  |
+| `F12`    | Toggle the display of the debug console.                                                                              |
 
 ## Input Prompt
 
