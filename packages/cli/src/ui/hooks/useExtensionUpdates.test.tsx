@@ -145,8 +145,8 @@ describe('useExtensionUpdates', () => {
       name: '',
     });
 
+    extensionManager.loadExtensions();
     function TestComponent() {
-      extensionManager.loadExtensions();
       useExtensionUpdates(extensionManager, addItem);
       return null;
     }
