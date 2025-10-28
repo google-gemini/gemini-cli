@@ -13,6 +13,8 @@ import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
+import { normalizePath } from './paths.js';
+
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
 
@@ -211,20 +213,23 @@ export function isWithinRoot(
   pathToCheck: string,
   rootDirectory: string,
 ): boolean {
-  const normalizedPathToCheck = path.resolve(pathToCheck);
-  const normalizedRootDirectory = path.resolve(rootDirectory);
+  const resolvedPathToCheck = path.resolve(pathToCheck);
+  const resolvedRootDirectory = path.resolve(rootDirectory);
+
+  // Normalize paths to NFC to ensure consistent comparison.
+  const nfcPathToCheck = normalizePath(resolvedPathToCheck);
+  const nfcRootDirectory = normalizePath(resolvedRootDirectory);
 
   // Ensure the rootDirectory path ends with a separator for correct startsWith comparison,
   // unless it's the root path itself (e.g., '/' or 'C:\').
   const rootWithSeparator =
-    normalizedRootDirectory === path.sep ||
-    normalizedRootDirectory.endsWith(path.sep)
-      ? normalizedRootDirectory
-      : normalizedRootDirectory + path.sep;
+    nfcRootDirectory === path.sep || nfcRootDirectory.endsWith(path.sep)
+      ? nfcRootDirectory
+      : nfcRootDirectory + path.sep;
 
   return (
-    normalizedPathToCheck === normalizedRootDirectory ||
-    normalizedPathToCheck.startsWith(rootWithSeparator)
+    nfcPathToCheck === nfcRootDirectory ||
+    nfcPathToCheck.startsWith(rootWithSeparator)
   );
 }
 

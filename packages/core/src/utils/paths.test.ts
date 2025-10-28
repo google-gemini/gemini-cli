@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { escapePath, unescapePath, isSubpath, shortenPath } from './paths.js';
+import {
+  escapePath,
+  unescapePath,
+  isSubpath,
+  shortenPath,
+  makeRelative,
+} from './paths.js';
 
 describe('escapePath', () => {
   it.each([
@@ -208,6 +214,30 @@ describe('isSubpath', () => {
 
     const unrelatedNFC = unrelated.normalize('NFC');
     expect(isSubpath(parentNFD, unrelatedNFC)).toBe(false);
+  });
+});
+
+describe('makeRelative', () => {
+  it('handles unicode normalization differences', () => {
+    const root = '/Users/user/테스트';
+    const target = '/Users/user/테스트/gemini-cli';
+
+    const rootNFD = root.normalize('NFD');
+    const targetNFC = target.normalize('NFC');
+
+    // The expected relative path should be 'gemini-cli' regardless of normalization
+    const expected = 'gemini-cli';
+
+    expect(makeRelative(targetNFC, rootNFD)).toBe(expected);
+    expect(makeRelative(target.normalize('NFD'), root.normalize('NFD'))).toBe(
+      expected,
+    );
+    expect(makeRelative(target.normalize('NFC'), root.normalize('NFC'))).toBe(
+      expected,
+    );
+    expect(makeRelative(target.normalize('NFD'), root.normalize('NFC'))).toBe(
+      expected,
+    );
   });
 });
 

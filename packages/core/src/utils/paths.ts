@@ -40,6 +40,17 @@ export function tmpdir(): string {
 }
 
 /**
+ * Consistently normalizes a path to NFC to prevent issues with different
+ * Unicode normalization forms between filesystems (like macOS's NFD) and
+ * other systems.
+ * @param p The path to normalize.
+ * @returns The NFC-normalized path.
+ */
+export function normalizePath(p: string): string {
+  return p.normalize('NFC');
+}
+
+/**
  * Replaces the home directory with a tilde.
  * @param path - The path to tildeify.
  * @returns The tildeified path.
@@ -269,7 +280,11 @@ export function makeRelative(
     return targetPath;
   }
   const resolvedRootDirectory = path.resolve(rootDirectory);
-  const relativePath = path.relative(resolvedRootDirectory, targetPath);
+
+  const relativePath = path.relative(
+    normalizePath(resolvedRootDirectory),
+    normalizePath(targetPath),
+  );
 
   // If the paths are the same, path.relative returns '', return '.' instead
   return relativePath || '.';
@@ -334,11 +349,11 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
   const isWindows = os.platform() === 'win32';
   const pathModule = isWindows ? path.win32 : path;
 
-  const normalizedParent = parentPath.normalize('NFC');
-  const normalizedChild = childPath.normalize('NFC');
-
   // On Windows, path.relative is case-insensitive. On POSIX, it's case-sensitive.
-  const relative = pathModule.relative(normalizedParent, normalizedChild);
+  const relative = pathModule.relative(
+    normalizePath(parentPath),
+    normalizePath(childPath),
+  );
 
   return (
     !relative.startsWith(`..${pathModule.sep}`) &&
