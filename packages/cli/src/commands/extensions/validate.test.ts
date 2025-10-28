@@ -122,9 +122,6 @@ describe('handleValidate', () => {
         'The following context files referenced in gemini-extension.json are missing: contextFile.md',
       ),
     );
-    // expect(consoleErrorSpy).toHaveBeenCalledWith(
-    //   expect.stringContaining('contextFile.md'),
-    // );
     expect(processSpy).toHaveBeenCalledWith(1);
   });
 });
