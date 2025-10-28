@@ -61,20 +61,20 @@ export async function updateExtension(
     const previousExtensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
-    await extensionManager.installOrUpdateExtension(
-      installMetadata,
-      previousExtensionConfig,
-    );
-    const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = extensionManager.loadExtension(
-      updatedExtensionStorage.getExtensionDir(),
-    );
-    if (!updatedExtension) {
+    let updatedExtension: GeminiCLIExtension;
+    try {
+      updatedExtension = await extensionManager.installOrUpdateExtension(
+        installMetadata,
+        previousExtensionConfig,
+      );
+    } catch (e) {
       dispatchExtensionStateUpdate({
         type: 'SET_STATE',
         payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
       });
-      throw new Error('Updated extension not found after installation.');
+      throw new Error(
+        `Updated extension not found after installation, got error:\n${e}`,
+      );
     }
     const updatedVersion = updatedExtension.version;
     dispatchExtensionStateUpdate({
