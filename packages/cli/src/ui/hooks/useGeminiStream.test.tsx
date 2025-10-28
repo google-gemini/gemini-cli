@@ -34,6 +34,7 @@ import {
   ToolErrorType,
   ToolConfirmationOutcome,
   tokenLimit,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -1623,8 +1624,8 @@ describe('useGeminiStream', () => {
     });
 
     it('should handle errors gracefully when auto-approving tool calls', async () => {
-      const consoleSpy = vi
-        .spyOn(console, 'error')
+      const debuggerSpy = vi
+        .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
       const mockOnConfirmSuccess = vi.fn().mockResolvedValue(undefined);
       const mockOnConfirmError = vi
@@ -1705,12 +1706,12 @@ describe('useGeminiStream', () => {
       expect(mockOnConfirmError).toHaveBeenCalledTimes(1);
 
       // Error should be logged
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(debuggerSpy).toHaveBeenCalledWith(
         'Failed to auto-approve tool call call2:',
         expect.any(Error),
       );
 
-      consoleSpy.mockRestore();
+      debuggerSpy.mockRestore();
     });
 
     it('should skip tool calls without confirmationDetails', async () => {
