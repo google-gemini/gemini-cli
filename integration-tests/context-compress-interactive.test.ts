@@ -29,13 +29,11 @@ describe('Interactive Mode', () => {
 
     const run = await rig.runInteractive();
 
-    await run.type('Initial prompt');
-    await run.type('\r');
+    await run.type('Initial prompt\r');
 
     await run.expectText('The initial response from the model', 5000);
 
-    await run.type('/compress');
-    await run.type('\r');
+    await run.type('/compress\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
       'chat_compression',
