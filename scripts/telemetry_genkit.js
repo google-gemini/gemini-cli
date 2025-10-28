@@ -6,11 +6,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createInterface } from 'node:readline';
 import { spawn } from 'node:child_process';
 import { manageTelemetrySettings, registerCleanup } from './telemetry_utils.js';
 
 const GENKIT_START_COMMAND = 'npx';
-const GENKIT_START_ARGS = ['-i', 'genkit-cli', 'start', '--non-interactive'];
+const GENKIT_START_ARGS = ['-y', 'genkit-cli', 'start', '--non-interactive'];
 
 async function main() {
   let genkitProcess;
@@ -34,11 +35,11 @@ async function main() {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  genkitProcess.stdout.on('data', (data) => {
-    const output = data.toString();
-    console.log(`[Genkit] ${output}`);
+  const rl = createInterface({ input: genkitProcess.stdout });
 
-    const match = output.match(/Telemetry API running on (http:\/\/[^\s]+)/);
+  rl.on('line', (line) => {
+    console.log(`[Genkit] ${line}`);
+    const match = line.match(/Telemetry API running on (http:\/\/[^\s]+)/);
     if (match) {
       const telemetryApiUrl = match[1];
       const otlpEndpoint = `${telemetryApiUrl}/api/otlp`;
