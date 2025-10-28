@@ -9,8 +9,13 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { MessageType } from '../types.js';
 import { extensionsCommand } from './extensionsCommand.js';
 import { type CommandContext } from './types.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { type ExtensionUpdateAction } from '../state/extensions.js';
+
+import open from 'open';
+vi.mock('open', () => ({
+  default: vi.fn(),
+}));
 
 vi.mock('../../config/extensions/update.js', () => ({
   updateExtension: vi.fn(),
@@ -26,6 +31,7 @@ describe('extensionsCommand', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockGetExtensions.mockReturnValue([]);
+    vi.mocked(open).mockClear();
     mockContext = createMockCommandContext({
       services: {
         config: {
@@ -37,6 +43,11 @@ describe('extensionsCommand', () => {
         dispatchExtensionStateUpdate: mockDispatchExtensionState,
       },
     });
+  });
+
+  afterEach(() => {
+    // Restore any stubbed environment variables, similar to docsCommand.test.ts
+    vi.unstubAllEnvs();
   });
 
   describe('list', () => {
@@ -300,6 +311,91 @@ describe('extensionsCommand', () => {
         const suggestions = await updateCompletion(mockContext, partialArg);
         expect(suggestions).toEqual(expected);
       });
+    });
+  });
+
+  describe('explore', () => {
+    const exploreAction = extensionsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'explore',
+    )?.action;
+
+    if (!exploreAction) {
+      throw new Error('Explore action not found');
+    }
+
+    it("should add an info message and call 'open' in a non-sandbox environment", async () => {
+      // Ensure no special environment variables that would affect behavior
+      vi.stubEnv('NODE_ENV', '');
+      vi.stubEnv('SANDBOX', '');
+
+      await exploreAction(mockContext, '');
+
+      const extensionsUrl = 'https://geminicli.com/extensions/';
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Opening extensions page in your browser: ${extensionsUrl}`,
+        },
+        expect.any(Number),
+      );
+
+      expect(open).toHaveBeenCalledWith(extensionsUrl);
+    });
+
+    it('should only add an info message in a sandbox environment', async () => {
+      // Simulate a sandbox environment
+      vi.stubEnv('NODE_ENV', '');
+      vi.stubEnv('SANDBOX', 'gemini-sandbox');
+      const extensionsUrl = 'https://geminicli.com/extensions/';
+
+      await exploreAction(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `View available extensions at ${extensionsUrl}`,
+        },
+        expect.any(Number),
+      );
+
+      // Ensure 'open' was not called in the sandbox
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('should add an info message and not call open in NODE_ENV test environment', async () => {
+      vi.stubEnv('NODE_ENV', 'test');
+      vi.stubEnv('SANDBOX', '');
+      const extensionsUrl = 'https://geminicli.com/extensions/';
+
+      await exploreAction(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
+        },
+        expect.any(Number),
+      );
+
+      // Ensure 'open' was not called in test environment
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors when opening the browser', async () => {
+      vi.stubEnv('NODE_ENV', '');
+      const extensionsUrl = 'https://geminicli.com/extensions/';
+      const errorMessage = 'Failed to open browser';
+      vi.mocked(open).mockRejectedValue(new Error(errorMessage));
+
+      await exploreAction(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
+        },
+        expect.any(Number),
+      );
     });
   });
 });
