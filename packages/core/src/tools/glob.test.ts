@@ -342,7 +342,17 @@ describe('GlobTool', () => {
   });
 
   describe('ignore file handling', () => {
-    it.each([
+    interface IgnoreFileTestCase {
+      name: string;
+      ignoreFile: { name: string; content: string };
+      filesToCreate: string[];
+      globToolParams: GlobToolParams;
+      expectedCountMessage: string;
+      expectedToContain?: string[];
+      notExpectedToContain?: string[];
+    }
+
+    it.each<IgnoreFileTestCase>([
       {
         name: 'should respect .gitignore files by default',
         ignoreFile: { name: '.gitignore', content: '*.ignored.txt' },
