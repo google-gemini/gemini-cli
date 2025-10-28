@@ -36,6 +36,13 @@ export interface TokenStorage {
   clearAll(): Promise<void>;
 }
 
+export interface SecretStorage {
+  setSecret(key: string, value: string): Promise<void>;
+  getSecret(key: string): Promise<string | null>;
+  deleteSecret(key: string): Promise<void>;
+  listSecrets(): Promise<string[]>;
+}
+
 export enum TokenStorageType {
   KEYCHAIN = 'keychain',
   ENCRYPTED_FILE = 'encrypted_file',

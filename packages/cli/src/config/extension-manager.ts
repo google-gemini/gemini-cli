@@ -133,7 +133,7 @@ export class ExtensionManager implements ExtensionLoader {
     const isUpdate = !!previousExtensionConfig;
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
-    let extension: GeminiCLIExtension;
+    let extension: GeminiCLIExtension | null;
     try {
       if (!isWorkspaceTrusted(this.settings).isTrusted) {
         throw new Error(
@@ -243,12 +243,16 @@ export class ExtensionManager implements ExtensionLoader {
           this.requestConsent,
           previousExtensionConfig,
         );
-
-        const extensionStorage = new ExtensionStorage(newExtensionName);
-        const destinationPath = extensionStorage.getExtensionDir();
+        const extensionId = getExtensionId(newExtensionConfig, installMetadata);
+        const destinationPath = new ExtensionStorage(
+          newExtensionName,
+        ).getExtensionDir();
         let previousSettings: Record<string, string> | undefined;
         if (isUpdate) {
-          previousSettings = getEnvContents(extensionStorage);
+          previousSettings = await getEnvContents(
+            previousExtensionConfig,
+            extensionId,
+          );
           await this.uninstallExtension(newExtensionName, isUpdate);
         }
 
@@ -257,6 +261,7 @@ export class ExtensionManager implements ExtensionLoader {
           if (isUpdate) {
             await maybePromptForSettings(
               newExtensionConfig,
+              extensionId,
               this.requestSetting,
               previousExtensionConfig,
               previousSettings,
@@ -264,6 +269,7 @@ export class ExtensionManager implements ExtensionLoader {
           } else {
             await maybePromptForSettings(
               newExtensionConfig,
+              extensionId,
               this.requestSetting,
             );
           }
@@ -286,7 +292,10 @@ export class ExtensionManager implements ExtensionLoader {
 
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore it.
-        extension = this.loadExtension(destinationPath)!;
+        extension = await this.loadExtension(destinationPath)!;
+        if (!extension) {
+          throw new Error(`Extension not found`);
+        }
         if (isUpdate) {
           logExtensionUpdateEvent(
             this.telemetryConfig,
@@ -401,7 +410,7 @@ export class ExtensionManager implements ExtensionLoader {
     this.eventEmitter.emit('extensionUninstalled', { extension });
   }
 
-  loadExtensions(): GeminiCLIExtension[] {
+  async loadExtensions(): Promise<GeminiCLIExtension[]> {
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
     }
@@ -413,12 +422,14 @@ export class ExtensionManager implements ExtensionLoader {
     for (const subdir of fs.readdirSync(extensionsDir)) {
       const extensionDir = path.join(extensionsDir, subdir);
 
-      this.loadExtension(extensionDir);
+      await this.loadExtension(extensionDir);
     }
     return this.loadedExtensions;
   }
 
-  private loadExtension(extensionDir: string): GeminiCLIExtension | null {
+  private async loadExtension(
+    extensionDir: string,
+  ): Promise<GeminiCLIExtension | null> {
     this.loadedExtensions ??= [];
     if (!fs.statSync(extensionDir).isDirectory()) {
       return null;
@@ -441,7 +452,10 @@ export class ExtensionManager implements ExtensionLoader {
         );
       }
 
-      const customEnv = getEnvContents(new ExtensionStorage(config.name));
+      const customEnv = await getEnvContents(
+        config,
+        getExtensionId(config, installMetadata),
+      );
       config = resolveEnvVarsInObject(config, customEnv);
 
       if (config.mcpServers) {
@@ -573,7 +587,7 @@ export class ExtensionManager implements ExtensionLoader {
     return output;
   }
 
-  disableExtension(name: string, scope: SettingScope) {
+  async disableExtension(name: string, scope: SettingScope) {
     if (
       scope === SettingScope.System ||
       scope === SettingScope.SystemDefaults
@@ -598,7 +612,7 @@ export class ExtensionManager implements ExtensionLoader {
     this.eventEmitter.emit('extensionDisabled', { extension });
   }
 
-  enableExtension(name: string, scope: SettingScope) {
+  async enableExtension(name: string, scope: SettingScope) {
     if (
       scope === SettingScope.System ||
       scope === SettingScope.SystemDefaults
