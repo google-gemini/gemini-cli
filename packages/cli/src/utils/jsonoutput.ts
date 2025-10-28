@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import stripAnsi from 'strip-ansi';
+
 export function checkInput(input: string | null | undefined): boolean {
   if (input === null || input === undefined) {
     return false;
@@ -18,9 +20,7 @@ export function checkInput(input: string | null | undefined): boolean {
     return false;
   }
 
-  const ANSI_PATTERN = String.raw`\u001B\[[0-9;]*m`;
-  const ansiRegexp = new RegExp(ANSI_PATTERN, 'g');
-  if (ansiRegexp.test(trimmed)) return false;
+  if (stripAnsi(trimmed) !== trimmed) return false;
 
   return true;
 }
