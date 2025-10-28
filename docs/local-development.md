@@ -17,6 +17,42 @@ when running Gemini CLI.
 
 ### Viewing Dev Traces
 
+You can view dev traces using either Jaeger or the Genkit Developer UI.
+
+#### Using Genkit
+
+Genkit provides a web-based UI for viewing traces and other telemetry data.
+
+1.  **Start the Genkit Telemetry Server:**
+
+    Run the following command to start the Genkit server:
+
+    ```bash
+    npm run telemetry -- --target=genkit
+    ```
+
+    The script will output the URL for the Genkit Developer UI, for example:
+
+    ```
+    Genkit Developer UI: http://localhost:4000
+    ```
+
+2.  **Run Gemini CLI with Dev Tracing:**
+
+    In a separate terminal, run your Gemini CLI command with the
+    `GEMINI_DEV_TRACING` environment variable:
+
+    ```bash
+    GEMINI_DEV_TRACING=true gemini
+    ```
+
+3.  **View the Traces:**
+
+    Open the Genkit Developer UI URL in your browser and navigate to the
+    **Traces** tab to view the traces.
+
+#### Using Jaeger
+
 You can view dev traces in the Jaeger UI. To get started, follow these steps:
 
 1.  **Start the telemetry collector:**
@@ -37,7 +73,7 @@ You can view dev traces in the Jaeger UI. To get started, follow these steps:
     `GEMINI_DEV_TRACING` environment variable:
 
     ```bash
-    GEMINI_DEV_TRACING=true gemini [your-command]
+    GEMINI_DEV_TRACING=true gemini
     ```
 
 3.  **View the traces:**

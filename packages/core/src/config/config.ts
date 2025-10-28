@@ -189,8 +189,6 @@ export class MCPServerConfig {
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
-    // When true, use Google ADC to fetch ID tokens for Cloud Run
-    readonly allow_unscoped_id_tokens_cloud_run?: boolean,
     // Service Account Configuration
     /* targetAudience format: CLIENT_ID.apps.googleusercontent.com */
     readonly targetAudience?: string,
