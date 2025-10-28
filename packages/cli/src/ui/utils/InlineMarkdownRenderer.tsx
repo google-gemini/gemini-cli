@@ -29,8 +29,6 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
 
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
-  // More conservative regex - removed the greedy _.*?_ pattern
-  // Only match underscores when they're properly bounded for markdown
   const inlineRegex =
     /(\*\*.*?\*\*|\*[^*]+?\*|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
   let match;
@@ -162,7 +160,6 @@ export const getPlainTextLength = (text: string): number => {
   const cleanText = text
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
-    // Removed underscore replacement to match the disabled underscore-based italics
     .replace(/~~(.*?)~~/g, '$1')
     .replace(/`(.*?)`/g, '$1')
     .replace(/<u>(.*?)<\/u>/g, '$1')
