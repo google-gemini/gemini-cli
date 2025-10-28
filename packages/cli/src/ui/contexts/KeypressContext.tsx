@@ -617,8 +617,6 @@ export function KeypressProvider({
         return;
       }
 
-      // Only apply Alt key character mapping on macOS (darwin platform)
-      // On Linux and other platforms, these characters are typed directly
       const mappedLetter = ALT_KEY_CHARACTER_MAP[key.sequence];
       if (mappedLetter && !key.meta && process.platform === 'darwin') {
         broadcast({
