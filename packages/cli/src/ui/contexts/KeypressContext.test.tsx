@@ -1649,3 +1649,425 @@ describe('Kitty Sequence Parsing', () => {
     vi.useRealTimers();
   });
 });
+
+describe('KeypressContext - Platform-specific Alt Key Mapping', () => {
+  let stdin: MockStdin;
+  const mockSetRawMode = vi.fn();
+  let originalPlatform: string;
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider kittyProtocolEnabled={false}>
+      {children}
+    </KeypressProvider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stdin = new MockStdin();
+    (useStdin as Mock).mockReturnValue({
+      stdin,
+      setRawMode: mockSetRawMode,
+    });
+    
+    // Store the original platform
+    originalPlatform = process.platform;
+  });
+
+  afterEach(() => {
+    // Restore the original platform
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+    });
+  });
+
+  describe('macOS (darwin) platform', () => {
+    beforeEach(() => {
+      // Mock process.platform to be 'darwin'
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        configurable: true,
+      });
+    });
+
+    it('should apply Alt key character mapping for ç on macOS', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate receiving 'ç' character on macOS (Alt+C produces this)
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false, // Important: this comes as meta:false but should be mapped to meta:true
+          shift: false,
+          paste: false,
+          sequence: 'ç', // \u00E7
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'c',
+          ctrl: false,
+          meta: true, // Should be mapped to Alt+C
+          shift: false,
+          paste: false,
+          sequence: 'ç',
+        }),
+      );
+    });
+
+    it('should apply Alt key character mapping for å on macOS', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate receiving 'å' character on macOS (Alt+A produces this)
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'å', // \u00E5
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'a',
+          ctrl: false,
+          meta: true, // Should be mapped to Alt+A
+          shift: false,
+          paste: false,
+          sequence: 'å',
+        }),
+      );
+    });
+
+    it('should apply Alt key character mapping for ø on macOS', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate receiving 'ø' character on macOS (Alt+O produces this)
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'ø', // \u00F8
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'o',
+          ctrl: false,
+          meta: true, // Should be mapped to Alt+O
+          shift: false,
+          paste: false,
+          sequence: 'ø',
+        }),
+      );
+    });
+
+    it('should not apply mapping when key already has meta=true on macOS', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate a key that already has meta=true
+      act(() => {
+        stdin.pressKey({
+          name: 'c',
+          ctrl: false,
+          meta: true, // Already has meta
+          shift: false,
+          paste: false,
+          sequence: 'ç',
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'c',
+          ctrl: false,
+          meta: true, // Should remain as is
+          shift: false,
+          paste: false,
+          sequence: 'ç',
+        }),
+      );
+    });
+  });
+
+  describe('Linux platform', () => {
+    beforeEach(() => {
+      // Mock process.platform to be 'linux'
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true,
+      });
+    });
+
+    it('should NOT apply Alt key character mapping for ç on Linux', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate receiving 'ç' character on Linux (typed directly)
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'ç', // \u00E7
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: undefined, // Should NOT be mapped to 'c'
+          ctrl: false,
+          meta: false, // Should NOT be mapped to meta:true
+          shift: false,
+          paste: false,
+          sequence: 'ç',
+        }),
+      );
+    });
+
+    it('should NOT apply Alt key character mapping for å on Linux', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate receiving 'å' character on Linux (typed directly)
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'å', // \u00E5
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: undefined, // Should NOT be mapped to 'a'
+          ctrl: false,
+          meta: false, // Should NOT be mapped to meta:true
+          shift: false,
+          paste: false,
+          sequence: 'å',
+        }),
+      );
+    });
+
+    it('should NOT apply Alt key character mapping for ø on Linux', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate receiving 'ø' character on Linux (typed directly)
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'ø', // \u00F8
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: undefined, // Should NOT be mapped to 'o'
+          ctrl: false,
+          meta: false, // Should NOT be mapped to meta:true
+          shift: false,
+          paste: false,
+          sequence: 'ø',
+        }),
+      );
+    });
+
+    it('should handle normal Alt+C combination on Linux', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate a normal Alt+C key press on Linux
+      act(() => {
+        stdin.pressKey({
+          name: 'c',
+          ctrl: false,
+          meta: true,
+          shift: false,
+          paste: false,
+          sequence: '\x1bc', // ESC+c sequence
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'c',
+          ctrl: false,
+          meta: true,
+          shift: false,
+          paste: false,
+          sequence: '\x1bc',
+        }),
+      );
+    });
+  });
+
+  describe('Windows platform', () => {
+    beforeEach(() => {
+      // Mock process.platform to be 'win32'
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        configurable: true,
+      });
+    });
+
+    it('should NOT apply Alt key character mapping on Windows', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate receiving 'ç' character on Windows
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'ç',
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: undefined, // Should NOT be mapped
+          ctrl: false,
+          meta: false, // Should NOT be mapped to meta:true
+          shift: false,
+          paste: false,
+          sequence: 'ç',
+        }),
+      );
+    });
+  });
+
+  describe('Edge cases', () => {
+    beforeEach(() => {
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        configurable: true,
+      });
+    });
+
+    it('should handle unknown characters not in ALT_KEY_CHARACTER_MAP on macOS', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate an accented character not in the mapping
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'ñ', // Not in ALT_KEY_CHARACTER_MAP
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: undefined, // Should not be mapped
+          ctrl: false,
+          meta: false, // Should remain false
+          shift: false,
+          paste: false,
+          sequence: 'ñ',
+        }),
+      );
+    });
+
+    it('should handle regular characters on macOS', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Simulate a regular 'a' character
+      act(() => {
+        stdin.pressKey({
+          name: 'a',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'a',
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'a', // Should pass through unchanged
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'a',
+        }),
+      );
+    });
+  });
+});
