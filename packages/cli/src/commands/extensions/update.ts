@@ -34,7 +34,7 @@ export async function handleUpdate(args: UpdateArgs) {
     workspaceDir,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
-    loadedSettings: loadSettings(workspaceDir),
+    settings: loadSettings(workspaceDir).merged,
   });
 
   const extensions = extensionManager.loadExtensions();

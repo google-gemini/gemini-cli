@@ -2433,7 +2433,7 @@ describe('Settings Loading and Merging', () => {
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
       const extensionManager = new ExtensionManager({
-        loadedSettings,
+        settings: loadedSettings.merged,
         workspaceDir: MOCK_WORKSPACE_DIR,
         requestConsent: vi.fn(),
         requestSetting: vi.fn(),
@@ -2506,7 +2506,7 @@ describe('Settings Loading and Merging', () => {
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
       const extensionManager = new ExtensionManager({
-        loadedSettings,
+        settings: loadedSettings.merged,
         workspaceDir: MOCK_WORKSPACE_DIR,
         requestConsent: vi.fn(),
         requestSetting: vi.fn(),

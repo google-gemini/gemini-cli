@@ -20,6 +20,7 @@ import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
+import { SimpleExtensionLoader } from '@google/gemini-cli-core';
 
 const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
@@ -70,7 +71,11 @@ export async function createApp() {
     loadEnvironment();
     const settings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);
-    const config = await loadConfig(settings, extensions, 'a2a-server');
+    const config = await loadConfig(
+      settings,
+      new SimpleExtensionLoader(extensions),
+      'a2a-server',
+    );
 
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];

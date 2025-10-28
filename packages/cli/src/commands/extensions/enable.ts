@@ -26,8 +26,10 @@ export function handleEnable(args: EnableArgs) {
     workspaceDir: workingDir,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
-    loadedSettings: loadSettings(workingDir),
+    settings: loadSettings(workingDir).merged,
   });
+  extensionManager.loadExtensions();
+
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
       extensionManager.enableExtension(args.name, SettingScope.Workspace);

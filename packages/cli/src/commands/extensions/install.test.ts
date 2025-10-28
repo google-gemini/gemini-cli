@@ -23,6 +23,7 @@ vi.mock('../../config/extension-manager.ts', async (importOriginal) => {
     ...actual,
     ExtensionManager: vi.fn().mockImplementation(() => ({
       installOrUpdateExtension: mockInstallOrUpdateExtension,
+      loadExtensions: vi.fn(),
     })),
   };
 });

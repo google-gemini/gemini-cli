@@ -12,6 +12,7 @@ import {
   beforeEach,
   afterEach,
   type Mock,
+  type MockedObject,
 } from 'vitest';
 import { render, cleanup } from 'ink-testing-library';
 import { AppContainer } from './AppContainer.js';
@@ -131,11 +132,13 @@ import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
+import { type ExtensionManager } from '../config/extension-manager.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
   let mockSettings: LoadedSettings;
   let mockInitResult: InitializationResult;
+  let mockExtensionManager: MockedObject<ExtensionManager>;
 
   // Create typed mocks for all hooks
   const mockedUseQuotaAndFallback = useQuotaAndFallback as Mock;
@@ -281,6 +284,15 @@ describe('AppContainer State Management', () => {
 
     // Mock config's getTargetDir to return consistent workspace directory
     vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+
+    mockExtensionManager = vi.mockObject({
+      getExtensions: vi.fn().mockReturnValue([]),
+      setRequestConsent: vi.fn(),
+      setRequestSetting: vi.fn(),
+    } as unknown as ExtensionManager);
+    vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
+      mockExtensionManager,
+    );
 
     // Mock LoadedSettings
     mockSettings = {
