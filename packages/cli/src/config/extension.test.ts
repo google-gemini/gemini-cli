@@ -425,6 +425,13 @@ describe('extension tests', () => {
             },
           },
         },
+        settings: [
+          {
+            name: 'My API Key',
+            description: 'API key for testing.',
+            envVar: 'MY_API_KEY',
+          },
+        ],
       });
 
       const envFilePath = path.join(extDir, '.env');
