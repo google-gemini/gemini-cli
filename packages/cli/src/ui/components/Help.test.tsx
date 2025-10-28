@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { render } from 'ink-testing-library';
 import { describe, it, expect } from 'vitest';
 import { Help } from './Help.js';
