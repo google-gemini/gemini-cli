@@ -64,6 +64,7 @@ const baseMockUiState = {
   streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  currentModel: 'gemini-pro',
 };
 
 export const renderWithProviders = (

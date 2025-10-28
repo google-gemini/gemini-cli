@@ -8,6 +8,7 @@ import type {
   Config,
   ToolCallRequestInfo,
   CompletedToolCall,
+  UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -24,6 +25,8 @@ import {
   JsonStreamEventType,
   uiTelemetryService,
   debugLogger,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -37,6 +40,7 @@ import {
   handleCancellationError,
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
+import { TextOutput } from './ui/utils/textOutput.js';
 
 export async function runNonInteractive(
   config: Config,
@@ -49,6 +53,19 @@ export async function runNonInteractive(
       stderr: true,
       debugMode: config.getDebugMode(),
     });
+    const textOutput = new TextOutput();
+
+    const handleUserFeedback = (payload: UserFeedbackPayload) => {
+      const prefix = payload.severity.toUpperCase();
+      process.stderr.write(`[${prefix}] ${payload.message}\n`);
+      if (payload.error && config.getDebugMode()) {
+        const errorToLog =
+          payload.error instanceof Error
+            ? payload.error.stack || payload.error.message
+            : String(payload.error);
+        process.stderr.write(`${errorToLog}\n`);
+      }
+    };
 
     const startTime = Date.now();
     const streamFormatter =
@@ -56,8 +73,12 @@ export async function runNonInteractive(
         ? new StreamJsonFormatter()
         : null;
 
+    let errorToHandle: unknown | undefined;
     try {
       consolePatcher.patch();
+      coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.drainFeedbackBacklog();
+
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
@@ -164,7 +185,9 @@ export async function runNonInteractive(
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
               responseText += event.value;
             } else {
-              process.stdout.write(event.value);
+              if (event.value) {
+                textOutput.write(event.value);
+              }
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
             if (streamFormatter) {
@@ -195,10 +218,13 @@ export async function runNonInteractive(
                 message: 'Maximum session turns exceeded',
               });
             }
+          } else if (event.type === GeminiEventType.Error) {
+            throw event.value.error;
           }
         }
 
         if (toolCallRequests.length > 0) {
+          textOutput.ensureTrailingNewline();
           const toolResponseParts: Part[] = [];
           const completedToolCalls: CompletedToolCall[] = [];
 
@@ -276,20 +302,25 @@ export async function runNonInteractive(
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
-            process.stdout.write(formatter.format(responseText, stats));
+            textOutput.write(formatter.format(responseText, stats));
           } else {
-            process.stdout.write('\n'); // Ensure a final newline
+            textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
           return;
         }
       }
     } catch (error) {
-      handleError(error, config);
+      errorToHandle = error;
     } finally {
       consolePatcher.cleanup();
+      coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
       if (isTelemetrySdkInitialized()) {
         await shutdownTelemetry(config);
       }
+    }
+
+    if (errorToHandle) {
+      handleError(errorToHandle, config);
     }
   });
 }
