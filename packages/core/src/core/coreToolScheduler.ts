@@ -1067,7 +1067,6 @@ export class CoreToolScheduler {
               typeof content === 'string' ? content.length : undefined;
             if (
               typeof content === 'string' &&
-              toolName === SHELL_TOOL_NAME &&
               this.config.getEnableToolOutputTruncation() &&
               this.config.getTruncateToolOutputThreshold() > 0 &&
               this.config.getTruncateToolOutputLines() > 0
@@ -1177,7 +1176,7 @@ export class CoreToolScheduler {
       // After completion, process the next item in the queue.
       if (this.requestQueue.length > 0) {
         const next = this.requestQueue.shift()!;
-        this._schedule(next.request, next.signal)
+        _schedule(next.request, next.signal)
           .then(next.resolve)
           .catch(next.reject);
       }
