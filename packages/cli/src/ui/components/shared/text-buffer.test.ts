@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** @vitest-environment jsdom */
+
 import { describe, it, expect, beforeEach } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { renderHook, act } from '@testing-library/react';
@@ -951,6 +953,40 @@ describe('useTextBuffer', () => {
         }),
       );
       expect(getBufferState(result).lines).toEqual(['', '']);
+    });
+
+    it('should do nothing for a tab key press', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'tab',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: '\t',
+        }),
+      );
+      expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should do nothing for a shift tab key press', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'tab',
+          ctrl: false,
+          meta: false,
+          shift: true,
+          paste: false,
+          sequence: '\u001b[9;2u',
+        }),
+      );
+      expect(getBufferState(result).text).toBe('');
     });
 
     it('should handle "Backspace" key', () => {

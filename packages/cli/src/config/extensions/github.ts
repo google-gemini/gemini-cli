@@ -6,19 +6,21 @@
 
 import { simpleGit } from 'simple-git';
 import { getErrorMessage } from '../../utils/errors.js';
-import type {
-  ExtensionInstallMetadata,
-  GeminiCLIExtension,
+import {
+  debugLogger,
+  type ExtensionInstallMetadata,
+  type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
 import * as tar from 'tar';
 import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
+import type { ExtensionManager } from '../extension-manager.js';
+import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
 /**
  * Clones a Git repository to a specified local path.
@@ -151,16 +153,13 @@ export async function fetchReleaseFromGithub(
 
 export async function checkForExtensionUpdate(
   extension: GeminiCLIExtension,
-  cwd: string = process.cwd(),
+  extensionManager: ExtensionManager,
 ): Promise<ExtensionUpdateState> {
   const installMetadata = extension.installMetadata;
   if (installMetadata?.type === 'local') {
-    const newExtension = loadExtension({
-      extensionDir: installMetadata.source,
-      workspaceDir: cwd,
-    });
+    const newExtension = extensionManager.loadExtension(installMetadata.source);
     if (!newExtension) {
-      console.error(
+      debugLogger.error(
         `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
       );
       return ExtensionUpdateState.ERROR;
@@ -182,12 +181,14 @@ export async function checkForExtensionUpdate(
       const git = simpleGit(extension.path);
       const remotes = await git.getRemotes(true);
       if (remotes.length === 0) {
-        console.error('No git remotes found.');
+        debugLogger.error('No git remotes found.');
         return ExtensionUpdateState.ERROR;
       }
       const remoteUrl = remotes[0].refs.fetch;
       if (!remoteUrl) {
-        console.error(`No fetch URL found for git remote ${remotes[0].name}.`);
+        debugLogger.error(
+          `No fetch URL found for git remote ${remotes[0].name}.`,
+        );
         return ExtensionUpdateState.ERROR;
       }
 
@@ -197,7 +198,7 @@ export async function checkForExtensionUpdate(
       const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
 
       if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
-        console.error(`Git ref ${refToCheck} not found.`);
+        debugLogger.error(`Git ref ${refToCheck} not found.`);
         return ExtensionUpdateState.ERROR;
       }
 
@@ -205,7 +206,7 @@ export async function checkForExtensionUpdate(
       const localHash = await git.revparse(['HEAD']);
 
       if (!remoteHash) {
-        console.error(
+        debugLogger.error(
           `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
         );
         return ExtensionUpdateState.ERROR;
@@ -217,12 +218,12 @@ export async function checkForExtensionUpdate(
     } else {
       const { source, releaseTag } = installMetadata;
       if (!source) {
-        console.error(`No "source" provided for extension.`);
+        debugLogger.error(`No "source" provided for extension.`);
         return ExtensionUpdateState.ERROR;
       }
       const repoInfo = tryParseGithubUrl(source);
       if (!repoInfo) {
-        console.error(
+        debugLogger.error(
           `Source is not a valid GitHub repository for release checks: ${source}`,
         );
         return ExtensionUpdateState.ERROR;
@@ -244,7 +245,7 @@ export async function checkForExtensionUpdate(
       return ExtensionUpdateState.UP_TO_DATE;
     }
   } catch (error) {
-    console.error(
+    debugLogger.error(
       `Failed to check for updates for extension "${installMetadata.source}": ${getErrorMessage(error)}`,
     );
     return ExtensionUpdateState.ERROR;

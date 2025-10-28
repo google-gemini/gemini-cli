@@ -1,0 +1,33 @@
+name: 'Trigger E2E'
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
+
+jobs:
+  save_repo_name:
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Save Repo name'
+        env:
+          # Replace with github.event.pull_request.head.repo.full_name when switched to listen on pull request events. This repo name does not contain the org which is needed for checkout.
+          REPO_NAME: '${{ github.event.repository.name }}'
+        run: |
+          mkdir -p ./pr
+          echo '${{ env.REPO_NAME }}' > ./pr/repo_name
+      - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'repo_name'
+          path: 'pr/'
+  trigger_e2e:
+    name: 'Trigger e2e'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - id: 'trigger-e2e'
+        run: |
+          echo "Trigger e2e workflow"

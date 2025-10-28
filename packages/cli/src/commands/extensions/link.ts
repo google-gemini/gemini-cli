@@ -6,12 +6,15 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  installOrUpdateExtension,
-  requestConsentNonInteractive,
-} from '../../config/extension.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+  debugLogger,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface InstallArgs {
   path: string;
@@ -23,15 +26,20 @@ export async function handleLink(args: InstallArgs) {
       source: args.path,
       type: 'link',
     };
-    const extensionName = await installOrUpdateExtension(
-      installMetadata,
-      requestConsentNonInteractive,
-    );
-    console.log(
+    const workspaceDir = process.cwd();
+    const extensionManager = new ExtensionManager({
+      workspaceDir,
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
+      loadedSettings: loadSettings(workspaceDir),
+    });
+    const extensionName =
+      await extensionManager.installOrUpdateExtension(installMetadata);
+    debugLogger.log(
       `Extension "${extensionName}" linked successfully and enabled.`,
     );
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }

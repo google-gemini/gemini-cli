@@ -25,6 +25,7 @@ describe('extensionsCommand', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    mockGetExtensions.mockReturnValue([]);
     mockContext = createMockCommandContext({
       services: {
         config: {
@@ -46,6 +47,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.EXTENSIONS_LIST,
+          extensions: expect.any(Array),
         },
         expect.any(Number),
       );
@@ -113,11 +115,13 @@ describe('extensionsCommand', () => {
       await updateAction(mockContext, '--all');
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
+        extensions: expect.any(Array),
       });
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.EXTENSIONS_LIST,
+          extensions: expect.any(Array),
         },
         expect.any(Number),
       );
@@ -130,11 +134,13 @@ describe('extensionsCommand', () => {
       await updateAction(mockContext, '--all');
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
+        extensions: expect.any(Array),
       });
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.EXTENSIONS_LIST,
+          extensions: expect.any(Array),
         },
         expect.any(Number),
       );
@@ -202,11 +208,13 @@ describe('extensionsCommand', () => {
       });
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
+        extensions: expect.any(Array),
       });
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.EXTENSIONS_LIST,
+          extensions: expect.any(Array),
         },
         expect.any(Number),
       );
@@ -223,6 +231,7 @@ describe('extensionsCommand', () => {
 
       const extensionOne: GeminiCLIExtension = {
         name: 'ext-one',
+        id: 'ext-one-id',
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/ext-one',
@@ -235,6 +244,7 @@ describe('extensionsCommand', () => {
       };
       const extensionTwo: GeminiCLIExtension = {
         name: 'another-ext',
+        id: 'another-ext-id',
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/another-ext',
@@ -247,6 +257,7 @@ describe('extensionsCommand', () => {
       };
       const allExt: GeminiCLIExtension = {
         name: 'all-ext',
+        id: 'all-ext-id',
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/all-ext',
