@@ -1176,7 +1176,7 @@ export class CoreToolScheduler {
       // After completion, process the next item in the queue.
       if (this.requestQueue.length > 0) {
         const next = this.requestQueue.shift()!;
-        _schedule(next.request, next.signal)
+        this._schedule(next.request, next.signal)
           .then(next.resolve)
           .catch(next.reject);
       }
