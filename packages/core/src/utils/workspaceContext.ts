@@ -125,7 +125,7 @@ export class WorkspaceContext {
       throw new Error(`Path is not a directory: ${absolutePath}`);
     }
 
-    return fs.realpathSync(absolutePath);
+    return normalizePath(fs.realpathSync(absolutePath));
   }
 
   /**
