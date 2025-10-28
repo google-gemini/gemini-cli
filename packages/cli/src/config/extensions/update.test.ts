@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { vi, type MockedFunction } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -50,13 +48,9 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('../trustedFolders.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../trustedFolders.js')>();
-  return {
-    ...actual,
-    isWorkspaceTrusted: vi.fn(),
-  };
-});
+vi.mock('../trustedFolders.js', () => ({
+  isWorkspaceTrusted: vi.fn(),
+}));
 
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
@@ -109,7 +103,7 @@ describe('update tests', () => {
       workspaceDir: tempWorkspaceDir,
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
-      loadedSettings: loadSettings(tempWorkspaceDir),
+      settings: loadSettings(tempWorkspaceDir).merged,
     });
   });
 
@@ -145,7 +139,9 @@ describe('update tests', () => {
         );
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
-      const extension = extensionManager.loadExtension(targetExtDir)!;
+      const extension = extensionManager
+        .loadExtensions()
+        .find((e) => e.name === extensionName)!;
       const updateInfo = await updateExtension(
         extension,
         extensionManager,
@@ -170,7 +166,7 @@ describe('update tests', () => {
 
     it('should call setExtensionUpdateState with UPDATING and then UPDATED_NEEDS_RESTART on success', async () => {
       const extensionName = 'test-extension';
-      const extensionDir = createExtension({
+      createExtension({
         extensionsDir: userExtensionsDir,
         name: extensionName,
         version: '1.0.0',
@@ -192,7 +188,10 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = extensionManager.loadExtension(extensionDir)!;
+
+      const extension = extensionManager
+        .loadExtensions()
+        .find((e) => e.name === extensionName)!;
       await updateExtension(
         extension,
         extensionManager,
@@ -218,7 +217,7 @@ describe('update tests', () => {
 
     it('should call setExtensionUpdateState with ERROR on failure', async () => {
       const extensionName = 'test-extension';
-      const extensionDir = createExtension({
+      createExtension({
         extensionsDir: userExtensionsDir,
         name: extensionName,
         version: '1.0.0',
@@ -232,7 +231,9 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = extensionManager.loadExtension(extensionDir)!;
+      const extension = extensionManager
+        .loadExtensions()
+        .find((e) => e.name === extensionName)!;
       await expect(
         updateExtension(
           extension,
@@ -261,7 +262,7 @@ describe('update tests', () => {
 
   describe('checkForAllExtensionUpdates', () => {
     it('should return UpdateAvailable for a git extension with updates', async () => {
-      const extensionDir = createExtension({
+      createExtension({
         extensionsDir: userExtensionsDir,
         name: 'test-extension',
         version: '1.0.0',
@@ -270,7 +271,6 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -280,7 +280,7 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -294,7 +294,7 @@ describe('update tests', () => {
     });
 
     it('should return UpToDate for a git extension with no updates', async () => {
-      const extensionDir = createExtension({
+      createExtension({
         extensionsDir: userExtensionsDir,
         name: 'test-extension',
         version: '1.0.0',
@@ -303,7 +303,6 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -313,7 +312,7 @@ describe('update tests', () => {
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -334,16 +333,15 @@ describe('update tests', () => {
         version: '1.0.0',
       });
 
-      const installedExtensionDir = createExtension({
+      createExtension({
         extensionsDir: userExtensionsDir,
         name: 'local-extension',
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = extensionManager.loadExtension(installedExtensionDir)!;
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -360,20 +358,19 @@ describe('update tests', () => {
       const localExtensionSourcePath = path.join(tempHomeDir, 'local-source');
       const sourceExtensionDir = createExtension({
         extensionsDir: localExtensionSourcePath,
-        name: 'my-local-ext',
+        name: 'local-extension',
         version: '1.1.0',
       });
 
-      const installedExtensionDir = createExtension({
+      createExtension({
         extensionsDir: userExtensionsDir,
         name: 'local-extension',
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = extensionManager.loadExtension(installedExtensionDir)!;
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );
@@ -387,7 +384,7 @@ describe('update tests', () => {
     });
 
     it('should return Error when git check fails', async () => {
-      const extensionDir = createExtension({
+      createExtension({
         extensionsDir: userExtensionsDir,
         name: 'error-extension',
         version: '1.0.0',
@@ -396,13 +393,12 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = extensionManager.loadExtension(extensionDir)!;
 
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
-        [extension],
+        extensionManager.loadExtensions(),
         extensionManager,
         dispatch,
       );

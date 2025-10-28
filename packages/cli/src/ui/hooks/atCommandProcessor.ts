@@ -281,7 +281,7 @@ export async function handleAtCommand({
                 );
               }
             } catch (globError) {
-              console.error(
+              debugLogger.warn(
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
               onDebugMessage(
@@ -294,7 +294,7 @@ export async function handleAtCommand({
             );
           }
         } else {
-          console.error(
+          debugLogger.warn(
             `Error stating path ${pathName}: ${getErrorMessage(error)}`,
           );
           onDebugMessage(

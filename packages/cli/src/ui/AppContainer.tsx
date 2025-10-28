@@ -50,6 +50,7 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
+import { getPolicyErrorsForUI } from '../config/policy.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
@@ -98,7 +99,7 @@ import {
   useExtensionUpdates,
 } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
-import { ExtensionManager } from '../config/extension-manager.js';
+import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
@@ -168,21 +169,12 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
-  const extensions = config.getExtensions();
-  const [extensionManager] = useState<ExtensionManager>(
-    new ExtensionManager({
-      enabledExtensionOverrides: config.getEnabledExtensions(),
-      workspaceDir: config.getWorkingDir(),
-      requestConsent: (description) =>
-        requestConsentInteractive(
-          description,
-          addConfirmUpdateExtensionRequest,
-        ),
-      // TODO: Support requesting settings in the interactive CLI
-      requestSetting: null,
-      loadedSettings: settings,
-    }),
+  const extensionManager = config.getExtensionLoader() as ExtensionManager;
+  // We are in the interactive CLI, update how we request consent and settings.
+  extensionManager.setRequestConsent((description) =>
+    requestConsentInteractive(description, addConfirmUpdateExtensionRequest),
   );
+  extensionManager.setRequestSetting();
 
   const { addConfirmUpdateExtensionRequest, confirmUpdateExtensionRequests } =
     useConfirmUpdateRequests();
@@ -190,7 +182,7 @@ export const AppContainer = (props: AppContainerProps) => {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
-  } = useExtensionUpdates(extensions, extensionManager, historyManager.addItem);
+  } = useExtensionUpdates(extensionManager, historyManager.addItem);
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const openPermissionsDialog = useCallback(
@@ -548,7 +540,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
           config.getDebugMode(),
           config.getFileService(),
           settings.merged,
-          config.getExtensions(),
+          config.getExtensionLoader(),
           config.isTrustedFolder(),
           settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
           config.getFileFilteringOptions(),
@@ -894,11 +886,23 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
     appEvents.on(AppEvent.LogError, logErrorHandler);
 
+    // Emit any policy errors that were stored during config loading
+    // Only show these when message bus integration is enabled, as policies
+    // are only active when the message bus is being used.
+    if (config.getEnableMessageBusIntegration()) {
+      const policyErrors = getPolicyErrorsForUI();
+      if (policyErrors.length > 0) {
+        for (const error of policyErrors) {
+          appEvents.emit(AppEvent.LogError, error);
+        }
+      }
+    }
+
     return () => {
       appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
       appEvents.off(AppEvent.LogError, logErrorHandler);
     };
-  }, [handleNewMessage]);
+  }, [handleNewMessage, config]);
 
   useEffect(() => {
     if (ctrlCTimerRef.current) {
