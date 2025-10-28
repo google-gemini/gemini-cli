@@ -264,3 +264,57 @@ using `"cwd": "${extensionPath}${/}run.ts"`.
 | `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
 | `${workspacePath}`         | The fully-qualified path of the current workspace.                                                                                                              |
 | `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |
+
+### Environment variables in extensions
+
+Extensions can reference environment variables inside their `gemini-extension.json`
+files using `$VAR_NAME` or `${VAR_NAME}` syntax. This is essential for
+configurations that require sensitive values like API keys or tokens.
+
+**Example: GitHub MCP server with an environment variable**
+
+```json
+{
+  "name": "my-github-extension",
+  "version": "1.0.0",
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_MCP_PAT",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_MCP_PAT": "$GITHUB_MCP_PAT"
+      }
+    }
+  }
+}
+```
+
+Extensions cannot automatically prompt for or collect environment variables
+during installation. You must define required variables before using the
+extension. The recommended place for extension-specific values is the
+`~/.gemini/.env` file:
+
+```bash
+# In ~/.gemini/.env
+GITHUB_MCP_PAT=pat_YourActualGitHubTokenHere
+MY_EXTENSION_API_KEY=your_api_key_here
+```
+
+> [!IMPORTANT]
+> If an extension relies on environment variables that are not set, you may see
+> authentication errors such as "Authorization header is badly formatted" or
+> "HTTP 400: bad request." Always review the extension's documentation or its
+> `gemini-extension.json` file to identify required variables.
+
+> [!TIP]
+> When you publish an extension, document the expected environment variables in
+> your README or context files. Descriptive names (for example,
+> `MY_EXTENSION_API_KEY`) make it easier for users to configure the extension
+> correctly.

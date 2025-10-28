@@ -70,7 +70,7 @@ Learn more at
 If you use up your initial number of requests, you can continue to benefit from
 Gemini CLI by upgrading to one of the following subscriptions:
 
-- [Google AI Pro and AI Ultra](https://cloud.google.com/products/gemini/pricing)
+- [Google AI Pro and AI Ultra](https://cloud.google.com/gemini/docs/pricing)
   by signing up at
   [Set up Gemini Code Assist](https://goo.gle/set-up-gemini-code-assist). This
   is recommended for individual developers. Quotas and pricing are based on a

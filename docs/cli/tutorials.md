@@ -63,14 +63,40 @@ how to launch the GitHub MCP server.
 > fine-grained access token that doesn't share access to both public and private
 > repositories.
 
-Use an environment variable to store your GitHub PAT:
+You need to set an environment variable to store your GitHub PAT. The specific variable name depends on how you're configuring the GitHub MCP server:
+
+**Option 1: Direct configuration (as shown above)**
+
+Set `GITHUB_PERSONAL_ACCESS_TOKEN` in your shell or `.env` file:
 
 ```bash
-GITHUB_PERSONAL_ACCESS_TOKEN="pat_YourActualGitHubTokenHere"
+export GITHUB_PERSONAL_ACCESS_TOKEN="pat_YourActualGitHubTokenHere"
 ```
 
 Gemini CLI uses this value in the `mcpServers` configuration that you defined in
 the `settings.json` file.
+
+**Option 2: Using extensions (e.g., the GitHub MCP extension)**
+
+Some extensions expect a different variable such as `GITHUB_MCP_PAT`. If you're
+using the official GitHub MCP extension
+(`gemini extensions install https://github.com/github/github-mcp-server`) or
+any other extension that requires this variable, set it in `~/.gemini/.env`:
+
+```bash
+# In ~/.gemini/.env
+GITHUB_MCP_PAT=pat_YourActualGitHubTokenHere
+```
+
+> [!NOTE]
+> Different extensions may use different environment variable names. Check the
+> extension's `gemini-extension.json` file to see which variables it expects.
+> Gemini CLI automatically substitutes environment variables in extension
+> configurations using `$VAR_NAME` or `${VAR_NAME}` syntax.
+
+Gemini CLI uses whichever variable you configure—either directly in
+`settings.json` or provided via an extension—when launching the GitHub MCP
+server.
 
 #### Launch Gemini CLI and verify the connection
 
