@@ -47,6 +47,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  getCoreSystemPrompt,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -551,6 +552,23 @@ Logging in with Google... Please restart Gemini CLI to continue.
       config.setGeminiMdFilePaths(filePaths);
 
       setGeminiMdFileCount(fileCount);
+
+      // Update the system instruction in the current chat session
+      try {
+        const chat = config.getGeminiClient().getChat();
+        const newSystemInstruction = getCoreSystemPrompt(config, memoryContent);
+        chat.setSystemInstruction(newSystemInstruction);
+      } catch (error) {
+        // Log error but don't fail the refresh - the config is updated
+        const errorMsg = getErrorMessage(error);
+        historyManager.addItem(
+          {
+            type: MessageType.WARNING,
+            text: `Memory config updated, but failed to update current chat session: ${errorMsg}`,
+          },
+          Date.now(),
+        );
+      }
 
       historyManager.addItem(
         {

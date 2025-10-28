@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getErrorMessage } from '@google/gemini-cli-core';
+import { getErrorMessage, getCoreSystemPrompt } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import { loadHierarchicalGeminiMemory } from '../../config/config.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
@@ -100,6 +100,26 @@ export const memoryCommand: SlashCommand = {
             config.setGeminiMdFileCount(fileCount);
             config.setGeminiMdFilePaths(filePaths);
             context.ui.setGeminiMdFileCount(fileCount);
+
+            // Update the system instruction in the current chat session
+            try {
+              const chat = config.getGeminiClient().getChat();
+              const newSystemInstruction = getCoreSystemPrompt(
+                config,
+                memoryContent,
+              );
+              chat.setSystemInstruction(newSystemInstruction);
+            } catch (error) {
+              // Log error but don't fail the refresh - the config is updated
+              const errorMsg = getErrorMessage(error);
+              context.ui.addItem(
+                {
+                  type: MessageType.WARNING,
+                  text: `Memory config updated, but failed to update current chat session: ${errorMsg}`,
+                },
+                Date.now(),
+              );
+            }
 
             const successMessage =
               memoryContent.length > 0
