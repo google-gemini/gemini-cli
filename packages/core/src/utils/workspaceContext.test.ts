@@ -165,8 +165,12 @@ describe('WorkspaceContext with real filesystem', () => {
 
       const workspaceContext = new WorkspaceContext(unicodeDirPath);
 
-      const pathInsideNFC = path.join(unicodeDirPath, 'file.txt').normalize('NFC');
-      const pathInsideNFD = path.join(unicodeDirPath, 'file.txt').normalize('NFD');
+      const pathInsideNFC = path
+        .join(unicodeDirPath, 'file.txt')
+        .normalize('NFC');
+      const pathInsideNFD = path
+        .join(unicodeDirPath, 'file.txt')
+        .normalize('NFD');
 
       // Test both NFC and NFD forms of a path inside the workspace
       expect(workspaceContext.isPathWithinWorkspace(pathInsideNFC)).toBe(true);
@@ -176,7 +180,9 @@ describe('WorkspaceContext with real filesystem', () => {
       const workspaceContextNFD = new WorkspaceContext(
         unicodeDirPath.normalize('NFD'),
       );
-      expect(workspaceContextNFD.isPathWithinWorkspace(pathInsideNFC)).toBe(true);
+      expect(workspaceContextNFD.isPathWithinWorkspace(pathInsideNFC)).toBe(
+        true,
+      );
 
       // Test a path outside the workspace
       const pathOutside = path.join(tempDir, '다른폴더', 'file.txt');

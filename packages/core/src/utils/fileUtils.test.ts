@@ -161,9 +161,15 @@ describe('fileUtils', () => {
       const pathInsideNFC = pathInside.normalize('NFC');
 
       expect(isWithinRoot(pathInsideNFC, rootNFD)).toBe(true);
-      expect(isWithinRoot(pathInside.normalize('NFD'), root.normalize('NFD'))).toBe(true);
-      expect(isWithinRoot(pathInside.normalize('NFC'), root.normalize('NFC'))).toBe(true);
-      expect(isWithinRoot(pathInside.normalize('NFD'), root.normalize('NFC'))).toBe(true);
+      expect(
+        isWithinRoot(pathInside.normalize('NFD'), root.normalize('NFD')),
+      ).toBe(true);
+      expect(
+        isWithinRoot(pathInside.normalize('NFC'), root.normalize('NFC')),
+      ).toBe(true);
+      expect(
+        isWithinRoot(pathInside.normalize('NFD'), root.normalize('NFC')),
+      ).toBe(true);
 
       const pathOutside = '/project/다른폴더/file.txt';
       expect(isWithinRoot(pathOutside, rootNFD)).toBe(false);

@@ -11,7 +11,6 @@ import * as process from 'node:process';
 import { debugLogger } from './debugLogger.js';
 import { normalizePath } from './paths.js';
 
-
 export type Unsubscribe = () => void;
 
 /**

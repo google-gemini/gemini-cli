@@ -9,7 +9,6 @@ import * as path from 'node:path';
 import ignore from 'ignore';
 import { normalizePath } from './paths.js';
 
-
 export interface GitIgnoreFilter {
   isIgnored(filePath: string): boolean;
 }
@@ -38,7 +37,9 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     const relativeBaseDir = isExcludeFile
       ? '.'
       : path
-          .dirname(path.relative(this.projectRoot, normalizePath(patternsFilePath)))
+          .dirname(
+            path.relative(this.projectRoot, normalizePath(patternsFilePath)),
+          )
           .split(path.sep)
           .join(path.posix.sep);
 
@@ -111,7 +112,10 @@ export class GitIgnoreParser implements GitIgnoreFilter {
 
     try {
       const resolved = path.resolve(this.projectRoot, filePath);
-      const relativePath = path.relative(this.projectRoot, normalizePath(resolved));
+      const relativePath = path.relative(
+        this.projectRoot,
+        normalizePath(resolved),
+      );
 
       if (relativePath === '' || relativePath.startsWith('..')) {
         return false;
