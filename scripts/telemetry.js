@@ -45,7 +45,7 @@ if (!settingsTarget) {
 }
 
 let target = settingsTarget || 'local';
-const allowedTargets = ['local', 'gcp'];
+const allowedTargets = ['local', 'gcp', 'genkit'];
 
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
 if (targetArg) {
@@ -65,11 +65,13 @@ if (targetArg) {
   );
 }
 
-const scriptPath = join(
-  projectRoot,
-  'scripts',
-  target === 'gcp' ? 'telemetry_gcp.js' : 'local_telemetry.js',
-);
+const targetScripts = {
+  gcp: 'telemetry_gcp.js',
+  local: 'local_telemetry.js',
+  genkit: 'telemetry_genkit.js',
+};
+
+const scriptPath = join(projectRoot, 'scripts', targetScripts[target]);
 
 try {
   console.log(`🚀 Running telemetry script for target: ${target}.`);
