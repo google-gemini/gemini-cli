@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
   ExtensionUpdateState,
@@ -204,7 +204,7 @@ export const useExtensionUpdates = (
           try {
             callback(nonNullResults);
           } catch (e) {
-            console.error(getErrorMessage(e));
+            debugLogger.warn(getErrorMessage(e));
           }
         });
       });
