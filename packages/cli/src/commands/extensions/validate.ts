@@ -60,7 +60,6 @@ async function validateExtension(args: ValidateArgs) {
         missingContextFiles.push(contextFilePath);
       }
     }
-    console.log(`These are the missing context files: ${missingContextFiles}`);
     if (missingContextFiles.length > 0) {
       debugLogger.error(
         'The following context files referenced in gemini-extension.json are missing:',
