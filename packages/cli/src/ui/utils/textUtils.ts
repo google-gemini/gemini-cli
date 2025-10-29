@@ -9,6 +9,31 @@ import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
 
+// Type definitions for Intl.Segmenter (ES2022+, Node.js 16+)
+// This is available in modern Node.js but TypeScript types may not include it
+declare global {
+  namespace Intl {
+    interface Segmenter {
+      segment(input: string): Segments;
+    }
+    interface SegmenterConstructor {
+      new (
+        locales?: string | string[],
+        options?: { granularity?: 'grapheme' | 'word' | 'sentence' },
+      ): Segmenter;
+    }
+    interface Segments {
+      [Symbol.iterator](): IterableIterator<SegmentData>;
+    }
+    interface SegmentData {
+      segment: string;
+      index: number;
+      input: string;
+    }
+    const Segmenter: SegmenterConstructor;
+  }
+}
+
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
  * @param asciiArt The ASCII art string.
@@ -24,15 +49,28 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
 
 /*
  * -------------------------------------------------------------------------
- *  Unicode‑aware helpers (work at the code‑point level rather than UTF‑16
- *  code units so that surrogate‑pair emoji count as one "column".)
+ *  Unicode‑aware helpers (work at the grapheme cluster level to properly
+ *  handle combining marks, emoji, and surrogate pairs)
  * ---------------------------------------------------------------------- */
 
-// Cache for code points to reduce GC pressure
-const codePointsCache = new Map<string, string[]>();
+// Cache for grapheme clusters to reduce GC pressure
+const graphemeCache = new Map<string, string[]>();
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 
-export function toCodePoints(str: string): string[] {
+/**
+ * Split a string into grapheme clusters (user-perceived characters).
+ * This properly handles:
+ * - Combining marks (e.g., 'é' = 'e' + combining acute)
+ * - Emoji with ZWJ sequences (e.g., family emoji)
+ * - Surrogate pairs
+ * - Regional indicator sequences (flags)
+ *
+ * Uses Intl.Segmenter (Node.js 16+) for accurate Unicode segmentation.
+ *
+ * @param str - The string to split into graphemes
+ * @returns An array of grapheme clusters
+ */
+export function toGraphemes(str: string): string[] {
   // ASCII fast path - check if all chars are ASCII (0-127)
   let isAscii = true;
   for (let i = 0; i < str.length; i++) {
@@ -47,29 +85,60 @@ export function toCodePoints(str: string): string[] {
 
   // Cache short strings
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
-    const cached = codePointsCache.get(str);
+    const cached = graphemeCache.get(str);
     if (cached) {
       return cached;
     }
   }
 
-  const result = Array.from(str);
+  // Use Intl.Segmenter for proper grapheme cluster segmentation
+  let result: string[];
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+    result = Array.from(segmenter.segment(str), (s) => s.segment);
+  } else {
+    // Fallback: Array.from handles surrogate pairs but not combining marks
+    result = Array.from(str);
+  }
 
   // Cache result (unlimited like Ink)
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
-    codePointsCache.set(str, result);
+    graphemeCache.set(str, result);
   }
 
   return result;
 }
 
-export function cpLen(str: string): number {
-  return toCodePoints(str).length;
+/**
+ * @deprecated Use toGraphemes instead for proper Unicode support.
+ * This function is kept for backward compatibility but may not handle
+ * all Unicode edge cases correctly.
+ */
+export function toCodePoints(str: string): string[] {
+  return toGraphemes(str);
 }
 
+/**
+ * Get the length of a string in grapheme clusters.
+ * This returns the number of user-perceived characters, not UTF-16 code units.
+ *
+ * @param str - The string to measure
+ * @returns The number of grapheme clusters
+ */
+export function cpLen(str: string): number {
+  return toGraphemes(str).length;
+}
+
+/**
+ * Slice a string by grapheme cluster indices.
+ *
+ * @param str - The string to slice
+ * @param start - The starting grapheme index
+ * @param end - The ending grapheme index (optional)
+ * @returns The sliced string
+ */
 export function cpSlice(str: string, start: number, end?: number): string {
-  // Slice by code‑point indices and re‑join.
-  const arr = toCodePoints(str).slice(start, end);
+  const arr = toGraphemes(str).slice(start, end);
   return arr.join('');
 }
 
@@ -146,6 +215,13 @@ export const getCachedStringWidth = (str: string): number => {
  */
 export const clearStringWidthCache = (): void => {
   stringWidthCache.clear();
+};
+
+/**
+ * Clear the grapheme cache (for testing purposes)
+ */
+export const clearGraphemeCache = (): void => {
+  graphemeCache.clear();
 };
 
 const regex = ansiRegex();

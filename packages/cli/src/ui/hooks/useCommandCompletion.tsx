@@ -10,7 +10,7 @@ import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { logicalPosToOffset } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
-import { toCodePoints } from '../utils/textUtils.js';
+import { toGraphemes } from '../utils/textUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import type { PromptCompletion } from './usePromptCompletion.js';
@@ -89,24 +89,24 @@ export function useCommandCompletion(
         };
       }
 
-      const codePoints = toCodePoints(currentLine);
+      const graphemes = toGraphemes(currentLine);
       for (let i = cursorCol - 1; i >= 0; i--) {
-        const char = codePoints[i];
+        const char = graphemes[i];
 
         if (char === ' ') {
           let backslashCount = 0;
-          for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          for (let j = i - 1; j >= 0 && graphemes[j] === '\\'; j--) {
             backslashCount++;
           }
           if (backslashCount % 2 === 0) {
             break;
           }
         } else if (char === '@') {
-          let end = codePoints.length;
-          for (let i = cursorCol; i < codePoints.length; i++) {
-            if (codePoints[i] === ' ') {
+          let end = graphemes.length;
+          for (let i = cursorCol; i < graphemes.length; i++) {
+            if (graphemes[i] === ' ') {
               let backslashCount = 0;
-              for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+              for (let j = i - 1; j >= 0 && graphemes[j] === '\\'; j--) {
                 backslashCount++;
               }
 
@@ -229,7 +229,7 @@ export function useCommandCompletion(
         }
       }
 
-      const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
+      const lineCodePoints = toGraphemes(buffer.lines[cursorRow] || '');
       const charAfterCompletion = lineCodePoints[end];
       if (
         charAfterCompletion !== ' ' &&

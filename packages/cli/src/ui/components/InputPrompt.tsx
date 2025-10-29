@@ -12,7 +12,7 @@ import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import { logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
+import { cpSlice, cpLen, toGraphemes } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -870,7 +870,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             let wordToProcess = word;
             while (stringWidth(wordToProcess) > inputWidth) {
               let part = '';
-              const wordCP = toCodePoints(wordToProcess);
+              const wordCP = toGraphemes(wordToProcess);
               let partWidth = 0;
               let splitIndex = 0;
               for (let i = 0; i < wordCP.length; i++) {
