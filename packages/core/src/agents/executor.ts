@@ -267,8 +267,27 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         terminate_reason: terminateReason,
       };
     } catch (error) {
+      // Check if the error is an AbortError caused by our internal timeout.
+      if (
+        error instanceof Error &&
+        error.name === 'AbortError' &&
+        timeoutController.signal.aborted &&
+        !signal.aborted // Ensure the external signal was not the cause
+      ) {
+        terminateReason = AgentTerminateMode.TIMEOUT;
+        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        this.emitActivity('ERROR', {
+          error: finalResult,
+          context: 'timeout',
+        });
+        return {
+          result: finalResult,
+          terminate_reason: terminateReason,
+        };
+      }
+
       this.emitActivity('ERROR', { error: String(error) });
-      throw error; // Re-throw the error for the parent context to handle.
+      throw error; // Re-throw other errors or external aborts.
     } finally {
       clearTimeout(timeoutId);
       logAgentFinish(
