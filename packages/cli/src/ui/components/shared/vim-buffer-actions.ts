@@ -22,7 +22,7 @@ import { assumeExhaustive } from '../../../utils/checks.js';
 
 // Check if we're at the end of a base word (on the last base character)
 // Returns true if current position has a base character followed only by combining marks until non-word
-function isAtEndOfBaseWord(lineCodePoints: string[], col: number): boolean {
+function isAtEndOfBaseWord(lineGraphemes: string[], col: number): boolean {
   if (!isWordCharStrict(lineGraphemes[col])) return false;
 
   // Look ahead to see if we have only combining marks followed by non-word
@@ -581,7 +581,7 @@ export function handleVimAction(
               !isWordCharWithCombining(lineGraphemes[col + 1]) ||
               // Or if we're on a base char followed only by combining marks until non-word
               (isWordCharStrict(lineGraphemes[col]) &&
-                isAtEndOfBaseWord(lineCodePoints, col)));
+                isAtEndOfBaseWord(lineGraphemes, col)));
 
           if (atEndOfWord) {
             // We're already at end of word, find next word end
