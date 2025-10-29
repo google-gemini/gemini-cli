@@ -49,6 +49,7 @@ import type {
   TaskMetadata,
   Thought,
   ThoughtSummary,
+  Citation,
 } from '../types.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
 
@@ -638,6 +639,10 @@ export class Task {
         logger.info('[Task] Sending agent thought...');
         this._sendThought(event.value, traceId);
         break;
+      case GeminiEventType.Citation:
+        logger.info('[Task] Received citation from LLM stream.');
+        this._sendCitation(event.value);
+        break;
       case GeminiEventType.ChatCompressed:
         break;
       case GeminiEventType.Finished:
@@ -977,6 +982,20 @@ export class Task {
         undefined,
         traceId,
       ),
+    );
+  }
+
+  _sendCitation(citation: string) {
+    if (!citation || citation.trim() === '') {
+      return;
+    }
+    logger.info('[Task] Sending citation to event bus.');
+    const message = this._createTextMessage(citation);
+    const citationEvent: Citation = {
+      kind: CoderAgentEvent.CitationEvent,
+    };
+    this.eventBus?.publish(
+      this._createStatusUpdateEvent(this.taskState, citationEvent, message),
     );
   }
 }

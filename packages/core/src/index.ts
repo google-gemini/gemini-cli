@@ -29,6 +29,7 @@ export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
 export * from './core/nonInteractiveToolExecutor.js';
+export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
 
@@ -66,6 +67,7 @@ export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
 export * from './utils/debugLogger.js';
 export * from './utils/events.js';
+export * from './utils/extensionLoader.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
