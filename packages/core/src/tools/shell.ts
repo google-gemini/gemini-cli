@@ -60,8 +60,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     params: ShellToolParams,
     private readonly allowlist: Set<string>,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -451,12 +453,16 @@ export class ShellTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: ShellToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.config,
       params,
       this.allowlist,
       messageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }
