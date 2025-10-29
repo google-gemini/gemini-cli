@@ -870,11 +870,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             let wordToProcess = word;
             while (stringWidth(wordToProcess) > inputWidth) {
               let part = '';
-              const wordCP = toGraphemes(wordToProcess);
+              const wordGraphemes = toGraphemes(wordToProcess);
               let partWidth = 0;
               let splitIndex = 0;
-              for (let i = 0; i < wordCP.length; i++) {
-                const char = wordCP[i];
+              for (let i = 0; i < wordGraphemes.length; i++) {
+                const char = wordGraphemes[i];
                 const charWidth = stringWidth(char);
                 if (partWidth + charWidth > inputWidth) {
                   break;

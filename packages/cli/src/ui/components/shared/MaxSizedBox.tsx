@@ -571,12 +571,12 @@ function layoutInkElementAsStyledText(
 
         if (wordWidth > availableWidth) {
           // Word is too long, needs to be split across lines
-          const wordAsCodePoints = toGraphemes(word);
-          let remainingWordAsCodePoints = wordAsCodePoints;
-          while (remainingWordAsCodePoints.length > 0) {
+          const wordAsGraphemes = toGraphemes(word);
+          let remainingWordAsGraphemes = wordAsGraphemes;
+          while (remainingWordAsGraphemes.length > 0) {
             let splitIndex = 0;
             let currentSplitWidth = 0;
-            for (const char of remainingWordAsCodePoints) {
+            for (const char of remainingWordAsGraphemes) {
               const charWidth = stringWidth(char);
               if (
                 wrappingPartWidth + currentSplitWidth + charWidth >
@@ -589,16 +589,16 @@ function layoutInkElementAsStyledText(
             }
 
             if (splitIndex > 0) {
-              const part = remainingWordAsCodePoints
+              const part = remainingWordAsGraphemes
                 .slice(0, splitIndex)
                 .join('');
               addToWrappingPart(part, segment.props);
               wrappingPartWidth += stringWidth(part);
-              remainingWordAsCodePoints =
-                remainingWordAsCodePoints.slice(splitIndex);
+              remainingWordAsGraphemes =
+                remainingWordAsGraphemes.slice(splitIndex);
             }
 
-            if (remainingWordAsCodePoints.length > 0) {
+            if (remainingWordAsGraphemes.length > 0) {
               addWrappingPartToLines();
             }
           }

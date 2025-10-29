@@ -229,8 +229,8 @@ export function useCommandCompletion(
         }
       }
 
-      const lineCodePoints = toGraphemes(buffer.lines[cursorRow] || '');
-      const charAfterCompletion = lineCodePoints[end];
+      const lineGraphemes = toGraphemes(buffer.lines[cursorRow] || '');
+      const charAfterCompletion = lineGraphemes[end];
       if (
         charAfterCompletion !== ' ' &&
         !suggestionText.endsWith('/') &&

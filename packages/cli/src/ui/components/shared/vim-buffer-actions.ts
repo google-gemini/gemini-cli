@@ -23,18 +23,18 @@ import { assumeExhaustive } from '../../../utils/checks.js';
 // Check if we're at the end of a base word (on the last base character)
 // Returns true if current position has a base character followed only by combining marks until non-word
 function isAtEndOfBaseWord(lineCodePoints: string[], col: number): boolean {
-  if (!isWordCharStrict(lineCodePoints[col])) return false;
+  if (!isWordCharStrict(lineGraphemes[col])) return false;
 
   // Look ahead to see if we have only combining marks followed by non-word
   let i = col + 1;
 
   // Skip any combining marks
-  while (i < lineCodePoints.length && isCombiningMark(lineCodePoints[i])) {
+  while (i < lineGraphemes.length && isCombiningMark(lineGraphemes[i])) {
     i++;
   }
 
   // If we hit end of line or non-word character, we were at end of base word
-  return i >= lineCodePoints.length || !isWordCharStrict(lineCodePoints[i]);
+  return i >= lineGraphemes.length || !isWordCharStrict(lineGraphemes[i]);
 }
 
 export type VimAction = Extract<
@@ -454,10 +454,10 @@ export function handleVimAction(
           newCol++;
 
           // Skip over combining marks - don't let cursor land on them
-          const currentLinePoints = toGraphemes(currentLine);
+          const currentLineGraphemes = toGraphemes(currentLine);
           while (
-            newCol < currentLinePoints.length &&
-            isCombiningMark(currentLinePoints[newCol]) &&
+            newCol < currentLineGraphemes.length &&
+            isCombiningMark(currentLineGraphemes[newCol]) &&
             newCol < lineLength - 1
           ) {
             newCol++;
@@ -571,16 +571,16 @@ export function handleVimAction(
         // Special handling for the first iteration when we're at end of word
         if (i === 0) {
           const currentLine = lines[row] || '';
-          const lineCodePoints = toGraphemes(currentLine);
+          const lineGraphemes = toGraphemes(currentLine);
 
           // Check if we're at the end of a word (on the last base character)
           const atEndOfWord =
-            col < lineCodePoints.length &&
-            isWordCharStrict(lineCodePoints[col]) &&
-            (col + 1 >= lineCodePoints.length ||
-              !isWordCharWithCombining(lineCodePoints[col + 1]) ||
+            col < lineGraphemes.length &&
+            isWordCharStrict(lineGraphemes[col]) &&
+            (col + 1 >= lineGraphemes.length ||
+              !isWordCharWithCombining(lineGraphemes[col + 1]) ||
               // Or if we're on a base char followed only by combining marks until non-word
-              (isWordCharStrict(lineCodePoints[col]) &&
+              (isWordCharStrict(lineGraphemes[col]) &&
                 isAtEndOfBaseWord(lineCodePoints, col)));
 
           if (atEndOfWord) {
@@ -709,8 +709,8 @@ export function handleVimAction(
       let col = 0;
 
       // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = toGraphemes(currentLine);
-      while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
+      const lineGraphemes = toGraphemes(currentLine);
+      while (col < lineGraphemes.length && /\s/.test(lineGraphemes[col])) {
         col++;
       }
 
@@ -746,8 +746,8 @@ export function handleVimAction(
       let col = 0;
 
       // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = toGraphemes(currentLine);
-      while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
+      const lineGraphemes = toGraphemes(currentLine);
+      while (col < lineGraphemes.length && /\s/.test(lineGraphemes[col])) {
         col++;
       }
 
