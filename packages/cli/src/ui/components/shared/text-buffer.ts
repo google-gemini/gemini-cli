@@ -39,13 +39,15 @@ function isWordChar(ch: string | undefined): boolean {
 }
 
 // Helper functions for line-based word navigation
+// Note: These now work with grapheme clusters, not individual code points
 export const isWordCharStrict = (char: string): boolean =>
-  /[\w\p{L}\p{N}]/u.test(char); // Matches a single character that is any Unicode letter, any Unicode number, or an underscore
+  /^[\w\p{L}\p{N}]$/u.test(char); // Anchored: matches only if entire string is a single word character
 
-export const isWhitespace = (char: string): boolean => /\s/.test(char);
+export const isWhitespace = (char: string): boolean => /^\s$/u.test(char);
 
-// Check if a character is a combining mark (only diacritics for now)
-export const isCombiningMark = (char: string): boolean => /\p{M}/u.test(char);
+// Check if a grapheme is a combining mark (only diacritics for now)
+// Note: This checks if the entire grapheme IS a combining mark, not if it CONTAINS one
+export const isCombiningMark = (char: string): boolean => /^\p{M}$/u.test(char);
 
 // Check if a character should be considered part of a word (including combining marks)
 export const isWordCharWithCombining = (char: string): boolean =>
