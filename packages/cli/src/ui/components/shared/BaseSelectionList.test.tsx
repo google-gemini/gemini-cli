@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import {
   BaseSelectionList,
@@ -301,7 +298,7 @@ describe('BaseSelectionList', () => {
 
         rerender(<BaseSelectionList {...componentProps} />);
 
-        await waitFor(() => {
+        await vi.waitFor(() => {
           expect(lastFrame()).toBeTruthy();
         });
       };
@@ -325,7 +322,7 @@ describe('BaseSelectionList', () => {
       // New visible window should be Items 2, 3, 4 (scroll offset 1).
       await updateActiveIndex(3);
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         expect(output).not.toContain('Item 1');
         expect(output).toContain('Item 2');
@@ -339,7 +336,7 @@ describe('BaseSelectionList', () => {
 
       await updateActiveIndex(4);
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         expect(output).toContain('Item 3'); // Should see items 3, 4, 5
         expect(output).toContain('Item 5');
@@ -350,7 +347,7 @@ describe('BaseSelectionList', () => {
       // This should trigger scroll up to show items 2, 3, 4
       await updateActiveIndex(1);
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         expect(output).toContain('Item 2');
         expect(output).toContain('Item 4');
@@ -364,7 +361,7 @@ describe('BaseSelectionList', () => {
       // Visible items: 8, 9, 10.
       const { lastFrame } = renderScrollableList(9);
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         expect(output).toContain('Item 10');
         expect(output).toContain('Item 8');
@@ -383,14 +380,14 @@ describe('BaseSelectionList', () => {
       expect(lastFrame()).toContain('Item 1');
 
       await updateActiveIndex(3); // Should trigger scroll
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         expect(output).toContain('Item 2');
         expect(output).toContain('Item 4');
         expect(output).not.toContain('Item 1');
       });
       await updateActiveIndex(5); // Scroll further
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         expect(output).toContain('Item 4');
         expect(output).toContain('Item 6');
@@ -417,7 +414,7 @@ describe('BaseSelectionList', () => {
     it('should correctly identify the selected item when scrolled (high index)', async () => {
       renderScrollableList(5);
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         // Item 6 (index 5) should be selected
         expect(mockRenderItem).toHaveBeenCalledWith(
           expect.objectContaining({ value: 'Item 6' }),
@@ -475,7 +472,7 @@ describe('BaseSelectionList', () => {
         0,
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         // At the top, should show first 3 items
         expect(output).toContain('Item 1');
@@ -493,7 +490,7 @@ describe('BaseSelectionList', () => {
         5,
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         // After scrolling to middle, should see items around index 5
         expect(output).toContain('Item 4');
@@ -512,7 +509,7 @@ describe('BaseSelectionList', () => {
         9,
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         const output = lastFrame();
         // At the end, should show last 3 items
         expect(output).toContain('Item 8');

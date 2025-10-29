@@ -255,7 +255,10 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
+  // Original fake responses file path for rewriting goldens in record mode.
+  originalFakeResponsesPath?: string;
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -275,7 +278,10 @@ export class TestRig {
     mkdirSync(this.testDir, { recursive: true });
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
-      fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      this.originalFakeResponsesPath = options.fakeResponsesPath;
+      if (process.env['REGENERATE_MODEL_GOLDENS'] !== 'true') {
+        fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      }
     }
 
     // Create a settings file to point the CLI to the local collector
@@ -344,7 +350,11 @@ export class TestRig {
       ? extraInitialArgs
       : [this.bundlePath, ...extraInitialArgs];
     if (this.fakeResponsesPath) {
-      initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
+        initialArgs.push('--record-responses', this.fakeResponsesPath);
+      } else {
+        initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      }
     }
     return { command, initialArgs };
   }
@@ -555,6 +565,12 @@ export class TestRig {
   }
 
   async cleanup() {
+    if (
+      process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
+      this.fakeResponsesPath
+    ) {
+      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
+    }
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {

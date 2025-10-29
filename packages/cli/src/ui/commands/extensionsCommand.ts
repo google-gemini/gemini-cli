@@ -13,6 +13,8 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import open from 'open';
+import process from 'node:process';
 
 async function listAction(context: CommandContext) {
   const historyItem: HistoryItemExtensionsList = {
@@ -112,6 +114,51 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
   return updateComplete.then((_) => {});
 }
 
+async function exploreAction(context: CommandContext) {
+  const extensionsUrl = 'https://geminicli.com/extensions/';
+
+  // Only check for NODE_ENV for explicit test mode, not for unit test framework
+  if (process.env['NODE_ENV'] === 'test') {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
+      },
+      Date.now(),
+    );
+  } else if (
+    process.env['SANDBOX'] &&
+    process.env['SANDBOX'] !== 'sandbox-exec'
+  ) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `View available extensions at ${extensionsUrl}`,
+      },
+      Date.now(),
+    );
+  } else {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Opening extensions page in your browser: ${extensionsUrl}`,
+      },
+      Date.now(),
+    );
+    try {
+      await open(extensionsUrl);
+    } catch (_error) {
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
+        },
+        Date.now(),
+      );
+    }
+  }
+}
+
 const listExtensionsCommand: SlashCommand = {
   name: 'list',
   description: 'List active extensions',
@@ -141,11 +188,22 @@ const updateExtensionsCommand: SlashCommand = {
   },
 };
 
+const exploreExtensionsCommand: SlashCommand = {
+  name: 'explore',
+  description: 'Open extensions page in your browser',
+  kind: CommandKind.BUILT_IN,
+  action: exploreAction,
+};
+
 export const extensionsCommand: SlashCommand = {
   name: 'extensions',
   description: 'Manage extensions',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listExtensionsCommand, updateExtensionsCommand],
+  subCommands: [
+    listExtensionsCommand,
+    updateExtensionsCommand,
+    exploreExtensionsCommand,
+  ],
   action: (context, args) =>
     // Default to list if no subcommand is provided
     listExtensionsCommand.action!(context, args),

@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import {
   vi,
   describe,
@@ -15,7 +13,8 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import {
   type Config,
   type FallbackModelHandler,

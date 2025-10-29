@@ -34,7 +34,7 @@ const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
   return (
     <Box flexDirection="row" columnGap={2} height={1}>
       <Text color={theme.text.primary} bold aria-label="Todo list">
-        📝 Todo
+        Todo
       </Text>
       <Text color={theme.text.secondary}>{score} (ctrl+t to toggle)</Text>
     </Box>

@@ -50,7 +50,7 @@ describe('keyMatchers', () => {
     [Command.OPEN_EXTERNAL_EDITOR]: (key: Key) =>
       key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
     [Command.PASTE_CLIPBOARD_IMAGE]: (key: Key) => key.ctrl && key.name === 'v',
-    [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.ctrl && key.name === 'o',
+    [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.name === 'f12',
     [Command.SHOW_FULL_TODOS]: (key: Key) => key.ctrl && key.name === 't',
     [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
       key.ctrl && key.name === 'g',
@@ -212,8 +212,8 @@ describe('keyMatchers', () => {
     // App level bindings
     {
       command: Command.SHOW_ERROR_DETAILS,
-      positive: [createKey('o', { ctrl: true })],
-      negative: [createKey('o'), createKey('e', { ctrl: true })],
+      positive: [createKey('f12')],
+      negative: [createKey('o', { ctrl: true }), createKey('f11')],
     },
     {
       command: Command.SHOW_FULL_TODOS,

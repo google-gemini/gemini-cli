@@ -67,8 +67,8 @@ import {
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { ExtensionManager } from './config/extension-manager.js';
-import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { createPolicyUpdater } from './config/policy.js';
+import { requestConsentNonInteractive } from './config/extensions/consent.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -230,7 +230,7 @@ export async function main() {
     // Temporary extension manager only used during this non-interactive UI phase.
     new ExtensionManager({
       workspaceDir: process.cwd(),
-      loadedSettings: settings,
+      settings: settings.merged,
       enabledExtensionOverrides: [],
       requestConsent: requestConsentNonInteractive,
       requestSetting: null,
@@ -299,7 +299,6 @@ export async function main() {
     if (sandboxConfig) {
       const partialConfig = await loadCliConfig(
         settings.merged,
-        [],
         sessionId,
         argv,
       );
@@ -370,23 +369,7 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    // Eventually, `extensions` should move off of `config` entirely and into
-    // the UI state instead.
-    const extensionManager = new ExtensionManager({
-      loadedSettings: settings,
-      workspaceDir: process.cwd(),
-      // At this stage, we still don't have an interactive UI.
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: null,
-      enabledExtensionOverrides: argv.extensions,
-    });
-    const extensions = extensionManager.loadExtensions();
-    const config = await loadCliConfig(
-      settings.merged,
-      extensions,
-      sessionId,
-      argv,
-    );
+    const config = await loadCliConfig(settings.merged, sessionId, argv);
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
@@ -397,7 +380,7 @@ export async function main() {
 
     if (config.getListExtensions()) {
       debugLogger.log('Installed extensions:');
-      for (const extension of extensions) {
+      for (const extension of config.getExtensions()) {
         debugLogger.log(`- ${extension.name}`);
       }
       process.exit(0);
@@ -434,7 +417,7 @@ export async function main() {
     }
 
     if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, extensions, argv);
+      return runZedIntegration(config, settings, argv);
     }
 
     let input = config.getQuestion();

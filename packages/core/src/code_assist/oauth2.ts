@@ -185,7 +185,7 @@ async function initOauthClient(
     for (let i = 0; !success && i < maxRetries; i++) {
       success = await authWithUserCode(client);
       if (!success) {
-        console.error(
+        debugLogger.error(
           '\nFailed to authenticate with user code.',
           i === maxRetries - 1 ? '' : 'Retrying...\n',
         );
@@ -215,17 +215,17 @@ async function initOauthClient(
       // in a minimal Docker container), it will emit an unhandled 'error' event,
       // causing the entire Node.js process to crash.
       childProcess.on('error', (error) => {
-        console.error(
-          'Failed to open browser automatically. Please try running again with NO_BROWSER=true set.',
+        debugLogger.error(
+          `Failed to open browser with error:`,
+          getErrorMessage(error),
+          `\nPlease try running again with NO_BROWSER=true set.`,
         );
-        console.error('Browser error details:', getErrorMessage(error));
       });
     } catch (err) {
-      console.error(
-        'An unexpected error occurred while trying to open the browser:',
+      debugLogger.error(
+        `Failed to open browser with error:`,
         getErrorMessage(err),
-        '\nThis might be due to browser compatibility issues or system configuration.',
-        '\nPlease try running again with NO_BROWSER=true set for manual authentication.',
+        `\nPlease try running again with NO_BROWSER=true set.`,
       );
       throw new FatalAuthenticationError(
         `Failed to open browser: ${getErrorMessage(err)}`,
@@ -293,7 +293,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   });
 
   if (!code) {
-    console.error('Authorization code is required.');
+    debugLogger.error('Authorization code is required.');
     return false;
   }
 
@@ -305,7 +305,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     });
     client.setCredentials(tokens);
   } catch (error) {
-    console.error(
+    debugLogger.error(
       'Failed to authenticate with authorization code:',
       getErrorMessage(error),
     );
@@ -528,7 +528,7 @@ export async function clearCachedCredentialFile() {
     // Clear the in-memory OAuth client cache to force re-authentication
     clearOauthClientCache();
   } catch (e) {
-    console.error('Failed to clear cached credentials:', e);
+    debugLogger.warn('Failed to clear cached credentials:', e);
   }
 }
 
@@ -549,7 +549,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
     );
 
     if (!response.ok) {
-      console.error(
+      debugLogger.log(
         'Failed to fetch user info:',
         response.status,
         response.statusText,
@@ -560,7 +560,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
     const userInfo = await response.json();
     await userAccountManager.cacheGoogleAccount(userInfo.email);
   } catch (error) {
-    console.error('Error retrieving user info:', error);
+    debugLogger.log('Error retrieving user info:', error);
   }
 }
 

@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
-/// <reference types="vitest/globals" />
-
 import {
   describe,
   it,
@@ -17,7 +13,8 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { usePermissionsModifyTrust } from './usePermissionsModifyTrust.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import type { LoadedSettings } from '../../config/settings.js';

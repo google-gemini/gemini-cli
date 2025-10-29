@@ -4,16 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { act, useState } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import type { Config, FileSearch } from '@google/gemini-cli-core';
 import { FileSearchFactory } from '@google/gemini-cli-core';
 import type { FileSystemStructure } from '@google/gemini-cli-test-utils';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
-import { useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test harness to capture the state from the hook's callbacks.
@@ -76,7 +74,7 @@ describe('useAtCompletion', () => {
         useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.length).toBeGreaterThan(0);
       });
 
@@ -106,7 +104,7 @@ describe('useAtCompletion', () => {
         useTestHarnessForAtCompletion(true, 'src/', mockConfig, testRootDir),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.length).toBeGreaterThan(0);
       });
 
@@ -129,7 +127,7 @@ describe('useAtCompletion', () => {
         useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.length).toBeGreaterThan(0);
       });
 
@@ -166,7 +164,7 @@ describe('useAtCompletion', () => {
       );
 
       // The hook should find 'cRaZycAsE.txt' even though the pattern is 'CrAzYCaSe'.
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'cRaZycAsE.txt',
         ]);
@@ -177,15 +175,29 @@ describe('useAtCompletion', () => {
   describe('UI State and Loading Behavior', () => {
     it('should be in a loading state during initial file system crawl', async () => {
       testRootDir = await createTmpDir({});
+
+      // Mock FileSearch to be slow to catch the loading state
+      const mockFileSearch = {
+        initialize: vi.fn().mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }),
+        search: vi.fn().mockResolvedValue([]),
+      };
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(
+        mockFileSearch as unknown as FileSearch,
+      );
+
       const { result } = renderHook(() =>
         useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
       // It's initially true because the effect runs synchronously.
-      expect(result.current.isLoadingSuggestions).toBe(true);
+      await vi.waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(true);
+      });
 
       // Wait for the loading to complete.
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
     });
@@ -200,7 +212,7 @@ describe('useAtCompletion', () => {
         { initialProps: { pattern: 'a' } },
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'a.txt',
         ]);
@@ -210,7 +222,7 @@ describe('useAtCompletion', () => {
       rerender({ pattern: 'b' });
 
       // Wait for the final result
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'b.txt',
         ]);
@@ -253,7 +265,7 @@ describe('useAtCompletion', () => {
       );
 
       // Wait for the initial search to complete (using real timers)
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'a.txt',
         ]);
@@ -283,7 +295,7 @@ describe('useAtCompletion', () => {
       vi.useRealTimers();
 
       // Wait for the search results to be processed
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'b.txt',
         ]);
@@ -314,7 +326,7 @@ describe('useAtCompletion', () => {
       );
 
       // Wait for the hook to be ready (initialization is complete)
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(mockFileSearch.search).toHaveBeenCalledWith(
           'a',
           expect.any(Object),
@@ -330,7 +342,7 @@ describe('useAtCompletion', () => {
       expect(abortSpy).toHaveBeenCalledTimes(1);
 
       // Wait for the final result, which should be from the second, faster search.
-      await waitFor(
+      await vi.waitFor(
         () => {
           expect(result.current.suggestions.map((s) => s.value)).toEqual(['b']);
         },
@@ -357,7 +369,7 @@ describe('useAtCompletion', () => {
       );
 
       // Wait for the hook to be ready and have suggestions
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'a.txt',
         ]);
@@ -389,7 +401,7 @@ describe('useAtCompletion', () => {
       );
 
       // Wait for the hook to enter the error state
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
       expect(result.current.suggestions).toEqual([]); // No suggestions on error
@@ -420,7 +432,7 @@ describe('useAtCompletion', () => {
         useTestHarnessForAtCompletion(true, '', mockConfig, testRootDir),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.length).toBeGreaterThan(0);
       });
 
@@ -441,7 +453,7 @@ describe('useAtCompletion', () => {
         useTestHarnessForAtCompletion(true, '', undefined, testRootDir),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.length).toBeGreaterThan(0);
       });
 
@@ -469,7 +481,7 @@ describe('useAtCompletion', () => {
       );
 
       // Wait for initial suggestions from the first directory
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'file1.txt',
         ]);
@@ -481,13 +493,13 @@ describe('useAtCompletion', () => {
       });
 
       // After CWD changes, suggestions should be cleared and it should load again.
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.isLoadingSuggestions).toBe(true);
         expect(result.current.suggestions).toEqual([]);
       });
 
       // Wait for the new suggestions from the second directory
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'file2.txt',
         ]);
@@ -525,7 +537,7 @@ describe('useAtCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions.length).toBeGreaterThan(0);
       });
 
