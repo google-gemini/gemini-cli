@@ -58,6 +58,7 @@ const createMockSettings = (
 describe('ThemeDialog Snapshots', () => {
   const baseProps = {
     onSelect: vi.fn(),
+    onCancel: vi.fn(),
     onHighlight: vi.fn(),
     availableTerminalHeight: 40,
     terminalWidth: 120,
@@ -104,5 +105,29 @@ describe('ThemeDialog Snapshots', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('should call onCancel when ESC is pressed', async () => {
+    const mockOnCancel = vi.fn();
+    const settings = createMockSettings();
+    const { stdin } = render(
+      <SettingsContext.Provider value={settings}>
+        <KeypressProvider kittyProtocolEnabled={false}>
+          <ThemeDialog
+            {...baseProps}
+            onCancel={mockOnCancel}
+            settings={settings}
+          />
+        </KeypressProvider>
+      </SettingsContext.Provider>,
+    );
+
+    act(() => {
+      stdin.write('\x1b');
+    });
+
+    await vi.waitFor(() => {
+      expect(mockOnCancel).toHaveBeenCalled();
+    });
   });
 });

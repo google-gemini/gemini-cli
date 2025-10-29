@@ -20,7 +20,16 @@ describe('Interactive file system', () => {
 
   it('should perform a read-then-write sequence', async () => {
     const fileName = 'version.txt';
-    rig.setup('interactive-read-then-write');
+    await rig.setup('interactive-read-then-write', {
+      settings: {
+        security: {
+          auth: {
+            selectedType: 'gemini-api-key',
+          },
+          disableYoloMode: false,
+        },
+      },
+    });
     rig.createFile(fileName, '1.0.0');
 
     const run = await rig.runInteractive();
@@ -44,5 +53,8 @@ describe('Interactive file system', () => {
       30000,
       (args) => args.includes('1.0.1') && args.includes(fileName),
     );
+
+    // Wait for telemetry to flush and file system to sync, especially in sandboxed environments
+    await rig.waitForTelemetryReady();
   });
 });

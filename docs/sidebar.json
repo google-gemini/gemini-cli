@@ -9,6 +9,10 @@
       {
         "label": "Architecture Overview",
         "slug": "docs/architecture"
+      },
+      {
+        "label": "Contribution Guide",
+        "slug": "docs/contributing"
       }
     ]
   },
@@ -145,6 +149,10 @@
       {
         "label": "Memory",
         "slug": "docs/tools/memory"
+      },
+      {
+        "label": "Todos",
+        "slug": "docs/tools/todos"
       },
       {
         "label": "MCP Servers",

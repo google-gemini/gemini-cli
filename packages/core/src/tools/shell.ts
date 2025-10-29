@@ -9,6 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
+import type { AnyToolInvocation } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -36,11 +37,11 @@ import {
   getCommandRoots,
   initializeShellParsers,
   isCommandAllowed,
-  SHELL_TOOL_NAMES,
+  isShellInvocationAllowlisted,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
-import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -58,8 +59,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: ShellToolParams,
     private readonly allowlist: Set<string>,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -76,7 +80,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
-  override async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
@@ -90,9 +94,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       !this.config.isInteractive() &&
       this.config.getApprovalMode() !== ApprovalMode.YOLO
     ) {
-      const allowedTools = this.config.getAllowedTools() || [];
-      const [SHELL_TOOL_NAME] = SHELL_TOOL_NAMES;
-      if (doesToolInvocationMatch(SHELL_TOOL_NAME, command, allowedTools)) {
+      if (this.isInvocationAllowlisted(command)) {
         // If it's an allowed shell command, we don't need to confirm execution.
         return false;
       }
@@ -324,6 +326,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
     }
   }
+
+  private isInvocationAllowlisted(command: string): boolean {
+    const allowedTools = this.config.getAllowedTools() || [];
+    if (allowedTools.length === 0) {
+      return false;
+    }
+
+    const invocation = { params: { command } } as unknown as AnyToolInvocation;
+    return isShellInvocationAllowlisted(invocation, allowedTools);
+  }
 }
 
 function getShellToolDescription(): string {
@@ -360,14 +372,19 @@ export class ShellTool extends BaseDeclarativeTool<
   ShellToolParams,
   ToolResult
 > {
+  static readonly Name = SHELL_TOOL_NAME;
+
   private allowlist: Set<string> = new Set();
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
     super(
-      SHELL_TOOL_NAME,
+      ShellTool.Name,
       'Shell',
       getShellToolDescription(),
       Kind.Execute,
@@ -393,6 +410,7 @@ export class ShellTool extends BaseDeclarativeTool<
       },
       false, // output is not markdown
       true, // output can be updated
+      messageBus,
     );
   }
 
@@ -434,7 +452,17 @@ export class ShellTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ShellToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
-    return new ShellToolInvocation(this.config, params, this.allowlist);
+    return new ShellToolInvocation(
+      this.config,
+      params,
+      this.allowlist,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
+import process from 'node:process';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -48,8 +50,11 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: ReadFileToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -136,9 +141,14 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ReadFileToolParams,
   ToolResult
 > {
-  constructor(private config: Config) {
+  static readonly Name = READ_FILE_TOOL_NAME;
+
+  constructor(
+    private config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
-      READ_FILE_TOOL_NAME,
+      ReadFileTool.Name,
       'ReadFile',
       `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
       Kind.Read,
@@ -146,7 +156,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
         properties: {
           absolute_path: {
             description:
-              "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+              process.platform === 'win32'
+                ? "The absolute path to the file to read (e.g., 'C:\\Users\\project\\file.txt'). Relative paths are not supported. You must provide an absolute path."
+                : "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
             type: 'string',
           },
           offset: {
@@ -163,6 +175,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
         required: ['absolute_path'],
         type: 'object',
       },
+      true,
+      false,
+      messageBus,
     );
   }
 
@@ -198,8 +213,11 @@ export class ReadFileTool extends BaseDeclarativeTool<
     }
 
     const fileService = this.config.getFileService();
-    if (fileService.shouldGeminiIgnoreFile(params.absolute_path)) {
-      return `File path '${filePath}' is ignored by .geminiignore pattern(s).`;
+    const fileFilteringOptions = this.config.getFileFilteringOptions();
+    if (
+      fileService.shouldIgnoreFile(params.absolute_path, fileFilteringOptions)
+    ) {
+      return `File path '${filePath}' is ignored by configured ignore patterns.`;
     }
 
     return null;
@@ -207,7 +225,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ReadFileToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ReadFileToolParams, ToolResult> {
-    return new ReadFileToolInvocation(this.config, params);
+    return new ReadFileToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

@@ -10,6 +10,7 @@ import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
+  BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
@@ -19,6 +20,7 @@ import {
   type ToolResult,
   type ToolResultDisplay,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
@@ -39,6 +41,7 @@ import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
 import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -368,13 +371,21 @@ interface CalculatedEdit {
   originalLineEnding: '\r\n' | '\n';
 }
 
-class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
+class EditToolInvocation
+  extends BaseToolInvocation<EditToolParams, ToolResult>
+  implements ToolInvocation<EditToolParams, ToolResult>
+{
   constructor(
     private readonly config: Config,
-    public params: EditToolParams,
-  ) {}
+    params: EditToolParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
+  ) {
+    super(params, messageBus, toolName, displayName);
+  }
 
-  toolLocations(): ToolLocation[] {
+  override toolLocations(): ToolLocation[] {
     return [{ path: this.params.file_path }];
   }
 
@@ -601,7 +612,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
    * Handles the confirmation prompt for the Edit tool in the CLI.
    * It needs to calculate the diff to show the user.
    */
-  async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
@@ -616,12 +627,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         throw error;
       }
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.log(`Error preparing edit: ${errorMsg}`);
+      debugLogger.log(`Error preparing edit: ${errorMsg}`);
       return false;
     }
 
     if (editData.error) {
-      console.log(`Error: ${editData.error.display}`);
+      debugLogger.log(`Error: ${editData.error.display}`);
       return false;
     }
 
@@ -815,9 +826,14 @@ export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  constructor(private readonly config: Config) {
+  static readonly Name = EDIT_TOOL_NAME;
+
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
-      EDIT_TOOL_NAME,
+      SmartEditTool.Name,
       'Edit',
       `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
@@ -872,6 +888,9 @@ A good instruction should concisely answer:
         required: ['file_path', 'instruction', 'old_string', 'new_string'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -911,7 +930,13 @@ A good instruction should concisely answer:
   protected createInvocation(
     params: EditToolParams,
   ): ToolInvocation<EditToolParams, ToolResult> {
-    return new EditToolInvocation(this.config, params);
+    return new EditToolInvocation(
+      this.config,
+      params,
+      this.messageBus,
+      this.name,
+      this.displayName,
+    );
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {
