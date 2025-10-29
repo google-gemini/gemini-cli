@@ -13,7 +13,8 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import {
   type Config,
   type FallbackModelHandler,
@@ -22,6 +23,7 @@ import {
   TerminalQuotaError,
   makeFakeConfig,
   type GoogleApiError,
+  RetryableQuotaError,
 } from '@google/gemini-cli-core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -129,31 +131,62 @@ describe('useQuotaAndFallback', () => {
     describe('Automatic Fallback Scenarios', () => {
       const testCases = [
         {
-          errorType: 'other',
+          description: 'other error for FREE tier',
           tier: UserTierId.FREE,
+          error: new Error('some error'),
           expectedMessageSnippets: [
             'Automatically switching from model-A to model-B for faster responses',
             'upgrade to a Gemini Code Assist Standard or Enterprise plan',
           ],
         },
         {
-          errorType: 'other',
+          description: 'other error for LEGACY tier',
           tier: UserTierId.LEGACY, // Paid tier
+          error: new Error('some error'),
           expectedMessageSnippets: [
             'Automatically switching from model-A to model-B for faster responses',
             'switch to using a paid API key from AI Studio',
           ],
         },
+        {
+          description: 'retryable quota error for FREE tier',
+          tier: UserTierId.FREE,
+          error: new RetryableQuotaError(
+            'retryable quota',
+            mockGoogleApiError,
+            5,
+          ),
+          expectedMessageSnippets: [
+            'Your requests are being throttled right now due to server being at capacity for model-A',
+            'Automatically switching from model-A to model-B',
+            'upgrading to a Gemini Code Assist Standard or Enterprise plan',
+          ],
+        },
+        {
+          description: 'retryable quota error for LEGACY tier',
+          tier: UserTierId.LEGACY, // Paid tier
+          error: new RetryableQuotaError(
+            'retryable quota',
+            mockGoogleApiError,
+            5,
+          ),
+          expectedMessageSnippets: [
+            'Your requests are being throttled right now due to server being at capacity for model-A',
+            'Automatically switching from model-A to model-B',
+            'switch to using a paid API key from AI Studio',
+          ],
+        },
       ];
 
-      for (const { errorType, tier, expectedMessageSnippets } of testCases) {
-        it(`should handle ${errorType} error for ${tier} tier correctly`, async () => {
+      for (const {
+        description,
+        tier,
+        error,
+        expectedMessageSnippets,
+      } of testCases) {
+        it(`should handle ${description} correctly`, async () => {
           const handler = getRegisteredHandler(tier);
-          const result = await handler(
-            'model-A',
-            'model-B',
-            new Error('some error'),
-          );
+          const result = await handler('model-A', 'model-B', error);
 
           // Automatic fallbacks should return 'stop'
           expect(result).toBe('stop');

@@ -17,10 +17,12 @@ import {
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
-  GEMINI_CONFIG_DIR,
+  GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
   type GeminiCLIExtension,
+  type ExtensionLoader,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -29,10 +31,10 @@ import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export async function loadConfig(
   settings: Settings,
-  extensions: GeminiCLIExtension[],
+  extensionLoader: ExtensionLoader,
   taskId: string,
 ): Promise<Config> {
-  const mcpServers = mergeMcpServers(settings, extensions);
+  const mcpServers = mergeMcpServers(settings, extensionLoader.getExtensions());
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
@@ -44,7 +46,7 @@ export async function loadConfig(
     targetDir: workspaceDir, // Or a specific directory the agent operates on
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
-    fullContext: false, // Server might have different context needs
+
     coreTools: settings.coreTools || undefined,
     excludeTools: settings.excludeTools || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
@@ -70,16 +72,16 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust: settings.folderTrust === true,
+    extensionLoader,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
-  const extensionContextFilePaths = extensions.flatMap((e) => e.contextFiles);
   const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
     workspaceDir,
     [workspaceDir],
     false,
     fileService,
-    extensionContextFilePaths,
+    extensionLoader,
     settings.folderTrust === true,
   );
   configParams.userMemory = memoryContent;
@@ -126,7 +128,7 @@ export function mergeMcpServers(
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
       if (mcpServers[key]) {
-        console.warn(
+        debugLogger.warn(
           `Skipping extension MCP config for server with key "${key}" as it already exists.`,
         );
         return;
@@ -176,7 +178,7 @@ function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_CONFIG_DIR, '.env');
+    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
       return geminiEnvPath;
     }
@@ -187,11 +189,7 @@ function findEnvFile(startDir: string): string | null {
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(
-        process.cwd(),
-        GEMINI_CONFIG_DIR,
-        '.env',
-      );
+      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
         return homeGeminiEnvPath;
       }

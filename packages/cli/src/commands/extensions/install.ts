@@ -6,18 +6,25 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  installOrUpdateExtension,
-  requestConsentNonInteractive,
-} from '../../config/extension.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+  debugLogger,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { stat } from 'node:fs/promises';
+import {
+  INSTALL_WARNING_MESSAGE,
+  requestConsentNonInteractive,
+} from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface InstallArgs {
   source: string;
   ref?: string;
   autoUpdate?: boolean;
   allowPreRelease?: boolean;
+  consent?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -54,13 +61,27 @@ export async function handleInstall(args: InstallArgs) {
       }
     }
 
-    const name = await installOrUpdateExtension(
-      installMetadata,
-      requestConsentNonInteractive,
-    );
-    console.log(`Extension "${name}" installed successfully and enabled.`);
+    const requestConsent = args.consent
+      ? () => Promise.resolve(true)
+      : requestConsentNonInteractive;
+    if (args.consent) {
+      debugLogger.log('You have consented to the following:');
+      debugLogger.log(INSTALL_WARNING_MESSAGE);
+    }
+
+    const workspaceDir = process.cwd();
+    const extensionManager = new ExtensionManager({
+      workspaceDir,
+      requestConsent,
+      requestSetting: promptForSetting,
+      settings: loadSettings(workspaceDir).merged,
+    });
+    await extensionManager.loadExtensions();
+    const name =
+      await extensionManager.installOrUpdateExtension(installMetadata);
+    debugLogger.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }
@@ -87,6 +108,12 @@ export const installCommand: CommandModule = {
         describe: 'Enable pre-release versions for this extension.',
         type: 'boolean',
       })
+      .option('consent', {
+        describe:
+          'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -99,6 +126,7 @@ export const installCommand: CommandModule = {
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
       allowPreRelease: argv['pre-release'] as boolean | undefined,
+      consent: argv['consent'] as boolean | undefined,
     });
   },
 };

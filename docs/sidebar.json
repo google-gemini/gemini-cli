@@ -9,6 +9,10 @@
       {
         "label": "Architecture Overview",
         "slug": "docs/architecture"
+      },
+      {
+        "label": "Contribution Guide",
+        "slug": "docs/contributing"
       }
     ]
   },
@@ -147,6 +151,10 @@
         "slug": "docs/tools/memory"
       },
       {
+        "label": "Todos",
+        "slug": "docs/tools/todos"
+      },
+      {
         "label": "MCP Servers",
         "slug": "docs/tools/mcp-server"
       }
@@ -161,7 +169,7 @@
       },
       {
         "label": "Get Started with Extensions",
-        "slug": "docs/extensions/getting-started-extensions.md"
+        "slug": "docs/extensions/getting-started-extensions"
       },
       {
         "label": "Extension Releasing",

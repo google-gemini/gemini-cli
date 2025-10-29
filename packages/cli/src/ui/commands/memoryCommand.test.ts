@@ -13,6 +13,7 @@ import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import {
   getErrorMessage,
+  SimpleExtensionLoader,
   type FileDiscoveryService,
 } from '@google/gemini-cli-core';
 import type { LoadServerHierarchicalMemoryResponse } from '@google/gemini-cli-core/index.js';
@@ -72,6 +73,7 @@ describe('memoryCommand', () => {
           config: {
             getUserMemory: mockGetUserMemory,
             getGeminiMdFileCount: mockGetGeminiMdFileCount,
+            getExtensionLoader: () => new SimpleExtensionLoader([]),
           },
         },
       });
@@ -176,7 +178,8 @@ describe('memoryCommand', () => {
         getWorkingDir: () => '/test/dir',
         getDebugMode: () => false,
         getFileService: () => ({}) as FileDiscoveryService,
-        getExtensionContextFilePaths: () => [],
+        getExtensionLoader: () => new SimpleExtensionLoader([]),
+        getExtensions: () => [],
         shouldLoadMemoryFromIncludeDirectories: () => false,
         getWorkspaceContext: () => ({
           getDirectories: () => [],
@@ -198,7 +201,7 @@ describe('memoryCommand', () => {
                 importFormat: 'tree',
               },
             },
-          } as LoadedSettings,
+          } as unknown as LoadedSettings,
         },
         ui: {
           setGeminiMdFileCount: vi.fn(),

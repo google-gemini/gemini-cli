@@ -6,11 +6,13 @@
 
 import { render } from 'ink-testing-library';
 import type React from 'react';
+import { act } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
+import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
@@ -59,8 +61,11 @@ export const createMockSettings = (
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
+  renderMarkdown: true,
+  streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  currentModel: 'gemini-pro',
 };
 
 export const renderWithProviders = (
@@ -70,12 +75,14 @@ export const renderWithProviders = (
     settings = mockSettings,
     uiState: providedUiState,
     width,
+    kittyProtocolEnabled = true,
     config = configProxy as unknown as Config,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
+    kittyProtocolEnabled?: boolean;
     config?: Config;
   } = {},
 ): ReturnType<typeof render> => {
@@ -112,7 +119,7 @@ export const renderWithProviders = (
         <UIStateContext.Provider value={finalUiState}>
           <VimModeProvider settings={settings}>
             <ShellFocusContext.Provider value={shellFocus}>
-              <KeypressProvider kittyProtocolEnabled={true}>
+              <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
                 {component}
               </KeypressProvider>
             </ShellFocusContext.Provider>
@@ -122,3 +129,59 @@ export const renderWithProviders = (
     </ConfigContext.Provider>,
   );
 };
+
+export function renderHook<Result, Props>(
+  renderCallback: (props: Props) => Result,
+  options?: {
+    initialProps?: Props;
+    wrapper?: React.ComponentType<{ children: React.ReactNode }>;
+  },
+): {
+  result: { current: Result };
+  rerender: (props?: Props) => void;
+  unmount: () => void;
+} {
+  const result = { current: undefined as unknown as Result };
+  let currentProps = options?.initialProps as Props;
+
+  function TestComponent({
+    renderCallback,
+    props,
+  }: {
+    renderCallback: (props: Props) => Result;
+    props: Props;
+  }) {
+    result.current = renderCallback(props);
+    return null;
+  }
+
+  const Wrapper = options?.wrapper || (({ children }) => <>{children}</>);
+
+  let inkRerender: (tree: React.ReactElement) => void = () => {};
+  let unmount: () => void = () => {};
+
+  act(() => {
+    const renderResult = render(
+      <Wrapper>
+        <TestComponent renderCallback={renderCallback} props={currentProps} />
+      </Wrapper>,
+    );
+    inkRerender = renderResult.rerender;
+    unmount = renderResult.unmount;
+  });
+
+  function rerender(props?: Props) {
+    if (arguments.length > 0) {
+      currentProps = props as Props;
+    }
+    act(() => {
+      inkRerender(
+        <Wrapper>
+          <TestComponent renderCallback={renderCallback} props={currentProps} />
+        </Wrapper>,
+      );
+    });
+  }
+
+  return { result, rerender, unmount };
+}
