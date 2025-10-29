@@ -9,6 +9,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { updateSettingsFilePreservingFormat } from './commentJson.js';
+import { coreEvents } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
+  },
+}));
 
 describe('commentJson', () => {
   let tempDir: string;
@@ -158,28 +165,20 @@ describe('commentJson', () => {
 
       fs.writeFileSync(testFilePath, corruptedContent, 'utf-8');
 
-      const consoleSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
       expect(() => {
         updateSettingsFilePreservingFormat(testFilePath, {
           model: 'gemini-2.5-flash',
         });
       }).not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error parsing settings file:',
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Error parsing settings file. Please check the JSON syntax.',
         expect.any(Error),
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Settings file may be corrupted. Please check the JSON syntax.',
       );
 
       const unchangedContent = fs.readFileSync(testFilePath, 'utf-8');
       expect(unchangedContent).toBe(corruptedContent);
-
-      consoleSpy.mockRestore();
     });
 
     it('should handle array updates while preserving comments', () => {
