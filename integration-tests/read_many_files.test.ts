@@ -6,14 +6,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { TestRig, validateModelOutput } from './test-helper.js';
-import { join } from 'node:path';
 
 describe('read_many_files', () => {
   it('should be able to read multiple files', async () => {
     const rig = new TestRig();
-    rig.setup('should be able to read multiple files', {
-      fakeResponsesPath: join(import.meta.dirname, 'read_many_files.responses'),
-    });
+    await rig.setup('should be able to read multiple files');
     rig.createFile('file1.txt', 'file 1 content');
     rig.createFile('file2.txt', 'file 2 content');
 
