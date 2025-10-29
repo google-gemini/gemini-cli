@@ -82,13 +82,12 @@ const TodoItemDisplay: React.FC<{
   role?: 'listitem';
 }> = ({ todo, wrap, role: ariaRole }) => {
   const textColor = statusColor[todo.status] ?? theme.text.primary;
-  const strikethrough = todo.status === 'completed';
 
   return (
     <Box flexDirection="row" columnGap={1} aria-role={ariaRole}>
       <TodoStatusDisplay status={todo.status} />
       <Box flexShrink={1}>
-        <Text color={textColor} wrap={wrap} strikethrough={strikethrough}>
+        <Text color={textColor} wrap={wrap}>
           {todo.description}
         </Text>
       </Box>
