@@ -2,7 +2,7 @@
 
 exports[`<TodoTray /> > renders a todo list with long descriptions that wrap when full view is on 1`] = `
 "──────────────────────────────────────────────────
- 📝 Todo  1/2 (ctrl+t to toggle)
+ Todo  1/2 (ctrl+t to toggle)
 
  » This is a very long description for a pending
    task that should wrap around multiple lines
@@ -13,7 +13,7 @@ exports[`<TodoTray /> > renders a todo list with long descriptions that wrap whe
 
 exports[`<TodoTray /> > renders a todo list with long descriptions that wrap when full view is on 2`] = `
 "──────────────────────────────────────────────────
- 📝 Todo  1/2 (ctrl+t to toggle) » This is a ver…"
+ Todo  1/2 (ctrl+t to toggle) » This is a very l…"
 `;
 
 exports[`<TodoTray /> > renders null when no todos are in the history 1`] = `""`;
@@ -26,7 +26,7 @@ exports[`<TodoTray /> > renders null when todo list is empty 2`] = `""`;
 
 exports[`<TodoTray /> > renders the most recent todo list when multiple write_todos calls are in history 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
- 📝 Todo  0/2 (ctrl+t to toggle)
+ Todo  0/2 (ctrl+t to toggle)
 
  ☐ Newer Task 1
  » Newer Task 2"
@@ -34,7 +34,7 @@ exports[`<TodoTray /> > renders the most recent todo list when multiple write_to
 
 exports[`<TodoTray /> > renders when todos exist and one is in progress 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
- 📝 Todo  1/3 (ctrl+t to toggle)
+ Todo  1/3 (ctrl+t to toggle)
 
  ☐ Pending Task
  » Task 2
@@ -44,12 +44,12 @@ exports[`<TodoTray /> > renders when todos exist and one is in progress 1`] = `
 
 exports[`<TodoTray /> > renders when todos exist and one is in progress 2`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
- 📝 Todo  1/3 (ctrl+t to toggle) » Task 2"
+ Todo  1/3 (ctrl+t to toggle) » Task 2"
 `;
 
 exports[`<TodoTray /> > renders when todos exist but none are in progress 1`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
- 📝 Todo  1/2 (ctrl+t to toggle)
+ Todo  1/2 (ctrl+t to toggle)
 
  ☐ Pending Task
  ✗ In Progress Task
@@ -58,5 +58,5 @@ exports[`<TodoTray /> > renders when todos exist but none are in progress 1`] = 
 
 exports[`<TodoTray /> > renders when todos exist but none are in progress 2`] = `
 "────────────────────────────────────────────────────────────────────────────────────────────────────
- 📝 Todo  1/2 (ctrl+t to toggle)"
+ Todo  1/2 (ctrl+t to toggle)"
 `;
