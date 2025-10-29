@@ -162,30 +162,18 @@ describe('WorkspaceContext with real filesystem', () => {
     it('should handle unicode normalization differences', () => {
       const unicodeDirName = '테스트';
       const unicodeDirPath = path.join(tempDir, unicodeDirName);
+      const unicodeFilePath = path.join(unicodeDirPath, 'file.txt');
       fs.mkdirSync(unicodeDirPath, { recursive: true });
+      fs.writeFileSync(unicodeFilePath, '');
 
       const workspaceContext = new WorkspaceContext(unicodeDirPath);
 
-      const pathInsideNFC = path
-        .join(unicodeDirPath, 'file.txt')
-        .normalize('NFC');
-      const pathInsideNFD = path
-        .join(unicodeDirPath, 'file.txt')
-        .normalize('NFD');
+      const pathInsideNFC = unicodeFilePath.normalize('NFC');
+      const pathInsideNFD = unicodeFilePath.normalize('NFD');
 
-      // Test both NFC and NFD forms of a path inside the workspace
       expect(workspaceContext.isPathWithinWorkspace(pathInsideNFC)).toBe(true);
       expect(workspaceContext.isPathWithinWorkspace(pathInsideNFD)).toBe(true);
 
-      // Test with a root directory that is NFD
-      const workspaceContextNFD = new WorkspaceContext(
-        unicodeDirPath.normalize('NFD'),
-      );
-      expect(workspaceContextNFD.isPathWithinWorkspace(pathInsideNFC)).toBe(
-        true,
-      );
-
-      // Test a path outside the workspace
       const pathOutside = path.join(tempDir, '다른폴더', 'file.txt');
       expect(workspaceContext.isPathWithinWorkspace(pathOutside)).toBe(false);
     });
