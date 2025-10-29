@@ -246,6 +246,14 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         currentMessage = nextMessage;
       }
 
+      if (terminateReason === AgentTerminateMode.TIMEOUT) {
+        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        this.emitActivity('ERROR', {
+          error: finalResult,
+          context: 'timeout',
+        });
+      }
+
       if (terminateReason === AgentTerminateMode.GOAL) {
         return {
           result: finalResult || 'Task completed.',
