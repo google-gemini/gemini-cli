@@ -182,7 +182,8 @@ export class WorkspaceContext {
    */
   private fullyResolvedPath(pathToCheck: string): string {
     try {
-      return fs.realpathSync(path.resolve(this.targetDir, pathToCheck));
+      const resolvedPath = path.resolve(this.targetDir, pathToCheck);
+      return fs.realpathSync(normalizePath(resolvedPath));
     } catch (e: unknown) {
       if (
         isNodeError(e) &&
