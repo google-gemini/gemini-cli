@@ -479,6 +479,7 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT,
         value: event.extensions_count.toString(),
       },
+      // We deliberately do not log the names of extensions here, to be safe.
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
