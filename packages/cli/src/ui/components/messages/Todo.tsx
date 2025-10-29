@@ -71,22 +71,17 @@ const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   }
 };
 
+const statusColor: Partial<Record<TodoStatus, string>> = {
+  in_progress: theme.text.accent,
+  pending: theme.text.secondary,
+};
+
 const TodoItemDisplay: React.FC<{
   todo: Todo;
   wrap?: 'truncate';
   role?: 'listitem';
 }> = ({ todo, wrap, role: ariaRole }) => {
-  let textColor = theme.text.primary;
-  switch (todo.status) {
-    case 'in_progress':
-      textColor = theme.text.accent;
-      break;
-    case 'pending':
-      textColor = theme.text.secondary;
-      break;
-    default:
-      break;
-  }
+  const textColor = statusColor[todo.status] ?? theme.text.primary;
 
   return (
     <Box flexDirection="row" columnGap={1} aria-role={ariaRole}>
