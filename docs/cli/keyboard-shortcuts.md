@@ -67,3 +67,12 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | Shortcut | Description                       |
 | -------- | --------------------------------- |
 | `Ctrl+G` | See context CLI received from IDE |
+
+## Meta+key combos on mac
+
+On Mac, all Meta+char combos should work normally except for these three which
+are mapped to special functionality.
+
+- `meta+b`: "∫" back one word
+- `meta+f`: "ƒ" forward one word
+- `meta+m`: "µ" toggle markup view

@@ -617,10 +617,10 @@ export function loadSettings(
                   'utf-8',
                 );
               } catch (e) {
-                console.error(
-                  `Error migrating settings file on disk: ${getErrorMessage(
-                    e,
-                  )}`,
+                coreEvents.emitFeedback(
+                  'error',
+                  'Failed to migrate settings file.',
+                  e,
                 );
               }
             } else {
