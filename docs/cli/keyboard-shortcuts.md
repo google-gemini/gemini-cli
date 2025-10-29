@@ -51,13 +51,11 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 
 ## Suggestions
 
-| Shortcut        | Description                                 |
-| --------------- | ------------------------------------------- |
-| `Down Arrow`    | Navigate down through the suggestions.      |
-| `Tab` / `Enter` | Accept the selected suggestion.             |
-| `Up Arrow`      | Navigate up through the suggestions.        |
-| `Right Arrow`   | Expand the currently selected suggestion.   |
-| `Left Arrow`    | Collapse the currently selected suggestion. |
+| Shortcut        | Description                            |
+| --------------- | -------------------------------------- |
+| `Down Arrow`    | Navigate down through the suggestions. |
+| `Tab` / `Enter` | Accept the selected suggestion.        |
+| `Up Arrow`      | Navigate up through the suggestions.   |
 
 ## Radio Button Select
 
