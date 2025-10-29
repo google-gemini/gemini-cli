@@ -153,7 +153,8 @@ export class WorkspaceContext {
    */
   private fullyResolvedPath(pathToCheck: string): string {
     try {
-      return fs.realpathSync(pathToCheck);
+      const normalizedPath = normalizePath(pathToCheck);
+      return fs.realpathSync(normalizedPath);
     } catch (e: unknown) {
       if (
         isNodeError(e) &&
