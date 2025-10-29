@@ -26,9 +26,6 @@ describe('handleValidate', () => {
   let debugLoggerLogSpy: MockInstance;
   let debugLoggerWarnSpy: MockInstance;
   let debugLoggerErrorSpy: MockInstance;
-  // let consoleLogSpy: MockInstance;
-  // let consoleErrorSpy: MockInstance;
-  // let consoleWarnSpy: MockInstance;
   let processSpy: MockInstance;
   let tempHomeDir: string;
   let tempWorkspaceDir: string;
@@ -37,9 +34,6 @@ describe('handleValidate', () => {
     debugLoggerLogSpy = vi.spyOn(debugLogger, 'log');
     debugLoggerWarnSpy = vi.spyOn(debugLogger, 'warn');
     debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
-    // consoleLogSpy = vi.spyOn(console, 'log');
-    // consoleErrorSpy = vi.spyOn(console, 'error');
-    // consoleWarnSpy = vi.spyOn(console, 'warn');
     processSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);

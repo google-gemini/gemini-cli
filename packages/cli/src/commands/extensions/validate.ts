@@ -63,9 +63,6 @@ async function validateExtension(args: ValidateArgs) {
       errors.push(
         `The following context files referenced in gemini-extension.json are missing: ${missingContextFiles}`,
       );
-      // throw new Error(
-      //   `The following context files referenced in gemini-extension.json are missing: ${missingContextFiles}`,
-      // );
     }
   }
 
