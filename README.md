@@ -57,7 +57,7 @@ brew install gemini-cli
 
 ```bash
 # Create and activate a new environment
-conda create -n gemini_env -c conda-forge nodejs
+conda create -y -n gemini_env -c conda-forge nodejs
 conda activate gemini_env
 
 # Install Gemini CLI globally via npm (inside the environment)
