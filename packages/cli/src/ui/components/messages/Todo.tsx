@@ -117,7 +117,19 @@ export const TodoTray: React.FC = () => {
     return todos.todos.find((todo) => todo.status === 'in_progress') || null;
   }, [todos]);
 
-  if (todos === null || !todos.todos || todos.todos.length === 0) {
+  const hasActiveTodos = useMemo(() => {
+    if (!todos || !todos.todos) return false;
+    return todos.todos.some(
+      (todo) => todo.status === 'pending' || todo.status === 'in_progress',
+    );
+  }, [todos]);
+
+  if (
+    todos === null ||
+    !todos.todos ||
+    todos.todos.length === 0 ||
+    (!uiState.showFullTodos && !hasActiveTodos)
+  ) {
     return null;
   }
 
@@ -134,7 +146,7 @@ export const TodoTray: React.FC = () => {
       {uiState.showFullTodos ? (
         <Box flexDirection="column" rowGap={1}>
           <TodoTitleDisplay todos={todos} />
-          <TodoListDisplay todos={todos!} />
+          <TodoListDisplay todos={todos} />
         </Box>
       ) : (
         <Box flexDirection="row" columnGap={1} height={1}>
@@ -143,7 +155,7 @@ export const TodoTray: React.FC = () => {
           </Box>
           {inProgress && (
             <Box flexShrink={1} flexGrow={1}>
-              <TodoItemDisplay todo={inProgress!} wrap="truncate" />
+              <TodoItemDisplay todo={inProgress} wrap="truncate" />
             </Box>
           )}
         </Box>
