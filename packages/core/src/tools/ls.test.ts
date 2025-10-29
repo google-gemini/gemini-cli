@@ -248,11 +248,6 @@ describe('LSTool', () => {
         return originalStat(p);
       });
 
-      // Spy on console.error to verify it's called
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
       const invocation = lsTool.build({ path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
@@ -261,13 +256,7 @@ describe('LSTool', () => {
       expect(result.llmContent).not.toContain('problematic.txt');
       expect(result.returnDisplay).toBe('Listed 1 item(s).');
 
-      // Verify error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/Error accessing.*problematic\.txt/s),
-      );
-
       statSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 

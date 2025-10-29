@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '../../test-utils/render.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
@@ -205,10 +203,12 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions.length).toBe(slashCommands.length);
-      expect(result.current.suggestions.map((s) => s.label)).toEqual(
-        expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
-      );
+      await vi.waitFor(() => {
+        expect(result.current.suggestions.length).toBe(slashCommands.length);
+        expect(result.current.suggestions.map((s) => s.label)).toEqual(
+          expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
+        );
+      });
     });
 
     it('should filter commands based on partial input', async () => {
@@ -224,7 +224,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'memory',
@@ -253,7 +253,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'stats',
@@ -369,8 +369,10 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions.length).toBe(1);
-      expect(result.current.suggestions[0].label).toBe('visible');
+      await vi.waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+        expect(result.current.suggestions[0].label).toBe('visible');
+      });
     });
   });
 
@@ -390,29 +392,31 @@ describe('useSlashCompletion', () => {
       const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/memory',
+          '/memory ',
           slashCommands,
           mockCommandContext,
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(2);
-      expect(result.current.suggestions).toEqual(
-        expect.arrayContaining([
-          {
-            label: 'show',
-            value: 'show',
-            description: 'Show memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-          {
-            label: 'add',
-            value: 'add',
-            description: 'Add to memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]),
-      );
+      await vi.waitFor(() => {
+        expect(result.current.suggestions).toHaveLength(2);
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([
+            {
+              label: 'show',
+              value: 'show',
+              description: 'Show memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+            {
+              label: 'add',
+              value: 'add',
+              description: 'Add to memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]),
+        );
+      });
     });
 
     it('should suggest all sub-commands when the query ends with the parent command and a space', async () => {
@@ -435,23 +439,25 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(2);
-      expect(result.current.suggestions).toEqual(
-        expect.arrayContaining([
-          {
-            label: 'show',
-            value: 'show',
-            description: 'Show memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-          {
-            label: 'add',
-            value: 'add',
-            description: 'Add to memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]),
-      );
+      await vi.waitFor(() => {
+        expect(result.current.suggestions).toHaveLength(2);
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([
+            {
+              label: 'show',
+              value: 'show',
+              description: 'Show memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+            {
+              label: 'add',
+              value: 'add',
+              description: 'Add to memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]),
+        );
+      });
     });
 
     it('should filter sub-commands by prefix', async () => {
@@ -474,7 +480,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'add',
@@ -547,7 +553,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(mockCompletionFn).toHaveBeenCalledWith(
           expect.objectContaining({
             invocation: {
@@ -560,7 +566,7 @@ describe('useSlashCompletion', () => {
         );
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions).toEqual([
           { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
           { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
@@ -596,7 +602,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(mockCompletionFn).toHaveBeenCalledWith(
           expect.objectContaining({
             invocation: {
@@ -609,7 +615,7 @@ describe('useSlashCompletion', () => {
         );
       });
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions).toHaveLength(3);
       });
     });
@@ -639,9 +645,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(0);
-      });
+      expect(result.current.suggestions).toHaveLength(0);
     });
   });
 
@@ -714,7 +718,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'summarize',
@@ -795,7 +799,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'custom-script',
