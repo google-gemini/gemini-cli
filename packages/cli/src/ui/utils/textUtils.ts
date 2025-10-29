@@ -134,8 +134,21 @@ export function toGraphemes(str: string): string[] {
  * @returns An array of code points (handling surrogate pairs correctly)
  */
 export function toCodePoints(str: string): string[] {
-  // Use spread operator which correctly handles surrogate pairs
-  // This is needed for stripUnsafeCharacters to inspect individual code points
+  // ASCII fast-path for performance (stripUnsafeCharacters is called on every keypress/paste)
+  let isAscii = true;
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) > 127) {
+      isAscii = false;
+      break;
+    }
+  }
+
+  if (isAscii) {
+    // Pure ASCII, split('') is faster
+    return str.split('');
+  }
+
+  // Non-ASCII: Use spread operator which correctly handles surrogate pairs
   return [...str];
 }
 
