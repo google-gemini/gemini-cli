@@ -23,9 +23,7 @@ interface ValidateArgs {
 export async function handleValidate(args: ValidateArgs) {
   try {
     await validateExtension(args);
-    debugLogger.log(
-      `Extension '${args.path}' has been successfully validated.`,
-    );
+    debugLogger.log(`Extension ${args.path} has been successfully validated.`);
   } catch (error) {
     debugLogger.error(getErrorMessage(error));
     process.exit(1);
@@ -44,6 +42,7 @@ async function validateExtension(args: ValidateArgs) {
   const extensionConfig: ExtensionConfig =
     extensionManager.loadExtensionConfig(absoluteInputPath);
   const warnings: string[] = [];
+  const errors: string[] = [];
 
   if (extensionConfig.contextFileName) {
     const contextFileNames = Array.isArray(extensionConfig.contextFileName)
@@ -61,9 +60,12 @@ async function validateExtension(args: ValidateArgs) {
       }
     }
     if (missingContextFiles.length > 0) {
-      throw new Error(
+      errors.push(
         `The following context files referenced in gemini-extension.json are missing: ${missingContextFiles}`,
       );
+      // throw new Error(
+      //   `The following context files referenced in gemini-extension.json are missing: ${missingContextFiles}`,
+      // );
     }
   }
 
@@ -74,8 +76,18 @@ async function validateExtension(args: ValidateArgs) {
   }
 
   if (warnings.length > 0) {
-    debugLogger.warn('Extension valid, but with warnings:');
-    warnings.forEach((w) => debugLogger.warn(`  - ${w}`));
+    debugLogger.warn('Validation warnings:');
+    for (const warning of warnings) {
+      debugLogger.warn(`  - ${warning}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    debugLogger.error('Validation failed with the following errors:');
+    for (const error of errors) {
+      debugLogger.error(`  - ${error}`);
+    }
+    throw new Error('Extension validation failed.');
   }
 }
 

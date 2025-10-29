@@ -11,15 +11,7 @@ import yargs from 'yargs';
 import { createExtension } from '../../test-utils/createExtension.js';
 import path from 'node:path';
 import * as os from 'node:os';
-
-const mockStat = vi.hoisted(() => vi.fn());
-
-vi.mock('node:fs/promises', () => ({
-  stat: mockStat,
-  default: {
-    stat: mockStat,
-  },
-}));
+import { debugLogger } from '@google/gemini-cli-core';
 
 describe('extensions validate command', () => {
   it('should fail if no path is provided', () => {
@@ -31,17 +23,23 @@ describe('extensions validate command', () => {
 });
 
 describe('handleValidate', () => {
-  let consoleLogSpy: MockInstance;
-  let consoleErrorSpy: MockInstance;
-  let consoleWarnSpy: MockInstance;
+  let debugLoggerLogSpy: MockInstance;
+  let debugLoggerWarnSpy: MockInstance;
+  let debugLoggerErrorSpy: MockInstance;
+  // let consoleLogSpy: MockInstance;
+  // let consoleErrorSpy: MockInstance;
+  // let consoleWarnSpy: MockInstance;
   let processSpy: MockInstance;
   let tempHomeDir: string;
   let tempWorkspaceDir: string;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log');
-    consoleErrorSpy = vi.spyOn(console, 'error');
-    consoleWarnSpy = vi.spyOn(console, 'warn');
+    debugLoggerLogSpy = vi.spyOn(debugLogger, 'log');
+    debugLoggerWarnSpy = vi.spyOn(debugLogger, 'warn');
+    debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
+    // consoleLogSpy = vi.spyOn(console, 'log');
+    // consoleErrorSpy = vi.spyOn(console, 'error');
+    // consoleWarnSpy = vi.spyOn(console, 'warn');
     processSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
@@ -66,8 +64,8 @@ describe('handleValidate', () => {
     await handleValidate({
       path: 'local-ext-name',
     });
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      "Extension 'local-ext-name' has been successfully validated.",
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension local-ext-name has been successfully validated.',
     );
   });
 
@@ -81,7 +79,7 @@ describe('handleValidate', () => {
     await handleValidate({
       path: 'INVALID_NAME',
     });
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Invalid extension name: "INVALID_NAME". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.',
       ),
@@ -99,10 +97,13 @@ describe('handleValidate', () => {
     await handleValidate({
       path: 'valid-name',
     });
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
+    expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         "Version '1' does not appear to be standard semver (e.g., 1.0.0).",
       ),
+    );
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      'Extension valid-name has been successfully validated.',
     );
   });
 
@@ -117,7 +118,7 @@ describe('handleValidate', () => {
     await handleValidate({
       path: 'valid-name',
     });
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'The following context files referenced in gemini-extension.json are missing: contextFile.md',
       ),
