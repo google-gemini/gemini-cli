@@ -71,9 +71,10 @@ const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   }
 };
 
-const statusColor: Partial<Record<TodoStatus, string>> = {
+const statusTextColor: Partial<Record<TodoStatus, string>> = {
   in_progress: theme.text.accent,
   completed: theme.text.secondary,
+  cancelled: theme.text.secondary,
 };
 
 const TodoItemDisplay: React.FC<{
@@ -81,13 +82,14 @@ const TodoItemDisplay: React.FC<{
   wrap?: 'truncate';
   role?: 'listitem';
 }> = ({ todo, wrap, role: ariaRole }) => {
-  const textColor = statusColor[todo.status] ?? theme.text.primary;
+  const textColor = statusTextColor[todo.status] ?? theme.text.primary;
+  const strikethrough = todo.status === 'cancelled';
 
   return (
     <Box flexDirection="row" columnGap={1} aria-role={ariaRole}>
       <TodoStatusDisplay status={todo.status} />
       <Box flexShrink={1}>
-        <Text color={textColor} wrap={wrap}>
+        <Text color={textColor} wrap={wrap} strikethrough={strikethrough}>
           {todo.description}
         </Text>
       </Box>
