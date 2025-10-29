@@ -153,14 +153,17 @@ export function toCodePoints(str: string): string[] {
 }
 
 /**
- * Get the length of a string in grapheme clusters.
- * This returns the number of user-perceived characters, not UTF-16 code units.
+ * Get the length of a string in code points (not grapheme clusters).
+ *
+ * This function returns code point count, which is used for offset calculations
+ * in logicalPosToOffset/offsetToLogicalPos. For UI display purposes (cursor
+ * positioning, text width), use toGraphemes().length instead.
  *
  * @param str - The string to measure
- * @returns The number of grapheme clusters
+ * @returns The number of code points
  */
 export function cpLen(str: string): number {
-  return toGraphemes(str).length;
+  return toCodePoints(str).length;
 }
 
 /**

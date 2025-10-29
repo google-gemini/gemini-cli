@@ -221,13 +221,17 @@ describe('cpLen', () => {
     expect(cpLen('ç')).toBe(1);
   });
 
-  it('should return correct length for emoji', () => {
+  it('should return code point count for emoji (not grapheme count)', () => {
+    // cpLen returns code points, not grapheme clusters
+    // Simple emoji: 1 code point
     expect(cpLen('👋')).toBe(1);
-    expect(cpLen('👨‍👩‍👧‍👦')).toBe(1);
+    // Complex emoji (family): multiple code points joined with ZWJ
+    expect(cpLen('👨‍👩‍👧‍👦')).toBe(7);
   });
 
-  it('should return correct length for flags', () => {
-    expect(cpLen('🇺🇸')).toBe(1);
+  it('should return code point count for flags', () => {
+    // Flags are 2 regional indicator code points
+    expect(cpLen('🇺🇸')).toBe(2);
   });
 
   it('should handle empty strings', () => {
