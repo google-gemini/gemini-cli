@@ -872,99 +872,118 @@ describe('Kitty Sequence Parsing', () => {
     vi.useRealTimers();
   });
 
-  // Terminals to test
-  const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
+  describe('Cross-terminal Alt key handling (simulating macOS)', () => {
+    let originalPlatform: NodeJS.Platform;
 
-  // Key mappings: letter -> [keycode, accented character]
-  const keys: Record<string, [number, string]> = {
-    a: [97, 'å'],
-    o: [111, 'ø'],
-    m: [109, 'µ'],
-  };
-
-  it.each(
-    terminals.flatMap((terminal) =>
-      Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
-        if (terminal === 'Ghostty') {
-          // Ghostty uses kitty protocol sequences
-          return {
-            terminal,
-            key,
-            chunk: `\x1b[${keycode};3u`,
-            expected: {
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-              kittyProtocol: true,
-            },
-          };
-        } else if (terminal === 'MacTerminal') {
-          // Mac Terminal sends ESC + letter
-          return {
-            terminal,
-            key,
-            kitty: false,
-            chunk: `\x1b${key}`,
-            expected: {
-              sequence: `\x1b${key}`,
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-            },
-          };
-        } else {
-          // iTerm2 and VSCode send accented characters (å, ø, µ)
-          // Note: µ (mu) is sent with meta:false on iTerm2/VSCode but
-          // gets converted to m with meta:true
-          return {
-            terminal,
-            key,
-            chunk: accentedChar,
-            expected: {
-              name: key,
-              ctrl: false,
-              meta: true, // Always expect meta:true after conversion
-              shift: false,
-              paste: false,
-              sequence: accentedChar,
-            },
-          };
-        }
-      }),
-    ),
-  )(
-    'should handle Alt+$key in $terminal',
-    ({
-      chunk,
-      expected,
-      kitty = true,
-    }: {
-      chunk: string;
-      expected: Partial<Key>;
-      kitty?: boolean;
-    }) => {
-      const keyHandler = vi.fn();
-      const testWrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider kittyProtocolEnabled={kitty}>
-          {children}
-        </KeypressProvider>
-      );
-      const { result } = renderHook(() => useKeypressContext(), {
-        wrapper: testWrapper,
+    beforeEach(() => {
+      originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        configurable: true,
       });
-      act(() => result.current.subscribe(keyHandler));
+    });
 
-      act(() => stdin.write(chunk));
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        configurable: true,
+      });
+    });
 
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining(expected),
-      );
-    },
-  );
+    // Terminals to test
+    const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
+
+    // Key mappings: letter -> [keycode, accented character]
+    const keys: Record<string, [number, string]> = {
+      b: [98, '\u222B'],
+      f: [102, '\u0192'],
+      m: [109, '\u00B5'],
+    };
+
+    it.each(
+      terminals.flatMap((terminal) =>
+        Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
+          if (terminal === 'Ghostty') {
+            // Ghostty uses kitty protocol sequences
+            return {
+              terminal,
+              key,
+              chunk: `\x1b[${keycode};3u`,
+              expected: {
+                name: key,
+                ctrl: false,
+                meta: true,
+                shift: false,
+                paste: false,
+                kittyProtocol: true,
+              },
+            };
+          } else if (terminal === 'MacTerminal') {
+            // Mac Terminal sends ESC + letter
+            return {
+              terminal,
+              key,
+              kitty: false,
+              chunk: `\x1b${key}`,
+              expected: {
+                sequence: `\x1b${key}`,
+                name: key,
+                ctrl: false,
+                meta: true,
+                shift: false,
+                paste: false,
+              },
+            };
+          } else {
+            // iTerm2 and VSCode send accented characters (å, ø, µ)
+            // Note: µ (mu) is sent with meta:false on iTerm2/VSCode but
+            // gets converted to m with meta:true
+            return {
+              terminal,
+              key,
+              chunk: accentedChar,
+              expected: {
+                name: key,
+                ctrl: false,
+                meta: true, // Always expect meta:true after conversion
+                shift: false,
+                paste: false,
+                sequence: accentedChar,
+              },
+            };
+          }
+        }),
+      ),
+    )(
+      'should handle Alt+$key in $terminal',
+      ({
+        chunk,
+        expected,
+        kitty = true,
+      }: {
+        chunk: string;
+        expected: Partial<Key>;
+        kitty?: boolean;
+      }) => {
+        const keyHandler = vi.fn();
+        const testWrapper = ({ children }: { children: React.ReactNode }) => (
+          <KeypressProvider kittyProtocolEnabled={kitty}>
+            {children}
+          </KeypressProvider>
+        );
+        const { result } = renderHook(() => useKeypressContext(), {
+          wrapper: testWrapper,
+        });
+        act(() => result.current.subscribe(keyHandler));
+
+        act(() => stdin.write(chunk));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      },
+    );
+  });
 
   describe('Backslash key handling', () => {
     beforeEach(() => {
