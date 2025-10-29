@@ -1257,8 +1257,8 @@ describe('runNonInteractive', () => {
       hasDeprecatedPromptArg: true,
     });
 
-    expect(processStdoutSpy).toHaveBeenCalledWith(
-      'Use the positional prompt instead. This flag will be removed in a future version.\n',
+    expect(processStderrSpy).toHaveBeenCalledWith(
+      'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n',
     );
     expect(processStdoutSpy).toHaveBeenCalledWith('Final Answer');
   });
@@ -1285,7 +1285,7 @@ describe('runNonInteractive', () => {
     });
 
     const deprecateText =
-      'Use the positional prompt instead. This flag will be removed in a future version.\n';
-    expect(processStdoutSpy).toHaveBeenCalledWith(deprecateText);
+      'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n';
+    expect(processStderrSpy).toHaveBeenCalledWith(deprecateText);
   });
 });

@@ -161,7 +161,7 @@ export async function runNonInteractive({
 
       let turnCount = 0;
       const deprecateText =
-        'Use the positional prompt instead. This flag will be removed in a future version.\n';
+        'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n';
       if (hasDeprecatedPromptArg) {
         if (streamFormatter) {
           streamFormatter.emitEvent({
@@ -172,7 +172,7 @@ export async function runNonInteractive({
             delta: true,
           });
         } else {
-          process.stdout.write(deprecateText);
+          process.stderr.write(deprecateText);
         }
       }
       while (true) {
