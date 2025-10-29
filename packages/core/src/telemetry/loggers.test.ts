@@ -231,6 +231,7 @@ describe('loggers', () => {
           output_format: 'json',
           extension_ids: '',
           extensions_count: 0,
+          auth_type: 'vertex-ai',
         },
       });
     });
