@@ -103,8 +103,11 @@ export function toGraphemes(str: string): string[] {
   if (graphemeSegmenter) {
     result = Array.from(graphemeSegmenter.segment(str), (s) => s.segment);
   } else {
-    // Fallback: Array.from handles surrogate pairs but not combining marks
-    result = Array.from(str);
+    // Fail loudly if Intl.Segmenter is unavailable (should not happen in Node.js 20+)
+    // Better to detect unsupported environments immediately than silently exhibit incorrect behavior
+    throw new Error(
+      'Intl.Segmenter is not available. Node.js 16+ is required for proper Unicode support.',
+    );
   }
 
   // Cache result (unlimited like Ink)
@@ -116,12 +119,24 @@ export function toGraphemes(str: string): string[] {
 }
 
 /**
- * @deprecated Use toGraphemes instead for proper Unicode support.
- * This function is kept for backward compatibility but may not handle
- * all Unicode edge cases correctly.
+ * Split a string into Unicode code points (not grapheme clusters).
+ *
+ * @deprecated Use `toGraphemes` for UI-related operations that need to work with
+ * user-perceived characters. This function splits by code points and should only
+ * be used for internal logic that needs to inspect individual code points
+ * (e.g., `stripUnsafeCharacters` which filters control characters).
+ *
+ * Note: Code points are NOT the same as grapheme clusters. For example:
+ * - toCodePoints('é') may return ['e', '́'] (base + combining mark)
+ * - toGraphemes('é') returns ['é'] (single grapheme cluster)
+ *
+ * @param str - The string to split into code points
+ * @returns An array of code points (handling surrogate pairs correctly)
  */
 export function toCodePoints(str: string): string[] {
-  return toGraphemes(str);
+  // Use spread operator which correctly handles surrogate pairs
+  // This is needed for stripUnsafeCharacters to inspect individual code points
+  return [...str];
 }
 
 /**

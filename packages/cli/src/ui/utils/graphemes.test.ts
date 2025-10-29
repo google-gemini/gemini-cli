@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   toGraphemes,
+  toCodePoints,
   cpLen,
   cpSlice,
   clearGraphemeCache,
@@ -306,5 +307,41 @@ describe('Regression Tests for Issues', () => {
 
     const word2 = cpSlice(text, firstSpaceIndex + 1, secondSpaceIndex);
     expect(word2).toBe('café');
+  });
+});
+
+describe('toCodePoints (deprecated but still used internally)', () => {
+  it('should split by code points, not graphemes', () => {
+    // toCodePoints should return individual code points for stripUnsafeCharacters
+    const simple = 'abc';
+    expect(toCodePoints(simple)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('should handle surrogate pairs correctly', () => {
+    // Emoji are surrogate pairs and should be single code points
+    const emoji = '😀';
+    expect(toCodePoints(emoji)).toEqual(['😀']);
+  });
+
+  it('should NOT merge combining marks (different from toGraphemes)', () => {
+    // This is critical: toCodePoints must return individual code points
+    // so stripUnsafeCharacters can inspect each one
+    const combining = 'e\u0301'; // e + combining acute
+    const codePoints = toCodePoints(combining);
+
+    // Should be 2 code points, not 1 grapheme cluster
+    expect(codePoints.length).toBe(2);
+    expect(codePoints[0]).toBe('e');
+    expect(codePoints[1]).toBe('\u0301');
+  });
+
+  it('difference between toCodePoints and toGraphemes', () => {
+    const text = 'e\u0301'; // e + combining acute
+
+    // toCodePoints: splits by code points (2 elements)
+    expect(toCodePoints(text).length).toBe(2);
+
+    // toGraphemes: splits by grapheme clusters (1 element)
+    expect(toGraphemes(text).length).toBe(1);
   });
 });
