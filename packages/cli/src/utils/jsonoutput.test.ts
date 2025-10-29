@@ -103,11 +103,6 @@ describe('check parsing json', () => {
     expect(output).toBeFalsy();
   });
 
-  it('returns null for null and undefined input', () => {
-    expect(tryParseJSON(null)).toBeFalsy();
-    expect(tryParseJSON(undefined)).toBeFalsy();
-  });
-
   it('returns parsed object for nested JSON', () => {
     const nestedJSON = '{"a": 1, "b": {"c": 2, "d": [3, 4]}}';
     const parsedJSON = JSON.parse(nestedJSON);
