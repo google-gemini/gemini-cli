@@ -58,7 +58,7 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    const previousExtensionConfig = await extensionManager.loadExtensionConfig(
+    const previousExtensionConfig = extensionManager.loadExtensionConfig(
       extension.path,
     );
     let updatedExtension: GeminiCLIExtension;

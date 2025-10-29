@@ -6,6 +6,7 @@
 
 import { render } from 'ink-testing-library';
 import type React from 'react';
+import { act } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -128,3 +129,59 @@ export const renderWithProviders = (
     </ConfigContext.Provider>,
   );
 };
+
+export function renderHook<Result, Props>(
+  renderCallback: (props: Props) => Result,
+  options?: {
+    initialProps?: Props;
+    wrapper?: React.ComponentType<{ children: React.ReactNode }>;
+  },
+): {
+  result: { current: Result };
+  rerender: (props?: Props) => void;
+  unmount: () => void;
+} {
+  const result = { current: undefined as unknown as Result };
+  let currentProps = options?.initialProps as Props;
+
+  function TestComponent({
+    renderCallback,
+    props,
+  }: {
+    renderCallback: (props: Props) => Result;
+    props: Props;
+  }) {
+    result.current = renderCallback(props);
+    return null;
+  }
+
+  const Wrapper = options?.wrapper || (({ children }) => <>{children}</>);
+
+  let inkRerender: (tree: React.ReactElement) => void = () => {};
+  let unmount: () => void = () => {};
+
+  act(() => {
+    const renderResult = render(
+      <Wrapper>
+        <TestComponent renderCallback={renderCallback} props={currentProps} />
+      </Wrapper>,
+    );
+    inkRerender = renderResult.rerender;
+    unmount = renderResult.unmount;
+  });
+
+  function rerender(props?: Props) {
+    if (arguments.length > 0) {
+      currentProps = props as Props;
+    }
+    act(() => {
+      inkRerender(
+        <Wrapper>
+          <TestComponent renderCallback={renderCallback} props={currentProps} />
+        </Wrapper>,
+      );
+    });
+  }
+
+  return { result, rerender, unmount };
+}
