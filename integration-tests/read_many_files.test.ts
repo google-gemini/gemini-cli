@@ -5,12 +5,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import { TestRig, validateModelOutput } from './test-helper.js';
+import { join } from 'node:path';
 
 describe('read_many_files', () => {
   it('should be able to read multiple files', async () => {
     const rig = new TestRig();
-    rig.setup('should be able to read multiple files');
+    rig.setup('should be able to read multiple files', {
+      fakeResponsesPath: join(import.meta.dirname, 'read_many_files.responses'),
+    });
     rig.createFile('file1.txt', 'file 1 content');
     rig.createFile('file2.txt', 'file 2 content');
 
@@ -27,14 +30,6 @@ describe('read_many_files', () => {
 
     // Accept either read_many_files OR at least 2 read_file calls
     const foundValidPattern = readManyFilesCall || readFileCalls.length >= 2;
-
-    // Add debugging information
-    if (!foundValidPattern) {
-      printDebugInfo(rig, result, {
-        'read_many_files called': readManyFilesCall,
-        'read_file calls': readFileCalls.length,
-      });
-    }
 
     expect(
       foundValidPattern,
