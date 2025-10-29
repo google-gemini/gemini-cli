@@ -29,7 +29,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ### Pre-requisites before installation
 
-- Node.js version 20, higher or Anaconda
+- Node.js version 20 or higher (can be installed via Anaconda)
 - macOS, Linux, or Windows
 
 ### Quick Install
