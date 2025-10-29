@@ -57,6 +57,13 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
 const graphemeCache = new Map<string, string[]>();
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 
+// Cache the Intl.Segmenter instance to avoid re-creation on each call
+// Creating Intl.Segmenter is expensive and this function is called frequently
+const graphemeSegmenter =
+  typeof Intl !== 'undefined' && Intl.Segmenter
+    ? new Intl.Segmenter('en', { granularity: 'grapheme' })
+    : undefined;
+
 /**
  * Split a string into grapheme clusters (user-perceived characters).
  * This properly handles:
@@ -93,9 +100,8 @@ export function toGraphemes(str: string): string[] {
 
   // Use Intl.Segmenter for proper grapheme cluster segmentation
   let result: string[];
-  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-    const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
-    result = Array.from(segmenter.segment(str), (s) => s.segment);
+  if (graphemeSegmenter) {
+    result = Array.from(graphemeSegmenter.segment(str), (s) => s.segment);
   } else {
     // Fallback: Array.from handles surrogate pairs but not combining marks
     result = Array.from(str);
