@@ -127,6 +127,8 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
 
@@ -175,6 +177,8 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
 
@@ -213,6 +217,8 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
 
@@ -235,6 +241,8 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
 
@@ -258,6 +266,8 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
 
@@ -284,6 +294,8 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 42,
         totalLinesRemoved: 18,
+        totalLinesGeneratedAdded: 42,
+        totalLinesGeneratedRemoved: 18,
       },
     };
 

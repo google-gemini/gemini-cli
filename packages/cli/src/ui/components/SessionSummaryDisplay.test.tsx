@@ -70,6 +70,8 @@ describe('<SessionSummaryDisplay />', () => {
       files: {
         totalLinesAdded: 42,
         totalLinesRemoved: 15,
+        totalLinesGeneratedAdded: 42,
+        totalLinesGeneratedRemoved: 15,
       },
     };
 

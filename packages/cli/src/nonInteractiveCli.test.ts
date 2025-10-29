@@ -607,6 +607,8 @@ describe('runNonInteractive', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
     vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(mockMetrics);
@@ -715,6 +717,8 @@ describe('runNonInteractive', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
     vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(mockMetrics);
@@ -769,6 +773,8 @@ describe('runNonInteractive', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+        totalLinesGeneratedAdded: 0,
+        totalLinesGeneratedRemoved: 0,
       },
     };
     vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(mockMetrics);

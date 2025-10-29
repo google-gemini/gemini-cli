@@ -273,6 +273,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
             user_removed_lines: diffStat.user_removed_lines,
             user_added_chars: diffStat.user_added_chars,
             user_removed_chars: diffStat.user_removed_chars,
+            suggested_added_lines: diffStat.suggested_added_lines,
+            suggested_removed_lines: diffStat.suggested_removed_lines,
           };
         }
       }

@@ -605,6 +605,8 @@ export interface DiffStat {
   user_removed_lines: number;
   user_added_chars: number;
   user_removed_chars: number;
+  suggested_added_lines: number;
+  suggested_removed_lines: number;
 }
 
 export interface ToolEditConfirmationDetails {

@@ -635,6 +635,8 @@ describe('EditTool', () => {
         user_removed_lines: 0,
         user_added_chars: 0,
         user_removed_chars: 0,
+        suggested_added_lines: 1,
+        suggested_removed_lines: 0,
       });
     });
 
@@ -704,6 +706,8 @@ describe('EditTool', () => {
         user_removed_lines: 0,
         user_added_chars: 0,
         user_removed_chars: 0,
+        suggested_added_lines: 3,
+        suggested_removed_lines: 3,
       });
     });
 
@@ -769,6 +773,8 @@ describe('EditTool', () => {
         user_removed_lines: 1,
         user_added_chars: 8,
         user_removed_chars: 7,
+        suggested_added_lines: 1,
+        suggested_removed_lines: 1,
       });
     });
 

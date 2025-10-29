@@ -38,7 +38,7 @@ export function getDiffStat(
     return { addedLines, removedLines, addedChars, removedChars };
   };
 
-  const modelPatch = Diff.structuredPatch(
+  const suggestedPatch = Diff.structuredPatch(
     fileName,
     fileName,
     oldStr,
@@ -47,7 +47,7 @@ export function getDiffStat(
     'Proposed',
     DEFAULT_DIFF_OPTIONS,
   );
-  const modelStats = getStats(modelPatch);
+  const suggestedStats = getStats(suggestedPatch);
 
   const userPatch = Diff.structuredPatch(
     fileName,
@@ -60,14 +60,32 @@ export function getDiffStat(
   );
   const userStats = getStats(userPatch);
 
+  const acceptedPatch = Diff.structuredPatch(
+    fileName,
+    fileName,
+    oldStr,
+    userStr,
+    'Current',
+    'User',
+    DEFAULT_DIFF_OPTIONS,
+  );
+  const acceptedStats = getStats(acceptedPatch);
+
+  console.log(`model accepted ${acceptedStats.addedLines}`);
+  console.log(`model removed ${acceptedStats.removedLines}`);
+  console.log(`suggested accepted ${suggestedStats.addedLines}`);
+  console.log(`suggested removed ${suggestedStats.removedLines}`);
+
   return {
-    model_added_lines: modelStats.addedLines,
-    model_removed_lines: modelStats.removedLines,
-    model_added_chars: modelStats.addedChars,
-    model_removed_chars: modelStats.removedChars,
+    model_added_lines: acceptedStats.addedLines,
+    model_removed_lines: acceptedStats.removedLines,
+    model_added_chars: acceptedStats.addedChars,
+    model_removed_chars: acceptedStats.removedChars,
     user_added_lines: userStats.addedLines,
     user_removed_lines: userStats.removedLines,
     user_added_chars: userStats.addedChars,
     user_removed_chars: userStats.removedChars,
+    suggested_added_lines: suggestedStats.addedLines,
+    suggested_removed_lines: suggestedStats.removedLines,
   };
 }

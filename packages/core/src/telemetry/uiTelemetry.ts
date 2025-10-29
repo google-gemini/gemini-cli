@@ -232,13 +232,13 @@ export class UiTelemetryService extends EventEmitter {
       if (event.metadata['model_removed_lines'] !== undefined) {
         files.totalLinesRemoved += event.metadata['model_removed_lines'];
       }
-      if (event.metadata['lines_generated_added'] !== undefined) {
+      if (event.metadata['model_generated_added_lines'] !== undefined) {
         files.totalLinesGeneratedAdded +=
-          event.metadata['lines_generated_added'];
+          event.metadata['model_generated_added_lines'];
       }
-      if (event.metadata['lines_generated_removed'] !== undefined) {
+      if (event.metadata['model_generated_removed_lines'] !== undefined) {
         files.totalLinesGeneratedRemoved +=
-          event.metadata['lines_generated_removed'];
+          event.metadata['model_generated_removed_lines'];
       }
     }
   }
