@@ -49,7 +49,7 @@ export class MessageBusPlugin extends BasePlugin {
     if (confirmationDetails) {
       this.messageBus.publish({
         type: MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
-        correlationId: randomUUID(),
+        correlationId,
         tool: declarativeTool,
         invocation,
         toolArgs,

@@ -338,10 +338,7 @@ interface CoreToolSchedulerOptions {
 export class CoreToolScheduler {
   // Static WeakMap to track which MessageBus instances already have a handler subscribed
   // This prevents duplicate subscriptions when multiple CoreToolScheduler instances are created
-  private static subscribedMessageBuses = new WeakMap<
-    MessageBus,
-    (request: ToolConfirmationRequest) => void
-  >();
+  private static subscribedMessageBuses = new WeakSet<MessageBus>();
 
   private toolCalls: ToolCall[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
@@ -379,52 +376,57 @@ export class CoreToolScheduler {
 
       // Check if we've already subscribed a handler to this message bus
       if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
-        // Create a shared handler that will be used for this message bus
-        const sharedHandler = (request: ToolConfirmationRequest) => {
-          // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
-          // to tell tools to use their legacy confirmation flow
-          messageBus.publish({
-            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-            correlationId: request.correlationId,
-            confirmed: false,
-            requiresUserConfirmation: true,
-          });
-        };
+        if (this.config.getAdkMode()) {
+          const displayRequestHandler = (
+            request: ToolConfirmationDisplayRequest,
+          ) => {
+            const waitingToolCall: WaitingToolCall = {
+              status: 'awaiting_approval',
+              request: {
+                callId: request.correlationId,
+                name: request.tool.name,
+                args: request.toolArgs,
+                isClientInitiated: true,
+                prompt_id: '',
+              },
+              tool: request.tool,
+              invocation: request.invocation,
+              confirmationDetails: request.confirmationDetails,
+            };
 
-        messageBus.subscribe(
-          MessageBusType.TOOL_CONFIRMATION_REQUEST,
-          sharedHandler,
-        );
-
-        const displayRequestHandler = (
-          request: ToolConfirmationDisplayRequest,
-        ) => {
-          const waitingToolCall: WaitingToolCall = {
-            status: 'awaiting_approval',
-            request: {
-              callId: request.correlationId,
-              name: request.tool.name,
-              args: request.toolArgs,
-              isClientInitiated: true,
-              prompt_id: '',
-            },
-            tool: request.tool,
-            invocation: request.invocation,
-            confirmationDetails: request.confirmationDetails,
+            if (this.onToolCallsUpdate) {
+              this.onToolCallsUpdate([waitingToolCall]);
+            }
           };
 
-          if (this.onToolCallsUpdate) {
-            this.onToolCallsUpdate([waitingToolCall]);
-          }
-        };
+          messageBus.subscribe(
+            MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
+            displayRequestHandler,
+          );
 
-        messageBus.subscribe(
-          MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
-          displayRequestHandler,
-        );
+          // Store the handler in the WeakMap so we don't subscribe again
+          CoreToolScheduler.subscribedMessageBuses.add(messageBus);
+        } else {
+          // Create a shared handler that will be used for this message bus
+          const sharedHandler = (request: ToolConfirmationRequest) => {
+            // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
+            // to tell tools to use their legacy confirmation flow
+            messageBus.publish({
+              type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+              correlationId: request.correlationId,
+              confirmed: false,
+              requiresUserConfirmation: true,
+            });
+          };
 
-        // Store the handler in the WeakMap so we don't subscribe again
-        CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
+          messageBus.subscribe(
+            MessageBusType.TOOL_CONFIRMATION_REQUEST,
+            sharedHandler,
+          );
+
+          // Store the handler in the WeakMap so we don't subscribe again
+          CoreToolScheduler.subscribedMessageBuses.add(messageBus);
+        }
       }
     }
   }

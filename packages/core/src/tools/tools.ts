@@ -734,21 +734,6 @@ export class AdkToolAdapter extends AdkBaseTool {
   async runAsync(request: RunAsyncToolRequest): Promise<unknown> {
     const invocation = this.tool.build(request.args);
     const abortController = new AbortController();
-
-    // const confirmationDetails = await invocation.shouldConfirmExecute(
-    //   abortController.signal,
-    // );
-
-    // if (confirmationDetails) {
-    //   this.messageBus.publish({
-    //     type: MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
-    //     correlationId: randomUUID(),
-    //     tool: this.tool,
-    //     invocation,
-    //     toolArgs: request.args,
-    //     confirmationDetails,
-    //   });
-    // }
     // Wait for response..then handle.
     const result = await invocation.execute(abortController.signal);
     return result;

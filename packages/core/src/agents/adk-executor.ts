@@ -29,7 +29,18 @@ import {
 } from '../config/models.js';
 import type { Part, FunctionDeclaration, Schema } from '@google/genai';
 import { convertInputConfigToGenaiSchema } from './schema-converter.js';
-import { AdkToolAdapter, type AnyDeclarativeTool } from '../tools/tools.js';
+import {
+  AdkToolAdapter,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+} from '../tools/tools.js';
+import type {
+  AnyDeclarativeTool,
+  ToolInvocation,
+  ToolResult,
+} from '../tools/tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import * as os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import type { ActivityCallback } from './executor.js';
@@ -139,21 +150,51 @@ async function prepareTools<TOutput extends z.ZodTypeAny>(
 
   toolsList.push(
     new AdkToolAdapter(
-      {
-        name: TASK_COMPLETE_TOOL_NAME,
-        description: completeTool.description,
-        schema: completeTool as FunctionDeclaration,
-        build: (args: Record<string, unknown>) => ({
-          async execute() {
-            return JSON.stringify(args);
-          },
-        }),
-      } as unknown as AnyDeclarativeTool,
+      new CompleteTaskTool(completeTool, messageBus),
       messageBus,
     ),
   );
 
   return toolsList;
+}
+
+class CompleteTaskTool extends BaseDeclarativeTool<object, ToolResult> {
+  constructor(schema: FunctionDeclaration, messageBus: MessageBus) {
+    super(
+      TASK_COMPLETE_TOOL_NAME,
+      'Complete Task',
+      schema.description || 'Complete the task',
+      Kind.Other,
+      schema.parameters,
+      false,
+      false,
+      messageBus,
+    );
+  }
+
+  override validateToolParams(_params: object): string | null {
+    // TODO: Validate params
+    return null;
+  }
+
+  protected createInvocation(
+    params: object,
+  ): ToolInvocation<object, ToolResult> {
+    return new CompleteTaskInvocation(params);
+  }
+}
+
+class CompleteTaskInvocation extends BaseToolInvocation<object, ToolResult> {
+  getDescription(): string {
+    return 'Completing the task';
+  }
+
+  async execute(): Promise<ToolResult> {
+    return {
+      llmContent: JSON.stringify(this.params),
+      returnDisplay: JSON.stringify(this.params, null, 2),
+    };
+  }
 }
 
 /**
@@ -245,18 +286,11 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
         parts: [{ text: query }],
       };
 
-      const { outputConfig } = this.definition;
-      const eventStream = await runner.runAsync({
+      const finalResult = await this.runWithRetry(runner, {
         userId,
         sessionId,
         newMessage: content,
       });
-
-      const finalResult = await this.processEventStream(
-        eventStream,
-        outputConfig,
-      );
-
       if (signal.aborted) {
         return {
           result: 'Execution aborted.',
@@ -290,6 +324,12 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
     let finalResult = '';
 
     for await (const event of eventStream) {
+      if (event.errorCode) {
+        throw new Error(
+          event.errorMessage || 'Model returned an empty response',
+        );
+      }
+
       const functionCalls = getFunctionCalls(event);
       if (functionCalls.length > 0) {
         for (const call of functionCalls) {
@@ -317,22 +357,17 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
         if (subject) {
           this.emitActivity('THOUGHT_CHUNK', { text: subject });
         }
-      }
 
-      if (event.content?.parts) {
         if (outputConfig) {
           for (const part of event.content.parts) {
             if (
               part.functionResponse &&
               part.functionResponse.name === TASK_COMPLETE_TOOL_NAME
             ) {
-              const response = part.functionResponse.response as {
-                result: string;
-              };
+              const response = part.functionResponse
+                .response as unknown as ToolResult;
 
-              // TODO: validate response against the schema; does ADK give
-              // us that for free?
-              finalResult = response.result;
+              finalResult = response.returnDisplay as string;
               break;
             }
           }
@@ -342,10 +377,49 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
             .join('');
         }
       }
+
       if (finalResult && outputConfig) {
         break;
       }
     }
+
+    if (!finalResult) {
+      throw new Error('No final output was returned.');
+    }
     return finalResult;
+  }
+
+  private async runWithRetry(
+    runner: InMemoryRunner,
+    runAsyncParams: {
+      userId: string;
+      sessionId: string;
+      newMessage: {
+        role: string;
+        parts: Array<{ text: string }>;
+      };
+    },
+  ): Promise<string> {
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        const { outputConfig } = this.definition;
+        const eventStream = await runner.runAsync(runAsyncParams);
+        return await this.processEventStream(eventStream, outputConfig);
+      } catch (error) {
+        attempts++;
+
+        if (attempts >= 3) {
+          throw error;
+        }
+        // If the first attempt failed, maybe it's because the model was stuck.
+        // We'll increase the temperature to try to unstick it.
+        const agent = runner.agent as LlmAgent;
+        if (agent.generateContentConfig?.temperature === 0) {
+          agent.generateContentConfig.temperature = 0.1;
+        }
+      }
+    }
+    throw new Error('Exhausted retries');
   }
 }

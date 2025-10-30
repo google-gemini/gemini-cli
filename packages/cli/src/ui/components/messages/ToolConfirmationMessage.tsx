@@ -88,7 +88,9 @@ export const ToolConfirmationMessage: React.FC<
     { isActive: isFocused },
   );
 
-  const handleSelect = (item: ToolConfirmationOutcome) => handleConfirm(item);
+  const handleSelect = (item: ToolConfirmationOutcome) => {
+    handleConfirm(item);
+  };
 
   let bodyContent: React.ReactNode | null = null; // Removed contextDisplay here
   let question: string;
