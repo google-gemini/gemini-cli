@@ -8,7 +8,6 @@ import type { Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
-import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
@@ -102,7 +101,7 @@ export class ChatCompressionService {
       };
     }
 
-    const originalTokenCount = uiTelemetryService.getLastPromptTokenCount();
+    const originalTokenCount = chat.getLastPromptTokenCount();
 
     // Don't compress if not forced and we are under the limit.
     if (!force) {
@@ -204,7 +203,6 @@ export class ChatCompressionService {
         },
       };
     } else {
-      uiTelemetryService.setLastPromptTokenCount(newTokenCount);
       return {
         newHistory: extraHistory,
         info: {
