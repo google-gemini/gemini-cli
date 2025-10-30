@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 import { AuthState, MessageType } from '../types.js';
 import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
+import { SettingScope } from '../../config/settings.js';
 
 interface UseQuotaAndFallbackArgs {
   config: Config;
@@ -24,7 +25,56 @@ interface UseQuotaAndFallbackArgs {
   userTier: UserTierId | undefined;
   setAuthState: (state: AuthState) => void;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
+  settings: {
+    setValue: (scope: SettingScope, key: string, value: unknown) => void;
+  };
 }
+
+type AutoFallbackType = 'gemini-api-key' | 'vertex-ai';
+
+const AUTO_FALLBACK_CONFIG: Record<
+  AutoFallbackType,
+  {
+    settingValue: { enabled: true; type: AutoFallbackType };
+    refreshAuthType: AuthType;
+    hasEnvVars: () => boolean;
+    successMessage: string;
+    getFailureMessage: (error: unknown) => string;
+    missingEnvMessage: string;
+  }
+> = {
+  'gemini-api-key': {
+    settingValue: { enabled: true, type: 'gemini-api-key' },
+    refreshAuthType: AuthType.USE_GEMINI,
+    hasEnvVars: () => Boolean(process.env['GEMINI_API_KEY']),
+    successMessage:
+      '✓ Switched to Gemini API key authentication. This session will now use your API key, and future sessions will automatically fallback when quota is exceeded.',
+    getFailureMessage: (error) =>
+      `Failed to switch to Gemini API key: ${
+        error instanceof Error ? error.message : String(error)
+      }. Setting saved for future sessions.`,
+    missingEnvMessage:
+      'Enabled Gemini API key fallback for future sessions. Set GEMINI_API_KEY environment variable to use API key authentication.',
+  },
+  'vertex-ai': {
+    settingValue: { enabled: true, type: 'vertex-ai' },
+    refreshAuthType: AuthType.USE_VERTEX_AI,
+    hasEnvVars: () =>
+      Boolean(
+        process.env['GOOGLE_API_KEY'] ||
+          (process.env['GOOGLE_CLOUD_PROJECT'] &&
+            process.env['GOOGLE_CLOUD_LOCATION']),
+      ),
+    successMessage:
+      '✓ Switched to Vertex AI authentication. This session will now use Vertex AI, and future sessions will automatically fallback when quota is exceeded.',
+    getFailureMessage: (error) =>
+      `Failed to switch to Vertex AI: ${
+        error instanceof Error ? error.message : String(error)
+      }. Setting saved for future sessions.`,
+    missingEnvMessage:
+      'Enabled Vertex AI fallback for future sessions. Set GOOGLE_API_KEY or (GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION) environment variables to use Vertex AI authentication.',
+  },
+};
 
 export function useQuotaAndFallback({
   config,
@@ -32,6 +82,7 @@ export function useQuotaAndFallback({
   userTier,
   setAuthState,
   setModelSwitchedFromQuotaError,
+  settings,
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
@@ -43,6 +94,7 @@ export function useQuotaAndFallback({
       failedModel,
       fallbackModel,
       error,
+      autoFallbackStatus,
     ): Promise<FallbackIntent | null> => {
       if (config.isInFallbackMode()) {
         return null;
@@ -117,8 +169,42 @@ export function useQuotaAndFallback({
       setModelSwitchedFromQuotaError(true);
       config.setQuotaErrorOccurred(true);
 
-      // Interactive Fallback for Pro quota
+      // Handle auto-fallback results from core
+      if (autoFallbackStatus?.status === 'success') {
+        // Core successfully switched auth - show success message
+        const authTypeName =
+          autoFallbackStatus.authType === 'gemini-api-key'
+            ? 'Gemini API key'
+            : 'Vertex AI';
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: `✓ Automatically switched to ${authTypeName} authentication due to quota limits. Retrying your request...`,
+          },
+          Date.now(),
+        );
+        return 'retry';
+      }
+
+      if (autoFallbackStatus?.status === 'missing-env-vars') {
+        // Auto-fallback enabled but env vars missing
+        const envVarName =
+          autoFallbackStatus.authType === 'gemini-api-key'
+            ? 'GEMINI_API_KEY'
+            : 'GOOGLE_API_KEY or (GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION)';
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: `Auto fallback is enabled but required environment variables are not set. Set ${envVarName} to use automatic fallback.`,
+          },
+          Date.now(),
+        );
+        return 'stop';
+      }
+
+      // Interactive Fallback for Pro quota (no auto-fallback or not attempted)
       if (error instanceof TerminalQuotaError) {
+        // Auto fallback not enabled - show interactive dialog
         if (isDialogPending.current) {
           return 'stop'; // A dialog is already active, so just stop this request.
         }
@@ -144,27 +230,70 @@ export function useQuotaAndFallback({
   }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
 
   const handleProQuotaChoice = useCallback(
-    (choice: 'auth' | 'continue') => {
+    async (choice: 'auth' | 'continue' | AutoFallbackType) => {
       if (!proQuotaRequest) return;
 
-      const intent: FallbackIntent = choice === 'auth' ? 'auth' : 'retry';
-      proQuotaRequest.resolve(intent);
+      if (choice === 'gemini-api-key' || choice === 'vertex-ai') {
+        const choiceConfig = AUTO_FALLBACK_CONFIG[choice];
+
+        // Set auto fallback preference
+        await settings.setValue(
+          SettingScope.User,
+          'security.auth.autoFallback',
+          choiceConfig.settingValue,
+        );
+
+        if (choiceConfig.hasEnvVars()) {
+          try {
+            await config.refreshAuth(choiceConfig.refreshAuthType);
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: choiceConfig.successMessage,
+              },
+              Date.now(),
+            );
+          } catch (error) {
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: choiceConfig.getFailureMessage(error),
+              },
+              Date.now(),
+            );
+          }
+        } else {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: choiceConfig.missingEnvMessage,
+            },
+            Date.now(),
+          );
+        }
+
+        proQuotaRequest.resolve('retry');
+      } else {
+        const intent: FallbackIntent = choice === 'auth' ? 'auth' : 'retry';
+        proQuotaRequest.resolve(intent);
+
+        if (choice === 'auth') {
+          setAuthState(AuthState.Updating);
+        } else {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: 'Switched to fallback model. Tip: Press Ctrl+P (or Up Arrow) to recall your previous prompt and submit it again if you wish.',
+            },
+            Date.now(),
+          );
+        }
+      }
+
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
-
-      if (choice === 'auth') {
-        setAuthState(AuthState.Updating);
-      } else {
-        historyManager.addItem(
-          {
-            type: MessageType.INFO,
-            text: 'Switched to fallback model. Tip: Press Ctrl+P (or Up Arrow) to recall your previous prompt and submit it again if you wish.',
-          },
-          Date.now(),
-        );
-      }
     },
-    [proQuotaRequest, setAuthState, historyManager],
+    [proQuotaRequest, setAuthState, historyManager, settings, config],
   );
 
   return {

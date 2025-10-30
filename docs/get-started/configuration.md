@@ -432,6 +432,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
 
+- **`security.auth.autoFallback.enabled`** (boolean):
+  - **Description:** Enable automatic authentication fallback when quota limits
+    are hit. When `true`, the CLI attempts to switch without prompting.
+  - **Default:** `false`
+
+- **`security.auth.autoFallback.type`** (string):
+  - **Description:** Which authentication method to use for automatic fallback.
+    Supported values are `"gemini-api-key"` and `"vertex-ai"`. The chosen method
+    must have its required environment variables set (e.g., `GEMINI_API_KEY` or
+    `GOOGLE_API_KEY` with `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`).
+  - **Default:** `"gemini-api-key"`
+
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):

@@ -710,6 +710,10 @@ export async function loadCliConfig(
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
+    autoFallback: {
+      enabled: settings.security?.auth?.autoFallback?.enabled ?? false,
+      type: settings.security?.auth?.autoFallback?.type ?? 'gemini-api-key',
+    },
     ptyInfo: ptyInfo?.name,
   });
 }

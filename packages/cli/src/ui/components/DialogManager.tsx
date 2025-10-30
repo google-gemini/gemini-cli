@@ -51,11 +51,17 @@ export const DialogManager = ({
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
   }
   if (uiState.proQuotaRequest) {
+    const hasVertexAI =
+      Boolean(process.env['GOOGLE_API_KEY']) ||
+      (Boolean(process.env['GOOGLE_CLOUD_PROJECT']) &&
+        Boolean(process.env['GOOGLE_CLOUD_LOCATION']));
     return (
       <ProQuotaDialog
         failedModel={uiState.proQuotaRequest.failedModel}
         fallbackModel={uiState.proQuotaRequest.fallbackModel}
         onChoice={uiActions.handleProQuotaChoice}
+        hasApiKey={Boolean(process.env['GEMINI_API_KEY'])}
+        hasVertexAI={hasVertexAI}
       />
     );
   }
