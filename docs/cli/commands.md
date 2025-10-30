@@ -325,3 +325,8 @@ Gemini CLI.
   the `GEMINI_CLI=1` environment variable is set in the subprocess's
   environment. This allows scripts or tools to detect if they are being run from
   within the Gemini CLI.
+
+### Command-Line Flags
+
+* **`--temperature`**
+* **Description:** Sets the temperature for the Gemini model. The temperature controls the randomness of the model's output. A higher value (e.g., 0.9) results in more creative and diverse responses, while a lower value (e.g., 0.2) makes the output more deterministic and focused. The value must be between 0.0 and 2.0.
