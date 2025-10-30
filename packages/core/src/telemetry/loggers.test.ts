@@ -92,7 +92,7 @@ import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
-import { type GeminiCLIExtension } from '@google/gemini-cli-core';
+import { type GeminiCLIExtension } from '../config/config.js';
 import {
   FinishReason,
   type CallableTool,
