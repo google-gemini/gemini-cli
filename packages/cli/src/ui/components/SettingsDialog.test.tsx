@@ -299,20 +299,39 @@ describe('SettingsDialog', () => {
     it.each([
       {
         name: 'arrow keys',
-        keys: [TerminalKeys.DOWN_ARROW, TerminalKeys.UP_ARROW],
+        down: TerminalKeys.DOWN_ARROW,
+        up: TerminalKeys.UP_ARROW,
       },
       {
         name: 'vim keys (j/k)',
-        keys: ['j', 'k'],
+        down: 'j',
+        up: 'k',
       },
-    ])('should navigate with $name', async ({ keys }) => {
+    ])('should navigate with $name', async ({ down, up }) => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
-      const { stdin, unmount } = renderDialog(settings, onSelect);
+      const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
+      const initialFrame = lastFrame();
+      expect(initialFrame).toContain('Vim Mode');
+
+      // Navigate down
       act(() => {
-        keys.forEach((key) => stdin.write(key as string));
+        stdin.write(down as string);
+      });
+
+      await vi.waitFor(() => {
+        expect(lastFrame()).toContain('Disable Auto Update');
+      });
+
+      // Navigate up
+      act(() => {
+        stdin.write(up as string);
+      });
+
+      await vi.waitFor(() => {
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       unmount();
