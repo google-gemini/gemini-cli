@@ -23,10 +23,6 @@ import { type LoadedSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { type Config } from '@google/gemini-cli-core';
 
-let onRenderCallback:
-  | ((renderMetrics: { renderTime: number }) => void)
-  | undefined;
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -40,10 +36,9 @@ vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
   return {
     ...actual,
-    render: vi.fn((_node, options) => {
-      onRenderCallback = options.onRender;
-      return actual.render(_node, options);
-    }),
+    // Mock here so we can spyOn the render function. ink uses ESM which doesn't
+    // allow us to spyOn it directly.
+    render: vi.fn((_node, options) => actual.render(_node, options)),
   };
 });
 
@@ -471,12 +466,8 @@ describe('startInteractiveUI', () => {
     registerCleanup: vi.fn(),
   }));
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   afterEach(() => {
-    onRenderCallback = undefined;
+    vi.clearAllMocks();
   });
 
   it('should render the UI with proper React context and exitOnCtrlC disabled', async () => {
@@ -535,6 +526,7 @@ describe('startInteractiveUI', () => {
 
   it('should not recordSlowRender when less than threshold', async () => {
     const { recordSlowRender } = await import('@google/gemini-cli-core');
+    vi.useFakeTimers();
 
     await startInteractiveUI(
       mockConfig,
@@ -544,13 +536,13 @@ describe('startInteractiveUI', () => {
       mockInitializationResult,
     );
 
-    onRenderCallback?.({ renderTime: 200 });
-
     expect(recordSlowRender).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('should call recordSlowRender when more than threshold', async () => {
     const { recordSlowRender } = await import('@google/gemini-cli-core');
+    vi.useFakeTimers();
 
     await startInteractiveUI(
       mockConfig,
@@ -560,11 +552,10 @@ describe('startInteractiveUI', () => {
       mockInitializationResult,
     );
 
-    onRenderCallback?.({ renderTime: 300 });
-
     expect(recordSlowRender).toHaveBeenCalledWith(mockConfig, {
       render_time: 300,
     });
+    vi.useRealTimers();
   });
 
   it.each([
