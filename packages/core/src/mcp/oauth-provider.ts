@@ -817,7 +817,7 @@ ${authUrl}
         );
       }
     } catch (saveError) {
-      coreEvents.emitFeedback('error', 'Failed to save auth token.', saveError);
+      debugLogger.error('Failed to save auth token.', saveError);
       throw saveError;
     }
 
