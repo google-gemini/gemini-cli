@@ -42,7 +42,7 @@
     "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "highlight.js": "^11.11.1",
-    "ink": "^6.2.3",
+    "ink": "npm:@jrichman/ink@6.4.0",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "latest-version": "^9.0.0",
@@ -74,6 +74,7 @@
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/react-test-renderer": "^19.1.0",
     "@types/semver": "^7.7.0",
     "@types/shell-quote": "^1.7.5",
     "@types/tar": "^6.1.13",
@@ -83,10 +84,15 @@
     "jsdom": "^26.1.0",
     "pretty-format": "^30.0.2",
     "react-dom": "^19.1.0",
+    "react-test-renderer": "^19.2.0",
     "typescript": "^5.3.3",
+    "vite-tsconfig-paths": "5.1.4",
     "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "vite-tsconfig-paths": "5.1.4"
   }
 }
