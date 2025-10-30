@@ -117,15 +117,18 @@ export class WorkspaceContext {
   private resolveAndValidateDir(directory: string): string {
     const absolutePath = path.resolve(this.targetDir, directory);
 
-    if (!fs.existsSync(absolutePath)) {
-      throw new Error(`Directory does not exist: ${absolutePath}`);
+    const normalizedPath = normalizePath(absolutePath);
+
+    if (!fs.existsSync(normalizedPath)) {
+      throw new Error(`Directory does not exist: ${normalizedPath}`);
     }
-    const stats = fs.statSync(absolutePath);
+    const stats = fs.statSync(normalizedPath);
     if (!stats.isDirectory()) {
-      throw new Error(`Path is not a directory: ${absolutePath}`);
+      throw new Error(`Path is not a directory: ${normalizedPath}`);
     }
 
-    return normalizePath(fs.realpathSync(absolutePath));
+    const rawFilesystemPath = fs.realpathSync(normalizedPath);
+    return normalizePath(rawFilesystemPath);
   }
 
   /**
@@ -183,7 +186,9 @@ export class WorkspaceContext {
   private fullyResolvedPath(pathToCheck: string): string {
     try {
       const resolvedPath = path.resolve(this.targetDir, pathToCheck);
-      return fs.realpathSync(normalizePath(resolvedPath));
+      const normalizedPath = normalizePath(resolvedPath);
+      const rawFilesystemPath = fs.realpathSync(normalizedPath);
+      return normalizePath(rawFilesystemPath);
     } catch (e: unknown) {
       if (
         isNodeError(e) &&
@@ -194,7 +199,7 @@ export class WorkspaceContext {
         !this.isFileSymlink(e.path)
       ) {
         // If it doesn't exist, e.path contains the fully resolved path.
-        return e.path;
+        return normalizePath(e.path);
       }
       throw e;
     }

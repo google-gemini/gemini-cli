@@ -13,6 +13,7 @@ import {
   ideContextStore,
   GEMINI_DIR,
   homedir,
+  normalizePath,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
@@ -117,7 +118,7 @@ export class LoadedTrustedFolders {
     }
 
     for (const untrustedPath of untrustedPaths) {
-      if (path.normalize(location) === path.normalize(untrustedPath)) {
+      if (normalizePath(location) === normalizePath(untrustedPath)) {
         return false;
       }
     }

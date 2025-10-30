@@ -47,7 +47,11 @@ export function tmpdir(): string {
  * @returns The NFC-normalized path.
  */
 export function normalizePath(p: string): string {
-  return p.normalize('NFC');
+  if (!p) {
+    return p;
+  }
+  const normalizedPath = path.normalize(p);
+  return normalizedPath.normalize('NFC');
 }
 
 /**

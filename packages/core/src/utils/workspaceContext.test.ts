@@ -10,7 +10,6 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { WorkspaceContext } from './workspaceContext.js';
 import { debugLogger } from './debugLogger.js';
-import { normalizePath } from './paths.js';
 
 describe('WorkspaceContext with real filesystem', () => {
   let tempDir: string;
@@ -197,7 +196,7 @@ describe('WorkspaceContext with real filesystem', () => {
 
       // There should be only one entry for the unicode directory, plus the initial cwd.
       expect(directories).toHaveLength(2);
-      expect(directories).toContain(normalizePath(unicodeDirPath));
+      expect(directories).toContain(unicodeDirPath.normalize('NFC'));
     });
 
     describe.skipIf(os.platform() === 'win32')('with symbolic link', () => {

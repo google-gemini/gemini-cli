@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as path from 'node:path';
 import { homedir } from '@google/gemini-cli-core';
+import { normalizePath } from '@google/gemini-cli-core';
 
 export function resolvePath(p: string): string {
   if (!p) {
@@ -17,5 +17,5 @@ export function resolvePath(p: string): string {
   } else if (p === '~' || p.startsWith('~/')) {
     expandedPath = homedir() + p.substring(1);
   }
-  return path.normalize(expandedPath);
+  return normalizePath(expandedPath);
 }
