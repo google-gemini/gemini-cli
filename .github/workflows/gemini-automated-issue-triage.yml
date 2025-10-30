@@ -151,20 +151,17 @@ jobs:
           prompt: |-
             ## Role
 
-            You are an issue triage assistant. Analyze the current GitHub issue
-            and identify the most appropriate existing labels by only using the provided data. Use the available
-            tools to gather information; do not ask for information to be
-            provided.
+            You are an issue triage assistant. Your role is to analyze a GitHub issue and determine the single most appropriate area/ label and the single most appropriate priority/ label based on the definitions provided.
 
             ## Steps
+            1. Review the issue title and body provided in the environment variables: ${ISSUE_TITLE} and ${ISSUE_BODY}.
+            2. Review the available labels provided in the environment variable: ${AVAILABLE_LABELS}.
+            3. Select exactly one area/ label that best matches the issue based on Reference 1: Area Definitions.
+            4. Select exactly one priority/ label that best matches the issue based on Reference 2: Priority Definitions.
+            
 
-            1. You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
-            2. Review the issue title and body provided in the environment variables: "${ISSUE_TITLE}" and "${ISSUE_BODY}".
-            3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case.
-            4. If the issue already has area/ label, dont try to change it. Similarly, if the issue already has a kind/ label don't change it. And if the issue already has a priority/ label do not change it for example:
-               If an issue has area/core and kind/bug  you will only add a priority/ label.
-               Instead if an issue has no labels, you will could add one lable of each kind.
-            5. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label.
+            - existing labels
+
             6. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
             7. Output the appropriate labels for this issue in JSON format with explanation, for example:
                ```
@@ -191,36 +188,7 @@ jobs:
             - Output only valid JSON format
             - Do not include any explanation or additional text, just the JSON
 
-            Reference 1: Priority Definitions
-            priority/p0: Critical / Blocker
-            - Definition: A catastrophic failure that makes the CLI unusable for most users or poses a severe security risk. This includes installation failures, authentication failures, persistent crashes, or critical security vulnerabilities.
-            - Key Questions:
-              - Is the CLI failing to install or run?
-              - Does it fail to authenticate or connect to the Gemini API, making all commands useless?
-              - Is it consistently crashing on basic, common commands?
-              - Does this represent a critical security vulnerability?
-
-            priority/p1: High
-            - Definition: A severe issue where a core feature (e.g., text generation, code generation, file processing) is unusable, failing, has severe performance degradation, or providing fundamentally incorrect output formatting (e.g., truncated text, broken JSON). Affects many users, and there is no reasonable workaround.
-            - Key Questions:
-              - Is a core feature failing for a specific, large user group (e.g., all Windows users, all users of a specific shell)?
-              - Is the CLI failing to process a supported input or misinterpreting critical flags?
-              - Is the CLI's output formatting consistently broken, making the response unusable?
-              - Is a core command or feature extremely slow, making it impractical to use?
-
-            priority/p2: Medium
-            - Definition: A moderately impactful issue causing inconvenience or a non-optimal experience, but a reasonable workaround exists. This also includes failures in non-core features.
-            - Key Questions:
-              - Is a command or flag behaving incorrectly, but the user can achieve their goal via other means?
-              - Is there a significant, non-blocking UI/UX problem in the terminal (e.g., broken progress indicators, bad terminal coloring)?
-
-            priority/p3: Low
-            - Definition: A minor, low-impact issue with minimal effect on functionality. This includes most cosmetic defects, typos in documentation, or unclear help text.
-            - Key Questions:
-              - Is this a typo in the README.md, gemini --help text, or other documentation?
-              - Is this a minor cosmetic issue (e.g., text alignment in output, an extra newline) that doesn't affect usability?
-
-            Reference 2: Area Definitions
+            Reference 1: Area Definitions
             area/agent
             - Description: Issues related to the "brain" of the CLI. This includes the core agent logic, model quality, tool/function calling, and memory.
             - Example Issues:
@@ -296,6 +264,35 @@ jobs:
 
             area/unknown
             - Description: Issues that do not clearly fit into any other defined area/ category, or where information is too limited to make a determination. Use this when no other area is appropriate.
+
+            Reference 2: Priority Definitions
+            priority/p0: Critical / Blocker
+            - Definition: A catastrophic failure that makes the CLI unusable for most users or poses a severe security risk. This includes installation failures, authentication failures, persistent crashes, or critical security vulnerabilities.
+            - Key Questions:
+              - Is the CLI failing to install or run?
+              - Does it fail to authenticate or connect to the Gemini API, making all commands useless?
+              - Is it consistently crashing on basic, common commands?
+              - Does this represent a critical security vulnerability?
+
+            priority/p1: High
+            - Definition: A severe issue where a core feature (e.g., text generation, code generation, file processing) is unusable, failing, has severe performance degradation, or providing fundamentally incorrect output formatting (e.g., truncated text, broken JSON). Affects many users, and there is no reasonable workaround.
+            - Key Questions:
+              - Is a core feature failing for a specific, large user group (e.g., all Windows users, all users of a specific shell)?
+              - Is the CLI failing to process a supported input or misinterpreting critical flags?
+              - Is the CLI's output formatting consistently broken, making the response unusable?
+              - Is a core command or feature extremely slow, making it impractical to use?
+
+            priority/p2: Medium
+            - Definition: A moderately impactful issue causing inconvenience or a non-optimal experience, but a reasonable workaround exists. This also includes failures in non-core features.
+            - Key Questions:
+              - Is a command or flag behaving incorrectly, but the user can achieve their goal via other means?
+              - Is there a significant, non-blocking UI/UX problem in the terminal (e.g., broken progress indicators, bad terminal coloring)?
+
+            priority/p3: Low
+            - Definition: A minor, low-impact issue with minimal effect on functionality. This includes most cosmetic defects, typos in documentation, or unclear help text.
+            - Key Questions:
+              - Is this a typo in the README.md, gemini --help text, or other documentation?
+              - Is this a minor cosmetic issue (e.g., text alignment in output, an extra newline) that doesn't affect usability?
 
       - name: 'Apply Labels to Issue'
         if: |-
