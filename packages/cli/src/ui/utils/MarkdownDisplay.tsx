@@ -211,21 +211,21 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           break;
         case 3:
           headerNode = (
-            <Text bold color={theme.text.primary}>
+            <Text bold color={ui?.responseColor || theme.text.primary}>
               <RenderInline text={headerText} />
             </Text>
           );
           break;
         case 4:
           headerNode = (
-            <Text italic color={theme.text.secondary}>
+            <Text italic color={ui?.responseColor || theme.text.secondary}>
               <RenderInline text={headerText} />
             </Text>
           );
           break;
         default:
           headerNode = (
-            <Text color={theme.text.primary}>
+            <Text color={ui?.responseColor || theme.text.primary}>
               <RenderInline text={headerText} />
             </Text>
           );
@@ -243,6 +243,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           type="ul"
           marker={marker}
           leadingWhitespace={leadingWhitespace}
+          responseColor={ui?.responseColor}
         />,
       );
     } else if (olMatch) {
@@ -256,6 +257,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           type="ol"
           marker={marker}
           leadingWhitespace={leadingWhitespace}
+          responseColor={ui?.responseColor}
         />,
       );
     } else {
@@ -391,6 +393,7 @@ interface RenderListItemProps {
   type: 'ul' | 'ol';
   marker: string;
   leadingWhitespace?: string;
+  responseColor?: string;
 }
 
 const RenderListItemInternal: React.FC<RenderListItemProps> = ({
