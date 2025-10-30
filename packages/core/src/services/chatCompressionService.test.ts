@@ -70,7 +70,7 @@ describe('findCompressSplitPoint', () => {
     expect(findCompressSplitPoint(history, 0.8)).toBe(4);
   });
 
-  it('should return earlier splitpoint if no valid ones are after threshhold', () => {
+  it('should return earlier splitpoint if no valid ones are after threshold', () => {
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'This is the first message.' }] },
       { role: 'model', parts: [{ text: 'This is the second message.' }] },
@@ -115,7 +115,7 @@ describe('ChatCompressionService', () => {
       getLastPromptTokenCount: vi.fn().mockReturnValue(500),
     } as unknown as GeminiChat;
     mockConfig = {
-      getChatCompression: vi.fn(),
+      getCompressionThreshold: vi.fn(),
       getContentGenerator: vi.fn(),
     } as unknown as Config;
 
