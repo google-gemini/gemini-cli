@@ -7,7 +7,6 @@
 import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
 import { diag, metrics, ValueType } from '@opentelemetry/api';
 import { SERVICE_NAME } from './constants.js';
-import { EVENT_CHAT_COMPRESSION } from './types.js';
 import type { Config } from '../config/config.js';
 import type {
   ModelRoutingEvent,
@@ -17,6 +16,7 @@ import type {
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 
+const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 const TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
 const API_REQUEST_COUNT = 'gemini_cli.api.request.count';
