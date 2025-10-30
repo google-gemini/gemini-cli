@@ -140,7 +140,6 @@ export class ExtensionManager implements ExtensionLoader {
     let extension: GeminiCLIExtension | null;
     try {
       if (!isWorkspaceTrusted(this.settings).isTrusted) {
-        console.log('Workspace is not trusted.');
         if (
           await this.requestConsent(
             `The current workspace at "${this.workspaceDir}" is not trusted. Do you want to trust this workspace to install extensions?`,
@@ -154,7 +153,6 @@ export class ExtensionManager implements ExtensionLoader {
           );
         }
       }
-      console.log('workspace is trusted');
       const extensionsDir = ExtensionStorage.getUserExtensionsDir();
       await fs.promises.mkdir(extensionsDir, { recursive: true });
 
