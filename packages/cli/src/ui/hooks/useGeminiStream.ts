@@ -306,10 +306,6 @@ export const useGeminiStream = (
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {
-      console.log(
-        '[CRS_LOG] History at cancellation:',
-        JSON.stringify(history, null, 2),
-      );
       // Reconstruct the full model turn from the UI history.
       // A single model response can be split into multiple history items
       // ('gemini' and 'gemini_content') for rendering performance. We need
@@ -329,20 +325,12 @@ export const useGeminiStream = (
 
       // 2. Add the final pending chunk.
       fullResponseText += pendingHistoryItemRef.current.text || '';
-      console.log(
-        '[CRS_LOG] Reconstructed fullResponseText:',
-        fullResponseText,
-      );
 
       // 3. Commit the full, reconstructed partial response.
       const historyItemToCommit: HistoryContent = {
         role: 'model',
         parts: [{ text: fullResponseText }],
       };
-      console.log(
-        '[CRS_LOG] Committing to history:',
-        JSON.stringify(historyItemToCommit, null, 2),
-      );
 
       geminiClient.commitCancelledResponse(historyItemToCommit);
       addItem(pendingHistoryItemRef.current, Date.now());
