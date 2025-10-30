@@ -95,6 +95,7 @@ describe('Telemetry Metrics', () => {
   let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
   let recordExitFailModule: typeof import('./metrics.js').recordExitFail;
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
+  let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -138,6 +139,7 @@ describe('Telemetry Metrics', () => {
     recordExitFailModule = metricsJsModule.recordExitFail;
     recordSlowRenderModule = metricsJsModule.recordSlowRender;
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
+    recordLinesChangedModule = metricsJsModule.recordLinesChanged;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -369,6 +371,53 @@ describe('Telemetry Metrics', () => {
         'user.email': 'test@example.com',
         model: 'gemini-different-model',
         type: 'input',
+      });
+    });
+  });
+
+  describe('recordLinesChanged metric', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTelemetryEnabled: () => true,
+    } as unknown as Config;
+
+    it('should not record lines added/removed if not initialized', () => {
+      recordLinesChangedModule(mockConfig, 10, 'added', {
+        function_name: 'fn',
+      });
+      recordLinesChangedModule(mockConfig, 5, 'removed', {
+        function_name: 'fn',
+      });
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('should record lines added with function_name after initialization', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+      recordLinesChangedModule(mockConfig, 10, 'added', {
+        function_name: 'my-fn',
+      });
+      expect(mockCounterAddFn).toHaveBeenCalledWith(10, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        type: 'added',
+        function_name: 'my-fn',
+      });
+    });
+
+    it('should record lines removed with function_name after initialization', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+      recordLinesChangedModule(mockConfig, 7, 'removed', {
+        function_name: 'my-fn',
+      });
+      expect(mockCounterAddFn).toHaveBeenCalledWith(7, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        type: 'removed',
+        function_name: 'my-fn',
       });
     });
   });
