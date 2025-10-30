@@ -24,6 +24,7 @@ const API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 const TOKEN_USAGE = 'gemini_cli.token.usage';
 const SESSION_COUNT = 'gemini_cli.session.count';
 const FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+const LINES_CHANGED = 'gemini_cli.lines.changed';
 const INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 const CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 const CONTENT_RETRY_FAILURE_COUNT =
@@ -72,11 +73,6 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
       decision?: 'accept' | 'reject' | 'modify' | 'auto_accept';
       tool_type?: 'native' | 'mcp';
-      // Optional diff statistics for file-modifying tools
-      model_added_lines?: number;
-      model_removed_lines?: number;
-      user_added_lines?: number;
-      user_removed_lines?: number;
     },
   },
   [API_REQUEST_COUNT]: {
@@ -114,6 +110,15 @@ const COUNTER_DEFINITIONS = {
       mimetype?: string;
       extension?: string;
       programming_language?: string;
+    },
+  },
+  [LINES_CHANGED]: {
+    description: 'Number of lines changed (from file diffs).',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (linesChangedCounter = c),
+    attributes: {} as {
+      function_name?: string;
+      type: 'added' | 'removed';
     },
   },
   [INVALID_CHUNK_COUNT]: {
@@ -454,6 +459,7 @@ let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let sessionCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let linesChangedCounter: Counter | undefined;
 let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
@@ -618,6 +624,21 @@ export function recordFileOperationMetric(
   fileOperationCounter.add(1, {
     ...baseMetricDefinition.getCommonAttributes(config),
     ...attributes,
+  });
+}
+
+export function recordLinesChanged(
+  config: Config,
+  lines: number,
+  changeType: 'added' | 'removed',
+  attributes?: { function_name?: string },
+): void {
+  if (!linesChangedCounter || !isMetricsInitialized) return;
+  if (!Number.isFinite(lines) || lines <= 0) return;
+  linesChangedCounter.add(lines, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    type: changeType,
+    ...(attributes ?? {}),
   });
 }
 

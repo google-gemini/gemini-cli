@@ -793,11 +793,15 @@ describe('loggers', () => {
 
     const mockMetrics = {
       recordToolCallMetrics: vi.fn(),
+      recordLinesChanged: vi.fn(),
     };
 
     beforeEach(() => {
       vi.spyOn(metrics, 'recordToolCallMetrics').mockImplementation(
         mockMetrics.recordToolCallMetrics,
+      );
+      vi.spyOn(metrics, 'recordLinesChanged').mockImplementation(
+        mockMetrics.recordLinesChanged,
       );
       mockLogger.emit.mockReset();
     });
@@ -895,10 +899,6 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           tool_type: 'native',
-          model_added_lines: 1,
-          model_removed_lines: 2,
-          user_added_lines: 5,
-          user_removed_lines: 6,
         },
       );
 
@@ -907,6 +907,19 @@ describe('loggers', () => {
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
+
+      expect(mockMetrics.recordLinesChanged).toHaveBeenCalledWith(
+        mockConfig,
+        1,
+        'added',
+        { function_name: 'test-function' },
+      );
+      expect(mockMetrics.recordLinesChanged).toHaveBeenCalledWith(
+        mockConfig,
+        2,
+        'removed',
+        { function_name: 'test-function' },
+      );
     });
     it('should log a tool call with a reject decision', () => {
       const call: ErroredToolCall = {
