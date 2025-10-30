@@ -67,6 +67,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_tools?: string;
   output_format: OutputFormat;
   extensions_count: number;
+  extensions: string;
   extension_ids: string;
   auth_type?: string;
 
@@ -102,6 +103,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.output_format = config.getOutputFormat();
     const extensions = config.getExtensions();
     this.extensions_count = extensions.length;
+    this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
     this.auth_type = generatorConfig?.authType;
     if (toolRegistry) {
@@ -135,6 +137,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       mcp_tools: this.mcp_tools,
       mcp_tools_count: this.mcp_tools_count,
       output_format: this.output_format,
+      extensions: this.extensions,
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
       auth_type: this.auth_type,
