@@ -515,13 +515,17 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    await runNonInteractive(
-      nonInteractiveConfig,
+    const hasDeprecatedPromptArg = process.argv.some((arg) =>
+      arg.startsWith('--prompt'),
+    );
+    await runNonInteractive({
+      config: nonInteractiveConfig,
       settings,
       input,
       prompt_id,
+      hasDeprecatedPromptArg,
       resumedSessionData,
-    );
+    });
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(0);

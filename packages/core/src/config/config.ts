@@ -585,7 +585,7 @@ export class Config {
       this.geminiClient.stripThoughtsFromHistory();
     }
 
-    const newContentGeneratorConfig = createContentGeneratorConfig(
+    const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
     );
