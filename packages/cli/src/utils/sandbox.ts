@@ -565,16 +565,9 @@ export async function start_sandbox(
       )}`;
       debugLogger.log(`ContainerName: ${containerName}`);
     } else {
-      let index = 0;
-      const containerNameCheck = execSync(
-        `${config.command} ps -a --format "{{.Names}}"`,
-      )
-        .toString()
-        .trim();
-      while (containerNameCheck.includes(`${imageName}-${index}`)) {
-        index++;
-      }
-      containerName = `${imageName}-${index}`;
+      // Use a random suffix to avoid name collisions when multiple CLI instances run concurrently.
+      const id = randomBytes(6).toString('hex');
+      containerName = `${imageName}-${id}`;
       debugLogger.log(`ContainerName (regular): ${containerName}`);
     }
     args.push('--name', containerName, '--hostname', containerName);
