@@ -6,7 +6,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
-import { AuthType, debugLogger, type Config } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  type Config,
+  loadApiKey,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
@@ -22,6 +27,10 @@ export function validateAuthMethodWithSettings(
   if (settings.merged.security?.auth?.useExternal) {
     return null;
   }
+  // If using Gemini API key, we don't validate it here as we might need to prompt for it.
+  if (authType === AuthType.USE_GEMINI) {
+    return null;
+  }
   return validateAuthMethod(authType);
 }
 
@@ -31,6 +40,9 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
   );
 
   const [authError, setAuthError] = useState<string | null>(null);
+  const [apiKeyDefaultValue, setApiKeyDefaultValue] = useState<
+    string | undefined
+  >(undefined);
 
   const onAuthError = useCallback(
     (error: string | null) => {
@@ -41,6 +53,14 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
     },
     [setAuthError, setAuthState],
   );
+
+  const reloadApiKey = useCallback(async () => {
+    const storedKey = (await loadApiKey()) ?? '';
+    const envKey = process.env['GEMINI_API_KEY'] ?? '';
+    const key = storedKey || envKey;
+    setApiKeyDefaultValue(key);
+    return key; // Return the key for immediate use
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -59,6 +79,15 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
         }
         return;
       }
+
+      if (authType === AuthType.USE_GEMINI) {
+        const key = await reloadApiKey(); // Use the unified function
+        if (!key) {
+          setAuthState(AuthState.AwaitingApiKeyInput);
+          return;
+        }
+      }
+
       const error = validateAuthMethodWithSettings(authType, settings);
       if (error) {
         onAuthError(error);
@@ -87,12 +116,22 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
         onAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
       }
     })();
-  }, [settings, config, authState, setAuthState, setAuthError, onAuthError]);
+  }, [
+    settings,
+    config,
+    authState,
+    setAuthState,
+    setAuthError,
+    onAuthError,
+    reloadApiKey,
+  ]);
 
   return {
     authState,
     setAuthState,
     authError,
     onAuthError,
+    apiKeyDefaultValue,
+    reloadApiKey,
   };
 };

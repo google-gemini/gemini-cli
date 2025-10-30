@@ -191,7 +191,7 @@ describe('AuthDialog', () => {
         AuthType.USE_GEMINI,
       );
       expect(props.setAuthState).toHaveBeenCalledWith(
-        AuthState.Unauthenticated,
+        AuthState.AwaitingApiKeyInput,
       );
     });
 
