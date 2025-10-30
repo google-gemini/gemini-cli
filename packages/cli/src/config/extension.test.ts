@@ -172,12 +172,10 @@ describe('extension tests', () => {
     mockPromptForSettings = vi.fn();
     mockPromptForSettings.mockResolvedValue('');
     fs.mkdirSync(userExtensionsDir, { recursive: true });
-    // vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: undefined,
     });
-    // vi.mocked(getTrustedFoldersPath).mockReturnValue(path.join(tempHomeDir, GEMINI_DIR, TRUSTED_FOLDERS_FILENAME));
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
