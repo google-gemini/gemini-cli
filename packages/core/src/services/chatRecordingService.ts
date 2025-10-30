@@ -6,7 +6,6 @@
 
 import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
-import { coreEvents } from '../utils/events.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
@@ -16,6 +15,7 @@ import type {
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -171,11 +171,7 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
-        'Error initializing chat recording service.',
-        error,
-      );
+      debugLogger.error('Error initializing chat recording service:', error);
       throw error;
     }
   }
@@ -227,11 +223,7 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
-        'Error saving message to chat history.',
-        error,
-      );
+      debugLogger.error('Error saving message to chat history.', error);
       throw error;
     }
   }
@@ -248,11 +240,7 @@ export class ChatRecordingService {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
-        'Error saving thought to chat history.',
-        error,
-      );
+      debugLogger.error('Error saving thought to chat history.', error);
       throw error;
     }
   }
@@ -286,8 +274,7 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
+      debugLogger.error(
         'Error updating message tokens in chat history.',
         error,
       );
@@ -384,8 +371,7 @@ export class ChatRecordingService {
         }
       });
     } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
+      debugLogger.error(
         'Error adding tool call to message in chat history.',
         error,
       );
@@ -402,11 +388,7 @@ export class ChatRecordingService {
       return JSON.parse(this.cachedLastConvData);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        coreEvents.emitFeedback(
-          'error',
-          'Error reading conversation file.',
-          error,
-        );
+        debugLogger.error('Error reading conversation file.', error);
         throw error;
       }
 
@@ -438,11 +420,7 @@ export class ChatRecordingService {
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
-        'Error writing conversation file.',
-        error,
-      );
+      debugLogger.error('Error writing conversation file.', error);
       throw error;
     }
   }
@@ -471,7 +449,7 @@ export class ChatRecordingService {
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
       fs.unlinkSync(sessionPath);
     } catch (error) {
-      coreEvents.emitFeedback('error', 'Error deleting session file.', error);
+      debugLogger.error('Error deleting session file.', error);
       throw error;
     }
   }
