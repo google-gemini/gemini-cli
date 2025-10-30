@@ -479,6 +479,7 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT,
         value: event.extensions_count.toString(),
       },
+      // We deliberately do not log the names of extensions here, to be safe.
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
@@ -634,27 +635,27 @@ export class ClearcutLogger {
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT,
-        value: JSON.stringify(event.input_token_count),
+        value: JSON.stringify(event.usage.input_token_count),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_OUTPUT_TOKEN_COUNT,
-        value: JSON.stringify(event.output_token_count),
+        value: JSON.stringify(event.usage.output_token_count),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_CACHED_TOKEN_COUNT,
-        value: JSON.stringify(event.cached_content_token_count),
+        value: JSON.stringify(event.usage.cached_content_token_count),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_THINKING_TOKEN_COUNT,
-        value: JSON.stringify(event.thoughts_token_count),
+        value: JSON.stringify(event.usage.thoughts_token_count),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
-        value: JSON.stringify(event.tool_token_count),
+        value: JSON.stringify(event.usage.tool_token_count),
       },
     ];
 
