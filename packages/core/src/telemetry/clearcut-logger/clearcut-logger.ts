@@ -564,6 +564,12 @@ export class ClearcutLogger {
         }
       }
     }
+    if (event.extension_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      });
+    }
 
     const logEvent = this.createLogEvent(EventNames.TOOL_CALL, data);
     this.enqueueLogEvent(logEvent);
@@ -776,6 +782,13 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_STATUS,
         value: JSON.stringify(event.status),
+      });
+    }
+
+    if (event.extension_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
       });
     }
 

@@ -71,18 +71,22 @@ const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   }
 };
 
-const statusTextColor: Partial<Record<TodoStatus, string>> = {
-  in_progress: theme.text.accent,
-  completed: theme.text.secondary,
-  cancelled: theme.text.secondary,
-};
-
 const TodoItemDisplay: React.FC<{
   todo: Todo;
   wrap?: 'truncate';
   role?: 'listitem';
 }> = ({ todo, wrap, role: ariaRole }) => {
-  const textColor = statusTextColor[todo.status] ?? theme.text.primary;
+  const textColor = (() => {
+    switch (todo.status) {
+      case 'in_progress':
+        return theme.text.accent;
+      case 'completed':
+      case 'cancelled':
+        return theme.text.secondary;
+      default:
+        return theme.text.primary;
+    }
+  })();
   const strikethrough = todo.status === 'cancelled';
 
   return (
