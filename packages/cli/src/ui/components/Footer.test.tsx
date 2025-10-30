@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect, vi } from 'vitest';
 import {
   renderWithProviders,
   createMockSettings,
@@ -120,6 +121,13 @@ describe('<Footer />', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
       uiState: { sessionStats: mockSessionStats },
+      settings: createMockSettings({
+        ui: {
+          footer: {
+            hideContextPercentage: false,
+          },
+        },
+      }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\(\d+% context left\)/);
@@ -129,6 +137,13 @@ describe('<Footer />', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 99,
       uiState: { sessionStats: mockSessionStats },
+      settings: createMockSettings({
+        ui: {
+          footer: {
+            hideContextPercentage: false,
+          },
+        },
+      }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\(\d+%\)/);
@@ -192,6 +207,13 @@ describe('<Footer />', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
         uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
       });
       expect(lastFrame()).toMatchSnapshot('complete-footer-wide');
     });
@@ -247,10 +269,49 @@ describe('<Footer />', () => {
       expect(lastFrame()).toMatchSnapshot('footer-only-sandbox');
     });
 
+    it('hides the context percentage when hideContextPercentage is true', () => {
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: true,
+            },
+          },
+        }),
+      });
+      expect(lastFrame()).toContain(defaultProps.model);
+      expect(lastFrame()).not.toMatch(/\(\d+% context left\)/);
+    });
+
+    it('shows the context percentage when hideContextPercentage is false', () => {
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
+      });
+      expect(lastFrame()).toContain(defaultProps.model);
+      expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+    });
+
     it('renders complete footer in narrow terminal (baseline narrow)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 79,
         uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
       });
       expect(lastFrame()).toMatchSnapshot('complete-footer-narrow');
     });
