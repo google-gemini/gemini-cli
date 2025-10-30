@@ -174,6 +174,18 @@ describe('gemini.tsx main function', () => {
         getMessageBus: () => ({
           subscribe: vi.fn(),
         }),
+        getToolRegistry: vi.fn(),
+        getContentGeneratorConfig: vi.fn(),
+        getModel: () => 'gemini-pro',
+        getEmbeddingModel: () => 'embedding-001',
+        getApprovalMode: () => 'default',
+        getCoreTools: () => [],
+        getTelemetryEnabled: () => false,
+        getTelemetryLogPromptsEnabled: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
+        getOutputFormat: () => 'text',
+        getExtensions: () => [],
+        getUsageStatisticsEnabled: () => false,
       } as unknown as Config;
     });
     vi.mocked(loadSettings).mockReturnValue({
@@ -309,6 +321,18 @@ describe('gemini.tsx main function kitty protocol', () => {
       getMessageBus: () => ({
         subscribe: vi.fn(),
       }),
+      getToolRegistry: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-001',
+      getApprovalMode: () => 'default',
+      getCoreTools: () => [],
+      getTelemetryEnabled: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getExtensions: () => [],
+      getUsageStatisticsEnabled: () => false,
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       errors: [],
@@ -340,6 +364,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       useWriteTodos: undefined,
       outputFormat: undefined,
       fakeResponses: undefined,
+      recordResponses: undefined,
     });
 
     await main();
@@ -414,6 +439,7 @@ describe('startInteractiveUI', () => {
   vi.mock('./utils/cleanup.js', () => ({
     cleanupCheckpoints: vi.fn(() => Promise.resolve()),
     registerCleanup: vi.fn(),
+    runExitCleanup: vi.fn(),
   }));
 
   vi.mock('ink', () => ({
