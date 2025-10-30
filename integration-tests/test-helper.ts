@@ -318,6 +318,8 @@ export class TestRig {
       model: DEFAULT_GEMINI_MODEL,
       sandbox:
         env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+      // Don't show the IDE connection dialog when running from VsCode
+      ide: { enabled: false, hasSeenNudge: true },
       ...options.settings, // Allow tests to override/add settings
     };
     writeFileSync(

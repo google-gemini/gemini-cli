@@ -28,7 +28,9 @@ test('installs a local extension, updates it, checks it was reloaded properly', 
 
   const rig = new TestRig();
   rig.setup('extension reload test', {
-    settings: { experimental: { extensionReloading: true } },
+    settings: {
+      experimental: { extensionReloading: true },
+    },
   });
   const testServerPath = join(rig.testDir!, 'gemini-extension.json');
   writeFileSync(testServerPath, safeJsonStringify(extension, 2));

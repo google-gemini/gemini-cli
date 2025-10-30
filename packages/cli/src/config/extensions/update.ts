@@ -146,34 +146,37 @@ export async function checkForAllExtensionUpdates(
   dispatch: (action: ExtensionUpdateAction) => void,
 ): Promise<void> {
   dispatch({ type: 'BATCH_CHECK_START' });
-  const promises: Array<Promise<void>> = [];
-  for (const extension of extensions) {
-    if (!extension.installMetadata) {
+  try {
+    const promises: Array<Promise<void>> = [];
+    for (const extension of extensions) {
+      if (!extension.installMetadata) {
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: extension.name,
+            state: ExtensionUpdateState.NOT_UPDATABLE,
+          },
+        });
+        continue;
+      }
       dispatch({
         type: 'SET_STATE',
         payload: {
           name: extension.name,
-          state: ExtensionUpdateState.NOT_UPDATABLE,
+          state: ExtensionUpdateState.CHECKING_FOR_UPDATES,
         },
       });
-      continue;
+      promises.push(
+        checkForExtensionUpdate(extension, extensionManager).then((state) =>
+          dispatch({
+            type: 'SET_STATE',
+            payload: { name: extension.name, state },
+          }),
+        ),
+      );
     }
-    dispatch({
-      type: 'SET_STATE',
-      payload: {
-        name: extension.name,
-        state: ExtensionUpdateState.CHECKING_FOR_UPDATES,
-      },
-    });
-    promises.push(
-      checkForExtensionUpdate(extension, extensionManager).then((state) =>
-        dispatch({
-          type: 'SET_STATE',
-          payload: { name: extension.name, state },
-        }),
-      ),
-    );
+    await Promise.all(promises);
+  } finally {
+    dispatch({ type: 'BATCH_CHECK_END' });
   }
-  await Promise.all(promises);
-  dispatch({ type: 'BATCH_CHECK_END' });
 }
