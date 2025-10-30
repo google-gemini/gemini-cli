@@ -37,6 +37,7 @@ import type {
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  EditProposedEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -91,6 +92,7 @@ export enum EventNames {
   AGENT_START = 'agent_start',
   AGENT_FINISH = 'agent_finish',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
+  EDIT_PROPOSED = 'edit_proposed',
 }
 
 export interface LogResponse {
@@ -1227,6 +1229,22 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.WEB_FETCH_FALLBACK_ATTEMPT, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logEditProposedEvent(event: EditProposedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_PROPOSED_ADDED_LINES,
+        value: event.suggested_added_lines.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_PROPOSED_REMOVED_LINES,
+        value: event.suggested_removed_lines.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.EDIT_PROPOSED, data));
     this.flushIfNeeded();
   }
 

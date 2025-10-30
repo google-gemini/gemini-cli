@@ -28,7 +28,7 @@ import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
-import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { DEFAULT_DIFF_OPTIONS, getConfirmedDiffStats } from './diffOptions.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -389,7 +389,7 @@ class EditToolInvocation
       const fileName = path.basename(this.params.file_path);
       const originallyProposedContent =
         this.params.ai_proposed_content || editData.newContent;
-      const diffStat = getDiffStat(
+      const diffStat = getConfirmedDiffStats(
         fileName,
         editData.currentContent ?? '',
         originallyProposedContent,

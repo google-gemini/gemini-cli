@@ -32,6 +32,8 @@ const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
+const EDIT_PROPOSED_ADDED_LINES = 'gemini.cli.edit.lines.added';
+const EDIT_PROPOSED_REMOVED_LINES = 'gemini.cli.edit.lines.removed';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -383,6 +385,20 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
       baseline_value: number;
     },
   },
+  [EDIT_PROPOSED_ADDED_LINES]: {
+    description: 'Distribution of lines added in a proposed edit.',
+    unit: 'lines',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (editProposedAddedLinesHistogram = h),
+    attributes: {} as Record<string, never>,
+  },
+  [EDIT_PROPOSED_REMOVED_LINES]: {
+    description: 'Distribution of lines removed in a proposed edit.',
+    unit: 'lines',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (editProposedRemovedLinesHistogram = h),
+    attributes: {} as Record<string, never>,
+  },
 } as const;
 
 type AllMetricDefs = typeof COUNTER_DEFINITIONS &
@@ -466,6 +482,8 @@ let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
+let editProposedAddedLinesHistogram: Histogram | undefined;
+let editProposedRemovedLinesHistogram: Histogram | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -549,6 +567,26 @@ export function recordToolCallMetrics(
     ...baseMetricDefinition.getCommonAttributes(config),
     function_name: attributes.function_name,
   });
+}
+
+export function recordEditProposedMetrics(
+  config: Config,
+  lines_added: number,
+  lines_removed: number,
+): void {
+  if (
+    !editProposedAddedLinesHistogram ||
+    !editProposedRemovedLinesHistogram ||
+    !isMetricsInitialized
+  ) {
+    return;
+  }
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+  };
+  editProposedAddedLinesHistogram.record(lines_added, metricAttributes);
+  editProposedRemovedLinesHistogram.record(lines_removed, metricAttributes);
 }
 
 export function recordCustomTokenUsageMetrics(

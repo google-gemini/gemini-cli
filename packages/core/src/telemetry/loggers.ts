@@ -48,6 +48,7 @@ import type {
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  EditProposedEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -63,6 +64,7 @@ import {
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordAgentRunMetrics,
+  recordEditProposedMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -126,6 +128,27 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
         }
       : {}),
   });
+}
+
+export function logEditProposed(
+  config: Config,
+  event: EditProposedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logEditProposedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+
+  recordEditProposedMetrics(
+    config,
+    event.suggested_added_lines,
+    event.suggested_removed_lines,
+  );
 }
 
 export function logToolOutputTruncated(

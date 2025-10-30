@@ -31,7 +31,7 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
-import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { DEFAULT_DIFF_OPTIONS, getConfirmedDiffStats } from './diffOptions.js';
 import type {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -296,7 +296,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       );
 
       const originallyProposedContent = ai_proposed_content || content;
-      const diffStat = getDiffStat(
+      const diffStat = getConfirmedDiffStats(
         fileName,
         currentContentForDiff,
         originallyProposedContent,

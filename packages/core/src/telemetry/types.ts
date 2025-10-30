@@ -1289,11 +1289,53 @@ export class ModelSlashCommandEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_EDIT_PROPOSED = 'gemini_cli.edit_proposed';
+export class EditProposedEvent implements BaseTelemetryEvent {
+  'event.name': 'edit_proposed';
+  'event.timestamp': string;
+  function_name: string;
+  prompt_id: string;
+  suggested_added_lines: number;
+  suggested_removed_lines: number;
+
+  constructor(
+    function_name: string,
+    prompt_id: string,
+    suggested_added_lines: number,
+    suggested_removed_lines: number,
+  ) {
+    this['event.name'] = 'edit_proposed';
+    this['event.timestamp'] = new Date().toISOString();
+    this.function_name = function_name;
+    this.prompt_id = prompt_id;
+    this.suggested_added_lines = suggested_added_lines;
+    this.suggested_removed_lines = suggested_removed_lines;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_EDIT_PROPOSED,
+      'event.timestamp': this['event.timestamp'],
+      function_name: this.function_name,
+      prompt_id: this.prompt_id,
+      suggested_added_lines: this.suggested_added_lines,
+      suggested_removed_lines: this.suggested_removed_lines,
+    };
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Edit proposed: ${this.function_name}. Suggested added lines: ${this.suggested_added_lines}, removed lines: ${this.suggested_removed_lines}.`;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
   | UserPromptEvent
   | ToolCallEvent
+  | EditProposedEvent
   | ApiRequestEvent
   | ApiErrorEvent
   | ApiResponseEvent
@@ -1354,7 +1396,6 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
     return `Disabled extension ${this.extension_name}`;
   }
 }
-
 export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit_strategy';
 export class SmartEditStrategyEvent implements BaseTelemetryEvent {
   'event.name': 'smart_edit_strategy';

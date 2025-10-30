@@ -12,32 +12,31 @@ export const DEFAULT_DIFF_OPTIONS: Diff.PatchOptions = {
   ignoreWhitespace: true,
 };
 
-export function getDiffStat(
+const getStats = (patch: Diff.ParsedDiff) => {
+  let addedLines = 0;
+  let removedLines = 0;
+  let addedChars = 0;
+  let removedChars = 0;
+
+  patch.hunks.forEach((hunk: Diff.Hunk) => {
+    hunk.lines.forEach((line: string) => {
+      if (line.startsWith('+')) {
+        addedLines++;
+        addedChars += line.length - 1;
+      } else if (line.startsWith('-')) {
+        removedLines++;
+        removedChars += line.length - 1;
+      }
+    });
+  });
+  return { addedLines, removedLines, addedChars, removedChars };
+};
+
+export function getSuggestedDiffStats(
   fileName: string,
   oldStr: string,
   aiStr: string,
-  userStr: string,
-): DiffStat {
-  const getStats = (patch: Diff.ParsedDiff) => {
-    let addedLines = 0;
-    let removedLines = 0;
-    let addedChars = 0;
-    let removedChars = 0;
-
-    patch.hunks.forEach((hunk: Diff.Hunk) => {
-      hunk.lines.forEach((line: string) => {
-        if (line.startsWith('+')) {
-          addedLines++;
-          addedChars += line.length - 1;
-        } else if (line.startsWith('-')) {
-          removedLines++;
-          removedChars += line.length - 1;
-        }
-      });
-    });
-    return { addedLines, removedLines, addedChars, removedChars };
-  };
-
+): Pick<DiffStat, 'suggested_added_lines' | 'suggested_removed_lines'> {
   const suggestedPatch = Diff.structuredPatch(
     fileName,
     fileName,
@@ -49,6 +48,18 @@ export function getDiffStat(
   );
   const suggestedStats = getStats(suggestedPatch);
 
+  return {
+    suggested_added_lines: suggestedStats.addedLines,
+    suggested_removed_lines: suggestedStats.removedLines,
+  };
+}
+
+export function getConfirmedDiffStats(
+  fileName: string,
+  oldStr: string,
+  aiStr: string,
+  userStr: string,
+): DiffStat {
   const userPatch = Diff.structuredPatch(
     fileName,
     fileName,
@@ -71,11 +82,6 @@ export function getDiffStat(
   );
   const acceptedStats = getStats(acceptedPatch);
 
-  console.log(`model accepted ${acceptedStats.addedLines}`);
-  console.log(`model removed ${acceptedStats.removedLines}`);
-  console.log(`suggested accepted ${suggestedStats.addedLines}`);
-  console.log(`suggested removed ${suggestedStats.removedLines}`);
-
   return {
     model_added_lines: acceptedStats.addedLines,
     model_removed_lines: acceptedStats.removedLines,
@@ -85,7 +91,5 @@ export function getDiffStat(
     user_removed_lines: userStats.removedLines,
     user_added_chars: userStats.addedChars,
     user_removed_chars: userStats.removedChars,
-    suggested_added_lines: suggestedStats.addedLines,
-    suggested_removed_lines: suggestedStats.removedLines,
   };
 }
