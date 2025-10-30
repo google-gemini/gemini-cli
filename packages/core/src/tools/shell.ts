@@ -9,7 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
-import type { AnyToolInvocation } from '../index.js';
+import { debugLogger, type AnyToolInvocation } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -60,8 +60,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     params: ShellToolParams,
     private readonly allowlist: Set<string>,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -224,7 +226,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
-              console.error(`pgrep: ${line}`);
+              debugLogger.error(`pgrep: ${line}`);
             }
             const pid = Number(line);
             if (pid !== result.pid) {
@@ -233,7 +235,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         } else {
           if (!signal.aborted) {
-            console.error('missing pgrep output');
+            debugLogger.error('missing pgrep output');
           }
         }
       }
@@ -422,7 +424,7 @@ export class ShellTool extends BaseDeclarativeTool<
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
-        console.error(
+        debugLogger.error(
           'Unexpected: isCommandAllowed returned false without a reason',
         );
         return `Command is not allowed: ${params.command}`;
@@ -451,12 +453,16 @@ export class ShellTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: ShellToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.config,
       params,
       this.allowlist,
       messageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }

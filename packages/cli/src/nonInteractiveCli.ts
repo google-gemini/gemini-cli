@@ -40,18 +40,29 @@ import {
   handleCancellationError,
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
+import { TextOutput } from './ui/utils/textOutput.js';
 
-export async function runNonInteractive(
-  config: Config,
-  settings: LoadedSettings,
-  input: string,
-  prompt_id: string,
-): Promise<void> {
+interface RunNonInteractiveParams {
+  config: Config;
+  settings: LoadedSettings;
+  input: string;
+  prompt_id: string;
+  hasDeprecatedPromptArg?: boolean;
+}
+
+export async function runNonInteractive({
+  config,
+  settings,
+  input,
+  prompt_id,
+  hasDeprecatedPromptArg,
+}: RunNonInteractiveParams): Promise<void> {
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
       debugMode: config.getDebugMode(),
     });
+    const textOutput = new TextOutput();
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -149,6 +160,21 @@ export async function runNonInteractive(
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
+      const deprecateText =
+        'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n';
+      if (hasDeprecatedPromptArg) {
+        if (streamFormatter) {
+          streamFormatter.emitEvent({
+            type: JsonStreamEventType.MESSAGE,
+            timestamp: new Date().toISOString(),
+            role: 'assistant',
+            content: deprecateText,
+            delta: true,
+          });
+        } else {
+          process.stderr.write(deprecateText);
+        }
+      }
       while (true) {
         turnCount++;
         if (
@@ -183,7 +209,9 @@ export async function runNonInteractive(
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
               responseText += event.value;
             } else {
-              process.stdout.write(event.value);
+              if (event.value) {
+                textOutput.write(event.value);
+              }
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
             if (streamFormatter) {
@@ -220,6 +248,7 @@ export async function runNonInteractive(
         }
 
         if (toolCallRequests.length > 0) {
+          textOutput.ensureTrailingNewline();
           const toolResponseParts: Part[] = [];
           const completedToolCalls: CompletedToolCall[] = [];
 
@@ -297,9 +326,9 @@ export async function runNonInteractive(
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
-            process.stdout.write(formatter.format(responseText, stats));
+            textOutput.write(formatter.format(responseText, stats));
           } else {
-            process.stdout.write('\n'); // Ensure a final newline
+            textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
           return;
         }
