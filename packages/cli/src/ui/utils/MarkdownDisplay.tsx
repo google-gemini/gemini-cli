@@ -35,7 +35,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   renderMarkdown = true,
 }) => {
   const settings = useSettings();
-  const { ui } = settings.merged;
+  const ui = settings.merged.ui;
 
   if (!text) return <></>;
 

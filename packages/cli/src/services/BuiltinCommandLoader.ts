@@ -13,7 +13,6 @@ import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { chatCommand } from '../ui/commands/chatCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
-import { colorCommand } from '../ui/commands/color.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
@@ -32,6 +31,7 @@ import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+import { responseColorCommand } from '../ui/commands/responseColor.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
@@ -61,7 +61,6 @@ export class BuiltinCommandLoader implements ICommandLoader {
       bugCommand,
       chatCommand,
       clearCommand,
-      colorCommand,
       compressCommand,
       copyCommand,
       corgiCommand,
@@ -80,6 +79,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
+      responseColorCommand,
       statsCommand,
       themeCommand,
       toolsCommand,
