@@ -29,6 +29,7 @@ describe('FixLLMEditWithInstruction', () => {
   const abortSignal = abortController.signal;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     resetLlmEditFixerCaches_TEST_ONLY(); // Ensure cache is cleared before each test
   });
@@ -319,4 +320,47 @@ describe('FixLLMEditWithInstruction', () => {
       });
     });
   });
+
+  it(
+    'should return null if the LLM call times out',
+    { timeout: 60000 },
+    async () => {
+      mockGenerateJson.mockImplementation(
+        async ({ abortSignal }) =>
+          // This promise will reject when the abort signal is aborted,
+          // which is what a real implementation should do.
+          new Promise((_resolve, reject) => {
+            if (abortSignal?.aborted) {
+              return reject(new DOMException('Aborted', 'AbortError'));
+            }
+            abortSignal?.addEventListener('abort', () => {
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          }),
+      );
+
+      const testPromptId = 'test-prompt-id-timeout';
+
+      const fixPromise = promptIdContext.run(testPromptId, () =>
+        FixLLMEditWithInstruction(
+          instruction,
+          old_string,
+          new_string,
+          error,
+          current_content,
+          mockBaseLlmClient,
+          abortSignal,
+        ),
+      );
+
+      // Let the timers advance just past the timeout.
+      // The timeout is 40000ms in llm-edit-fixer.ts.
+      await vi.advanceTimersByTimeAsync(40001);
+
+      const result = await fixPromise;
+
+      expect(result).toBeNull();
+      expect(mockGenerateJson).toHaveBeenCalledOnce();
+    },
+  );
 });
