@@ -445,6 +445,15 @@ const SETTINGS_SCHEMA = {
         description: 'Custom witty phrases to display during loading.',
         showInDialog: false,
       },
+      responseColor: {
+        type: 'string',
+        label: 'Response Color',
+        category: 'UI',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'The color of the response text.',
+        showInDialog: true,
+      },
       accessibility: {
         type: 'object',
         label: 'Accessibility',

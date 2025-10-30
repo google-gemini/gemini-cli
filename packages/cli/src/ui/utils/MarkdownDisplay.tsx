@@ -35,6 +35,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   renderMarkdown = true,
 }) => {
   const settings = useSettings();
+  const { ui } = settings.merged;
 
   if (!text) return <></>;
 
@@ -268,7 +269,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       } else {
         addContentBlock(
           <Box key={key}>
-            <Text wrap="wrap" color={theme.text.primary}>
+            <Text wrap="wrap" color={ui?.responseColor || theme.text.primary}>
               <RenderInline text={line} />
             </Text>
           </Box>,
