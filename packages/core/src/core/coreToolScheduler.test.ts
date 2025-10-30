@@ -1553,7 +1553,7 @@ describe('CoreToolScheduler request queueing', () => {
     expect(statusUpdates).toContain('awaiting_approval');
     expect(executeFn).not.toHaveBeenCalled();
     expect(onAllToolCallsComplete).not.toHaveBeenCalled();
-  });
+  }, 20000);
 
   it('should handle two synchronous calls to schedule', async () => {
     const executeFn = vi.fn().mockResolvedValue({

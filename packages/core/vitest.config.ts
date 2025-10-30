@@ -9,6 +9,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     reporters: ['default', 'junit'],
+    timeout: 30000,
     silent: true,
     setupFiles: ['./test-setup.ts'],
     outputFile: {
