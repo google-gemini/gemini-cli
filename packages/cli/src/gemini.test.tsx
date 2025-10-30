@@ -526,7 +526,9 @@ describe('startInteractiveUI', () => {
 
   it('should not recordSlowRender when less than threshold', async () => {
     const { recordSlowRender } = await import('@google/gemini-cli-core');
-    vi.useFakeTimers();
+    const performanceSpy = vi.spyOn(performance, 'now');
+    performanceSpy.mockReturnValueOnce(0);
+    performanceSpy.mockReturnValueOnce(200);
 
     await startInteractiveUI(
       mockConfig,
@@ -537,12 +539,13 @@ describe('startInteractiveUI', () => {
     );
 
     expect(recordSlowRender).not.toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
   it('should call recordSlowRender when more than threshold', async () => {
     const { recordSlowRender } = await import('@google/gemini-cli-core');
-    vi.useFakeTimers();
+    const performanceSpy = vi.spyOn(performance, 'now');
+    performanceSpy.mockReturnValueOnce(0);
+    performanceSpy.mockReturnValueOnce(300);
 
     await startInteractiveUI(
       mockConfig,
@@ -555,7 +558,6 @@ describe('startInteractiveUI', () => {
     expect(recordSlowRender).toHaveBeenCalledWith(mockConfig, {
       render_time: 300,
     });
-    vi.useRealTimers();
   });
 
   it.each([
