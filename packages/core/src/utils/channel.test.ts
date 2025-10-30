@@ -5,7 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { isNightly, isPreview, isStable } from './channel.js';
+import { isNightly, isPreview, isStable, _clearCache } from './channel.js';
 import * as packageJson from './package.js';
 
 vi.mock('./package.js', () => ({
@@ -15,6 +15,7 @@ vi.mock('./package.js', () => ({
 describe('channel', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    _clearCache();
   });
 
   describe('isStable', () => {
@@ -128,6 +129,31 @@ describe('channel', () => {
         name: 'test',
       });
       await expect(isPreview('/test/dir')).resolves.toBe(false);
+    });
+  });
+
+  describe('memoization', () => {
+    it('should only call getPackageJson once for the same cwd', async () => {
+      const spy = vi
+        .spyOn(packageJson, 'getPackageJson')
+        .mockResolvedValue({ name: 'test', version: '1.0.0' });
+
+      await expect(isStable('/test/dir')).resolves.toBe(true);
+      await expect(isNightly('/test/dir')).resolves.toBe(false);
+      await expect(isPreview('/test/dir')).resolves.toBe(false);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call getPackageJson again for a different cwd', async () => {
+      const spy = vi
+        .spyOn(packageJson, 'getPackageJson')
+        .mockResolvedValue({ name: 'test', version: '1.0.0' });
+
+      await expect(isStable('/test/dir1')).resolves.toBe(true);
+      await expect(isStable('/test/dir2')).resolves.toBe(true);
+
+      expect(spy).toHaveBeenCalledTimes(2);
     });
   });
 });
