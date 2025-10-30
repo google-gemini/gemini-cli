@@ -7,7 +7,8 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import type React from 'react';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useVim } from './vim.js';
 import type { VimMode } from './vim.js';
 import type { Key } from './useKeypress.js';
@@ -175,25 +176,10 @@ describe('useVim hook', () => {
     };
   };
 
-  const renderVimHook = (buffer?: Partial<TextBuffer>) => {
-    let hookResult: ReturnType<typeof useVim>;
-    function TestComponent() {
-      hookResult = useVim(
-        (buffer || mockBuffer) as TextBuffer,
-        mockHandleFinalSubmit,
-      );
-      return null;
-    }
-    const { rerender } = render(<TestComponent />);
-    return {
-      result: {
-        get current() {
-          return hookResult;
-        },
-      },
-      rerender: () => rerender(<TestComponent />),
-    };
-  };
+  const renderVimHook = (buffer?: Partial<TextBuffer>) =>
+    renderHook(() =>
+      useVim((buffer || mockBuffer) as TextBuffer, mockHandleFinalSubmit),
+    );
 
   const exitInsertMode = (result: {
     current: {
@@ -1307,7 +1293,7 @@ describe('useVim hook', () => {
       mockVimContext.vimMode = 'INSERT';
       const { result } = renderVimHook();
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.mode).toBe('INSERT');
       });
 
@@ -1323,7 +1309,7 @@ describe('useVim hook', () => {
       const emptyBuffer = createMockBuffer('');
       const { result } = renderVimHook(emptyBuffer);
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.mode).toBe('INSERT');
       });
 
@@ -1337,7 +1323,7 @@ describe('useVim hook', () => {
       const nonEmptyBuffer = createMockBuffer('not empty');
       const { result } = renderVimHook(nonEmptyBuffer);
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.mode).toBe('INSERT');
       });
 

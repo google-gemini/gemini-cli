@@ -7,6 +7,7 @@
 import type React from 'react';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import type { Mock } from 'vitest';
 import { vi } from 'vitest';
 import type { Key } from './KeypressContext.js';
@@ -275,7 +276,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       act(() => writeSequence(pastedText));
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(keyHandler).toHaveBeenCalledTimes(1);
       });
 
@@ -1020,7 +1021,7 @@ describe('Kitty Sequence Parsing', () => {
     }
 
     // Should parse once complete
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'escape',
