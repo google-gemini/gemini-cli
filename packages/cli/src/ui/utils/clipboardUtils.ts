@@ -96,6 +96,49 @@ export const clipboardState = {
 };
 
 /**
+ * Acquires a file-based lock to prevent concurrent clipboard operations across processes
+ * @param tempDir The temporary directory for clipboard files
+ * @returns true if lock acquired, false otherwise
+ */
+async function acquireLock(tempDir: string): Promise<boolean> {
+  const lockFile = path.join(tempDir, 'clipboard.lock');
+  try {
+    // Check if lock file exists and is recent (within 30 seconds)
+    const stats = await fs.stat(lockFile);
+    const now = Date.now();
+    if (now - stats.mtimeMs < 30000) {
+      // Lock is recent, cannot acquire
+      return false;
+    }
+    // Lock is stale, remove it
+    await fs.unlink(lockFile);
+  } catch {
+    // Lock file doesn't exist, proceed
+  }
+
+  // Create lock file
+  try {
+    await fs.writeFile(lockFile, process.pid.toString(), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Releases the file-based lock
+ * @param tempDir The temporary directory for clipboard files
+ */
+async function releaseLock(tempDir: string): Promise<void> {
+  const lockFile = path.join(tempDir, 'clipboard.lock');
+  try {
+    await fs.unlink(lockFile);
+  } catch {
+    // Ignore errors
+  }
+}
+
+/**
  * Gets clipboard content in a platform-agnostic way
  * @returns The clipboard content as a string, or null if not available
  */
@@ -125,8 +168,8 @@ async function getClipboardContent(): Promise<string | null> {
         return stdout || null;
       }
     }
-  } catch (error) {
-    console.error('Error reading clipboard:', error);
+  } catch {
+    // Ignore errors
   }
   return null;
 }
@@ -219,53 +262,47 @@ export async function saveClipboardImageDetailed(
   targetDir?: string,
   protectionOptions: Partial<PasteProtectionOptions> = {},
 ): Promise<SaveClipboardImageResult> {
-  // Prevent concurrent clipboard operations
-  if (clipboardState.isProcessing) {
+  // Validate targetDir for security
+  if (targetDir) {
+    if (!path.isAbsolute(targetDir)) {
+      return {
+        filePath: null,
+        error: 'targetDir must be an absolute path',
+      };
+    }
+    // Ensure it's within the current working directory to prevent path traversal
+    const cwd = process.cwd();
+    if (!path.resolve(targetDir).startsWith(path.resolve(cwd))) {
+      return {
+        filePath: null,
+        error: 'targetDir must be within the current working directory',
+      };
+    }
+  }
+
+  const baseDir = targetDir || process.cwd();
+  const tempDir = path.join(baseDir, '.gemini-clipboard');
+  try {
+    await fs.mkdir(tempDir, { recursive: true });
+  } catch (error) {
+    console.error('Failed to create directory:', error);
     return {
       filePath: null,
-      error: 'Clipboard operation already in progress',
+      error: 'Failed to process clipboard image: Failed to create directory',
+    };
+  }
+
+  // Acquire file-based lock to prevent cross-process concurrency
+  if (!(await acquireLock(tempDir))) {
+    return {
+      filePath: null,
+      error: 'Clipboard operation already in progress (another process)',
     };
   }
 
   clipboardState.isProcessing = true;
 
   try {
-    // Create a temporary directory for clipboard images within the target directory
-    // This avoids security restrictions on paths outside the target directory
-    const baseDir = targetDir || process.cwd();
-
-    // Validate targetDir for security
-    if (targetDir) {
-      if (!path.isAbsolute(targetDir)) {
-        clipboardState.isProcessing = false;
-        return {
-          filePath: null,
-          error: 'targetDir must be an absolute path',
-        };
-      }
-      // Ensure it's within the current working directory to prevent path traversal
-      const cwd = process.cwd();
-      if (!path.resolve(targetDir).startsWith(path.resolve(cwd))) {
-        clipboardState.isProcessing = false;
-        return {
-          filePath: null,
-          error: 'targetDir must be within the current working directory',
-        };
-      }
-    }
-
-    const tempDir = path.join(baseDir, '.gemini-clipboard');
-    try {
-      await fs.mkdir(tempDir, { recursive: true });
-    } catch (error) {
-      console.error('Failed to create directory:', error);
-      clipboardState.isProcessing = false;
-      return {
-        filePath: null,
-        error: 'Failed to process clipboard image: Failed to create directory',
-      };
-    }
-
     // Merge provided options with defaults
     const options: PasteProtectionOptions = {
       ...defaultPasteProtection,
@@ -357,6 +394,7 @@ export async function saveClipboardImageDetailed(
       ) {
         // Always return the expected error for all empty/unsupported/duplicate cases
         clipboardState.isProcessing = false;
+        await releaseLock(tempDir);
         return {
           filePath: null,
           error: 'Unsupported platform or no image in clipboard',
@@ -378,9 +416,10 @@ export async function saveClipboardImageDetailed(
           );
           if (!validation.isValid) {
             clipboardState.isProcessing = false;
+            await releaseLock(tempDir);
             return {
               filePath: null,
-              error: 'Unsupported platform or no image in clipboard',
+              error: validation.error || 'Content validation failed',
             };
           }
         }
@@ -434,6 +473,7 @@ export async function saveClipboardImageDetailed(
             const stats = await fs.stat(currentFilePath);
             if (stats.size > 0) {
               clipboardState.isProcessing = false;
+              await releaseLock(tempDir);
               return { filePath: currentFilePath, displayName };
             }
           } catch {
@@ -570,11 +610,13 @@ export async function saveClipboardImageDetailed(
           const stats = await fs.stat(tempFilePath);
           if (stats.size > 0) {
             clipboardState.isProcessing = false;
+            await releaseLock(tempDir);
             return { filePath: tempFilePath, displayName };
           }
         } catch (err) {
           console.error('Failed to access saved image file:', err);
           clipboardState.isProcessing = false;
+          await releaseLock(tempDir);
           return { filePath: null, error: 'Failed to access saved image file' };
         }
       } else if (result.stderr) {
@@ -596,6 +638,7 @@ export async function saveClipboardImageDetailed(
           );
         }
         clipboardState.isProcessing = false;
+        await releaseLock(tempDir);
         return { filePath: null, error: 'PowerShell error' };
       }
     } else if (process.platform === 'linux') {
@@ -608,6 +651,7 @@ export async function saveClipboardImageDetailed(
           'xclip is not installed. Cannot save clipboard images on Linux.',
         );
         clipboardState.isProcessing = false;
+        await releaseLock(tempDir);
         return { filePath: null, error: 'xclip is not installed' };
       }
 
@@ -671,6 +715,7 @@ export async function saveClipboardImageDetailed(
             const stats = await fs.stat(linuxTempFilePath);
             if (stats.size > 0) {
               clipboardState.isProcessing = false;
+              await releaseLock(tempDir);
               return { filePath: linuxTempFilePath, displayName };
             }
           } catch (error) {
@@ -702,43 +747,38 @@ export async function saveClipboardImageDetailed(
           );
 
           try {
-            try {
-              // First, get the clipboard content as a Buffer
-              const { stdout: clipboardData } = await execFileAsync(
-                'xclip',
-                ['-selection', 'clipboard', '-t', format.type, '-o'],
-                { encoding: 'buffer' },
-              );
+            // First, get the clipboard content as a Buffer
+            const { stdout: clipboardData } = await execFileAsync(
+              'xclip',
+              ['-selection', 'clipboard', '-t', format.type, '-o'],
+              { encoding: 'buffer' },
+            );
 
-              // Write the buffer directly without encoding
-              await writeFile(linuxTempFilePath, clipboardData);
+            // Write the buffer directly without encoding
+            await writeFile(linuxTempFilePath, clipboardData);
 
-              // Verify the file was created and has content
-              const stats = await fs.stat(linuxTempFilePath);
-              if (stats.size > 0) {
-                clipboardState.isProcessing = false;
-                return { filePath: linuxTempFilePath, displayName };
-              }
-            } catch (error) {
-              // Continue to next format on error
-              console.debug(
-                `Clipboard read failed for type ${format.type}:`,
-                error,
-              );
+            // Verify the file was created and has content
+            const stats = await fs.stat(linuxTempFilePath);
+            if (stats.size > 0) {
+              clipboardState.isProcessing = false;
+              await releaseLock(tempDir);
+              return { filePath: linuxTempFilePath, displayName };
             }
-            // If we get here, the format didn't work, so clean up
-            await fs.unlink(linuxTempFilePath).catch(() => {});
           } catch (error) {
-            console.error(`Error processing format ${format.type}:`, error);
-            // Clean up on error
-            await fs.unlink(linuxTempFilePath).catch(() => {});
-            // Continue to next format
+            // Continue to next format on error
+            console.debug(
+              `Clipboard read failed for type ${format.type}:`,
+              error,
+            );
           }
+          // If we get here, the format didn't work, so clean up
+          await fs.unlink(linuxTempFilePath).catch(() => {});
         }
       }
     }
 
     clipboardState.isProcessing = false;
+    await releaseLock(tempDir);
     return {
       filePath: null,
       error: 'Unsupported platform or no image in clipboard',
@@ -746,6 +786,7 @@ export async function saveClipboardImageDetailed(
   } catch (error) {
     console.error('Error in saveClipboardImage:', error);
     clipboardState.isProcessing = false;
+    await releaseLock(tempDir);
     return {
       filePath: null,
       error: 'Unsupported platform or no image in clipboard',
