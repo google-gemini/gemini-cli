@@ -11,7 +11,8 @@ import * as path from 'node:path';
 import { createExtension } from '../../test-utils/createExtension.js';
 import { useExtensionUpdates } from './useExtensionUpdates.js';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { MessageType } from '../types.js';
 import {
   checkForAllExtensionUpdates,
@@ -102,7 +103,7 @@ describe('useExtensionUpdates', () => {
 
     render(<TestComponent />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
@@ -152,7 +153,7 @@ describe('useExtensionUpdates', () => {
 
     render(<TestComponent />);
 
-    await vi.waitFor(
+    await waitFor(
       () => {
         expect(addItem).toHaveBeenCalledWith(
           {
@@ -230,7 +231,7 @@ describe('useExtensionUpdates', () => {
 
     render(<TestComponent />);
 
-    await vi.waitFor(
+    await waitFor(
       () => {
         expect(addItem).toHaveBeenCalledTimes(2);
         expect(addItem).toHaveBeenCalledWith(
@@ -313,7 +314,7 @@ describe('useExtensionUpdates', () => {
 
     render(<TestComponent />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(addItem).toHaveBeenCalledTimes(1);
       expect(addItem).toHaveBeenCalledWith(
         {

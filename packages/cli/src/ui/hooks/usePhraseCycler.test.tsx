@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import {
   usePhraseCycler,
@@ -50,7 +50,9 @@ describe('usePhraseCycler', () => {
       <TestComponent isActive={true} isWaiting={false} />,
     );
     rerender(<TestComponent isActive={true} isWaiting={true} />);
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(lastFrame()).toBe('Waiting for user confirmation...');
   });
 
@@ -59,7 +61,9 @@ describe('usePhraseCycler', () => {
       <TestComponent isActive={false} isWaiting={false} />,
     );
     const initialPhrase = lastFrame();
-    await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS * 2);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS * 2);
+    });
     expect(lastFrame()).toBe(initialPhrase);
   });
 
@@ -69,7 +73,9 @@ describe('usePhraseCycler', () => {
       <TestComponent isActive={true} isWaiting={false} />,
     );
     // Initial phrase should be one of the witty phrases
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
 
     await act(async () => {
@@ -77,7 +83,9 @@ describe('usePhraseCycler', () => {
     });
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
 
-    await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+    });
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
   });
 
@@ -109,11 +117,15 @@ describe('usePhraseCycler', () => {
         customPhrases={customPhrases}
       />,
     );
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(lastFrame()).toBe('Phrase A');
 
     // Interval -> callCount 1 -> returns 0.99 -> 'Phrase B'
-    await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+    });
     expect(lastFrame()).toBe('Phrase B');
 
     // Deactivate -> resets to customPhrases[0] -> 'Phrase A'
@@ -124,7 +136,9 @@ describe('usePhraseCycler', () => {
         customPhrases={customPhrases}
       />,
     );
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(lastFrame()).toBe('Phrase A');
 
     // Activate again -> callCount 2 -> returns 0 -> 'Phrase A'
@@ -135,7 +149,9 @@ describe('usePhraseCycler', () => {
         customPhrases={customPhrases}
       />,
     );
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(lastFrame()).toBe('Phrase A');
   });
 
@@ -164,7 +180,9 @@ describe('usePhraseCycler', () => {
     expect(lastFrame()).toBe('Custom Phrase 1');
 
     randomMock.mockReturnValue(0.99);
-    await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS + 100);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS + 100);
+    });
 
     expect(lastFrame()).toBe('Custom Phrase 2');
 
@@ -175,7 +193,9 @@ describe('usePhraseCycler', () => {
     rerender(
       <TestComponent isActive={true} isWaiting={false} customPhrases={[]} />,
     );
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
 
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
   });
@@ -185,7 +205,9 @@ describe('usePhraseCycler', () => {
     const { lastFrame } = render(
       <TestComponent isActive={true} isWaiting={false} customPhrases={[]} />,
     );
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
 
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
   });
@@ -195,22 +217,30 @@ describe('usePhraseCycler', () => {
     const { lastFrame, rerender } = render(
       <TestComponent isActive={true} isWaiting={false} />,
     );
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
 
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
 
     // Cycle to a different phrase (potentially)
-    await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS);
+    });
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
 
     // Go to waiting state
     rerender(<TestComponent isActive={false} isWaiting={true} />);
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(lastFrame()).toBe('Waiting for user confirmation...');
 
     // Go back to active cycling - should pick a random witty phrase
     rerender(<TestComponent isActive={true} isWaiting={false} />);
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
   });
 });
