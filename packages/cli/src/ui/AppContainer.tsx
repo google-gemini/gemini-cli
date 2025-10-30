@@ -930,6 +930,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
     [handleSlashCommand],
   );
 
+  const [embeddedShellExitConfirm, setEmbeddedShellExitConfirm] =
+    useState(false);
+
+  useEffect(() => {
+    if (embeddedShellFocused === false && ctrlCTimerRef.current !== null) {
+      setEmbeddedShellExitConfirm(true);
+    }
+  }, [embeddedShellFocused]);
+
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
       // Debug log keystrokes if enabled
@@ -1075,6 +1084,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
+    embeddedShellExitConfirm ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
