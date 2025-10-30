@@ -10,6 +10,7 @@ import { checkExhaustive } from '../../utils/checks.js';
 export enum ExtensionUpdateState {
   CHECKING_FOR_UPDATES = 'checking for updates',
   UPDATED_NEEDS_RESTART = 'updated, needs restart',
+  UPDATED = 'updated',
   UPDATING = 'updating',
   UPDATE_AVAILABLE = 'update available',
   UP_TO_DATE = 'up to date',
