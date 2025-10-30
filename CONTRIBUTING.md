@@ -54,9 +54,9 @@ use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
 for this purpose.
 
 If your pull request involves changes to `packages/cli` (the frontend), we
-recommend running our automated frontend review tool. This tool helps detect
-common React anti-patterns, testing issues, and other frontend-specific best
-practices that are easy to miss.
+recommend running our automated frontend review tool. **Note: This tool is
+currently experimental.** It helps detect common React anti-patterns, testing
+issues, and other frontend-specific best practices that are easy to miss.
 
 To run the review tool, enter the following command from within Gemini CLI:
 
