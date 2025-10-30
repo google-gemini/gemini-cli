@@ -102,12 +102,6 @@ export enum EventMetadataKey {
   // Logs the reason for web fetch fallback.
   GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
 
-  // Logs AI added lines in edit/write tool response that were proposed.
-  GEMINI_CLI_EDIT_PROPOSED_ADDED_LINES = 124,
-
-  // Logs AI removed lines in edit/write tool response that were proposed.
-  GEMINI_CLI_EDIT_PROPOSED_REMOVED_LINES = 125,
-
   // ==========================================================================
   // GenAI API Request Event Keys
   // ===========================================================================
@@ -241,10 +235,10 @@ export enum EventMetadataKey {
   // Logs the type of the IDE connection.
   GEMINI_CLI_IDE_CONNECTION_TYPE = 46,
 
-  // Logs AI added lines in edit/write tool response that were accepted.
+  // Logs AI added lines in edit/write tool response.
   GEMINI_CLI_AI_ADDED_LINES = 47,
 
-  // Logs AI removed lines in edit/write tool response that were accepted.
+  // Logs AI removed lines in edit/write tool response.
   GEMINI_CLI_AI_REMOVED_LINES = 48,
 
   // Logs user added lines in edit/write tool response.
@@ -253,10 +247,10 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
-  // Logs AI added characters in edit/write tool response that were accepted.
+  // Logs AI added characters in edit/write tool response.
   GEMINI_CLI_AI_ADDED_CHARS = 103,
 
-  // Logs AI removed characters in edit/write tool response that were accepted.
+  // Logs AI removed characters in edit/write tool response.
   GEMINI_CLI_AI_REMOVED_CHARS = 104,
 
   // Logs user added characters in edit/write tool response.

@@ -72,8 +72,6 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
-        totalLinesGeneratedAdded: 0,
-        totalLinesGeneratedRemoved: 0,
       },
     });
 
@@ -114,8 +112,6 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
-        totalLinesGeneratedAdded: 0,
-        totalLinesGeneratedRemoved: 0,
       },
     });
 
@@ -168,8 +164,6 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
-        totalLinesGeneratedAdded: 0,
-        totalLinesGeneratedRemoved: 0,
       },
     });
 
@@ -222,8 +216,6 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
-        totalLinesGeneratedAdded: 0,
-        totalLinesGeneratedRemoved: 0,
       },
     });
 
@@ -268,8 +260,6 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
-        totalLinesGeneratedAdded: 0,
-        totalLinesGeneratedRemoved: 0,
       },
     });
 
@@ -307,8 +297,6 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
-        totalLinesGeneratedAdded: 0,
-        totalLinesGeneratedRemoved: 0,
       },
     });
 

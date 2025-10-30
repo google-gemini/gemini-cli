@@ -70,8 +70,6 @@ export interface SessionMetrics {
   files: {
     totalLinesAdded: number;
     totalLinesRemoved: number;
-    totalLinesGeneratedAdded: number;
-    totalLinesGeneratedRemoved: number;
   };
 }
 
@@ -109,8 +107,6 @@ const createInitialMetrics = (): SessionMetrics => ({
   files: {
     totalLinesAdded: 0,
     totalLinesRemoved: 0,
-    totalLinesGeneratedAdded: 0,
-    totalLinesGeneratedRemoved: 0,
   },
 });
 
@@ -231,14 +227,6 @@ export class UiTelemetryService extends EventEmitter {
       }
       if (event.metadata['model_removed_lines'] !== undefined) {
         files.totalLinesRemoved += event.metadata['model_removed_lines'];
-      }
-      if (event.metadata['model_generated_added_lines'] !== undefined) {
-        files.totalLinesGeneratedAdded +=
-          event.metadata['model_generated_added_lines'];
-      }
-      if (event.metadata['model_generated_removed_lines'] !== undefined) {
-        files.totalLinesGeneratedRemoved +=
-          event.metadata['model_generated_removed_lines'];
       }
     }
   }
