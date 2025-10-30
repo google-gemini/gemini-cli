@@ -209,7 +209,7 @@ export async function startInteractiveUI(
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
-          recordSlowRender(config);
+          recordSlowRender(config, { render_time: renderTime });
         }
       },
     } as RenderOptions,

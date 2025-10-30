@@ -187,7 +187,9 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts UI frames that take too long to render.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (slowRenderCounter = c),
-    attributes: {} as Record<string, never>,
+    attributes: {} as {
+      render_time: number;
+    },
   },
 } as const;
 
@@ -650,9 +652,15 @@ export function recordExitFail(config: Config): void {
 /**
  * Records a metric for when a UI frame is slow in rendering
  */
-export function recordSlowRender(config: Config): void {
+export function recordSlowRender(
+  config: Config,
+  attributes: MetricDefinitions[typeof SLOW_RENDER_COUNT]['attributes'],
+): void {
   if (!slowRenderCounter || !isMetricsInitialized) return;
-  slowRenderCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+  slowRenderCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
 }
 
 /**

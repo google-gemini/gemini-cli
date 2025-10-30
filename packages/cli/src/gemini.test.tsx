@@ -562,7 +562,9 @@ describe('startInteractiveUI', () => {
 
     onRenderCallback?.({ renderTime: 300 });
 
-    expect(recordSlowRender).toHaveBeenCalledTimes(1);
+    expect(recordSlowRender).toHaveBeenCalledWith(mockConfig, {
+      render_time: 300,
+    });
   });
 
   it.each([

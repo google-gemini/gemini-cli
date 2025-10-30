@@ -199,14 +199,14 @@ describe('Telemetry Metrics', () => {
   describe('recordSlowRender', () => {
     it('does not record metrics if not initialized', () => {
       const config = makeFakeConfig({});
-      recordSlowRenderModule(config);
+      recordSlowRenderModule(config, { render_time: 300 });
       expect(mockCounterAddFn).not.toHaveBeenCalled();
     });
 
     it('records a slow render event when initialized', () => {
       const config = makeFakeConfig({});
       initializeMetricsModule(config);
-      recordSlowRenderModule(config);
+      recordSlowRenderModule(config, { render_time: 300 });
 
       // Called for session, then for slow render
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
@@ -214,6 +214,7 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
+        render_time: 300,
       });
     });
   });
