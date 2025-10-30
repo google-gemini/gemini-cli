@@ -251,6 +251,9 @@ Captures startup configuration and user prompt submissions.
     - `debug_mode` (boolean)
     - `mcp_servers` (string)
     - `mcp_servers_count` (int)
+    - `extensions` (string)
+    - `extension_ids` (string)
+    - `extension_count` (int)
     - `mcp_tools` (string, if applicable)
     - `mcp_tools_count` (int, if applicable)
     - `output_format` ("text", "json", or "stream-json")
@@ -297,6 +300,26 @@ Captures tool executions, output truncation, and Smart Edit behavior.
 - `gemini_cli.smart_edit_correction`: Smart Edit correction result.
   - **Attributes**:
     - `correction` ("success" | "failure")
+
+- `gen_ai.client.inference.operation.details`: This event provides detailed
+  information about the GenAI operation, aligned with [OpenTelemetry GenAI
+  semantic conventions for events].
+  - **Attributes**:
+    - `gen_ai.request.model` (string)
+    - `gen_ai.provider.name` (string)
+    - `gen_ai.operation.name` (string)
+    - `gen_ai.input.messages` (json string)
+    - `gen_ai.output.messages` (json string)
+    - `gen_ai.response.finish_reasons` (array of strings)
+    - `gen_ai.usage.input_tokens` (int)
+    - `gen_ai.usage.output_tokens` (int)
+    - `gen_ai.request.temperature` (float)
+    - `gen_ai.request.top_p` (float)
+    - `gen_ai.request.top_k` (int)
+    - `gen_ai.request.max_tokens` (int)
+    - `gen_ai.system_instructions` (json string)
+    - `server.address` (string)
+    - `server.port` (int)
 
 #### Files
 
@@ -735,3 +758,5 @@ standardized observability across GenAI applications:
 
 [OpenTelemetry GenAI semantic conventions]:
   https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-metrics.md
+[OpenTelemetry GenAI semantic conventions for events]:
+  https://github.com/open-telemetry/semantic-conventions/blob/8b4f210f43136e57c1f6f47292eb6d38e3bf30bb/docs/gen-ai/gen-ai-events.md
