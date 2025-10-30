@@ -680,6 +680,7 @@ export async function loadCliConfig(
     listExtensions: argv.listExtensions || false,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
+    enableExtensionReloading: settings.experimental?.extensionReloading,
     blockedMcpServers,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,

@@ -160,6 +160,7 @@ export class McpClient {
     if (this.status !== MCPServerStatus.CONNECTED) {
       return;
     }
+    this.toolRegistry.removeMcpToolsByServer(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;

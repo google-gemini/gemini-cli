@@ -1075,6 +1075,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable extension management features.',
         showInDialog: false,
       },
+      extensionReloading: {
+        type: 'boolean',
+        label: 'Extension Reloading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enables extension loading/unloading within the CLI session.',
+        showInDialog: false,
+      },
       useModelRouter: {
         type: 'boolean',
         label: 'Use Model Router',

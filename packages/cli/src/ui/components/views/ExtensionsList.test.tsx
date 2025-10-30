@@ -98,6 +98,10 @@ describe('<ExtensionsList />', () => {
       expectedText: '(updated, needs restart)',
     },
     {
+      state: ExtensionUpdateState.UPDATED,
+      expectedText: '(updated)',
+    },
+    {
       state: ExtensionUpdateState.ERROR,
       expectedText: '(error)',
     },

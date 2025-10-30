@@ -84,6 +84,7 @@ describe('handleAtCommand', () => {
         getReadManyFilesExcludes: () => [],
       }),
       getUsageStatisticsEnabled: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
