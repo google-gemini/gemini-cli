@@ -97,7 +97,21 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            const labelNames = labels.map(label => label.name);
+            const allowedLabels = [
+              'priority/p0',
+              'priority/p1',
+              'priority/p2',
+              'priority/p3',
+              'area/agent',
+              'area/enterprise',
+              'area/non-interactive',
+              'area/core',
+              'area/security',
+              'area/platform',
+              'area/extensions'
+              'area/unknown'
+            ];
+            const labelNames = labels.map(label => label.name).filter(name => allowedLabels.includes(name));
             core.setOutput('available_labels', labelNames.join(','));
             core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
             return labelNames;
@@ -140,7 +154,7 @@ jobs:
             You are an issue triage assistant. Analyze the current GitHub issue
             and identify the most appropriate existing labels by only using the provided data. Use the available
             tools to gather information; do not ask for information to be
-            provided. Do not remove the following labels titled maintainer,  help wanted or good first issue.
+            provided.
 
             ## Steps
 
@@ -177,88 +191,111 @@ jobs:
             - Output only valid JSON format
             - Do not include any explanation or additional text, just the JSON
 
-            Categorization Guidelines:
-            P0: Critical / Blocker
-            - A P0 bug is a catastrophic failure that demands immediate attention.
-            - To be a P0 it means almost all users are running into this issue and it is blocking users from being able to use the product.
-            - You would see this in the form of many comments from different developers on the bug.
-            - It represents a complete showstopper for a significant portion of users or for the development process itself.
-            Impact:
-            - Blocks development or testing for the entire team.
-            - Major security vulnerability that could compromise user data or system integrity.
-            - Causes data loss or corruption with no workaround.
-            - Crashes the application or makes a core feature completely unusable for all or most users in a production environment. Will it cause severe quality degration? Is it preventing contributors from contributing to the repository or is it a release blocker?
-            Qualifier: Is the main function of the software broken?
-            Example: The gemini auth login command fails with an unrecoverable error, preventing any user from authenticating and using the rest of the CLI.
-            P1: High
-            - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature.
-            - While not a complete blocker, it's a major problem that needs a fast resolution. Feature requests are almost never P1.
-            - Once again this would be affecting many users.
-            - You would see this in the form of comments from different developers on the bug.
-            Impact:
-            - A core feature is broken or behaving incorrectly for a large number of users or large number of use cases.
-            - Review the bug details and comments to try figure out if this issue affects a large set of use cases or if it's a narrow set of use cases.
-            - Severe performance degradation making the application frustratingly slow.
-            - No straightforward workaround exists, or the workaround is difficult and non-obvious.
-            Qualifier: Is a key feature unusable or giving very wrong results?
-            Example: Gemini CLI enters a loop when making read-many-files tool call. I am unable to break out of the loop and gemini doesn't follow instructions subsequently.
-            P2: Medium
-            - A P2 bug is a moderately impactful issue. It's a noticeable problem but doesn't prevent the use of the software's main functionality.
-            Impact:
-            - Affects a non-critical feature or a smaller, specific subset of users.
-            - An inconvenient but functional workaround is available and easy to execute.
-            - Noticeable UI/UX problems that don't break functionality but look unprofessional (e.g., elements are misaligned or overlapping).
-            Qualifier: Is it an annoying but non-blocking problem?
-            Example: An error message is unclear or contains a typo, causing user confusion but not halting their workflow.
-            P3: Low
-            - A P3 bug is a minor, low-impact issue that is trivial or cosmetic. It has little to no effect on the overall functionality of the application.
-            Impact:
-            - Minor cosmetic issues like color inconsistencies, typos in documentation, or slight alignment problems on a non-critical page.
-            - An edge-case bug that is very difficult to reproduce and affects a tiny fraction of users.
-            Qualifier: Is it a "nice-to-fix" issue?
-            Example: Spelling mistakes etc.
-            Things you should know:
-            - If users are talking about issues where the model gets downgraded from pro to flash then i want you to categorize that as a performance issue
-            - This product is designed to use different models eg.. using pro, downgrading to flash etc. when users report that they dont expect the model to change those would be categorized as feature requests.
-            Definition of Areas
-            area/ux:
-            - Issues concerning user-facing elements like command usability, interactive features, help docs, and perceived performance.
-            - I am seeing my screen flicker when using Gemini CLI
-            - I am seeing the output malformed
-            - Theme changes aren't taking effect
-            - My keyboard inputs arent' being recognzied
-            area/platform:
-            - Issues related to installation, packaging, OS compatibility (Windows, macOS, Linux), and the underlying CLI framework.
-            area/background: Issues related to long-running background tasks, daemons, and autonomous or proactive agent features.
-            area/models:
-            - i am not getting a response that is reasonable or expected. this can include things like
-            - I am calling a tool and the tool is not performing as expected.
-            - i am expecting a tool to be called and it is not getting called ,
-            - Including experience when using
-            - built-in tools (e.g., web search, code interpreter, read file, writefile, etc..),
-            - Function calling issues should be under this area
-            - i am getting responses from the model that are malformed.
-            - Issues concerning Gemini quality of response and inference,
-            - Issues talking about unnecessary token consumption.
-            - Issues talking about Model getting stuck in a loop be watchful as this could be the root cause for issues that otherwise seem like model performance issues.
-            - Memory compression
-            - unexpected responses,
-            - poor quality of generated code
-            area/tools:
-            - These are primarily issues related to Model Context Protocol
-            - These are issues that mention MCP support
-            - feature requests asking for support for new tools.
-            area/core: Issues with fundamental components like command parsing, configuration management, session state, and the main API client logic. Introducing multi-modality
-            area/contribution: Issues related to improving the developer contribution experience, such as CI/CD pipelines, build scripts, and test automation infrastructure.
-            area/authentication: Issues related to user identity, login flows, API key handling, credential storage, and access token management, unable to sign in selecting wrong authentication path etc..
-            area/security-privacy: Issues concerning vulnerability patching, dependency security, data sanitization, privacy controls, and preventing unauthorized data access.
-            area/extensibility: Issues related to the plugin system, extension APIs, or making the CLI's functionality available in other applications, github actions, ide support etc..
-            area/performance: Issues focused on model performance
-            - Issues with running out of capacity,
-            - 429 errors etc..
-            - could also pertain to latency,
-            - other general software performance like, memory usage, CPU consumption, and algorithmic efficiency.
-            - Switching models from one to the other unexpectedly.
+            Reference 1: Priority Definitions
+            priority/p0: Critical / Blocker
+            - Definition: A catastrophic failure that makes the CLI unusable for most users or poses a severe security risk. This includes installation failures, authentication failures, persistent crashes, or critical security vulnerabilities.
+            - Key Questions:
+              - Is the CLI failing to install or run?
+              - Does it fail to authenticate or connect to the Gemini API, making all commands useless?
+              - Is it consistently crashing on basic, common commands?
+              - Does this represent a critical security vulnerability?
+
+            priority/p1: High
+            - Definition: A severe issue where a core feature (e.g., text generation, code generation, file processing) is unusable, failing, has severe performance degradation, or providing fundamentally incorrect output formatting (e.g., truncated text, broken JSON). Affects many users, and there is no reasonable workaround.
+            - Key Questions:
+              - Is a core feature failing for a specific, large user group (e.g., all Windows users, all users of a specific shell)?
+              - Is the CLI failing to process a supported input or misinterpreting critical flags?
+              - Is the CLI's output formatting consistently broken, making the response unusable?
+              - Is a core command or feature extremely slow, making it impractical to use?
+
+            priority/p2: Medium
+            - Definition: A moderately impactful issue causing inconvenience or a non-optimal experience, but a reasonable workaround exists. This also includes failures in non-core features.
+            - Key Questions:
+              - Is a command or flag behaving incorrectly, but the user can achieve their goal via other means?
+              - Is there a significant, non-blocking UI/UX problem in the terminal (e.g., broken progress indicators, bad terminal coloring)?
+
+            priority/p3: Low
+            - Definition: A minor, low-impact issue with minimal effect on functionality. This includes most cosmetic defects, typos in documentation, or unclear help text.
+            - Key Questions:
+              - Is this a typo in the README.md, gemini --help text, or other documentation?
+              - Is this a minor cosmetic issue (e.g., text alignment in output, an extra newline) that doesn't affect usability?
+
+            Reference 2: Area Definitions
+            area/agent
+            - Description: Issues related to the "brain" of the CLI. This includes the core agent logic, model quality, tool/function calling, and memory.
+            - Example Issues:
+              "I am not getting a reasonable or expected response."
+              "The model is not calling the tool I expected."
+              "The web search tool is not working as expected."
+              "Feature request for a new built-in tool (e.g., read file, write file)."
+              "The generated code is poor quality or incorrect."
+              "The model seems stuck in a loop."
+              "The response from the model is malformed (e.g., broken JSON, bad formatting)."
+              "Concerns about unnecessary token consumption."
+              "Issues with how memory or chat history is managed."
+              "Issues with sub-agents."
+              "Model is switching from one to another unexpectedly."
+
+            area/enterprise
+            - Description: Issues specific to enterprise-level features, including telemetry, policy, and licenses.
+            - Example Issues:
+              "Usage data is not appearing in our telemetry dashboard."
+              "A user is able to perform an action that should be blocked by an admin policy."
+              "Questions about billing, licensing tiers, or enterprise quotas."
+
+            area/non-interactive
+            - Description: Issues related to using the CLI in automated or non-interactive environments.
+            - Example Issues:
+              "Problems using the CLI as an SDK in another surface."
+              "The CLI is behaving differently when run from a shell script vs. an interactive terminal."
+              "GitHub action is failing."
+
+            area/core
+            - Description: Issues with the fundamental CLI app itself. This includes the user interface (UI/UX), installation, OS compatibility, and performance.
+            - Example Issues:
+              "I am seeing my screen flicker when using the CLI."
+              "The output in my terminal is malformed or unreadable."
+              "Theme changes are not taking effect."
+              "Keyboard inputs (e.g., arrow keys, Ctrl+C) are not being recognized."
+              "The CLI failed to install or update."
+              "An issue specific to running on Windows, macOS, or Linux."
+              "Problems with command parsing, flags, or argument handling."
+              "High CPU or memory usage by the CLI process."
+              "Issues related to multi-modality (e.g., handling image inputs)."
+              "Problems with the IDE integration connection or installation"
+
+            area/security
+            - Description: Issues related to user authentication, authorization, data security, and privacy.
+            - Example Issues:
+              "I am unable to sign in."
+              "The login flow is selecting the wrong authentication path"
+              "Problems with API key handling or credential storage."
+              "A report of a security vulnerability"
+              "Concerns about data sanitization or potential data leaks."
+              "Issues or requests related to privacy controls."
+              "Preventing unauthorized data access."
+
+            area/platform
+            - Description: Issues related to CI/CD, release management, testing, eval infrastructure, capacity, quota management, and sandbox environments.
+            - Example Issues:
+              "I am getting a 429 'Resource Exhausted' or 500-level server error."
+              "General slowness or high latency from the service."
+              "The build script is broken on the main branch."
+              "Tests are failing in the CI/CD pipeline."
+              "Issues with the release management or publishing process."
+              "User is running out of capacity."
+              "Problems specific to the sandbox or staging environments."
+              "Questions about quota limits or requests for increases."
+
+            area/extensions
+            - Description: Issues related to the extension ecosystem, including the marketplace and website.
+            - Example Issues:
+              "Bugs related to the extension marketplace website."
+              "Issues with a specific extension."
+              "Feature request for the extension ecosystem."
+
+            area/unknown
+            - Description: Issues that do not clearly fit into any other defined area/ category, or where information is too limited to make a determination. Use this when no other area is appropriate.
 
       - name: 'Apply Labels to Issue'
         if: |-
