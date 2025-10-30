@@ -34,6 +34,7 @@ function renderTable(entries: SchemaEntry[]): string {
   const rows = entries.map(([key, value]) => {
     const description = value.description
       .trim()
+      .replace(/\\/g, '\\\\')
       .replace(/\|/g, '\\|')
       .replace(/\r?\n/g, '<br />');
     return `| \`${formatVariableName(key)}\` | ${description} |`;
