@@ -5,11 +5,12 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { act, useState } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
-import { useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test utility type and helper function for creating test SlashCommands
@@ -194,46 +195,86 @@ describe('useSlashCompletion', () => {
         }),
         createTestCommand({ name: 'chat', description: 'Manage chat history' }),
       ];
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await vi.waitFor(() => {
-        expect(result.current.suggestions.length).toBe(slashCommands.length);
-        expect(result.current.suggestions.map((s) => s.label)).toEqual(
-          expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/',
+            slashCommands,
+            mockCommandContext,
+          ),
         );
+        result = hook.result;
+        unmount = hook.unmount;
       });
+
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.suggestions.length).toBe(slashCommands.length);
+          expect(result.current.suggestions.map((s) => s.label)).toEqual(
+            expect.arrayContaining([
+              'help',
+              'clear',
+              'memory',
+              'chat',
+              'stats',
+            ]),
+          );
+        });
+      });
+      unmount!();
     });
 
     it('should filter commands based on partial input', async () => {
       const slashCommands = [
         createTestCommand({ name: 'memory', description: 'Manage memory' }),
       ];
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/mem',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
+      const setSuggestions = vi.fn();
+      const setIsLoadingSuggestions = vi.fn();
+      const setIsPerfectMatch = vi.fn();
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          {
-            label: 'memory',
-            value: 'memory',
-            description: 'Manage memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]);
+      let result: {
+        current: { completionStart: number; completionEnd: number };
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useSlashCompletion({
+            enabled: true,
+            query: '/mem',
+            slashCommands,
+            commandContext: mockCommandContext,
+            setSuggestions,
+            setIsLoadingSuggestions,
+            setIsPerfectMatch,
+          }),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
       });
+
+      await act(async () => {
+        await waitFor(() => {
+          expect(setSuggestions).toHaveBeenCalledWith([
+            {
+              label: 'memory',
+              value: 'memory',
+              description: 'Manage memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]);
+          expect(result.current.completionStart).toBe(1);
+          expect(result.current.completionEnd).toBe(4);
+        });
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      unmount!();
     });
 
     it('should suggest commands based on partial altNames', async () => {
@@ -244,16 +285,24 @@ describe('useSlashCompletion', () => {
           description: 'check session stats. Usage: /stats [model|tools]',
         }),
       ];
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/usag',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/usag',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'stats',
@@ -262,7 +311,9 @@ describe('useSlashCompletion', () => {
             commandKind: CommandKind.BUILT_IN,
           },
         ]);
+        expect(result.current.completionStart).toBe(1);
       });
+      unmount!();
     });
 
     it('should NOT provide suggestions for a perfectly typed command that is a leaf node', async () => {
@@ -273,16 +324,27 @@ describe('useSlashCompletion', () => {
           action: vi.fn(),
         }),
       ];
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/clear',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      expect(result.current.suggestions).toHaveLength(0);
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/clear',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
+      await waitFor(() => {
+        expect(result.current.suggestions).toHaveLength(0);
+        expect(result.current.completionStart).toBe(1);
+      });
+      unmount!();
     });
 
     it.each([['/?'], ['/usage']])(
@@ -303,16 +365,28 @@ describe('useSlashCompletion', () => {
           }),
         ];
 
-        const { result } = renderHook(() =>
-          useTestHarnessForSlashCompletion(
-            true,
-            query,
-            mockSlashCommands,
-            mockCommandContext,
-          ),
-        );
+        let result: {
+          current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+        };
+        let unmount: () => void;
+        await act(async () => {
+          const hook = renderHook(() =>
+            useTestHarnessForSlashCompletion(
+              true,
+              query,
+              mockSlashCommands,
+              mockCommandContext,
+            ),
+          );
+          result = hook.result;
+          unmount = hook.unmount;
+        });
 
-        expect(result.current.suggestions).toHaveLength(0);
+        await waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+          expect(result.current.completionStart).toBe(1);
+        });
+        unmount!();
       },
     );
 
@@ -320,32 +394,55 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         createTestCommand({ name: 'clear', description: 'Clear the screen' }),
       ];
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/clear ',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/clear ',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await waitFor(() => {
+        expect(result.current.suggestions).toHaveLength(0);
+      });
+      unmount!();
     });
 
     it('should not provide suggestions for an unknown command', async () => {
       const slashCommands = [
         createTestCommand({ name: 'help', description: 'Show help' }),
       ];
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/unknown-command',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/unknown-command',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await waitFor(() => {
+        expect(result.current.suggestions).toHaveLength(0);
+        expect(result.current.completionStart).toBe(1);
+      });
+      unmount!();
     });
 
     it('should not suggest hidden commands', async () => {
@@ -360,19 +457,28 @@ describe('useSlashCompletion', () => {
           hidden: true,
         }),
       ];
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
         expect(result.current.suggestions[0].label).toBe('visible');
       });
+      unmount!();
     });
   });
 
@@ -389,7 +495,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory ',
@@ -398,7 +504,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(2);
         expect(result.current.suggestions).toEqual(
           expect.arrayContaining([
@@ -417,6 +523,7 @@ describe('useSlashCompletion', () => {
           ]),
         );
       });
+      unmount();
     });
 
     it('should suggest all sub-commands when the query ends with the parent command and a space', async () => {
@@ -430,7 +537,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory ',
@@ -439,7 +546,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(2);
         expect(result.current.suggestions).toEqual(
           expect.arrayContaining([
@@ -458,6 +565,7 @@ describe('useSlashCompletion', () => {
           ]),
         );
       });
+      unmount();
     });
 
     it('should filter sub-commands by prefix', async () => {
@@ -471,7 +579,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory a',
@@ -480,7 +588,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'add',
@@ -489,7 +597,9 @@ describe('useSlashCompletion', () => {
             commandKind: CommandKind.BUILT_IN,
           },
         ]);
+        expect(result.current.completionStart).toBe(8);
       });
+      unmount();
     });
 
     it('should provide no suggestions for an invalid sub-command', async () => {
@@ -503,7 +613,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory dothisnow',
@@ -511,8 +621,13 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      expect(result.current.suggestions).toHaveLength(0);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+          expect(result.current.completionStart).toBe(8);
+        });
+      });
+      unmount();
     });
   });
 
@@ -544,7 +659,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat resume my-ch',
@@ -553,25 +668,32 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(mockCompletionFn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            invocation: {
-              raw: '/chat resume my-ch',
-              name: 'resume',
-              args: 'my-ch',
-            },
-          }),
-          'my-ch',
-        );
+      await act(async () => {
+        await waitFor(() => {
+          expect(mockCompletionFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              invocation: {
+                raw: '/chat resume my-ch',
+                name: 'resume',
+                args: 'my-ch',
+              },
+            }),
+            'my-ch',
+          );
+        });
       });
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
-          { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
-        ]);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.suggestions).toEqual([
+            { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
+            { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
+          ]);
+          expect(result.current.completionStart).toBe(13);
+          expect(result.current.isLoadingSuggestions).toBe(false);
+        });
       });
+      unmount();
     });
 
     it('should call command.completion with an empty string when args start with a space', async () => {
@@ -593,7 +715,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat resume ',
@@ -602,50 +724,55 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
-        expect(mockCompletionFn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            invocation: {
-              raw: '/chat resume',
-              name: 'resume',
-              args: '',
-            },
-          }),
-          '',
-        );
+      await act(async () => {
+        await waitFor(() => {
+          expect(mockCompletionFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              invocation: {
+                raw: '/chat resume ',
+                name: 'resume',
+                args: '',
+              },
+            }),
+            '',
+          );
+        });
       });
 
-      await vi.waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(3);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(3);
+          expect(result.current.completionStart).toBe(13);
+        });
       });
+      unmount();
     });
 
     it('should handle completion function that returns null', async () => {
-      const completionFn = vi.fn().mockResolvedValue(null);
+      const mockCompletionFn = vi.fn().mockResolvedValue(null);
+
       const slashCommands = [
         createTestCommand({
-          name: 'chat',
-          description: 'Manage chat history',
-          subCommands: [
-            createTestCommand({
-              name: 'resume',
-              description: 'Resume a saved chat',
-              completion: completionFn,
-            }),
-          ],
+          name: 'test',
+          description: 'Test command',
+          completion: mockCompletionFn,
         }),
       ];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/chat resume ',
+          '/test arg',
           slashCommands,
           mockCommandContext,
         ),
       );
 
-      expect(result.current.suggestions).toHaveLength(0);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([]);
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+      unmount();
     });
   });
 
@@ -666,7 +793,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/',
@@ -675,22 +802,25 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual(
-        expect.arrayContaining([
-          {
-            label: 'summarize',
-            value: 'summarize',
-            description: 'Summarize content',
-            commandKind: CommandKind.MCP_PROMPT,
-          },
-          {
-            label: 'help',
-            value: 'help',
-            description: 'Show help',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]),
-      );
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([
+            {
+              label: 'summarize',
+              value: 'summarize',
+              description: 'Summarize content',
+              commandKind: CommandKind.MCP_PROMPT,
+            },
+            {
+              label: 'help',
+              value: 'help',
+              description: 'Show help',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]),
+        );
+      });
+      unmount();
     });
 
     it('should include commandKind when filtering MCP commands by prefix', async () => {
@@ -709,7 +839,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/summ',
@@ -718,7 +848,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'summarize',
@@ -727,7 +857,9 @@ describe('useSlashCompletion', () => {
             commandKind: CommandKind.MCP_PROMPT,
           },
         ]);
+        expect(result.current.completionStart).toBe(1);
       });
+      unmount();
     });
 
     it('should include commandKind for sub-commands', async () => {
@@ -753,7 +885,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory',
@@ -762,22 +894,25 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual(
-        expect.arrayContaining([
-          {
-            label: 'show',
-            value: 'show',
-            description: 'Show memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-          {
-            label: 'add',
-            value: 'add',
-            description: 'Add to memory',
-            commandKind: CommandKind.MCP_PROMPT,
-          },
-        ]),
-      );
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual(
+          expect.arrayContaining([
+            {
+              label: 'show',
+              value: 'show',
+              description: 'Show memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+            {
+              label: 'add',
+              value: 'add',
+              description: 'Add to memory',
+              commandKind: CommandKind.MCP_PROMPT,
+            },
+          ]),
+        );
+      });
+      unmount();
     });
 
     it('should include commandKind for file commands', async () => {
@@ -790,7 +925,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result } = renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/custom',
@@ -799,7 +934,7 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions).toEqual([
           {
             label: 'custom-script',
@@ -808,11 +943,13 @@ describe('useSlashCompletion', () => {
             commandKind: CommandKind.FILE,
           },
         ]);
+        expect(result.current.completionStart).toBe(1);
       });
+      unmount();
     });
   });
 
-  it('should not call shared callbacks when disabled', () => {
+  it('should not call shared callbacks when disabled', async () => {
     const mockSetSuggestions = vi.fn();
     const mockSetIsLoadingSuggestions = vi.fn();
     const mockSetIsPerfectMatch = vi.fn();
@@ -824,7 +961,7 @@ describe('useSlashCompletion', () => {
       }),
     ];
 
-    const { rerender } = renderHook(
+    const { rerender, unmount } = renderHook(
       ({ enabled, query }) =>
         useSlashCompletion({
           enabled,
@@ -849,9 +986,17 @@ describe('useSlashCompletion', () => {
     rerender({ enabled: false, query: '@src/file.ts' });
     rerender({ enabled: false, query: '@src/file.tsx' });
 
+    // Wait for any internal async operations to settle to avoid act warnings
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
     // Should not have called shared callbacks during @ completion typing
-    expect(mockSetSuggestions).not.toHaveBeenCalled();
-    expect(mockSetIsLoadingSuggestions).not.toHaveBeenCalled();
-    expect(mockSetIsPerfectMatch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockSetSuggestions).not.toHaveBeenCalled();
+      expect(mockSetIsLoadingSuggestions).not.toHaveBeenCalled();
+      expect(mockSetIsPerfectMatch).not.toHaveBeenCalled();
+    });
+    unmount();
   });
 });

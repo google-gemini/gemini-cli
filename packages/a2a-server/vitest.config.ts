@@ -11,7 +11,6 @@ export default defineConfig({
   test: {
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],
     exclude: ['**/node_modules/**', '**/dist/**'],
-    environment: 'jsdom',
     globals: true,
     reporters: ['default', 'junit'],
     silent: true,

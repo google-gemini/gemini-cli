@@ -5,7 +5,7 @@
  */
 
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
-import { render } from 'ink-testing-library';
+import { render } from '../../../test-utils/render.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
 import { vi } from 'vitest';

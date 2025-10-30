@@ -407,7 +407,9 @@ describe('useReactToolScheduler', () => {
     ]);
 
     // Clean up the pending promise to avoid open handles.
-    resolveExecute({ llmContent: 'output', returnDisplay: 'display' });
+    await act(async () => {
+      resolveExecute({ llmContent: 'output', returnDisplay: 'display' });
+    });
   });
 
   it('should handle tool not found', async () => {
@@ -854,7 +856,9 @@ describe('useReactToolScheduler', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    schedule(request2, new AbortController().signal);
+    act(() => {
+      schedule(request2, new AbortController().signal);
+    });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(50);

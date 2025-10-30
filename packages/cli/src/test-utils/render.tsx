@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render as inkRender } from 'ink-testing-library';
 import type React from 'react';
 import { act } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
@@ -18,6 +18,34 @@ import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
+
+// Wrapper around ink-testing-library's render that ensures act() is called
+export const render = (
+  tree: React.ReactElement,
+): ReturnType<typeof inkRender> => {
+  let renderResult: ReturnType<typeof inkRender> =
+    undefined as unknown as ReturnType<typeof inkRender>;
+  act(() => {
+    renderResult = inkRender(tree);
+  });
+
+  const originalUnmount = renderResult.unmount;
+  const originalRerender = renderResult.rerender;
+
+  return {
+    ...renderResult,
+    unmount: () => {
+      act(() => {
+        originalUnmount();
+      });
+    },
+    rerender: (newTree: React.ReactElement) => {
+      act(() => {
+        originalRerender(newTree);
+      });
+    },
+  };
+};
 
 const mockConfig = {
   getModel: () => 'gemini-pro',

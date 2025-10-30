@@ -14,7 +14,7 @@ import {
   type MockedFunction,
 } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { useEditorSettings } from './useEditorSettings.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
