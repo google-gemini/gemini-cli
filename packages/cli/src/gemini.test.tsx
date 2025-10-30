@@ -23,6 +23,11 @@ import { type LoadedSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { type Config } from '@google/gemini-cli-core';
 
+const performance = vi.hoisted(() => ({
+  now: vi.fn(),
+}));
+vi.stubGlobal('performance', performance);
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -526,9 +531,8 @@ describe('startInteractiveUI', () => {
 
   it('should not recordSlowRender when less than threshold', async () => {
     const { recordSlowRender } = await import('@google/gemini-cli-core');
-    const performanceSpy = vi.spyOn(performance, 'now');
-    performanceSpy.mockReturnValueOnce(0);
-    performanceSpy.mockReturnValueOnce(200);
+    performance.now.mockReturnValueOnce(0);
+    performance.now.mockReturnValueOnce(200);
 
     await startInteractiveUI(
       mockConfig,
@@ -543,9 +547,8 @@ describe('startInteractiveUI', () => {
 
   it('should call recordSlowRender when more than threshold', async () => {
     const { recordSlowRender } = await import('@google/gemini-cli-core');
-    const performanceSpy = vi.spyOn(performance, 'now');
-    performanceSpy.mockReturnValueOnce(0);
-    performanceSpy.mockReturnValueOnce(300);
+    performance.now.mockReturnValueOnce(0);
+    performance.now.mockReturnValueOnce(300);
 
     await startInteractiveUI(
       mockConfig,
