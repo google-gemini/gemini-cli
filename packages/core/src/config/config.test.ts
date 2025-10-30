@@ -6,18 +6,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type {
-  ConfigParameters,
-  SandboxConfig,
-  HookDefinition,
-} from './config.js';
-import {
-  Config,
-  DEFAULT_FILE_FILTERING_OPTIONS,
-  HookType,
-  HookEventName,
-} from './config.js';
+<<<<<<< HEAD
+import type { ConfigParameters, SandboxConfig } from './config.js';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
 import { ApprovalMode } from '../policy/types.js';
+=======
+import type { ConfigParameters, SandboxConfig } from './config.js';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { ApprovalMode } from '../policy/types.js';
+
+>>>>>>> a0ba2af9f (Refactor PolicyEngine from CLI to Core package)
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {

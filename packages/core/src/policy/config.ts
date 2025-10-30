@@ -21,16 +21,13 @@ import {
   type UpdatePolicy,
 } from '../confirmation-bus/types.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
-import { coreEvents } from '../utils/events.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 
-// Policy tier constants for priority calculation
-export const DEFAULT_POLICY_TIER = 1;
-export const USER_POLICY_TIER = 2;
-export const ADMIN_POLICY_TIER = 3;
+// Store policy loading errors to be displayed after UI is ready
+let storedPolicyErrors: string[] = [];
 
 /**
  * Gets the list of directories to search for policy files, in order of increasing priority
@@ -67,6 +64,7 @@ export function getPolicyTier(
   const USER_POLICIES_DIR = Storage.getUserPoliciesDir();
   const ADMIN_POLICIES_DIR = Storage.getSystemPoliciesDir();
 
+  // Normalize paths for comparison
   const normalizedDir = path.resolve(dir);
   const normalizedUser = path.resolve(USER_POLICIES_DIR);
   const normalizedAdmin = path.resolve(ADMIN_POLICIES_DIR);
@@ -75,19 +73,21 @@ export function getPolicyTier(
     defaultPoliciesDir &&
     normalizedDir === path.resolve(defaultPoliciesDir)
   ) {
-    return DEFAULT_POLICY_TIER;
+    return 1;
   }
   if (normalizedDir === path.resolve(DEFAULT_CORE_POLICIES_DIR)) {
-    return DEFAULT_POLICY_TIER;
+    return 1;
   }
   if (normalizedDir === normalizedUser) {
-    return USER_POLICY_TIER;
+    return 2;
   }
   if (normalizedDir === normalizedAdmin) {
-    return ADMIN_POLICY_TIER;
+    return 3;
   }
 
-  return DEFAULT_POLICY_TIER;
+  // Default to tier 1 if unknown, or maybe it should be 2 (user) if it's some other random dir?
+  // Sticking to CLI behavior of defaulting to 1.
+  return 1;
 }
 
 /**
@@ -120,12 +120,10 @@ export async function createPolicyEngineConfig(
     (dir) => getPolicyTier(dir, defaultPoliciesDir),
   );
 
-  // Emit any errors encountered during TOML loading to the UI
-  // coreEvents has a buffer that will display these once the UI is ready
+  // Store any errors encountered during TOML loading
+  // These will be emitted by getPolicyErrorsForUI() after the UI is ready.
   if (errors.length > 0) {
-    for (const error of errors) {
-      coreEvents.emitFeedback('error', formatPolicyError(error));
-    }
+    storedPolicyErrors = errors.map((error) => formatPolicyError(error));
   }
 
   const rules: PolicyRule[] = [...tomlRules];
@@ -248,4 +246,16 @@ export function createPolicyUpdater(
       });
     },
   );
+}
+
+/**
+ * Gets and clears any policy errors that were stored during config loading.
+ * This should be called once the UI is ready to display errors.
+ *
+ * @returns Array of formatted error messages, or empty array if no errors
+ */
+export function getPolicyErrorsForUI(): string[] {
+  const errors = [...storedPolicyErrors];
+  storedPolicyErrors = []; // Clear after retrieving
+  return errors;
 }
