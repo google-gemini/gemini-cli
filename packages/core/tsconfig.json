@@ -7,6 +7,6 @@
     "rootDir": ".",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
+  "include": ["index.ts", "src"],
   "exclude": ["node_modules", "dist"]
 }
