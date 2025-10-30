@@ -77,9 +77,11 @@ export async function handleInstall(args: InstallArgs) {
       settings: loadSettings(workspaceDir).merged,
     });
     await extensionManager.loadExtensions();
-    const name =
+    const extension =
       await extensionManager.installOrUpdateExtension(installMetadata);
-    debugLogger.log(`Extension "${name}" installed successfully and enabled.`);
+    debugLogger.log(
+      `Extension "${extension.name}" installed successfully and enabled.`,
+    );
   } catch (error) {
     debugLogger.error(getErrorMessage(error));
     process.exit(1);
