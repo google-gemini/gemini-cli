@@ -141,6 +141,25 @@ describe('GeminiChat', () => {
     vi.resetAllMocks();
   });
 
+  describe('constructor', () => {
+    it('should initialize lastPromptTokenCount based on history size', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+      ];
+      const chatWithHistory = new GeminiChat(mockConfig, config, history);
+      const estimatedTokens = Math.ceil(JSON.stringify(history).length / 4);
+      expect(chatWithHistory.getLastPromptTokenCount()).toBe(estimatedTokens);
+    });
+
+    it('should initialize lastPromptTokenCount for empty history', () => {
+      const chatEmpty = new GeminiChat(mockConfig, config, []);
+      expect(chatEmpty.getLastPromptTokenCount()).toBe(
+        Math.ceil(JSON.stringify([]).length / 4),
+      );
+    });
+  });
+
   describe('sendMessageStream', () => {
     it('should succeed if a tool call is followed by an empty part', async () => {
       // 1. Mock a stream that contains a tool call, then an invalid (empty) part.
@@ -707,14 +726,6 @@ describe('GeminiChat', () => {
           config: {},
         },
         'prompt-id-1',
-      );
-
-      // Verify that token counting is called when usageMetadata is present
-      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
-        42,
-      );
-      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(
-        1,
       );
     });
   });
