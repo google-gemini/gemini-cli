@@ -25,6 +25,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   vscodium: 'VSCodium',
   windsurf: 'Windsurf',
   zed: 'Zed',
+  trae: 'Trae',
 };
 
 class EditorSettingsManager {
