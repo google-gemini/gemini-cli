@@ -8,6 +8,11 @@ import stripAnsi from 'strip-ansi';
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
+import {
+  tokenize,
+  styledCharsFromTokens,
+  type StyledChar,
+} from '@alcalzone/ansi-tokenize';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
@@ -28,32 +33,38 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  handle combining marks, emoji, and surrogate pairs)
  * ---------------------------------------------------------------------- */
 
-// Cache for grapheme clusters to reduce GC pressure
+// Cache for grapheme segmentation results (aligns with Ink's toStyledCharactersCache)
 const graphemeCache = new Map<string, string[]>();
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 
-// Cache the Intl.Segmenter instance to avoid re-creation on each call
-// Creating Intl.Segmenter is expensive and this function is called frequently
-const graphemeSegmenter =
-  typeof Intl !== 'undefined' && Intl.Segmenter
-    ? new Intl.Segmenter('en', { granularity: 'grapheme' })
-    : undefined;
-
 /**
- * Split a string into grapheme clusters (user-perceived characters).
- * This properly handles:
- * - Combining marks (e.g., 'é' = 'e' + combining acute)
- * - Emoji with ZWJ sequences (e.g., family emoji)
- * - Surrogate pairs
- * - Regional indicator sequences (flags)
+ * Splits a string into an array of grapheme clusters (user-perceived characters).
  *
- * Uses Intl.Segmenter (Node.js 16+) for accurate Unicode segmentation.
+ * This implementation aligns with Ink's toStyledCharacters() logic for consistent
+ * cursor positioning and text wrapping. It manually combines Unicode sequences:
+ * - Regional indicators (flags)
+ * - Combining marks (diacritics)
+ * - Variation selectors
+ * - Skin tone modifiers
+ * - Zero-width joiners (ZWJ)
+ * - Keycaps
+ * - Tags block
  *
- * @param str - The string to split into graphemes
+ * This is critical for:
+ * - Cursor positioning in text editors (must match Ink's behavior)
+ * - Backspace/delete operations
+ * - Text selection and manipulation
+ * - Vim mode navigation
+ *
+ * @param str - The string to split into grapheme clusters
  * @returns An array of grapheme clusters
+ *
+ * @example
+ * toGraphemes('café') // ['c', 'a', 'f', 'é']
+ * toGraphemes('👨‍👩‍👧‍👦') // ['👨‍👩‍👧‍👦'] (single family emoji)
  */
 export function toGraphemes(str: string): string[] {
-  // ASCII fast path - check if all chars are ASCII (0-127)
+  // ASCII fast-path: avoid tokenization overhead for pure ASCII
   let isAscii = true;
   for (let i = 0; i < str.length; i++) {
     if (str.charCodeAt(i) > 127) {
@@ -73,24 +84,133 @@ export function toGraphemes(str: string): string[] {
     }
   }
 
-  // Use Intl.Segmenter for proper grapheme cluster segmentation
-  let result: string[];
-  if (graphemeSegmenter) {
-    result = Array.from(graphemeSegmenter.segment(str), (s) => s.segment);
-  } else {
-    // Fail loudly if Intl.Segmenter is unavailable (should not happen in Node.js 20+)
-    // Better to detect unsupported environments immediately than silently exhibit incorrect behavior
-    throw new Error(
-      'Intl.Segmenter is not available. Node.js 16+ is required for proper Unicode support.',
-    );
+  // Use Ink's approach: tokenize ANSI, then manually combine grapheme clusters
+  const tokens = tokenize(str);
+  const characters = styledCharsFromTokens(tokens);
+  const combinedCharacters: string[] = [];
+
+  for (let i = 0; i < characters.length; i++) {
+    const character = characters[i];
+    if (!character) {
+      continue;
+    }
+
+    // Handle tab expansion (4 spaces like Ink)
+    if (character.value === '\t') {
+      combinedCharacters.push(' ', ' ', ' ', ' ');
+      continue;
+    }
+
+    // Skip backspace
+    if (character.value === '\b') {
+      continue;
+    }
+
+    let { value } = character;
+    const firstCodePoint = value.codePointAt(0);
+
+    // 1. Regional Indicators (Flags)
+    // These combine in pairs.
+    // See: https://en.wikipedia.org/wiki/Regional_indicator_symbol
+    if (
+      firstCodePoint &&
+      firstCodePoint >= 0x1f1e6 &&
+      firstCodePoint <= 0x1f1ff &&
+      i + 1 < characters.length
+    ) {
+      const nextCharacter = characters[i + 1];
+
+      if (nextCharacter) {
+        const nextFirstCodePoint = nextCharacter.value.codePointAt(0);
+
+        if (
+          nextFirstCodePoint &&
+          nextFirstCodePoint >= 0x1f1e6 &&
+          nextFirstCodePoint <= 0x1f1ff
+        ) {
+          value += nextCharacter.value;
+          i++;
+
+          combinedCharacters.push(value);
+          continue;
+        }
+      }
+    }
+
+    // 2. Other combining characters
+    // See: https://en.wikipedia.org/wiki/Combining_character
+    while (i + 1 < characters.length) {
+      const nextCharacter = characters[i + 1];
+
+      if (!nextCharacter) {
+        break;
+      }
+
+      const codePoints = [...nextCharacter.value].map((char) =>
+        char.codePointAt(0),
+      );
+
+      const nextFirstCodePoint = codePoints[0];
+
+      if (!nextFirstCodePoint) {
+        break;
+      }
+
+      // Variation selectors
+      const isVariationSelector =
+        nextFirstCodePoint >= 0xfe00 && nextFirstCodePoint <= 0xfe0f;
+
+      // Skin tone modifiers
+      const isSkinToneModifier =
+        nextFirstCodePoint >= 0x1f3fb && nextFirstCodePoint <= 0x1f3ff;
+
+      const isZeroWidthJoiner = nextFirstCodePoint === 0x200d;
+      const isKeycap = nextFirstCodePoint === 0x20e3;
+
+      // Tags block (U+E0000 - U+E007F)
+      const isTagsBlock =
+        nextFirstCodePoint >= 0xe0000 && nextFirstCodePoint <= 0xe007f;
+
+      // Combining Diacritical Marks
+      const isCombiningMark =
+        nextFirstCodePoint >= 0x0300 && nextFirstCodePoint <= 0x036f;
+
+      const isCombining =
+        isVariationSelector ||
+        isSkinToneModifier ||
+        isZeroWidthJoiner ||
+        isKeycap ||
+        isTagsBlock ||
+        isCombiningMark;
+
+      if (!isCombining) {
+        break;
+      }
+
+      // Merge with previous character
+      value += nextCharacter.value;
+      i++; // Consume next character.
+
+      // If it was a ZWJ, also consume the character after it.
+      if (isZeroWidthJoiner && i + 1 < characters.length) {
+        const characterAfterZwj = characters[i + 1];
+
+        if (characterAfterZwj) {
+          value += characterAfterZwj.value;
+          i++; // Consume character after ZWJ.
+        }
+      }
+    }
+
+    combinedCharacters.push(value);
   }
 
-  // Cache result (unlimited like Ink)
+  // Cache result
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
-    graphemeCache.set(str, result);
+    graphemeCache.set(str, combinedCharacters);
   }
 
-  return result;
+  return combinedCharacters;
 }
 
 /**
