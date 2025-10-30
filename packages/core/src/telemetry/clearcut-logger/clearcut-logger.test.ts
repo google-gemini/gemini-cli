@@ -330,7 +330,11 @@ describe('ClearcutLogger', () => {
       },
       {
         name: 'VSCode via TERM_PROGRAM',
-        env: { TERM_PROGRAM: 'vscode' },
+        env: {
+          TERM_PROGRAM: 'vscode',
+          GITHUB_SHA: undefined,
+          MONOSPACE_ENV: '',
+        },
         expected: 'vscode',
       },
       {
@@ -345,17 +349,29 @@ describe('ClearcutLogger', () => {
       },
       {
         name: 'Cursor',
-        env: { CURSOR_TRACE_ID: 'abc123', TERM_PROGRAM: 'vscode' },
+        env: {
+          CURSOR_TRACE_ID: 'abc123',
+          TERM_PROGRAM: 'vscode',
+          GITHUB_SHA: undefined,
+        },
         expected: 'cursor',
       },
       {
         name: 'Firebase Studio',
-        env: { MONOSPACE_ENV: 'true', TERM_PROGRAM: 'vscode' },
+        env: {
+          MONOSPACE_ENV: 'true',
+          TERM_PROGRAM: 'vscode',
+          GITHUB_SHA: undefined,
+        },
         expected: 'firebasestudio',
       },
       {
         name: 'Devin',
-        env: { __COG_BASHRC_SOURCED: 'true', TERM_PROGRAM: 'vscode' },
+        env: {
+          __COG_BASHRC_SOURCED: 'true',
+          TERM_PROGRAM: 'vscode',
+          GITHUB_SHA: undefined,
+        },
         expected: 'devin',
       },
     ])(
@@ -363,11 +379,8 @@ describe('ClearcutLogger', () => {
       ({ env, expected }) => {
         const { logger } = setup({});
         for (const [key, value] of Object.entries(env)) {
-          if (value !== undefined) {
-            vi.stubEnv(key, value);
-          }
+          vi.stubEnv(key, value);
         }
-
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0]).toContainEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
