@@ -20,10 +20,13 @@ export async function createPolicyEngineConfig(
   settings: Settings,
   approvalMode: ApprovalMode,
 ): Promise<PolicyEngineConfig> {
-  // Cast Settings to PolicySettings. TypeScript's structural typing should handle this,
-  // but explicit casting might be needed if Settings has index signatures or other complexities.
-  // Based on our analysis, they are compatible.
-  const policySettings: PolicySettings = settings as unknown as PolicySettings;
+  // Explicitly construct PolicySettings from Settings to ensure type safety
+  // and avoid accidental leakage of other settings properties.
+  const policySettings: PolicySettings = {
+    mcp: settings.mcp,
+    tools: settings.tools,
+    mcpServers: settings.mcpServers,
+  };
 
   return createCorePolicyEngineConfig(policySettings, approvalMode);
 }
