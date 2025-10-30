@@ -9,31 +9,6 @@ import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
 
-// Type definitions for Intl.Segmenter (ES2022+, Node.js 16+)
-// This is available in modern Node.js but TypeScript types may not include it
-declare global {
-  namespace Intl {
-    interface Segmenter {
-      segment(input: string): Segments;
-    }
-    interface SegmenterConstructor {
-      new (
-        locales?: string | string[],
-        options?: { granularity?: 'grapheme' | 'word' | 'sentence' },
-      ): Segmenter;
-    }
-    interface Segments {
-      [Symbol.iterator](): IterableIterator<SegmentData>;
-    }
-    interface SegmentData {
-      segment: string;
-      index: number;
-      input: string;
-    }
-    const Segmenter: SegmenterConstructor;
-  }
-}
-
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
  * @param asciiArt The ASCII art string.
