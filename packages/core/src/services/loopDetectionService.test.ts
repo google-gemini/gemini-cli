@@ -143,6 +143,22 @@ describe('LoopDetectionService', () => {
       }
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
+
+    it('should stop reporting a loop when disabled for session after a loop was detected', () => {
+      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+      // Trigger a loop
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD; i++) {
+        service.addAndCheck(event);
+      }
+      expect(service.addAndCheck(event)).toBe(true);
+
+      // Disable for session
+      service.disableForSession();
+      expect(loggers.logLoopDetectionDisabled).toHaveBeenCalledTimes(1);
+
+      // Should now return false even though a loop was previously detected
+      expect(service.addAndCheck(event)).toBe(false);
+    });
   });
 
   describe('Content Loop Detection', () => {
