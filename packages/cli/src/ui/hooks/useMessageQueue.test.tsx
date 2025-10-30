@@ -6,19 +6,21 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useMessageQueue } from './useMessageQueue.js';
 import { StreamingState } from '../types.js';
-import { waitFor } from '../../test-utils/async.js';
 
 describe('useMessageQueue', () => {
   let mockSubmitQuery: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockSubmitQuery = vi.fn();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -32,23 +34,15 @@ describe('useMessageQueue', () => {
       hookResult = useMessageQueue(props);
       return null;
     }
-    let renderResult: ReturnType<typeof render>;
-    act(() => {
-      renderResult = render(<TestComponent {...initialProps} />);
-    });
+    const { rerender } = render(<TestComponent {...initialProps} />);
     return {
       result: {
         get current() {
-          return hookResult!;
+          return hookResult;
         },
       },
-      rerender: (newProps: Partial<typeof initialProps>) => {
-        act(() => {
-          renderResult!.rerender(
-            <TestComponent {...initialProps} {...newProps} />,
-          );
-        });
-      },
+      rerender: (newProps: Partial<typeof initialProps>) =>
+        rerender(<TestComponent {...initialProps} {...newProps} />),
     };
   };
 
@@ -155,9 +149,7 @@ describe('useMessageQueue', () => {
     expect(result.current.messageQueue).toEqual(['Message 1', 'Message 2']);
 
     // Transition to Idle
-    act(() => {
-      rerender({ streamingState: StreamingState.Idle });
-    });
+    rerender({ streamingState: StreamingState.Idle });
 
     await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');

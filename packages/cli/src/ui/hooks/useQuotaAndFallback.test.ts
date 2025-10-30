@@ -229,7 +229,7 @@ describe('useQuotaAndFallback', () => {
 
         // Call the handler but do not await it, to check the intermediate state
         let promise: Promise<FallbackIntent | null>;
-        await act(async () => {
+        await act(() => {
           promise = handler(
             'gemini-pro',
             'gemini-flash',
@@ -242,7 +242,7 @@ describe('useQuotaAndFallback', () => {
         expect(result.current.proQuotaRequest?.failedModel).toBe('gemini-pro');
 
         // Simulate the user choosing to continue with the fallback model
-        await act(async () => {
+        await act(() => {
           result.current.handleProQuotaChoice('continue');
         });
 
@@ -269,7 +269,7 @@ describe('useQuotaAndFallback', () => {
           .calls[0][0] as FallbackModelHandler;
 
         let promise1: Promise<FallbackIntent | null>;
-        await act(async () => {
+        await act(() => {
           promise1 = handler(
             'gemini-pro',
             'gemini-flash',
@@ -293,7 +293,7 @@ describe('useQuotaAndFallback', () => {
         expect(result2!).toBe('stop');
         expect(result.current.proQuotaRequest).toBe(firstRequest);
 
-        await act(async () => {
+        await act(() => {
           result.current.handleProQuotaChoice('continue');
         });
 
@@ -338,7 +338,7 @@ describe('useQuotaAndFallback', () => {
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
       let promise: Promise<FallbackIntent | null>;
-      await act(async () => {
+      await act(() => {
         promise = handler(
           'gemini-pro',
           'gemini-flash',
@@ -346,7 +346,7 @@ describe('useQuotaAndFallback', () => {
         );
       });
 
-      await act(async () => {
+      await act(() => {
         result.current.handleProQuotaChoice('auth');
       });
 
@@ -371,7 +371,7 @@ describe('useQuotaAndFallback', () => {
         .calls[0][0] as FallbackModelHandler;
       // The first `addItem` call is for the initial quota error message
       let promise: Promise<FallbackIntent | null>;
-      await act(async () => {
+      await act(() => {
         promise = handler(
           'gemini-pro',
           'gemini-flash',
@@ -379,7 +379,7 @@ describe('useQuotaAndFallback', () => {
         );
       });
 
-      await act(async () => {
+      await act(() => {
         result.current.handleProQuotaChoice('continue');
       });
 

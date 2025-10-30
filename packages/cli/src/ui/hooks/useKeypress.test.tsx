@@ -5,7 +5,7 @@
  */
 
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { useKeypress } from './useKeypress.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { useStdin } from 'ink';
@@ -49,15 +49,11 @@ describe('useKeypress', () => {
       useKeypress(onKeypress, { isActive });
       return null;
     }
-    let result: ReturnType<typeof render>;
-    act(() => {
-      result = render(
-        <KeypressProvider kittyProtocolEnabled={false}>
-          <TestComponent />
-        </KeypressProvider>,
-      );
-    });
-    return result!;
+    return render(
+      <KeypressProvider kittyProtocolEnabled={false}>
+        <TestComponent />
+      </KeypressProvider>,
+    );
   };
 
   beforeEach(() => {
@@ -100,17 +96,13 @@ describe('useKeypress', () => {
   it('should set and release raw mode', () => {
     const { unmount } = renderKeypressHook(true);
     expect(mockSetRawMode).toHaveBeenCalledWith(true);
-    act(() => {
-      unmount();
-    });
+    unmount();
     expect(mockSetRawMode).toHaveBeenCalledWith(false);
   });
 
   it('should stop listening after being unmounted', () => {
     const { unmount } = renderKeypressHook(true);
-    act(() => {
-      unmount();
-    });
+    unmount();
     act(() => stdin.write('a'));
     expect(onKeypress).not.toHaveBeenCalled();
   });
@@ -278,9 +270,7 @@ describe('useKeypress', () => {
       expect(onKeypress).not.toHaveBeenCalled();
 
       // Unmounting should trigger the flush.
-      act(() => {
-        unmount();
-      });
+      unmount();
 
       expect(onKeypress).toHaveBeenCalledTimes(1);
       expect(onKeypress).toHaveBeenCalledWith({

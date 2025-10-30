@@ -9,11 +9,7 @@ import type { CompressionDisplayProps } from './CompressionMessage.js';
 import { CompressionMessage } from './CompressionMessage.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
 import type { CompressionProps } from '../../types.js';
-import { describe, it, expect, vi } from 'vitest';
-
-vi.mock('ink-spinner', () => ({
-  default: () => null,
-}));
+import { describe, it, expect } from 'vitest';
 
 describe('<CompressionMessage />', () => {
   const createCompressionProps = (

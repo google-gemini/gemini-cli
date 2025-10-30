@@ -5,20 +5,19 @@
  */
 
 import { vi } from 'vitest';
-import { act } from 'react';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createExtension } from '../../test-utils/createExtension.js';
 import { useExtensionUpdates } from './useExtensionUpdates.js';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { MessageType } from '../types.js';
 import {
   checkForAllExtensionUpdates,
   updateExtension,
 } from '../../config/extensions/update.js';
-import { waitFor } from '../../test-utils/async.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
@@ -102,25 +101,16 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    let renderResult: ReturnType<typeof render>;
-    await act(async () => {
-      renderResult = render(<TestComponent />);
-    });
+    render(<TestComponent />);
 
-    await act(async () => {
-      await waitFor(() => {
-        expect(addItem).toHaveBeenCalledWith(
-          {
-            type: MessageType.INFO,
-            text: 'You have 1 extension with an update available, run "/extensions list" for more information.',
-          },
-          expect.any(Number),
-        );
-      });
-    });
-
-    await act(async () => {
-      renderResult!.unmount();
+    await waitFor(() => {
+      expect(addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'You have 1 extension with an update available, run "/extensions list" for more information.',
+        },
+        expect.any(Number),
+      );
     });
   });
 
@@ -161,29 +151,20 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    let renderResult: ReturnType<typeof render>;
-    await act(async () => {
-      renderResult = render(<TestComponent />);
-    });
+    render(<TestComponent />);
 
-    await act(async () => {
-      await waitFor(
-        () => {
-          expect(addItem).toHaveBeenCalledWith(
-            {
-              type: MessageType.INFO,
-              text: 'Extension "test-extension" successfully updated: 1.0.0 → 1.1.0.',
-            },
-            expect.any(Number),
-          );
-        },
-        { timeout: 4000 },
-      );
-    });
-
-    await act(async () => {
-      renderResult!.unmount();
-    });
+    await waitFor(
+      () => {
+        expect(addItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Extension "test-extension" successfully updated: 1.0.0 → 1.1.0.',
+          },
+          expect.any(Number),
+        );
+      },
+      { timeout: 4000 },
+    );
   });
 
   it('should batch update notifications for multiple extensions', async () => {
@@ -248,41 +229,31 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    let renderResult: ReturnType<typeof render>;
-    await act(async () => {
-      renderResult = render(<TestComponent />);
-    });
+    render(<TestComponent />);
 
-    await act(async () => {
-      await waitFor(
-        () => {
-          expect(addItem).toHaveBeenCalledTimes(2);
-          expect(addItem).toHaveBeenCalledWith(
-            {
-              type: MessageType.INFO,
-              text: 'Extension "test-extension-1" successfully updated: 1.0.0 → 1.1.0.',
-            },
-            expect.any(Number),
-          );
-          expect(addItem).toHaveBeenCalledWith(
-            {
-              type: MessageType.INFO,
-              text: 'Extension "test-extension-2" successfully updated: 2.0.0 → 2.1.0.',
-            },
-            expect.any(Number),
-          );
-        },
-        { timeout: 4000 },
-      );
-    });
-
-    await act(async () => {
-      renderResult!.unmount();
-    });
+    await waitFor(
+      () => {
+        expect(addItem).toHaveBeenCalledTimes(2);
+        expect(addItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Extension "test-extension-1" successfully updated: 1.0.0 → 1.1.0.',
+          },
+          expect.any(Number),
+        );
+        expect(addItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Extension "test-extension-2" successfully updated: 2.0.0 → 2.1.0.',
+          },
+          expect.any(Number),
+        );
+      },
+      { timeout: 4000 },
+    );
   });
 
   it('should batch update notifications for multiple extensions with autoUpdate: false', async () => {
-    vi.useFakeTimers();
     vi.spyOn(extensionManager, 'getExtensions').mockReturnValue([
       {
         name: 'test-extension-1',
@@ -341,31 +312,17 @@ describe('useExtensionUpdates', () => {
       return null;
     }
 
-    let renderResult: ReturnType<typeof render>;
-    await act(async () => {
-      renderResult = render(<TestComponent />);
-    });
+    render(<TestComponent />);
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(100);
+    await waitFor(() => {
+      expect(addItem).toHaveBeenCalledTimes(1);
+      expect(addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'You have 2 extensions with an update available, run "/extensions list" for more information.',
+        },
+        expect.any(Number),
+      );
     });
-
-    await act(async () => {
-      await waitFor(() => {
-        expect(addItem).toHaveBeenCalledTimes(1);
-        expect(addItem).toHaveBeenCalledWith(
-          {
-            type: MessageType.INFO,
-            text: 'You have 2 extensions with an update available, run "/extensions list" for more information.',
-          },
-          expect.any(Number),
-        );
-      });
-    });
-
-    await act(async () => {
-      renderResult!.unmount();
-    });
-    vi.useRealTimers();
   });
 });

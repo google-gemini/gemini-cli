@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { vi } from 'vitest';
-import { act } from 'react';
 import {
   useMemoryMonitor,
   MEMORY_CHECK_INTERVAL,
@@ -33,34 +32,21 @@ describe('useMemoryMonitor', () => {
     return null;
   }
 
-  it('should not warn when memory usage is below threshold', async () => {
+  it('should not warn when memory usage is below threshold', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD / 2,
     } as NodeJS.MemoryUsage);
-    let renderResult: ReturnType<typeof render>;
-    await act(async () => {
-      renderResult = render(<TestComponent />);
-    });
-    await act(async () => {
-      vi.advanceTimersByTime(10000);
-    });
+    render(<TestComponent />);
+    vi.advanceTimersByTime(10000);
     expect(addItem).not.toHaveBeenCalled();
-    await act(async () => {
-      renderResult!.unmount();
-    });
   });
 
-  it('should warn when memory usage is above threshold', async () => {
+  it('should warn when memory usage is above threshold', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    let renderResult: ReturnType<typeof render>;
-    await act(async () => {
-      renderResult = render(<TestComponent />);
-    });
-    await act(async () => {
-      vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
-    });
+    render(<TestComponent />);
+    vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
     expect(addItem).toHaveBeenCalledWith(
       {
@@ -69,37 +55,22 @@ describe('useMemoryMonitor', () => {
       },
       expect.any(Number),
     );
-    await act(async () => {
-      renderResult!.unmount();
-    });
   });
 
-  it('should only warn once', async () => {
+  it('should only warn once', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    let renderResult: ReturnType<typeof render>;
-    await act(async () => {
-      renderResult = render(<TestComponent />);
-    });
-    await act(async () => {
-      vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
-    });
+    const { rerender } = render(<TestComponent />);
+    vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
 
     // Rerender and advance timers, should not warn again
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    await act(async () => {
-      renderResult!.rerender(<TestComponent />);
-    });
-    await act(async () => {
-      vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
-    });
+    rerender(<TestComponent />);
+    vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      renderResult!.unmount();
-    });
   });
 });
