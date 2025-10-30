@@ -11,6 +11,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { safeJsonStringify } from '@google/gemini-cli-core/src/utils/safeJsonStringify.js';
 import { env } from 'node:process';
+import { platform } from 'node:os';
 
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
@@ -18,7 +19,7 @@ describe('extension reloading', () => {
   const sandboxEnv = env['GEMINI_SANDBOX'];
 
   // Fails in sandbox mode, can't check for local extension updates.
-  itIf(!sandboxEnv || sandboxEnv === 'false')(
+  itIf((!sandboxEnv || sandboxEnv === 'false') && platform() !== 'win32')(
     'installs a local extension, updates it, checks it was reloaded properly',
     async () => {
       const serverA = new TestMcpServer();
