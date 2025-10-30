@@ -710,12 +710,24 @@ describe('IdeClient', () => {
         expect(result.isValid).toBe(true);
       });
 
-      it('should handle paths with a literal % sign without crashing', () => {
+      it('should return false for paths containing a literal % sign', () => {
         const workspacePath = '/test/a%path';
         const cwd = '/test/a%path/sub-dir';
         const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
-        expect(result.isValid).toBe(true);
+        expect(result.isValid).toBe(false);
       });
+
+      it.skipIf(process.platform !== 'win32')(
+        'should correctly convert a Windows file URI',
+        () => {
+          const workspacePath = 'file:///C:\\Users\\test';
+          const cwd = 'C:\\Users\\test\\sub-dir';
+
+          const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+
+          expect(result.isValid).toBe(true);
+        },
+      );
     });
   });
 });

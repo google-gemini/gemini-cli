@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { isSubpath } from '../utils/paths.js';
 import { detectIde, type IdeInfo } from '../ide/detect-ide.js';
 import { ideContextStore } from './ideContext.js';
@@ -522,7 +523,7 @@ export class IdeClient {
       .map((p) => {
         try {
           if (p.startsWith('file://')) {
-            return new URL(p).pathname;
+            return fileURLToPath(p);
           }
           return decodeURIComponent(p);
         } catch (e) {
