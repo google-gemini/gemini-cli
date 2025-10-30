@@ -134,7 +134,6 @@ export function logEditProposed(
   config: Config,
   event: EditProposedEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logEditProposedEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);

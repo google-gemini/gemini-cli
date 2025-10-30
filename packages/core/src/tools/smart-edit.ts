@@ -25,8 +25,11 @@ import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { type Config, ApprovalMode } from '../config/config.js';
-import { DEFAULT_DIFF_OPTIONS, getConfirmedDiffStats } from './diffOptions.js';
-import type { DiffStat } from './tools.js';
+import {
+  DEFAULT_DIFF_OPTIONS,
+  getConfirmedDiffStats,
+  getSuggestedDiffStats,
+} from './diffOptions.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -376,11 +379,6 @@ class EditToolInvocation
   extends BaseToolInvocation<EditToolParams, ToolResult>
   implements ToolInvocation<EditToolParams, ToolResult>
 {
-  private _suggestedDiffStat?: Pick<
-    DiffStat,
-    'suggested_added_lines' | 'suggested_removed_lines'
-  >;
-
   constructor(
     private readonly config: Config,
     params: EditToolParams,
@@ -681,7 +679,11 @@ class EditToolInvocation
         }
       },
       ideConfirmation,
-      suggestedDiffStat: this._suggestedDiffStat,
+      suggestedDiffStat: getSuggestedDiffStats(
+        fileName,
+        editData.currentContent ?? '',
+        editData.newContent,
+      ),
     };
     return confirmationDetails;
   }
