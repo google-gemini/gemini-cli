@@ -65,6 +65,8 @@ let config: Config;
 const getToolRegistrySpy = vi.fn().mockReturnValue(ApprovalMode.DEFAULT);
 const getApprovalModeSpy = vi.fn();
 const getShellExecutionConfigSpy = vi.fn();
+const getExtensionsSpy = vi.fn();
+
 vi.mock('../config/config.js', async () => {
   const actual = await vi.importActual('../config/config.js');
   return {
@@ -74,6 +76,7 @@ vi.mock('../config/config.js', async () => {
         getToolRegistry: getToolRegistrySpy,
         getApprovalMode: getApprovalModeSpy,
         getShellExecutionConfig: getShellExecutionConfigSpy,
+        getExtensions: getExtensionsSpy,
       });
       config = mockConfig as Config;
       return config;
@@ -310,7 +313,7 @@ describe('E2E Tests', () => {
     expect(workingEvent.kind).toBe('status-update');
     expect(workingEvent.status.state).toBe('working');
 
-    // State Update: Validate each tool call
+    // State Update: Validate the first tool call
     const toolCallValidateEvent1 = events[3].result as TaskStatusUpdateEvent;
     expect(toolCallValidateEvent1.metadata?.['coderAgent']).toMatchObject({
       kind: 'tool-call-update',
@@ -323,47 +326,218 @@ describe('E2E Tests', () => {
         },
       },
     ]);
-    const toolCallValidateEvent2 = events[4].result as TaskStatusUpdateEvent;
-    expect(toolCallValidateEvent2.metadata?.['coderAgent']).toMatchObject({
+
+    // --- Assert the event stream ---
+    // 1. Initial "submitted" status.
+    expect((events[0].result as TaskStatusUpdateEvent).status.state).toBe(
+      'submitted',
+    );
+
+    // 2. "working" status after receiving the user prompt.
+    expect((events[1].result as TaskStatusUpdateEvent).status.state).toBe(
+      'working',
+    );
+
+    // 3. A "state-change" event from the agent.
+    expect(events[2].result.metadata?.['coderAgent']).toMatchObject({
+      kind: 'state-change',
+    });
+
+    // 4. Tool 1 is validating.
+    const toolCallUpdate1 = events[3].result as TaskStatusUpdateEvent;
+    expect(toolCallUpdate1.metadata?.['coderAgent']).toMatchObject({
       kind: 'tool-call-update',
     });
-    expect(toolCallValidateEvent2.status.message?.parts).toMatchObject([
+    expect(toolCallUpdate1.status.message?.parts).toMatchObject([
       {
         data: {
+          request: { callId: 'test-call-id-1' },
           status: 'validating',
-          request: { callId: 'test-call-id-2' },
         },
       },
     ]);
 
-    // State Update: Set each tool call to awaiting
-    const toolCallAwaitEvent1 = events[5].result as TaskStatusUpdateEvent;
-    expect(toolCallAwaitEvent1.metadata?.['coderAgent']).toMatchObject({
-      kind: 'tool-call-confirmation',
+    // 5. Tool 2 is validating.
+    const toolCallUpdate2 = events[4].result as TaskStatusUpdateEvent;
+    expect(toolCallUpdate2.metadata?.['coderAgent']).toMatchObject({
+      kind: 'tool-call-update',
     });
-    expect(toolCallAwaitEvent1.status.message?.parts).toMatchObject([
+    expect(toolCallUpdate2.status.message?.parts).toMatchObject([
       {
         data: {
-          status: 'awaiting_approval',
-          request: { callId: 'test-call-id-1' },
-        },
-      },
-    ]);
-    const toolCallAwaitEvent2 = events[6].result as TaskStatusUpdateEvent;
-    expect(toolCallAwaitEvent2.metadata?.['coderAgent']).toMatchObject({
-      kind: 'tool-call-confirmation',
-    });
-    expect(toolCallAwaitEvent2.status.message?.parts).toMatchObject([
-      {
-        data: {
-          status: 'awaiting_approval',
           request: { callId: 'test-call-id-2' },
+          status: 'validating',
         },
       },
     ]);
+
+    // 6. Tool 1 is awaiting approval.
+    const toolCallAwaitEvent = events[5].result as TaskStatusUpdateEvent;
+    expect(toolCallAwaitEvent.metadata?.['coderAgent']).toMatchObject({
+      kind: 'tool-call-confirmation',
+    });
+    expect(toolCallAwaitEvent.status.message?.parts).toMatchObject([
+      {
+        data: {
+          request: { callId: 'test-call-id-1' },
+          status: 'awaiting_approval',
+        },
+      },
+    ]);
+
+    // 7. The final event is "input-required".
+    const finalEvent = events[6].result as TaskStatusUpdateEvent;
+    expect(finalEvent.final).toBe(true);
+    expect(finalEvent.status.state).toBe('input-required');
+
+    // The scheduler now waits for approval, so no more events are sent.
+    assertUniqueFinalEventIsLast(events);
+    expect(events.length).toBe(7);
+  });
+
+  it('should handle multiple tool calls sequentially in YOLO mode', async () => {
+    // Set YOLO mode to auto-approve tools and test sequential execution.
+    getApprovalModeSpy.mockReturnValue(ApprovalMode.YOLO);
+
+    // First call yields the tool request
+    sendMessageStreamSpy.mockImplementationOnce(async function* () {
+      yield* [
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'test-call-id-1',
+            name: 'test-tool-1',
+            args: {},
+          },
+        },
+        {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'test-call-id-2',
+            name: 'test-tool-2',
+            args: {},
+          },
+        },
+      ];
+    });
+    // Subsequent calls yield nothing, as the tools will "succeed".
+    sendMessageStreamSpy.mockImplementation(async function* () {
+      yield* [{ type: 'content', value: 'All tools executed.' }];
+    });
+
+    const mockTool1 = new MockTool({
+      name: 'test-tool-1',
+      displayName: 'Test Tool 1',
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
+      execute: vi
+        .fn()
+        .mockResolvedValue({ llmContent: 'tool 1 done', returnDisplay: '' }),
+    });
+    const mockTool2 = new MockTool({
+      name: 'test-tool-2',
+      displayName: 'Test Tool 2',
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
+      execute: vi
+        .fn()
+        .mockResolvedValue({ llmContent: 'tool 2 done', returnDisplay: '' }),
+    });
+
+    getToolRegistrySpy.mockReturnValue({
+      getAllTools: vi.fn().mockReturnValue([mockTool1, mockTool2]),
+      getToolsByServer: vi.fn().mockReturnValue([]),
+      getTool: vi.fn().mockImplementation((name: string) => {
+        if (name === 'test-tool-1') return mockTool1;
+        if (name === 'test-tool-2') return mockTool2;
+        return undefined;
+      }),
+    });
+
+    const agent = request.agent(app);
+    const res = await agent
+      .post('/')
+      .send(
+        createStreamMessageRequest(
+          'run two tools',
+          'a2a-multi-tool-test-message',
+        ),
+      )
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const events = streamToSSEEvents(res.text);
+    assertTaskCreationAndWorkingStatus(events);
+
+    // --- Assert the sequential execution flow ---
+    const eventStream = events.slice(2).map((e) => {
+      const update = e.result as TaskStatusUpdateEvent;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const agentData = update.metadata?.['coderAgent'] as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toolData = update.status.message?.parts[0] as any;
+      if (!toolData) {
+        return { kind: agentData.kind };
+      }
+      return {
+        kind: agentData.kind,
+        status: toolData.data?.status,
+        callId: toolData.data?.request.callId,
+      };
+    });
+
+    const expectedFlow = [
+      // Initial state change
+      { kind: 'state-change', status: undefined, callId: undefined },
+      // Tool 1 Lifecycle
+      {
+        kind: 'tool-call-update',
+        status: 'validating',
+        callId: 'test-call-id-1',
+      },
+      {
+        kind: 'tool-call-update',
+        status: 'scheduled',
+        callId: 'test-call-id-1',
+      },
+      {
+        kind: 'tool-call-update',
+        status: 'executing',
+        callId: 'test-call-id-1',
+      },
+      {
+        kind: 'tool-call-update',
+        status: 'success',
+        callId: 'test-call-id-1',
+      },
+      // Tool 2 Lifecycle
+      {
+        kind: 'tool-call-update',
+        status: 'validating',
+        callId: 'test-call-id-2',
+      },
+      {
+        kind: 'tool-call-update',
+        status: 'scheduled',
+        callId: 'test-call-id-2',
+      },
+      {
+        kind: 'tool-call-update',
+        status: 'executing',
+        callId: 'test-call-id-2',
+      },
+      {
+        kind: 'tool-call-update',
+        status: 'success',
+        callId: 'test-call-id-2',
+      },
+      // Final updates
+      { kind: 'state-change', status: undefined, callId: undefined },
+      { kind: 'text-content', status: undefined, callId: undefined },
+    ];
+
+    // Use `toContainEqual` for flexibility if other events are interspersed.
+    expect(eventStream).toEqual(expect.arrayContaining(expectedFlow));
 
     assertUniqueFinalEventIsLast(events);
-    expect(events.length).toBe(8);
   });
 
   it('should handle tool calls that do not require approval', async () => {
@@ -651,5 +825,63 @@ describe('E2E Tests', () => {
     const thoughtEvent = events[3].result as TaskStatusUpdateEvent;
     expect(thoughtEvent.kind).toBe('status-update');
     expect(thoughtEvent.metadata?.['traceId']).toBe(traceId);
+  });
+
+  describe('/executeCommand', () => {
+    const mockExtensions = [{ name: 'test-extension', version: '0.0.1' }];
+
+    beforeEach(() => {
+      getExtensionsSpy.mockReturnValue(mockExtensions);
+    });
+
+    afterEach(() => {
+      getExtensionsSpy.mockClear();
+    });
+
+    it('should return extensions for valid command', async () => {
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'extensions list', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      expect(res.body).toEqual(mockExtensions);
+      expect(getExtensionsSpy).toHaveBeenCalled();
+    });
+
+    it('should return 404 for invalid command', async () => {
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'invalid command' })
+        .set('Content-Type', 'application/json')
+        .expect(404);
+
+      expect(res.body.error).toBe('Command not found: invalid command');
+      expect(getExtensionsSpy).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 for missing command', async () => {
+      const agent = request.agent(app);
+      await agent
+        .post('/executeCommand')
+        .send({ args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(400);
+      expect(getExtensionsSpy).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 if args is not an array', async () => {
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'extensions.list', args: 'not-an-array' })
+        .set('Content-Type', 'application/json')
+        .expect(400);
+
+      expect(res.body.error).toBe('"args" field must be an array.');
+      expect(getExtensionsSpy).not.toHaveBeenCalled();
+    });
   });
 });

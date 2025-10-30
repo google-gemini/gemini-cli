@@ -750,7 +750,11 @@ export class ShellExecutionService {
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
-        if (e instanceof Error && 'code' in e && e.code === 'ESRCH') {
+        if (
+          e instanceof Error &&
+          (('code' in e && e.code === 'ESRCH') ||
+            e.message === 'Cannot resize a pty that has already exited')
+        ) {
           // ignore
         } else {
           throw e;

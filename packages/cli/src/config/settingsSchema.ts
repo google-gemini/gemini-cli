@@ -937,6 +937,15 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      disableYoloMode: {
+        type: 'boolean',
+        label: 'Disable YOLO Mode',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
       folderTrust: {
         type: 'object',
         label: 'Folder Trust',
@@ -1090,7 +1099,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Codebase Investigator',
             category: 'Experimental',
             requiresRestart: true,
-            default: true,
+            default: false,
             description: 'Enable the Codebase Investigator agent.',
             showInDialog: true,
           },

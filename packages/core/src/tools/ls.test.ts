@@ -149,7 +149,7 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
       // .git is always ignored by default.
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 git-ignored)');
+      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 ignored)');
     });
 
     it('should respect geminiignore patterns', async () => {
@@ -161,7 +161,7 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 gemini-ignored)');
+      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 ignored)');
     });
 
     it('should handle non-directory paths', async () => {
@@ -248,11 +248,6 @@ describe('LSTool', () => {
         return originalStat(p);
       });
 
-      // Spy on console.error to verify it's called
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
       const invocation = lsTool.build({ path: tempRootDir });
       const result = await invocation.execute(abortSignal);
 
@@ -261,13 +256,7 @@ describe('LSTool', () => {
       expect(result.llmContent).not.toContain('problematic.txt');
       expect(result.returnDisplay).toBe('Listed 1 item(s).');
 
-      // Verify error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringMatching(/Error accessing.*problematic\.txt/s),
-      );
-
       statSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 

@@ -13,6 +13,7 @@ import {
 } from './mcp-client.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { EventEmitter } from 'node:events';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
@@ -70,10 +71,12 @@ export class McpClientManager {
         } catch (error) {
           this.eventEmitter?.emit('mcp-client-update', this.clients);
           // Log the error but don't let a single failed server stop the others
-          console.error(
+          coreEvents.emitFeedback(
+            'error',
             `Error during discovery for server '${name}': ${getErrorMessage(
               error,
             )}`,
+            error,
           );
         }
       });

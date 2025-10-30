@@ -1,0 +1,8 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`runNonInteractive > should write a single newline between sequential text outputs from the model 1`] = `
+"Use mock tool
+Use mock tool again
+Finished.
+"
+`;

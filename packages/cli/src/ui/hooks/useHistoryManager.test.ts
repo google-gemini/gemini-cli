@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { useHistory } from './useHistoryManager.js';
 import type { HistoryItem } from '../types.js';
 

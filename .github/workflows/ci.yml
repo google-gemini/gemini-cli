@@ -66,6 +66,9 @@ jobs:
       - name: 'Install dependencies'
         run: 'npm ci'
 
+      - name: 'Validate NOTICES.txt'
+        run: 'git diff --exit-code packages/vscode-ide-companion/NOTICES.txt'
+
       - name: 'Check lockfile'
         run: 'npm run check:lockfile'
 
@@ -90,6 +93,17 @@ jobs:
       - name: 'Run sensitive keyword linter'
         run: 'node scripts/lint.js --sensitive-keywords'
 
+  link_checker:
+    name: 'Link Checker'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+      - name: 'Link Checker'
+        uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
+        with:
+          args: '--verbose ./**/*.md'
+          fail: true
   test_linux:
     name: 'Test (Linux)'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -351,6 +365,7 @@ jobs:
     if: 'always()'
     needs:
       - 'lint'
+      - 'link_checker'
       - 'test_linux'
       - 'test_mac'
       - 'codeql'
@@ -360,6 +375,7 @@ jobs:
       - name: 'Check all job results'
         run: |
           if [[ (${{ needs.lint.result }} != 'success' && ${{ needs.lint.result }} != 'skipped') || \
+               (${{ needs.link_checker.result }} != 'success' && ${{ needs.link_checker.result }} != 'skipped') || \
                (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
                (${{ needs.test_mac.result }} != 'success' && ${{ needs.test_mac.result }} != 'skipped') || \
                (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
