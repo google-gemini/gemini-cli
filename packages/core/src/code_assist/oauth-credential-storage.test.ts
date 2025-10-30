@@ -31,7 +31,7 @@ vi.mock('node:fs', () => ({
 }));
 vi.mock('node:os');
 vi.mock('node:path');
-vi.mock('@google/gemini-cli-core', () => ({
+vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
   },
