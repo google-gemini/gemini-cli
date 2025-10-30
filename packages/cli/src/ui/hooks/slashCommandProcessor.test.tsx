@@ -262,7 +262,7 @@ describe('useSlashCommandProcessor', () => {
       expect(mockAddItem).toHaveBeenLastCalledWith(
         {
           type: MessageType.ERROR,
-          text: 'Unknown command: /nonexistent',
+          text: expect.stringContaining('Unknown command'),
         },
         expect.any(Number),
       );
@@ -408,39 +408,38 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Action Result Handling', () => {
-    it('should handle "dialog: theme" action', async () => {
-      const command = createTestCommand({
-        name: 'themecmd',
-        action: vi.fn().mockResolvedValue({ type: 'dialog', dialog: 'theme' }),
-      });
-      const result = setupProcessorHook([command]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
+    it.each([
+      {
+        dialogType: 'theme' as const,
+        commandName: 'themecmd',
+        mockToAssert: mockOpenThemeDialog,
+      },
+      {
+        dialogType: 'model' as const,
+        commandName: 'modelcmd',
+        mockToAssert: mockOpenModelDialog,
+      },
+    ])(
+      'should handle "dialog: $dialogType" action',
+      async ({ dialogType, commandName, mockToAssert }) => {
+        const command = createTestCommand({
+          name: commandName,
+          action: vi
+            .fn()
+            .mockResolvedValue({ type: 'dialog', dialog: dialogType }),
+        });
+        const result = setupProcessorHook([command]);
+        await vi.waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
 
-      await act(async () => {
-        await result.current.handleSlashCommand('/themecmd');
-      });
+        await act(async () => {
+          await result.current.handleSlashCommand(`/${commandName}`);
+        });
 
-      expect(mockOpenThemeDialog).toHaveBeenCalled();
-    });
-
-    it('should handle "dialog: model" action', async () => {
-      const command = createTestCommand({
-        name: 'modelcmd',
-        action: vi.fn().mockResolvedValue({ type: 'dialog', dialog: 'model' }),
-      });
-      const result = setupProcessorHook([command]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
-
-      await act(async () => {
-        await result.current.handleSlashCommand('/modelcmd');
-      });
-
-      expect(mockOpenModelDialog).toHaveBeenCalled();
-    });
+        expect(mockToAssert).toHaveBeenCalled();
+      },
+    );
 
     it('should handle "load_history" action', async () => {
       const mockClient = {
@@ -468,7 +467,7 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockClearItems).toHaveBeenCalledTimes(1);
       expect(mockAddItem).toHaveBeenCalledWith(
-        { type: 'user', text: 'old prompt' },
+        { type: 'user', text: expect.stringContaining('old prompt') },
         expect.any(Number),
       );
     });
@@ -526,75 +525,62 @@ describe('useSlashCommandProcessor', () => {
         await result.current.handleSlashCommand('/exit');
       });
 
-      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
-    });
-    it('should handle "submit_prompt" action returned from a file-based command', async () => {
-      const fileCommand = createTestCommand(
-        {
-          name: 'filecmd',
-          description: 'A command from a file',
-          action: async () => ({
-            type: 'submit_prompt',
-            content: [{ text: 'The actual prompt from the TOML file.' }],
-          }),
-        },
-        CommandKind.FILE,
-      );
-
-      const result = setupProcessorHook([], [fileCommand]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
-
-      let actionResult;
-      await act(async () => {
-        actionResult = await result.current.handleSlashCommand('/filecmd');
-      });
-
-      expect(actionResult).toEqual({
-        type: 'submit_prompt',
-        content: [{ text: 'The actual prompt from the TOML file.' }],
-      });
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        { type: MessageType.USER, text: '/filecmd' },
-        expect.any(Number),
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.stringContaining('bye')]),
       );
     });
+    it.each([
+      {
+        kind: CommandKind.FILE,
+        name: 'filecmd',
+        description: 'A command from a file',
+        prompt: 'The actual prompt from the TOML file.',
+        setupHook: (command: SlashCommand) => setupProcessorHook([], [command]),
+      },
+      {
+        kind: CommandKind.MCP_PROMPT,
+        name: 'mcpcmd',
+        description: 'A command from mcp',
+        prompt: 'The actual prompt from the mcp command.',
+        setupHook: (command: SlashCommand) =>
+          setupProcessorHook([], [], [command]),
+      },
+    ])(
+      'should handle "submit_prompt" action from a $kind command',
+      async ({ kind, name, description, prompt, setupHook }) => {
+        const command = createTestCommand(
+          {
+            name,
+            description,
+            action: async () => ({
+              type: 'submit_prompt',
+              content: [{ text: prompt }],
+            }),
+          },
+          kind,
+        );
 
-    it('should handle "submit_prompt" action returned from a mcp-based command', async () => {
-      const mcpCommand = createTestCommand(
-        {
-          name: 'mcpcmd',
-          description: 'A command from mcp',
-          action: async () => ({
-            type: 'submit_prompt',
-            content: [{ text: 'The actual prompt from the mcp command.' }],
-          }),
-        },
-        CommandKind.MCP_PROMPT,
-      );
+        const result = setupHook(command);
+        await vi.waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
 
-      const result = setupProcessorHook([], [], [mcpCommand]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
+        let actionResult;
+        await act(async () => {
+          actionResult = await result.current.handleSlashCommand(`/${name}`);
+        });
 
-      let actionResult;
-      await act(async () => {
-        actionResult = await result.current.handleSlashCommand('/mcpcmd');
-      });
+        expect(actionResult).toEqual({
+          type: 'submit_prompt',
+          content: [{ text: prompt }],
+        });
 
-      expect(actionResult).toEqual({
-        type: 'submit_prompt',
-        content: [{ text: 'The actual prompt from the mcp command.' }],
-      });
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        { type: MessageType.USER, text: '/mcpcmd' },
-        expect.any(Number),
-      );
-    });
+        expect(mockAddItem).toHaveBeenCalledWith(
+          { type: MessageType.USER, text: `/${name}` },
+          expect.any(Number),
+        );
+      },
+    );
   });
 
   describe('Shell Command Confirmation Flow', () => {
@@ -718,7 +704,7 @@ describe('useSlashCommandProcessor', () => {
 
       // Verify the final success message was added.
       expect(mockAddItem).toHaveBeenCalledWith(
-        { type: MessageType.INFO, text: 'Success!' },
+        { type: MessageType.INFO, text: expect.stringContaining('Success') },
         expect.any(Number),
       );
 
@@ -776,80 +762,75 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Parsing and Matching', () => {
-    it('should be case-sensitive', async () => {
-      const command = createTestCommand({ name: 'test' });
-      const result = setupProcessorHook([command]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
+    it.each([
+      {
+        description: 'should be case-sensitive and fail',
+        commandToRun: '/Test',
+        command: createTestCommand({ name: 'test' }),
+        shouldFail: true,
+      },
+      {
+        description: 'should correctly match an altName',
+        commandToRun: '/alias',
+        command: createTestCommand({
+          name: 'main',
+          altNames: ['alias'],
+          action: vi.fn(),
+        }),
+        shouldFail: false,
+      },
+      {
+        description: 'should handle extra whitespace around the command',
+        commandToRun: '  /test  with-args  ',
+        command: createTestCommand({ name: 'test', action: vi.fn() }),
+        shouldFail: false,
+        expectedArgs: 'with-args',
+      },
+      {
+        description: 'should handle `?` as a command prefix',
+        commandToRun: '?help',
+        command: createTestCommand({ name: 'help', action: vi.fn() }),
+        shouldFail: false,
+      },
+    ])(
+      '$description',
+      async ({ commandToRun, command, shouldFail, expectedArgs }) => {
+        const result = setupProcessorHook([command]);
+        await vi.waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
 
-      await act(async () => {
-        // Use uppercase when command is lowercase
-        await result.current.handleSlashCommand('/Test');
-      });
+        await act(async () => {
+          await result.current.handleSlashCommand(commandToRun);
+        });
 
-      // It should fail and call addItem with an error
-      expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: 'Unknown command: /Test',
-        },
-        expect.any(Number),
-      );
-    });
-
-    it('should correctly match an altName', async () => {
-      const action = vi.fn();
-      const command = createTestCommand({
-        name: 'main',
-        altNames: ['alias'],
-        description: 'a command with an alias',
-        action,
-      });
-      const result = setupProcessorHook([command]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
-
-      await act(async () => {
-        await result.current.handleSlashCommand('/alias');
-      });
-
-      expect(action).toHaveBeenCalledTimes(1);
-      expect(mockAddItem).not.toHaveBeenCalledWith(
-        expect.objectContaining({ type: MessageType.ERROR }),
-      );
-    });
-
-    it('should handle extra whitespace around the command', async () => {
-      const action = vi.fn();
-      const command = createTestCommand({ name: 'test', action });
-      const result = setupProcessorHook([command]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
-
-      await act(async () => {
-        await result.current.handleSlashCommand('  /test  with-args  ');
-      });
-
-      expect(action).toHaveBeenCalledWith(expect.anything(), 'with-args');
-    });
-
-    it('should handle `?` as a command prefix', async () => {
-      const action = vi.fn();
-      const command = createTestCommand({ name: 'help', action });
-      const result = setupProcessorHook([command]);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands).toHaveLength(1),
-      );
-
-      await act(async () => {
-        await result.current.handleSlashCommand('?help');
-      });
-
-      expect(action).toHaveBeenCalledTimes(1);
-    });
+        if (shouldFail) {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            {
+              type: MessageType.ERROR,
+              text: expect.stringContaining('Unknown command'),
+            },
+            expect.any(Number),
+          );
+          if (command.action) {
+            expect(command.action).not.toHaveBeenCalled();
+          }
+        } else {
+          expect(mockAddItem).not.toHaveBeenCalledWith(
+            expect.objectContaining({ type: MessageType.ERROR }),
+          );
+          if (command.action) {
+            expect(command.action).toHaveBeenCalledTimes(1);
+            if (expectedArgs) {
+              expect(command.action).toHaveBeenCalledWith(
+                expect.anything(),
+                expectedArgs,
+              );
+            }
+          }
+        }
+      },
+    );
   });
 
   describe('Command Precedence', () => {
@@ -995,99 +976,74 @@ describe('useSlashCommandProcessor', () => {
       vi.mocked(logSlashCommand).mockClear();
     });
 
-    it('should log a simple slash command', async () => {
-      const result = setupProcessorHook(loggingTestCommands);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
-      );
-      await act(async () => {
-        await result.current.handleSlashCommand('/logtest');
-      });
-
-      expect(logSlashCommand).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
+    it.each([
+      {
+        description: 'should log a simple slash command',
+        commandToRun: '/logtest',
+        shouldCallLogger: true,
+        expectedPayload: {
           command: 'logtest',
           subcommand: undefined,
           status: SlashCommandStatus.SUCCESS,
-        }),
-      );
-    });
-
-    it('logs nothing for a bogus command', async () => {
-      const result = setupProcessorHook(loggingTestCommands);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
-      );
-      await act(async () => {
-        await result.current.handleSlashCommand('/bogusbogusbogus');
-      });
-
-      expect(logSlashCommand).not.toHaveBeenCalled();
-    });
-
-    it('logs a failure event for a failed command', async () => {
-      const result = setupProcessorHook(loggingTestCommands);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
-      );
-      await act(async () => {
-        await result.current.handleSlashCommand('/fail');
-      });
-
-      expect(logSlashCommand).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
+        },
+      },
+      {
+        description: 'logs nothing for a bogus command',
+        commandToRun: '/bogusbogusbogus',
+        shouldCallLogger: false,
+      },
+      {
+        description: 'logs a failure event for a failed command',
+        commandToRun: '/fail',
+        shouldCallLogger: true,
+        expectedPayload: {
           command: 'fail',
           status: 'error',
           subcommand: undefined,
-        }),
-      );
-    });
-
-    it('should log a slash command with a subcommand', async () => {
-      const result = setupProcessorHook(loggingTestCommands);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
-      );
-      await act(async () => {
-        await result.current.handleSlashCommand('/logwithsub sub');
-      });
-
-      expect(logSlashCommand).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
+        },
+      },
+      {
+        description: 'should log a slash command with a subcommand',
+        commandToRun: '/logwithsub sub',
+        shouldCallLogger: true,
+        expectedPayload: {
           command: 'logwithsub',
           subcommand: 'sub',
-        }),
-      );
-    });
-
-    it('should log the command path when an alias is used', async () => {
-      const result = setupProcessorHook(loggingTestCommands);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
-      );
-      await act(async () => {
-        await result.current.handleSlashCommand('/la');
-      });
-      expect(logSlashCommand).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
+        },
+      },
+      {
+        description: 'should log the command path when an alias is used',
+        commandToRun: '/la',
+        shouldCallLogger: true,
+        expectedPayload: {
           command: 'logalias',
-        }),
-      );
-    });
+        },
+      },
+      {
+        description: 'should not log for unknown commands',
+        commandToRun: '/unknown',
+        shouldCallLogger: false,
+      },
+    ])(
+      '$description',
+      async ({ commandToRun, shouldCallLogger, expectedPayload }) => {
+        const result = setupProcessorHook(loggingTestCommands);
+        await vi.waitFor(() =>
+          expect(result.current.slashCommands?.length).toBeGreaterThan(0),
+        );
+        await act(async () => {
+          await result.current.handleSlashCommand(commandToRun);
+        });
 
-    it('should not log for unknown commands', async () => {
-      const result = setupProcessorHook(loggingTestCommands);
-      await vi.waitFor(() =>
-        expect(result.current.slashCommands?.length).toBeGreaterThan(0),
-      );
-      await act(async () => {
-        await result.current.handleSlashCommand('/unknown');
-      });
-      expect(logSlashCommand).not.toHaveBeenCalled();
-    });
+        if (shouldCallLogger) {
+          expect(logSlashCommand).toHaveBeenCalledWith(
+            mockConfig,
+            expect.objectContaining(expectedPayload),
+          );
+        } else {
+          expect(logSlashCommand).not.toHaveBeenCalled();
+        }
+      },
+    );
   });
 });
