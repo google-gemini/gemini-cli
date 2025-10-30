@@ -17,10 +17,10 @@ import { makeChatCompressionEvent } from '../telemetry/types.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
 
 /**
- * Threshold for compression token count as a fraction of the model's token limit.
- * If the chat history exceeds this threshold, it will be compressed.
+ * Default threshold for compression token count as a fraction of the model's
+ * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-export const COMPRESSION_TOKEN_THRESHOLD = 0.7;
+export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.2;
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
@@ -104,13 +104,11 @@ export class ChatCompressionService {
 
     const originalTokenCount = uiTelemetryService.getLastPromptTokenCount();
 
-    const contextPercentageThreshold =
-      config.getChatCompression()?.contextPercentageThreshold;
-
     // Don't compress if not forced and we are under the limit.
     if (!force) {
       const threshold =
-        contextPercentageThreshold ?? COMPRESSION_TOKEN_THRESHOLD;
+        config.getChatCompression()?.contextPercentageThreshold ??
+        DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
       if (originalTokenCount < threshold * tokenLimit(model)) {
         return {
           newHistory: null,
