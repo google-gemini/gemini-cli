@@ -518,6 +518,8 @@ interface UseTextBufferProps {
   onChange?: (text: string) => void; // Callback for when text changes
   isValidPath: (path: string) => boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
+  inputFilter?: (text: string) => string; // Optional filter for input text
+  singleLine?: boolean;
 }
 
 interface UndoHistoryEntry {
@@ -949,9 +951,15 @@ export type TextBufferAction =
   | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
   | { type: 'vim_escape_insert_mode' };
 
+export interface TextBufferOptions {
+  inputFilter?: (text: string) => string;
+  singleLine?: boolean;
+}
+
 function textBufferReducerLogic(
   state: TextBufferState,
   action: TextBufferAction,
+  options: TextBufferOptions = {},
 ): TextBufferState {
   const pushUndoLocal = pushUndo;
 
@@ -986,8 +994,20 @@ function textBufferReducerLogic(
 
       const currentLine = (r: number) => newLines[r] ?? '';
 
+      let payload = action.payload;
+      if (options.singleLine) {
+        payload = payload.replace(/[\r\n]/g, '');
+      }
+      if (options.inputFilter) {
+        payload = options.inputFilter(payload);
+      }
+
+      if (payload.length === 0) {
+        return state;
+      }
+
       const str = stripUnsafeCharacters(
-        action.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
+        payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
       );
       const parts = str.split('\n');
       const lineContent = currentLine(newCursorRow);
@@ -1498,8 +1518,9 @@ function textBufferReducerLogic(
 export function textBufferReducer(
   state: TextBufferState,
   action: TextBufferAction,
+  options: TextBufferOptions = {},
 ): TextBufferState {
-  const newState = textBufferReducerLogic(state, action);
+  const newState = textBufferReducerLogic(state, action, options);
 
   if (
     newState.lines !== state.lines ||
@@ -1525,6 +1546,8 @@ export function useTextBuffer({
   onChange,
   isValidPath,
   shellModeActive = false,
+  inputFilter,
+  singleLine = false,
 }: UseTextBufferProps): TextBuffer {
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -1551,7 +1574,11 @@ export function useTextBuffer({
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
-  const [state, dispatch] = useReducer(textBufferReducer, initialState);
+  const [state, dispatch] = useReducer(
+    (s: TextBufferState, a: TextBufferAction) =>
+      textBufferReducer(s, a, { inputFilter, singleLine }),
+    initialState,
+  );
   const {
     lines,
     cursorRow,
@@ -1609,7 +1636,7 @@ export function useTextBuffer({
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
-      if (/[\n\r]/.test(ch)) {
+      if (!singleLine && /[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
         return;
       }
@@ -1648,12 +1675,15 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath, shellModeActive],
+    [isValidPath, shellModeActive, singleLine],
   );
 
   const newline = useCallback((): void => {
+    if (singleLine) {
+      return;
+    }
     dispatch({ type: 'insert', payload: '\n' });
-  }, []);
+  }, [singleLine]);
 
   const backspace = useCallback((): void => {
     dispatch({ type: 'backspace' });
@@ -1895,10 +1925,11 @@ export function useTextBuffer({
       }
 
       if (
-        key.name === 'return' ||
-        input === '\r' ||
-        input === '\n' ||
-        input === '\\\r' // VSCode terminal represents shift + enter this way
+        !singleLine &&
+        (key.name === 'return' ||
+          input === '\r' ||
+          input === '\n' ||
+          input === '\\r') // VSCode terminal represents shift + enter this way
       )
         newline();
       else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
@@ -1947,6 +1978,7 @@ export function useTextBuffer({
       insert,
       undo,
       redo,
+      singleLine,
     ],
   );
 
