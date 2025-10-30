@@ -24,8 +24,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 0,
       user_added_chars: 0,
       user_removed_chars: 0,
-      suggested_added_lines: 0,
-      suggested_removed_lines: 0,
     });
   });
 
@@ -43,8 +41,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 0,
       user_added_chars: 0,
       user_removed_chars: 0,
-      suggested_added_lines: 1,
-      suggested_removed_lines: 0,
     });
   });
 
@@ -62,8 +58,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 0,
       user_added_chars: 0,
       user_removed_chars: 0,
-      suggested_added_lines: 0,
-      suggested_removed_lines: 1,
     });
   });
 
@@ -81,8 +75,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 0,
       user_added_chars: 0,
       user_removed_chars: 0,
-      suggested_added_lines: 1,
-      suggested_removed_lines: 1,
     });
   });
 
@@ -100,8 +92,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 0,
       user_added_chars: 5,
       user_removed_chars: 0,
-      suggested_added_lines: 1,
-      suggested_removed_lines: 0,
     });
   });
 
@@ -119,8 +109,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 1,
       user_added_chars: 0,
       user_removed_chars: 5,
-      suggested_added_lines: 1,
-      suggested_removed_lines: 0,
     });
   });
 
@@ -138,8 +126,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 1,
       user_added_chars: 10,
       user_removed_chars: 5,
-      suggested_added_lines: 1,
-      suggested_removed_lines: 0,
     });
   });
 
@@ -157,8 +143,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 1,
       user_added_chars: 13,
       user_removed_chars: 5,
-      suggested_added_lines: 2,
-      suggested_removed_lines: 2,
     });
   });
 
@@ -176,8 +160,6 @@ describe('getConfirmedDiffStats', () => {
       user_removed_lines: 0,
       user_added_chars: 0,
       user_removed_chars: 0,
-      suggested_added_lines: 1,
-      suggested_removed_lines: 1,
     });
   });
 });

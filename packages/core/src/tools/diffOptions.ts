@@ -60,6 +60,17 @@ export function getConfirmedDiffStats(
   aiStr: string,
   userStr: string,
 ): DiffStat {
+  const modelPatch = Diff.structuredPatch(
+    fileName,
+    fileName,
+    oldStr,
+    aiStr,
+    'Current',
+    'Proposed',
+    DEFAULT_DIFF_OPTIONS,
+  );
+  const modelStats = getStats(modelPatch);
+
   const userPatch = Diff.structuredPatch(
     fileName,
     fileName,
@@ -71,22 +82,11 @@ export function getConfirmedDiffStats(
   );
   const userStats = getStats(userPatch);
 
-  const acceptedPatch = Diff.structuredPatch(
-    fileName,
-    fileName,
-    oldStr,
-    userStr,
-    'Current',
-    'User',
-    DEFAULT_DIFF_OPTIONS,
-  );
-  const acceptedStats = getStats(acceptedPatch);
-
   return {
-    model_added_lines: acceptedStats.addedLines,
-    model_removed_lines: acceptedStats.removedLines,
-    model_added_chars: acceptedStats.addedChars,
-    model_removed_chars: acceptedStats.removedChars,
+    model_added_lines: modelStats.addedLines,
+    model_removed_lines: modelStats.removedLines,
+    model_added_chars: modelStats.addedChars,
+    model_removed_chars: modelStats.removedChars,
     user_added_lines: userStats.addedLines,
     user_removed_lines: userStats.removedLines,
     user_added_chars: userStats.addedChars,
