@@ -123,7 +123,11 @@ export class LoopDetectionService {
    * @returns true if a loop is detected, false otherwise
    */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
-    if (this.loopDetected || this.disabledForSession) {
+    if (this.disabledForSession) {
+      return false;
+    }
+
+    if (this.loopDetected) {
       return this.loopDetected;
     }
 
