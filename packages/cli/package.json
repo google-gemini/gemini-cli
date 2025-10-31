@@ -79,7 +79,6 @@
     "@types/yargs": "^17.0.32",
     "archiver": "^7.0.1",
     "ink-testing-library": "^4.0.0",
-    "jsdom": "^26.1.0",
     "pretty-format": "^30.0.2",
     "react-dom": "^19.2.0",
     "typescript": "^5.3.3",
