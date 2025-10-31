@@ -13,6 +13,7 @@ import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
+import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
@@ -811,12 +812,12 @@ ${authUrl}
           `✓ Token verification successful (fingerprint: ${tokenFingerprint})`,
         );
       } else {
-        console.error(
+        debugLogger.warn(
           'Token verification failed: token not found or invalid after save',
         );
       }
     } catch (saveError) {
-      console.error(`Failed to save token: ${getErrorMessage(saveError)}`);
+      debugLogger.error('Failed to save auth token.', saveError);
       throw saveError;
     }
 
@@ -889,7 +890,11 @@ ${authUrl}
 
         return newToken.accessToken;
       } catch (error) {
-        console.error(`Failed to refresh token: ${getErrorMessage(error)}`);
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to refresh auth token.',
+          error,
+        );
         // Remove invalid token
         await this.tokenStorage.deleteCredentials(serverName);
       }
