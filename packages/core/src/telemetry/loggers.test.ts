@@ -92,6 +92,7 @@ import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
+import { type GeminiCLIExtension } from '../config/config.js';
 import {
   FinishReason,
   type CallableTool,
@@ -200,7 +201,11 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
         getOutputFormat: () => OutputFormat.JSON,
-        getExtensions: () => [],
+        getExtensions: () =>
+          [
+            { name: 'ext-one', id: 'id-one' },
+            { name: 'ext-two', id: 'id-two' },
+          ] as GeminiCLIExtension[],
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -229,8 +234,10 @@ describe('loggers', () => {
           mcp_tools: undefined,
           mcp_tools_count: undefined,
           output_format: 'json',
-          extension_ids: '',
-          extensions_count: 0,
+          extension_ids: 'id-one,id-two',
+          extensions_count: 2,
+          extensions: 'ext-one,ext-two',
+          auth_type: 'vertex-ai',
         },
       });
     });
@@ -786,11 +793,15 @@ describe('loggers', () => {
 
     const mockMetrics = {
       recordToolCallMetrics: vi.fn(),
+      recordLinesChanged: vi.fn(),
     };
 
     beforeEach(() => {
       vi.spyOn(metrics, 'recordToolCallMetrics').mockImplementation(
         mockMetrics.recordToolCallMetrics,
+      );
+      vi.spyOn(metrics, 'recordLinesChanged').mockImplementation(
+        mockMetrics.recordLinesChanged,
       );
       mockLogger.emit.mockReset();
     });
@@ -888,10 +899,6 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           tool_type: 'native',
-          model_added_lines: 1,
-          model_removed_lines: 2,
-          user_added_lines: 5,
-          user_removed_lines: 6,
         },
       );
 
@@ -900,6 +907,19 @@ describe('loggers', () => {
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
+
+      expect(mockMetrics.recordLinesChanged).toHaveBeenCalledWith(
+        mockConfig,
+        1,
+        'added',
+        { function_name: 'test-function' },
+      );
+      expect(mockMetrics.recordLinesChanged).toHaveBeenCalledWith(
+        mockConfig,
+        2,
+        'removed',
+        { function_name: 'test-function' },
+      );
     });
     it('should log a tool call with a reject decision', () => {
       const call: ErroredToolCall = {

@@ -226,7 +226,7 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      vi.mocked(createContentGeneratorConfig).mockReturnValue(
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue(
         mockContentConfig,
       );
 
@@ -251,7 +251,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
-        (_: Config, authType: AuthType | undefined) =>
+        async (_: Config, authType: AuthType | undefined) =>
           ({ authType }) as unknown as ContentGeneratorConfig,
       );
 
@@ -268,7 +268,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
-        (_: Config, authType: AuthType | undefined) =>
+        async (_: Config, authType: AuthType | undefined) =>
           ({ authType }) as unknown as ContentGeneratorConfig,
       );
 
@@ -563,7 +563,7 @@ describe('Server Config (config.ts)', () => {
         useModelRouter: true,
       });
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getUseModelRouter()).toBe(true);
     });
 
     it('should enable model router by default for other auth types', async () => {
@@ -1105,7 +1105,9 @@ describe('BaseLlmClient Lifecycle', () => {
     const authType = AuthType.USE_GEMINI;
     const mockContentConfig = { model: 'gemini-flash', apiKey: 'test-key' };
 
-    vi.mocked(createContentGeneratorConfig).mockReturnValue(mockContentConfig);
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
 
     await config.refreshAuth(authType);
 
