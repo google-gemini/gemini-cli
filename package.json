@@ -58,7 +58,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.0",
+    "ink": "6.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "wrap-ansi": "9.0.2",
@@ -103,7 +103,7 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
-    "ink": "npm:@jrichman/ink@6.4.0",
+    "ink": "6.4.0",
     "ink-testing-library": "^4.0.0",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
