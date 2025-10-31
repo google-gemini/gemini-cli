@@ -1506,7 +1506,7 @@ describe('AppContainer State Management', () => {
       // Arrange: Mock initial model
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
 
-      const { rerender: actualRerender, unmount: actualUnmount } = render(
+      const { unmount } = render(
         <AppContainer
           config={mockConfig}
           settings={mockSettings}
@@ -1514,9 +1514,6 @@ describe('AppContainer State Management', () => {
           initializationResult={mockInitResult}
         />,
       );
-
-      const rerender = actualRerender;
-      const unmount = actualUnmount;
 
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1535,16 +1532,6 @@ describe('AppContainer State Management', () => {
       act(() => {
         handler({ model: 'new-model' });
       });
-
-      // Rerender to reflect state change
-      rerender(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
 
       // Assert: Verify model is updated
       expect(capturedUIState.currentModel).toBe('new-model');
