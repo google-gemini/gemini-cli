@@ -73,13 +73,14 @@ describe('PrepareLabel', () => {
         textColor={color}
         isExpanded={true}
       />,
+      100,
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('creates centered window around match when collapsed', () => {
-    const prefix = 'cd /very/long/path/that/keeps/going/'.repeat(3);
+    const prefix = 'cd_/very/long/path/that/keeps/going/'.repeat(3);
     const core = 'search-here';
     const suffix = '/and/then/some/more/components/'.repeat(3);
     const label = prefix + core + suffix;
@@ -92,6 +93,7 @@ describe('PrepareLabel', () => {
         textColor={color}
         isExpanded={false}
       />,
+      100,
     );
     const out = lastFrame();
     const f = flat(out);

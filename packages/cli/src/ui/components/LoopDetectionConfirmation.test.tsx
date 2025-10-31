@@ -14,6 +14,7 @@ describe('LoopDetectionConfirmation', () => {
   it('renders correctly', () => {
     const { lastFrame } = renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
+      { width: 101 },
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -21,6 +22,7 @@ describe('LoopDetectionConfirmation', () => {
   it('contains the expected options', () => {
     const { lastFrame } = renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
+      { width: 100 },
     );
     const output = lastFrame()!.toString();
 
