@@ -92,7 +92,7 @@ import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
-import { type GeminiCLIExtension } from '@google/gemini-cli-core';
+import { type GeminiCLIExtension } from '../config/config.js';
 import {
   FinishReason,
   type CallableTool,
@@ -1244,6 +1244,7 @@ describe('loggers', () => {
         undefined,
         undefined,
         'test-extension',
+        'test-extension-id',
       );
 
       const call: CompletedToolCall = {
@@ -1278,7 +1279,8 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
-          extension_id: 'test-extension',
+          extension_name: 'test-extension',
+          extension_id: 'test-extension-id',
           function_name: 'mock_mcp_tool',
           function_args: JSON.stringify(
             {
