@@ -66,12 +66,6 @@ export class McpClientManager {
         this.disconnectClient.bind(this),
       ),
     );
-    // This is required to update the content generator configuration with the
-    // new tool configuration.
-    const geminiClient = this.cliConfig.getGeminiClient();
-    if (geminiClient.isInitialized()) {
-      await geminiClient.setTools();
-    }
   }
 
   /**
@@ -91,12 +85,6 @@ export class McpClientManager {
         }),
       ),
     );
-    // This is required to update the content generator configuration with the
-    // new tool configuration.
-    const geminiClient = this.cliConfig.getGeminiClient();
-    if (geminiClient.isInitialized()) {
-      await geminiClient.setTools();
-    }
   }
 
   private isAllowedMcpServer(name: string) {
@@ -130,6 +118,13 @@ export class McpClientManager {
         debugLogger.warn(
           `Error stopping client '${name}': ${getErrorMessage(error)}`,
         );
+      } finally {
+        // This is required to update the content generator configuration with the
+        // new tool configuration.
+        const geminiClient = this.cliConfig.getGeminiClient();
+        if (geminiClient.isInitialized()) {
+          await geminiClient.setTools();
+        }
       }
     }
   }
@@ -201,6 +196,12 @@ export class McpClientManager {
             );
           }
         } finally {
+          // This is required to update the content generator configuration with the
+          // new tool configuration.
+          const geminiClient = this.cliConfig.getGeminiClient();
+          if (geminiClient.isInitialized()) {
+            await geminiClient.setTools();
+          }
           resolve();
         }
       })();
@@ -251,7 +252,7 @@ export class McpClientManager {
 
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     await Promise.all(
-      Object.entries(servers).map(async ([name, config]) =>
+      Object.entries(servers).map(([name, config]) =>
         this.maybeDiscoverMcpServer(name, config),
       ),
     );
