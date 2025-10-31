@@ -194,15 +194,14 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     // If the model stops calling tools without calling complete_task, it's an error.
     if (functionCalls.length === 0) {
-      const finalResult = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
       this.emitActivity('ERROR', {
-        error: finalResult,
+        error: `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`,
         context: 'protocol_violation',
       });
       return {
         status: 'stop',
         terminateReason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
-        finalResult,
+        finalResult: null,
       };
     }
 
@@ -229,17 +228,20 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
    * Generates a specific warning message for the agent's final turn.
    */
   private getFinalWarningMessage(
-    reason: 'timeout' | 'max_turns' | 'no_complete_task',
+    reason:
+      | AgentTerminateMode.TIMEOUT
+      | AgentTerminateMode.MAX_TURNS
+      | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
   ): string {
     let explanation = '';
     switch (reason) {
-      case 'timeout':
+      case AgentTerminateMode.TIMEOUT:
         explanation = 'You have exceeded the time limit.';
         break;
-      case 'max_turns':
+      case AgentTerminateMode.MAX_TURNS:
         explanation = 'You have exceeded the maximum number of turns.';
         break;
-      case 'no_complete_task':
+      case AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL:
         explanation = 'You have stopped calling tools without finishing.';
         break;
       default:
@@ -258,7 +260,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     chat: GeminiChat,
     tools: FunctionDeclaration[],
     turnCounter: number,
-    reason: 'timeout' | 'max_turns' | 'no_complete_task',
+    reason:
+      | AgentTerminateMode.TIMEOUT
+      | AgentTerminateMode.MAX_TURNS
+      | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
     externalSignal: AbortSignal, // The original signal passed to run()
   ): Promise<string | null> {
     this.emitActivity('THOUGHT_CHUNK', {
@@ -400,29 +405,18 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       // === UNIFIED RECOVERY BLOCK ===
-      // This block is reached whenever the loop breaks for any reason
-      // other than a successful GOAL.
-      let recoveryReason: 'timeout' | 'max_turns' | 'no_complete_task' | null =
-        null;
-
-      if (terminateReason === AgentTerminateMode.TIMEOUT) {
-        recoveryReason = 'timeout';
-      } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-        recoveryReason = 'max_turns';
-      } else if (
-        terminateReason === AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
-      ) {
-        recoveryReason = 'no_complete_task';
-      }
-
       // Only attempt recovery if it's a known recoverable reason.
       // We don't recover from GOAL (already done) or ABORTED (user cancelled).
-      if (recoveryReason) {
+      if (
+        terminateReason !== AgentTerminateMode.ERROR &&
+        terminateReason !== AgentTerminateMode.ABORTED &&
+        terminateReason !== AgentTerminateMode.GOAL
+      ) {
         const recoveryResult = await this.executeFinalWarningTurn(
           chat,
           tools,
           turnCounter, // Use current turnCounter for the recovery attempt
-          recoveryReason,
+          terminateReason,
           signal, // Pass the external signal
         );
 
@@ -488,7 +482,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             chat,
             tools,
             turnCounter, // Use current turnCounter
-            'timeout',
+            AgentTerminateMode.TIMEOUT,
             signal,
           );
 

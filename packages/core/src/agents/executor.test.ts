@@ -581,7 +581,7 @@ describe('AgentExecutor', () => {
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
 
-      const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
+      const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
 
       expect(output.terminate_reason).toBe(
         AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
@@ -1096,7 +1096,7 @@ describe('AgentExecutor', () => {
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
           data: {
-            text: 'Execution limit reached (max_turns). Attempting one final recovery turn with a grace period.',
+            text: 'Execution limit reached (MAX_TURNS). Attempting one final recovery turn with a grace period.',
           },
         }),
       );
@@ -1181,7 +1181,7 @@ describe('AgentExecutor', () => {
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
           data: {
-            text: 'Execution limit reached (no_complete_task). Attempting one final recovery turn with a grace period.',
+            text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
           },
         }),
       );
@@ -1277,7 +1277,7 @@ describe('AgentExecutor', () => {
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
           data: {
-            text: 'Execution limit reached (timeout). Attempting one final recovery turn with a grace period.',
+            text: 'Execution limit reached (TIMEOUT). Attempting one final recovery turn with a grace period.',
           },
         }),
       );
