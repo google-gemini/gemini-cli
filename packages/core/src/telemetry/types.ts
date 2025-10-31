@@ -224,6 +224,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   tool_type: 'native' | 'mcp';
   content_length?: number;
   mcp_server_name?: string;
+  extension_name?: string;
   extension_id?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
@@ -270,6 +271,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       ) {
         this.tool_type = 'mcp';
         this.mcp_server_name = call.tool.serverName;
+        this.extension_name = call.tool.extensionName;
         this.extension_id = call.tool.extensionId;
       } else {
         this.tool_type = 'native';
@@ -320,6 +322,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       tool_type: this.tool_type,
       content_length: this.content_length,
       mcp_server_name: this.mcp_server_name,
+      extension_name: this.extension_name,
       extension_id: this.extension_id,
       metadata: this.metadata,
     };

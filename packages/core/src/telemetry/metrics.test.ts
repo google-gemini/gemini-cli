@@ -403,126 +403,81 @@ describe('Telemetry Metrics', () => {
       getTelemetryEnabled: () => true,
     } as unknown as Config;
 
-    it('should not record metrics if not initialized', () => {
-      recordFileOperationMetricModule(mockConfig, {
-        operation: FileOperation.CREATE,
-        lines: 10,
-        mimetype: 'text/plain',
-        extension: 'txt',
-      });
-      expect(mockCounterAddFn).not.toHaveBeenCalled();
-    });
+    type FileOperationTestCase = {
+      name: string;
+      initialized: boolean;
+      attributes: {
+        operation: FileOperation;
+        lines?: number;
+        mimetype?: string;
+        extension?: string;
+      };
+      shouldCall: boolean;
+    };
 
-    it('should record file creation with all attributes', () => {
-      initializeMetricsModule(mockConfig);
-      recordFileOperationMetricModule(mockConfig, {
-        operation: FileOperation.CREATE,
-        lines: 10,
-        mimetype: 'text/plain',
-        extension: 'txt',
-      });
+    it.each<FileOperationTestCase>([
+      {
+        name: 'should not record metrics if not initialized',
+        initialized: false,
+        attributes: {
+          operation: FileOperation.CREATE,
+          lines: 10,
+          mimetype: 'text/plain',
+          extension: 'txt',
+        },
+        shouldCall: false,
+      },
+      {
+        name: 'should record file creation with all attributes',
+        initialized: true,
+        attributes: {
+          operation: FileOperation.CREATE,
+          lines: 10,
+          mimetype: 'text/plain',
+          extension: 'txt',
+        },
+        shouldCall: true,
+      },
+      {
+        name: 'should record file read with minimal attributes',
+        initialized: true,
+        attributes: { operation: FileOperation.READ },
+        shouldCall: true,
+      },
+      {
+        name: 'should record file update with some attributes',
+        initialized: true,
+        attributes: {
+          operation: FileOperation.UPDATE,
+          mimetype: 'application/javascript',
+        },
+        shouldCall: true,
+      },
+      {
+        name: 'should record file update with no optional attributes',
+        initialized: true,
+        attributes: { operation: FileOperation.UPDATE },
+        shouldCall: true,
+      },
+    ])('$name', ({ initialized, attributes, shouldCall }) => {
+      if (initialized) {
+        initializeMetricsModule(mockConfig);
+        // The session start event also calls the counter.
+        mockCounterAddFn.mockClear();
+      }
 
-      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
-      expect(mockCounterAddFn).toHaveBeenNthCalledWith(1, 1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-      });
-      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        operation: FileOperation.CREATE,
-        lines: 10,
-        mimetype: 'text/plain',
-        extension: 'txt',
-      });
-    });
+      recordFileOperationMetricModule(mockConfig, attributes);
 
-    it('should record file read with minimal attributes', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
-
-      recordFileOperationMetricModule(mockConfig, {
-        operation: FileOperation.READ,
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        operation: FileOperation.READ,
-      });
-    });
-
-    it('should record file update with some attributes', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
-
-      recordFileOperationMetricModule(mockConfig, {
-        operation: FileOperation.UPDATE,
-        mimetype: 'application/javascript',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        operation: FileOperation.UPDATE,
-        mimetype: 'application/javascript',
-      });
-    });
-
-    it('should record file operation without diffStat', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
-
-      recordFileOperationMetricModule(mockConfig, {
-        operation: FileOperation.UPDATE,
-      });
-
-      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        operation: FileOperation.UPDATE,
-      });
-    });
-
-    it('should record minimal file operation when optional parameters are undefined', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
-
-      recordFileOperationMetricModule(mockConfig, {
-        operation: FileOperation.UPDATE,
-        lines: 10,
-        mimetype: 'text/plain',
-        extension: 'txt',
-      });
-
-      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        operation: FileOperation.UPDATE,
-        lines: 10,
-        mimetype: 'text/plain',
-        extension: 'txt',
-      });
-    });
-
-    it('should not include diffStat attributes when diffStat is not provided', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
-
-      recordFileOperationMetricModule(mockConfig, {
-        operation: FileOperation.UPDATE,
-      });
-
-      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        operation: FileOperation.UPDATE,
-      });
+      if (shouldCall) {
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          ...attributes,
+        });
+      } else {
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      }
     });
   });
 
