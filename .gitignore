@@ -27,6 +27,8 @@ package-lock.json
 .DS_Store
 Thumbs.db
 
+.cache/
+
 # TypeScript build info files
 *.tsbuildinfo
 
