@@ -4,14 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type MutableRefObject } from 'react';
-import { render } from 'ink-testing-library';
-import { renderHook } from '@testing-library/react';
-import { act } from 'react-dom/test-utils';
+import { type MutableRefObject, Component, type ReactNode } from 'react';
+import { render } from '../../test-utils/render.js';
+
+import { act } from 'react';
 import type { SessionMetrics } from './SessionContext.js';
 import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { uiTelemetryService } from '@google/gemini-cli-core';
+
+class ErrorBoundary extends Component<
+  { children: ReactNode; onError: (error: Error) => void },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; onError: (error: Error) => void }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(_error: Error) {
+    return { hasError: true };
+  }
+
+  override componentDidCatch(error: Error) {
+    this.props.onError(error);
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
 
 /**
  * A test harness component that uses the hook and exposes the context value
@@ -33,7 +58,7 @@ describe('SessionStatsContext', () => {
       ReturnType<typeof useSessionStats> | undefined
     > = { current: undefined };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
@@ -44,6 +69,7 @@ describe('SessionStatsContext', () => {
     expect(stats?.sessionStartTime).toBeInstanceOf(Date);
     expect(stats?.metrics).toBeDefined();
     expect(stats?.metrics.models).toEqual({});
+    unmount();
   });
 
   it('should update metrics when the uiTelemetryService emits an update', () => {
@@ -51,7 +77,7 @@ describe('SessionStatsContext', () => {
       ReturnType<typeof useSessionStats> | undefined
     > = { current: undefined };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
@@ -84,6 +110,7 @@ describe('SessionStatsContext', () => {
           accept: 1,
           reject: 0,
           modify: 0,
+          auto_accept: 0,
         },
         byName: {
           'test-tool': {
@@ -95,9 +122,14 @@ describe('SessionStatsContext', () => {
               accept: 1,
               reject: 0,
               modify: 0,
+              auto_accept: 0,
             },
           },
         },
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -111,6 +143,7 @@ describe('SessionStatsContext', () => {
     const stats = contextRef.current?.stats;
     expect(stats?.metrics).toEqual(newMetrics);
     expect(stats?.lastPromptTokenCount).toBe(100);
+    unmount();
   });
 
   it('should not update metrics if the data is the same', () => {
@@ -125,7 +158,7 @@ describe('SessionStatsContext', () => {
       return null;
     };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <CountingTestHarness />
       </SessionStatsProvider>,
@@ -152,8 +185,12 @@ describe('SessionStatsContext', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -193,19 +230,27 @@ describe('SessionStatsContext', () => {
     });
 
     expect(renderCount).toBe(3);
+    unmount();
   });
 
   it('should throw an error when useSessionStats is used outside of a provider', () => {
-    // Suppress console.error for this test since we expect an error
+    const onError = vi.fn();
+    // Suppress console.error from React for this test
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    try {
-      // Expect renderHook itself to throw when the hook is used outside a provider
-      expect(() => {
-        renderHook(() => useSessionStats());
-      }).toThrow('useSessionStats must be used within a SessionStatsProvider');
-    } finally {
-      consoleSpy.mockRestore();
-    }
+    const { unmount } = render(
+      <ErrorBoundary onError={onError}>
+        <TestHarness contextRef={{ current: undefined }} />
+      </ErrorBoundary>,
+    );
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'useSessionStats must be used within a SessionStatsProvider',
+      }),
+    );
+
+    consoleSpy.mockRestore();
+    unmount();
   });
 });

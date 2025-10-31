@@ -15,18 +15,17 @@ import {
   isNodeError,
   parseAndFormatApiError,
   safeLiteralReplace,
-} from '@google/gemini-cli-core';
-import type {
-  ToolConfirmationPayload,
-  CompletedToolCall,
-  ToolCall,
-  ToolCallRequestInfo,
-  ServerGeminiErrorEvent,
-  ServerGeminiStreamEvent,
-  ToolCallConfirmationDetails,
-  Config,
-  UserTierId,
-  AnsiOutput,
+  type AnyDeclarativeTool,
+  type ToolCall,
+  type ToolConfirmationPayload,
+  type CompletedToolCall,
+  type ToolCallRequestInfo,
+  type ServerGeminiErrorEvent,
+  type ServerGeminiStreamEvent,
+  type ToolCallConfirmationDetails,
+  type Config,
+  type UserTierId,
+  type AnsiOutput,
 } from '@google/gemini-cli-core';
 import type { RequestContext } from '@a2a-js/sdk/server';
 import { type ExecutionEventBus } from '@a2a-js/sdk/server';
@@ -41,7 +40,6 @@ import type {
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import * as fs from 'node:fs';
-
 import { CoderAgentEvent } from '../types.js';
 import type {
   CoderAgentMessage,
@@ -51,8 +49,11 @@ import type {
   TaskMetadata,
   Thought,
   ThoughtSummary,
+  Citation,
 } from '../types.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
+
+type UnionKeys<T> = T extends T ? keyof T : never;
 
 export class Task {
   id: string;
@@ -219,12 +220,14 @@ export class Task {
     final = false,
     timestamp?: string,
     metadataError?: string,
+    traceId?: string,
   ): TaskStatusUpdateEvent {
     const metadata: {
       coderAgent: CoderAgentMessage;
       model: string;
       userTier?: UserTierId;
       error?: string;
+      traceId?: string;
     } = {
       coderAgent: coderAgentMessage,
       model: this.config.getModel(),
@@ -233,6 +236,10 @@ export class Task {
 
     if (metadataError) {
       metadata.error = metadataError;
+    }
+
+    if (traceId) {
+      metadata.traceId = traceId;
     }
 
     return {
@@ -256,6 +263,7 @@ export class Task {
     messageParts?: Part[], // For more complex messages
     final = false,
     metadataError?: string,
+    traceId?: string,
   ): void {
     this.taskState = newState;
     let message: Message | undefined;
@@ -280,6 +288,7 @@ export class Task {
       final,
       undefined,
       metadataError,
+      traceId,
     );
     this.eventBus?.publish(event);
   }
@@ -364,11 +373,11 @@ export class Task {
 
       // Only send an update if the status has actually changed.
       if (hasChanged) {
-        const message = this.toolStatusMessage(tc, this.id, this.contextId);
         const coderAgentMessage: CoderAgentMessage =
           tc.status === 'awaiting_approval'
             ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
             : { kind: CoderAgentEvent.ToolCallUpdateEvent };
+        const message = this.toolStatusMessage(tc, this.id, this.contextId);
 
         const event = this._createStatusUpdateEvent(
           this.taskState,
@@ -395,20 +404,16 @@ export class Task {
     const isAwaitingApproval = allPendingStatuses.some(
       (status) => status === 'awaiting_approval',
     );
-    const allPendingAreStable = allPendingStatuses.every(
-      (status) =>
-        status === 'awaiting_approval' ||
-        status === 'success' ||
-        status === 'error' ||
-        status === 'cancelled',
+    const isExecuting = allPendingStatuses.some(
+      (status) => status === 'executing',
     );
 
-    // 1. Are any pending tool calls awaiting_approval
-    // 2. Are all pending tool calls in a stable state (i.e. not in validing or executing)
-    // 3. After an inline edit, the edited tool call will send awaiting_approval THEN scheduled. We wait for the next update in this case.
+    // The turn is complete and requires user input if at least one tool
+    // is waiting for the user's decision, and no other tool is actively
+    // running in the background.
     if (
       isAwaitingApproval &&
-      allPendingAreStable &&
+      !isExecuting &&
       !this.skipFinalTrueAfterInlineEdit
     ) {
       this.skipFinalTrueAfterInlineEdit = false;
@@ -436,6 +441,19 @@ export class Task {
     return scheduler;
   }
 
+  private _pickFields<
+    T extends ToolCall | AnyDeclarativeTool,
+    K extends UnionKeys<T>,
+  >(from: T, ...fields: K[]): Partial<T> {
+    const ret = {} as Pick<T, K>;
+    for (const field of fields) {
+      if (field in from) {
+        ret[field] = from[field];
+      }
+    }
+    return ret as Partial<T>;
+  }
+
   private toolStatusMessage(
     tc: ToolCall,
     taskId: string,
@@ -444,33 +462,33 @@ export class Task {
     const messageParts: Part[] = [];
 
     // Create a serializable version of the ToolCall (pick necesssary
-    // properties/avoic methods causing circular reference errors)
-    const serializableToolCall: { [key: string]: unknown } = {
-      request: tc.request,
-      status: tc.status,
-    };
-
-    // For WaitingToolCall type
-    if ('confirmationDetails' in tc) {
-      serializableToolCall['confirmationDetails'] = tc.confirmationDetails;
-    }
+    // properties/avoid methods causing circular reference errors)
+    const serializableToolCall: Partial<ToolCall> = this._pickFields(
+      tc,
+      'request',
+      'status',
+      'confirmationDetails',
+      'liveOutput',
+      'response',
+    );
 
     if (tc.tool) {
-      serializableToolCall['tool'] = {
-        name: tc.tool.name,
-        displayName: tc.tool.displayName,
-        description: tc.tool.description,
-        kind: tc.tool.kind,
-        isOutputMarkdown: tc.tool.isOutputMarkdown,
-        canUpdateOutput: tc.tool.canUpdateOutput,
-        schema: tc.tool.schema,
-        parameterSchema: tc.tool.parameterSchema,
-      };
+      serializableToolCall.tool = this._pickFields(
+        tc.tool,
+        'name',
+        'displayName',
+        'description',
+        'kind',
+        'isOutputMarkdown',
+        'canUpdateOutput',
+        'schema',
+        'parameterSchema',
+      ) as AnyDeclarativeTool;
     }
 
     messageParts.push({
       kind: 'data',
-      data: serializableToolCall as ToolCall,
+      data: serializableToolCall,
     } as Part);
 
     return {
@@ -568,10 +586,13 @@ export class Task {
     const stateChange: StateChange = {
       kind: CoderAgentEvent.StateChangeEvent,
     };
+    const traceId =
+      'traceId' in event && event.traceId ? event.traceId : undefined;
+
     switch (event.type) {
       case GeminiEventType.Content:
         logger.info('[Task] Sending agent message content...');
-        this._sendTextContent(event.value);
+        this._sendTextContent(event.value, traceId);
         break;
       case GeminiEventType.ToolCallRequest:
         // This is now handled by the agent loop, which collects all requests
@@ -610,11 +631,17 @@ export class Task {
           'Task cancelled by user',
           undefined,
           true,
+          undefined,
+          traceId,
         );
         break;
       case GeminiEventType.Thought:
         logger.info('[Task] Sending agent thought...');
-        this._sendThought(event.value);
+        this._sendThought(event.value, traceId);
+        break;
+      case GeminiEventType.Citation:
+        logger.info('[Task] Received citation from LLM stream.');
+        this._sendCitation(event.value);
         break;
       case GeminiEventType.ChatCompressed:
         break;
@@ -644,6 +671,7 @@ export class Task {
           undefined,
           false,
           errMessage,
+          traceId,
         );
         break;
       }
@@ -901,7 +929,7 @@ export class Task {
     }
   }
 
-  _sendTextContent(content: string): void {
+  _sendTextContent(content: string, traceId?: string): void {
     if (content === '') {
       return;
     }
@@ -916,11 +944,14 @@ export class Task {
         textContent,
         message,
         false,
+        undefined,
+        undefined,
+        traceId,
       ),
     );
   }
 
-  _sendThought(content: ThoughtSummary): void {
+  _sendThought(content: ThoughtSummary, traceId?: string): void {
     if (!content.subject && !content.description) {
       return;
     }
@@ -942,7 +973,29 @@ export class Task {
       kind: CoderAgentEvent.ThoughtEvent,
     };
     this.eventBus?.publish(
-      this._createStatusUpdateEvent(this.taskState, thought, message, false),
+      this._createStatusUpdateEvent(
+        this.taskState,
+        thought,
+        message,
+        false,
+        undefined,
+        undefined,
+        traceId,
+      ),
+    );
+  }
+
+  _sendCitation(citation: string) {
+    if (!citation || citation.trim() === '') {
+      return;
+    }
+    logger.info('[Task] Sending citation to event bus.');
+    const message = this._createTextMessage(citation);
+    const citationEvent: Citation = {
+      kind: CoderAgentEvent.CitationEvent,
+    };
+    this.eventBus?.publish(
+      this._createStatusUpdateEvent(this.taskState, citationEvent, message),
     );
   }
 }

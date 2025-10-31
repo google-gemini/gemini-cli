@@ -19,6 +19,7 @@ import type {
   ToolResult,
   Config,
   ToolRegistry,
+  AnyToolInvocation,
 } from '../index.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -30,9 +31,14 @@ import {
   ApprovalMode,
 } from '../index.js';
 import type { Part, PartListUnion } from '@google/genai';
-import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
+import {
+  MockModifiableTool,
+  MockTool,
+  MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+} from '../test-utils/mock-tool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { isShellInvocationAllowlisted } from '../utils/shell-utils.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -205,8 +211,10 @@ async function waitForStatus(
 
 describe('CoreToolScheduler', () => {
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
-    const mockTool = new MockTool();
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -249,6 +257,9 @@ describe('CoreToolScheduler', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -275,6 +286,263 @@ describe('CoreToolScheduler', () => {
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls[0].status).toBe('cancelled');
+  });
+
+  it('should cancel all tools when cancelAll is called', async () => {
+    const mockTool1 = new MockTool({
+      name: 'mockTool1',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
+    const mockTool2 = new MockTool({ name: 'mockTool2' });
+    const mockTool3 = new MockTool({ name: 'mockTool3' });
+
+    const mockToolRegistry = {
+      getTool: (name: string) => {
+        if (name === 'mockTool1') return mockTool1;
+        if (name === 'mockTool2') return mockTool2;
+        if (name === 'mockTool3') return mockTool3;
+        return undefined;
+      },
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: (name: string) => {
+        if (name === 'mockTool1') return mockTool1;
+        if (name === 'mockTool2') return mockTool2;
+        if (name === 'mockTool3') return mockTool3;
+        return undefined;
+      },
+      getToolByDisplayName: () => undefined,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const requests = [
+      {
+        callId: '1',
+        name: 'mockTool1',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-1',
+      },
+      {
+        callId: '2',
+        name: 'mockTool2',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-1',
+      },
+      {
+        callId: '3',
+        name: 'mockTool3',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-1',
+      },
+    ];
+
+    // Don't await, let it run in the background
+    void scheduler.schedule(requests, abortController.signal);
+
+    // Wait for the first tool to be awaiting approval
+    await waitForStatus(onToolCallsUpdate, 'awaiting_approval');
+
+    // Cancel all operations
+    scheduler.cancelAll(abortController.signal);
+    abortController.abort(); // Also fire the signal
+
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+
+    expect(completedCalls).toHaveLength(3);
+    expect(completedCalls.find((c) => c.request.callId === '1')?.status).toBe(
+      'cancelled',
+    );
+    expect(completedCalls.find((c) => c.request.callId === '2')?.status).toBe(
+      'cancelled',
+    );
+    expect(completedCalls.find((c) => c.request.callId === '3')?.status).toBe(
+      'cancelled',
+    );
+  });
+
+  it('should cancel all tools in a batch when one is cancelled via confirmation', async () => {
+    const mockTool1 = new MockTool({
+      name: 'mockTool1',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
+    const mockTool2 = new MockTool({ name: 'mockTool2' });
+    const mockTool3 = new MockTool({ name: 'mockTool3' });
+
+    const mockToolRegistry = {
+      getTool: (name: string) => {
+        if (name === 'mockTool1') return mockTool1;
+        if (name === 'mockTool2') return mockTool2;
+        if (name === 'mockTool3') return mockTool3;
+        return undefined;
+      },
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: (name: string) => {
+        if (name === 'mockTool1') return mockTool1;
+        if (name === 'mockTool2') return mockTool2;
+        if (name === 'mockTool3') return mockTool3;
+        return undefined;
+      },
+      getToolByDisplayName: () => undefined,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const requests = [
+      {
+        callId: '1',
+        name: 'mockTool1',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-1',
+      },
+      {
+        callId: '2',
+        name: 'mockTool2',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-1',
+      },
+      {
+        callId: '3',
+        name: 'mockTool3',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-1',
+      },
+    ];
+
+    // Don't await, let it run in the background
+    void scheduler.schedule(requests, abortController.signal);
+
+    // Wait for the first tool to be awaiting approval
+    const awaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
+
+    // Cancel the first tool via its confirmation handler
+    await awaitingCall.confirmationDetails.onConfirm(
+      ToolConfirmationOutcome.Cancel,
+    );
+    abortController.abort(); // User cancelling often involves an abort signal
+
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+
+    expect(completedCalls).toHaveLength(3);
+    expect(completedCalls.find((c) => c.request.callId === '1')?.status).toBe(
+      'cancelled',
+    );
+    expect(completedCalls.find((c) => c.request.callId === '2')?.status).toBe(
+      'cancelled',
+    );
+    expect(completedCalls.find((c) => c.request.callId === '3')?.status).toBe(
+      'cancelled',
+    );
   });
 
   it('should mark tool call as cancelled when abort happens during confirmation error', async () => {
@@ -326,6 +594,9 @@ describe('CoreToolScheduler', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -359,15 +630,18 @@ describe('CoreToolScheduler', () => {
   describe('getToolSuggestion', () => {
     it('should suggest the top N closest tool names for a typo', () => {
       // Create mocked tool registry
+      const mockToolRegistry = {
+        getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
+      } as unknown as ToolRegistry;
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
         getUseSmartEdit: () => false,
         getUseModelRouter: () => false,
         getGeminiClient: () => null, // No client needed for these tests
+        getEnableMessageBusIntegration: () => false,
+        getMessageBus: () => null,
+        getPolicyEngine: () => null,
       } as unknown as Config;
-      const mockToolRegistry = {
-        getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
-      } as unknown as ToolRegistry;
 
       // Create scheduler
       const scheduler = new CoreToolScheduler({
@@ -399,6 +673,7 @@ describe('CoreToolScheduler', () => {
 describe('CoreToolScheduler with payload', () => {
   it('should update args and diff and execute tool when payload is provided', async () => {
     const mockTool = new MockModifiableTool();
+    mockTool.executeFn = vi.fn();
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -441,6 +716,9 @@ describe('CoreToolScheduler with payload', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -761,6 +1039,9 @@ describe('CoreToolScheduler edit cancellation', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -813,13 +1094,15 @@ describe('CoreToolScheduler edit cancellation', () => {
 describe('CoreToolScheduler YOLO mode', () => {
   it('should execute tool requiring confirmation directly without waiting', async () => {
     // Arrange
-    const mockTool = new MockTool();
-    mockTool.executeFn.mockReturnValue({
+    const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Tool executed',
       returnDisplay: 'Tool executed',
     });
-    // This tool would normally require confirmation.
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
 
     const mockToolRegistry = {
@@ -865,6 +1148,9 @@ describe('CoreToolScheduler YOLO mode', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -894,7 +1180,7 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -927,8 +1213,8 @@ describe('CoreToolScheduler request queueing', () => {
       resolveFirstCall = resolve;
     });
 
-    const mockTool = new MockTool();
-    mockTool.executeFn.mockImplementation(() => firstCallPromise);
+    const executeFn = vi.fn().mockImplementation(() => firstCallPromise);
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
     const declarativeTool = mockTool;
 
     const mockToolRegistry = {
@@ -972,6 +1258,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1011,8 +1300,7 @@ describe('CoreToolScheduler request queueing', () => {
     );
 
     // Ensure the second tool call hasn't been executed yet.
-    expect(mockTool.executeFn).toHaveBeenCalledTimes(1);
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
 
     // Complete the first tool call.
     resolveFirstCall!({
@@ -1034,9 +1322,9 @@ describe('CoreToolScheduler request queueing', () => {
 
     await vi.waitFor(() => {
       // Now the second tool call should have been executed.
-      expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
+      expect(executeFn).toHaveBeenCalledTimes(2);
     });
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Wait for the second completion.
     await vi.waitFor(() => {
@@ -1050,13 +1338,15 @@ describe('CoreToolScheduler request queueing', () => {
 
   it('should auto-approve a tool call if it is on the allowedTools list', async () => {
     // Arrange
-    const mockTool = new MockTool('mockTool');
-    mockTool.executeFn.mockReturnValue({
+    const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Tool executed',
       returnDisplay: 'Tool executed',
     });
-    // This tool would normally require confirmation.
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
 
     const toolRegistry = {
@@ -1103,6 +1393,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1132,7 +1425,7 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1158,8 +1451,116 @@ describe('CoreToolScheduler request queueing', () => {
     }
   });
 
+  it('should require approval for a chained shell command even when prefix is allowlisted', async () => {
+    expect(
+      isShellInvocationAllowlisted(
+        {
+          params: { command: 'git status && rm -rf /tmp/should-not-run' },
+        } as unknown as AnyToolInvocation,
+        ['run_shell_command(git)'],
+      ),
+    ).toBe(false);
+
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Shell command executed',
+      returnDisplay: 'Shell command executed',
+    });
+
+    const mockShellTool = new MockTool({
+      name: 'run_shell_command',
+      shouldConfirmExecute: (params) =>
+        Promise.resolve({
+          type: 'exec',
+          title: 'Confirm Shell Command',
+          command: String(params['command'] ?? ''),
+          rootCommand: 'git',
+          onConfirm: async () => {},
+        }),
+      execute: () => executeFn({}),
+    });
+
+    const toolRegistry = {
+      getTool: () => mockShellTool,
+      getToolByName: () => mockShellTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => mockShellTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => ['run_shell_command(git)'],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 80,
+        terminalHeight: 24,
+      }),
+      getTerminalWidth: vi.fn(() => 80),
+      getTerminalHeight: vi.fn(() => 24),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getToolRegistry: () => toolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: 'shell-1',
+      name: 'run_shell_command',
+      args: { command: 'git status && rm -rf /tmp/should-not-run' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-shell-auto-approved',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    const statusUpdates = onToolCallsUpdate.mock.calls
+      .map((call) => (call[0][0] as ToolCall)?.status)
+      .filter(Boolean);
+
+    expect(statusUpdates).toContain('awaiting_approval');
+    expect(executeFn).not.toHaveBeenCalled();
+    expect(onAllToolCallsComplete).not.toHaveBeenCalled();
+  });
+
   it('should handle two synchronous calls to schedule', async () => {
-    const mockTool = new MockTool();
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Tool executed',
+      returnDisplay: 'Tool executed',
+    });
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -1201,6 +1602,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1241,9 +1645,9 @@ describe('CoreToolScheduler request queueing', () => {
     await Promise.all([schedulePromise1, schedulePromise2]);
 
     // Ensure the tool was called twice with the correct arguments.
-    expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ a: 1 });
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledTimes(2);
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
@@ -1273,6 +1677,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const testTool = new TestApprovalTool(mockConfig);
@@ -1360,16 +1767,19 @@ describe('CoreToolScheduler request queueing', () => {
 
     await scheduler.schedule(requests, abortController.signal);
 
-    // Wait for all tools to be awaiting approval
+    // Wait for the FIRST tool to be awaiting approval
     await vi.waitFor(() => {
       const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
+      // With the sequential scheduler, the update includes the active call and the queue.
       expect(calls?.length).toBe(3);
-      expect(calls?.every((call) => call.status === 'awaiting_approval')).toBe(
-        true,
-      );
+      expect(calls?.[0].status).toBe('awaiting_approval');
+      expect(calls?.[0].request.callId).toBe('1');
+      // Check that the other two are in the queue (still in 'validating' state)
+      expect(calls?.[1].status).toBe('validating');
+      expect(calls?.[2].status).toBe('validating');
     });
 
-    expect(pendingConfirmations.length).toBe(3);
+    expect(pendingConfirmations.length).toBe(1);
 
     // Approve the first tool with ProceedAlways
     const firstConfirmation = pendingConfirmations[0];
@@ -1378,17 +1788,283 @@ describe('CoreToolScheduler request queueing', () => {
     // Wait for all tools to be completed
     await vi.waitFor(() => {
       expect(onAllToolCallsComplete).toHaveBeenCalled();
-      const completedCalls = onAllToolCallsComplete.mock.calls.at(
-        -1,
-      )?.[0] as ToolCall[];
-      expect(completedCalls?.length).toBe(3);
-      expect(completedCalls?.every((call) => call.status === 'success')).toBe(
-        true,
-      );
     });
+
+    const completedCalls = onAllToolCallsComplete.mock.calls.at(
+      -1,
+    )?.[0] as ToolCall[];
+    expect(completedCalls?.length).toBe(3);
+    expect(completedCalls?.every((call) => call.status === 'success')).toBe(
+      true,
+    );
 
     // Verify approval mode was changed
     expect(approvalMode).toBe(ApprovalMode.AUTO_EDIT);
+  });
+});
+
+describe('CoreToolScheduler Sequential Execution', () => {
+  it('should execute tool calls in a batch sequentially', async () => {
+    // Arrange
+    let firstCallFinished = false;
+    const executeFn = vi
+      .fn()
+      .mockImplementation(async (args: { call: number }) => {
+        if (args.call === 1) {
+          // First call, wait for a bit to simulate work
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          firstCallFinished = true;
+          return { llmContent: 'First call done' };
+        }
+        if (args.call === 2) {
+          // Second call, should only happen after the first is finished
+          if (!firstCallFinished) {
+            throw new Error(
+              'Second tool call started before the first one finished!',
+            );
+          }
+          return { llmContent: 'Second call done' };
+        }
+        return { llmContent: 'default' };
+      });
+
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getToolRegistry: () => mockToolRegistry,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const requests = [
+      {
+        callId: '1',
+        name: 'mockTool',
+        args: { call: 1 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '2',
+        name: 'mockTool',
+        args: { call: 2 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+    ];
+
+    // Act
+    await scheduler.schedule(requests, abortController.signal);
+
+    // Assert
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    // Check that execute was called twice
+    expect(executeFn).toHaveBeenCalledTimes(2);
+
+    // Check the order of calls
+    const calls = executeFn.mock.calls;
+    expect(calls[0][0]).toEqual({ call: 1 });
+    expect(calls[1][0]).toEqual({ call: 2 });
+
+    // The onAllToolCallsComplete should be called once with both results
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls).toHaveLength(2);
+    expect(completedCalls[0].status).toBe('success');
+    expect(completedCalls[1].status).toBe('success');
+  });
+
+  it('should cancel subsequent tools when the signal is aborted.', async () => {
+    // Arrange
+    const abortController = new AbortController();
+    let secondCallStarted = false;
+
+    const executeFn = vi
+      .fn()
+      .mockImplementation(async (args: { call: number }) => {
+        if (args.call === 1) {
+          return { llmContent: 'First call done' };
+        }
+        if (args.call === 2) {
+          secondCallStarted = true;
+          // This call will be cancelled while it's "running".
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          // It should not return a value because it will be cancelled.
+          return { llmContent: 'Second call should not complete' };
+        }
+        if (args.call === 3) {
+          return { llmContent: 'Third call done' };
+        }
+        return { llmContent: 'default' };
+      });
+
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getToolRegistry: () => mockToolRegistry,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const requests = [
+      {
+        callId: '1',
+        name: 'mockTool',
+        args: { call: 1 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '2',
+        name: 'mockTool',
+        args: { call: 2 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '3',
+        name: 'mockTool',
+        args: { call: 3 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+    ];
+
+    // Act
+    const schedulePromise = scheduler.schedule(
+      requests,
+      abortController.signal,
+    );
+
+    // Wait for the second call to start, then abort.
+    await vi.waitFor(() => {
+      expect(secondCallStarted).toBe(true);
+    });
+    abortController.abort();
+
+    await schedulePromise;
+
+    // Assert
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    // Check that execute was called for the first two tools only
+    expect(executeFn).toHaveBeenCalledTimes(2);
+    expect(executeFn).toHaveBeenCalledWith({ call: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ call: 2 });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls).toHaveLength(3);
+
+    const call1 = completedCalls.find((c) => c.request.callId === '1');
+    const call2 = completedCalls.find((c) => c.request.callId === '2');
+    const call3 = completedCalls.find((c) => c.request.callId === '3');
+
+    expect(call1?.status).toBe('success');
+    expect(call2?.status).toBe('cancelled');
+    expect(call3?.status).toBe('cancelled');
   });
 });
 
