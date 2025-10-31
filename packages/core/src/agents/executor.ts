@@ -188,10 +188,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       new AgentStartEvent(this.agentId, this.definition.name),
     );
 
+    let chat: GeminiChat | undefined;
+    let tools: FunctionDeclaration[] | undefined;
     try {
-      const chat = await this.createChatObject(inputs);
-      const tools = this.prepareToolsList();
-
+      chat = await this.createChatObject(inputs);
+      tools = this.prepareToolsList();
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
         : 'Get Started!';
@@ -259,11 +260,23 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       if (terminateReason === AgentTerminateMode.TIMEOUT) {
-        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
-        this.emitActivity('ERROR', {
-          error: finalResult,
-          context: 'timeout',
-        });
+        const recoveryResult = await this.executeGracefulTimeoutRecovery(
+          chat,
+          tools,
+          turnCounter, // Use current turnCounter for the recovery attempt
+        );
+
+        if (recoveryResult !== null) {
+          // Recovery Succeeded
+          terminateReason = AgentTerminateMode.GOAL;
+          finalResult = recoveryResult;
+        } else {
+          finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+          this.emitActivity('ERROR', {
+            error: finalResult,
+            context: 'timeout',
+          });
+        }
       }
 
       if (terminateReason === AgentTerminateMode.GOAL) {
@@ -286,6 +299,23 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         timeoutController.signal.aborted &&
         !signal.aborted // Ensure the external signal was not the cause
       ) {
+        if (chat && tools) {
+          const recoveryResult = await this.executeGracefulTimeoutRecovery(
+            chat,
+            tools,
+            turnCounter, // Use current turnCounter
+          );
+
+          if (recoveryResult !== null) {
+            // Recovery Succeeded
+            terminateReason = AgentTerminateMode.GOAL;
+            finalResult = recoveryResult;
+            return {
+              result: finalResult,
+              terminate_reason: terminateReason,
+            };
+          }
+        }
         terminateReason = AgentTerminateMode.TIMEOUT;
         finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
         this.emitActivity('ERROR', {
@@ -312,6 +342,78 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           terminateReason,
         ),
       );
+    }
+  }
+
+  /**
+   * Attempts a single, final recovery turn if the agent times out.
+   * Gives the agent a 1-minute grace period to call `complete_task`.
+   *
+   * @returns The final result string if recovery was successful, or `null` if it failed.
+   */
+  private async executeGracefulTimeoutRecovery(
+    chat: GeminiChat,
+    tools: FunctionDeclaration[],
+    turnCounter: number,
+  ): Promise<string | null> {
+    this.emitActivity('THOUGHT_CHUNK', {
+      text: 'Timeout limit reached. Attempting one final recovery turn with a 1-minute grace period.',
+    });
+
+    const gracePeriodMs = 60 * 1000; // 1 minute
+    const graceTimeoutController = new AbortController();
+    const graceTimeoutId = setTimeout(
+      () => graceTimeoutController.abort(new Error('Grace period timed out.')),
+      gracePeriodMs,
+    );
+
+    try {
+      const recoveryMessage: Content = {
+        role: 'user',
+        parts: [
+          {
+            text: `You have exceeded the time limit. You have one final chance to complete the task with a 1-minute grace period. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted and potentially follow-ups. Do not call any other tools.`,
+          },
+        ],
+      };
+
+      // We use executeTurn because it encapsulates all logic for model calls and response processing.
+      // We pass the *grace* signal to it.
+      const turnResult = await this.executeTurn(
+        chat,
+        recoveryMessage,
+        tools,
+        turnCounter, // This will be the "last" turn number
+        graceTimeoutController.signal,
+        graceTimeoutController.signal, // Pass grace signal as both combined and timeout
+      );
+
+      if (
+        turnResult.status === 'stop' &&
+        turnResult.terminateReason === AgentTerminateMode.GOAL
+      ) {
+        // Success!
+        this.emitActivity('THOUGHT_CHUNK', {
+          text: 'Graceful recovery succeeded.',
+        });
+        return turnResult.finalResult ?? 'Task completed during grace period.';
+      }
+
+      // Any other outcome (continue, error, non-GOAL stop) is a failure.
+      this.emitActivity('ERROR', {
+        error: 'Graceful recovery attempt failed.',
+        context: 'timeout_recovery',
+      });
+      return null;
+    } catch (error) {
+      // This catch block will likely catch the 'Grace period timed out' error.
+      this.emitActivity('ERROR', {
+        error: `Graceful recovery attempt failed: ${String(error)}`,
+        context: 'timeout_recovery',
+      });
+      return null;
+    } finally {
+      clearTimeout(graceTimeoutId);
     }
   }
 
