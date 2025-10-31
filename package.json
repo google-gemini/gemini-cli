@@ -59,6 +59,7 @@
   },
   "overrides": {
     "ink": "6.4.0",
+    "string-width": "^8.1.0",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
