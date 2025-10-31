@@ -159,6 +159,10 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().ui.properties.showMemoryUsage.showInDialog,
       ).toBe(true);
+      expect(
+        getSettingsSchema().ui.properties.footer.properties
+          .hideContextPercentage.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().general.properties.vimMode.showInDialog).toBe(
         true,
       );

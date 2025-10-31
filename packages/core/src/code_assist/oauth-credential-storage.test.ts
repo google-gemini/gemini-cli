@@ -8,7 +8,7 @@ import { type Credentials } from 'google-auth-library';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import type { OAuthCredentials } from '../mcp/token-storage/types.js';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents } from '../utils/events.js';
 
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -31,7 +31,7 @@ vi.mock('node:fs', () => ({
 }));
 vi.mock('node:os');
 vi.mock('node:path');
-vi.mock('@google/gemini-cli-core', () => ({
+vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
   },

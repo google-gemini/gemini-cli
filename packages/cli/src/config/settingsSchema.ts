@@ -14,7 +14,6 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
-  ChatCompressionSettings,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -389,6 +388,15 @@ const SETTINGS_SCHEMA = {
             description: 'Hide the model name and context usage in the footer.',
             showInDialog: true,
           },
+          hideContextPercentage: {
+            type: 'boolean',
+            label: 'Hide Context Window Percentage',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Hides the context window remaining percentage.',
+            showInDialog: true,
+          },
         },
       },
       hideFooter: {
@@ -578,14 +586,15 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for summarizing tool output.',
         showInDialog: false,
       },
-      chatCompression: {
-        type: 'object',
-        label: 'Chat Compression',
+      compressionThreshold: {
+        type: 'number',
+        label: 'Compression Threshold',
         category: 'Model',
-        requiresRestart: false,
-        default: undefined as ChatCompressionSettings | undefined,
-        description: 'Chat compression settings.',
-        showInDialog: false,
+        requiresRestart: true,
+        default: 0.2 as number,
+        description:
+          'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
+        showInDialog: true,
       },
       skipNextSpeakerCheck: {
         type: 'boolean',
@@ -1073,6 +1082,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description: 'Enable extension management features.',
+        showInDialog: false,
+      },
+      extensionReloading: {
+        type: 'boolean',
+        label: 'Extension Reloading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
       },
       useModelRouter: {

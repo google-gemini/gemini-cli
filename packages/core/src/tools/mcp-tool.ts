@@ -218,6 +218,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly trust?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
+    override readonly extensionName?: string,
     override readonly extensionId?: string,
     messageBus?: MessageBus,
   ) {
@@ -230,6 +231,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput,
       messageBus,
+      extensionName,
       extensionId,
     );
   }
@@ -244,6 +246,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.trust,
       `${this.serverName}__${this.serverToolName}`,
       this.cliConfig,
+      this.extensionName,
       this.extensionId,
       this.messageBus,
     );

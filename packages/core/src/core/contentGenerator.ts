@@ -15,6 +15,7 @@ import type {
 import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
+import { loadApiKey } from './apiKeyCredentialStorage.js';
 
 import type { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
@@ -57,11 +58,12 @@ export type ContentGeneratorConfig = {
   proxy?: string;
 };
 
-export function createContentGeneratorConfig(
+export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
-): ContentGeneratorConfig {
-  const geminiApiKey = process.env['GEMINI_API_KEY'] || undefined;
+): Promise<ContentGeneratorConfig> {
+  const geminiApiKey =
+    (await loadApiKey()) || process.env['GEMINI_API_KEY'] || undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||

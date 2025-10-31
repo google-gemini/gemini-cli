@@ -4,13 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, vi, type MockInstance, type Mock } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
+import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import type { ExtensionManager } from '../../config/extension-manager.js';
+import type { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import type * as fs from 'node:fs/promises';
+import type { Stats } from 'node:fs';
 
-const mockInstallOrUpdateExtension = vi.hoisted(() => vi.fn());
-const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
-const mockStat = vi.hoisted(() => vi.fn());
+const mockInstallOrUpdateExtension: Mock<
+  typeof ExtensionManager.prototype.installOrUpdateExtension
+> = vi.hoisted(() => vi.fn());
+const mockRequestConsentNonInteractive: Mock<
+  typeof requestConsentNonInteractive
+> = vi.hoisted(() => vi.fn());
+const mockStat: Mock<typeof fs.stat> = vi.hoisted(() => vi.fn());
 
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
@@ -49,13 +58,13 @@ describe('extensions install command', () => {
 });
 
 describe('handleInstall', () => {
-  let consoleLogSpy: MockInstance;
-  let consoleErrorSpy: MockInstance;
+  let debugLogSpy: MockInstance;
+  let debugErrorSpy: MockInstance;
   let processSpy: MockInstance;
 
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, 'log');
-    consoleErrorSpy = vi.spyOn(console, 'error');
+    debugLogSpy = vi.spyOn(debugLogger, 'log');
+    debugErrorSpy = vi.spyOn(debugLogger, 'error');
     processSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation(() => undefined as never);
@@ -69,37 +78,43 @@ describe('handleInstall', () => {
   });
 
   it('should install an extension from a http source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue('http-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'http-extension',
+    } as unknown as GeminiCLIExtension);
 
     await handleInstall({
       source: 'http://google.com',
     });
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(debugLogSpy).toHaveBeenCalledWith(
       'Extension "http-extension" installed successfully and enabled.',
     );
   });
 
   it('should install an extension from a https source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue('https-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'https-extension',
+    } as unknown as GeminiCLIExtension);
 
     await handleInstall({
       source: 'https://google.com',
     });
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(debugLogSpy).toHaveBeenCalledWith(
       'Extension "https-extension" installed successfully and enabled.',
     );
   });
 
   it('should install an extension from a git source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue('git-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'git-extension',
+    } as unknown as GeminiCLIExtension);
 
     await handleInstall({
       source: 'git@some-url',
     });
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(debugLogSpy).toHaveBeenCalledWith(
       'Extension "git-extension" installed successfully and enabled.',
     );
   });
@@ -110,30 +125,34 @@ describe('handleInstall', () => {
       source: 'test://google.com',
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Install source not found.');
+    expect(debugErrorSpy).toHaveBeenCalledWith('Install source not found.');
     expect(processSpy).toHaveBeenCalledWith(1);
   });
 
   it('should install an extension from a sso source', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue('sso-extension');
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'sso-extension',
+    } as unknown as GeminiCLIExtension);
 
     await handleInstall({
       source: 'sso://google.com',
     });
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(debugLogSpy).toHaveBeenCalledWith(
       'Extension "sso-extension" installed successfully and enabled.',
     );
   });
 
   it('should install an extension from a local path', async () => {
-    mockInstallOrUpdateExtension.mockResolvedValue('local-extension');
-    mockStat.mockResolvedValue({});
+    mockInstallOrUpdateExtension.mockResolvedValue({
+      name: 'local-extension',
+    } as unknown as GeminiCLIExtension);
+    mockStat.mockResolvedValue({} as Stats);
     await handleInstall({
       source: '/some/path',
     });
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(debugLogSpy).toHaveBeenCalledWith(
       'Extension "local-extension" installed successfully and enabled.',
     );
   });
@@ -145,7 +164,7 @@ describe('handleInstall', () => {
 
     await handleInstall({ source: 'git@some-url' });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Install extension failed');
+    expect(debugErrorSpy).toHaveBeenCalledWith('Install extension failed');
     expect(processSpy).toHaveBeenCalledWith(1);
   });
 });

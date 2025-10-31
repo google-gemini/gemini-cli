@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { act } from 'react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -78,34 +78,46 @@ describe('useIdeTrustListener', () => {
     );
   });
 
-  const renderTrustListenerHook = () => {
+  const renderTrustListenerHook = async () => {
     let hookResult: ReturnType<typeof useIdeTrustListener>;
     function TestComponent() {
       hookResult = useIdeTrustListener();
       return null;
     }
-    const { rerender } = render(<TestComponent />);
+    const { rerender, unmount } = render(<TestComponent />);
+
+    // Flush any pending async state updates from the hook's initialization
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
     return {
       result: {
         get current() {
           return hookResult;
         },
       },
-      rerender: () => rerender(<TestComponent />),
+      rerender: async () => {
+        rerender(<TestComponent />);
+      },
+      unmount: async () => {
+        unmount();
+      },
     };
   };
 
-  it('should initialize correctly with no trust information', () => {
+  it('should initialize correctly with no trust information', async () => {
     vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
       isTrusted: undefined,
       source: undefined,
     });
 
-    const { result } = renderTrustListenerHook();
+    const { result, unmount } = await renderTrustListenerHook();
 
     expect(result.current.isIdeTrusted).toBe(undefined);
     expect(result.current.needsRestart).toBe(false);
     expect(result.current.restartReason).toBe('NONE');
+    await unmount();
   });
 
   it('should NOT set needsRestart when connecting for the first time', async () => {
@@ -116,7 +128,7 @@ describe('useIdeTrustListener', () => {
       isTrusted: true,
       source: 'ide',
     });
-    const { result } = renderTrustListenerHook();
+    const { result, unmount } = await renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
@@ -136,6 +148,7 @@ describe('useIdeTrustListener', () => {
     expect(result.current.isIdeTrusted).toBe(true);
     expect(result.current.needsRestart).toBe(false);
     expect(result.current.restartReason).toBe('CONNECTION_CHANGE');
+    await unmount();
   });
 
   it('should set needsRestart when IDE trust changes', async () => {
@@ -150,7 +163,7 @@ describe('useIdeTrustListener', () => {
       source: 'ide',
     });
 
-    const { result } = renderTrustListenerHook();
+    const { result, unmount } = await renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
@@ -174,6 +187,7 @@ describe('useIdeTrustListener', () => {
     expect(result.current.isIdeTrusted).toBe(false);
     expect(result.current.needsRestart).toBe(true);
     expect(result.current.restartReason).toBe('TRUST_CHANGE');
+    await unmount();
   });
 
   it('should set needsRestart when IDE disconnects', async () => {
@@ -188,7 +202,7 @@ describe('useIdeTrustListener', () => {
       source: 'ide',
     });
 
-    const { result } = renderTrustListenerHook();
+    const { result, unmount } = await renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
@@ -210,6 +224,7 @@ describe('useIdeTrustListener', () => {
     expect(result.current.isIdeTrusted).toBe(undefined);
     expect(result.current.needsRestart).toBe(true);
     expect(result.current.restartReason).toBe('CONNECTION_CHANGE');
+    await unmount();
   });
 
   it('should NOT set needsRestart if trust value does not change', async () => {
@@ -224,7 +239,7 @@ describe('useIdeTrustListener', () => {
       source: 'ide',
     });
 
-    const { result, rerender } = renderTrustListenerHook();
+    const { result, rerender, unmount } = await renderTrustListenerHook();
 
     // Manually trigger the initial connection state for the test setup
     await act(async () => {
@@ -234,9 +249,10 @@ describe('useIdeTrustListener', () => {
     expect(result.current.isIdeTrusted).toBe(true);
     expect(result.current.needsRestart).toBe(false);
 
-    rerender();
+    await rerender();
 
     expect(result.current.isIdeTrusted).toBe(true);
     expect(result.current.needsRestart).toBe(false);
+    await unmount();
   });
 });

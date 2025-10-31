@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`PrepareLabel > creates centered window around match when collapsed 1`] = `
-"...ry/long/path/that/keeps/going/cd /very/long/path/that/keeps/going/search-here/and/then/some/more/
+"...ry/long/path/that/keeps/going/cd_/very/long/path/that/keeps/going/search-here/and/then/some/more/
 components//and/then/some/more/components//and/..."
 `;
 

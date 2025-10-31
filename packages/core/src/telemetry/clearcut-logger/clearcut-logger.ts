@@ -479,6 +479,7 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT,
         value: event.extensions_count.toString(),
       },
+      // We deliberately do not log the names of extensions here, to be safe.
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
@@ -562,6 +563,12 @@ export class ClearcutLogger {
           });
         }
       }
+    }
+    if (event.extension_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      });
     }
 
     const logEvent = this.createLogEvent(EventNames.TOOL_CALL, data);
@@ -775,6 +782,13 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_STATUS,
         value: JSON.stringify(event.status),
+      });
+    }
+
+    if (event.extension_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
       });
     }
 

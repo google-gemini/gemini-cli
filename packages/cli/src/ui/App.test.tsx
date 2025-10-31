@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, type Mock } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../test-utils/render.js';
 import { Text, useIsScreenReaderEnabled } from 'ink';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { App } from './App.js';

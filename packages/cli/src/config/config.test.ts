@@ -1545,7 +1545,7 @@ describe('loadCliConfig with includeDirectories', () => {
   });
 });
 
-describe('loadCliConfig chatCompression', () => {
+describe('loadCliConfig compressionThreshold', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
@@ -1558,28 +1558,24 @@ describe('loadCliConfig chatCompression', () => {
     vi.restoreAllMocks();
   });
 
-  it('should pass chatCompression settings to the core config', async () => {
+  it('should pass settings to the core config', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
       model: {
-        chatCompression: {
-          contextPercentageThreshold: 0.5,
-        },
+        compressionThreshold: 0.5,
       },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getChatCompression()).toEqual({
-      contextPercentageThreshold: 0.5,
-    });
+    expect(config.getCompressionThreshold()).toBe(0.5);
   });
 
-  it('should have undefined chatCompression if not in settings', async () => {
+  it('should have undefined compressionThreshold if not in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getChatCompression()).toBeUndefined();
+    expect(config.getCompressionThreshold()).toBeUndefined();
   });
 });
 

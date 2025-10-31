@@ -7,7 +7,8 @@
 import type { MockedFunction } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs';
 import * as fsPromises from 'node:fs/promises';
@@ -161,7 +162,7 @@ describe('useGitBranchName', () => {
     expect(result.current).toBe('main');
 
     // Wait for watcher to be set up
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(watchSpy).toHaveBeenCalled();
     });
 
@@ -171,7 +172,7 @@ describe('useGitBranchName', () => {
       rerender();
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current).toBe('develop');
     });
   });
@@ -236,7 +237,7 @@ describe('useGitBranchName', () => {
     });
 
     // Wait for watcher to be set up BEFORE unmounting
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(watchMock).toHaveBeenCalledWith(
         GIT_LOGS_HEAD_PATH,
         expect.any(Function),

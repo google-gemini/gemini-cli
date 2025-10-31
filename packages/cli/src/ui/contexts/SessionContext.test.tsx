@@ -5,7 +5,7 @@
  */
 
 import { type MutableRefObject, Component, type ReactNode } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 
 import { act } from 'react';
 import type { SessionMetrics } from './SessionContext.js';
@@ -58,7 +58,7 @@ describe('SessionStatsContext', () => {
       ReturnType<typeof useSessionStats> | undefined
     > = { current: undefined };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
@@ -69,6 +69,7 @@ describe('SessionStatsContext', () => {
     expect(stats?.sessionStartTime).toBeInstanceOf(Date);
     expect(stats?.metrics).toBeDefined();
     expect(stats?.metrics.models).toEqual({});
+    unmount();
   });
 
   it('should update metrics when the uiTelemetryService emits an update', () => {
@@ -76,7 +77,7 @@ describe('SessionStatsContext', () => {
       ReturnType<typeof useSessionStats> | undefined
     > = { current: undefined };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
@@ -142,6 +143,7 @@ describe('SessionStatsContext', () => {
     const stats = contextRef.current?.stats;
     expect(stats?.metrics).toEqual(newMetrics);
     expect(stats?.lastPromptTokenCount).toBe(100);
+    unmount();
   });
 
   it('should not update metrics if the data is the same', () => {
@@ -156,7 +158,7 @@ describe('SessionStatsContext', () => {
       return null;
     };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <CountingTestHarness />
       </SessionStatsProvider>,
@@ -228,6 +230,7 @@ describe('SessionStatsContext', () => {
     });
 
     expect(renderCount).toBe(3);
+    unmount();
   });
 
   it('should throw an error when useSessionStats is used outside of a provider', () => {
@@ -235,7 +238,7 @@ describe('SessionStatsContext', () => {
     // Suppress console.error from React for this test
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    render(
+    const { unmount } = render(
       <ErrorBoundary onError={onError}>
         <TestHarness contextRef={{ current: undefined }} />
       </ErrorBoundary>,
@@ -248,5 +251,6 @@ describe('SessionStatsContext', () => {
     );
 
     consoleSpy.mockRestore();
+    unmount();
   });
 });

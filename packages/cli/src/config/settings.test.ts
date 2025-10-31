@@ -1104,15 +1104,15 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
-    it('should merge chatCompression settings, with workspace taking precedence', () => {
+    it('should merge compressionThreshold settings, with workspace taking precedence', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.5 } },
+        model: { compressionThreshold: 0.5 },
       };
       const workspaceSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.8 } },
+        model: { compressionThreshold: 0.8 },
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -1127,15 +1127,11 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.user.settings.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.5,
-      });
-      expect(settings.workspace.settings.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.8,
-      });
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.8,
-      });
+      expect(settings.user.settings.model?.compressionThreshold).toEqual(0.5);
+      expect(settings.workspace.settings.model?.compressionThreshold).toEqual(
+        0.8,
+      );
+      expect(settings.merged.model?.compressionThreshold).toEqual(0.8);
     });
 
     it('should merge output format settings, with workspace taking precedence', () => {
@@ -1162,13 +1158,13 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.output?.format).toBe('json');
     });
 
-    it('should handle chatCompression when only in user settings', () => {
+    it('should handle compressionThreshold when only in user settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
       const userSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.5 } },
+        model: { compressionThreshold: 0.5 },
       };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
@@ -1179,9 +1175,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.5,
-      });
+      expect(settings.merged.model?.compressionThreshold).toEqual(0.5);
     });
 
     it('should have model as undefined if not in any settings file', () => {
@@ -1191,39 +1185,15 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.model).toBeUndefined();
     });
 
-    it('should ignore chatCompression if contextPercentageThreshold is invalid', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      const userSettingsContent = {
-        general: {},
-        model: { chatCompression: { contextPercentageThreshold: 1.5 } },
-      };
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 1.5,
-      });
-      warnSpy.mockRestore();
-    });
-
-    it('should deep merge chatCompression settings', () => {
+    it('should use user compressionThreshold if workspace does not define it', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.5 } },
+        model: { compressionThreshold: 0.5 },
       };
       const workspaceSettingsContent = {
         general: {},
-        model: { chatCompression: {} },
+        model: {},
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -1238,9 +1208,7 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.5,
-      });
+      expect(settings.merged.model?.compressionThreshold).toEqual(0.5);
     });
 
     it('should merge includeDirectories from all scopes', () => {
@@ -2025,9 +1993,6 @@ describe('Settings Loading and Merging', () => {
         },
         model: {
           name: 'gemini-pro',
-          chatCompression: {
-            contextPercentageThreshold: 0.5,
-          },
         },
         mcpServers: {
           'server-1': {
@@ -2046,9 +2011,6 @@ describe('Settings Loading and Merging', () => {
           myTheme: {},
         },
         model: 'gemini-pro',
-        chatCompression: {
-          contextPercentageThreshold: 0.5,
-        },
         mcpServers: {
           'server-1': {
             command: 'node server.js',
@@ -2088,9 +2050,6 @@ describe('Settings Loading and Merging', () => {
         },
         model: {
           name: 'gemini-pro',
-          chatCompression: {
-            contextPercentageThreshold: 0.8,
-          },
         },
         context: {
           fileName: 'CONTEXT.md',
@@ -2130,9 +2089,6 @@ describe('Settings Loading and Merging', () => {
         theme: 'dark',
         usageStatisticsEnabled: false,
         model: 'gemini-pro',
-        chatCompression: {
-          contextPercentageThreshold: 0.8,
-        },
         contextFileName: 'CONTEXT.md',
         includeDirectories: ['/src'],
         sandbox: true,

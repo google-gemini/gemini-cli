@@ -9,6 +9,7 @@ import { McpClientManager } from './mcp-client-manager.js';
 import { McpClient } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Config } from '../config/config.js';
+import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 
 vi.mock('./mcp-client.js', async () => {
   const originalModule = await vi.importActual('./mcp-client.js');
@@ -36,17 +37,22 @@ describe('McpClientManager', () => {
     vi.mocked(McpClient).mockReturnValue(
       mockedMcpClient as unknown as McpClient,
     );
-    const manager = new McpClientManager({} as ToolRegistry);
-    await manager.discoverAllMcpTools({
-      isTrustedFolder: () => true,
-      getMcpServers: () => ({
-        'test-server': {},
-      }),
-      getMcpServerCommand: () => '',
-      getPromptRegistry: () => {},
-      getDebugMode: () => false,
-      getWorkspaceContext: () => {},
-    } as unknown as Config);
+    const manager = new McpClientManager(
+      {} as ToolRegistry,
+      {
+        isTrustedFolder: () => true,
+        getExtensionLoader: () => new SimpleExtensionLoader([]),
+        getMcpServers: () => ({
+          'test-server': {},
+        }),
+        getMcpServerCommand: () => '',
+        getPromptRegistry: () => {},
+        getDebugMode: () => false,
+        getWorkspaceContext: () => {},
+        getEnableExtensionReloading: () => false,
+      } as unknown as Config,
+    );
+    await manager.discoverAllMcpTools();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
   });
@@ -61,17 +67,22 @@ describe('McpClientManager', () => {
     vi.mocked(McpClient).mockReturnValue(
       mockedMcpClient as unknown as McpClient,
     );
-    const manager = new McpClientManager({} as ToolRegistry);
-    await manager.discoverAllMcpTools({
-      isTrustedFolder: () => false,
-      getMcpServers: () => ({
-        'test-server': {},
-      }),
-      getMcpServerCommand: () => '',
-      getPromptRegistry: () => {},
-      getDebugMode: () => false,
-      getWorkspaceContext: () => {},
-    } as unknown as Config);
+    const manager = new McpClientManager(
+      {} as ToolRegistry,
+      {
+        isTrustedFolder: () => false,
+        getExtensionLoader: () => new SimpleExtensionLoader([]),
+        getMcpServers: () => ({
+          'test-server': {},
+        }),
+        getMcpServerCommand: () => '',
+        getPromptRegistry: () => {},
+        getDebugMode: () => false,
+        getWorkspaceContext: () => {},
+        getEnableExtensionReloading: () => false,
+      } as unknown as Config,
+    );
+    await manager.discoverAllMcpTools();
     expect(mockedMcpClient.connect).not.toHaveBeenCalled();
     expect(mockedMcpClient.discover).not.toHaveBeenCalled();
   });

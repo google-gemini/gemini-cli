@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useMessageQueue } from './useMessageQueue.js';
 import { StreamingState } from '../types.js';
 
@@ -150,7 +151,7 @@ describe('useMessageQueue', () => {
     // Transition to Idle
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
       expect(result.current.messageQueue).toEqual([]);
     });
@@ -206,7 +207,7 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('First batch');
       expect(result.current.messageQueue).toEqual([]);
     });
@@ -222,7 +223,7 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit again
     rerender({ streamingState: StreamingState.Idle });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
       expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
     });

@@ -9,6 +9,7 @@ import type { Mock, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
@@ -507,7 +508,7 @@ describe('useGeminiStream', () => {
       }
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledTimes(1);
       expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
@@ -590,7 +591,7 @@ describe('useGeminiStream', () => {
       }
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
@@ -702,7 +703,7 @@ describe('useGeminiStream', () => {
       }
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       // The tools should be marked as submitted locally
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith([
         'cancel-1',
@@ -840,7 +841,7 @@ describe('useGeminiStream', () => {
     });
 
     // 5. Wait for submitQuery to be called
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSendMessageStream).toHaveBeenCalledWith(
         toolCallResponseParts,
         expect.any(AbortSignal),
@@ -889,7 +890,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for the first part of the response
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.streamingState).toBe(StreamingState.Responding);
       });
 
@@ -897,7 +898,7 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       // Verify cancellation message is added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
             type: MessageType.INFO,
@@ -1030,7 +1031,7 @@ describe('useGeminiStream', () => {
         result.current.submitQuery('long running query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.streamingState).toBe(StreamingState.Responding);
       });
 
@@ -1038,12 +1039,11 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       // Allow the stream to continue
-      act(() => {
+      await act(async () => {
         continueStream();
+        // Wait a bit to see if the second part is processed
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
-
-      // Wait a bit to see if the second part is processed
-      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // The text should not have been updated with " Canceled"
       const lastCall = mockAddItem.mock.calls.find(
@@ -1138,7 +1138,7 @@ describe('useGeminiStream', () => {
       expect(mockCancelAllToolCalls).toHaveBeenCalled();
 
       // A cancellation message should be added to history
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             text: 'Request cancelled.',
@@ -1167,7 +1167,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/memory add "test fact"');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockScheduleToolCalls).toHaveBeenCalledWith(
           [
             expect.objectContaining({
@@ -1194,7 +1194,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/help');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
         expect(mockSendMessageStream).not.toHaveBeenCalled(); // No LLM call made
@@ -1215,7 +1215,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/my-custom-command');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/my-custom-command',
         );
@@ -1250,7 +1250,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/emptycmd');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith('/emptycmd');
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '',
@@ -1268,7 +1268,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('// This is a line comment');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '// This is a line comment',
@@ -1286,7 +1286,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/* This is a block comment */');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '/* This is a block comment */',
@@ -1324,7 +1324,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/about');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
@@ -1401,7 +1401,7 @@ describe('useGeminiStream', () => {
         }
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockPerformMemoryRefresh).toHaveBeenCalledTimes(1);
       });
     });
@@ -1457,7 +1457,7 @@ describe('useGeminiStream', () => {
       });
 
       // 3. Assertion
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockParseAndFormatApiError).toHaveBeenCalledWith(
           'Rate limit exceeded',
           mockAuthType,
@@ -1990,7 +1990,7 @@ describe('useGeminiStream', () => {
       });
 
       // Check that the info message was added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
             type: 'info',
@@ -2050,7 +2050,7 @@ describe('useGeminiStream', () => {
         });
 
         // Check that the message was added without suggestion
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(mockAddItem).toHaveBeenCalledWith(
             {
               type: 'info',
@@ -2105,7 +2105,7 @@ describe('useGeminiStream', () => {
         });
 
         // Check that the message was added with suggestion
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(mockAddItem).toHaveBeenCalledWith(
             {
               type: 'info',
@@ -2161,7 +2161,7 @@ describe('useGeminiStream', () => {
       });
 
       // Check that onCancelSubmit was called
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(onCancelSubmitSpy).toHaveBeenCalled();
       });
     });
@@ -2360,7 +2360,7 @@ describe('useGeminiStream', () => {
           await result.current.submitQuery(`Test ${reason}`);
         });
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(mockAddItem).toHaveBeenCalledWith(
             {
               type: 'info',
@@ -2487,7 +2487,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for the first response to complete
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'gemini',
@@ -2520,7 +2520,7 @@ describe('useGeminiStream', () => {
       // We can verify this by checking that the LoadingIndicator would not show the previous thought
       // The actual thought state is internal to the hook, but we can verify the behavior
       // by ensuring the second response doesn't show the previous thought
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'gemini',
@@ -2638,7 +2638,7 @@ describe('useGeminiStream', () => {
       });
 
       // Verify cancellation message was added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'info',
@@ -2696,7 +2696,7 @@ describe('useGeminiStream', () => {
       });
 
       // Verify error message was added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'error',
@@ -2747,7 +2747,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('test query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
         expect(
           typeof result.current.loopDetectionConfirmationRequest?.onComplete,
@@ -2795,7 +2795,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for confirmation request to be set
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2824,7 +2824,7 @@ describe('useGeminiStream', () => {
       );
 
       // Verify that the request was retried
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
         expect(mockSendMessageStream).toHaveBeenNthCalledWith(
           2,
@@ -2860,7 +2860,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for confirmation request to be set
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2907,7 +2907,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('first query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2957,7 +2957,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('second query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2980,7 +2980,7 @@ describe('useGeminiStream', () => {
       );
 
       // Verify that the request was retried
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockSendMessageStream).toHaveBeenCalledTimes(3); // 1st query, 2nd query, retry of 2nd query
         expect(mockSendMessageStream).toHaveBeenNthCalledWith(
           3,
@@ -3011,7 +3011,7 @@ describe('useGeminiStream', () => {
       });
 
       // Verify that the content was added to history before the loop detection dialog
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'gemini',
@@ -3022,7 +3022,7 @@ describe('useGeminiStream', () => {
       });
 
       // Then verify loop detection confirmation request was set
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
     });

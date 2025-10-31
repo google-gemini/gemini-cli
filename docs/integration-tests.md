@@ -72,6 +72,9 @@ these responses.
 REGENERATE_MODEL_GOLDENS="true" npm run test:e2e
 ```
 
+**WARNING**: Make sure you run **await rig.cleanup()** at the end of your test,
+else the golden files will not be updated.
+
 ### Deflaking a test
 
 Before adding a **new** integration test, you should test it at least 5 times
