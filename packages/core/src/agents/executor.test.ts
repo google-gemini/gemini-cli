@@ -572,21 +572,24 @@ describe('AgentExecutor', () => {
       });
 
       mockModelResponse([], 'I think I am done.');
+      mockModelResponse([], 'I think I am done.');
 
       const output = await executor.run({ goal: 'Strict test' }, signal);
 
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
 
       const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
 
-      expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
       expect(output.result).toBe(expectedError);
 
       // Telemetry check for error
       expect(mockedLogAgentFinish).toHaveBeenCalledWith(
         mockConfig,
         expect.objectContaining({
-          terminate_reason: AgentTerminateMode.ERROR,
+          terminate_reason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
         }),
       );
 
@@ -892,7 +895,7 @@ describe('AgentExecutor', () => {
       });
     };
 
-    it('should terminate when max_turns is reached', async () => {
+    it('should terminate when max_turns + 1 is reached', async () => {
       const MAX = 2;
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
@@ -901,11 +904,12 @@ describe('AgentExecutor', () => {
 
       mockWorkResponse('t1');
       mockWorkResponse('t2');
+      mockWorkResponse('t3');
 
       const output = await executor.run({ goal: 'Turns test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
     });
 
     it('should terminate with TIMEOUT if a model call takes too long', async () => {

@@ -50,6 +50,18 @@ export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
 
+/** The possible outcomes of a single agent turn. */
+type AgentTurnResult =
+  | {
+      status: 'continue';
+      nextMessage: Content;
+    }
+  | {
+      status: 'stop';
+      terminateReason: AgentTerminateMode;
+      finalResult: string | null;
+    };
+
 /**
  * Executes an agent loop based on an {@link AgentDefinition}.
  *
@@ -168,6 +180,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     // Combine the external signal with the internal timeout signal.
     const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    let hasBeenWarnedForLimits = false;
+    let hasBeenWarnedForStopping = false;
 
     logAgentStart(
       this.runtimeContext,
@@ -187,8 +201,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         // Check for termination conditions like max turns or timeout.
         const reason = this.checkTermination(startTime, turnCounter);
         if (reason) {
-          terminateReason = reason;
-          break;
+          if (hasBeenWarnedForLimits) {
+            terminateReason = reason;
+            break;
+          }
+          hasBeenWarnedForLimits = true;
+          if (!currentMessage.parts) {
+            currentMessage.parts = [];
+          }
+          currentMessage.parts.push({
+            text: `You are about to exceed the execution limit (${reason}). You must call \`${TASK_COMPLETE_TOOL_NAME}\` on your next turn. Summarize your work if necessary.`,
+          });
         }
         if (combinedSignal.aborted) {
           // Determine which signal caused the abort.
@@ -197,53 +220,42 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
             : AgentTerminateMode.ABORTED;
           break;
         }
-
-        const promptId = `${this.agentId}#${turnCounter++}`;
-
-        const { functionCalls } = await promptIdContext.run(
-          promptId,
-          async () =>
-            this.callModel(
-              chat,
-              currentMessage,
-              tools,
-              combinedSignal,
-              promptId,
-            ),
+        const turnResult = await this.executeTurn(
+          chat,
+          currentMessage,
+          tools,
+          turnCounter++,
+          combinedSignal,
+          timeoutController.signal,
         );
-
-        if (combinedSignal.aborted) {
-          terminateReason = timeoutController.signal.aborted
-            ? AgentTerminateMode.TIMEOUT
-            : AgentTerminateMode.ABORTED;
-          break;
-        }
-
-        // If the model stops calling tools without calling complete_task, it's an error.
-        if (functionCalls.length === 0) {
-          terminateReason = AgentTerminateMode.ERROR;
-          finalResult = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
-          this.emitActivity('ERROR', {
-            error: finalResult,
-            context: 'protocol_violation',
+        if (
+          turnResult.status === 'stop' &&
+          turnResult.terminateReason ===
+            AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL &&
+          !hasBeenWarnedForStopping
+        ) {
+          hasBeenWarnedForStopping = true;
+          if (!currentMessage.parts) {
+            currentMessage.parts = [];
+          }
+          currentMessage.parts.push({
+            text: `You have stopped calling tools. You must either call another tool to continue your work or call \`${TASK_COMPLETE_TOOL_NAME}\` to finish.`,
           });
-          break;
+          continue;
+        }
+        if (turnResult.status === 'stop') {
+          terminateReason = turnResult.terminateReason;
+          // Only set finalResult if the turn provided one (e.g., error or goal).
+          // If it was an abort/timeout, finalResult remains null here
+          // and will be set by the logic below.
+          if (turnResult.finalResult) {
+            finalResult = turnResult.finalResult;
+          }
+          break; // Exit the loop
         }
 
-        const { nextMessage, submittedOutput, taskCompleted } =
-          await this.processFunctionCalls(
-            functionCalls,
-            combinedSignal,
-            promptId,
-          );
-
-        if (taskCompleted) {
-          finalResult = submittedOutput ?? 'Task completed successfully.';
-          terminateReason = AgentTerminateMode.GOAL;
-          break;
-        }
-
-        currentMessage = nextMessage;
+        // If status is 'continue', update message for the next loop
+        currentMessage = turnResult.nextMessage;
       }
 
       if (terminateReason === AgentTerminateMode.TIMEOUT) {
@@ -301,6 +313,71 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         ),
       );
     }
+  }
+
+  /**
+   * Executes a single turn of the agent's logic, from calling the model
+   * to processing its response.
+   *
+   * @returns An {@link AgentTurnResult} object indicating whether to continue
+   * or stop the agent loop.
+   */
+  private async executeTurn(
+    chat: GeminiChat,
+    currentMessage: Content,
+    tools: FunctionDeclaration[],
+    turnCounter: number,
+    combinedSignal: AbortSignal,
+    timeoutSignal: AbortSignal, // Pass the timeout controller's signal
+  ): Promise<AgentTurnResult> {
+    const promptId = `${this.agentId}#${turnCounter}`;
+
+    const { functionCalls } = await promptIdContext.run(promptId, async () =>
+      this.callModel(chat, currentMessage, tools, combinedSignal, promptId),
+    );
+
+    if (combinedSignal.aborted) {
+      const terminateReason = timeoutSignal.aborted
+        ? AgentTerminateMode.TIMEOUT
+        : AgentTerminateMode.ABORTED;
+      return {
+        status: 'stop',
+        terminateReason,
+        finalResult: null, // 'run' method will set the final timeout string
+      };
+    }
+
+    // If the model stops calling tools without calling complete_task, it's an error.
+    if (functionCalls.length === 0) {
+      const finalResult = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
+      this.emitActivity('ERROR', {
+        error: finalResult,
+        context: 'protocol_violation',
+      });
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+        finalResult,
+      };
+    }
+
+    const { nextMessage, submittedOutput, taskCompleted } =
+      await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
+
+    if (taskCompleted) {
+      const finalResult = submittedOutput ?? 'Task completed successfully.';
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.GOAL,
+        finalResult,
+      };
+    }
+
+    // Task is not complete, continue to the next turn.
+    return {
+      status: 'continue',
+      nextMessage,
+    };
   }
 
   /**
