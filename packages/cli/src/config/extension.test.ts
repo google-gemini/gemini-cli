@@ -1581,7 +1581,10 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('my-extension', SettingScope.User);
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.User,
+      );
       expect(
         isEnabled({
           name: 'my-extension',
@@ -1598,7 +1601,10 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('my-extension', SettingScope.Workspace);
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.Workspace,
+      );
       expect(
         isEnabled({
           name: 'my-extension',
@@ -1621,8 +1627,14 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('my-extension', SettingScope.User);
-      extensionManager.disableExtension('my-extension', SettingScope.User);
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.User,
+      );
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.User,
+      );
       expect(
         isEnabled({
           name: 'my-extension',
@@ -1653,7 +1665,7 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.disableExtension('ext1', SettingScope.Workspace);
 
       expect(mockLogExtensionDisable).toHaveBeenCalled();
       expect(ExtensionDisableEvent).toHaveBeenCalledWith(
@@ -1681,7 +1693,7 @@ This extension will run the following MCP servers:
         version: '1.0.0',
       });
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.User);
+      await extensionManager.disableExtension('ext1', SettingScope.User);
       let activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(0);
 
@@ -1698,7 +1710,7 @@ This extension will run the following MCP servers:
         version: '1.0.0',
       });
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.disableExtension('ext1', SettingScope.Workspace);
       let activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(0);
 
@@ -1719,8 +1731,8 @@ This extension will run the following MCP servers:
         },
       });
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.Workspace);
-      extensionManager.enableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.disableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.enableExtension('ext1', SettingScope.Workspace);
 
       expect(mockLogExtensionEnable).toHaveBeenCalled();
       expect(ExtensionEnableEvent).toHaveBeenCalledWith(

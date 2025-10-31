@@ -27,7 +27,7 @@ describe('McpClientManager', () => {
     vi.restoreAllMocks();
   });
 
-  it('should discover tools from all servers', async () => {
+  it('should discover tools from all configured', async () => {
     const mockedMcpClient = {
       connect: vi.fn(),
       discover: vi.fn(),
@@ -50,6 +50,8 @@ describe('McpClientManager', () => {
         getDebugMode: () => false,
         getWorkspaceContext: () => {},
         getEnableExtensionReloading: () => false,
+        getAllowedMcpServers: () => [],
+        getBlockedMcpServers: () => [],
       } as unknown as Config,
     );
     await manager.startConfiguredMcpServers();

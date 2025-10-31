@@ -610,7 +610,7 @@ export class ExtensionManager extends ExtensionLoader {
       scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
     this.extensionEnablementManager.disable(name, true, scopePath);
     extension.isActive = false;
-    await this.stopExtension(extension);
+    await this.maybeStopExtension(extension);
     logExtensionDisable(
       this.telemetryConfig,
       new ExtensionDisableEvent(hashValue(name), extension.id, scope),
