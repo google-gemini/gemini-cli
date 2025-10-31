@@ -17,6 +17,7 @@ import type {
   DeclarativeTool,
   ToolResult,
 } from './tools.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * A declarative tool that supports a modify operation.
@@ -128,13 +129,13 @@ function deleteTempFiles(oldPath: string, newPath: string): void {
   try {
     fs.unlinkSync(oldPath);
   } catch {
-    console.error(`Error deleting temp diff file: ${oldPath}`);
+    debugLogger.error(`Error deleting temp diff file: ${oldPath}`);
   }
 
   try {
     fs.unlinkSync(newPath);
   } catch {
-    console.error(`Error deleting temp diff file: ${newPath}`);
+    debugLogger.error(`Error deleting temp diff file: ${newPath}`);
   }
 }
 
