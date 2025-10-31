@@ -5,7 +5,8 @@
  */
 
 import path from 'node:path';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { AgentExecutor } from './executor.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
@@ -105,16 +106,16 @@ export class SubagentInvocation<
       const output = await executor.run(this.params, signal);
 
       const tempDir = this.config.storage.getProjectTempDir();
+      await fs.mkdir(tempDir, { recursive: true });
       const subagentName = this.definition.name.replace(/[^a-zA-Z0-9]/g, '_');
-      const timestamp = Date.now();
-      const outputFileName = `subagent_${subagentName}_${timestamp}.output`;
+      const uniqueId = randomUUID();
+      const outputFileName = `subagent_${subagentName}_${uniqueId}.output`;
       const outputFilePath = path.join(tempDir, outputFileName);
-
       const outputContent =
         typeof output.result === 'string'
           ? output.result
           : JSON.stringify(output.result, null, 2);
-      fs.writeFileSync(outputFilePath, outputContent, 'utf8');
+      await fs.writeFile(outputFilePath, outputContent, 'utf8');
 
       const fileSavedMessage = `Full result saved to ${outputFilePath}`;
 
