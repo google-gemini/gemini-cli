@@ -52,7 +52,7 @@ describe('McpClientManager', () => {
         getEnableExtensionReloading: () => false,
       } as unknown as Config,
     );
-    await manager.discoverAllMcpTools();
+    await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
   });
@@ -82,7 +82,7 @@ describe('McpClientManager', () => {
         getEnableExtensionReloading: () => false,
       } as unknown as Config,
     );
-    await manager.discoverAllMcpTools();
+    await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).not.toHaveBeenCalled();
     expect(mockedMcpClient.discover).not.toHaveBeenCalled();
   });
