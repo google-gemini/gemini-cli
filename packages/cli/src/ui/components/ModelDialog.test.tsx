@@ -40,7 +40,7 @@ const renderComponent = (
 
   const mockConfig = contextValue
     ? ({
-        // --- Functions d by ModelDialog ---
+        // --- Functions used by ModelDialog ---
         getModel: vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO),
         setModel: vi.fn(),
 
