@@ -6,7 +6,8 @@
 
 import { vi, type MockedFunction } from 'vitest';
 import * as fs from 'node:fs';
-import type * as os from 'node:os';
+import * as os from 'node:os';
+// import type * as os from 'node:os';
 import * as path from 'node:path';
 import {
   type GeminiCLIExtension,
@@ -16,7 +17,10 @@ import {
   KeychainTokenStorage,
 } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from './settings.js';
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import {
+  isWorkspaceTrusted,
+  resetTrustedFoldersForTesting,
+} from './trustedFolders.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { join } from 'node:path';
@@ -60,18 +64,13 @@ vi.mock('simple-git', () => ({
   }),
 }));
 
-const tempHomeDir = await vi.hoisted(async () => {
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  const os = await import('node:os');
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-home-'));
-});
+const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
   return {
     ...mockedOs,
-    homedir: () => tempHomeDir,
+    homedir: mockHomedir,
   };
 });
 
@@ -129,6 +128,7 @@ interface MockKeychainStorage {
 }
 
 describe('extension tests', () => {
+  let tempHomeDir: string;
   let tempWorkspaceDir: string;
   let userExtensionsDir: string;
   let extensionManager: ExtensionManager;
@@ -162,7 +162,9 @@ describe('extension tests', () => {
     (
       KeychainTokenStorage as unknown as ReturnType<typeof vi.fn>
     ).mockImplementation(() => mockKeychainStorage);
-    fs.mkdirSync(tempHomeDir, { recursive: true });
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
     tempWorkspaceDir = fs.mkdtempSync(
       path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
     );
@@ -176,6 +178,7 @@ describe('extension tests', () => {
       isTrusted: true,
       source: undefined,
     });
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
@@ -183,6 +186,7 @@ describe('extension tests', () => {
       requestSetting: mockPromptForSettings,
       settings: loadSettings(tempWorkspaceDir).merged,
     });
+    resetTrustedFoldersForTesting();
   });
 
   afterEach(() => {
@@ -873,7 +877,7 @@ describe('extension tests', () => {
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should prompt prompt for trust if workspace is not trusted', async () => {
+    it('should prompt for trust if workspace is not trusted', async () => {
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: false,
         source: undefined,
@@ -942,13 +946,11 @@ describe('extension tests', () => {
         name: 'my-local-extension',
         version: '1.0.0',
       });
-
       await extensionManager.loadExtensions();
       await extensionManager.installOrUpdateExtension({
         source: sourceExtDir,
         type: 'local',
       });
-
       expect(fs.existsSync(trustedFoldersPath)).toBe(true);
       const trustedFolders = JSON.parse(
         fs.readFileSync(trustedFoldersPath, 'utf-8'),
