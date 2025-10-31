@@ -635,7 +635,7 @@ describe('Server Config (config.ts)', () => {
       expect(config.getModel()).toBe(chosenModel);
     });
 
-    it('should NOT switch to auto model if already on default model, even if router is enabled', async () => {
+    it('should NOT switch to auto model if cli provides specific model, even if router is enabled', async () => {
       const config = new Config({
         ...baseParams,
         useModelRouter: true,
