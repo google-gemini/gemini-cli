@@ -6,6 +6,9 @@
 
 import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
 
+// Schema version for structured outputs (non-streaming JSON and streaming JSON)
+export const JSON_SCHEMA_VERSION = 1 as const;
+
 export enum OutputFormat {
   TEXT = 'text',
   JSON = 'json',
@@ -19,6 +22,8 @@ export interface JsonError {
 }
 
 export interface JsonOutput {
+  // Schema version for this JSON payload
+  version: number;
   response?: string;
   stats?: SessionMetrics;
   error?: JsonError;
@@ -43,6 +48,9 @@ export interface InitEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.INIT;
   session_id: string;
   model: string;
+  // Optional schema and CLI versioning information for consumers
+  schema_version?: number;
+  cli_version?: string;
 }
 
 export interface MessageEvent extends BaseJsonStreamEvent {

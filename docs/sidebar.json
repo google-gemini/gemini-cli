@@ -69,6 +69,10 @@
         "slug": "docs/cli/headless"
       },
       {
+        "label": "Structured Output",
+        "slug": "docs/cli/structured-output"
+      },
+      {
         "label": "Keyboard Shortcuts",
         "slug": "docs/cli/keyboard-shortcuts"
       },

@@ -279,6 +279,8 @@ gemini
   context to Gemini CLI.
 - [**Checkpointing**](./docs/cli/checkpointing.md) - Save and resume
   conversations.
+- [**Structured Output**](./docs/cli/structured-output.md) - Versioned JSON and
+  streaming output schemas.
 - [**Token Caching**](./docs/cli/token-caching.md) - Optimize token usage.
 
 ### Tools & Extensions

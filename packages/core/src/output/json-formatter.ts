@@ -6,11 +6,14 @@
 
 import stripAnsi from 'strip-ansi';
 import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
+import { JSON_SCHEMA_VERSION } from './types.js';
 import type { JsonError, JsonOutput } from './types.js';
 
 export class JsonFormatter {
   format(response?: string, stats?: SessionMetrics, error?: JsonError): string {
-    const output: JsonOutput = {};
+    const output: JsonOutput = {
+      version: JSON_SCHEMA_VERSION,
+    };
 
     if (response !== undefined) {
       output.response = stripAnsi(response);

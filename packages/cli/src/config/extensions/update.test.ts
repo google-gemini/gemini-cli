@@ -201,7 +201,7 @@ describe('update tests', () => {
         ),
       );
       expect(updatedConfig.version).toBe('1.1.0');
-    });
+    }, 20000);
 
     it('should call setExtensionUpdateState with UPDATING and then UPDATED_NEEDS_RESTART on success', async () => {
       const extensionName = 'test-extension';

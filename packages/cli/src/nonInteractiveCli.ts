@@ -105,6 +105,8 @@ export async function runNonInteractive({
           timestamp: new Date().toISOString(),
           session_id: config.getSessionId(),
           model: config.getModel(),
+          schema_version: 1,
+          cli_version: process.env['CLI_VERSION'] ?? 'unknown',
         });
       }
 

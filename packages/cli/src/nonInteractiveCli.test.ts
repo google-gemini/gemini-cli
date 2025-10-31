@@ -632,7 +632,7 @@ describe('runNonInteractive', () => {
     );
     expect(processStdoutSpy).toHaveBeenCalledWith(
       JSON.stringify(
-        { response: 'Hello World', stats: MOCK_SESSION_METRICS },
+        { version: 1, response: 'Hello World', stats: MOCK_SESSION_METRICS },
         null,
         2,
       ),
@@ -715,7 +715,11 @@ describe('runNonInteractive', () => {
 
     // This should output JSON with empty response but include stats
     expect(processStdoutSpy).toHaveBeenCalledWith(
-      JSON.stringify({ response: '', stats: MOCK_SESSION_METRICS }, null, 2),
+      JSON.stringify(
+        { version: 1, response: '', stats: MOCK_SESSION_METRICS },
+        null,
+        2,
+      ),
     );
   });
 
@@ -750,7 +754,11 @@ describe('runNonInteractive', () => {
 
     // This should output JSON with empty response but include stats
     expect(processStdoutSpy).toHaveBeenCalledWith(
-      JSON.stringify({ response: '', stats: MOCK_SESSION_METRICS }, null, 2),
+      JSON.stringify(
+        { version: 1, response: '', stats: MOCK_SESSION_METRICS },
+        null,
+        2,
+      ),
     );
   });
 
@@ -787,6 +795,7 @@ describe('runNonInteractive', () => {
     expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
       JSON.stringify(
         {
+          version: 1,
           error: {
             type: 'Error',
             message: 'Invalid input provided',
@@ -832,6 +841,7 @@ describe('runNonInteractive', () => {
     expect(consoleErrorJsonSpy).toHaveBeenCalledWith(
       JSON.stringify(
         {
+          version: 1,
           error: {
             type: 'FatalInputError',
             message: 'Invalid command syntax provided',

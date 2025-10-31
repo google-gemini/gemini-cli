@@ -15,6 +15,7 @@ describe('JsonFormatter', () => {
     const response = 'This is a test response.';
     const formatted = formatter.format(response);
     const expected = {
+      version: 1,
       response,
     };
     expect(JSON.parse(formatted)).toEqual(expected);
@@ -116,6 +117,7 @@ describe('JsonFormatter', () => {
     };
     const formatted = formatter.format(response, stats);
     const expected = {
+      version: 1,
       response,
       stats,
     };
@@ -131,6 +133,7 @@ describe('JsonFormatter', () => {
     };
     const formatted = formatter.format(undefined, undefined, error);
     const expected = {
+      version: 1,
       error,
     };
     expect(JSON.parse(formatted)).toEqual(expected);
@@ -146,6 +149,7 @@ describe('JsonFormatter', () => {
     };
     const formatted = formatter.format(response, undefined, error);
     const expected = {
+      version: 1,
       response,
       error,
     };
@@ -159,6 +163,7 @@ describe('JsonFormatter', () => {
     const parsed = JSON.parse(formatted);
 
     expect(parsed).toEqual({
+      version: 1,
       error: {
         type: 'Error',
         message: 'Something went wrong',
@@ -181,6 +186,7 @@ describe('JsonFormatter', () => {
     const parsed = JSON.parse(formatted);
 
     expect(parsed).toEqual({
+      version: 1,
       error: {
         type: 'CustomError',
         message: 'Custom error occurred',
@@ -219,6 +225,7 @@ describe('JsonFormatter', () => {
 
     const formatted = formatter.format(response, stats, error);
     const expected = {
+      version: 1,
       response,
       stats,
       error,
@@ -235,6 +242,7 @@ describe('JsonFormatter', () => {
     const parsed = JSON.parse(formatted);
 
     expect(parsed).toEqual({
+      version: 1,
       error: {
         type: 'Error',
         message: 'API returned: {"error": "Invalid request", "code": 400}',
@@ -253,6 +261,7 @@ describe('JsonFormatter', () => {
     const parsed = JSON.parse(formatted);
 
     expect(parsed).toEqual({
+      version: 1,
       error: {
         type: 'Error',
         message: 'Error: "quoted text" and \\backslash',
