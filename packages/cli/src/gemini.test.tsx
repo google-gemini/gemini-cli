@@ -319,6 +319,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
+    vi.restoreAllMocks();
   });
 
   it('should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true', async () => {
@@ -406,7 +407,7 @@ describe('validateDnsResolutionOrder', () => {
   });
 
   afterEach(() => {
-    consoleWarnSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   it('should return "ipv4first" when the input is "ipv4first"', () => {
@@ -473,7 +474,7 @@ describe('startInteractiveUI', () => {
   }));
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should render the UI with proper React context and exitOnCtrlC disabled', async () => {
