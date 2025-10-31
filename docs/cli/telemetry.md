@@ -225,8 +225,9 @@ For local development and debugging, you can capture telemetry data locally:
 The following section describes the structure of logs and metrics generated for
 Gemini CLI.
 
-The `session.id`, `installation.id`, and `user.email` are included as common
-attributes on all logs and metrics.
+The `session.id`, `installation.id`, and `user.email` (available only when
+authenticated with a Google account) are included as common attributes on all
+logs and metrics.
 
 ### Logs
 
