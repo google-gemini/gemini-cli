@@ -1501,5 +1501,54 @@ describe('AppContainer State Management', () => {
       );
       unmount();
     });
+
+    it('updates currentModel when ModelChanged event is received', async () => {
+      // Arrange: Mock initial model
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
+
+      const { rerender: actualRerender, unmount: actualUnmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      const rerender = actualRerender;
+      const unmount = actualUnmount;
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Verify initial model
+      expect(capturedUIState.currentModel).toBe('initial-model');
+
+      // Get the registered handler for ModelChanged
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ModelChanged,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      // Act: Simulate ModelChanged event
+      act(() => {
+        handler({ model: 'new-model' });
+      });
+
+      // Rerender to reflect state change
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Assert: Verify model is updated
+      expect(capturedUIState.currentModel).toBe('new-model');
+      unmount();
+    });
   });
 });
