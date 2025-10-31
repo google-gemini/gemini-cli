@@ -14,6 +14,7 @@ import type { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
 import type { GeminiChat } from './geminiChat.js';
 import { InvalidStreamError, StreamEventType } from './geminiChat.js';
+import type { ResolvedModelConfig } from '../services/modelGenerationConfigService.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
@@ -52,6 +53,11 @@ describe('Turn', () => {
     maybeIncludeSchemaDepthContext: typeof mockMaybeIncludeSchemaDepthContext;
   };
   let mockChatInstance: MockedChatInstance;
+  const mockResolvedConfig = {
+    model: 'gemini',
+    sdkConfig: {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as ResolvedModelConfig as any;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -96,20 +102,21 @@ describe('Turn', () => {
 
       const events = [];
       const reqParts: Part[] = [{ text: 'Hi' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+
+      const mockResolvedConfig = {
+        model: 'gemini',
+        sdkConfig: {
+          abortSignal: new AbortController().signal,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as ResolvedModelConfig as any;
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
       expect(mockSendMessageStream).toHaveBeenCalledWith(
-        'test-model',
-        {
-          message: reqParts,
-          config: { abortSignal: expect.any(AbortSignal) },
-        },
+        mockResolvedConfig,
+        reqParts,
         'prompt-id-1',
       );
 
@@ -145,11 +152,7 @@ describe('Turn', () => {
 
       const events = [];
       const reqParts: Part[] = [{ text: 'Use tools' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
@@ -207,13 +210,16 @@ describe('Turn', () => {
       })();
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
+      const mockResolvedConfig = {
+        model: 'gemini',
+        sdkConfig: {
+          abortSignal: abortController.signal,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as ResolvedModelConfig as any;
       const events = [];
       const reqParts: Part[] = [{ text: 'Test abort' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        abortController.signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
       expect(events).toEqual([
@@ -232,11 +238,7 @@ describe('Turn', () => {
       const reqParts: Part[] = [{ text: 'Trigger invalid stream' }];
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
@@ -255,11 +257,7 @@ describe('Turn', () => {
       mockGetHistory.mockReturnValue(historyContent);
       mockMaybeIncludeSchemaDepthContext.mockResolvedValue(undefined);
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
@@ -296,11 +294,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'Test undefined tool parts' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'Test undefined tool parts' },
+      ])) {
         events.push(event);
       }
 
@@ -353,11 +349,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'Test finish reason' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'Test finish reason' },
+      ])) {
         events.push(event);
       }
 
@@ -401,11 +395,7 @@ describe('Turn', () => {
 
       const events = [];
       const reqParts: Part[] = [{ text: 'Generate long text' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
@@ -439,11 +429,7 @@ describe('Turn', () => {
 
       const events = [];
       const reqParts: Part[] = [{ text: 'Test safety' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
@@ -476,11 +462,7 @@ describe('Turn', () => {
 
       const events = [];
       const reqParts: Part[] = [{ text: 'Test no finish reason' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
@@ -521,11 +503,7 @@ describe('Turn', () => {
 
       const events = [];
       const reqParts: Part[] = [{ text: 'Test multiple responses' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, reqParts)) {
         events.push(event);
       }
 
@@ -564,11 +542,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'Test citations' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'Test citations' },
+      ])) {
         events.push(event);
       }
 
@@ -614,11 +590,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'test' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'test' },
+      ])) {
         events.push(event);
       }
 
@@ -661,11 +635,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'test' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'test' },
+      ])) {
         events.push(event);
       }
 
@@ -707,11 +679,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'test' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'test' },
+      ])) {
         events.push(event);
       }
 
@@ -746,9 +716,12 @@ describe('Turn', () => {
       const reqParts: Part[] = [{ text: 'Test malformed error handling' }];
 
       for await (const event of turn.run(
-        'test-model',
+        {
+          model: 'gemini',
+          sdkConfig: { abortSignal: abortController.signal },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as ResolvedModelConfig as any,
         reqParts,
-        abortController.signal,
       )) {
         events.push(event);
       }
@@ -771,11 +744,7 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [])) {
         events.push(event);
       }
 
@@ -798,11 +767,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'Hi' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'Hi' },
+      ])) {
         events.push(event);
       }
 
@@ -830,11 +797,9 @@ describe('Turn', () => {
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
 
       const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'Hi' }],
-        new AbortController().signal,
-      )) {
+      for await (const event of turn.run(mockResolvedConfig, [
+        { text: 'Hi' },
+      ])) {
         events.push(event);
       }
 
@@ -862,11 +827,7 @@ describe('Turn', () => {
       })();
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
       const reqParts: Part[] = [{ text: 'Hi' }];
-      for await (const _ of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
+      for await (const _ of turn.run(mockResolvedConfig, reqParts)) {
         // consume stream
       }
       expect(turn.getDebugResponses()).toEqual([resp1, resp2]);

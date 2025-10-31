@@ -6,9 +6,11 @@
 
 import { createHash } from 'node:crypto';
 import { type Content, Type } from '@google/genai';
-import { type BaseLlmClient } from '../core/baseLlmClient.js';
+import {
+  type BaseLlmClient,
+  type GenerateJsonOptions,
+} from '../core/baseLlmClient.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 
@@ -92,7 +94,7 @@ const editCorrectionWithInstructionCache = new LruCache<
 
 async function generateJsonWithTimeout<T>(
   client: BaseLlmClient,
-  params: Parameters<BaseLlmClient['generateJson']>[0],
+  options: GenerateJsonOptions,
   timeoutMs: number,
 ): Promise<T | null> {
   try {
@@ -100,11 +102,11 @@ async function generateJsonWithTimeout<T>(
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
 
     const result = await client.generateJson({
-      ...params,
+      ...options,
       // The operation will be aborted if either the original signal is aborted
       // or if the timeout is reached.
       abortSignal: AbortSignal.any([
-        params.abortSignal ?? new AbortController().signal,
+        options.abortSignal ?? new AbortController().signal,
         timeoutSignal,
       ]),
     });
@@ -173,13 +175,17 @@ export async function FixLLMEditWithInstruction(
     },
   ];
 
+  const resolvedConfig =
+    baseLlmClient.config.generationConfigService.getResolvedConfig({
+      model: 'edit-corrector',
+    });
   const result = await generateJsonWithTimeout<SearchReplaceEdit>(
     baseLlmClient,
     {
       contents,
       schema: SearchReplaceEditSchema,
       abortSignal,
-      model: DEFAULT_GEMINI_FLASH_MODEL,
+      resolvedConfig,
       systemInstruction: EDIT_SYS_PROMPT,
       promptId,
       maxAttempts: 1,

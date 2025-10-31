@@ -435,10 +435,14 @@ export class LoopDetectionService {
     };
     let result;
     try {
+      const resolvedConfig =
+        this.config.generationConfigService.getResolvedConfig({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+        });
       result = await this.config.getBaseLlmClient().generateJson({
         contents,
         schema,
-        model: DEFAULT_GEMINI_FLASH_MODEL,
+        resolvedConfig,
         systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,
         abortSignal: signal,
         promptId: this.promptId,

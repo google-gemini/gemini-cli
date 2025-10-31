@@ -24,6 +24,7 @@ import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
+import type { ResolvedModelConfig } from '../services/modelGenerationConfigService.js';
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
@@ -75,6 +76,15 @@ const mockConfig = {
     .fn()
     .mockReturnValue({ authType: AuthType.USE_GEMINI }),
   getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+  generationConfigService: {
+    getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+      model,
+      sdkConfig: {
+        temperature: 0,
+        topP: 1,
+      },
+    })),
+  },
 } as unknown as Mocked<Config>;
 
 // Helper to create a mock GenerateContentResponse
@@ -99,7 +109,14 @@ describe('BaseLlmClient', () => {
     defaultOptions = {
       contents: [{ role: 'user', parts: [{ text: 'Give me a color.' }] }],
       schema: { type: 'object', properties: { color: { type: 'string' } } },
-      model: 'test-model',
+      resolvedConfig: {
+        model: 'test-model',
+        sdkConfig: {
+          temperature: 0,
+          topP: 1,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any as ResolvedModelConfig,
       abortSignal: abortController.signal,
       promptId: 'test-prompt-id',
     };
@@ -152,7 +169,15 @@ describe('BaseLlmClient', () => {
 
       const options: GenerateJsonOptions = {
         ...defaultOptions,
-        config: { temperature: 0.8, topK: 10 },
+        resolvedConfig: {
+          model: 'test-model',
+          sdkConfig: {
+            temperature: 0.8,
+            topK: 10,
+            topP: 1,
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any as ResolvedModelConfig,
       };
 
       await client.generateJson(options);
@@ -296,7 +321,7 @@ describe('BaseLlmClient', () => {
       const calls = vi.mocked(logMalformedJsonResponse).mock.calls;
       const lastCall = calls[calls.length - 1];
       const event = lastCall[1] as MalformedJsonResponseEvent;
-      expect(event.model).toBe('test-model');
+      expect(event.model).toBe(defaultOptions.resolvedConfig.model);
     });
 
     it('should handle extra whitespace correctly without logging malformed telemetry', async () => {

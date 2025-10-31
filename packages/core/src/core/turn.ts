@@ -30,6 +30,7 @@ import type { GeminiChat } from './geminiChat.js';
 import { InvalidStreamError } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
+import type { ResolvedModelConfig } from '../services/modelGenerationConfigService.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -225,23 +226,19 @@ export class Turn {
     private readonly chat: GeminiChat,
     private readonly prompt_id: string,
   ) {}
+
   // The run method yields simpler events suitable for server logic
   async *run(
-    model: string,
+    resolvedModelConfig: ResolvedModelConfig,
     req: PartListUnion,
-    signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    const signal = resolvedModelConfig.sdkConfig.abortSignal;
     try {
       // Note: This assumes `sendMessageStream` yields events like
       // { type: StreamEventType.RETRY } or { type: StreamEventType.CHUNK, value: GenerateContentResponse }
       const responseStream = await this.chat.sendMessageStream(
-        model,
-        {
-          message: req,
-          config: {
-            abortSignal: signal,
-          },
-        },
+        resolvedModelConfig,
+        req,
         this.prompt_id,
       );
 
@@ -318,7 +315,7 @@ export class Turn {
         }
       }
     } catch (e) {
-      if (signal.aborted) {
+      if (signal?.aborted) {
         yield { type: GeminiEventType.UserCancelled };
         // Regular cancellation error, fail gracefully.
         return;

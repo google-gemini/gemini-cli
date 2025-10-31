@@ -14,7 +14,6 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { type Config } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -80,11 +79,14 @@ class WebSearchToolInvocation extends BaseToolInvocation<
     const geminiClient = this.config.getGeminiClient();
 
     try {
+      const resolvedConfig =
+        this.config.generationConfigService.getResolvedConfig({
+          model: 'web-search-tool',
+        });
       const response = await geminiClient.generateContent(
         [{ role: 'user', parts: [{ text: this.params.query }] }],
-        { tools: [{ googleSearch: {} }] },
         signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        resolvedConfig,
       );
 
       const responseText = getResponseText(response);

@@ -17,6 +17,14 @@ import type { BaseLlmClient } from '../core/baseLlmClient.js';
 const mockGenerateJson = vi.fn();
 const mockBaseLlmClient = {
   generateJson: mockGenerateJson,
+  config: {
+    generationConfigService: {
+      getResolvedConfig: vi.fn().mockReturnValue({
+        model: 'edit-corrector',
+        sdkConfig: {},
+      }),
+    },
+  },
 } as unknown as BaseLlmClient;
 
 describe('FixLLMEditWithInstruction', () => {

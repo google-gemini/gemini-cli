@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { isFunctionResponse } from './messageInspectors.js';
 import { debugLogger } from './debugLogger.js';
+import type { Content } from '@google/genai';
 
 const CHECK_PROMPT = `Analyze *only* the content and structure of your immediately preceding response (your last turn in the conversation history). Based *strictly* on that response, determine who should logically speak next: the 'user' or the 'model' (you).
 **Decision Rules (apply in order):**
@@ -43,6 +44,7 @@ export interface NextSpeakerResponse {
 export async function checkNextSpeaker(
   chat: GeminiChat,
   baseLlmClient: BaseLlmClient,
+  config: Config,
   abortSignal: AbortSignal,
   promptId: string,
 ): Promise<NextSpeakerResponse | null> {
@@ -110,10 +112,13 @@ export async function checkNextSpeaker(
   ];
 
   try {
+    const resolvedConfig = config.generationConfigService.getResolvedConfig({
+      model: DEFAULT_GEMINI_FLASH_MODEL,
+    });
     const parsedResponse = (await baseLlmClient.generateJson({
       contents,
       schema: RESPONSE_SCHEMA,
-      model: DEFAULT_GEMINI_FLASH_MODEL,
+      resolvedConfig,
       abortSignal,
       promptId,
     })) as unknown as NextSpeakerResponse;

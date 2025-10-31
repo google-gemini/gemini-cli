@@ -14,28 +14,15 @@ import type {
 } from '../routingStrategy.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
 } from '../../config/models.js';
-import {
-  type GenerateContentConfig,
-  createUserContent,
-  Type,
-} from '@google/genai';
+import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-
-const CLASSIFIER_GENERATION_CONFIG: GenerateContentConfig = {
-  temperature: 0,
-  maxOutputTokens: 1024,
-  thinkingConfig: {
-    thinkingBudget: 512, // This counts towards output max, so we don't want -1.
-  },
-};
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -170,12 +157,15 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
+      const resolvedConfig = _config.generationConfigService.getResolvedConfig({
+        model: 'classifier',
+      });
+
       const jsonResponse = await baseLlmClient.generateJson({
         contents: [...finalHistory, createUserContent(context.request)],
         schema: RESPONSE_SCHEMA,
-        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        resolvedConfig,
         systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-        config: CLASSIFIER_GENERATION_CONFIG,
         abortSignal: context.signal,
         promptId,
       });

@@ -19,6 +19,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import type { ResolvedModelConfig } from '../services/modelGenerationConfigService.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -30,24 +31,13 @@ export interface GenerateJsonOptions {
   contents: Content[];
   /** The required JSON schema for the output. */
   schema: Record<string, unknown>;
-  /** The specific model to use for this task. */
-  model: string;
+  /** The resolved model and generation config. */
+  resolvedConfig: ResolvedModelConfig;
   /**
    * Task-specific system instructions.
    * If omitted, no system instruction is sent.
    */
   systemInstruction?: string | Part | Part[] | Content;
-  /**
-   * Overrides for generation configuration (e.g., temperature).
-   */
-  config?: Omit<
-    GenerateContentConfig,
-    | 'systemInstruction'
-    | 'responseJsonSchema'
-    | 'responseMimeType'
-    | 'tools'
-    | 'abortSignal'
-  >;
   /** Signal for cancellation. */
   abortSignal: AbortSignal;
   /**
@@ -64,15 +54,9 @@ export interface GenerateJsonOptions {
  * A client dedicated to stateless, utility-focused LLM calls.
  */
 export class BaseLlmClient {
-  // Default configuration for utility tasks
-  private readonly defaultUtilityConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
-
   constructor(
     private readonly contentGenerator: ContentGenerator,
-    private readonly config: Config,
+    readonly config: Config,
   ) {}
 
   async generateJson(
@@ -81,17 +65,19 @@ export class BaseLlmClient {
     const {
       contents,
       schema,
-      model,
+      resolvedConfig,
       abortSignal,
       systemInstruction,
       promptId,
       maxAttempts,
     } = options;
 
+    const { model: resolvedModel, sdkConfig: resolvedSettings } =
+      resolvedConfig;
+
     const requestConfig: GenerateContentConfig = {
       abortSignal,
-      ...this.defaultUtilityConfig,
-      ...options.config,
+      ...resolvedSettings,
       ...(systemInstruction && { systemInstruction }),
       responseJsonSchema: schema,
       responseMimeType: 'application/json',
@@ -101,7 +87,7 @@ export class BaseLlmClient {
       const apiCall = () =>
         this.contentGenerator.generateContent(
           {
-            model,
+            model: resolvedModel,
             config: requestConfig,
             contents,
           },
@@ -114,7 +100,7 @@ export class BaseLlmClient {
           return true; // Retry on empty response
         }
         try {
-          JSON.parse(this.cleanJsonResponse(text, model));
+          JSON.parse(this.cleanJsonResponse(text, resolvedModel));
           return false;
         } catch (_e) {
           return true;
@@ -128,7 +114,7 @@ export class BaseLlmClient {
 
       // If we are here, the content is valid (not empty and parsable).
       return JSON.parse(
-        this.cleanJsonResponse(getResponseText(result)!.trim(), model),
+        this.cleanJsonResponse(getResponseText(result)!.trim(), resolvedModel),
       );
     } catch (error) {
       if (abortSignal.aborted) {
