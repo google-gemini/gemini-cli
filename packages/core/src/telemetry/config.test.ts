@@ -218,6 +218,283 @@ describe('telemetry/config helpers', () => {
       const result = parseOtlpHeaders('{invalid json}');
       expect(result).toBeUndefined();
     });
+
+    it('handles single key=value pair with comma in value (unquoted)', async () => {
+      const result = parseOtlpHeaders('Accept=text/html,application/xhtml+xml');
+      expect(result).toEqual({
+        Accept: 'text/html,application/xhtml+xml',
+      });
+    });
+
+    it('handles quoted values with commas using double quotes', async () => {
+      const result = parseOtlpHeaders(
+        'Accept="text/html,application/xhtml+xml",Authorization=Bearer token',
+      );
+      expect(result).toEqual({
+        Accept: 'text/html,application/xhtml+xml',
+        Authorization: 'Bearer token',
+      });
+    });
+
+    it('handles quoted values with commas using single quotes', async () => {
+      const result = parseOtlpHeaders(
+        "Accept='text/html,application/xhtml+xml',Authorization=Bearer token",
+      );
+      expect(result).toEqual({
+        Accept: 'text/html,application/xhtml+xml',
+        Authorization: 'Bearer token',
+      });
+    });
+
+    it('handles quoted values with semicolons', async () => {
+      const result = parseOtlpHeaders(
+        'Cache-Control="max-age=3600; must-revalidate",Authorization=Bearer token',
+      );
+      expect(result).toEqual({
+        'Cache-Control': 'max-age=3600; must-revalidate',
+        Authorization: 'Bearer token',
+      });
+    });
+
+    it('handles multiple quoted values', async () => {
+      const result = parseOtlpHeaders(
+        'Accept="text/html,application/json",Cache-Control="no-cache, no-store",Authorization=Bearer token',
+      );
+      expect(result).toEqual({
+        Accept: 'text/html,application/json',
+        'Cache-Control': 'no-cache, no-store',
+        Authorization: 'Bearer token',
+      });
+    });
+
+    it('handles mixed quoted and unquoted values', async () => {
+      const result = parseOtlpHeaders(
+        'key1=simple,key2="complex, value",key3=another',
+      );
+      expect(result).toEqual({
+        key1: 'simple',
+        key2: 'complex, value',
+        key3: 'another',
+      });
+    });
+
+    it('handles values with both commas and semicolons in quotes', async () => {
+      const result = parseOtlpHeaders('Complex="value,with;both",Simple=plain');
+      expect(result).toEqual({
+        Complex: 'value,with;both',
+        Simple: 'plain',
+      });
+    });
+
+    it('handles trailing commas', async () => {
+      const result = parseOtlpHeaders('key1=value1,key2=value2,');
+      expect(result).toEqual({
+        key1: 'value1',
+        key2: 'value2',
+      });
+    });
+
+    it('handles leading commas', async () => {
+      const result = parseOtlpHeaders(',key1=value1,key2=value2');
+      expect(result).toEqual({
+        key1: 'value1',
+        key2: 'value2',
+      });
+    });
+
+    it('handles consecutive delimiters', async () => {
+      const result = parseOtlpHeaders('key1=value1,,key2=value2;;key3=value3');
+      expect(result).toEqual({
+        key1: 'value1',
+        key2: 'value2',
+        key3: 'value3',
+      });
+    });
+
+    it('handles values with equals signs in quotes', async () => {
+      const result = parseOtlpHeaders('Math="x=y+z",key2=value2');
+      expect(result).toEqual({
+        Math: 'x=y+z',
+        key2: 'value2',
+      });
+    });
+
+    it('handles empty quoted values', async () => {
+      const result = parseOtlpHeaders('key1="",key2=value2');
+      expect(result).toEqual({
+        key2: 'value2',
+      });
+    });
+
+    it('handles whitespace around quoted values', async () => {
+      const result = parseOtlpHeaders('  key1 = "value1" , key2="value2"  ');
+      expect(result).toEqual({
+        key1: 'value1',
+        key2: 'value2',
+      });
+    });
+
+    it('handles real-world Accept header example with quotes', async () => {
+      const result = parseOtlpHeaders(
+        'Accept="text/html,application/xhtml+xml,application/xml;q=0.9"',
+      );
+      expect(result).toEqual({
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9',
+      });
+    });
+
+    it('handles real-world Cache-Control header example with quotes', async () => {
+      const result = parseOtlpHeaders(
+        'Cache-Control="public, max-age=31536000, immutable"',
+      );
+      expect(result).toEqual({
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      });
+    });
+
+    it('handles simple Accept header without quotes', async () => {
+      const result = parseOtlpHeaders('Accept=application/json');
+      expect(result).toEqual({
+        Accept: 'application/json',
+      });
+    });
+
+    it('handles Authorization header without quotes', async () => {
+      const result = parseOtlpHeaders('Authorization=Bearer token123');
+      expect(result).toEqual({
+        Authorization: 'Bearer token123',
+      });
+    });
+
+    // Security and validation tests
+
+    it('rejects header names with invalid characters', async () => {
+      expect(parseOtlpHeaders('Bad Header=value')).toBeUndefined(); // space
+      expect(parseOtlpHeaders('Bad:Header=value')).toBeUndefined(); // colon
+      expect(parseOtlpHeaders('Bad(Header)=value')).toBeUndefined(); // parens
+      expect(parseOtlpHeaders('Bad<Header>=value')).toBeUndefined(); // angle brackets
+    });
+
+    it('accepts valid header names with allowed special characters', async () => {
+      const result = parseOtlpHeaders(
+        'X-Custom-Header=value,X-API_Key=abc,Content-Type=json',
+      );
+      expect(result).toEqual({
+        'X-Custom-Header': 'value',
+        'X-API_Key': 'abc',
+        'Content-Type': 'json',
+      });
+    });
+
+    it('rejects header values with control characters', async () => {
+      expect(parseOtlpHeaders('Header=value\nwith\nnewlines')).toBeUndefined();
+      expect(parseOtlpHeaders('Header=value\rwith\rcarriage')).toBeUndefined();
+      expect(parseOtlpHeaders('Header=value\x00null')).toBeUndefined();
+    });
+
+    it('allows tabs in header values', async () => {
+      const result = parseOtlpHeaders('Header=value\twith\ttabs');
+      expect(result).toEqual({
+        Header: 'value\twith\ttabs',
+      });
+    });
+
+    it('rejects values exceeding maximum length', async () => {
+      const longValue = 'x'.repeat(9000);
+      const result = parseOtlpHeaders(`Header=${longValue}`);
+      expect(result).toBeUndefined();
+    });
+
+    it('accepts values at maximum length', async () => {
+      const maxValue = 'x'.repeat(8192);
+      const result = parseOtlpHeaders(`Header=${maxValue}`);
+      expect(result).toEqual({
+        Header: maxValue,
+      });
+    });
+
+    it('rejects unclosed double quotes', async () => {
+      expect(parseOtlpHeaders('Header="unclosed')).toBeUndefined();
+      expect(
+        parseOtlpHeaders('Header1="closed",Header2="unclosed'),
+      ).toBeUndefined();
+    });
+
+    it('rejects unclosed single quotes', async () => {
+      expect(parseOtlpHeaders("Header='unclosed")).toBeUndefined();
+      expect(
+        parseOtlpHeaders("Header1='closed',Header2='unclosed"),
+      ).toBeUndefined();
+    });
+
+    it('handles escaped quotes within quoted values', async () => {
+      const result = parseOtlpHeaders('Message="He said \\"hello\\""');
+      expect(result).toEqual({
+        Message: 'He said "hello"',
+      });
+    });
+
+    it('handles escaped backslashes', async () => {
+      const result = parseOtlpHeaders('Path="C:\\\\Program Files\\\\app"');
+      expect(result).toEqual({
+        Path: 'C:\\Program Files\\app',
+      });
+    });
+
+    it('handles mixed escape sequences', async () => {
+      const result = parseOtlpHeaders(
+        'Complex="quotes\\"and\\\\backslashes\\\\and,commas"',
+      );
+      expect(result).toEqual({
+        Complex: 'quotes"and\\backslashes\\and,commas',
+      });
+    });
+
+    it('enforces maximum header count', async () => {
+      // Create 101 headers (exceeds limit of 100)
+      const headers = Array.from(
+        { length: 101 },
+        (_, i) => `Header${i}=value${i}`,
+      ).join(',');
+      const result = parseOtlpHeaders(headers);
+      expect(result).toBeUndefined();
+    });
+
+    it('accepts maximum header count', async () => {
+      // Create exactly 100 headers (at the limit)
+      const headers = Array.from(
+        { length: 100 },
+        (_, i) => `Header${i}=value${i}`,
+      ).join(',');
+      const result = parseOtlpHeaders(headers);
+      expect(result).toBeDefined();
+      expect(Object.keys(result ?? {}).length).toBe(100);
+    });
+
+    it('validates JSON header names and values', async () => {
+      const result = parseOtlpHeaders(
+        '{"Valid-Header":"value","Bad Header":"value2"}',
+      );
+      // Should only include the valid header
+      expect(result).toEqual({
+        'Valid-Header': 'value',
+      });
+    });
+
+    it('rejects JSON with control characters in values', async () => {
+      const result = parseOtlpHeaders('{"Header":"value\\nwith\\nnewlines"}');
+      expect(result).toBeUndefined();
+    });
+
+    it('handles empty header name', async () => {
+      expect(parseOtlpHeaders('=value')).toBeUndefined();
+      expect(parseOtlpHeaders('  =value')).toBeUndefined();
+    });
+
+    it('handles empty header value after unquoting', async () => {
+      expect(parseOtlpHeaders('Header=""')).toBeUndefined();
+      expect(parseOtlpHeaders("Header=''")).toBeUndefined();
+    });
   });
 
   describe('resolveTelemetrySettings with headers', () => {

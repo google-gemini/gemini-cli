@@ -34,10 +34,158 @@ export function parseTelemetryTargetValue(
   return undefined;
 }
 
+interface ParserState {
+  readonly inQuotes: boolean;
+  readonly quoteChar: string;
+  readonly escaped: boolean;
+}
+
+const createInitialState = (): ParserState => ({
+  inQuotes: false,
+  quoteChar: '',
+  escaped: false,
+});
+
+function updateParserState(state: ParserState, char: string): ParserState {
+  if (state.escaped) {
+    return { ...state, escaped: false };
+  }
+
+  if (char === '\\') {
+    return { ...state, escaped: true };
+  }
+
+  if ((char === '"' || char === "'") && !state.inQuotes) {
+    return { inQuotes: true, quoteChar: char, escaped: false };
+  }
+
+  if (char === state.quoteChar && state.inQuotes) {
+    return { inQuotes: false, quoteChar: '', escaped: false };
+  }
+
+  return state;
+}
+
+const isUnquotedDelimiter = (char: string, state: ParserState): boolean =>
+  !state.inQuotes && (char === ',' || char === ';');
+
+const isUnquotedEquals = (char: string, state: ParserState): boolean =>
+  !state.inQuotes && char === '=';
+
+// Reasonable limits to prevent accidental misuse and protect OTLP backends
+const MAX_HEADER_VALUE_LENGTH = 8192; // 8KB per header value
+const MAX_HEADER_COUNT = 100; // Most backends limit total header size anyway
+
+const isValidHeaderName = (name: string): boolean => {
+  if (!name || name.length === 0) {
+    return false;
+  }
+  // RFC 7230: Valid header name characters
+  return /^[A-Za-z0-9!#$%&'*+\-.^_`|~]+$/.test(name);
+};
+
+const isValidHeaderValue = (value: string): boolean => {
+  if (value.length > MAX_HEADER_VALUE_LENGTH) {
+    return false;
+  }
+  // RFC 7230: No control characters except tab
+  // eslint-disable-next-line no-control-regex
+  return !/[\x00-\x08\x0A-\x1F\x7F]/.test(value);
+};
+
+const unquote = (value: string): string => {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1).replace(/\\(.)/g, '$1');
+  }
+  return value;
+};
+
+function splitByDelimitersRespectingQuotes(input: string): string[] {
+  const parts: string[] = [];
+  let currentPart = '';
+  let state = createInitialState();
+
+  for (const char of input) {
+    state = updateParserState(state, char);
+
+    if (isUnquotedDelimiter(char, state)) {
+      const trimmed = currentPart.trim();
+      if (trimmed) {
+        parts.push(trimmed);
+      }
+      currentPart = '';
+    } else {
+      currentPart += char;
+    }
+  }
+
+  if (state.inQuotes) {
+    throw new Error(
+      `Unclosed quote in header value. Expected closing ${state.quoteChar}`,
+    );
+  }
+
+  const trimmed = currentPart.trim();
+  if (trimmed) {
+    parts.push(trimmed);
+  }
+
+  return parts;
+}
+
+function parseKeyValuePair(
+  pair: string,
+): { key: string; value: string } | null {
+  const equalsIndex = pair.indexOf('=');
+  if (equalsIndex === -1) {
+    return null;
+  }
+
+  const key = pair.substring(0, equalsIndex).trim();
+  const rawValue = pair.substring(equalsIndex + 1).trim();
+
+  if (!isValidHeaderName(key)) {
+    return null;
+  }
+
+  if (
+    (rawValue.startsWith('"') && !rawValue.endsWith('"')) ||
+    (rawValue.startsWith("'") && !rawValue.endsWith("'"))
+  ) {
+    throw new Error('Unclosed quote in header value');
+  }
+
+  const value = unquote(rawValue);
+
+  if (!key || !value || !isValidHeaderValue(value)) {
+    return null;
+  }
+
+  return { key, value };
+}
+
+function countUnquotedEquals(input: string): number {
+  let state = createInitialState();
+  let count = 0;
+
+  for (const char of input) {
+    state = updateParserState(state, char);
+    if (isUnquotedEquals(char, state)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
 /**
  * Parse OTLP headers from a string value.
- * Supports JSON format or key=value pairs separated by comma or semicolon.
- * Returns Record<string, string> or undefined if parsing fails.
+ * Supports JSON format or key=value pairs separated by comma/semicolon.
+ * Validates per RFC 7230 and enforces reasonable limits to prevent
+ * accidental misuse and protect OTLP backends.
  */
 export function parseOtlpHeaders(
   value: string | undefined,
@@ -48,7 +196,6 @@ export function parseOtlpHeaders(
 
   const trimmedValue = value.trim();
 
-  // Try JSON format first
   if (trimmedValue.startsWith('{')) {
     try {
       const parsed = JSON.parse(trimmedValue);
@@ -59,41 +206,53 @@ export function parseOtlpHeaders(
       ) {
         const result: Record<string, string> = {};
         for (const [key, val] of Object.entries(parsed)) {
-          if (key && val !== undefined && val !== null) {
-            result[key] = String(val);
+          if (!key || val === undefined || val === null) {
+            continue;
+          }
+          const stringVal = String(val);
+          if (isValidHeaderName(key) && isValidHeaderValue(stringVal)) {
+            result[key] = stringVal;
+            if (Object.keys(result).length > MAX_HEADER_COUNT) {
+              return undefined;
+            }
           }
         }
         return Object.keys(result).length > 0 ? result : undefined;
       }
     } catch {
-      // It looked like JSON but failed to parse, so we assume it's invalid.
       return undefined;
     }
   }
 
-  // Try delimiter parsing (comma or semicolon)
   if (trimmedValue.includes('=')) {
-    const result: Record<string, string> = {};
-    // Split by comma first, then handle semicolons
-    const pairs = trimmedValue.split(/[,;]/);
+    try {
+      const result: Record<string, string> = {};
+      const equalsCount = countUnquotedEquals(trimmedValue);
 
-    for (const pair of pairs) {
-      const trimmedPair = pair.trim();
-      if (!trimmedPair) continue;
+      if (equalsCount === 1) {
+        const parsed = parseKeyValuePair(trimmedValue);
+        if (parsed) {
+          result[parsed.key] = parsed.value;
+        }
+      } else {
+        const pairs = splitByDelimitersRespectingQuotes(trimmedValue);
 
-      const equalsIndex = trimmedPair.indexOf('=');
-      if (equalsIndex === -1) continue;
-
-      const key = trimmedPair.substring(0, equalsIndex).trim();
-      const val = trimmedPair.substring(equalsIndex + 1).trim();
-
-      if (key && val) {
-        result[key] = val;
+        for (const pair of pairs) {
+          const parsed = parseKeyValuePair(pair);
+          if (parsed) {
+            result[parsed.key] = parsed.value;
+            if (Object.keys(result).length > MAX_HEADER_COUNT) {
+              return undefined;
+            }
+          }
+        }
       }
-    }
 
-    if (Object.keys(result).length > 0) {
-      return result;
+      if (Object.keys(result).length > 0) {
+        return result;
+      }
+    } catch (_error) {
+      return undefined;
     }
   }
 
