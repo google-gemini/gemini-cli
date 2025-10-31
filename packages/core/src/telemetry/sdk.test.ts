@@ -278,7 +278,7 @@ describe('Telemetry SDK', () => {
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
   });
 
-it('should defer initialization when useCliAuth is true and no credentials are provided', async () => {
+  it('should defer initialization when useCliAuth is true and no credentials are provided', async () => {
     vi.spyOn(mockConfig, 'getTelemetryUseCliAuth').mockReturnValue(true);
     vi.spyOn(mockConfig, 'getTelemetryTarget').mockReturnValue(
       TelemetryTarget.GCP,
