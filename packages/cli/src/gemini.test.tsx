@@ -478,19 +478,40 @@ describe('startInteractiveUI', () => {
     vi.restoreAllMocks();
   });
 
+  async function startTestInteractiveUI(
+    config: Config,
+    settings: LoadedSettings,
+    startupWarnings: string[],
+    workspaceRoot: string,
+    initializationResult: {
+      authError: Error | null;
+      themeError: Error | null;
+      shouldOpenAuthDialog: boolean;
+      geminiMdFileCount: number;
+    },
+  ) {
+    await act(async () => {
+      await startInteractiveUI(
+        config,
+        settings,
+        startupWarnings,
+        workspaceRoot,
+        initializationResult,
+      );
+    });
+  }
+
   it('should render the UI with proper React context and exitOnCtrlC disabled', async () => {
     const { render } = await import('ink');
     const renderSpy = vi.mocked(render);
 
-    await act(async () => {
-      await startInteractiveUI(
-        mockConfig,
-        mockSettings,
-        mockStartupWarnings,
-        mockWorkspaceRoot,
-        mockInitializationResult,
-      );
-    });
+    await startTestInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
 
     // Verify render was called with correct options
     expect(renderSpy).toHaveBeenCalledTimes(1);
@@ -510,17 +531,13 @@ describe('startInteractiveUI', () => {
   it('should perform all startup tasks in correct order', async () => {
     const { getCliVersion } = await import('./utils/version.js');
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
-    const { registerCleanup } = await import('./utils/cleanup.js');
-
-    await act(async () => {
-      await startInteractiveUI(
-        mockConfig,
-        mockSettings,
-        mockStartupWarnings,
-        mockWorkspaceRoot,
-        mockInitializationResult,
-      );
-    });
+    await startTestInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
 
     // Verify all startup tasks were called
     expect(getCliVersion).toHaveBeenCalledTimes(1);
@@ -539,17 +556,13 @@ describe('startInteractiveUI', () => {
   it('should not recordSlowRender when less than threshold', async () => {
     const { recordSlowRender } = await import('@google/gemini-cli-core');
     performance.now.mockReturnValueOnce(0);
-    performance.now.mockReturnValueOnce(200);
-
-    await act(async () => {
-      await startInteractiveUI(
-        mockConfig,
-        mockSettings,
-        mockStartupWarnings,
-        mockWorkspaceRoot,
-        mockInitializationResult,
-      );
-    });
+    await startTestInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
 
     expect(recordSlowRender).not.toHaveBeenCalled();
   });
@@ -559,15 +572,13 @@ describe('startInteractiveUI', () => {
     performance.now.mockReturnValueOnce(0);
     performance.now.mockReturnValueOnce(300);
 
-    await act(async () => {
-      await startInteractiveUI(
-        mockConfig,
-        mockSettings,
-        mockStartupWarnings,
-        mockWorkspaceRoot,
-        mockInitializationResult,
-      );
-    });
+    await startTestInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
 
     expect(recordSlowRender).toHaveBeenCalledWith(mockConfig, 300);
   });
@@ -592,15 +603,13 @@ describe('startInteractiveUI', () => {
       getScreenReader: () => screenReader,
     } as Config;
 
-    await act(async () => {
-      await startInteractiveUI(
-        mockConfigWithScreenReader,
-        mockSettings,
-        mockStartupWarnings,
-        mockWorkspaceRoot,
-        mockInitializationResult,
-      );
-    });
+    await startTestInteractiveUI(
+      mockConfigWithScreenReader,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
 
     if (expectedCalls.length > 0) {
       expect(writeSpy).toHaveBeenCalledWith(expectedCalls[0][0]);
