@@ -1,5 +1,8 @@
 name: 'Release: Patch (3) Release'
 
+run-name: >-
+  Release Patch (3) Release | T:${{ inputs.type }} | R:${{ inputs.release_ref }} ${{ inputs.original_pr && format('| PR:#{0}', inputs.original_pr) || '' }}
+
 on:
   workflow_dispatch:
     inputs:
