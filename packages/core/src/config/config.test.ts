@@ -539,7 +539,6 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
     });
 
-
     it('should return provided OTLP headers', () => {
       const headers = {
         Authorization: 'Bearer token',

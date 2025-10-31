@@ -238,7 +238,6 @@ describe('Telemetry SDK', () => {
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
   });
 
-
   it('should pass headers to HTTP exporters', () => {
     const headers = {
       Authorization: 'Bearer token123',
