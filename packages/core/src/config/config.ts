@@ -559,8 +559,6 @@ export class Config {
       if (this.model === DEFAULT_GEMINI_MODEL_AUTO) {
         this.model = DEFAULT_GEMINI_MODEL;
       }
-    } else if (this.useModelRouter && this.model === DEFAULT_GEMINI_MODEL) {
-      this.model = DEFAULT_GEMINI_MODEL_AUTO;
     }
 
     // Vertex and Genai have incompatible encryption and sending history with
