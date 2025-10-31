@@ -106,6 +106,13 @@ const mockToolRequiresConfirmation = new MockTool({
   shouldConfirmExecute: vi.fn(),
 });
 
+// Helper function to advance timers asynchronously within act
+const advanceTimers = async (time = 0) => {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(time);
+  });
+};
+
 describe('useReactToolScheduler in YOLO Mode', () => {
   let onComplete: Mock;
 
@@ -158,15 +165,9 @@ describe('useReactToolScheduler in YOLO Mode', () => {
       schedule(request, new AbortController().signal);
     });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0); // Process validation
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0); // Process scheduling
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0); // Process execution
-    });
+    await advanceTimers(); // Process validation
+    await advanceTimers(); // Process scheduling
+    await advanceTimers(); // Process execution
 
     // Check that execute WAS called
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
@@ -275,15 +276,9 @@ describe('useReactToolScheduler', () => {
       schedule(request, new AbortController().signal);
     });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
+    await advanceTimers();
 
     expect(mockTool.execute).toHaveBeenCalledWith(request.args);
     expect(onComplete).toHaveBeenCalledWith([
@@ -346,15 +341,9 @@ describe('useReactToolScheduler', () => {
     expect(result.current[0][0].request.callId).not.toBe('oldCall');
 
     // Let the new call finish.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
+    await advanceTimers();
     expect(onComplete).toHaveBeenCalled();
   });
 
@@ -380,9 +369,7 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    }); // validation
+    await advanceTimers(); // validation
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0); // Process scheduling
     });
@@ -395,9 +382,7 @@ describe('useReactToolScheduler', () => {
       cancelAllToolCalls(cancelController.signal);
     });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
 
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -430,12 +415,8 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
 
     expect(completedToolCalls).toHaveLength(1);
     expect(completedToolCalls[0].status).toBe('error');
@@ -469,12 +450,8 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
 
     expect(completedToolCalls).toHaveLength(1);
     expect(completedToolCalls[0].status).toBe('error');
@@ -504,15 +481,9 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
+    await advanceTimers();
 
     expect(completedToolCalls).toHaveLength(1);
     expect(completedToolCalls[0].status).toBe('error');
@@ -539,9 +510,7 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
 
     const waitingCall = result.current[0][0] as any;
     expect(waitingCall.status).toBe('awaiting_approval');
@@ -552,15 +521,9 @@ describe('useReactToolScheduler', () => {
       await capturedOnConfirmForTest?.(ToolConfirmationOutcome.ProceedOnce);
     });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
+    await advanceTimers();
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
@@ -597,9 +560,7 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
 
     const waitingCall = result.current[0][0] as any;
     expect(waitingCall.status).toBe('awaiting_approval');
@@ -609,12 +570,8 @@ describe('useReactToolScheduler', () => {
     await act(async () => {
       await capturedOnConfirmForTest?.(ToolConfirmationOutcome.Cancel);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.Cancel,
@@ -672,9 +629,7 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
 
     expect(liveUpdateFn).toBeDefined();
     expect(result.current[0][0].status).toBe('executing');
@@ -682,16 +637,12 @@ describe('useReactToolScheduler', () => {
     await act(async () => {
       liveUpdateFn?.('Live output 1');
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
 
     await act(async () => {
       liveUpdateFn?.('Live output 2');
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
 
     act(() => {
       resolveExecutePromise({
@@ -699,12 +650,8 @@ describe('useReactToolScheduler', () => {
         returnDisplay: 'Final display',
       } as ToolResult);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
 
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -760,18 +707,10 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(requests, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
+    await advanceTimers();
+    await advanceTimers();
+    await advanceTimers();
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     const completedCalls = onComplete.mock.calls[0][0] as ToolCall[];
@@ -852,9 +791,7 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request1, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await advanceTimers();
 
     act(() => {
       schedule(request2, new AbortController().signal);
