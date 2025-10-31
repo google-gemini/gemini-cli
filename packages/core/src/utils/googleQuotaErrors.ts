@@ -96,7 +96,7 @@ export function classifyGoogleError(error: unknown): unknown {
       const quotaId = violation.quotaId ?? '';
       if (quotaId.includes('PerDay') || quotaId.includes('Daily')) {
         return new TerminalQuotaError(
-          `${googleApiError.message}\nExpected quota reset within 24h.`,
+          `You have exhausted your daily quota on this model.`,
           googleApiError,
         );
       }
@@ -139,7 +139,7 @@ export function classifyGoogleError(error: unknown): unknown {
     const quotaLimit = errorInfo.metadata?.['quota_limit'] ?? '';
     if (quotaLimit.includes('PerDay') || quotaLimit.includes('Daily')) {
       return new TerminalQuotaError(
-        `${googleApiError.message}\nExpected quota reset within 24h.`,
+        `You have exhausted your daily quota on this model.`,
         googleApiError,
       );
     }
