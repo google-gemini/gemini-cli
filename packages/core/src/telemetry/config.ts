@@ -68,7 +68,6 @@ export function parseOtlpHeaders(
     } catch {
       // It looked like JSON but failed to parse, so we assume it's invalid.
       return undefined;
-
     }
   }
 
@@ -100,7 +99,6 @@ export function parseOtlpHeaders(
 
   return undefined;
 }
-
 
 export interface TelemetryArgOverrides {
   telemetry?: boolean;
