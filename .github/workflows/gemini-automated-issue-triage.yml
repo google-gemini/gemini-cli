@@ -171,7 +171,7 @@ jobs:
             2. Review the available labels provided in the environment variable: ${AVAILABLE_LABELS}.
             3. Select exactly one area/ label that best matches the issue based on Reference 1: Area Definitions.
             4. Select exactly one priority/ label that best matches the issue based on Reference 2: Priority Definitions.
-            5. Fallback Logic: 
+            5. Fallback Logic:
                 - If you cannot confidently determine the correct area/ label from the definitions, you must use area/unknown.
                 - If you cannot confidently determine the correct priority/ label from the definitions, you must use priority/unknown.
             6. Output your two selected labels in JSON format and nothing else. Example:
