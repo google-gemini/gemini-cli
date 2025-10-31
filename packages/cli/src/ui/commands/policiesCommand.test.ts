@@ -35,7 +35,7 @@ describe('policiesCommand', () => {
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: MessageType.INFO,
+          type: MessageType.ERROR,
           text: 'Error: Config not available.',
         }),
         expect.any(Number),
