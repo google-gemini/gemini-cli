@@ -66,7 +66,6 @@
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
     "@google/gemini-cli-test-utils": "file:../test-utils",
-    "@testing-library/react": "^16.3.0",
     "@types/archiver": "^6.0.3",
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
