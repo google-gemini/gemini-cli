@@ -763,12 +763,11 @@ class EditToolInvocation
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
-        const originallyProposedContent =
-          this.params.ai_proposed_string || this.params.new_string;
+
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
-          originallyProposedContent,
+          editData.newContent,
           this.params.new_string,
         );
         displayResult = {
