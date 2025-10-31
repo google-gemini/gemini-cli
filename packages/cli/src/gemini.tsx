@@ -40,6 +40,7 @@ import {
   getOauthClient,
   UserPromptEvent,
   debugLogger,
+  recordSlowRender,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -209,7 +210,7 @@ export async function startInteractiveUI(
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
-          console.log('Slow render');
+          recordSlowRender(config, renderTime);
         }
       },
     } as RenderOptions,

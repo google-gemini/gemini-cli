@@ -33,6 +33,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    recordSlowRender: vi.fn(),
   };
 });
 
@@ -527,6 +528,38 @@ describe('startInteractiveUI', () => {
     // We need a small delay to let it execute
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not recordSlowRender when less than threshold', async () => {
+    const { recordSlowRender } = await import('@google/gemini-cli-core');
+    performance.now.mockReturnValueOnce(0);
+    performance.now.mockReturnValueOnce(200);
+
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+
+    expect(recordSlowRender).not.toHaveBeenCalled();
+  });
+
+  it('should call recordSlowRender when more than threshold', async () => {
+    const { recordSlowRender } = await import('@google/gemini-cli-core');
+    performance.now.mockReturnValueOnce(0);
+    performance.now.mockReturnValueOnce(300);
+
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+
+    expect(recordSlowRender).toHaveBeenCalledWith(mockConfig, 300);
   });
 
   it.each([
