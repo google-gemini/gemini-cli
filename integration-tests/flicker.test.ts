@@ -6,12 +6,17 @@
 
 import { describe, it, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
+import { join } from 'node:path';
 
 describe('Flicker Detector', () => {
-  // TODO: https://github.com/google-gemini/gemini-cli/issues/11170
-  it.skip('should not detect a flicker under the max height budget', async () => {
+  it('should not detect a flicker under the max height budget', async () => {
     const rig = new TestRig();
-    await rig.setup('flicker-detector-test');
+    rig.setup('flicker-detector-test', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress-empty.responses',
+      ),
+    });
 
     const run = await rig.runInteractive();
     const prompt = 'Tell me a fun fact.';
@@ -27,5 +32,6 @@ describe('Flicker Detector', () => {
     // We expect NO flicker event to be found.
     const flickerMetric = rig.readMetric('ui.flicker.count');
     expect(flickerMetric).toBeNull();
+    await rig.cleanup();
   });
 });
