@@ -245,13 +245,13 @@ their corresponding top-level category object in your `settings.json` file.
     example `{"run_shell_command": {"tokenBudget": 2000}}`
   - **Default:** `undefined`
 
-- **`model.chatCompression.contextPercentageThreshold`** (number):
+- **`model.compressionThreshold`** (number):
   - **Description:** Sets the threshold for chat history compression as a
-    percentage of the model's total token limit. This is a value between 0 and 1
+    fraction of the model's total token limit. This is a value between 0 and 1
     that applies to both automatic compression and the manual `/compress`
     command. For example, a value of `0.6` will trigger compression when the
     chat history exceeds 60% of the token limit.
-  - **Default:** `0.7`
+  - **Default:** `0.2`
 
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
