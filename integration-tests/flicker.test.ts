@@ -14,7 +14,7 @@ describe('Flicker Detector', () => {
     rig.setup('flicker-detector-test', {
       fakeResponsesPath: join(
         import.meta.dirname,
-        'context-compress-interactive.compress-empty.responses',
+        'flicker-detector.max-height.responses',
       ),
     });
 
