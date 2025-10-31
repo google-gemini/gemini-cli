@@ -394,7 +394,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       recordResponses: undefined,
     });
 
-    await main();
+    await act(async () => {
+      await main();
+    });
 
     expect(setRawModeSpy).toHaveBeenCalledWith(true);
     expect(detectAndEnableKittyProtocol).toHaveBeenCalledTimes(1);
@@ -528,12 +530,6 @@ describe('startInteractiveUI', () => {
     const { getCliVersion } = await import('./utils/version.js');
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
     const { registerCleanup } = await import('./utils/cleanup.js');
-    const mockInitializationResult = {
-      authError: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 0,
-    };
 
     await startTestInteractiveUI(
       mockConfig,
@@ -606,12 +602,6 @@ describe('startInteractiveUI', () => {
       ...mockConfig,
       getScreenReader: () => screenReader,
     } as Config;
-    const mockInitializationResult = {
-      authError: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 0,
-    };
 
     await startTestInteractiveUI(
       mockConfigWithScreenReader,
