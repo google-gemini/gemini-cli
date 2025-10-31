@@ -72,7 +72,7 @@ observability framework — Gemini CLI's observability system provides:
 ## Configuration
 
 All telemetry behavior is controlled through your `.gemini/settings.json` file.
-These settings can be overridden by environment variables.
+Environment variables can be used to override the settings in the file.
 
 | Setting        | Environment Variable             | Description                                       | Values            | Default                 |
 | -------------- | -------------------------------- | ------------------------------------------------- | ----------------- | ----------------------- |
