@@ -571,22 +571,28 @@ describe('AgentExecutor', () => {
         },
       });
 
+      // Turn 2 (protocol violation)
       mockModelResponse([], 'I think I am done.');
+
+      // Turn 3 (recovery turn - also fails)
+      mockModelResponse([], 'I still give up.');
 
       const output = await executor.run({ goal: 'Strict test' }, signal);
 
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
 
       const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
 
-      expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
       expect(output.result).toBe(expectedError);
 
       // Telemetry check for error
       expect(mockedLogAgentFinish).toHaveBeenCalledWith(
         mockConfig,
         expect.objectContaining({
-          terminate_reason: AgentTerminateMode.ERROR,
+          terminate_reason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
         }),
       );
 
@@ -901,11 +907,13 @@ describe('AgentExecutor', () => {
 
       mockWorkResponse('t1');
       mockWorkResponse('t2');
+      // Recovery turn
+      mockModelResponse([], 'I give up');
 
       const output = await executor.run({ goal: 'Turns test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
     });
 
     it('should terminate with TIMEOUT if a model call takes too long', async () => {
@@ -931,6 +939,8 @@ describe('AgentExecutor', () => {
           });
         })();
       });
+      // Recovery turn
+      mockModelResponse([], 'I give up');
 
       const runPromise = executor.run({ goal: 'Timeout test' }, signal);
 
@@ -941,7 +951,7 @@ describe('AgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
       expect(output.result).toContain('Agent timed out after 0.5 minutes.');
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
 
       // Verify activity stream reported the timeout
       expect(activities).toContainEqual(
@@ -992,10 +1002,13 @@ describe('AgentExecutor', () => {
         };
       });
 
+      // Recovery turn
+      mockModelResponse([], 'I give up');
+
       const output = await executor.run({ goal: 'Timeout test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
     });
 
     it('should terminate when AbortSignal is triggered', async () => {
