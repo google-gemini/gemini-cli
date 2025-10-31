@@ -174,7 +174,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     combinedSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
   ): Promise<AgentTurnResult> {
-    console.log(`turn: ${turnCounter}`);
     const promptId = `${this.agentId}#${turnCounter}`;
 
     const { functionCalls } = await promptIdContext.run(promptId, async () =>
