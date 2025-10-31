@@ -209,6 +209,17 @@ async function waitForStatus(
   });
 }
 
+const mockLogEditProposed = vi.hoisted(() => vi.fn());
+const mockLogToolCall = vi.hoisted(() => vi.fn());
+vi.mock('../telemetry/loggers.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as object),
+    logEditProposed: mockLogEditProposed,
+    logToolCall: mockLogToolCall,
+  };
+});
+
 describe('CoreToolScheduler', () => {
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
     const mockTool = new MockTool({
@@ -625,6 +636,92 @@ describe('CoreToolScheduler', () => {
       (call[0] as ToolCall[]).map((toolCall) => toolCall.status),
     );
     expect(statuses).not.toContain('error');
+  });
+
+  it('should log edit proposed event when an edit tool proposes a diff', async () => {
+    const mockEditTool = new MockModifiableTool();
+    const declarativeTool = mockEditTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockModifiableTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    await waitForStatus(onToolCallsUpdate, 'awaiting_approval');
+
+    expect(mockLogEditProposed).toHaveBeenCalledTimes(1);
+    const [actualConfig, actualEvent] = mockLogEditProposed.mock.calls[0];
+
+    expect(actualConfig).toBe(mockConfig);
+
+    expect(actualEvent).toMatchObject({
+      'event.name': 'edit_proposed',
+      'event.timestamp': expect.any(String),
+      function_name: 'mockModifiableTool',
+      prompt_id: 'prompt-id-1',
+      suggested_added_lines: 1,
+      suggested_removed_lines: 1,
+    });
   });
 
   describe('getToolSuggestion', () => {

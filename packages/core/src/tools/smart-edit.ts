@@ -25,7 +25,11 @@ import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { type Config, ApprovalMode } from '../config/config.js';
-import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import {
+  DEFAULT_DIFF_OPTIONS,
+  getConfirmedDiffStats,
+  getSuggestedDiffStats,
+} from './diffOptions.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -675,6 +679,11 @@ class EditToolInvocation
         }
       },
       ideConfirmation,
+      suggestedDiffStat: getSuggestedDiffStats(
+        fileName,
+        editData.currentContent ?? '',
+        editData.newContent,
+      ),
     };
     return confirmationDetails;
   }
@@ -764,12 +773,13 @@ class EditToolInvocation
           DEFAULT_DIFF_OPTIONS,
         );
 
-        const diffStat = getDiffStat(
+        const diffStat = getConfirmedDiffStats(
           fileName,
           editData.currentContent ?? '',
           editData.newContent,
           this.params.new_string,
         );
+
         displayResult = {
           fileDiff,
           fileName,

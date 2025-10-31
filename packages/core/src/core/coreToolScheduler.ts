@@ -48,6 +48,8 @@ import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { logEditProposed } from '../telemetry/loggers.js';
+import { EditProposedEvent } from '../telemetry/types.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -855,6 +857,23 @@ export class CoreToolScheduler {
 
         const confirmationDetails =
           await invocation.shouldConfirmExecute(signal);
+
+        if (
+          confirmationDetails &&
+          confirmationDetails.type === 'edit' &&
+          confirmationDetails.suggestedDiffStat
+        ) {
+          logEditProposed(
+            this.config,
+            new EditProposedEvent(
+              reqInfo.name,
+              reqInfo.prompt_id,
+              confirmationDetails.suggestedDiffStat.suggested_added_lines ?? 0,
+              confirmationDetails.suggestedDiffStat.suggested_removed_lines ??
+                0,
+            ),
+          );
+        }
 
         if (!confirmationDetails) {
           this.setToolCallOutcome(

@@ -5,16 +5,40 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getDiffStat } from './diffOptions.js';
+import { getConfirmedDiffStats, getSuggestedDiffStats } from './diffOptions.js';
 
-describe('getDiffStat', () => {
+describe('getSuggestedDiffStats', () => {
+  const fileName = 'test.txt';
+
+  it('should return 0 for all stats when there are no changes', () => {
+    const oldStr = 'line1\nline2\n';
+    const aiStr = 'line1\nline2\n';
+    const diffStat = getSuggestedDiffStats(fileName, oldStr, aiStr);
+    expect(diffStat).toEqual({
+      suggested_added_lines: 0,
+      suggested_removed_lines: 0,
+    });
+  });
+
+  it('should correctly report model additions', () => {
+    const oldStr = 'line1\nline2\n';
+    const aiStr = 'line1\nline2\nline3\n';
+    const diffStat = getSuggestedDiffStats(fileName, oldStr, aiStr);
+    expect(diffStat).toEqual({
+      suggested_added_lines: 1,
+      suggested_removed_lines: 0,
+    });
+  });
+});
+
+describe('getConfirmedDiffStats', () => {
   const fileName = 'test.txt';
 
   it('should return 0 for all stats when there are no changes', () => {
     const oldStr = 'line1\nline2\n';
     const aiStr = 'line1\nline2\n';
     const userStr = 'line1\nline2\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 0,
       model_removed_lines: 0,
@@ -31,7 +55,7 @@ describe('getDiffStat', () => {
     const oldStr = 'line1\nline2\n';
     const aiStr = 'line1\nline2\nline3\n';
     const userStr = 'line1\nline2\nline3\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 1,
       model_removed_lines: 0,
@@ -48,7 +72,7 @@ describe('getDiffStat', () => {
     const oldStr = 'line1\nline2\nline3\n';
     const aiStr = 'line1\nline3\n';
     const userStr = 'line1\nline3\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 0,
       model_removed_lines: 1,
@@ -65,7 +89,7 @@ describe('getDiffStat', () => {
     const oldStr = 'line1\nline2\nline3\n';
     const aiStr = 'line1\nline_two\nline3\n';
     const userStr = 'line1\nline_two\nline3\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 1,
       model_removed_lines: 1,
@@ -82,7 +106,7 @@ describe('getDiffStat', () => {
     const oldStr = 'line1\nline2\n';
     const aiStr = 'line1\nline2\nline3\n';
     const userStr = 'line1\nline2\nline3\nline4\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 1,
       model_removed_lines: 0,
@@ -99,7 +123,7 @@ describe('getDiffStat', () => {
     const oldStr = 'line1\nline2\n';
     const aiStr = 'line1\nline2\nline3\n';
     const userStr = 'line1\nline2\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 1,
       model_removed_lines: 0,
@@ -116,7 +140,7 @@ describe('getDiffStat', () => {
     const oldStr = 'line1\nline2\n';
     const aiStr = 'line1\nline2\nline3\n';
     const userStr = 'line1\nline2\nline_three\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 1,
       model_removed_lines: 0,
@@ -133,7 +157,7 @@ describe('getDiffStat', () => {
     const oldStr = 'line1\nline2\nline3\nline4\n';
     const aiStr = 'line_one\nline2\nline_three\nline4\n';
     const userStr = 'line_one\nline_two\nline_three\nline4\nline5\n';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 2,
       model_removed_lines: 2,
@@ -150,7 +174,7 @@ describe('getDiffStat', () => {
     const oldStr = 'hello world';
     const aiStr = 'hello universe';
     const userStr = 'hello universe';
-    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    const diffStat = getConfirmedDiffStats(fileName, oldStr, aiStr, userStr);
     expect(diffStat).toEqual({
       model_added_lines: 1,
       model_removed_lines: 1,

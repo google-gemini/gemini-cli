@@ -624,6 +624,8 @@ export interface DiffStat {
   user_removed_lines: number;
   user_added_chars: number;
   user_removed_chars: number;
+  suggested_added_lines?: number;
+  suggested_removed_lines?: number;
 }
 
 export interface ToolEditConfirmationDetails {
@@ -640,6 +642,10 @@ export interface ToolEditConfirmationDetails {
   newContent: string;
   isModifying?: boolean;
   ideConfirmation?: Promise<DiffUpdateResult>;
+  suggestedDiffStat?: Pick<
+    DiffStat,
+    'suggested_added_lines' | 'suggested_removed_lines'
+  >;
 }
 
 export interface ToolConfirmationPayload {
