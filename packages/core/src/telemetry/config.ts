@@ -90,7 +90,7 @@ const isValidHeaderValue = (value: string): boolean => {
   }
   // RFC 7230: No control characters except tab
   // eslint-disable-next-line no-control-regex
-  return !/[\x00-\x08\x0A-\x1F\x7F]/.test(value);
+  return !/[\u0000-\u0008\u000A-\u001F\u007F]/u.test(value);
 };
 
 const unquote = (value: string): string => {
