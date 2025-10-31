@@ -29,7 +29,7 @@ describe('<AnsiOutputText />', () => {
         createAnsiToken({ text: 'world!' }),
       ],
     ];
-    const { lastFrame } = render(<AnsiOutputText data={data} />);
+    const { lastFrame } = render(<AnsiOutputText data={data} width={80} />);
     expect(lastFrame()).toBe('Hello, world!');
   });
 
@@ -45,7 +45,7 @@ describe('<AnsiOutputText />', () => {
     ];
     // Note: ink-testing-library doesn't render styles, so we can only check the text.
     // We are testing that it renders without crashing.
-    const { lastFrame } = render(<AnsiOutputText data={data} />);
+    const { lastFrame } = render(<AnsiOutputText data={data} width={80} />);
     expect(lastFrame()).toBe('BoldItalicUnderlineDimInverse');
   });
 
@@ -58,7 +58,7 @@ describe('<AnsiOutputText />', () => {
     ];
     // Note: ink-testing-library doesn't render colors, so we can only check the text.
     // We are testing that it renders without crashing.
-    const { lastFrame } = render(<AnsiOutputText data={data} />);
+    const { lastFrame } = render(<AnsiOutputText data={data} width={80} />);
     expect(lastFrame()).toBe('Red FGBlue BG');
   });
 
@@ -69,7 +69,7 @@ describe('<AnsiOutputText />', () => {
       [createAnsiToken({ text: 'Third line' })],
       [createAnsiToken({ text: '' })],
     ];
-    const { lastFrame } = render(<AnsiOutputText data={data} />);
+    const { lastFrame } = render(<AnsiOutputText data={data} width={80} />);
     const output = lastFrame();
     expect(output).toBeDefined();
     const lines = output!.split('\n');
@@ -85,7 +85,7 @@ describe('<AnsiOutputText />', () => {
       [createAnsiToken({ text: 'Line 4' })],
     ];
     const { lastFrame } = render(
-      <AnsiOutputText data={data} availableTerminalHeight={2} />,
+      <AnsiOutputText data={data} availableTerminalHeight={2} width={80} />,
     );
     const output = lastFrame();
     expect(output).not.toContain('Line 1');
@@ -99,7 +99,9 @@ describe('<AnsiOutputText />', () => {
     for (let i = 0; i < 1000; i++) {
       largeData.push([createAnsiToken({ text: `Line ${i}` })]);
     }
-    const { lastFrame } = render(<AnsiOutputText data={largeData} />);
+    const { lastFrame } = render(
+      <AnsiOutputText data={largeData} width={80} />,
+    );
     // We are just checking that it renders something without crashing.
     expect(lastFrame()).toBeDefined();
   });

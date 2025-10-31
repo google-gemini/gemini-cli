@@ -23,12 +23,15 @@ const mockProcess = vi.hoisted(() => ({
   platform: 'darwin',
 }));
 
-vi.stubGlobal('process', {
-  ...process,
-  get platform() {
-    return mockProcess.platform;
-  },
-});
+vi.stubGlobal(
+  'process',
+  Object.create(process, {
+    platform: {
+      get: () => mockProcess.platform,
+      configurable: true, // Allows the property to be changed later if needed
+    },
+  }),
+);
 
 interface MockChildProcess extends EventEmitter {
   stdin: EventEmitter & {
@@ -53,8 +56,14 @@ describe('commandUtils', () => {
       stdin: Object.assign(new EventEmitter(), {
         write: vi.fn(),
         end: vi.fn(),
+        destroy: vi.fn(),
       }),
-      stderr: new EventEmitter(),
+      stdout: Object.assign(new EventEmitter(), {
+        destroy: vi.fn(),
+      }),
+      stderr: Object.assign(new EventEmitter(), {
+        destroy: vi.fn(),
+      }),
     }) as MockChildProcess;
 
     mockSpawn.mockReturnValue(mockChild as unknown as ReturnType<typeof spawn>);
@@ -218,6 +227,70 @@ describe('commandUtils', () => {
         );
         expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
         expect(mockChild.stdin.end).toHaveBeenCalled();
+      });
+
+      it('should successfully copy on Linux when receiving an "exit" event', async () => {
+        const testText = 'Hello, linux!';
+        const linuxOptions: SpawnOptions = {
+          stdio: ['pipe', 'inherit', 'pipe'],
+        };
+
+        // Simulate successful execution via 'exit' event
+        setTimeout(() => {
+          mockChild.emit('exit', 0);
+        }, 0);
+
+        await copyToClipboard(testText);
+
+        expect(mockSpawn).toHaveBeenCalledWith(
+          'xclip',
+          ['-selection', 'clipboard'],
+          linuxOptions,
+        );
+        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
+        expect(mockChild.stdin.end).toHaveBeenCalled();
+      });
+
+      it('should handle command failure on Linux via "exit" event', async () => {
+        const testText = 'Hello, linux!';
+        let callCount = 0;
+
+        mockSpawn.mockImplementation(() => {
+          const child = Object.assign(new EventEmitter(), {
+            stdin: Object.assign(new EventEmitter(), {
+              write: vi.fn(),
+              end: vi.fn(),
+              destroy: vi.fn(),
+            }),
+            stdout: Object.assign(new EventEmitter(), {
+              destroy: vi.fn(),
+            }),
+            stderr: Object.assign(new EventEmitter(), {
+              destroy: vi.fn(),
+            }),
+          });
+
+          setTimeout(() => {
+            if (callCount === 0) {
+              // First call (xclip) fails with 'exit'
+              child.stderr.emit('data', 'xclip failed');
+              child.emit('exit', 127);
+            } else {
+              // Second call (xsel) also fails with 'exit'
+              child.stderr.emit('data', 'xsel failed');
+              child.emit('exit', 127);
+            }
+            callCount++;
+          }, 0);
+
+          return child as unknown as ReturnType<typeof spawn>;
+        });
+
+        await expect(copyToClipboard(testText)).rejects.toThrow(
+          'All copy commands failed. "\'xclip\' exited with code 127: xclip failed", "\'xsel\' exited with code 127: xsel failed".',
+        );
+
+        expect(mockSpawn).toHaveBeenCalledTimes(2);
       });
 
       it('should fall back to xsel when xclip fails', async () => {
