@@ -923,7 +923,7 @@ describe('extension tests', () => {
           type: 'local',
         }),
       ).rejects.toThrow(
-        `Could not install extension from untrusted folder at ${sourceExtDir}`,
+        `Could not install extension because the current workspace at ${tempWorkspaceDir} is not trusted.`,
       );
     });
 

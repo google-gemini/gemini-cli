@@ -149,7 +149,7 @@ export class ExtensionManager implements ExtensionLoader {
           trustedFolders.setValue(this.workspaceDir, TrustLevel.TRUST_FOLDER);
         } else {
           throw new Error(
-            `Could not install extension from untrusted folder at ${installMetadata.source}`,
+            `Could not install extension because the current workspace at ${this.workspaceDir} is not trusted.`,
           );
         }
       }
