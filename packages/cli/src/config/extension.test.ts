@@ -7,7 +7,6 @@
 import { vi, type MockedFunction } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-// import type * as os from 'node:os';
 import * as path from 'node:path';
 import {
   type GeminiCLIExtension,
@@ -174,11 +173,11 @@ describe('extension tests', () => {
     mockPromptForSettings = vi.fn();
     mockPromptForSettings.mockResolvedValue('');
     fs.mkdirSync(userExtensionsDir, { recursive: true });
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: undefined,
     });
-    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
