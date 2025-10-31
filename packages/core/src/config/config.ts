@@ -146,7 +146,7 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
-import { debugLogger } from '../utils/debugLogger.js';
+
 import {
   type ExtensionLoader,
   SimpleExtensionLoader,
@@ -1162,19 +1162,11 @@ export class Config {
         // This first implementation is only focused on the general case of
         // the tool registry.
         const messageBusEnabled = this.getEnableMessageBusIntegration();
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
-          );
-        }
+
         const toolArgs = messageBusEnabled
           ? [...args, this.getMessageBus()]
           : args;
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
-          );
-        }
+
         registry.registerTool(new ToolClass(...toolArgs));
       }
     };
