@@ -95,6 +95,7 @@ describe('Telemetry Metrics', () => {
   let recordExitFailModule: typeof import('./metrics.js').recordExitFail;
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
   let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
+  let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -138,6 +139,7 @@ describe('Telemetry Metrics', () => {
     recordExitFailModule = metricsJsModule.recordExitFail;
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
     recordLinesChangedModule = metricsJsModule.recordLinesChanged;
+    recordSlowRenderModule = metricsJsModule.recordSlowRender;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -192,6 +194,29 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
+      });
+    });
+  });
+
+  describe('recordSlowRender', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordSlowRenderModule(config, { render_time: 123 });
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a slow render event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordSlowRenderModule(config, { render_time: 123 });
+
+      // Called for session, then for slow render
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        render_time: 123,
       });
     });
   });
