@@ -520,6 +520,34 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
     });
+    it('should return provided OTLP headers', () => {
+      const headers = {
+        Authorization: 'Bearer token',
+        'x-api-key': 'abc123',
+      };
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, otlpHeaders: headers },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpHeaders()).toEqual(headers);
+    });
+
+    it('should return empty object for OTLP headers if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpHeaders()).toEqual({});
+    });
+
+    it('should return empty object for OTLP headers if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryOtlpHeaders()).toEqual({});
+    });
   });
 
   describe('UseRipgrep Configuration', () => {
