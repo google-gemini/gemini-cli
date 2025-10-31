@@ -32,7 +32,7 @@ import {
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import { type Config, recordSlowRender } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import {
   sessionId,
   logUserPrompt,
@@ -209,7 +209,7 @@ export async function startInteractiveUI(
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
-          recordSlowRender(config, { render_time: renderTime });
+          console.log('Slow render');
         }
       },
     } as RenderOptions,

@@ -92,7 +92,6 @@ describe('Telemetry Metrics', () => {
   let recordGenAiClientTokenUsageModule: typeof import('./metrics.js').recordGenAiClientTokenUsage;
   let recordGenAiClientOperationDurationModule: typeof import('./metrics.js').recordGenAiClientOperationDuration;
   let recordFlickerFrameModule: typeof import('./metrics.js').recordFlickerFrame;
-  let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
   let recordExitFailModule: typeof import('./metrics.js').recordExitFail;
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
   let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
@@ -137,7 +136,6 @@ describe('Telemetry Metrics', () => {
       metricsJsModule.recordGenAiClientOperationDuration;
     recordFlickerFrameModule = metricsJsModule.recordFlickerFrame;
     recordExitFailModule = metricsJsModule.recordExitFail;
-    recordSlowRenderModule = metricsJsModule.recordSlowRender;
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
     recordLinesChangedModule = metricsJsModule.recordLinesChanged;
 
@@ -194,29 +192,6 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
-      });
-    });
-  });
-
-  describe('recordSlowRender', () => {
-    it('does not record metrics if not initialized', () => {
-      const config = makeFakeConfig({});
-      recordSlowRenderModule(config, { render_time: 300 });
-      expect(mockCounterAddFn).not.toHaveBeenCalled();
-    });
-
-    it('records a slow render event when initialized', () => {
-      const config = makeFakeConfig({});
-      initializeMetricsModule(config);
-      recordSlowRenderModule(config, { render_time: 300 });
-
-      // Called for session, then for slow render
-      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
-      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        render_time: 300,
       });
     });
   });

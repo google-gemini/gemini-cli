@@ -57,7 +57,6 @@ const REGRESSION_PERCENTAGE_CHANGE =
   'gemini_cli.performance.regression.percentage_change';
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
 const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
-const SLOW_RENDER_COUNT = 'gemini_cli.ui.slow_render.count';
 const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
 
 const baseMetricDefinition = {
@@ -187,14 +186,6 @@ const COUNTER_DEFINITIONS = {
     valueType: ValueType.INT,
     assign: (c: Counter) => (exitFailCounter = c),
     attributes: {} as Record<string, never>,
-  },
-  [SLOW_RENDER_COUNT]: {
-    description: 'Counts UI frames that take too long to render.',
-    valueType: ValueType.INT,
-    assign: (c: Counter) => (slowRenderCounter = c),
-    attributes: {} as {
-      render_time: number;
-    },
   },
 } as const;
 
@@ -481,7 +472,6 @@ let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
-let slowRenderCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -668,20 +658,6 @@ export function recordFlickerFrame(config: Config): void {
 export function recordExitFail(config: Config): void {
   if (!exitFailCounter || !isMetricsInitialized) return;
   exitFailCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
-}
-
-/**
- * Records a metric for when a UI frame is slow in rendering
- */
-export function recordSlowRender(
-  config: Config,
-  attributes: MetricDefinitions[typeof SLOW_RENDER_COUNT]['attributes'],
-): void {
-  if (!slowRenderCounter || !isMetricsInitialized) return;
-  slowRenderCounter.add(1, {
-    ...baseMetricDefinition.getCommonAttributes(config),
-    ...attributes,
-  });
 }
 
 /**
