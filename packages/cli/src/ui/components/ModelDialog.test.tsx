@@ -85,7 +85,7 @@ describe('<ModelDialog />', () => {
     expect(lastFrame()).toContain('Select Model');
     expect(lastFrame()).toContain('(Press Esc to close)');
     expect(lastFrame()).toContain(
-      '> To use a specific Gemini model, use the --model flag.',
+      '> To use a specific Gemini model on startup, use the --model flag.',
     );
     unmount();
   });
