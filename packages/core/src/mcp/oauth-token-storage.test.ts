@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents } from '../utils/events.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
@@ -34,7 +34,7 @@ vi.mock('../config/storage.js', () => ({
   },
 }));
 
-vi.mock('@google/gemini-cli-core', () => ({
+vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
   },
