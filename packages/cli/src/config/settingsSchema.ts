@@ -14,7 +14,6 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
-  ChatCompressionSettings,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -578,14 +577,15 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for summarizing tool output.',
         showInDialog: false,
       },
-      chatCompression: {
-        type: 'object',
-        label: 'Chat Compression',
+      compressionThreshold: {
+        type: 'number',
+        label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: false,
-        default: undefined as ChatCompressionSettings | undefined,
-        description: 'Chat compression settings.',
-        showInDialog: false,
+        default: 0.2 as number,
+        description:
+          'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
+        showInDialog: true,
       },
       skipNextSpeakerCheck: {
         type: 'boolean',
