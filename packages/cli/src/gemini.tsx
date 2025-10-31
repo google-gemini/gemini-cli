@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, type RenderOptions } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
@@ -32,7 +32,7 @@ import {
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import {
   sessionId,
   logUserPrompt,
@@ -40,6 +40,7 @@ import {
   getOauthClient,
   UserPromptEvent,
   debugLogger,
+  recordSlowRender,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -69,6 +70,8 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
+
+const SLOW_RENDER_MS = 200;
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -205,7 +208,12 @@ export async function startInteractiveUI(
     {
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
-    },
+      onRender: ({ renderTime }: { renderTime: number }) => {
+        if (renderTime > SLOW_RENDER_MS) {
+          recordSlowRender(config, renderTime);
+        }
+      },
+    } as RenderOptions,
   );
 
   checkForUpdates(settings)
