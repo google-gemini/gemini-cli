@@ -873,7 +873,7 @@ describe('extension tests', () => {
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should prompt prompt for trust if workspace is not trusted', async () => {
+    it('should prompt for trust if workspace is not trusted', async () => {
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: false,
         source: undefined,
