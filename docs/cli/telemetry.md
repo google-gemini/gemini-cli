@@ -281,6 +281,8 @@ Captures tool executions, output truncation, and Smart Edit behavior.
     - `prompt_id` (string)
     - `tool_type` ("native" or "mcp")
     - `mcp_server_name` (string, if applicable)
+    - `extension_name` (string, if applicable)
+    - `extension_id` (string, if applicable)
     - `content_length` (int, if applicable)
     - `metadata` (if applicable)
 

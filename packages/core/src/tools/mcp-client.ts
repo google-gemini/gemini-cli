@@ -628,6 +628,7 @@ export async function discoverTools(
           mcpServerConfig.trust,
           undefined,
           cliConfig,
+          mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
           messageBus,
         );
