@@ -158,6 +158,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
+    let finalDisplay: string | null = null;
 
     logAgentStart(
       this.runtimeContext,
@@ -209,11 +210,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           break;
         }
 
-        const { nextMessage, submittedOutput, taskCompleted } =
+        const { nextMessage, submittedOutput, displayOutput, taskCompleted } =
           await this.processFunctionCalls(functionCalls, signal, promptId);
 
         if (taskCompleted) {
           finalResult = submittedOutput ?? 'Task completed successfully.';
+          finalDisplay = displayOutput ?? finalResult;
           terminateReason = AgentTerminateMode.GOAL;
           break;
         }
@@ -224,6 +226,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       if (terminateReason === AgentTerminateMode.GOAL) {
         return {
           result: finalResult || 'Task completed.',
+          displayResult: finalDisplay || 'Task completed.',
           terminate_reason: terminateReason,
         };
       }
@@ -231,6 +234,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       return {
         result:
           finalResult || 'Agent execution was terminated before completion.',
+        displayResult:
+          finalDisplay || 'Agent execution was terminated before completion.',
         terminate_reason: terminateReason,
       };
     } catch (error) {
@@ -378,6 +383,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<{
     nextMessage: Content;
     submittedOutput: string | null;
+    displayOutput: string | null;
     taskCompleted: boolean;
   }> {
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
@@ -385,6 +391,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     allowedToolNames.add(TASK_COMPLETE_TOOL_NAME);
 
     let submittedOutput: string | null = null;
+    let displayOutput: string | null = null;
     let taskCompleted = false;
 
     // We'll collect promises for the tool executions
@@ -456,6 +463,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
                 typeof outputValue === 'string'
                   ? outputValue
                   : JSON.stringify(outputValue, null, 2);
+            }
+            if (this.definition.processOutputDisplay) {
+              displayOutput =
+                this.definition.processOutputDisplay(validatedOutput);
+            } else {
+              displayOutput = submittedOutput;
             }
             syncResponseParts.push({
               functionResponse: {
@@ -587,6 +600,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     return {
       nextMessage: { role: 'user', parts: toolResponseParts },
       submittedOutput,
+      displayOutput,
       taskCompleted,
     };
   }

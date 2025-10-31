@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import path from 'node:path';
+import fs from 'node:fs';
 import type { Config } from '../config/config.js';
 import { AgentExecutor } from './executor.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
@@ -102,18 +104,36 @@ export class SubagentInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      const tempDir = this.config.storage.getProjectTempDir();
+      const subagentName = this.definition.name.replace(/[^a-zA-Z0-9]/g, '_');
+      const timestamp = Date.now();
+      const outputFileName = `subagent_${subagentName}_${timestamp}.output`;
+      const outputFilePath = path.join(tempDir, outputFileName);
+
+      const outputContent =
+        typeof output.result === 'string'
+          ? output.result
+          : JSON.stringify(output.result, null, 2);
+      fs.writeFileSync(outputFilePath, outputContent, 'utf8');
+
+      const fileSavedMessage = `Full result saved to ${outputFilePath}`;
+
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
 Result:
-${output.result}`;
+${output.result}
+The result has also been saved to a file: ${outputFilePath}.
+`;
 
       const displayContent = `
 Subagent ${this.definition.name} Finished
 
-Termination Reason:\n ${output.terminate_reason}
+Termination Reason:
+ ${output.terminate_reason}
 
-Result:
-${output.result}
+Result summary: ${output.displayResult || output.result}
+
+${fileSavedMessage}
 `;
 
       return {

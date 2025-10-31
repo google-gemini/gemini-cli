@@ -67,6 +67,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
 
   // The 'output' parameter is now strongly typed as CodebaseInvestigationReportSchema
   processOutput: (output) => JSON.stringify(output, null, 2),
+  processOutputDisplay: (output) => output.SummaryOfFindings,
 
   modelConfig: {
     model: DEFAULT_GEMINI_MODEL,

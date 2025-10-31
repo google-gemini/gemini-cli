@@ -28,6 +28,7 @@ export enum AgentTerminateMode {
  */
 export interface OutputObject {
   result: string;
+  displayResult: string;
   terminate_reason: AgentTerminateMode;
 }
 
@@ -67,9 +68,18 @@ export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
    * call into a string format.
    *
    * @param output The raw output value from the `complete_task` tool, now strongly typed with TOutput.
-   * @returns A string representation of the final output.
+   * @returns A string representation of the final output to be used as the LLM input.
    */
   processOutput?: (output: z.infer<TOutput>) => string;
+
+  /**
+   * An optional function to process the raw output from the agent's final tool
+   * call into a string format that will be displayed to the user.
+   *
+   * @param output The raw output value from the `complete_task` tool, now strongly typed with TOutput.
+   * @returns A string representation of the final output that will be displayed to the user
+   */
+  processOutputDisplay?: (output: z.infer<TOutput>) => string;
 }
 
 /**
