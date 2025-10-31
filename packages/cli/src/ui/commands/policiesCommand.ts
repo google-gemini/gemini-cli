@@ -16,7 +16,7 @@ const listPoliciesCommand: SlashCommand = {
     if (!config) {
       context.ui.addItem(
         {
-          type: MessageType.INFO,
+          type: MessageType.ERROR,
           text: 'Error: Config not available.',
         },
         Date.now(),
