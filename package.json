@@ -116,7 +116,6 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@testing-library/dom": "^10.4.1",
     "latest-version": "^9.0.0",
     "simple-git": "^3.28.0"
   },
