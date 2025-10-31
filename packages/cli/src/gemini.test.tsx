@@ -606,6 +606,12 @@ describe('startInteractiveUI', () => {
       ...mockConfig,
       getScreenReader: () => screenReader,
     } as Config;
+    const mockInitializationResult = {
+      authError: null,
+      themeError: null,
+      shouldOpenAuthDialog: false,
+      geminiMdFileCount: 0,
+    };
 
     await startTestInteractiveUI(
       mockConfigWithScreenReader,
