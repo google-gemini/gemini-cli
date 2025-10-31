@@ -5,7 +5,31 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getConfirmedDiffStats } from './diffOptions.js';
+import { getConfirmedDiffStats, getSuggestedDiffStats } from './diffOptions.js';
+
+describe('getSuggestedDiffStats', () => {
+  const fileName = 'test.txt';
+
+  it('should return 0 for all stats when there are no changes', () => {
+    const oldStr = 'line1\nline2\n';
+    const aiStr = 'line1\nline2\n';
+    const diffStat = getSuggestedDiffStats(fileName, oldStr, aiStr);
+    expect(diffStat).toEqual({
+      suggested_added_lines: 0,
+      suggested_removed_lines: 0,
+    });
+  });
+
+  it('should correctly report model additions', () => {
+    const oldStr = 'line1\nline2\n';
+    const aiStr = 'line1\nline2\nline3\n';
+    const diffStat = getSuggestedDiffStats(fileName, oldStr, aiStr);
+    expect(diffStat).toEqual({
+      suggested_added_lines: 1,
+      suggested_removed_lines: 0,
+    });
+  });
+});
 
 describe('getConfirmedDiffStats', () => {
   const fileName = 'test.txt';

@@ -156,16 +156,7 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.tool.shouldConfirm) {
-      return {
-        type: 'edit',
-        title: 'Confirm Mock Tool',
-        fileName: 'test.txt',
-        filePath: 'test.txt',
-        fileDiff: 'diff',
-        originalContent: 'originalContent',
-        newContent: 'newContent',
-        onConfirm: async () => {},
-      };
+      return this.tool.shouldConfirmExecuteFn();
     }
     return false;
   }
@@ -186,6 +177,22 @@ export class MockModifiableTool
   // up PR which has MockModifiableTool expect MockTool
   executeFn: (params: Record<string, unknown>) => ToolResult | undefined = () =>
     undefined;
+  shouldConfirmExecuteFn: () => Promise<ToolCallConfirmationDetails | false> =
+    () =>
+      Promise.resolve({
+        type: 'edit',
+        title: 'Confirm Mock Tool',
+        fileName: 'test.txt',
+        filePath: 'test.txt',
+        fileDiff: 'diff',
+        originalContent: 'originalContent',
+        newContent: 'newContent',
+        onConfirm: async () => {},
+        suggestedDiffStat: {
+          suggested_added_lines: 1,
+          suggested_removed_lines: 1,
+        },
+      });
   shouldConfirm = true;
 
   constructor(name = 'mockModifiableTool') {

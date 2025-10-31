@@ -31,7 +31,11 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
-import { DEFAULT_DIFF_OPTIONS, getConfirmedDiffStats } from './diffOptions.js';
+import {
+  DEFAULT_DIFF_OPTIONS,
+  getConfirmedDiffStats,
+  getSuggestedDiffStats,
+} from './diffOptions.js';
 import type {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -226,6 +230,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         }
       },
       ideConfirmation,
+      suggestedDiffStat: getSuggestedDiffStats(
+        fileName,
+        originalContent,
+        correctedContent,
+      ),
     };
     return confirmationDetails;
   }

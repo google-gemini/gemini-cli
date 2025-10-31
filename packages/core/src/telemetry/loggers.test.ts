@@ -43,6 +43,7 @@ import {
   logAgentFinish,
   logWebFetchFallbackAttempt,
   logExtensionUpdateEvent,
+  logEditProposed,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -85,6 +86,8 @@ import {
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
   EVENT_EXTENSION_UPDATE,
+  EditProposedEvent,
+  EVENT_EDIT_PROPOSED,
 } from './types.js';
 import * as metrics from './metrics.js';
 import {
@@ -1638,6 +1641,44 @@ describe('loggers', () => {
           reason: 'private_ip',
         },
       });
+    });
+  });
+
+  describe('logEditProposed', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordEditProposedMetrics');
+    });
+
+    it('should log the event to OTEL and record metrics', () => {
+      const event = new EditProposedEvent('test-tool', 'prompt-id-1', 10, 5);
+
+      logEditProposed(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Edit proposed: test-tool. Suggested added lines: 10, removed lines: 5.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_EDIT_PROPOSED,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          prompt_id: 'prompt-id-1',
+          suggested_added_lines: 10,
+          suggested_removed_lines: 5,
+          function_name: 'test-tool',
+        },
+      });
+
+      expect(metrics.recordEditProposedMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        10,
+        5,
+      );
     });
   });
 });
