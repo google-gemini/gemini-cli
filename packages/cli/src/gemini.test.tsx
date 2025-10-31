@@ -23,6 +23,7 @@ import { type LoadedSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { type Config } from '@google/gemini-cli-core';
 import { act } from 'react';
+import { type InitializationResult } from './core/initializer.js';
 
 const performance = vi.hoisted(() => ({
   now: vi.fn(),
@@ -483,12 +484,7 @@ describe('startInteractiveUI', () => {
     settings: LoadedSettings,
     startupWarnings: string[],
     workspaceRoot: string,
-    initializationResult: {
-      authError: Error | null;
-      themeError: Error | null;
-      shouldOpenAuthDialog: boolean;
-      geminiMdFileCount: number;
-    },
+    initializationResult: InitializationResult,
   ) {
     await act(async () => {
       await startInteractiveUI(
@@ -531,6 +527,14 @@ describe('startInteractiveUI', () => {
   it('should perform all startup tasks in correct order', async () => {
     const { getCliVersion } = await import('./utils/version.js');
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
+    const { registerCleanup } = await import('./utils/cleanup.js');
+    const mockInitializationResult = {
+      authError: null,
+      themeError: null,
+      shouldOpenAuthDialog: false,
+      geminiMdFileCount: 0,
+    };
+
     await startTestInteractiveUI(
       mockConfig,
       mockSettings,
