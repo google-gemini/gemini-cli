@@ -13,7 +13,8 @@ import {
   type MockedFunction,
   type Mock,
 } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
 import { Config, ApprovalMode } from '@google/gemini-cli-core';

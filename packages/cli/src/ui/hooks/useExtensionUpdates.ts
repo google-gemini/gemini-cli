@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
   ExtensionUpdateState,
@@ -18,12 +18,9 @@ import {
   checkForAllExtensionUpdates,
   updateExtension,
 } from '../../config/extensions/update.js';
-import {
-  requestConsentInteractive,
-  type ExtensionUpdateInfo,
-} from '../../config/extension.js';
+import { type ExtensionUpdateInfo } from '../../config/extension.js';
 import { checkExhaustive } from '../../utils/checks.js';
-import type { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
+import type { ExtensionManager } from '../../config/extension-manager.js';
 
 type ConfirmationRequestWrapper = {
   prompt: React.ReactNode;
@@ -48,16 +45,7 @@ function confirmationRequestsReducer(
   }
 }
 
-export const useExtensionUpdates = (
-  extensions: GeminiCLIExtension[],
-  extensionEnablementManager: ExtensionEnablementManager,
-  addItem: UseHistoryManagerReturn['addItem'],
-  cwd: string,
-) => {
-  const [extensionsUpdateState, dispatchExtensionStateUpdate] = useReducer(
-    extensionUpdatesReducer,
-    initialExtensionUpdatesState,
-  );
+export const useConfirmUpdateRequests = () => {
   const [
     confirmUpdateExtensionRequests,
     dispatchConfirmUpdateExtensionRequests,
@@ -82,6 +70,23 @@ export const useExtensionUpdates = (
     },
     [dispatchConfirmUpdateExtensionRequests],
   );
+  return {
+    addConfirmUpdateExtensionRequest,
+    confirmUpdateExtensionRequests,
+    dispatchConfirmUpdateExtensionRequests,
+  };
+};
+
+export const useExtensionUpdates = (
+  extensionManager: ExtensionManager,
+  addItem: UseHistoryManagerReturn['addItem'],
+  enableExtensionReloading: boolean,
+) => {
+  const [extensionsUpdateState, dispatchExtensionStateUpdate] = useReducer(
+    extensionUpdatesReducer,
+    initialExtensionUpdatesState,
+  );
+  const extensions = extensionManager.getExtensions();
 
   useEffect(() => {
     const extensionsToCheck = extensions.filter((extension) => {
@@ -95,15 +100,13 @@ export const useExtensionUpdates = (
     if (extensionsToCheck.length === 0) return;
     checkForAllExtensionUpdates(
       extensionsToCheck,
-      extensionEnablementManager,
+      extensionManager,
       dispatchExtensionStateUpdate,
-      cwd,
     );
   }, [
     extensions,
-    extensionEnablementManager,
+    extensionManager,
     extensionsUpdateState.extensionStatuses,
-    cwd,
     dispatchExtensionStateUpdate,
   ]);
 
@@ -158,15 +161,10 @@ export const useExtensionUpdates = (
       } else {
         const updatePromise = updateExtension(
           extension,
-          extensionEnablementManager,
-          cwd,
-          (description) =>
-            requestConsentInteractive(
-              description,
-              addConfirmUpdateExtensionRequest,
-            ),
+          extensionManager,
           currentState.status,
           dispatchExtensionStateUpdate,
+          enableExtensionReloading,
         );
         updatePromises.push(updatePromise);
         updatePromise
@@ -208,18 +206,17 @@ export const useExtensionUpdates = (
           try {
             callback(nonNullResults);
           } catch (e) {
-            console.error(getErrorMessage(e));
+            debugLogger.warn(getErrorMessage(e));
           }
         });
       });
     }
   }, [
     extensions,
-    extensionEnablementManager,
+    extensionManager,
     extensionsUpdateState,
-    addConfirmUpdateExtensionRequest,
     addItem,
-    cwd,
+    enableExtensionReloading,
   ]);
 
   const extensionsUpdateStateComputed = useMemo(() => {
@@ -237,7 +234,5 @@ export const useExtensionUpdates = (
     extensionsUpdateState: extensionsUpdateStateComputed,
     extensionsUpdateStateInternal: extensionsUpdateState.extensionStatuses,
     dispatchExtensionStateUpdate,
-    confirmUpdateExtensionRequests,
-    addConfirmUpdateExtensionRequest,
   };
 };

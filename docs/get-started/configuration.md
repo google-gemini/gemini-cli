@@ -65,11 +65,12 @@ locations for these files:
     controls over users' Gemini CLI setups.
 
 **Note on environment variables in settings:** String values within your
-`settings.json` files can reference environment variables using either
-`$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically
-resolved when the settings are loaded. For example, if you have an environment
-variable `MY_API_TOKEN`, you could use it in `settings.json` like this:
-`"apiKey": "$MY_API_TOKEN"`.
+`settings.json` and `gemini-extension.json` files can reference environment
+variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
+be automatically resolved when the settings are loaded. For example, if you have
+an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
+this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
 > **Note for Enterprise Users:** For guidance on deploying and managing Gemini
 > CLI in a corporate environment, please see the
@@ -244,13 +245,13 @@ their corresponding top-level category object in your `settings.json` file.
     example `{"run_shell_command": {"tokenBudget": 2000}}`
   - **Default:** `undefined`
 
-- **`model.chatCompression.contextPercentageThreshold`** (number):
+- **`model.compressionThreshold`** (number):
   - **Description:** Sets the threshold for chat history compression as a
-    percentage of the model's total token limit. This is a value between 0 and 1
+    fraction of the model's total token limit. This is a value between 0 and 1
     that applies to both automatic compression and the manual `/compress`
     command. For example, a value of `0.6` will trigger compression when the
     chat history exceeds 60% of the token limit.
-  - **Default:** `0.7`
+  - **Default:** `0.2`
 
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
