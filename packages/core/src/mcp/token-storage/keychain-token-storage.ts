@@ -8,6 +8,7 @@ import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials, SecretStorage } from './types.js';
 import { coreEvents } from '../../utils/events.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 interface Keytar {
   getPassword(service: string, account: string): Promise<string | null>;
@@ -47,7 +48,7 @@ export class KeychainTokenStorage
       const module = await import(moduleName);
       this.keytarModule = module.default || module;
     } catch (error) {
-      coreEvents.emitFeedback('error', "Failed to load 'keytar' module", error);
+      debugLogger.error("Failed to load 'keytar' module", error);
     }
     return this.keytarModule;
   }
