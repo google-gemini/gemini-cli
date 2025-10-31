@@ -49,6 +49,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
+const GRACE_PERIOD_MS = 60 * 1000; // 1 min
 
 /** The possible outcomes of a single agent turn. */
 type AgentTurnResult =
@@ -159,265 +160,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   }
 
   /**
-   * Runs the agent.
-   *
-   * @param inputs The validated input parameters for this invocation.
-   * @param signal An `AbortSignal` for cancellation.
-   * @returns A promise that resolves to the agent's final output.
-   */
-  async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
-    const startTime = Date.now();
-    let turnCounter = 0;
-    let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
-    let finalResult: string | null = null;
-
-    const { max_time_minutes } = this.definition.runConfig;
-    const timeoutController = new AbortController();
-    const timeoutId = setTimeout(
-      () => timeoutController.abort(new Error('Agent timed out.')),
-      max_time_minutes * 60 * 1000,
-    );
-
-    // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
-    let hasBeenWarnedForLimits = false;
-    let hasBeenWarnedForStopping = false;
-
-    logAgentStart(
-      this.runtimeContext,
-      new AgentStartEvent(this.agentId, this.definition.name),
-    );
-
-    let chat: GeminiChat | undefined;
-    let tools: FunctionDeclaration[] | undefined;
-    try {
-      chat = await this.createChatObject(inputs);
-      tools = this.prepareToolsList();
-      const query = this.definition.promptConfig.query
-        ? templateString(this.definition.promptConfig.query, inputs)
-        : 'Get Started!';
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
-
-      while (true) {
-        // Check for termination conditions like max turns or timeout.
-        const reason = this.checkTermination(startTime, turnCounter);
-        if (reason) {
-          if (hasBeenWarnedForLimits) {
-            terminateReason = reason;
-            break;
-          }
-          hasBeenWarnedForLimits = true;
-          if (!currentMessage.parts) {
-            currentMessage.parts = [];
-          }
-          currentMessage.parts.push({
-            text: `You are about to exceed the execution limit (${reason}). You must call \`${TASK_COMPLETE_TOOL_NAME}\` on your next turn. Summarize your work if necessary.`,
-          });
-        }
-        if (combinedSignal.aborted) {
-          // Determine which signal caused the abort.
-          terminateReason = timeoutController.signal.aborted
-            ? AgentTerminateMode.TIMEOUT
-            : AgentTerminateMode.ABORTED;
-          break;
-        }
-        const turnResult = await this.executeTurn(
-          chat,
-          currentMessage,
-          tools,
-          turnCounter++,
-          combinedSignal,
-          timeoutController.signal,
-        );
-        if (
-          turnResult.status === 'stop' &&
-          turnResult.terminateReason ===
-            AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL &&
-          !hasBeenWarnedForStopping
-        ) {
-          hasBeenWarnedForStopping = true;
-          if (!currentMessage.parts) {
-            currentMessage.parts = [];
-          }
-          currentMessage.parts.push({
-            text: `You have stopped calling tools. You must either call another tool to continue your work or call \`${TASK_COMPLETE_TOOL_NAME}\` to finish.`,
-          });
-          continue;
-        }
-        if (turnResult.status === 'stop') {
-          terminateReason = turnResult.terminateReason;
-          // Only set finalResult if the turn provided one (e.g., error or goal).
-          // If it was an abort/timeout, finalResult remains null here
-          // and will be set by the logic below.
-          if (turnResult.finalResult) {
-            finalResult = turnResult.finalResult;
-          }
-          break; // Exit the loop
-        }
-
-        // If status is 'continue', update message for the next loop
-        currentMessage = turnResult.nextMessage;
-      }
-
-      if (terminateReason === AgentTerminateMode.TIMEOUT) {
-        const recoveryResult = await this.executeGracefulTimeoutRecovery(
-          chat,
-          tools,
-          turnCounter, // Use current turnCounter for the recovery attempt
-        );
-
-        if (recoveryResult !== null) {
-          // Recovery Succeeded
-          terminateReason = AgentTerminateMode.GOAL;
-          finalResult = recoveryResult;
-        } else {
-          finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
-          this.emitActivity('ERROR', {
-            error: finalResult,
-            context: 'timeout',
-          });
-        }
-      }
-
-      if (terminateReason === AgentTerminateMode.GOAL) {
-        return {
-          result: finalResult || 'Task completed.',
-          terminate_reason: terminateReason,
-        };
-      }
-
-      return {
-        result:
-          finalResult || 'Agent execution was terminated before completion.',
-        terminate_reason: terminateReason,
-      };
-    } catch (error) {
-      // Check if the error is an AbortError caused by our internal timeout.
-      if (
-        error instanceof Error &&
-        error.name === 'AbortError' &&
-        timeoutController.signal.aborted &&
-        !signal.aborted // Ensure the external signal was not the cause
-      ) {
-        if (chat && tools) {
-          const recoveryResult = await this.executeGracefulTimeoutRecovery(
-            chat,
-            tools,
-            turnCounter, // Use current turnCounter
-          );
-
-          if (recoveryResult !== null) {
-            // Recovery Succeeded
-            terminateReason = AgentTerminateMode.GOAL;
-            finalResult = recoveryResult;
-            return {
-              result: finalResult,
-              terminate_reason: terminateReason,
-            };
-          }
-        }
-        terminateReason = AgentTerminateMode.TIMEOUT;
-        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
-        this.emitActivity('ERROR', {
-          error: finalResult,
-          context: 'timeout',
-        });
-        return {
-          result: finalResult,
-          terminate_reason: terminateReason,
-        };
-      }
-
-      this.emitActivity('ERROR', { error: String(error) });
-      throw error; // Re-throw other errors or external aborts.
-    } finally {
-      clearTimeout(timeoutId);
-      logAgentFinish(
-        this.runtimeContext,
-        new AgentFinishEvent(
-          this.agentId,
-          this.definition.name,
-          Date.now() - startTime,
-          turnCounter,
-          terminateReason,
-        ),
-      );
-    }
-  }
-
-  /**
-   * Attempts a single, final recovery turn if the agent times out.
-   * Gives the agent a 1-minute grace period to call `complete_task`.
-   *
-   * @returns The final result string if recovery was successful, or `null` if it failed.
-   */
-  private async executeGracefulTimeoutRecovery(
-    chat: GeminiChat,
-    tools: FunctionDeclaration[],
-    turnCounter: number,
-  ): Promise<string | null> {
-    this.emitActivity('THOUGHT_CHUNK', {
-      text: 'Timeout limit reached. Attempting one final recovery turn with a 1-minute grace period.',
-    });
-
-    const gracePeriodMs = 60 * 1000; // 1 minute
-    const graceTimeoutController = new AbortController();
-    const graceTimeoutId = setTimeout(
-      () => graceTimeoutController.abort(new Error('Grace period timed out.')),
-      gracePeriodMs,
-    );
-
-    try {
-      const recoveryMessage: Content = {
-        role: 'user',
-        parts: [
-          {
-            text: `You have exceeded the time limit. You have one final chance to complete the task with a 1-minute grace period. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted and potentially follow-ups. Do not call any other tools.`,
-          },
-        ],
-      };
-
-      // We use executeTurn because it encapsulates all logic for model calls and response processing.
-      // We pass the *grace* signal to it.
-      const turnResult = await this.executeTurn(
-        chat,
-        recoveryMessage,
-        tools,
-        turnCounter, // This will be the "last" turn number
-        graceTimeoutController.signal,
-        graceTimeoutController.signal, // Pass grace signal as both combined and timeout
-      );
-
-      if (
-        turnResult.status === 'stop' &&
-        turnResult.terminateReason === AgentTerminateMode.GOAL
-      ) {
-        // Success!
-        this.emitActivity('THOUGHT_CHUNK', {
-          text: 'Graceful recovery succeeded.',
-        });
-        return turnResult.finalResult ?? 'Task completed during grace period.';
-      }
-
-      // Any other outcome (continue, error, non-GOAL stop) is a failure.
-      this.emitActivity('ERROR', {
-        error: 'Graceful recovery attempt failed.',
-        context: 'timeout_recovery',
-      });
-      return null;
-    } catch (error) {
-      // This catch block will likely catch the 'Grace period timed out' error.
-      this.emitActivity('ERROR', {
-        error: `Graceful recovery attempt failed: ${String(error)}`,
-        context: 'timeout_recovery',
-      });
-      return null;
-    } finally {
-      clearTimeout(graceTimeoutId);
-    }
-  }
-
-  /**
    * Executes a single turn of the agent's logic, from calling the model
    * to processing its response.
    *
@@ -480,6 +222,275 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       status: 'continue',
       nextMessage,
     };
+  }
+
+  /**
+   * Attempts a single, final recovery turn if the agent times out.
+   * Gives the agent a grace period to call `complete_task`.
+   *
+   * @returns The final result string if recovery was successful, or `null` if it failed.
+   */
+  private async executeGracefulTimeoutRecovery(
+    chat: GeminiChat,
+    tools: FunctionDeclaration[],
+    turnCounter: number,
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    this.emitActivity('THOUGHT_CHUNK', {
+      text: 'Timeout limit reached. Attempting one final recovery turn with a grace period.',
+    });
+
+    const gracePeriodMs = GRACE_PERIOD_MS;
+    const graceTimeoutController = new AbortController();
+    const graceTimeoutId = setTimeout(
+      () => graceTimeoutController.abort(new Error('Grace period timed out.')),
+      gracePeriodMs,
+    );
+
+    try {
+      const recoveryMessage: Content = {
+        role: 'user',
+        parts: [
+          {
+            text: `You have exceeded the time limit. You have one final chance to complete the task with a short grace period. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted and potentially follow-ups. Do not call any other tools.`,
+          },
+        ],
+      };
+
+      // We use executeTurn because it encapsulates all logic for model calls and response processing.
+      // We pass the *grace* signal to identify the timeout, but ultimately we  monitor both the abort and timeoutsignal
+      const combinedSignal = AbortSignal.any([
+        signal,
+        graceTimeoutController.signal,
+      ]);
+      const turnResult = await this.executeTurn(
+        chat,
+        recoveryMessage,
+        tools,
+        turnCounter, // This will be the "last" turn number
+        combinedSignal,
+        graceTimeoutController.signal,
+      );
+
+      if (
+        turnResult.status === 'stop' &&
+        turnResult.terminateReason === AgentTerminateMode.GOAL
+      ) {
+        // Success!
+        this.emitActivity('THOUGHT_CHUNK', {
+          text: 'Graceful recovery succeeded.',
+        });
+        return turnResult.finalResult ?? 'Task completed during grace period.';
+      }
+
+      // Any other outcome (continue, error, non-GOAL stop) is a failure.
+      this.emitActivity('ERROR', {
+        error: 'Graceful recovery attempt failed.',
+        context: 'timeout_recovery',
+      });
+      return null;
+    } catch (error) {
+      // This catch block will likely catch the 'Grace period timed out' error.
+      this.emitActivity('ERROR', {
+        error: `Graceful recovery attempt failed: ${String(error)}`,
+        context: 'timeout_recovery',
+      });
+      return null;
+    } finally {
+      clearTimeout(graceTimeoutId);
+    }
+  }
+
+  /**
+   * Runs the agent.
+   *
+   * @param inputs The validated input parameters for this invocation.
+   * @param signal An `AbortSignal` for cancellation.
+   * @returns A promise that resolves to the agent's final output.
+   */
+  async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
+    const startTime = Date.now();
+    let turnCounter = 0;
+    let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
+    let finalResult: string | null = null;
+
+    const { max_time_minutes } = this.definition.runConfig;
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(
+      () => timeoutController.abort(new Error('Agent timed out.')),
+      max_time_minutes * 60 * 1000,
+    );
+
+    // Combine the external signal with the internal timeout signal.
+    const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    let hasBeenWarnedForLimits = false;
+    let hasBeenWarnedForStopping = false;
+
+    logAgentStart(
+      this.runtimeContext,
+      new AgentStartEvent(this.agentId, this.definition.name),
+    );
+
+    let chat: GeminiChat | undefined;
+    let tools: FunctionDeclaration[] | undefined;
+    try {
+      chat = await this.createChatObject(inputs);
+      tools = this.prepareToolsList();
+      const query = this.definition.promptConfig.query
+        ? templateString(this.definition.promptConfig.query, inputs)
+        : 'Get Started!';
+      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
+
+      while (true) {
+        // Check for termination conditions like max turns or timeout.
+        const reason = this.checkTermination(startTime, turnCounter);
+        if (reason) {
+          if (hasBeenWarnedForLimits) {
+            terminateReason = reason;
+            break;
+          }
+          hasBeenWarnedForLimits = true;
+          if (!currentMessage.parts) {
+            currentMessage.parts = [];
+          }
+          this.emitActivity('THOUGHT_CHUNK', {
+            text: 'Max number of turns limit reached. Asking agent to wrap its work.',
+          });
+          currentMessage.parts.push({
+            text: `You are about to exceed the execution limit (${reason}). You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted and potentially follow-ups. Do not call any other tools.`,
+          });
+        }
+        if (combinedSignal.aborted) {
+          // Determine which signal caused the abort.
+          terminateReason = timeoutController.signal.aborted
+            ? AgentTerminateMode.TIMEOUT
+            : AgentTerminateMode.ABORTED;
+          break;
+        }
+        const turnResult = await this.executeTurn(
+          chat,
+          currentMessage,
+          tools,
+          turnCounter++,
+          combinedSignal,
+          timeoutController.signal,
+        );
+        if (
+          turnResult.status === 'stop' &&
+          turnResult.terminateReason ===
+            AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL &&
+          !hasBeenWarnedForStopping
+        ) {
+          hasBeenWarnedForStopping = true;
+          if (!currentMessage.parts) {
+            currentMessage.parts = [];
+          }
+          currentMessage.parts.push({
+            text: `You have stopped calling tools. You must either call another tool to continue your work or call \`${TASK_COMPLETE_TOOL_NAME}\` to finish.`,
+          });
+          continue;
+        }
+        if (turnResult.status === 'stop') {
+          terminateReason = turnResult.terminateReason;
+          // Only set finalResult if the turn provided one (e.g., error or goal).
+          // If it was an abort/timeout, finalResult remains null here
+          // and will be set by the logic below.
+          if (turnResult.finalResult) {
+            finalResult = turnResult.finalResult;
+          }
+          break; // Exit the loop
+        }
+
+        // If status is 'continue', update message for the next loop
+        currentMessage = turnResult.nextMessage;
+      }
+
+      if (terminateReason === AgentTerminateMode.TIMEOUT) {
+        const recoveryResult = await this.executeGracefulTimeoutRecovery(
+          chat,
+          tools,
+          turnCounter, // Use current turnCounter for the recovery attempt
+          signal, // Pass the external signal
+        );
+
+        if (recoveryResult !== null) {
+          // Recovery Succeeded
+          terminateReason = AgentTerminateMode.GOAL;
+          finalResult = recoveryResult;
+        } else {
+          finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+          this.emitActivity('ERROR', {
+            error: finalResult,
+            context: 'timeout',
+          });
+        }
+      }
+
+      if (terminateReason === AgentTerminateMode.GOAL) {
+        return {
+          result: finalResult || 'Task completed.',
+          terminate_reason: terminateReason,
+        };
+      }
+
+      return {
+        result:
+          finalResult || 'Agent execution was terminated before completion.',
+        terminate_reason: terminateReason,
+      };
+    } catch (error) {
+      // Check if the error is an AbortError caused by our internal timeout.
+      if (
+        error instanceof Error &&
+        error.name === 'AbortError' &&
+        timeoutController.signal.aborted &&
+        !signal.aborted // Ensure the external signal was not the cause
+      ) {
+        if (chat && tools) {
+          const recoveryResult = await this.executeGracefulTimeoutRecovery(
+            chat,
+            tools,
+            turnCounter, // Use current turnCounter
+            signal,
+          );
+
+          if (recoveryResult !== null) {
+            // Recovery Succeeded
+            terminateReason = AgentTerminateMode.GOAL;
+            finalResult = recoveryResult;
+            return {
+              result: finalResult,
+              terminate_reason: terminateReason,
+            };
+          }
+        }
+        terminateReason = AgentTerminateMode.TIMEOUT;
+        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        this.emitActivity('ERROR', {
+          error: finalResult,
+          context: 'timeout',
+        });
+        return {
+          result: finalResult,
+          terminate_reason: terminateReason,
+        };
+      }
+
+      this.emitActivity('ERROR', { error: String(error) });
+      throw error; // Re-throw other errors or external aborts.
+    } finally {
+      clearTimeout(timeoutId);
+      logAgentFinish(
+        this.runtimeContext,
+        new AgentFinishEvent(
+          this.agentId,
+          this.definition.name,
+          Date.now() - startTime,
+          turnCounter,
+          terminateReason,
+        ),
+      );
+    }
   }
 
   /**
