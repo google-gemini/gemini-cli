@@ -126,6 +126,7 @@ export {
   recordBaselineComparison,
   isPerformanceMonitoringActive,
   recordFlickerFrame,
+  recordSlowRender,
   // Performance monitoring types
   PerformanceMetricType,
   MemoryMetricType,
