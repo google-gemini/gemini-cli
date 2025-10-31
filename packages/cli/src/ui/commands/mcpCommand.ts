@@ -43,7 +43,7 @@ const authCommand: SlashCommand = {
       };
     }
 
-    const mcpServers = config.getMcpClientManager().getMcpServers();
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() ?? {};
 
     if (!serverName) {
       // List servers that support OAuth
@@ -132,7 +132,7 @@ const authCommand: SlashCommand = {
       }
       // Update the client with the new tools
       const geminiClient = config.getGeminiClient();
-      if (geminiClient) {
+      if (geminiClient?.isInitialized()) {
         await geminiClient.setTools();
       }
 
@@ -188,10 +188,10 @@ const listAction = async (
     };
   }
 
-  const mcpServers = config.getMcpServers() || {};
+  const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
   const serverNames = Object.keys(mcpServers);
   const blockedMcpServers =
-    config.getMcpClientManager().getBlockedMcpServers() || [];
+    config.getMcpClientManager()?.getBlockedMcpServers() || [];
 
   const connectingServers = serverNames.filter(
     (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
@@ -321,7 +321,7 @@ const refreshCommand: SlashCommand = {
 
     // Update the client with the new tools
     const geminiClient = config.getGeminiClient();
-    if (geminiClient) {
+    if (geminiClient?.isInitialized()) {
       await geminiClient.setTools();
     }
 

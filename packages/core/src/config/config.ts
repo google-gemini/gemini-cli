@@ -292,7 +292,7 @@ export interface ConfigParameters {
 
 export class Config {
   private toolRegistry!: ToolRegistry;
-  private mcpClientManager!: McpClientManager;
+  private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
@@ -777,7 +777,7 @@ export class Config {
     return this.mcpServers;
   }
 
-  getMcpClientManager(): McpClientManager {
+  getMcpClientManager(): McpClientManager | undefined {
     return this.mcpClientManager;
   }
 

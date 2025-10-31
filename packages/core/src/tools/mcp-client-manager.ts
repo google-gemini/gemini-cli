@@ -62,11 +62,16 @@ export class McpClientManager {
   async stopExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Unloading extension: ${extension.name}`);
     await Promise.all(
-      Object.keys(extension.mcpServers ?? {}).map(this.disconnectClient),
+      Object.keys(extension.mcpServers ?? {}).map(
+        this.disconnectClient.bind(this),
+      ),
     );
     // This is required to update the content generator configuration with the
     // new tool configuration.
-    this.cliConfig.getGeminiClient().setTools();
+    const geminiClient = this.cliConfig.getGeminiClient();
+    if (geminiClient.isInitialized()) {
+      await geminiClient.setTools();
+    }
   }
 
   /**
@@ -80,12 +85,18 @@ export class McpClientManager {
     debugLogger.log(`Loading extension: ${extension.name}`);
     await Promise.all(
       Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
-        this.maybeDiscoverMcpServer(name, config),
+        this.maybeDiscoverMcpServer(name, {
+          ...config,
+          extension,
+        }),
       ),
     );
     // This is required to update the content generator configuration with the
     // new tool configuration.
-    this.cliConfig.getGeminiClient().setTools();
+    const geminiClient = this.cliConfig.getGeminiClient();
+    if (geminiClient.isInitialized()) {
+      await geminiClient.setTools();
+    }
   }
 
   private isAllowedMcpServer(name: string) {

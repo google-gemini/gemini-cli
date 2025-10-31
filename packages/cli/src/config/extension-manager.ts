@@ -28,6 +28,7 @@ import {
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   ExtensionInstallEvent,
+  ExtensionLoader,
   ExtensionUninstallEvent,
   ExtensionUpdateEvent,
   getErrorMessage,
@@ -36,6 +37,7 @@ import {
   logExtensionInstallEvent,
   logExtensionUninstall,
   logExtensionUpdateEvent,
+  type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
@@ -54,10 +56,6 @@ import {
   maybePromptForSettings,
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
-import {
-  ExtensionLoader,
-  type ExtensionEvents,
-} from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import type { EventEmitter } from 'node:stream';
 
 interface ExtensionManagerParams {

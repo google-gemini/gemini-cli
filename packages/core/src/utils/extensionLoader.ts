@@ -37,7 +37,7 @@ export abstract class ExtensionLoader {
     } else {
       throw new Error('Already started, you may only call `start` once.');
     }
-    await Promise.all(this.getExtensions().map(this.startExtension));
+    await Promise.all(this.getExtensions().map(this.startExtension.bind(this)));
   }
 
   /**
@@ -59,7 +59,7 @@ export abstract class ExtensionLoader {
       completed: this.startCompletedCount,
     });
 
-    await this.config.getMcpClientManager().startExtension(extension);
+    await this.config.getMcpClientManager()!.startExtension(extension);
     // TODO: Move all extension features here, including at least:
     // - context file loading
     // - custom command loading
@@ -109,7 +109,7 @@ export abstract class ExtensionLoader {
       completed: this.stopCompletedCount,
     });
 
-    await this.config.getMcpClientManager().stopExtension(extension);
+    await this.config.getMcpClientManager()!.stopExtension(extension);
     // TODO: Remove all extension features here, including at least:
     // - context files
     // - custom commands

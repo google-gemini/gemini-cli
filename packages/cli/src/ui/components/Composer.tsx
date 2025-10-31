@@ -104,7 +104,7 @@ export const Composer = () => {
                 mcpServers={config.getMcpServers()}
                 blockedMcpServers={config
                   .getMcpClientManager()
-                  .getBlockedMcpServers()}
+                  ?.getBlockedMcpServers() ?? []}
               />
             )
           )}
