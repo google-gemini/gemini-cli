@@ -48,6 +48,7 @@ jobs:
       ) &&
       !contains(github.event.issue.labels.*.name, 'area/') &&
       !contains(github.event.issue.labels.*.name, 'priority/')
+    timeout-minutes: 5
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Get issue data for manual trigger'
@@ -79,12 +80,12 @@ jobs:
             echo "Issue #${ISSUE_NUMBER_INPUT} does not have the 'status/need-triage' label. Stopping workflow."
             exit 1
           fi
-          
+
           if echo "${LABELS}" | grep -q 'area/' || echo "${LABELS}" | grep -q 'priority/'; then
             echo "Issue #${ISSUE_NUMBER_INPUT} already has 'area/' or 'priority/' labels. Stopping workflow."
             exit 1
           fi
-          
+
           echo "Manual triage checks passed."
 
       - name: 'Checkout'
@@ -182,7 +183,7 @@ jobs:
             - Reference all shell variables as "${VAR}" (with quotes and braces).
             - Output only valid JSON format.
             - Do not include any explanation or additional text, just the JSON.
-          
+
             Reference 1: Area Definitions
             area/agent
             - Description: Issues related to the "brain" of the CLI. This includes the core agent logic, model quality, tool/function calling, and memory.
