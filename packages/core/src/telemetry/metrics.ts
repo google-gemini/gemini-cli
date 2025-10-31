@@ -12,6 +12,7 @@ import type {
   ModelRoutingEvent,
   ModelSlashCommandEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
