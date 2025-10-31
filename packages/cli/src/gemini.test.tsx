@@ -364,6 +364,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       useWriteTodos: undefined,
       outputFormat: undefined,
       fakeResponses: undefined,
+      recordResponses: undefined,
     });
 
     await main();
@@ -438,6 +439,7 @@ describe('startInteractiveUI', () => {
   vi.mock('./utils/cleanup.js', () => ({
     cleanupCheckpoints: vi.fn(() => Promise.resolve()),
     registerCleanup: vi.fn(),
+    runExitCleanup: vi.fn(),
   }));
 
   vi.mock('ink', () => ({

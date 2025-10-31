@@ -226,7 +226,7 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      vi.mocked(createContentGeneratorConfig).mockReturnValue(
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue(
         mockContentConfig,
       );
 
@@ -251,7 +251,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
-        (_: Config, authType: AuthType | undefined) =>
+        async (_: Config, authType: AuthType | undefined) =>
           ({ authType }) as unknown as ContentGeneratorConfig,
       );
 
@@ -268,7 +268,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
-        (_: Config, authType: AuthType | undefined) =>
+        async (_: Config, authType: AuthType | undefined) =>
           ({ authType }) as unknown as ContentGeneratorConfig,
       );
 
@@ -556,28 +556,83 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('UseModelRouter Configuration', () => {
-    it('should default useModelRouter to false when not provided', () => {
-      const config = new Config(baseParams);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should set useModelRouter to true when provided as true', () => {
-      const paramsWithModelRouter: ConfigParameters = {
+  describe('Model Router with Auth', () => {
+    it('should disable model router by default for oauth-personal', async () => {
+      const config = new Config({
         ...baseParams,
         useModelRouter: true,
-      };
-      const config = new Config(paramsWithModelRouter);
+      });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       expect(config.getUseModelRouter()).toBe(true);
     });
 
-    it('should set useModelRouter to false when explicitly provided as false', () => {
-      const paramsWithModelRouter: ConfigParameters = {
+    it('should enable model router by default for other auth types', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+      });
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should disable model router for specified auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should enable model router for other auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [],
+      });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should keep model router disabled when useModelRouter is false', async () => {
+      const config = new Config({
         ...baseParams,
         useModelRouter: false,
-      };
-      const config = new Config(paramsWithModelRouter);
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should keep the user-chosen model after refreshAuth, even when model router is disabled for the auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      const chosenModel = 'gemini-1.5-pro-latest';
+      config.setModel(chosenModel);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getModel()).toBe(chosenModel);
+    });
+
+    it('should keep the user-chosen model after refreshAuth, when model router is enabled for the auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      const chosenModel = 'gemini-1.5-pro-latest';
+      config.setModel(chosenModel);
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getUseModelRouter()).toBe(true);
+      expect(config.getModel()).toBe(chosenModel);
     });
   });
 
@@ -1050,7 +1105,9 @@ describe('BaseLlmClient Lifecycle', () => {
     const authType = AuthType.USE_GEMINI;
     const mockContentConfig = { model: 'gemini-flash', apiKey: 'test-key' };
 
-    vi.mocked(createContentGeneratorConfig).mockReturnValue(mockContentConfig);
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
 
     await config.refreshAuth(authType);
 

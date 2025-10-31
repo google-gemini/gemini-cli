@@ -65,6 +65,7 @@ import {
   recordApiResponseMetrics,
   recordAgentRunMetrics,
   recordEditProposedMetrics,
+  recordLinesChanged,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -91,6 +92,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
+
   const logRecord: LogRecord = {
     body: event.toLogBody(),
     attributes: event.toOpenTelemetryAttributes(config),
@@ -119,15 +121,22 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     success: event.success,
     decision: event.decision,
     tool_type: event.tool_type,
-    ...(event.metadata
-      ? {
-          model_added_lines: event.metadata['model_added_lines'],
-          model_removed_lines: event.metadata['model_removed_lines'],
-          user_added_lines: event.metadata['user_added_lines'],
-          user_removed_lines: event.metadata['user_removed_lines'],
-        }
-      : {}),
   });
+
+  if (event.metadata) {
+    const added = event.metadata['model_added_lines'];
+    if (typeof added === 'number' && added > 0) {
+      recordLinesChanged(config, added, 'added', {
+        function_name: event.function_name,
+      });
+    }
+    const removed = event.metadata['model_removed_lines'];
+    if (typeof removed === 'number' && removed > 0) {
+      recordLinesChanged(config, removed, 'removed', {
+        function_name: event.function_name,
+      });
+    }
+  }
 }
 
 export function logEditProposed(
@@ -241,11 +250,9 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
+  logger.emit(event.toLogRecord(config));
+  logger.emit(event.toSemanticLogRecord(config));
+
   recordApiErrorMetrics(config, event.duration_ms, {
     model: event.model,
     status_code: event.status_code,
@@ -253,12 +260,11 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
   });
 
   // Record GenAI operation duration for errors
-  const conventionAttributes = getConventionAttributes(event);
   recordApiResponseMetrics(config, event.duration_ms, {
     model: event.model,
     status_code: event.status_code,
     genAiAttributes: {
-      ...conventionAttributes,
+      ...getConventionAttributes(event),
       'error.type': event.error_type || 'unknown',
     },
   });
@@ -275,11 +281,8 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
+  logger.emit(event.toLogRecord(config));
+  logger.emit(event.toSemanticLogRecord(config));
 
   const conventionAttributes = getConventionAttributes(event);
 
@@ -290,11 +293,11 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
   });
 
   const tokenUsageData = [
-    { count: event.input_token_count, type: 'input' as const },
-    { count: event.output_token_count, type: 'output' as const },
-    { count: event.cached_content_token_count, type: 'cache' as const },
-    { count: event.thoughts_token_count, type: 'thought' as const },
-    { count: event.tool_token_count, type: 'tool' as const },
+    { count: event.usage.input_token_count, type: 'input' as const },
+    { count: event.usage.output_token_count, type: 'output' as const },
+    { count: event.usage.cached_content_token_count, type: 'cache' as const },
+    { count: event.usage.thoughts_token_count, type: 'thought' as const },
+    { count: event.usage.tool_token_count, type: 'tool' as const },
   ];
 
   for (const { count, type } of tokenUsageData) {

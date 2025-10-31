@@ -4,16 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
-/// <reference types="vitest/globals" />
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
-import { waitFor, act } from '@testing-library/react';
+import { act } from 'react';
 import * as processUtils from '../../utils/processUtils.js';
 import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js';
 

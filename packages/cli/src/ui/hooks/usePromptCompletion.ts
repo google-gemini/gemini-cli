@@ -7,6 +7,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import {
+  debugLogger,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   getResponseText,
 } from '@google/gemini-cli-core';
@@ -151,7 +152,9 @@ export function usePromptCompletion({
           (error instanceof Error && error.name === 'AbortError')
         )
       ) {
-        console.error('prompt completion error:', error);
+        debugLogger.warn(
+          `[WARN] prompt completion failed: : (${error instanceof Error ? error.message : String(error)})`,
+        );
         // Clear the last requested text to allow retry only on real errors
         lastRequestedTextRef.current = '';
       }

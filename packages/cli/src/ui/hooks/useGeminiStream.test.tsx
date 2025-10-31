@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/** @vitest-environment jsdom */
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Mock, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
@@ -34,6 +34,7 @@ import {
   ToolErrorType,
   ToolConfirmationOutcome,
   tokenLimit,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -1038,12 +1039,11 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       // Allow the stream to continue
-      act(() => {
+      await act(async () => {
         continueStream();
+        // Wait a bit to see if the second part is processed
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
-
-      // Wait a bit to see if the second part is processed
-      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // The text should not have been updated with " Canceled"
       const lastCall = mockAddItem.mock.calls.find(
@@ -1709,8 +1709,8 @@ describe('useGeminiStream', () => {
     });
 
     it('should handle errors gracefully when auto-approving tool calls', async () => {
-      const consoleSpy = vi
-        .spyOn(console, 'error')
+      const debuggerSpy = vi
+        .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
       const mockOnConfirmSuccess = vi.fn().mockResolvedValue(undefined);
       const mockOnConfirmError = vi
@@ -1791,12 +1791,12 @@ describe('useGeminiStream', () => {
       expect(mockOnConfirmError).toHaveBeenCalledTimes(1);
 
       // Error should be logged
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(debuggerSpy).toHaveBeenCalledWith(
         'Failed to auto-approve tool call call2:',
         expect.any(Error),
       );
 
-      consoleSpy.mockRestore();
+      debuggerSpy.mockRestore();
     });
 
     it('should skip tool calls without confirmationDetails', async () => {
