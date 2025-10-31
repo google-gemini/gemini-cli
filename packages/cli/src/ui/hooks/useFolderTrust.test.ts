@@ -7,6 +7,7 @@
 import { vi, type Mock, type MockInstance } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useFolderTrust } from './useFolderTrust.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
@@ -88,7 +89,7 @@ describe('useFolderTrust', () => {
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isFolderTrustDialogOpen).toBe(true);
     });
     expect(onTrustChange).toHaveBeenCalledWith(undefined);
@@ -129,7 +130,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isTrusted).toBeUndefined();
     });
 
@@ -139,7 +140,7 @@ describe('useFolderTrust', () => {
       );
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
         '/test/path',
         TrustLevel.TRUST_FOLDER,
@@ -207,7 +208,7 @@ describe('useFolderTrust', () => {
       );
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockTrustedFolders.setValue).not.toHaveBeenCalled();
       expect(mockSettings.setValue).not.toHaveBeenCalled();
       expect(result.current.isFolderTrustDialogOpen).toBe(true);
@@ -229,7 +230,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isTrusted).toBe(false);
     });
 
@@ -237,7 +238,7 @@ describe('useFolderTrust', () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(result.current.isRestarting).toBe(true);
       expect(result.current.isFolderTrustDialogOpen).toBe(true); // Dialog should stay open
     });
