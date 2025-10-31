@@ -35,8 +35,14 @@ This function aims to find an *intelligent* or "safe" index within the provided 
 **In essence, `findSafeSplitPoint` tries to be a good Markdown citizen when forced to divide content, preferring structural boundaries over arbitrary character limits, with a strong emphasis on not corrupting code blocks.**
 */
 
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
+import type { Node } from 'unist';
+
 /**
- * Checks if a given character index within a string is inside a fenced (```) code block.
+ * Checks if a given character index within a string is inside a fenced code block.
+ * Uses AST parsing to properly detect code blocks including those in lists with indentation.
  * @param content The full string content.
  * @param indexToTest The character index to test.
  * @returns True if the index is inside a code block's content, false otherwise.
@@ -45,22 +51,49 @@ const isIndexInsideCodeBlock = (
   content: string,
   indexToTest: number,
 ): boolean => {
-  let fenceCount = 0;
-  let searchPos = 0;
-  while (searchPos < content.length) {
-    const nextFence = content.indexOf('```', searchPos);
-    if (nextFence === -1 || nextFence >= indexToTest) {
-      break;
-    }
-    fenceCount++;
-    searchPos = nextFence + 3;
+  try {
+    const processor = unified().use(remarkParse).use(remarkGfm);
+    const tree = processor.parse(content);
+
+    // Walk the AST to find all code blocks and their positions
+    const codeBlocks: Array<{ start: number; end: number }> = [];
+
+    const walk = (node: Node) => {
+      if (
+        node.type === 'code' &&
+        node.position &&
+        node.position.start.offset !== undefined &&
+        node.position.end.offset !== undefined
+      ) {
+        // Code node positions are in the AST
+        codeBlocks.push({
+          start: node.position.start.offset,
+          end: node.position.end.offset,
+        });
+      }
+      if ('children' in node && Array.isArray(node.children)) {
+        (node.children as Node[]).forEach(walk);
+      }
+    };
+
+    walk(tree);
+
+    // Check if indexToTest falls within any code block
+    return codeBlocks.some(
+      (block) => indexToTest >= block.start && indexToTest < block.end,
+    );
+  } catch (error) {
+    // Avoid falling back to a known buggy regex implementation.
+    // It's safer to assume it's not a code block if parsing fails.
+    console.error('Failed to parse markdown for code block detection:', error);
+    return false;
   }
-  return fenceCount % 2 === 1;
 };
 
 /**
  * Finds the starting index of the code block that encloses the given index.
  * Returns -1 if the index is not inside a code block.
+ * Uses AST parsing to properly detect code blocks.
  * @param content The markdown content.
  * @param index The index to check.
  * @returns Start index of the enclosing code block or -1.
@@ -69,25 +102,39 @@ const findEnclosingCodeBlockStart = (
   content: string,
   index: number,
 ): number => {
-  if (!isIndexInsideCodeBlock(content, index)) {
+  try {
+    const processor = unified().use(remarkParse).use(remarkGfm);
+    const tree = processor.parse(content);
+
+    // Walk the AST to find the code block containing the index
+    let enclosingStart = -1;
+
+    const walk = (node: Node) => {
+      if (
+        node.type === 'code' &&
+        node.position &&
+        node.position.start.offset !== undefined &&
+        node.position.end.offset !== undefined
+      ) {
+        const start = node.position.start.offset;
+        const end = node.position.end.offset;
+        if (index >= start && index < end) {
+          enclosingStart = start;
+          return; // Found it, stop searching
+        }
+      }
+      if ('children' in node && Array.isArray(node.children)) {
+        (node.children as Node[]).forEach(walk);
+      }
+    };
+
+    walk(tree);
+    return enclosingStart;
+  } catch (error) {
+    // If parsing fails, we cannot reliably find the block.
+    console.error('Failed to parse markdown for code block detection:', error);
     return -1;
   }
-  let currentSearchPos = 0;
-  while (currentSearchPos < index) {
-    const blockStartIndex = content.indexOf('```', currentSearchPos);
-    if (blockStartIndex === -1 || blockStartIndex >= index) {
-      break;
-    }
-    const blockEndIndex = content.indexOf('```', blockStartIndex + 3);
-    if (blockStartIndex < index) {
-      if (blockEndIndex === -1 || index < blockEndIndex + 3) {
-        return blockStartIndex;
-      }
-    }
-    if (blockEndIndex === -1) break;
-    currentSearchPos = blockEndIndex + 3;
-  }
-  return -1;
 };
 
 export const findLastSafeSplitPoint = (content: string) => {
@@ -109,7 +156,7 @@ export const findLastSafeSplitPoint = (content: string) => {
       break;
     }
 
-    const potentialSplitPoint = dnlIndex + 2;
+    const potentialSplitPoint = dnlIndex;
     if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
       return potentialSplitPoint;
     }
