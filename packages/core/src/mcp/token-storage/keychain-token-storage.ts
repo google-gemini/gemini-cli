@@ -6,7 +6,7 @@
 
 import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
-import type { OAuthCredentials } from './types.js';
+import type { OAuthCredentials, SecretStorage } from './types.js';
 import { coreEvents } from '../../utils/events.js';
 
 interface Keytar {
@@ -23,8 +23,12 @@ interface Keytar {
 }
 
 const KEYCHAIN_TEST_PREFIX = '__keychain_test__';
+const SECRET_PREFIX = '__secret__';
 
-export class KeychainTokenStorage extends BaseTokenStorage {
+export class KeychainTokenStorage
+  extends BaseTokenStorage
+  implements SecretStorage
+{
   private keychainAvailable: boolean | null = null;
   private keytarModule: Keytar | null = null;
   private keytarLoadAttempted = false;
@@ -137,7 +141,11 @@ export class KeychainTokenStorage extends BaseTokenStorage {
     try {
       const credentials = await keytar.findCredentials(this.serviceName);
       return credentials
-        .filter((cred) => !cred.account.startsWith(KEYCHAIN_TEST_PREFIX))
+        .filter(
+          (cred) =>
+            !cred.account.startsWith(KEYCHAIN_TEST_PREFIX) &&
+            !cred.account.startsWith(SECRET_PREFIX),
+        )
         .map((cred: { account: string }) => cred.account);
     } catch (error) {
       coreEvents.emitFeedback(
@@ -163,7 +171,11 @@ export class KeychainTokenStorage extends BaseTokenStorage {
     try {
       const credentials = (
         await keytar.findCredentials(this.serviceName)
-      ).filter((c) => !c.account.startsWith(KEYCHAIN_TEST_PREFIX));
+      ).filter(
+        (c) =>
+          !c.account.startsWith(KEYCHAIN_TEST_PREFIX) &&
+          !c.account.startsWith(SECRET_PREFIX),
+      );
 
       for (const cred of credentials) {
         try {
@@ -257,5 +269,63 @@ export class KeychainTokenStorage extends BaseTokenStorage {
 
   async isAvailable(): Promise<boolean> {
     return this.checkKeychainAvailability();
+  }
+
+  async setSecret(key: string, value: string): Promise<void> {
+    if (!(await this.checkKeychainAvailability())) {
+      throw new Error('Keychain is not available');
+    }
+    const keytar = await this.getKeytar();
+    if (!keytar) {
+      throw new Error('Keytar module not available');
+    }
+    await keytar.setPassword(this.serviceName, `${SECRET_PREFIX}${key}`, value);
+  }
+
+  async getSecret(key: string): Promise<string | null> {
+    if (!(await this.checkKeychainAvailability())) {
+      throw new Error('Keychain is not available');
+    }
+    const keytar = await this.getKeytar();
+    if (!keytar) {
+      throw new Error('Keytar module not available');
+    }
+    return keytar.getPassword(this.serviceName, `${SECRET_PREFIX}${key}`);
+  }
+
+  async deleteSecret(key: string): Promise<void> {
+    if (!(await this.checkKeychainAvailability())) {
+      throw new Error('Keychain is not available');
+    }
+    const keytar = await this.getKeytar();
+    if (!keytar) {
+      throw new Error('Keytar module not available');
+    }
+    const deleted = await keytar.deletePassword(
+      this.serviceName,
+      `${SECRET_PREFIX}${key}`,
+    );
+    if (!deleted) {
+      throw new Error(`No secret found for key: ${key}`);
+    }
+  }
+
+  async listSecrets(): Promise<string[]> {
+    if (!(await this.checkKeychainAvailability())) {
+      throw new Error('Keychain is not available');
+    }
+    const keytar = await this.getKeytar();
+    if (!keytar) {
+      throw new Error('Keytar module not available');
+    }
+    try {
+      const credentials = await keytar.findCredentials(this.serviceName);
+      return credentials
+        .filter((cred) => cred.account.startsWith(SECRET_PREFIX))
+        .map((cred) => cred.account.substring(SECRET_PREFIX.length));
+    } catch (error) {
+      console.error('Failed to list secrets from keychain:', error);
+      return [];
+    }
   }
 }

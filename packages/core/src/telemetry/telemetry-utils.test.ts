@@ -8,39 +8,41 @@ import { describe, it, expect } from 'vitest';
 import { getProgrammingLanguage } from './telemetry-utils.js';
 
 describe('getProgrammingLanguage', () => {
-  it('should return the programming language when file_path is present', () => {
-    const args = { file_path: 'src/test.ts' };
-    const language = getProgrammingLanguage(args);
-    expect(language).toBe('TypeScript');
-  });
+  type ProgrammingLanguageTestCase = {
+    name: string;
+    args: Record<string, string>;
+    expected: string | undefined;
+  };
 
-  it('should return the programming language when absolute_path is present', () => {
-    const args = { absolute_path: 'src/test.py' };
+  it.each<ProgrammingLanguageTestCase>([
+    {
+      name: 'file_path is present',
+      args: { file_path: 'src/test.ts' },
+      expected: 'TypeScript',
+    },
+    {
+      name: 'absolute_path is present',
+      args: { absolute_path: 'src/test.py' },
+      expected: 'Python',
+    },
+    { name: 'path is present', args: { path: 'src/test.go' }, expected: 'Go' },
+    {
+      name: 'no file path is present',
+      args: {},
+      expected: undefined,
+    },
+    {
+      name: 'unknown file extensions',
+      args: { file_path: 'src/test.unknown' },
+      expected: undefined,
+    },
+    {
+      name: 'files with no extension',
+      args: { file_path: 'src/test' },
+      expected: undefined,
+    },
+  ])('should return $expected when $name', ({ args, expected }) => {
     const language = getProgrammingLanguage(args);
-    expect(language).toBe('Python');
-  });
-
-  it('should return the programming language when path is present', () => {
-    const args = { path: 'src/test.go' };
-    const language = getProgrammingLanguage(args);
-    expect(language).toBe('Go');
-  });
-
-  it('should return undefined when no file path is present', () => {
-    const args = {};
-    const language = getProgrammingLanguage(args);
-    expect(language).toBeUndefined();
-  });
-
-  it('should handle unknown file extensions gracefully', () => {
-    const args = { file_path: 'src/test.unknown' };
-    const language = getProgrammingLanguage(args);
-    expect(language).toBeUndefined();
-  });
-
-  it('should handle files with no extension', () => {
-    const args = { file_path: 'src/test' };
-    const language = getProgrammingLanguage(args);
-    expect(language).toBeUndefined();
+    expect(language).toBe(expected);
   });
 });
