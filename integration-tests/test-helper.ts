@@ -229,7 +229,7 @@ export class InteractiveRun {
 
   // Simulates typing a string one character at a time to avoid paste detection.
   async sendKeys(text: string) {
-    const delay = 5;
+    const delay = 10;
     for (const char of text) {
       this.ptyProcess.write(char);
       await new Promise((resolve) => setTimeout(resolve, delay));
@@ -576,9 +576,11 @@ export class TestRig {
   async cleanup() {
     if (
       process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
-      this.fakeResponsesPath
+      this.fakeResponsesPath &&
+      fs.existsSync(this.fakeResponsesPath) &&
+      this.originalFakeResponsesPath
     ) {
-      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
+      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath);
     }
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
