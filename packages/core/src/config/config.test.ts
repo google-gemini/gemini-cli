@@ -25,6 +25,7 @@ import {
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
+import { ContextManager } from '../services/contextManager.js';
 import { ShellTool } from '../tools/shell.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -44,6 +45,10 @@ vi.mock('fs', async (importOriginal) => {
     realpathSync: vi.fn((path) => path),
   };
 });
+
+vi.mock('../services/contextManager.js', () => ({
+  ContextManager: vi.fn(),
+}));
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
@@ -426,6 +431,42 @@ describe('Server Config (config.ts)', () => {
         expect(config.getUsageStatisticsEnabled()).toBe(enabled);
       },
     );
+  });
+
+  describe('JIT Context Configuration', () => {
+    it('should initialize ContextManager when experimentalJitContext is true', async () => {
+      const params = { ...baseParams, experimentalJitContext: true };
+      const config = new Config(params);
+      await config.initialize();
+
+      expect(ContextManager).toHaveBeenCalledWith(path.resolve(TARGET_DIR));
+      expect(config.getContextManager()).toBeInstanceOf(ContextManager);
+    });
+
+    it('should NOT initialize ContextManager when experimentalJitContext is false', async () => {
+      const params = { ...baseParams, experimentalJitContext: false };
+      const config = new Config(params);
+      await config.initialize();
+
+      expect(ContextManager).not.toHaveBeenCalled();
+      expect(config.getContextManager()).toBeNull();
+    });
+
+    it('should default experimentalJitContext to false', async () => {
+      const config = new Config(baseParams);
+      await config.initialize();
+
+      expect(config.getExperimentalJitContext()).toBe(false);
+      expect(config.getContextManager()).toBeNull();
+    });
+
+    it('should allow setting and getting global and environment memory', () => {
+      const config = new Config(baseParams);
+      config.setGlobalMemory('global');
+      config.setEnvironmentMemory('env');
+      expect(config.getGlobalMemory()).toBe('global');
+      expect(config.getEnvironmentMemory()).toBe('env');
+    });
   });
 
   describe('Telemetry Settings', () => {

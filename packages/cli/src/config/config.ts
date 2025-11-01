@@ -677,6 +677,7 @@ export async function loadCliConfig(
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
+    experimentalJitContext: settings.experimental?.jitContext ?? false,
     listExtensions: argv.listExtensions || false,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,

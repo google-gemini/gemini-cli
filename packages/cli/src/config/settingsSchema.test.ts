@@ -334,5 +334,20 @@ describe('SettingsSchema', () => {
         getSettingsSchema().experimental.properties.useModelRouter.default,
       ).toBe(true);
     });
+
+    it('should have jitContext setting in schema', () => {
+      expect(
+        getSettingsSchema().experimental.properties.jitContext,
+      ).toBeDefined();
+      expect(getSettingsSchema().experimental.properties.jitContext.type).toBe(
+        'boolean',
+      );
+      expect(
+        getSettingsSchema().experimental.properties.jitContext.category,
+      ).toBe('Experimental');
+      expect(
+        getSettingsSchema().experimental.properties.jitContext.default,
+      ).toBe(false);
+    });
   });
 });
