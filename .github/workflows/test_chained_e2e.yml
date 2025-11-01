@@ -22,10 +22,6 @@ concurrency:
   cancel-in-progress: |-
     ${{ github.event_name != 'push' && github.event_name != 'merge_group' }}
 
-permissions:
-  contents: 'read'
-  statuses: 'write'
-
 jobs:
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
@@ -111,7 +107,7 @@ jobs:
           allowForks: 'true'
           repo: '${{ needs.parse_run_context.outputs.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT || secrets.GITHUB_TOKEN }}'
           status: 'pending'
 
   e2e_linux:
@@ -300,5 +296,5 @@ jobs:
           allowForks: 'true'
           repo: '${{ needs.parse_run_context.outputs.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT || secrets.GITHUB_TOKEN }}'
           status: '${{ job.status }}'
