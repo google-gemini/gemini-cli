@@ -138,6 +138,40 @@ describe('LSTool', () => {
       expect(result.returnDisplay).toBe('Listed 1 item(s).');
     });
 
+    it('should respect complex ignore patterns with brace expansion', async () => {
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content2');
+      await fs.writeFile(path.join(tempRootDir, 'file3.md'), 'content3');
+
+      const invocation = lsTool.build({
+        path: tempRootDir,
+        ignore: ['*.{txt,log}'],
+      });
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('file3.md');
+      expect(result.llmContent).not.toContain('file1.txt');
+      expect(result.llmContent).not.toContain('file2.log');
+      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+    });
+
+    it('should respect complex ignore patterns with character sets', async () => {
+      await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
+      await fs.writeFile(path.join(tempRootDir, 'file2.txt'), 'content2');
+      await fs.writeFile(path.join(tempRootDir, 'filea.txt'), 'content3');
+
+      const invocation = lsTool.build({
+        path: tempRootDir,
+        ignore: ['file[1-9].txt'],
+      });
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('filea.txt');
+      expect(result.llmContent).not.toContain('file1.txt');
+      expect(result.llmContent).not.toContain('file2.txt');
+      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+    });
+
     it('should respect gitignore patterns', async () => {
       await fs.writeFile(path.join(tempRootDir, 'file1.txt'), 'content1');
       await fs.writeFile(path.join(tempRootDir, 'file2.log'), 'content1');
