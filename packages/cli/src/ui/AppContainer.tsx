@@ -153,6 +153,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
   const [showDebugProfiler, setShowDebugProfiler] = useState(false);
+  const [copyModeEnabled, setCopyModeEnabled] = useState(false);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     initializationResult.geminiMdFileCount,
@@ -226,6 +227,19 @@ export const AppContainer = (props: AppContainerProps) => {
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
 
+  useEffect(() => {
+    if (!copyModeEnabled) {
+      // turn on mouse scroll
+      // Enable mouse tracking with SGR format
+      // ?1002h = button event tracking (clicks + drags + scroll wheel)
+      // ?1006h = SGR extended mouse mode (better coordinate handling)
+      stdout.write('\u001b[?1002h\u001b[?1006h');
+    } else {
+      // turn off mouse scroll.
+      stdout.write('\u001b[?1006l\u001b[?1002l');
+    }
+  }, [copyModeEnabled, stdout]);
+
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
@@ -248,10 +262,12 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
     })();
     registerCleanup(async () => {
+      // Turn off mouse scroll.
+      stdout.write('\u001b[?1006l\u001b[?1002l');
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
     });
-  }, [config]);
+  }, [config, stdout]);
 
   useEffect(
     () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
@@ -344,9 +360,11 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [historyManager.history, logger]);
 
   const refreshStatic = useCallback(() => {
-    stdout.write(ansiEscapes.clearTerminal);
+    if (settings.merged.ui?.useInkScrolling === false) {
+      stdout.write(ansiEscapes.clearTerminal);
+    }
     setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, stdout]);
+  }, [setHistoryRemountKey, stdout, settings]);
 
   const {
     isThemeDialogOpen,
@@ -1009,9 +1027,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
+      if (copyModeEnabled) {
+        setCopyModeEnabled(false);
+        // We don't want to process any other keys if we're in copy mode.
+        return;
+      }
+
       // Debug log keystrokes if enabled
       if (settings.merged.general?.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
+      if (key.ctrl && key.name === 'x') {
+        setCopyModeEnabled(true);
+        return;
       }
 
       if (keyMatchers[Command.QUIT](key)) {
@@ -1078,6 +1107,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
       refreshStatic,
+      setCopyModeEnabled,
+      copyModeEnabled,
     ],
   );
 
@@ -1294,6 +1325,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       showDebugProfiler,
+      copyModeEnabled,
     }),
     [
       isThemeDialogOpen,
@@ -1378,6 +1410,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showDebugProfiler,
       apiKeyDefaultValue,
       authState,
+      copyModeEnabled,
     ],
   );
 

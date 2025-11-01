@@ -37,9 +37,13 @@ import {
   MODIFIER_CTRL_BIT,
 } from '../utils/platformConstants.js';
 
+import {
+  ESC,
+  SGR_MOUSE_REGEX,
+  couldBeSGRMouseSequence,
+} from '../utils/input.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 
-const ESC = '\u001B';
 export const PASTE_MODE_START = `${ESC}[200~`;
 export const PASTE_MODE_END = `${ESC}[201~`;
 export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
@@ -107,6 +111,8 @@ function couldBeKittySequence(buffer: string): boolean {
   if (buffer === ESC || buffer === `${ESC}[`) return true;
 
   if (!buffer.startsWith(`${ESC}[`)) return false;
+
+  if (couldBeSGRMouseSequence(buffer)) return true;
 
   // Check for known kitty sequence patterns:
   // 1. ESC[<digit> - could be CSI-u or tilde-coded
@@ -720,103 +726,118 @@ export function KeypressProvider({
               broadcast(parsed.key);
               remainingBuffer = remainingBuffer.slice(parsed.length);
               parsedAny = true;
+              continue;
+            }
+
+            const mouseMatch = remainingBuffer.match(SGR_MOUSE_REGEX);
+            if (mouseMatch) {
+              if (debugKeystrokeLogging) {
+                debugLogger.log(
+                  '[DEBUG] SGR mouse sequence ignored:',
+                  JSON.stringify(mouseMatch[0]),
+                );
+              }
+              remainingBuffer = remainingBuffer.slice(mouseMatch[0].length);
+              parsedAny = true;
+              continue;
+            }
+
+            // If we can't parse a sequence at the start, check if there's
+            // another ESC later in the buffer. If so, the data before it
+            // is garbage/incomplete and should be dropped so we can
+            // process the next sequence.
+            const nextEscIndex = remainingBuffer.indexOf(ESC, 1);
+            if (nextEscIndex !== -1) {
+              const garbage = remainingBuffer.slice(0, nextEscIndex);
+              if (debugKeystrokeLogging) {
+                debugLogger.log(
+                  '[DEBUG] Dropping incomplete sequence before next ESC:',
+                  JSON.stringify(garbage),
+                );
+              }
+              // Drop garbage and continue parsing from next ESC
+              remainingBuffer = remainingBuffer.slice(nextEscIndex);
+              // We made progress, so we can continue the loop to parse the next sequence
+              continue;
+            }
+
+            // Check if buffer could become a valid kitty sequence
+            const couldBeValid = couldBeKittySequence(remainingBuffer);
+
+            if (!couldBeValid) {
+              // Not a kitty sequence - flush as regular input immediately
+              if (debugKeystrokeLogging) {
+                debugLogger.log(
+                  '[DEBUG] Not a kitty sequence, flushing:',
+                  JSON.stringify(remainingBuffer),
+                );
+              }
+              broadcast({
+                name: '',
+                ctrl: false,
+                meta: false,
+                shift: false,
+                paste: false,
+                sequence: remainingBuffer,
+              });
+              remainingBuffer = '';
+              parsedAny = true;
+            } else if (remainingBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
+              // Buffer overflow - log and clear
+              if (debugKeystrokeLogging) {
+                debugLogger.log(
+                  '[DEBUG] Kitty buffer overflow, clearing:',
+                  JSON.stringify(remainingBuffer),
+                );
+              }
+              if (config) {
+                const event = new KittySequenceOverflowEvent(
+                  remainingBuffer.length,
+                  remainingBuffer,
+                );
+                logKittySequenceOverflow(config, event);
+              }
+              // Flush as regular input
+              broadcast({
+                name: '',
+                ctrl: false,
+                meta: false,
+                shift: false,
+                paste: false,
+                sequence: remainingBuffer,
+              });
+              remainingBuffer = '';
+              parsedAny = true;
             } else {
-              // If we can't parse a sequence at the start, check if there's
-              // another ESC later in the buffer. If so, the data before it
-              // is garbage/incomplete and should be dropped so we can
-              // process the next sequence.
-              const nextEscIndex = remainingBuffer.indexOf(ESC, 1);
-              if (nextEscIndex !== -1) {
-                const garbage = remainingBuffer.slice(0, nextEscIndex);
-                if (debugKeystrokeLogging) {
-                  debugLogger.log(
-                    '[DEBUG] Dropping incomplete sequence before next ESC:',
-                    JSON.stringify(garbage),
-                  );
-                }
-                // Drop garbage and continue parsing from next ESC
-                remainingBuffer = remainingBuffer.slice(nextEscIndex);
-                // We made progress, so we can continue the loop to parse the next sequence
-                continue;
+              if (config?.getDebugMode() || debugKeystrokeLogging) {
+                debugLogger.warn(
+                  'Kitty sequence buffer has content:',
+                  JSON.stringify(kittySequenceBuffer),
+                );
               }
-
-              // Check if buffer could become a valid kitty sequence
-              const couldBeValid = couldBeKittySequence(remainingBuffer);
-
-              if (!couldBeValid) {
-                // Not a kitty sequence - flush as regular input immediately
-                if (debugKeystrokeLogging) {
-                  debugLogger.log(
-                    '[DEBUG] Not a kitty sequence, flushing:',
-                    JSON.stringify(remainingBuffer),
-                  );
-                }
-                broadcast({
-                  name: '',
-                  ctrl: false,
-                  meta: false,
-                  shift: false,
-                  paste: false,
-                  sequence: remainingBuffer,
-                });
-                remainingBuffer = '';
-                parsedAny = true;
-              } else if (remainingBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
-                // Buffer overflow - log and clear
-                if (debugKeystrokeLogging) {
-                  debugLogger.log(
-                    '[DEBUG] Kitty buffer overflow, clearing:',
-                    JSON.stringify(remainingBuffer),
-                  );
-                }
-                if (config) {
-                  const event = new KittySequenceOverflowEvent(
-                    remainingBuffer.length,
-                    remainingBuffer,
-                  );
-                  logKittySequenceOverflow(config, event);
-                }
-                // Flush as regular input
-                broadcast({
-                  name: '',
-                  ctrl: false,
-                  meta: false,
-                  shift: false,
-                  paste: false,
-                  sequence: remainingBuffer,
-                });
-                remainingBuffer = '';
-                parsedAny = true;
-              } else {
-                if (config?.getDebugMode() || debugKeystrokeLogging) {
-                  debugLogger.warn(
-                    'Kitty sequence buffer has content:',
-                    JSON.stringify(kittySequenceBuffer),
-                  );
-                }
-                // Could be valid but incomplete - set timeout
-                kittySequenceTimeout = setTimeout(() => {
-                  if (kittySequenceBuffer) {
-                    if (debugKeystrokeLogging) {
-                      debugLogger.log(
-                        '[DEBUG] Kitty sequence timeout, flushing:',
-                        JSON.stringify(kittySequenceBuffer),
-                      );
-                    }
-                    broadcast({
-                      name: '',
-                      ctrl: false,
-                      meta: false,
-                      shift: false,
-                      paste: false,
-                      sequence: kittySequenceBuffer,
-                    });
-                    kittySequenceBuffer = '';
+              // Could be valid but incomplete - set timeout
+              kittySequenceTimeout = setTimeout(() => {
+                if (kittySequenceBuffer) {
+                  if (debugKeystrokeLogging) {
+                    debugLogger.log(
+                      '[DEBUG] Kitty sequence timeout, flushing:',
+                      JSON.stringify(kittySequenceBuffer),
+                    );
                   }
-                  kittySequenceTimeout = null;
-                }, KITTY_SEQUENCE_TIMEOUT_MS);
-                break;
-              }
+                  const isEscape = kittySequenceBuffer === ESC;
+                  broadcast({
+                    name: isEscape ? 'escape' : '',
+                    ctrl: false,
+                    meta: isEscape,
+                    shift: false,
+                    paste: false,
+                    sequence: kittySequenceBuffer,
+                  });
+                  kittySequenceBuffer = '';
+                }
+                kittySequenceTimeout = null;
+              }, KITTY_SEQUENCE_TIMEOUT_MS);
+              break;
             }
           }
 

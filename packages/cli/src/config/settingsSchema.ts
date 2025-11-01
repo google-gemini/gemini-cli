@@ -451,6 +451,15 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Use custom scrolling behavior in the Ink rendering library.',
+      },
+      useAlternateBuffer: {
+        type: 'boolean',
+        label: 'Use Alternate Screen Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
       customWittyPhrases: {

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, type RenderOptions } from 'ink';
+import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
@@ -57,7 +57,9 @@ import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { MouseProvider } from './ui/contexts/MouseContext.js';
 
+import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
@@ -161,12 +163,24 @@ export async function startInteractiveUI(
   // do not yet have support for scrolling in that mode.
   if (!config.getScreenReader()) {
     process.stdout.write('\x1b[?7l');
-
-    registerCleanup(() => {
-      // Re-enable line wrapping on exit.
-      process.stdout.write('\x1b[?7h');
-    });
   }
+
+  const mouseEventsEnabled = settings.merged.ui?.useAlternateBuffer === true;
+  if (mouseEventsEnabled) {
+    // Enable mouse tracking with SGR format
+    // ?1002h = button event tracking (clicks + drags + scroll wheel)
+    // ?1006h = SGR extended mouse mode (better coordinate handling)
+    // ?1049h = alternate screen buffer
+    process.stdout.write('\u001b[?1002h\u001b[?1006h');
+  }
+
+  registerCleanup(() => {
+    // Re-enable line wrapping on exit.
+    process.stdout.write('\x1b[?7h');
+    if (mouseEventsEnabled) {
+      process.stdout.write('\u001b[?1006l\u001b[?1002l');
+    }
+  });
 
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -181,17 +195,26 @@ export async function startInteractiveUI(
           config={config}
           debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
         >
-          <SessionStatsProvider>
-            <VimModeProvider settings={settings}>
-              <AppContainer
-                config={config}
-                settings={settings}
-                startupWarnings={startupWarnings}
-                version={version}
-                initializationResult={initializationResult}
-              />
-            </VimModeProvider>
-          </SessionStatsProvider>
+          <MouseProvider
+            mouseEventsEnabled={mouseEventsEnabled}
+            debugKeystrokeLogging={
+              settings.merged.general?.debugKeystrokeLogging
+            }
+          >
+            <ScrollProvider>
+              <SessionStatsProvider>
+                <VimModeProvider settings={settings}>
+                  <AppContainer
+                    config={config}
+                    settings={settings}
+                    startupWarnings={startupWarnings}
+                    version={version}
+                    initializationResult={initializationResult}
+                  />
+                </VimModeProvider>
+              </SessionStatsProvider>
+            </ScrollProvider>
+          </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
     );
@@ -213,7 +236,8 @@ export async function startInteractiveUI(
           recordSlowRender(config, renderTime);
         }
       },
-    } as RenderOptions,
+      alternateBuffer: settings.merged.ui?.useAlternateBuffer,
+    },
   );
 
   checkForUpdates(settings)
