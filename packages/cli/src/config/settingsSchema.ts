@@ -442,6 +442,15 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Use the entire width of the terminal for output.',
+      },
+      useInkScrolling: {
+        type: 'boolean',
+        label: 'Use Ink Scrolling',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Use custom scrolling behavior in the Ink rendering library.',
         showInDialog: true,
       },
       customWittyPhrases: {

@@ -248,7 +248,9 @@ def fibonacci(n):
         a, b = b, a + b
     return a`,
                     'python',
-                    codeBlockHeight,
+                    settings.merged.ui?.useInkScrolling === false
+                      ? codeBlockHeight
+                      : undefined,
                     colorizeCodeWidth,
                   )}
                   <Box marginTop={1} />
@@ -259,7 +261,11 @@ def fibonacci(n):
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                    availableTerminalHeight={diffHeight}
+                    availableTerminalHeight={
+                      settings.merged.ui?.useInkScrolling === false
+                        ? diffHeight
+                        : undefined
+                    }
                     terminalWidth={colorizeCodeWidth}
                     theme={previewTheme}
                   />

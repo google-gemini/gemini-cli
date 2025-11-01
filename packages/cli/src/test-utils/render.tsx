@@ -17,6 +17,7 @@ import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
+import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
 
 import { type Config } from '@google/gemini-cli-core';
 
@@ -163,14 +164,16 @@ export const renderWithProviders = (
           <VimModeProvider settings={settings}>
             <ShellFocusContext.Provider value={shellFocus}>
               <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-                <Box
-                  width={terminalWidth}
-                  flexShrink={0}
-                  flexGrow={0}
-                  flexDirection="column"
-                >
-                  {component}
-                </Box>
+                <ScrollProvider>
+                  <Box
+                    width={terminalWidth}
+                    flexShrink={0}
+                    flexGrow={0}
+                    flexDirection="column"
+                  >
+                    {component}
+                  </Box>
+                </ScrollProvider>
               </KeypressProvider>
             </ShellFocusContext.Provider>
           </VimModeProvider>
