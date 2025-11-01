@@ -124,6 +124,10 @@ class GeminiAgent {
           audio: true,
           embeddedContext: true,
         },
+        mcpCapabilities: {
+          http: true,
+          sse: true,
+        },
       },
     };
   }
@@ -190,12 +194,49 @@ class GeminiAgent {
   ): Promise<Config> {
     const mergedMcpServers = { ...this.settings.merged.mcpServers };
 
-    for (const { command, args, env: rawEnv, name } of mcpServers) {
-      const env: Record<string, string> = {};
-      for (const { name: envName, value } of rawEnv) {
-        env[envName] = value;
+    for (const config of mcpServers) {
+      if ('type' in config && config.type === 'sse') {
+        mergedMcpServers[config.name] = new MCPServerConfig(
+          undefined, // command
+          undefined, // args
+          undefined, // env
+          undefined, // cwd
+          config.url,
+          undefined, // httpUrl
+          Object.fromEntries(
+            config.headers.map(
+              ({ name, value }: { name: string; value: string }) => [
+                name,
+                value,
+              ],
+            ),
+          ),
+        );
+      } else if ('type' in config && config.type === 'http') {
+        mergedMcpServers[config.name] = new MCPServerConfig(
+          undefined, // command
+          undefined, // args
+          undefined, // env
+          undefined, // cwd
+          undefined, // url (for SSE)
+          config.url, // httpUrl
+          Object.fromEntries(
+            config.headers.map(
+              ({ name, value }: { name: string; value: string }) => [
+                name,
+                value,
+              ],
+            ),
+          ),
+        );
+      } else {
+        const { command, args, env: rawEnv, name } = config;
+        const env: Record<string, string> = {};
+        for (const { name: envName, value } of rawEnv) {
+          env[envName] = value;
+        }
+        mergedMcpServers[name] = new MCPServerConfig(command, args, env, cwd);
       }
-      mergedMcpServers[name] = new MCPServerConfig(command, args, env, cwd);
     }
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
@@ -335,7 +376,9 @@ class Session {
     return { stopReason: 'end_turn' };
   }
 
-  private async sendUpdate(update: acp.SessionUpdate): Promise<void> {
+  private async sendUpdate(
+    update: acp.SessionNotification['update'],
+  ): Promise<void> {
     const params: acp.SessionNotification = {
       sessionId: this.id,
       update,
