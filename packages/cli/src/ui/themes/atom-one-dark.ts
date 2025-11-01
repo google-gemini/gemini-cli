@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const atomOneDarkColors: ColorsTheme = {
   type: 'dark',
@@ -21,6 +22,7 @@ const atomOneDarkColors: ColorsTheme = {
   DiffRemoved: '#562B2F',
   Comment: '#5c6370',
   Gray: '#5c6370',
+  DarkGray: interpolateColor('#5c6370', '#282c34', 0.5),
   GradientColors: ['#61aeee', '#98c379'],
 };
 
