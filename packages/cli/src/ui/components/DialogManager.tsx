@@ -7,6 +7,7 @@
 import { Box, Text } from 'ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
+import { DinoGame } from './dino/DinoGame.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { ConsentPrompt } from './ConsentPrompt.js';
@@ -140,6 +141,9 @@ export const DialogManager = ({
   }
   if (uiState.isModelDialogOpen) {
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
+  }
+  if (uiState.isDinoDialogOpen) {
+    return <DinoGame onClose={uiActions.closeDinoDialog} />;
   }
   if (uiState.isAuthenticating) {
     return (

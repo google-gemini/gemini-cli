@@ -399,6 +399,15 @@ const SETTINGS_SCHEMA = {
           'Hide the context summary (GEMINI.md, MCP servers) above the input.',
         showInDialog: true,
       },
+      enableDinoGame: {
+        type: 'boolean',
+        label: 'Enable Dino Game',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable the dino game command.',
+        showInDialog: true,
+      },
       footer: {
         type: 'object',
         label: 'Footer',
