@@ -1106,6 +1106,34 @@ describe('runNonInteractive', () => {
     expect(getWrittenOutput()).toBe('file.txt\n');
   });
 
+  it('should process input with special characters like trailing exclamation marks', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Hello!' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      'Hello!',
+      'prompt-id-special-chars',
+    );
+
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
+      [{ text: 'Hello!' }],
+      expect.any(AbortSignal),
+      'prompt-id-special-chars',
+    );
+    expect(processStdoutSpy).toHaveBeenCalledWith('Hello!');
+    expect(processStdoutSpy).toHaveBeenCalledWith('\n');
+  });
+
   describe('CoreEvents Integration', () => {
     it('subscribes to UserFeedback and drains backlog on start', async () => {
       const events: ServerGeminiStreamEvent[] = [
