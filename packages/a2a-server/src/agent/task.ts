@@ -51,6 +51,7 @@ import type {
   ThoughtSummary,
   Citation,
 } from '../types.js';
+import { saveRestorableToolCall } from '../utils/checkpointUtils.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
@@ -548,6 +549,15 @@ export class Task {
   ): Promise<void> {
     if (requests.length === 0) {
       return;
+    }
+
+    for (const request of requests) {
+      await saveRestorableToolCall(
+        request,
+        this.config,
+        this.geminiClient,
+        this.id,
+      );
     }
 
     const updatedRequests = await Promise.all(

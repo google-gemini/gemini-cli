@@ -7,12 +7,17 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  type Config,
+  performRestore,
+  type ToolCallData,
+} from '@google/gemini-cli-core';
+import {
   type CommandContext,
   type SlashCommand,
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { HistoryItem } from '../types.js';
 
 async function restoreAction(
   context: CommandContext,
@@ -74,40 +79,31 @@ async function restoreAction(
 
     const filePath = path.join(checkpointDir, selectedFile);
     const data = await fs.readFile(filePath, 'utf-8');
-    const toolCallData = JSON.parse(data);
+    const toolCallData = JSON.parse(data) as ToolCallData;
 
-    if (toolCallData.history) {
-      if (!loadHistory) {
-        // This should not happen
-        return {
-          type: 'message',
-          messageType: 'error',
-          content: 'loadHistory function is not available.',
-        };
+    const actionStream = performRestore(toolCallData, gitService);
+    let previousAction: SlashCommandActionReturn | undefined;
+
+    for await (const currentAction of actionStream) {
+      if (previousAction) {
+        // This was not the last action, so process it now.
+        if (previousAction.type === 'message') {
+          addItem(
+            {
+              type: previousAction.messageType,
+              text: previousAction.content,
+            },
+            Date.now(),
+          );
+        } else if (previousAction.type === 'load_history' && loadHistory) {
+          loadHistory(previousAction.history as HistoryItem[]);
+        }
       }
-      loadHistory(toolCallData.history);
+      previousAction = currentAction;
     }
 
-    if (toolCallData.clientHistory) {
-      await config?.getGeminiClient()?.setHistory(toolCallData.clientHistory);
-    }
-
-    if (toolCallData.commitHash) {
-      await gitService?.restoreProjectFromSnapshot(toolCallData.commitHash);
-      addItem(
-        {
-          type: 'info',
-          text: 'Restored project to the state before the tool call.',
-        },
-        Date.now(),
-      );
-    }
-
-    return {
-      type: 'tool',
-      toolName: toolCallData.toolCall.name,
-      toolArgs: toolCallData.toolCall.args,
-    };
+    // After the loop, previousAction holds the last action, which we return.
+    return previousAction;
   } catch (error) {
     return {
       type: 'message',
