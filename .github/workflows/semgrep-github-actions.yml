@@ -1,0 +1,49 @@
+name: Semgrep GitHub Actions Scan
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    env:
+      SEMGREP_SEND_METRICS: "0"
+      SEMGREP_DISABLE_VERSION_CHECK: "1"
+      SEMGREP_RULES_BRANCH: develop
+      SEMGREP_RULES_REPO: https://github.com/semgrep/semgrep-rules.git
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Semgrep CLI
+        run: |
+          python -m pip install --upgrade pip
+          pip install "semgrep>=1.65.0,<2.0.0"
+
+      - name: Fetch Semgrep community GitHub Actions rules
+        run: |
+          git clone --depth 1 --branch "${SEMGREP_RULES_BRANCH}" "${SEMGREP_RULES_REPO}" /tmp/semgrep-rules
+
+      - name: Run Semgrep against workflow files
+        run: |
+          semgrep \
+            --config /tmp/semgrep-rules/yaml/github-actions/security \
+            --metrics=off \
+            --error \
+            .github/workflows
