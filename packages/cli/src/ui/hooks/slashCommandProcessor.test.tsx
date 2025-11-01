@@ -52,8 +52,10 @@ const { mockProcessExit } = vi.hoisted(() => ({
   mockProcessExit: vi.fn((_code?: number): never => undefined as never),
 }));
 
-vi.mock('node:process', () => {
+vi.mock('node:process', async (importOriginal) => {
+  const originalProcess = await importOriginal<typeof process>();
   const mockProcess: Partial<NodeJS.Process> = {
+    ...originalProcess,
     exit: mockProcessExit,
     platform: 'sunos',
     cwd: () => '/fake/dir',

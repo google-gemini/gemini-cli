@@ -69,6 +69,7 @@ export interface CliArgs {
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   includeDirectories: string[] | undefined;
+  _: Array<string | number>;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
