@@ -11,7 +11,7 @@ import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import { unescapePath } from '@google/gemini-cli-core';
 import {
-  toCodePoints,
+  toGraphemes,
   cpLen,
   cpSlice,
   stripUnsafeCharacters,
@@ -39,13 +39,16 @@ function isWordChar(ch: string | undefined): boolean {
 }
 
 // Helper functions for line-based word navigation
+// Note: These work with grapheme clusters which may contain multiple code points
+// (e.g., 'é' can be 'e' + combining mark). We check if the grapheme CONTAINS
+// a word character, not if it IS a single word character.
 export const isWordCharStrict = (char: string): boolean =>
-  /[\w\p{L}\p{N}]/u.test(char); // Matches a single character that is any Unicode letter, any Unicode number, or an underscore
+  /[\w\p{L}\p{N}]/u.test(char); // Matches if the grapheme contains a word character
 
 export const isWhitespace = (char: string): boolean => /\s/.test(char);
 
-// Check if a character is a combining mark (only diacritics for now)
-export const isCombiningMark = (char: string): boolean => /\p{M}/u.test(char);
+// Check if a grapheme is a pure combining mark (no base character)
+export const isCombiningMark = (char: string): boolean => /^\p{M}$/u.test(char);
 
 // Check if a character should be considered part of a word (including combining marks)
 export const isWordCharWithCombining = (char: string): boolean =>
@@ -73,7 +76,7 @@ export const findNextWordStartInLine = (
   line: string,
   col: number,
 ): number | null => {
-  const chars = toCodePoints(line);
+  const chars = toGraphemes(line);
   let i = col;
 
   if (i >= chars.length) return null;
@@ -117,7 +120,7 @@ export const findPrevWordStartInLine = (
   line: string,
   col: number,
 ): number | null => {
-  const chars = toCodePoints(line);
+  const chars = toGraphemes(line);
   let i = col;
 
   if (i <= 0) return null;
@@ -156,7 +159,7 @@ export const findPrevWordStartInLine = (
 
 // Find word end within a line
 export const findWordEndInLine = (line: string, col: number): number | null => {
-  const chars = toCodePoints(line);
+  const chars = toGraphemes(line);
   let i = col;
 
   // If we're already at the end of a word (including punctuation sequences), advance to next word
@@ -267,7 +270,7 @@ export const findNextWordAcrossLines = (
   // Search subsequent lines
   for (let row = cursorRow + 1; row < lines.length; row++) {
     const line = lines[row] || '';
-    const chars = toCodePoints(line);
+    const chars = toGraphemes(line);
 
     // For empty lines, if we haven't found any words yet, return the empty line
     if (chars.length === 0) {
@@ -275,7 +278,7 @@ export const findNextWordAcrossLines = (
       let hasWordsInLaterLines = false;
       for (let laterRow = row + 1; laterRow < lines.length; laterRow++) {
         const laterLine = lines[laterRow] || '';
-        const laterChars = toCodePoints(laterLine);
+        const laterChars = toGraphemes(laterLine);
         let firstNonWhitespace = 0;
         while (
           firstNonWhitespace < laterChars.length &&
@@ -338,7 +341,7 @@ export const findPrevWordAcrossLines = (
   // Search previous lines
   for (let row = cursorRow - 1; row >= 0; row--) {
     const line = lines[row] || '';
-    const chars = toCodePoints(line);
+    const chars = toGraphemes(line);
 
     if (chars.length === 0) continue;
 
@@ -659,18 +662,18 @@ function calculateLayout(
     } else {
       // Non-empty logical line
       let currentPosInLogLine = 0; // Tracks position within the current logical line (code point index)
-      const codePointsInLogLine = toCodePoints(logLine);
+      const graphemesInLogLine = toGraphemes(logLine);
 
-      while (currentPosInLogLine < codePointsInLogLine.length) {
+      while (currentPosInLogLine < graphemesInLogLine.length) {
         let currentChunk = '';
         let currentChunkVisualWidth = 0;
         let numCodePointsInChunk = 0;
-        let lastWordBreakPoint = -1; // Index in codePointsInLogLine for word break
+        let lastWordBreakPoint = -1; // Index in graphemesInLogLine for word break
         let numCodePointsAtLastWordBreak = 0;
 
         // Iterate through code points to build the current visual line (chunk)
-        for (let i = currentPosInLogLine; i < codePointsInLogLine.length; i++) {
-          const char = codePointsInLogLine[i];
+        for (let i = currentPosInLogLine; i < graphemesInLogLine.length; i++) {
+          const char = graphemesInLogLine[i];
           const charVisualWidth = getCachedStringWidth(char);
 
           if (currentChunkVisualWidth + charVisualWidth > viewportWidth) {
@@ -681,7 +684,7 @@ function calculateLayout(
               currentPosInLogLine + numCodePointsAtLastWordBreak < i
             ) {
               // We have a valid word break point to use, and it's not the start of the current segment
-              currentChunk = codePointsInLogLine
+              currentChunk = graphemesInLogLine
                 .slice(
                   currentPosInLogLine,
                   currentPosInLogLine + numCodePointsAtLastWordBreak,
@@ -728,11 +731,11 @@ function calculateLayout(
         // or if the loop broke but numCodePointsInChunk is still 0 (e.g. first char too wide for empty line)
         if (
           numCodePointsInChunk === 0 &&
-          currentPosInLogLine < codePointsInLogLine.length
+          currentPosInLogLine < graphemesInLogLine.length
         ) {
           // This can happen if the very first character considered for a new visual line is wider than the viewport.
           // In this case, we take that single character.
-          const firstChar = codePointsInLogLine[currentPosInLogLine];
+          const firstChar = graphemesInLogLine[currentPosInLogLine];
           currentChunk = firstChar;
           numCodePointsInChunk = 1; // Ensure we advance
         }
@@ -741,10 +744,10 @@ function calculateLayout(
         // it implies an issue, like viewportWidth being 0 or less. Avoid infinite loop.
         if (
           numCodePointsInChunk === 0 &&
-          currentPosInLogLine < codePointsInLogLine.length
+          currentPosInLogLine < graphemesInLogLine.length
         ) {
           // Force advance by one character to prevent infinite loop if something went wrong
-          currentChunk = codePointsInLogLine[currentPosInLogLine];
+          currentChunk = graphemesInLogLine[currentPosInLogLine];
           numCodePointsInChunk = 1;
         }
 
@@ -763,9 +766,9 @@ function calculateLayout(
         // advance past this space as it acted as a delimiter for word wrapping.
         if (
           logicalStartOfThisChunk + numCodePointsInChunk <
-            codePointsInLogLine.length &&
-          currentPosInLogLine < codePointsInLogLine.length && // Redundant if previous is true, but safe
-          codePointsInLogLine[currentPosInLogLine] === ' '
+            graphemesInLogLine.length &&
+          currentPosInLogLine < graphemesInLogLine.length && // Redundant if previous is true, but safe
+          graphemesInLogLine[currentPosInLogLine] === ' '
         ) {
           currentPosInLogLine++;
         }
@@ -1199,7 +1202,7 @@ function textBufferReducerLogic(
             newCursorCol = cpLen(lines[newCursorRow] ?? '');
           } else {
             const lineContent = lines[cursorRow];
-            const arr = toCodePoints(lineContent);
+            const arr = toGraphemes(lineContent);
             let start = cursorCol;
             let onlySpaces = true;
             for (let i = 0; i < start; i++) {
@@ -1234,7 +1237,7 @@ function textBufferReducerLogic(
           let newCursorRow = cursorRow;
           let newCursorCol = cursorCol;
           const lineContent = lines[cursorRow] ?? '';
-          const arr = toCodePoints(lineContent);
+          const arr = toGraphemes(lineContent);
 
           if (cursorCol >= arr.length) {
             newCursorRow++;
@@ -1660,7 +1663,7 @@ export function useTextBuffer({
       }
 
       let currentText = '';
-      for (const char of toCodePoints(ch)) {
+      for (const char of toGraphemes(ch)) {
         if (char.codePointAt(0) === 127) {
           if (currentText.length > 0) {
             dispatch({ type: 'insert', payload: currentText });
