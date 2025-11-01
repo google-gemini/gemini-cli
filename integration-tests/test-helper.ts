@@ -220,6 +220,13 @@ export class InteractiveRun {
     }
   }
 
+  // Types an entire string at once, necessary for some things like commands
+  // but may run into paste detection issues for larger strings.
+  async sendText(text: string) {
+    this.ptyProcess.write(text);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
   // Simulates typing a string one character at a time to avoid paste detection.
   async sendKeys(text: string) {
     const delay = 5;
@@ -255,7 +262,10 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
+  // Original fake responses file path for rewriting goldens in record mode.
+  originalFakeResponsesPath?: string;
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -275,7 +285,10 @@ export class TestRig {
     mkdirSync(this.testDir, { recursive: true });
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
-      fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      this.originalFakeResponsesPath = options.fakeResponsesPath;
+      if (process.env['REGENERATE_MODEL_GOLDENS'] !== 'true') {
+        fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      }
     }
 
     // Create a settings file to point the CLI to the local collector
@@ -305,6 +318,8 @@ export class TestRig {
       model: DEFAULT_GEMINI_MODEL,
       sandbox:
         env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+      // Don't show the IDE connection dialog when running from VsCode
+      ide: { enabled: false, hasSeenNudge: true },
       ...options.settings, // Allow tests to override/add settings
     };
     writeFileSync(
@@ -344,7 +359,11 @@ export class TestRig {
       ? extraInitialArgs
       : [this.bundlePath, ...extraInitialArgs];
     if (this.fakeResponsesPath) {
-      initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
+        initialArgs.push('--record-responses', this.fakeResponsesPath);
+      } else {
+        initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      }
     }
     return { command, initialArgs };
   }
@@ -376,13 +395,13 @@ export class TestRig {
     };
 
     if (typeof promptOrOptions === 'string') {
-      commandArgs.push('--prompt', promptOrOptions);
+      commandArgs.push(promptOrOptions);
     } else if (
       typeof promptOrOptions === 'object' &&
       promptOrOptions !== null
     ) {
       if (promptOrOptions.prompt) {
-        commandArgs.push('--prompt', promptOrOptions.prompt);
+        commandArgs.push(promptOrOptions.prompt);
       }
       if (promptOrOptions.stdin) {
         execOptions.input = promptOrOptions.stdin;
@@ -555,6 +574,12 @@ export class TestRig {
   }
 
   async cleanup() {
+    if (
+      process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
+      this.fakeResponsesPath
+    ) {
+      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
+    }
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
@@ -991,7 +1016,7 @@ export class TestRig {
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
-    await run.expectText('Type your message', 30000);
+    await run.expectText('  Type your message or @path/to/file', 30000);
     return run;
   }
 }

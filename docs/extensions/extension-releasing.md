@@ -15,11 +15,9 @@ if you need to ship platform specific binary files.
 
 This is the most flexible and simple option. All you need to do is create a
 publicly accessible git repo (such as a public github repository) and then users
-can install your extension using `gemini extensions install <your-repo-uri>`, or
-for a GitHub repository they can use the simplified
-`gemini extensions install <org>/<repo>` format. They can optionally depend on a
-specific ref (branch/tag/commit) using the `--ref=<some-ref>` argument, this
-defaults to the default branch.
+can install your extension using `gemini extensions install <your-repo-uri>`.
+They can optionally depend on a specific ref (branch/tag/commit) using the
+`--ref=<some-ref>` argument, this defaults to the default branch.
 
 Whenever commits are pushed to the ref that a user depends on, they will be
 prompted to update the extension. Note that this also allows for easy rollbacks,

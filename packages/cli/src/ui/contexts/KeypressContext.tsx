@@ -48,33 +48,54 @@ export const PASTE_CODE_TIMEOUT_MS = 50; // Flush incomplete paste code after 50
 export const SINGLE_QUOTE = "'";
 export const DOUBLE_QUOTE = '"';
 
-const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
-  '\u00E5': 'a',
-  '\u222B': 'b',
-  '\u00E7': 'c',
-  '\u2202': 'd',
-  '\u00B4': 'e',
-  '\u0192': 'f',
-  '\u00A9': 'g',
-  '\u02D9': 'h',
-  '\u02C6': 'i',
-  '\u2206': 'j',
-  '\u02DA': 'k',
-  '\u00AC': 'l',
-  '\u00B5': 'm',
-  '\u02DC': 'n',
-  '\u00F8': 'o',
-  '\u03C0': 'p',
-  '\u0153': 'q',
-  '\u00AE': 'r',
-  '\u00DF': 's',
-  '\u2020': 't',
-  '\u00A8': 'u',
-  '\u221A': 'v',
-  '\u2211': 'w',
-  '\u2248': 'x',
-  '\u00A5': 'y',
-  '\u03A9': 'z',
+// On Mac, hitting alt+char will yield funny characters.
+// Remap these three since we listen for them.
+const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
+  '\u222B': 'b', // "∫" back one word
+  '\u0192': 'f', // "ƒ" forward one word
+  '\u00B5': 'm', // "µ" toggle markup view
+};
+
+/**
+ * Maps symbols from parameterized functional keys `\x1b[1;1<letter>`
+ * to their corresponding key names (e.g., 'up', 'f1').
+ */
+const LEGACY_FUNC_TO_NAME: { [k: string]: string } = {
+  A: 'up',
+  B: 'down',
+  C: 'right',
+  D: 'left',
+  H: 'home',
+  F: 'end',
+  P: 'f1',
+  Q: 'f2',
+  R: 'f3',
+  S: 'f4',
+};
+
+/**
+ * Maps key codes from tilde-coded functional keys `\x1b[<code>~`
+ * to their corresponding key names.
+ */
+const TILDE_KEYCODE_TO_NAME: Record<number, string> = {
+  1: 'home',
+  2: 'insert',
+  3: 'delete',
+  4: 'end',
+  5: 'pageup',
+  6: 'pagedown',
+  11: 'f1',
+  12: 'f2',
+  13: 'f3',
+  14: 'f4',
+  15: 'f5',
+  17: 'f6', // skipping 16 is intentional
+  18: 'f7',
+  19: 'f8',
+  20: 'f9',
+  21: 'f10',
+  23: 'f11', // skipping 22 is intentional
+  24: 'f12',
 };
 
 /**
@@ -190,19 +211,7 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
     const alt = (bits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
     const ctrl = (bits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
     const sym = m[2];
-    const symbolToName: { [k: string]: string } = {
-      A: 'up',
-      B: 'down',
-      C: 'right',
-      D: 'left',
-      H: 'home',
-      F: 'end',
-      P: 'f1',
-      Q: 'f2',
-      R: 'f3',
-      S: 'f4',
-    };
-    const name = symbolToName[sym] || '';
+    const name = LEGACY_FUNC_TO_NAME[sym] || '';
     if (!name) return null;
     return {
       key: {
@@ -237,29 +246,7 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
 
     // Tilde-coded functional keys (Delete, Insert, PageUp/Down, Home/End)
     if (terminator === '~') {
-      let name: string | null = null;
-      switch (keyCode) {
-        case 1:
-          name = 'home';
-          break;
-        case 2:
-          name = 'insert';
-          break;
-        case 3:
-          name = 'delete';
-          break;
-        case 4:
-          name = 'end';
-          break;
-        case 5:
-          name = 'pageup';
-          break;
-        case 6:
-          name = 'pagedown';
-          break;
-        default:
-          break;
-      }
+      const name = TILDE_KEYCODE_TO_NAME[keyCode];
       if (name) {
         return {
           key: {
@@ -328,15 +315,7 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
   m = buffer.match(legacyFuncKey);
   if (m) {
     const sym = m[1];
-    const nameMap: { [key: string]: string } = {
-      A: 'up',
-      B: 'down',
-      C: 'right',
-      D: 'left',
-      H: 'home',
-      F: 'end',
-    };
-    const name = nameMap[sym]!;
+    const name = LEGACY_FUNC_TO_NAME[sym]!;
     return {
       key: {
         name,
@@ -481,19 +460,8 @@ export function useKeypressContext() {
   return context;
 }
 
-/**
- * Determines if the passthrough stream workaround should be used.
- * This is necessary for Node.js versions older than 20 or when the
- * PASTE_WORKAROUND environment variable is set, to correctly handle
- * paste events.
- */
 function shouldUsePassthrough(): boolean {
-  const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
-  return (
-    nodeMajorVersion < 20 ||
-    process.env['PASTE_WORKAROUND'] === '1' ||
-    process.env['PASTE_WORKAROUND'] === 'true'
-  );
+  return process.env['PASTE_WORKAROUND'] !== 'false';
 }
 
 export function KeypressProvider({
@@ -626,8 +594,8 @@ export function KeypressProvider({
         return;
       }
 
-      const mappedLetter = ALT_KEY_CHARACTER_MAP[key.sequence];
-      if (mappedLetter && !key.meta) {
+      const mappedLetter = MAC_ALT_KEY_CHARACTER_MAP[key.sequence];
+      if (process.platform === 'darwin' && mappedLetter && !key.meta) {
         broadcast({
           name: mappedLetter,
           ctrl: false,
