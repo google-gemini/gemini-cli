@@ -36,9 +36,9 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 #### Run instantly with npx
 
+Using npx (no installation required)
 ```bash
-# Using npx (no installation required)
-npx https://github.com/google-gemini/gemini-cli
+npx @google/gemini-cli
 ```
 
 #### Install globally with npm
