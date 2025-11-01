@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as process from 'node:process';
 import { debugLogger } from './debugLogger.js';
+import { normalizePath } from './paths.js';
 
 export type Unsubscribe = () => void;
 
@@ -89,15 +90,18 @@ export class WorkspaceContext {
       ? directory
       : path.resolve(basePath, directory);
 
-    if (!fs.existsSync(absolutePath)) {
-      throw new Error(`Directory does not exist: ${absolutePath}`);
+    const normalizedPath = normalizePath(absolutePath);
+
+    if (!fs.existsSync(normalizedPath)) {
+      throw new Error(`Directory does not exist: ${normalizedPath}`);
     }
-    const stats = fs.statSync(absolutePath);
+    const stats = fs.statSync(normalizedPath);
     if (!stats.isDirectory()) {
-      throw new Error(`Path is not a directory: ${absolutePath}`);
+      throw new Error(`Path is not a directory: ${normalizedPath}`);
     }
 
-    return fs.realpathSync(absolutePath);
+    const rawFilesystemPath = fs.realpathSync(normalizedPath);
+    return rawFilesystemPath.normalize('NFC');
   }
 
   /**
@@ -154,7 +158,9 @@ export class WorkspaceContext {
    */
   private fullyResolvedPath(pathToCheck: string): string {
     try {
-      return fs.realpathSync(pathToCheck);
+      const normalizedPath = normalizePath(pathToCheck);
+      const rawFilesystemPath = fs.realpathSync(normalizedPath);
+      return normalizePath(rawFilesystemPath);
     } catch (e: unknown) {
       if (
         isNodeError(e) &&
@@ -165,7 +171,7 @@ export class WorkspaceContext {
         !this.isFileSymlink(e.path)
       ) {
         // If it doesn't exist, e.path contains the fully resolved path.
-        return e.path;
+        return normalizePath(e.path);
       }
       throw e;
     }
@@ -181,7 +187,10 @@ export class WorkspaceContext {
     pathToCheck: string,
     rootDirectory: string,
   ): boolean {
-    const relative = path.relative(rootDirectory, pathToCheck);
+    const relative = path.relative(
+      normalizePath(rootDirectory),
+      normalizePath(pathToCheck),
+    );
     return (
       !relative.startsWith(`..${path.sep}`) &&
       relative !== '..' &&

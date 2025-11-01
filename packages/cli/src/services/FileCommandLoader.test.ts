@@ -1040,6 +1040,27 @@ describe('FileCommandLoader', () => {
         ),
       ).rejects.toThrow('Something else went wrong');
     });
+
+    it('should correctly generate command names from paths with unicode characters', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      const unicodeDirName = '테스트';
+      const unicodeDirPath = path.join(userCommandsDir, unicodeDirName);
+      const tomlFileName = 'my-cmd.toml';
+      const tomlFilePath = path.join(unicodeDirPath, tomlFileName);
+
+      mock({
+        [tomlFilePath]: 'prompt = "A test prompt"',
+      });
+
+      const loader = new FileCommandLoader(null);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      // The command name should be correctly formed using the unicode directory name
+      expect(commands[0].name).toBe(
+        `${unicodeDirName}:${tomlFileName.replace('.toml', '')}`,
+      );
+    });
     it('assembles the processor pipeline in the correct order (AtFile -> Shell -> Default)', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({

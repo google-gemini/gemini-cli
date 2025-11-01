@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { isSubpath } from './paths.js';
+import { isSubpath, normalizePath } from './paths.js';
 import { marked, type Token } from 'marked';
 import { debugLogger } from './debugLogger.js';
 
@@ -240,7 +240,7 @@ export async function processImports(
       depth: number,
     ) {
       // Normalize the file path to ensure consistent comparison
-      const normalizedPath = path.normalize(filePath);
+      const normalizedPath = normalizePath(filePath);
 
       // Skip if already processed
       if (processedFiles.has(normalizedPath)) return;
@@ -277,7 +277,7 @@ export async function processImports(
         }
 
         const fullPath = path.resolve(fileBasePath, importPath);
-        const normalizedFullPath = path.normalize(fullPath);
+        const normalizedFullPath = normalizePath(fullPath);
 
         // Skip if already processed
         if (processedFiles.has(normalizedFullPath)) continue;
@@ -305,7 +305,7 @@ export async function processImports(
     }
 
     // Start with the root file (current file)
-    const rootPath = path.normalize(
+    const rootPath = normalizePath(
       importState.currentFile || path.resolve(basePath),
     );
     await processFlat(content, basePath, rootPath, 0);
