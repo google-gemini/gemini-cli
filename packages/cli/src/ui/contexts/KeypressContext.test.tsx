@@ -469,6 +469,10 @@ describe('KeypressContext - Kitty Protocol', () => {
       { sequence: `\x1b[1~`, expected: { name: 'home' } },
       { sequence: `\x1b[4~`, expected: { name: 'end' } },
       { sequence: `\x1b[2~`, expected: { name: 'insert' } },
+      { sequence: `\x1b[11~`, expected: { name: 'f1' } },
+      { sequence: `\x1b[17~`, expected: { name: 'f6' } },
+      { sequence: `\x1b[23~`, expected: { name: 'f11' } },
+      { sequence: `\x1b[24~`, expected: { name: 'f12' } },
       // Reverse tabs
       { sequence: `\x1b[Z`, expected: { name: 'tab', shift: true } },
       { sequence: `\x1b[1;2Z`, expected: { name: 'tab', shift: true } },
