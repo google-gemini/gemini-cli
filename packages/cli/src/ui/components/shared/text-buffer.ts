@@ -21,7 +21,8 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { findPlaceholderCandidates } from '../../utils/parse.js';
 
-const LARGE_PASTE_CHAR_THRESHOLD = 1000; // When the pasted content is larger than this threshold, it will be inserted as a placeholder
+// When the pasted content is larger than this threshold, it will be inserted as a placeholder
+const LARGE_PASTE_CHAR_THRESHOLD = 1000;
 
 export type Direction =
   | 'left'
