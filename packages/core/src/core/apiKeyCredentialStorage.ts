@@ -26,15 +26,6 @@ export async function loadApiKey(): Promise<string | null> {
 
     return null;
   } catch (error: unknown) {
-    // Ignore "file not found" error from FileTokenStorage, it just means no key is saved yet.
-    // This is common in fresh environments like e2e tests.
-    if (
-      error instanceof Error &&
-      error.message === 'Token file does not exist'
-    ) {
-      return null;
-    }
-
     // Log other errors but don't crash, just return null so user can re-enter key
     debugLogger.error('Failed to load API key from storage:', error);
     return null;
