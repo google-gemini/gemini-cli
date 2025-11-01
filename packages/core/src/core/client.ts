@@ -51,6 +51,7 @@ import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { HistoryContent } from '../common/types.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -121,6 +122,10 @@ export class GeminiClient {
       throw new Error('Chat not initialized');
     }
     return this.chat;
+  }
+
+  commitCancelledResponse(finalPartialContent: HistoryContent) {
+    this.getChat().commitCancelledResponse(finalPartialContent);
   }
 
   isInitialized(): boolean {

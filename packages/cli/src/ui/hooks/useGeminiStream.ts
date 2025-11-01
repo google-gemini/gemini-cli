@@ -66,6 +66,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import type { HistoryContent } from '@google/gemini-cli-core/src/common/types.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -305,6 +306,33 @@ export const useGeminiStream = (
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {
+      // Reconstruct the full model turn from the UI history.
+      // A single model response can be split into multiple history items
+      // ('gemini' and 'gemini_content') for rendering performance. We need
+      // to recombine them to get the full partial text.
+      let fullResponseText = '';
+      const historyForTurn = [...history];
+      let lastItem = historyForTurn.pop();
+
+      // 1. Go backwards and collect all parts of this turn.
+      while (
+        lastItem &&
+        (lastItem.type === 'gemini' || lastItem.type === 'gemini_content')
+      ) {
+        fullResponseText = (lastItem.text || '') + fullResponseText;
+        lastItem = historyForTurn.pop();
+      }
+
+      // 2. Add the final pending chunk.
+      fullResponseText += pendingHistoryItemRef.current.text || '';
+
+      // 3. Commit the full, reconstructed partial response.
+      const historyItemToCommit: HistoryContent = {
+        role: 'model',
+        parts: [{ text: fullResponseText }],
+      };
+
+      geminiClient.commitCancelledResponse(historyItemToCommit);
       addItem(pendingHistoryItemRef.current, Date.now());
     }
     setPendingHistoryItem(null);
@@ -334,6 +362,8 @@ export const useGeminiStream = (
     setShellInputFocused,
     cancelAllToolCalls,
     toolCalls,
+    geminiClient,
+    history,
   ]);
 
   useKeypress(

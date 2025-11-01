@@ -38,6 +38,7 @@ import {
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
+import type { HistoryContent } from '../common/types.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -114,7 +115,7 @@ function isValidContent(content: Content): boolean {
  * @throws Error if the history does not start with a user turn.
  * @throws Error if the history contains an invalid role.
  */
-function validateHistory(history: Content[]) {
+function validateHistory(history: HistoryContent[]) {
   for (const content of history) {
     if (content.role !== 'user' && content.role !== 'model') {
       throw new Error(`Role must be user or model, but got ${content.role}.`);
@@ -126,37 +127,35 @@ function validateHistory(history: Content[]) {
  * Extracts the curated (valid) history from a comprehensive history.
  *
  * @remarks
- * The model may sometimes generate invalid or empty contents(e.g., due to safety
- * filters or recitation). Extracting valid turns from the history
- * ensures that subsequent requests could be accepted by the model.
+ * The model may sometimes generate invalid or empty contents (e.g., due to
+ * safety filters or recitation). This function ensures that only valid and
+ * complete turns are included in the history sent to the model for the next
+ * request.
+ *
+ * It filters out:
+ * - Model turns that contain invalid content (e.g., empty parts).
+ * - Model turns that are marked as `isPartial`, which indicates an incomplete
+ *   stream that should not be part of the model's context.
+ *
+ * @param comprehensiveHistory The full history, including any partial or
+ *   invalid turns.
+ * @returns A new array containing only the curated, valid history.
  */
-function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
-  if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
+function extractCuratedHistory(
+  comprehensiveHistory: HistoryContent[],
+): HistoryContent[] {
+  if (!comprehensiveHistory) {
     return [];
   }
-  const curatedHistory: Content[] = [];
-  const length = comprehensiveHistory.length;
-  let i = 0;
-  while (i < length) {
-    if (comprehensiveHistory[i].role === 'user') {
-      curatedHistory.push(comprehensiveHistory[i]);
-      i++;
-    } else {
-      const modelOutput: Content[] = [];
-      let isValid = true;
-      while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
-          isValid = false;
-        }
-        i++;
-      }
-      if (isValid) {
-        curatedHistory.push(...modelOutput);
-      }
+  // Filter out model turns that are marked as partial (incomplete stream) or
+  // contain invalid content (e.g., empty parts from safety filtering).
+  // User turns are always included.
+  return comprehensiveHistory.filter((content) => {
+    if (content.role === 'user') {
+      return true;
     }
-  }
-  return curatedHistory;
+    return !content.isPartial && isValidContent(content);
+  });
 }
 
 /**
@@ -190,7 +189,7 @@ export class GeminiChat {
   constructor(
     private readonly config: Config,
     private readonly generationConfig: GenerateContentConfig = {},
-    private history: Content[] = [],
+    private history: HistoryContent[] = [],
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
@@ -270,6 +269,17 @@ export class GeminiChat {
           attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
           attempt++
         ) {
+          // A partial response object is added to the history at the start of
+          // each attempt. It will be populated with streaming content. If the
+          // attempt fails, it's removed by the catch block. If it succeeds,
+          // it remains in the history.
+          const partialResponse: HistoryContent = {
+            role: 'model',
+            parts: [],
+            isPartial: true,
+          };
+          self.history.push(partialResponse);
+
           try {
             if (attempt > 0) {
               yield { type: StreamEventType.RETRY };
@@ -289,6 +299,7 @@ export class GeminiChat {
               requestContents,
               currentParams,
               prompt_id,
+              partialResponse,
             );
 
             for await (const chunk of stream) {
@@ -300,30 +311,38 @@ export class GeminiChat {
           } catch (error) {
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
+            const hasMoreAttempts =
+              attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1;
 
-            if (isContentError) {
-              // Check if we have more attempts left.
-              if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
-                logContentRetry(
-                  self.config,
-                  new ContentRetryEvent(
-                    attempt,
-                    (error as InvalidStreamError).type,
-                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
-                    model,
-                  ),
-                );
-                await new Promise((res) =>
-                  setTimeout(
-                    res,
-                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs *
-                      (attempt + 1),
-                  ),
-                );
-                continue;
+            if (isContentError && hasMoreAttempts) {
+              // Scenario A: We will retry.
+              // Remove the failed partial placeholder for this attempt.
+              self.history.pop();
+              logContentRetry(
+                self.config,
+                new ContentRetryEvent(
+                  attempt,
+                  (error as InvalidStreamError).type,
+                  INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
+                  model,
+                ),
+              );
+              await new Promise((res) =>
+                setTimeout(
+                  res,
+                  INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs * (attempt + 1),
+                ),
+              );
+              continue; // Go to the next attempt.
+            } else {
+              // Scenario B: This is the final failure.
+              if (isContentError) {
+                // All retries exhausted for a retryable error. Clean up history.
+                self.history.pop();
               }
+              // For non-retryable errors, we leave the partial item in the history.
+              break; // Exit the loop to re-throw the error.
             }
-            break;
           }
         }
 
@@ -351,6 +370,7 @@ export class GeminiChat {
     requestContents: Content[],
     params: SendMessageParameters,
     prompt_id: string,
+    partialResponse: HistoryContent,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const apiCall = () => {
       const modelToUse = getEffectiveModel(
@@ -389,7 +409,7 @@ export class GeminiChat {
       signal: params.config?.abortSignal,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    return this.processStreamResponse(model, streamResponse, partialResponse);
   }
 
   /**
@@ -415,7 +435,7 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    * chat session.
    */
-  getHistory(curated: boolean = false): Content[] {
+  getHistory(curated: boolean = false): HistoryContent[] {
     const history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
@@ -434,12 +454,23 @@ export class GeminiChat {
   /**
    * Adds a new entry to the chat history.
    */
-  addHistory(content: Content): void {
+  addHistory(content: HistoryContent): void {
     this.history.push(content);
   }
 
-  setHistory(history: Content[]): void {
+  setHistory(history: HistoryContent[]): void {
     this.history = history;
+  }
+
+  /**
+   * Commits a partial (e.g., from a cancelled request) response to the
+   * definitive history.
+   */
+  commitCancelledResponse(finalPartialContent: HistoryContent): void {
+    // Remove any existing item that was marked as partial
+    this.history = this.history.filter((item) => !item.isPartial);
+    // Add the final version of the partial content, ensuring it's marked as partial.
+    this.history.push({ ...finalPartialContent, isPartial: true });
   }
 
   stripThoughtsFromHistory(): void {
@@ -494,71 +525,86 @@ export class GeminiChat {
   private async *processStreamResponse(
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    partialResponse: HistoryContent,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
-
     let hasToolCall = false;
     let hasFinishReason = false;
+    let streamSuccessful = false;
 
-    for await (const chunk of streamResponse) {
-      hasFinishReason =
-        chunk?.candidates?.some((candidate) => candidate.finishReason) ?? false;
-      if (isValidResponse(chunk)) {
-        const content = chunk.candidates?.[0]?.content;
-        if (content?.parts) {
-          if (content.parts.some((part) => part.thought)) {
-            // Record thoughts
-            this.recordThoughtFromContent(content);
-          }
-          if (content.parts.some((part) => part.functionCall)) {
-            hasToolCall = true;
-          }
+    try {
+      for await (const chunk of streamResponse) {
+        hasFinishReason =
+          chunk?.candidates?.some((candidate) => candidate.finishReason) ??
+          false;
+        if (isValidResponse(chunk)) {
+          const content = chunk.candidates?.[0]?.content;
+          if (content?.parts) {
+            if (content.parts.some((part) => part.thought)) {
+              // Record thoughts
+              this.recordThoughtFromContent(content);
+            }
+            if (content.parts.some((part) => part.functionCall)) {
+              hasToolCall = true;
+            }
 
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
-          );
+            modelResponseParts.push(
+              ...content.parts.filter((part) => !part.thought),
+            );
+            partialResponse.parts = [...modelResponseParts];
+          }
+        }
+
+        // Record token usage if this chunk has usageMetadata
+        if (chunk.usageMetadata) {
+          this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+          if (chunk.usageMetadata.promptTokenCount !== undefined) {
+            this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
+          }
+        }
+
+        yield chunk; // Yield every chunk to the UI immediately.
+      }
+      streamSuccessful = true;
+    } finally {
+      // String thoughts and consolidate text parts.
+      const consolidatedParts: Part[] = [];
+      for (const part of modelResponseParts) {
+        const lastPart = consolidatedParts[consolidatedParts.length - 1];
+        if (
+          lastPart?.text &&
+          isValidNonThoughtTextPart(lastPart) &&
+          isValidNonThoughtTextPart(part)
+        ) {
+          lastPart.text += part.text;
+        } else {
+          consolidatedParts.push(part);
         }
       }
+      partialResponse.parts = consolidatedParts;
 
-      // Record token usage if this chunk has usageMetadata
-      if (chunk.usageMetadata) {
-        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
-        if (chunk.usageMetadata.promptTokenCount !== undefined) {
-          this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
-        }
+      const responseText = consolidatedParts
+        .filter((part) => part.text)
+        .map((part) => part.text)
+        .join('')
+        .trim();
+
+      // Record model response text from the collected parts
+      if (responseText) {
+        this.chatRecordingService.recordMessage({
+          model,
+          type: 'gemini',
+          content: responseText,
+        });
       }
 
-      yield chunk; // Yield every chunk to the UI immediately.
-    }
-
-    // String thoughts and consolidate text parts.
-    const consolidatedParts: Part[] = [];
-    for (const part of modelResponseParts) {
-      const lastPart = consolidatedParts[consolidatedParts.length - 1];
-      if (
-        lastPart?.text &&
-        isValidNonThoughtTextPart(lastPart) &&
-        isValidNonThoughtTextPart(part)
-      ) {
-        lastPart.text += part.text;
+      if (streamSuccessful) {
+        // On success, the turn is complete, so the `isPartial` flag is no longer needed.
+        delete partialResponse.isPartial;
       } else {
-        consolidatedParts.push(part);
+        // On failure (e.g., stream interruption), explicitly mark the history item as partial.
+        partialResponse.isPartial = true;
       }
-    }
-
-    const responseText = consolidatedParts
-      .filter((part) => part.text)
-      .map((part) => part.text)
-      .join('')
-      .trim();
-
-    // Record model response text from the collected parts
-    if (responseText) {
-      this.chatRecordingService.recordMessage({
-        model,
-        type: 'gemini',
-        content: responseText,
-      });
     }
 
     // Stream validation logic: A stream is considered successful if:
@@ -568,7 +614,7 @@ export class GeminiChat {
     // We throw an error only when there's no tool call AND:
     // - No finish reason, OR
     // - Empty response text (e.g., only thoughts with no actual content)
-    if (!hasToolCall && (!hasFinishReason || !responseText)) {
+    if (!hasToolCall && (!hasFinishReason || !partialResponse.parts.length)) {
       if (!hasFinishReason) {
         throw new InvalidStreamError(
           'Model stream ended without a finish reason.',
@@ -581,8 +627,6 @@ export class GeminiChat {
         );
       }
     }
-
-    this.history.push({ role: 'model', parts: consolidatedParts });
   }
 
   getLastPromptTokenCount(): number {

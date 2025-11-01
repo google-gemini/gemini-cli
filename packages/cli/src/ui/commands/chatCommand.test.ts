@@ -7,9 +7,12 @@
 import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import type { SlashCommand, CommandContext } from './types.js';
+import type {
+  SlashCommand,
+  CommandContext,
+  SlashCommandActionReturn,
+} from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import type { Content } from '@google/genai';
 import type { GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
@@ -17,6 +20,8 @@ import { chatCommand, serializeHistoryToMarkdown } from './chatCommand.js';
 import type { Stats } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
+import type { Content } from '@google/genai';
+import type { HistoryContent } from '@google/gemini-cli-core/src/common/types.js';
 
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
@@ -222,6 +227,26 @@ describe('chatCommand', () => {
         content: `Conversation checkpoint saved with tag: ${tag}.`,
       });
     });
+
+    it('should save history including partial responses', async () => {
+      const history: HistoryContent[] = [
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        {
+          role: 'model',
+          parts: [{ text: 'I am a partial response' }],
+          isPartial: true,
+        },
+      ];
+      mockGetHistory.mockReturnValue(history);
+
+      if (!saveCommand.action)
+        throw new Error('saveCommand.action not defined');
+      await saveCommand.action(mockContext, tag);
+
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(history, tag);
+    });
   });
 
   describe('resume subcommand', () => {
@@ -272,6 +297,34 @@ describe('chatCommand', () => {
         ] as HistoryItemWithoutId[],
         clientHistory: conversation,
       });
+    });
+
+    it('should resume history including partial responses', async () => {
+      const conversation: HistoryContent[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        {
+          role: 'model',
+          parts: [{ text: 'I am a partial response' }],
+          isPartial: true,
+        },
+      ];
+      mockLoadCheckpoint.mockResolvedValue(conversation);
+
+      if (!resumeCommand.action)
+        throw new Error('resumeCommand.action not defined');
+      const result = (await resumeCommand.action(
+        mockContext,
+        goodTag,
+      )) as SlashCommandActionReturn & {
+        type: 'load_history';
+      };
+
+      expect(result.type).toBe('load_history');
+      expect(result.history).toEqual([
+        { type: 'user', text: 'Hello' },
+        { type: 'gemini', text: 'I am a partial response' },
+      ]);
+      expect(result.clientHistory).toEqual(conversation);
     });
 
     describe('completion', () => {
