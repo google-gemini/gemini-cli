@@ -1,0 +1,47 @@
+# .github/actions/publish-bundle/action.yml
+name: 'Publish Bundle'
+description: 'Builds, versions, and publishes the bundled CLI package.'
+inputs:
+  version:
+    description: 'The version to publish the package with.'
+    required: true
+  tag:
+    description: 'The npm dist-tag to publish the package with.'
+    required: true
+  github-token:
+    description: 'GitHub token for authentication.'
+    required: true
+  package-scope:
+    description: 'The npm scope to publish the package to.'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Setup NPMRC'
+      uses: './.github/actions/setup-npmrc'
+      with:
+        github-token: '${{ inputs.github-token }}'
+
+    - name: 'Bundle'
+      shell: 'bash'
+      run: 'npm run bundle'
+
+    - name: 'Prepare Package for Publishing'
+      if: "${{ inputs.package-scope != '' }}"
+      shell: 'bash'
+      env:
+        PACKAGE_SCOPE: '${{ inputs.package-scope }}'
+      run: 'node scripts/prepare-package.js --scope=${{ env.PACKAGE_SCOPE }}'
+
+    - name: 'Set Version'
+      shell: 'bash'
+      env:
+        PACKAGE_VERSION: '${{ inputs.version }}'
+      run: 'npm version --no-git-tag-version "${{ env.PACKAGE_VERSION }}"'
+
+    - name: 'Publish to GitHub Packages'
+      env:
+        NODE_AUTH_TOKEN: '${{ inputs.github-token }}'
+        NPM_TAG: '${{ inputs.tag }}'
+      shell: 'bash'
+      run: 'npm publish --tag="${{ env.NPM_TAG }}"'

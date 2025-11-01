@@ -1,0 +1,91 @@
+# .github/workflows/pr-checks.yml
+name: 'Checks'
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+      - 'release/**'
+  merge_group:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}'
+  cancel-in-progress: true
+
+env:
+  CLI_PACKAGE_NAME: '@google/gemini-cli'
+
+permissions:
+  contents: 'read'
+  packages: 'write'
+  pull-requests: 'write'
+  security-events: 'write'
+  checks: 'write'
+  statuses: 'write'
+  actions: 'read'
+  attestations: 'read'
+  deployments: 'read'
+  discussions: 'read'
+  issues: 'read'
+  pages: 'read'
+  repository-projects: 'read'
+  id-token: 'write'
+
+jobs:
+  lint:
+    name: 'Lint'
+    uses: './.github/workflows/lint.yml'
+
+  get-vars:
+    name: 'Get Environment Variables'
+    runs-on: 'ubuntu-latest'
+    environment: 'dev'
+    outputs:
+      cli-package-name: '${{ steps.get-vars.outputs.cli-package-name }}'
+      npm-registry-scope: '${{ steps.get-vars.outputs.npm-registry-scope }}'
+      npm-registry-url: '${{ steps.get-vars.outputs.npm-registry-url }}'
+    steps:
+      - id: 'get-vars'
+        env:
+          CLI_PACKAGE_NAME: '${{ vars.CLI_PACKAGE_NAME }}'
+          NPM_REGISTRY_SCOPE: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          NPM_REGISTRY_URL: '${{ vars.NPM_REGISTRY_URL }}'
+        run: |
+          echo "cli-package-name=${CLI_PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "npm-registry-scope=${NPM_REGISTRY_SCOPE}" >> "$GITHUB_OUTPUT"
+          echo "npm-registry-url=${NPM_REGISTRY_URL}" >> "$GITHUB_OUTPUT"
+
+  build-and-publish:
+    name: 'Build and Publish CI Bundle'
+    needs: ['lint', 'get-vars']
+    uses: './.github/workflows/build-and-publish.yml'
+    with:
+      cli-package-name: '${{ needs.get-vars.outputs.cli-package-name }}'
+      npm-registry-scope: '${{ needs.get-vars.outputs.npm-registry-scope }}'
+      npm-registry-url: '${{ needs.get-vars.outputs.npm-registry-url }}'
+
+  ci:
+    name: 'CI Checks'
+    needs: 'lint'
+    uses: './.github/workflows/ci.yml'
+
+  e2e:
+    name: 'E2E Checks'
+    needs: ['build-and-publish', 'get-vars']
+    uses: './.github/workflows/e2e.yml'
+    permissions:
+      contents: 'read'
+      packages: 'read'
+    with:
+      version: '${{ needs.build-and-publish.outputs.version }}'
+      cli-package-name: '${{ needs.get-vars.outputs.cli-package-name }}'
+      image-uri: '${{ needs.build-and-publish.outputs.image-uri }}'
+    secrets:
+      GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+
+  bundle-size:
+    name: 'Bundle Size Check'
+    needs: 'build-and-publish'
+    uses: './.github/workflows/bundle-size.yml'
+    with:
+      version: '${{ needs.build-and-publish.outputs.version }}'
