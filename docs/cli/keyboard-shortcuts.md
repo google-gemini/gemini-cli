@@ -67,6 +67,12 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 | `1-9`              | Select an item by its number.                                                                                 |
 | (multi-digit)      | For items with numbers greater than 9, press the digits in quick succession to select the corresponding item. |
 
+## Tool Use
+
+| Shortcut | Description                                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------- |
+| `Ctrl+S` | When confirming an MCP tool call, toggle display of the input arguments to the MCP server (as JSON). |
+
 ## IDE Integration
 
 | Shortcut | Description                       |
