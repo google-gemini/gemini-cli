@@ -53,6 +53,7 @@ vi.mock('../ui/commands/permissionsCommand.js', async () => {
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
 import type { Config } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../config/settings.js';
 import { CommandKind } from '../ui/commands/types.js';
 
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
@@ -63,6 +64,9 @@ vi.mock('../ui/commands/chatCommand.js', () => ({ chatCommand: {} }));
 vi.mock('../ui/commands/clearCommand.js', () => ({ clearCommand: {} }));
 vi.mock('../ui/commands/compressCommand.js', () => ({ compressCommand: {} }));
 vi.mock('../ui/commands/corgiCommand.js', () => ({ corgiCommand: {} }));
+vi.mock('../ui/commands/dinoCommand.js', () => ({
+  dinoCommand: { name: 'dino' },
+}));
 vi.mock('../ui/commands/docsCommand.js', () => ({ docsCommand: {} }));
 vi.mock('../ui/commands/editorCommand.js', () => ({ editorCommand: {} }));
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
@@ -88,6 +92,7 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
 
 describe('BuiltinCommandLoader', () => {
   let mockConfig: Config;
+  let mockSettings: LoadedSettings;
 
   const restoreCommandMock = restoreCommand as Mock;
 
@@ -100,6 +105,14 @@ describe('BuiltinCommandLoader', () => {
       getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
+    mockSettings = {
+      merged: {
+        ui: {
+          enableDinoGame: true,
+        },
+      },
+    } as unknown as LoadedSettings;
+
     restoreCommandMock.mockReturnValue({
       name: 'restore',
       description: 'Restore command',
@@ -108,7 +121,7 @@ describe('BuiltinCommandLoader', () => {
   });
 
   it('should correctly pass the config object to restore command factory', async () => {
-    const loader = new BuiltinCommandLoader(mockConfig);
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
     await loader.loadCommands(new AbortController().signal);
 
     // ideCommand is now a constant, no longer needs config
@@ -118,7 +131,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should filter out null command definitions returned by factories', async () => {
     // ideCommand is now a constant SlashCommand
-    const loader = new BuiltinCommandLoader(mockConfig);
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
     const commands = await loader.loadCommands(new AbortController().signal);
 
     // The 'ide' command should be present.
@@ -131,7 +144,7 @@ describe('BuiltinCommandLoader', () => {
   });
 
   it('should handle a null config gracefully when calling factories', async () => {
-    const loader = new BuiltinCommandLoader(null);
+    const loader = new BuiltinCommandLoader(null, mockSettings);
     await loader.loadCommands(new AbortController().signal);
     // ideCommand is now a constant, no longer needs config
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
@@ -139,7 +152,7 @@ describe('BuiltinCommandLoader', () => {
   });
 
   it('should return a list of all loaded commands', async () => {
-    const loader = new BuiltinCommandLoader(mockConfig);
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
     const commands = await loader.loadCommands(new AbortController().signal);
 
     const aboutCmd = commands.find((c) => c.name === 'about');
@@ -154,7 +167,7 @@ describe('BuiltinCommandLoader', () => {
   });
 
   it('should include permissions command when folder trust is enabled', async () => {
-    const loader = new BuiltinCommandLoader(mockConfig);
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
     const commands = await loader.loadCommands(new AbortController().signal);
     const permissionsCmd = commands.find((c) => c.name === 'permissions');
     expect(permissionsCmd).toBeDefined();
@@ -162,7 +175,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should exclude permissions command when folder trust is disabled', async () => {
     (mockConfig.getFolderTrust as Mock).mockReturnValue(false);
-    const loader = new BuiltinCommandLoader(mockConfig);
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
     const commands = await loader.loadCommands(new AbortController().signal);
     const permissionsCmd = commands.find((c) => c.name === 'permissions');
     expect(permissionsCmd).toBeUndefined();
@@ -173,7 +186,10 @@ describe('BuiltinCommandLoader', () => {
       ...mockConfig,
       getUseModelRouter: () => true,
     } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithModelRouter);
+    const loader = new BuiltinCommandLoader(
+      mockConfigWithModelRouter,
+      mockSettings,
+    );
     const commands = await loader.loadCommands(new AbortController().signal);
     const modelCmd = commands.find((c) => c.name === 'model');
     expect(modelCmd).toBeDefined();
@@ -184,7 +200,10 @@ describe('BuiltinCommandLoader', () => {
       ...mockConfig,
       getUseModelRouter: () => false,
     } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithoutModelRouter);
+    const loader = new BuiltinCommandLoader(
+      mockConfigWithoutModelRouter,
+      mockSettings,
+    );
     const commands = await loader.loadCommands(new AbortController().signal);
     const modelCmd = commands.find((c) => c.name === 'model');
     expect(modelCmd).toBeUndefined();
@@ -195,7 +214,10 @@ describe('BuiltinCommandLoader', () => {
       ...mockConfig,
       getEnableMessageBusIntegration: () => true,
     } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
+    const loader = new BuiltinCommandLoader(
+      mockConfigWithMessageBus,
+      mockSettings,
+    );
     const commands = await loader.loadCommands(new AbortController().signal);
     const policiesCmd = commands.find((c) => c.name === 'policies');
     expect(policiesCmd).toBeDefined();
@@ -206,15 +228,35 @@ describe('BuiltinCommandLoader', () => {
       ...mockConfig,
       getEnableMessageBusIntegration: () => false,
     } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
+    const loader = new BuiltinCommandLoader(
+      mockConfigWithoutMessageBus,
+      mockSettings,
+    );
     const commands = await loader.loadCommands(new AbortController().signal);
     const policiesCmd = commands.find((c) => c.name === 'policies');
     expect(policiesCmd).toBeUndefined();
+  });
+
+  it('should include dinoCommand when enableDinoGame is true', async () => {
+    mockSettings.merged.ui!.enableDinoGame = true;
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const dinoCmd = commands.find((c) => c.name === 'dino');
+    expect(dinoCmd).toBeDefined();
+  });
+
+  it('should exclude dinoCommand when enableDinoGame is false', async () => {
+    mockSettings.merged.ui!.enableDinoGame = false;
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const dinoCmd = commands.find((c) => c.name === 'dino');
+    expect(dinoCmd).toBeUndefined();
   });
 });
 
 describe('BuiltinCommandLoader profile', () => {
   let mockConfig: Config;
+  let mockSettings: LoadedSettings;
 
   beforeEach(() => {
     vi.resetModules();
@@ -225,12 +267,19 @@ describe('BuiltinCommandLoader profile', () => {
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
     } as unknown as Config;
+    mockSettings = {
+      merged: {
+        ui: {
+          enableDinoGame: true,
+        },
+      },
+    } as unknown as LoadedSettings;
   });
 
   it('should not include profile command when isDevelopment is false', async () => {
     process.env['NODE_ENV'] = 'production';
     const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
-    const loader = new BuiltinCommandLoader(mockConfig);
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
     const commands = await loader.loadCommands(new AbortController().signal);
     const profileCmd = commands.find((c) => c.name === 'profile');
     expect(profileCmd).toBeUndefined();
@@ -239,7 +288,7 @@ describe('BuiltinCommandLoader profile', () => {
   it('should include profile command when isDevelopment is true', async () => {
     process.env['NODE_ENV'] = 'development';
     const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
-    const loader = new BuiltinCommandLoader(mockConfig);
+    const loader = new BuiltinCommandLoader(mockConfig, mockSettings);
     const commands = await loader.loadCommands(new AbortController().signal);
     const profileCmd = commands.find((c) => c.name === 'profile');
     expect(profileCmd).toBeDefined();

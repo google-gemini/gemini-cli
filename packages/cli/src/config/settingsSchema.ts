@@ -404,7 +404,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Dino Game',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Enable the dino game command.',
         showInDialog: true,
       },

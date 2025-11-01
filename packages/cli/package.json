@@ -42,7 +42,7 @@
     "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "highlight.js": "^11.11.1",
-    "ink": "npm:@jrichman/ink@6.4.0",
+    "ink": "github:jacob314/ink#021b9e0fd67b724a1d100096bc0614f9fe4d0870",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "latest-version": "^9.0.0",

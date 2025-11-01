@@ -38,13 +38,21 @@ export const DefaultAppLayout: React.FC = () => {
       <Box flexDirection="column" ref={uiState.mainControlsRef}>
         <Notifications />
 
-        {uiState.dialogsVisible ? (
+        {uiState.dialogsVisible && !uiState.isDinoDialogOpen ? (
           <DialogManager
             terminalWidth={uiState.mainAreaWidth}
             addItem={uiState.historyManager.addItem}
           />
         ) : (
-          <Composer />
+          <>
+            {uiState.isDinoDialogOpen && (
+              <DialogManager
+                terminalWidth={uiState.mainAreaWidth}
+                addItem={uiState.historyManager.addItem}
+              />
+            )}
+            <Composer />
+          </>
         )}
 
         <ExitWarning />

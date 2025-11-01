@@ -143,7 +143,12 @@ export const DialogManager = ({
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
   }
   if (uiState.isDinoDialogOpen) {
-    return <DinoGame onClose={uiActions.closeDinoDialog} />;
+    return (
+      <DinoGame
+        onClose={uiActions.closeDinoDialog}
+        availableHeight={terminalHeight - staticExtraHeight}
+      />
+    );
   }
   if (uiState.isAuthenticating) {
     return (

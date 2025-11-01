@@ -38,14 +38,46 @@ files.forEach((file) => {
   fs.createReadStream(filePath)
     .pipe(new PNG())
     .on('parsed', function () {
-      const dataArray = Array.from(this.data);
+      let asciiArt = '';
+      for (let y = 0; y < this.height; y++) {
+        let line = '';
+        for (let x = 0; x < this.width; x++) {
+          const idx = (this.width * y + x) << 2;
+          const r = this.data[idx];
+          const a = this.data[idx + 3];
+          if (a < 128) {
+            line += ' ';
+          } else if (r < 128) {
+            line += '█';
+          } else {
+            line += '░';
+          }
+        }
+        asciiArt += line.trimEnd() + '\n';
+      }
+      // Remove the very last newline to avoid an empty extra line if desired,
+      // but keeping it might be cleaner for the template literal.
+      // Let's keep it simple and just trim the whole thing at the end if needed,
+      // but a trailing newline is often good standard practice.
+      // Actually, for template literal it's better to NOT have a leading newline
+      // if we want exact matching, but for readability:
+      /*
+        export const FOO = `
+        ███
+        ███
+        `;
+      */
+      // The above has a leading newline (empty line) and a trailing newline.
+      // We should probably trim it when parsing.
+
       const fileContent = `/**
  * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export const ${variableName} = new Uint8Array([${dataArray.join(',')}]);
+export const ${variableName} = \`
+${asciiArt}\`;
 `;
       fs.writeFileSync(outputFilePath, fileContent);
       console.log(`Exported ${file} to ${outputFilePath}`);
