@@ -62,7 +62,8 @@
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
-    }
+    },
+    "tar-fs": "2.1.4"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
