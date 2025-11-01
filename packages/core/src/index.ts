@@ -8,8 +8,14 @@
 export * from './config/config.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
+export * from './output/stream-json-formatter.js';
 export * from './policy/types.js';
 export * from './policy/policy-engine.js';
+export * from './confirmation-bus/types.js';
+export * from './confirmation-bus/message-bus.js';
+
+// Export Commands logic
+export * from './commands/extensions.js';
 
 // Export Core Logic
 export * from './core/client.js';
@@ -23,6 +29,7 @@ export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
 export * from './core/nonInteractiveToolExecutor.js';
+export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
 
@@ -30,6 +37,7 @@ export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
+export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
 export * from './utils/paths.js';
@@ -37,10 +45,12 @@ export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
+export * from './utils/getPty.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/gitUtils.js';
 export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
+export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
@@ -56,6 +66,10 @@ export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
+export * from './utils/debugLogger.js';
+export * from './utils/events.js';
+export * from './utils/extensionLoader.js';
+export * from './utils/package.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

@@ -11,6 +11,8 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into your terminal. It provides lightweight access to Gemini, giving you the
 most direct path from your prompt to our model.
 
+Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
+
 ## 🚀 Why Gemini CLI?
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
@@ -24,6 +26,11 @@ most direct path from your prompt to our model.
 - **🛡️ Open source**: Apache 2.0 licensed.
 
 ## 📦 Installation
+
+### Pre-requisites before installation
+
+- Node.js version 20 or higher
+- macOS, Linux, or Windows
 
 ### Quick Install
 
@@ -45,11 +52,6 @@ npm install -g @google/gemini-cli
 ```bash
 brew install gemini-cli
 ```
-
-#### System Requirements
-
-- Node.js version 20 or higher
-- macOS, Linux, or Windows
 
 ## Release Cadence and Tags
 
@@ -228,6 +230,13 @@ the `--output-format json` flag to get structured output:
 gemini -p "Explain the architecture of this codebase" --output-format json
 ```
 
+For real-time event streaming (useful for monitoring long-running operations),
+use `--output-format stream-json` to get newline-delimited JSON events:
+
+```bash
+gemini -p "Run tests and deploy" --output-format stream-json
+```
+
 ### Quick Examples
 
 #### Start a new project
@@ -297,6 +306,8 @@ gemini
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
 - [**Tools API Development**](./docs/core/tools-api.md) - Create custom tools.
+- [**Local development**](./docs/local-development.md) - Local development
+  tooling.
 
 ### Troubleshooting & Support
 

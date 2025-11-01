@@ -8,6 +8,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Content } from '@google/genai';
 import type { Storage } from '../config/storage.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -82,7 +83,7 @@ export class Logger {
       const fileContent = await fs.readFile(this.logFilePath, 'utf-8');
       const parsedLogs = JSON.parse(fileContent);
       if (!Array.isArray(parsedLogs)) {
-        console.debug(
+        debugLogger.debug(
           `Log file at ${this.logFilePath} is not a valid JSON array. Starting with empty logs.`,
         );
         await this._backupCorruptedLogFile('malformed_array');
@@ -102,14 +103,14 @@ export class Logger {
         return [];
       }
       if (error instanceof SyntaxError) {
-        console.debug(
+        debugLogger.debug(
           `Invalid JSON in log file ${this.logFilePath}. Backing up and starting fresh.`,
           error,
         );
         await this._backupCorruptedLogFile('invalid_json');
         return [];
       }
-      console.debug(
+      debugLogger.debug(
         `Failed to read or parse log file ${this.logFilePath}:`,
         error,
       );
@@ -122,7 +123,7 @@ export class Logger {
     const backupPath = `${this.logFilePath}.${reason}.${Date.now()}.bak`;
     try {
       await fs.rename(this.logFilePath, backupPath);
-      console.debug(`Backed up corrupted log file to ${backupPath}`);
+      debugLogger.debug(`Backed up corrupted log file to ${backupPath}`);
     } catch (_backupError) {
       // If rename fails (e.g. file doesn't exist), no need to log an error here as the primary error (e.g. invalid JSON) is already handled.
     }
@@ -166,7 +167,7 @@ export class Logger {
     entryToAppend: LogEntry,
   ): Promise<LogEntry | null> {
     if (!this.logFilePath) {
-      console.debug('Log file path not set. Cannot persist log entry.');
+      debugLogger.debug('Log file path not set. Cannot persist log entry.');
       throw new Error('Log file path not set during update attempt.');
     }
 
@@ -174,7 +175,7 @@ export class Logger {
     try {
       currentLogsOnDisk = await this._readLogFile();
     } catch (readError) {
-      console.debug(
+      debugLogger.debug(
         'Critical error reading log file before append:',
         readError,
       );
@@ -205,7 +206,7 @@ export class Logger {
     );
 
     if (entryExists) {
-      console.debug(
+      debugLogger.debug(
         `Duplicate log entry detected and skipped: session ${entryToAppend.sessionId}, messageId ${entryToAppend.messageId}`,
       );
       this.logs = currentLogsOnDisk; // Ensure in-memory is synced with disk
@@ -223,7 +224,7 @@ export class Logger {
       this.logs = currentLogsOnDisk;
       return entryToAppend; // Return the successfully appended entry
     } catch (error) {
-      console.debug('Error writing to log file:', error);
+      debugLogger.debug('Error writing to log file:', error);
       throw error;
     }
   }
@@ -242,7 +243,7 @@ export class Logger {
 
   async logMessage(type: MessageSenderType, message: string): Promise<void> {
     if (!this.initialized || this.sessionId === undefined) {
-      console.debug(
+      debugLogger.debug(
         'Logger not initialized or session ID missing. Cannot log message.',
       );
       return;
@@ -341,7 +342,7 @@ export class Logger {
       const fileContent = await fs.readFile(path, 'utf-8');
       const parsedContent = JSON.parse(fileContent);
       if (!Array.isArray(parsedContent)) {
-        console.warn(
+        debugLogger.warn(
           `Checkpoint file at ${path} is not a valid JSON array. Returning empty checkpoint.`,
         );
         return [];

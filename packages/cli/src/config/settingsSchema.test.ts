@@ -159,6 +159,10 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().ui.properties.showMemoryUsage.showInDialog,
       ).toBe(true);
+      expect(
+        getSettingsSchema().ui.properties.footer.properties
+          .hideContextPercentage.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().general.properties.vimMode.showInDialog).toBe(
         true,
       );
@@ -328,25 +332,6 @@ describe('SettingsSchema', () => {
       ).toBe('Experimental');
       expect(
         getSettingsSchema().experimental.properties.useModelRouter.default,
-      ).toBe(false);
-    });
-
-    it('should have enableSubagents setting in schema', () => {
-      expect(
-        getSettingsSchema().experimental.properties.enableSubagents,
-      ).toBeDefined();
-      expect(
-        getSettingsSchema().experimental.properties.enableSubagents.type,
-      ).toBe('boolean');
-      expect(
-        getSettingsSchema().experimental.properties.enableSubagents.category,
-      ).toBe('Experimental');
-      expect(
-        getSettingsSchema().experimental.properties.enableSubagents.default,
-      ).toBe(false);
-      expect(
-        getSettingsSchema().experimental.properties.enableSubagents
-          .requiresRestart,
       ).toBe(true);
     });
   });

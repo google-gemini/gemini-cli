@@ -4,16 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// --------------------------------------------------------------------------
+// IMPORTANT: When adding a new setting, especially one with `showInDialog: true`,
+// please ensure it is also documented in `docs/get-started/configuration.md`.
+// --------------------------------------------------------------------------
+
 import type {
   MCPServerConfig,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
-  ChatCompressionSettings,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -177,6 +182,16 @@ const SETTINGS_SCHEMA = {
         description:
           'Enable AI-powered prompt completion suggestions while typing.',
         showInDialog: true,
+      },
+      retryFetchErrors: {
+        type: 'boolean',
+        label: 'Retry Fetch Errors',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Retry on "exception TypeError: fetch failed sending request" errors.',
+        showInDialog: false,
       },
       debugKeystrokeLogging: {
         type: 'boolean',
@@ -373,6 +388,15 @@ const SETTINGS_SCHEMA = {
             description: 'Hide the model name and context usage in the footer.',
             showInDialog: true,
           },
+          hideContextPercentage: {
+            type: 'boolean',
+            label: 'Hide Context Window Percentage',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Hides the context window remaining percentage.',
+            showInDialog: true,
+          },
         },
       },
       hideFooter: {
@@ -562,14 +586,15 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for summarizing tool output.',
         showInDialog: false,
       },
-      chatCompression: {
-        type: 'object',
-        label: 'Chat Compression',
+      compressionThreshold: {
+        type: 'number',
+        label: 'Compression Threshold',
         category: 'Model',
-        requiresRestart: false,
-        default: undefined as ChatCompressionSettings | undefined,
-        description: 'Chat compression settings.',
-        showInDialog: false,
+        requiresRestart: true,
+        default: 0.2 as number,
+        description:
+          'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
+        showInDialog: true,
       },
       skipNextSpeakerCheck: {
         type: 'boolean',
@@ -899,7 +924,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use Smart Edit',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
+    default: true,
     description: 'Enable the smart-edit tool instead of the replace tool.',
     showInDialog: false,
   },
@@ -921,6 +946,15 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      disableYoloMode: {
+        type: 'boolean',
+        label: 'Disable YOLO Mode',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
       folderTrust: {
         type: 'object',
         label: 'Folder Trust',
@@ -1050,24 +1084,85 @@ const SETTINGS_SCHEMA = {
         description: 'Enable extension management features.',
         showInDialog: false,
       },
+      extensionReloading: {
+        type: 'boolean',
+        label: 'Extension Reloading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enables extension loading/unloading within the CLI session.',
+        showInDialog: false,
+      },
       useModelRouter: {
         type: 'boolean',
         label: 'Use Model Router',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
       },
-      enableSubagents: {
-        type: 'boolean',
-        label: 'Enable Subagents',
+      codebaseInvestigatorSettings: {
+        type: 'object',
+        label: 'Codebase Investigator Settings',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable experimental subagents.',
+        default: {},
+        description: 'Configuration for Codebase Investigator.',
         showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Codebase Investigator',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable the Codebase Investigator agent.',
+            showInDialog: true,
+          },
+          maxNumTurns: {
+            type: 'number',
+            label: 'Codebase Investigator Max Num Turns',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 15,
+            description:
+              'Maximum number of turns for the Codebase Investigator agent.',
+            showInDialog: true,
+          },
+          maxTimeMinutes: {
+            type: 'number',
+            label: 'Max Time (Minutes)',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 5,
+            description:
+              'Maximum time for the Codebase Investigator agent (in minutes).',
+            showInDialog: false,
+          },
+          thinkingBudget: {
+            type: 'number',
+            label: 'Thinking Budget',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: -1,
+            description:
+              'The thinking budget for the Codebase Investigator agent.',
+            showInDialog: false,
+          },
+          model: {
+            type: 'string',
+            label: 'Model',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: DEFAULT_GEMINI_MODEL,
+            description:
+              'The model to use for the Codebase Investigator agent.',
+            showInDialog: false,
+          },
+        },
       },
     },
   },

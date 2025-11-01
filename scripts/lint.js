@@ -49,6 +49,13 @@ function getPlatformArch() {
 
 const platformArch = getPlatformArch();
 
+const PYTHON_VENV_PATH = join(TEMP_DIR, 'python_venv');
+
+const yamllintCheck =
+  process.platform === 'win32'
+    ? `if exist "${PYTHON_VENV_PATH}\\Scripts\\yamllint.exe" (exit 0) else (exit 1)`
+    : `test -x "${PYTHON_VENV_PATH}/bin/yamllint"`;
+
 /**
  * @typedef {{
  *   check: string;
@@ -97,8 +104,11 @@ const LINTERS = {
     `,
   },
   yamllint: {
-    check: 'command -v yamllint',
-    installer: `pip3 install --user "yamllint==${YAMLLINT_VERSION}"`,
+    check: yamllintCheck,
+    installer: `
+    python3 -m venv "${PYTHON_VENV_PATH}" && \
+    "${PYTHON_VENV_PATH}/bin/pip" install "yamllint==${YAMLLINT_VERSION}"
+  `,
     run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
   },
 };
@@ -107,12 +117,7 @@ function runCommand(command, stdio = 'inherit') {
   try {
     const env = { ...process.env };
     const nodeBin = join(process.cwd(), 'node_modules', '.bin');
-    env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${env.PATH}`;
-    if (process.platform === 'darwin') {
-      env.PATH = `${env.PATH}:${process.env.HOME}/Library/Python/3.12/bin`;
-    } else if (process.platform === 'linux') {
-      env.PATH = `${env.PATH}:${process.env.HOME}/.local/bin`;
-    }
+    env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${PYTHON_VENV_PATH}/bin:${env.PATH}`;
     execSync(command, { stdio, env });
     return true;
   } catch (_e) {
@@ -142,7 +147,7 @@ export function setupLinters() {
 
 export function runESLint() {
   console.log('\nRunning ESLint...');
-  if (!runCommand('npm run lint:ci')) {
+  if (!runCommand('npm run lint')) {
     process.exit(1);
   }
 }
@@ -251,6 +256,79 @@ export function runSensitiveKeywordLinter() {
   }
 }
 
+function stripJSONComments(json) {
+  return json.replace(
+    /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g,
+    (m, g) => (g ? '' : m),
+  );
+}
+
+export function runTSConfigLinter() {
+  console.log('\nRunning tsconfig linter...');
+
+  let files = [];
+  try {
+    // Find all tsconfig.json files under packages/ using a git pathspec
+    files = execSync("git ls-files 'packages/**/tsconfig.json'")
+      .toString()
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch (e) {
+    console.error('Error finding tsconfig.json files:', e.message);
+    process.exit(1);
+  }
+
+  let hasError = false;
+
+  for (const file of files) {
+    const tsconfigPath = join(process.cwd(), file);
+    if (!existsSync(tsconfigPath)) {
+      console.error(`Error: ${tsconfigPath} does not exist.`);
+      hasError = true;
+      continue;
+    }
+
+    try {
+      const content = readFileSync(tsconfigPath, 'utf-8');
+      const config = JSON.parse(stripJSONComments(content));
+
+      // Check if exclude exists and matches exactly
+      if (config.exclude) {
+        if (!Array.isArray(config.exclude)) {
+          console.error(
+            `Error: ${file} "exclude" must be an array. Found: ${JSON.stringify(
+              config.exclude,
+            )}`,
+          );
+          hasError = true;
+        } else {
+          const allowedExclude = new Set(['node_modules', 'dist']);
+          const invalidExcludes = config.exclude.filter(
+            (item) => !allowedExclude.has(item),
+          );
+
+          if (invalidExcludes.length > 0) {
+            console.error(
+              `Error: ${file} "exclude" contains invalid items: ${JSON.stringify(
+                invalidExcludes,
+              )}. Only "node_modules" and "dist" are allowed.`,
+            );
+            hasError = true;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error parsing ${tsconfigPath}: ${error.message}`);
+      hasError = true;
+    }
+  }
+
+  if (hasError) {
+    process.exit(1);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -275,6 +353,9 @@ function main() {
   if (args.includes('--sensitive-keywords')) {
     runSensitiveKeywordLinter();
   }
+  if (args.includes('--tsconfig')) {
+    runTSConfigLinter();
+  }
 
   if (args.length === 0) {
     setupLinters();
@@ -284,6 +365,7 @@ function main() {
     runYamllint();
     runPrettier();
     runSensitiveKeywordLinter();
+    runTSConfigLinter();
     console.log('\nAll linting checks passed!');
   }
 }

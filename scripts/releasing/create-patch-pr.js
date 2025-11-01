@@ -30,6 +30,12 @@ async function main() {
       choices: ['stable', 'preview'],
       demandOption: true,
     })
+    .option('cli-package-name', {
+      description:
+        'fully qualified package name with scope (e.g @google/gemini-cli)',
+      string: true,
+      default: '@google/gemini-cli',
+    })
     .option('dry-run', {
       description: 'Whether to run in dry-run mode.',
       type: 'boolean',
@@ -48,7 +54,7 @@ async function main() {
 
   run('git fetch --all --tags --prune', dryRun);
 
-  const releaseInfo = getLatestReleaseInfo(channel);
+  const releaseInfo = getLatestReleaseInfo({ argv, channel });
   const latestTag = releaseInfo.currentTag;
   const nextVersion = releaseInfo.nextVersion;
 
@@ -168,7 +174,7 @@ async function main() {
             `📝 Creating commit with conflict markers for manual resolution...`,
           );
           execSync('git add .');
-          execSync(`git commit --no-edit`);
+          execSync(`git commit --no-edit --no-verify`);
           console.log(`✅ Committed cherry-pick with conflict markers`);
         } else {
           // Re-throw if it's not a conflict error
@@ -267,10 +273,10 @@ function branchExists(branchName) {
   }
 }
 
-function getLatestReleaseInfo(channel) {
+function getLatestReleaseInfo({ argv, channel } = {}) {
   console.log(`Fetching latest release info for channel: ${channel}...`);
   const patchFrom = channel; // 'stable' or 'preview'
-  const command = `node scripts/get-release-version.js --type=patch --patch-from=${patchFrom}`;
+  const command = `node scripts/get-release-version.js --cli-package-name="${argv['cli-package-name']}" --type=patch --patch-from=${patchFrom}`;
   try {
     const result = JSON.parse(execSync(command).toString().trim());
     console.log(`Current ${channel} tag: ${result.previousReleaseTag}`);
