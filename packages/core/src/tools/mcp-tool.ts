@@ -18,6 +18,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import { isMimeTypeSupported } from '../utils/mimeUtils.js';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -192,11 +193,16 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       };
     }
 
-    const transformedParts = transformMcpContentToParts(rawResponseParts);
+    const sanitizedRawResponseParts =
+      returnSanitizedMcpContent(rawResponseParts);
+
+    const transformedParts = transformMcpContentToParts(
+      sanitizedRawResponseParts,
+    );
 
     return {
       llmContent: transformedParts,
-      returnDisplay: getStringifiedResultForDisplay(rawResponseParts),
+      returnDisplay: getStringifiedResultForDisplay(sanitizedRawResponseParts),
     };
   }
 
@@ -323,6 +329,57 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
   return {
     text: `Resource Link: ${block.title || block.name} at ${block.uri}`,
   };
+}
+
+/**
+ * Sanitizes the MCP content blocks, replacing unsupported mime types
+ * with an error message. If no sanitization is needed, the original
+ * response is returned. Otherwise, a sanitized copy is returned.
+ * @param sdkResponse The raw Part[] array from `mcpTool.callTool()`.
+ * @returns A sanitized Part[] array.
+ */
+export function returnSanitizedMcpContent(sdkResponse: Part[]): Part[] {
+  let sanitizedResponse: Part[] | null = null;
+
+  for (let partIndex = 0; partIndex < sdkResponse.length; partIndex++) {
+    const funcResponse = sdkResponse[partIndex]?.functionResponse;
+    const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
+
+    if (!Array.isArray(mcpContent)) {
+      continue;
+    }
+
+    for (let blockIndex = 0; blockIndex < mcpContent.length; blockIndex++) {
+      const block = mcpContent[blockIndex];
+      let mimeType: string | undefined;
+
+      if (block.type === 'image' || block.type === 'audio') {
+        mimeType = block.mimeType;
+      } else if (block.type === 'resource' && block.resource.blob) {
+        mimeType = block.resource.mimeType || 'application/octet-stream';
+      }
+
+      if (mimeType && !isMimeTypeSupported(mimeType)) {
+        if (!sanitizedResponse) {
+          // Lazily create a deep copy the first time we need to mutate.
+          sanitizedResponse = structuredClone(sdkResponse);
+        }
+
+        // The structure of sanitizedResponse mirrors sdkResponse, so we can use the same indices.
+        const sanitizedMcpContent =
+          sanitizedResponse[partIndex]?.functionResponse?.response?.['content'];
+
+        if (Array.isArray(sanitizedMcpContent)) {
+          sanitizedMcpContent[blockIndex] = {
+            type: 'text',
+            text: `[Tool returned unsupported mimetype: ${mimeType}]`,
+          };
+        }
+      }
+    }
+  }
+
+  return sanitizedResponse ?? sdkResponse;
 }
 
 /**
