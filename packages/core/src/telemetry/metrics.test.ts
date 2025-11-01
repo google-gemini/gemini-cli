@@ -280,96 +280,33 @@ describe('Telemetry Metrics', () => {
       expect(mockCounterAddFn).not.toHaveBeenCalled();
     });
 
-    it('should record token usage with the correct attributes', () => {
-      initializeMetricsModule(mockConfig);
-      recordTokenUsageMetricsModule(mockConfig, 100, {
-        model: 'gemini-pro',
-        type: 'input',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
-      expect(mockCounterAddFn).toHaveBeenNthCalledWith(1, 1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-      });
-      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 100, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'input',
-      });
-    });
+    it.each([
+      { type: 'input', tokens: 100, model: 'gemini-pro' },
+      { type: 'output', tokens: 50, model: 'gemini-pro' },
+      { type: 'thought', tokens: 25, model: 'gemini-pro' },
+      { type: 'cache', tokens: 75, model: 'gemini-pro' },
+      { type: 'tool', tokens: 125, model: 'gemini-pro' },
+      { type: 'input', tokens: 200, model: 'gemini-different-model' },
+    ])(
+      'should record token usage for $type type with $tokens tokens for model $model',
+      ({ type, tokens, model }) => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
 
-    it('should record token usage for different types', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
+        recordTokenUsageMetricsModule(mockConfig, tokens, {
+          model,
+          type: type as 'input' | 'output' | 'thought' | 'cache' | 'tool',
+        });
 
-      recordTokenUsageMetricsModule(mockConfig, 50, {
-        model: 'gemini-pro',
-        type: 'output',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(50, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'output',
-      });
-
-      recordTokenUsageMetricsModule(mockConfig, 25, {
-        model: 'gemini-pro',
-        type: 'thought',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(25, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'thought',
-      });
-
-      recordTokenUsageMetricsModule(mockConfig, 75, {
-        model: 'gemini-pro',
-        type: 'cache',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(75, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'cache',
-      });
-
-      recordTokenUsageMetricsModule(mockConfig, 125, {
-        model: 'gemini-pro',
-        type: 'tool',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(125, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'tool',
-      });
-    });
-
-    it('should handle different models', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
-
-      recordTokenUsageMetricsModule(mockConfig, 200, {
-        model: 'gemini-different-model',
-        type: 'input',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(200, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-different-model',
-        type: 'input',
-      });
-    });
+        expect(mockCounterAddFn).toHaveBeenCalledWith(tokens, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          model,
+          type,
+        });
+      },
+    );
   });
 
   describe('recordLinesChanged metric', () => {
@@ -921,80 +858,60 @@ describe('Telemetry Metrics', () => {
     });
 
     describe('recordMemoryUsage', () => {
-      it('should record memory usage for different memory types', () => {
-        initializeMetricsModule(mockConfig);
-        mockHistogramRecordFn.mockClear();
-
-        recordMemoryUsageModule(mockConfig, 15728640, {
+      it.each([
+        {
           memory_type: MemoryMetricType.HEAP_USED,
           component: 'startup',
-        });
-
-        expect(mockHistogramRecordFn).toHaveBeenCalledWith(15728640, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'heap_used',
-          component: 'startup',
-        });
-      });
-
-      it('should record memory usage for all memory metric types', () => {
-        initializeMetricsModule(mockConfig);
-        mockHistogramRecordFn.mockClear();
-
-        recordMemoryUsageModule(mockConfig, 31457280, {
+          value: 15728640,
+        },
+        {
           memory_type: MemoryMetricType.HEAP_TOTAL,
           component: 'api_call',
-        });
-        recordMemoryUsageModule(mockConfig, 2097152, {
+          value: 31457280,
+        },
+        {
           memory_type: MemoryMetricType.EXTERNAL,
           component: 'tool_execution',
-        });
-        recordMemoryUsageModule(mockConfig, 41943040, {
+          value: 2097152,
+        },
+        {
           memory_type: MemoryMetricType.RSS,
           component: 'memory_monitor',
-        });
-
-        expect(mockHistogramRecordFn).toHaveBeenCalledTimes(3); // One for each call
-        expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(1, 31457280, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'heap_total',
-          component: 'api_call',
-        });
-        expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(2, 2097152, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'external',
-          component: 'tool_execution',
-        });
-        expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(3, 41943040, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'rss',
-          component: 'memory_monitor',
-        });
-      });
-
-      it('should record memory usage without component', () => {
-        initializeMetricsModule(mockConfig);
-        mockHistogramRecordFn.mockClear();
-
-        recordMemoryUsageModule(mockConfig, 15728640, {
+          value: 41943040,
+        },
+        {
           memory_type: MemoryMetricType.HEAP_USED,
-        });
+          component: undefined,
+          value: 15728640,
+        },
+      ])(
+        'should record memory usage for $memory_type',
+        ({ memory_type, component, value }) => {
+          initializeMetricsModule(mockConfig);
+          mockHistogramRecordFn.mockClear();
 
-        expect(mockHistogramRecordFn).toHaveBeenCalledWith(15728640, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'heap_used',
-        });
-      });
+          recordMemoryUsageModule(mockConfig, value, {
+            memory_type,
+            component,
+          });
+
+          const expectedAttributes: Record<string, unknown> = {
+            'session.id': 'test-session-id',
+            'installation.id': 'test-installation-id',
+            'user.email': 'test@example.com',
+            memory_type,
+          };
+
+          if (component) {
+            expectedAttributes['component'] = component;
+          }
+
+          expect(mockHistogramRecordFn).toHaveBeenCalledWith(
+            value,
+            expectedAttributes,
+          );
+        },
+      );
     });
 
     describe('recordCpuUsage', () => {
