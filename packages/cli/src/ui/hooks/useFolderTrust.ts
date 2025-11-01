@@ -67,7 +67,22 @@ export const useFolderTrust = (
           return;
       }
 
-      trustedFolders.setValue(cwd, trustLevel);
+      try {
+        trustedFolders.setValue(cwd, trustLevel);
+      } catch (_e) {
+        addItem(
+          {
+            type: MessageType.WARNING,
+            text: 'Failed to save trust settings. Exiting Gemini CLI.',
+          },
+          Date.now(),
+        );
+        setTimeout(() => {
+          process.exit(1);
+        }, 100);
+        return;
+      }
+
       const currentIsTrusted =
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
@@ -82,7 +97,7 @@ export const useFolderTrust = (
         setIsFolderTrustDialogOpen(false);
       }
     },
-    [onTrustChange, isTrusted],
+    [onTrustChange, isTrusted, addItem],
   );
 
   return {
