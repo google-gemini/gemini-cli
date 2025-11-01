@@ -47,6 +47,10 @@ export class LoggingContentGenerator implements ContentGenerator {
     private readonly config: Config,
   ) {}
 
+  get userTier() {
+    return this.wrapped.userTier;
+  }
+
   getWrapped(): ContentGenerator {
     return this.wrapped;
   }
