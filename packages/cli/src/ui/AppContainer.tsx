@@ -587,6 +587,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       config.setGeminiMdFileCount(fileCount);
       config.setGeminiMdFilePaths(filePaths);
 
+      await config.updateSystemInstructionIfInitialized();
+
       setGeminiMdFileCount(fileCount);
 
       historyManager.addItem(

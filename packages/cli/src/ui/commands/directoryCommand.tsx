@@ -113,6 +113,8 @@ export const directoryCommand: SlashCommand = {
             config.setUserMemory(memoryContent);
             config.setGeminiMdFileCount(fileCount);
             context.ui.setGeminiMdFileCount(fileCount);
+
+            await config.updateSystemInstructionIfInitialized();
           }
           addItem(
             {
