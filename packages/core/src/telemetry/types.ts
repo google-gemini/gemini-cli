@@ -975,6 +975,28 @@ export class KittySequenceOverflowEvent {
   }
 }
 
+export interface ResearchOptInEvent extends BaseTelemetryEvent {
+  'event.name': 'research_opt_in';
+  'event.timestamp': string;
+  opt_in_status: boolean;
+  contact_email?: string;
+  user_id?: string;
+}
+
+export function makeResearchOptInEvent({
+  opt_in_status,
+  contact_email,
+  user_id,
+}: Omit<ResearchOptInEvent, CommonFields>): ResearchOptInEvent {
+  return {
+    'event.name': 'research_opt_in',
+    'event.timestamp': new Date().toISOString(),
+    opt_in_status,
+    contact_email,
+    user_id,
+  };
+}
+
 export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
 export class FileOperationEvent implements BaseTelemetryEvent {
   'event.name': 'file_operation';
