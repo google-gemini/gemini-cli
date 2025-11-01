@@ -15,18 +15,13 @@ interface InfoMessageProps {
 
 export const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
   const prefix = 'ℹ ';
-  const prefixWidth = prefix.length;
 
   return (
-    <Box flexDirection="row" marginTop={1}>
-      <Box width={prefixWidth}>
-        <Text color={theme.status.warning}>{prefix}</Text>
-      </Box>
-      <Box flexGrow={1}>
-        <Text wrap="wrap" color={theme.status.warning}>
-          <RenderInline text={text} />
-        </Text>
-      </Box>
+    <Box flexDirection="row" marginTop={1} gap={1}>
+      <Text color={theme.status.warning}>{prefix}</Text>
+      <Text wrap="wrap" color={theme.status.warning}>
+        <RenderInline text={text} />
+      </Text>
     </Box>
   );
 };
