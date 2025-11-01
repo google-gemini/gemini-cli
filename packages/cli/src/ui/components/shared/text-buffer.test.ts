@@ -223,44 +223,43 @@ describe('textBufferReducer', () => {
   });
 
   describe('delete_word_left action', () => {
-    it('should delete a simple word', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['hello world'],
-        cursorRow: 0,
+    it.each([
+      {
+        name: 'simple word',
+        initialLine: 'hello world',
         cursorCol: 11,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['hello ']);
-      expect(state.cursorCol).toBe(6);
-    });
-
-    it('should delete a path segment', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['path/to/file'],
-        cursorRow: 0,
+        expectedLine: 'hello ',
+        expectedCursorCol: 6,
+      },
+      {
+        name: 'path segment',
+        initialLine: 'path/to/file',
         cursorCol: 12,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['path/to/']);
-      expect(state.cursorCol).toBe(8);
-    });
-
-    it('should delete variable_name parts', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['variable_name'],
-        cursorRow: 0,
+        expectedLine: 'path/to/',
+        expectedCursorCol: 8,
+      },
+      {
+        name: 'variable_name parts',
+        initialLine: 'variable_name',
         cursorCol: 13,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['variable_']);
-      expect(state.cursorCol).toBe(9);
-    });
+        expectedLine: 'variable_',
+        expectedCursorCol: 9,
+      },
+    ])(
+      'should delete $name',
+      ({ initialLine, cursorCol, expectedLine, expectedCursorCol }) => {
+        const stateWithText: TextBufferState = {
+          ...initialState,
+          lines: [initialLine],
+          cursorRow: 0,
+          cursorCol,
+        };
+        const action: TextBufferAction = { type: 'delete_word_left' };
+        const state = textBufferReducer(stateWithText, action);
+        expect(state.lines).toEqual([expectedLine]);
+        expect(state.cursorCol).toBe(expectedCursorCol);
+      },
+    );
 
     it('should act like backspace at the beginning of a line', () => {
       const stateWithText: TextBufferState = {
@@ -278,16 +277,27 @@ describe('textBufferReducer', () => {
   });
 
   describe('delete_word_right action', () => {
-    it('should delete a simple word', () => {
+    it.each([
+      {
+        name: 'simple word',
+        initialLine: 'hello world',
+        expectedLine: 'world',
+      },
+      {
+        name: 'variable_name parts',
+        initialLine: 'variable_name',
+        expectedLine: '_name',
+      },
+    ])('should delete $name', ({ initialLine, expectedLine }) => {
       const stateWithText: TextBufferState = {
         ...initialState,
-        lines: ['hello world'],
+        lines: [initialLine],
         cursorRow: 0,
         cursorCol: 0,
       };
       const action: TextBufferAction = { type: 'delete_word_right' };
       const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['world']);
+      expect(state.lines).toEqual([expectedLine]);
       expect(state.cursorCol).toBe(0);
     });
 
@@ -303,19 +313,6 @@ describe('textBufferReducer', () => {
       expect(state.lines).toEqual(['/to/file']);
       state = textBufferReducer(state, action);
       expect(state.lines).toEqual(['to/file']);
-    });
-
-    it('should delete variable_name parts', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['variable_name'],
-        cursorRow: 0,
-        cursorCol: 0,
-      };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['_name']);
-      expect(state.cursorCol).toBe(0);
     });
 
     it('should act like delete at the end of a line', () => {
@@ -417,12 +414,14 @@ describe('useTextBuffer', () => {
         }),
       );
       const state = getBufferState(result);
-      expect(state.allVisualLines).toEqual([
-        'The quick',
-        'brown fox',
-        'jumps over the',
-        'lazy dog.',
-      ]);
+      expect(state.allVisualLines).toMatchInlineSnapshot(`
+        [
+          "The quick",
+          "brown fox",
+          "jumps over the",
+          "lazy dog.",
+        ]
+      `);
     });
 
     it('should wrap visual lines with multiple spaces', () => {
@@ -437,12 +436,14 @@ describe('useTextBuffer', () => {
       // Including multiple spaces at the end of the lines like this is
       // consistent with Google docs behavior and makes it intuitive to edit
       // the spaces as needed.
-      expect(state.allVisualLines).toEqual([
-        'The  quick ',
-        'brown fox   ',
-        'jumps over the',
-        'lazy dog.',
-      ]);
+      expect(state.allVisualLines).toMatchInlineSnapshot(`
+        [
+          "The  quick ",
+          "brown fox   ",
+          "jumps over the",
+          "lazy dog.",
+        ]
+      `);
     });
 
     it('should wrap visual lines even without spaces', () => {
@@ -759,13 +760,15 @@ describe('useTextBuffer', () => {
           isValidPath: () => false,
         }),
       );
-      expect(result.current.allVisualLines).toEqual([
-        'line',
-        'one',
-        'secon',
-        'd',
-        'line',
-      ]);
+      expect(result.current.allVisualLines).toMatchInlineSnapshot(`
+        [
+          "line",
+          "one",
+          "secon",
+          "d",
+          "line",
+        ]
+      `);
       // Initial cursor [0,0] (start of "line")
       act(() => result.current.move('down')); // visual cursor from [0,0] to [1,0] ("o" of "one")
       act(() => result.current.move('right')); // visual cursor to [1,1] ("n" of "one")
@@ -790,15 +793,14 @@ describe('useTextBuffer', () => {
       );
       const state = getBufferState(result);
       // Expected visual lines with word wrapping (viewport width 10):
-      // "This is a"
-      // "very long"
-      // "line of"
-      // "text."
-      expect(state.allVisualLines.length).toBe(4);
-      expect(state.allVisualLines[0]).toBe('This is a');
-      expect(state.allVisualLines[1]).toBe('very long');
-      expect(state.allVisualLines[2]).toBe('line of');
-      expect(state.allVisualLines[3]).toBe('text.');
+      expect(state.allVisualLines).toMatchInlineSnapshot(`
+        [
+          "This is a",
+          "very long",
+          "line of",
+          "text.",
+        ]
+      `);
     });
 
     it('should update visualScrollRow when visualCursor moves out of viewport', () => {
@@ -2101,27 +2103,20 @@ describe('Unicode helper functions', () => {
   });
 
   describe('isWordCharStrict with Unicode', () => {
-    it('should return true for ASCII word characters', () => {
-      expect(isWordCharStrict('a')).toBe(true);
-      expect(isWordCharStrict('Z')).toBe(true);
-      expect(isWordCharStrict('0')).toBe(true);
-      expect(isWordCharStrict('_')).toBe(true);
-    });
-
-    it('should return false for punctuation', () => {
-      expect(isWordCharStrict('.')).toBe(false);
-      expect(isWordCharStrict(',')).toBe(false);
-      expect(isWordCharStrict('!')).toBe(false);
-    });
-
-    it('should return true for non-Latin scripts', () => {
-      expect(isWordCharStrict('你')).toBe(true); // Chinese character
-      expect(isWordCharStrict('م')).toBe(true); // Arabic character
-    });
-
-    it('should return false for whitespace', () => {
-      expect(isWordCharStrict(' ')).toBe(false);
-      expect(isWordCharStrict('\t')).toBe(false);
+    it.each([
+      { char: 'a', expected: true, type: 'ASCII lowercase letter' },
+      { char: 'Z', expected: true, type: 'ASCII uppercase letter' },
+      { char: '0', expected: true, type: 'ASCII digit' },
+      { char: '_', expected: true, type: 'ASCII underscore' },
+      { char: '.', expected: false, type: 'punctuation dot' },
+      { char: ',', expected: false, type: 'punctuation comma' },
+      { char: '!', expected: false, type: 'punctuation exclamation' },
+      { char: '你', expected: true, type: 'Chinese character' },
+      { char: 'م', expected: true, type: 'Arabic character' },
+      { char: ' ', expected: false, type: 'whitespace space' },
+      { char: '\t', expected: false, type: 'whitespace tab' },
+    ])('should return $expected for $type ($char)', ({ char, expected }) => {
+      expect(isWordCharStrict(char)).toBe(expected);
     });
   });
 
