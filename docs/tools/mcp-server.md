@@ -61,8 +61,7 @@ The Gemini CLI supports three MCP transport types:
 
 ## How to set up your MCP server
 
-The Gemini CLI uses the `mcpServers` configuration in your `settings.json` file
-to locate and connect to MCP servers. This configuration supports multiple
+The Gemini CLI uses the `mcpServers` configuration from `settings.json` files, which can be defined globally (`~/.gemini/settings.json`) or at a project level (`.gemini/settings.json`). This configuration supports multiple
 servers with different transport mechanisms.
 
 ### Configure the MCP server in settings.json
