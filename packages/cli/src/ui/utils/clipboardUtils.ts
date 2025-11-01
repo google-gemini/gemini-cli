@@ -8,7 +8,7 @@ import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { spawnAsync } from '@google/gemini-cli-core';
+import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -110,7 +110,7 @@ export async function saveClipboardImage(
     // No format worked
     return null;
   } catch (error) {
-    console.error('Error saving clipboard image:', error);
+    debugLogger.warn('Error saving clipboard image:', error);
     return null;
   }
 }
