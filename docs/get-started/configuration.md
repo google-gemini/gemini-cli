@@ -124,6 +124,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable automatic session cleanup.
   - **Default:** `false`
 
+- **`general.retryFetchErrors`** (boolean):
+  - **Description:** Whether to automatically retry on transient network errors for API calls.
+  - **Default:** `false`
+
 #### `output`
 
 - **`output.format`** (string):
@@ -432,6 +436,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
 
+- **`security.disableYoloMode`** (boolean):
+  - **Description:** If set to `true`, it prevents the CLI from starting in YOLO mode, even if requested via command-line flags.
+  - **Default:** `false`
+
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
@@ -456,6 +464,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable model routing to route requests to the best model
     based on complexity.
   - **Default:** `false`
+
+- **`experimental.extensionManagement`** (boolean):
+  - **Description:** Enable experimental extension management features.
+  - **Default:** `true`
+
+- **`experimental.extensionReloading`** (boolean):
+  - **Description:** Enable experimental extension reloading features.
+  - **Default:** `undefined`
+
+- **`experimental.codebaseInvestigatorSettings`** (object):
+  - **Description:** Settings for the experimental codebase investigator.
+  - **Default:** `undefined`
 
 #### `mcpServers`
 
@@ -736,15 +756,11 @@ for that specific session.
     `--output-format json` or `--output-format stream-json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
-- **`--sandbox-image`**:
-  - Sets the sandbox image URI.
 - **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
 
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
-- **`--show-memory-usage`**:
-  - Displays the current memory usage.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
 - **`--approval-mode <mode>`**:
@@ -756,26 +772,12 @@ for that specific session.
   - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
     `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`
+- **`--experimental-acp`**:
+  - **Description:** Starts the agent in ACP mode.
 - **`--allowed-tools <tool1,tool2,...>`**:
   - A comma-separated list of tool names that will bypass the confirmation
     dialog.
   - Example: `gemini --allowed-tools "ShellTool(git status)"`
-- **`--telemetry`**:
-  - Enables [telemetry](../cli/telemetry.md).
-- **`--telemetry-target`**:
-  - Sets the telemetry target. See [telemetry](../cli/telemetry.md) for more
-    information.
-- **`--telemetry-otlp-endpoint`**:
-  - Sets the OTLP endpoint for telemetry. See [telemetry](../cli/telemetry.md)
-    for more information.
-- **`--telemetry-otlp-protocol`**:
-  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`.
-    See [telemetry](../cli/telemetry.md) for more information.
-- **`--telemetry-log-prompts`**:
-  - Enables logging of prompts for telemetry. See
-    [telemetry](../cli/telemetry.md) for more information.
-- **`--checkpointing`**:
-  - Enables [checkpointing](../cli/checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all
     available extensions are used.
@@ -783,9 +785,6 @@ for that specific session.
   - Example: `gemini -e my-extension -e my-other-extension`
 - **`--list-extensions`** (**`-l`**):
   - Lists all available extensions and exits.
-- **`--proxy`**:
-  - Sets the proxy for the CLI.
-  - Example: `--proxy http://localhost:7890`.
 - **`--include-directories <dir1,dir2,...>`**:
   - Includes additional directories in the workspace for multi-directory
     support.
