@@ -470,7 +470,7 @@ describe('GeminiChat', () => {
         'This is the visible text that should not be lost.',
       );
     });
-    it('should throw an error when a tool call is followed by an empty stream response', async () => {
+    it('should succeed when a tool call is followed by an empty stream response', async () => {
       // 1. Setup: A history where the model has just made a function call.
       const initialHistory: Content[] = [
         {
@@ -496,7 +496,7 @@ describe('GeminiChat', () => {
         yield {
           candidates: [
             {
-              content: { role: 'model', parts: [{ thought: true }] },
+              content: { role: 'model', parts: [{ thought: 'thinking...' }] },
               finishReason: 'STOP',
             },
           ],
@@ -520,14 +520,20 @@ describe('GeminiChat', () => {
         'prompt-id-stream-1',
       );
 
-      // 4. Assert: The stream processing should throw an InvalidStreamError.
+      // 4. Assert: The stream processing should now succeed without throwing an error.
       await expect(
         (async () => {
           for await (const _ of stream) {
             // This loop consumes the stream to trigger the internal logic.
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
+
+      // 5. Verify history was recorded correctly.
+      const history = chat.getHistory();
+      expect(history.length).toBe(4); // user turn + model turn (functionCall) + user turn (functionResponse) + model turn (empty response)
+      const modelTurnAfterFunctionResponse = history[2]!;
+      expect(modelTurnAfterFunctionResponse?.parts?.length).toBe(0); // Empty parts after stripping thoughts
     });
 
     it('should succeed when there is a tool call without finish reason', async () => {
@@ -608,7 +614,7 @@ describe('GeminiChat', () => {
       ).rejects.toThrow(InvalidStreamError);
     });
 
-    it('should throw InvalidStreamError when no tool call and empty response text', async () => {
+    it('should succeed when no tool call and empty response text but has finish reason', async () => {
       // Setup: Stream with finish reason but empty response (only thoughts)
       const streamWithEmptyResponse = (async function* () {
         yield {
@@ -634,13 +640,19 @@ describe('GeminiChat', () => {
         'prompt-id-1',
       );
 
+      // Assert: The stream processing should now succeed without throwing an error.
       await expect(
         (async () => {
           for await (const _ of stream) {
             // consume stream
           }
         })(),
-      ).rejects.toThrow(InvalidStreamError);
+      ).resolves.not.toThrow();
+
+      // Verify history was recorded correctly with an empty model turn.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2); // user turn + model turn
+      expect(history[1]?.parts?.length).toBe(0); // Empty parts after stripping thoughts
     });
 
     it('should succeed when there is finish reason and response text', async () => {
