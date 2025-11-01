@@ -908,7 +908,62 @@ describe('AgentExecutor', () => {
       expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX);
     });
 
-    it('should terminate if timeout is reached', async () => {
+    it('should terminate with TIMEOUT if a model call takes too long', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_time_minutes: 0.5, // 30 seconds
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock a model call that is interruptible by an abort signal.
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          await new Promise<void>((resolve) => {
+            // This promise resolves when aborted, ending the generator.
+            signal?.addEventListener('abort', () => {
+              resolve();
+            });
+          });
+        })();
+      });
+
+      const runPromise = executor.run({ goal: 'Timeout test' }, signal);
+
+      // Advance time past the timeout to trigger the abort.
+      await vi.advanceTimersByTimeAsync(31 * 1000);
+
+      const output = await runPromise;
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
+      expect(output.result).toContain('Agent timed out after 0.5 minutes.');
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+
+      // Verify activity stream reported the timeout
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'timeout',
+            error: 'Agent timed out after 0.5 minutes.',
+          }),
+        }),
+      );
+
+      // Verify telemetry
+      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          terminate_reason: AgentTerminateMode.TIMEOUT,
+        }),
+      );
+    });
+
+    it('should terminate with TIMEOUT if a tool call takes too long', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         max_time_minutes: 1,
       });
