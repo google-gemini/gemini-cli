@@ -58,9 +58,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         : theme.border.default;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
-  // This is a bit of a magic number, but it accounts for the border and
-  // marginLeft.
-  const innerWidth = terminalWidth - 4;
+  // This is a bit of a magic number.
+  const innerWidth = terminalWidth - 2;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
   // note, after the CTA, this automatically moves over to the next 'confirming' tool
@@ -101,29 +100,22 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         hasPending && (!isShellCommand || !isEmbeddedShellFocused)
       }
       borderColor={borderColor}
-      gap={1}
     >
       {toolCalls.map((tool) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         return (
           <Box key={tool.callId} flexDirection="column" minHeight={1}>
-            <Box flexDirection="row" alignItems="center">
-              <ToolMessage
-                {...tool}
-                availableTerminalHeight={availableTerminalHeightPerToolMessage}
-                terminalWidth={innerWidth}
-                emphasis={
-                  isConfirming
-                    ? 'high'
-                    : toolAwaitingApproval
-                      ? 'low'
-                      : 'medium'
-                }
-                activeShellPtyId={activeShellPtyId}
-                embeddedShellFocused={embeddedShellFocused}
-                config={config}
-              />
-            </Box>
+            <ToolMessage
+              {...tool}
+              availableTerminalHeight={availableTerminalHeightPerToolMessage}
+              terminalWidth={innerWidth}
+              emphasis={
+                isConfirming ? 'high' : toolAwaitingApproval ? 'low' : 'medium'
+              }
+              activeShellPtyId={activeShellPtyId}
+              embeddedShellFocused={embeddedShellFocused}
+              config={config}
+            />
             {tool.status === ToolCallStatus.Confirming &&
               isConfirming &&
               tool.confirmationDetails && (

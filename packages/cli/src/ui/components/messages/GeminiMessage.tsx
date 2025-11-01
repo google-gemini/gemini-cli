@@ -35,14 +35,25 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
           {prefix}
         </Text>
       </Box>
-      <Box flexGrow={1} flexDirection="column">
-        <MarkdownDisplay
-          text={text}
-          isPending={isPending}
-          availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
-          renderMarkdown={renderMarkdown}
-        />
+      <Box
+        flexGrow={1}
+        flexShrink={1}
+        flexDirection="column"
+        overflowX="hidden"
+        overflowY="scroll"
+        scrollbarThumbColor={theme.text.secondary}
+        scrollTop={Number.MAX_SAFE_INTEGER}
+        maxHeight={availableTerminalHeight}
+      >
+        <Box flexShrink={0} flexDirection="column">
+          <MarkdownDisplay
+            text={text}
+            isPending={isPending}
+            availableTerminalHeight={availableTerminalHeight}
+            terminalWidth={terminalWidth}
+            renderMarkdown={renderMarkdown}
+          />
+        </Box>
       </Box>
     </Box>
   );

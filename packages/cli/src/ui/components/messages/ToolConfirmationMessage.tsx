@@ -178,7 +178,7 @@ export const ToolConfirmationMessage: React.FC<
         diffContent={confirmationDetails.fileDiff}
         filename={confirmationDetails.fileName}
         availableTerminalHeight={availableBodyContentHeight()}
-        terminalWidth={childWidth}
+        terminalWidth={terminalWidth}
       />
     );
   } else if (confirmationDetails.type === 'exec') {
@@ -210,10 +210,10 @@ export const ToolConfirmationMessage: React.FC<
     }
     bodyContent = (
       <Box flexDirection="column">
-        <Box paddingX={1} marginLeft={1}>
+        <Box paddingX={1}>
           <MaxSizedBox
             maxHeight={bodyContentHeight}
-            maxWidth={Math.max(childWidth - 4, 1)}
+            maxWidth={Math.max(childWidth, 1)}
           >
             <Box>
               <Text color={theme.text.link}>{executionProps.command}</Text>
@@ -248,8 +248,13 @@ export const ToolConfirmationMessage: React.FC<
     });
 
     bodyContent = (
-      <Box flexDirection="column" paddingX={1} marginLeft={1}>
-        <RenderInline text={infoProps.prompt} defaultColor={theme.text.link} />
+      <Box flexDirection="column" paddingX={1}>
+        <Text color={theme.text.link}>
+          <RenderInline
+            text={infoProps.prompt}
+            defaultColor={theme.text.link}
+          />
+        </Text>
         {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
           <Box flexDirection="column" marginTop={1}>
             <Text color={theme.text.primary}>URLs to fetch:</Text>
@@ -268,7 +273,7 @@ export const ToolConfirmationMessage: React.FC<
     const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
 
     bodyContent = (
-      <Box flexDirection="column" paddingX={1} marginLeft={1}>
+      <Box flexDirection="column" paddingX={1}>
         <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
         <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
       </Box>
@@ -300,22 +305,26 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" padding={1} width={childWidth}>
+    <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
-      <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
+      <Box
+        flexGrow={1}
+        flexShrink={1}
+        overflow="hidden"
+        marginBottom={1}
+        paddingLeft={1}
+      >
         {bodyContent}
       </Box>
 
       {/* Confirmation Question */}
-      <Box marginBottom={1} flexShrink={0}>
-        <Text color={theme.text.primary} wrap="truncate">
-          {question}
-        </Text>
+      <Box marginBottom={1} flexShrink={0} paddingX={1}>
+        <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
       {/* Select Input for Options */}
-      <Box flexShrink={0}>
+      <Box flexShrink={0} paddingX={1}>
         <RadioButtonSelect
           items={options}
           onSelect={handleSelect}

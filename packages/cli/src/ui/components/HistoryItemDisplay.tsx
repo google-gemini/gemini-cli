@@ -18,6 +18,7 @@ import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
 import { Box } from 'ink';
+import { theme } from '../semantic-colors.js';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
@@ -57,7 +58,16 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
   return (
-    <Box flexDirection="column" key={itemForDisplay.id}>
+    <Box
+      flexDirection="column"
+      key={itemForDisplay.id}
+      maxHeight={availableTerminalHeight}
+      width={terminalWidth}
+      overflowY="scroll"
+      overflowX="hidden"
+      scrollbarThumbColor={theme.text.secondary}
+      scrollTop={Number.MAX_SAFE_INTEGER}
+    >
       {/* Render standard message types */}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} />
@@ -78,7 +88,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'gemini_content' && (
         <GeminiMessageContent
           text={itemForDisplay.text}
-          isPending={isPending}
           availableTerminalHeight={
             availableTerminalHeightGemini ?? availableTerminalHeight
           }

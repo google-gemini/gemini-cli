@@ -14,10 +14,10 @@ import { useSettings } from '../contexts/SettingsContext.js';
 
 interface MarkdownDisplayProps {
   text: string;
-  isPending: boolean;
-  availableTerminalHeight?: number;
   terminalWidth: number;
   renderMarkdown?: boolean;
+  availableTerminalHeight?: number;
+  isPending?: boolean;
 }
 
 // Constants for Markdown parsing and rendering
@@ -29,10 +29,9 @@ const LIST_ITEM_TEXT_FLEX_GROW = 1;
 
 const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   text,
-  isPending,
-  availableTerminalHeight,
   terminalWidth,
   renderMarkdown = true,
+  availableTerminalHeight,
 }) => {
   const settings = useSettings();
   const responseColor = theme.text.response ?? theme.text.primary;
@@ -99,8 +98,6 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
             key={key}
             content={codeBlockContent}
             lang={codeBlockLang}
-            isPending={isPending}
-            availableTerminalHeight={availableTerminalHeight}
             terminalWidth={terminalWidth}
           />,
         );
@@ -287,8 +284,6 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         key="line-eof"
         content={codeBlockContent}
         lang={codeBlockLang}
-        isPending={isPending}
-        availableTerminalHeight={availableTerminalHeight}
         terminalWidth={terminalWidth}
       />,
     );
@@ -314,62 +309,21 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
 interface RenderCodeBlockProps {
   content: string[];
   lang: string | null;
-  isPending: boolean;
-  availableTerminalHeight?: number;
   terminalWidth: number;
 }
 
 const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   content,
   lang,
-  isPending,
-  availableTerminalHeight,
   terminalWidth,
 }) => {
   const settings = useSettings();
-  const MIN_LINES_FOR_MESSAGE = 1; // Minimum lines to show before the "generating more" message
-  const RESERVED_LINES = 2; // Lines reserved for the message itself and potential padding
-
-  if (isPending && availableTerminalHeight !== undefined) {
-    const MAX_CODE_LINES_WHEN_PENDING = Math.max(
-      0,
-      availableTerminalHeight - RESERVED_LINES,
-    );
-
-    if (content.length > MAX_CODE_LINES_WHEN_PENDING) {
-      if (MAX_CODE_LINES_WHEN_PENDING < MIN_LINES_FOR_MESSAGE) {
-        // Not enough space to even show the message meaningfully
-        return (
-          <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING}>
-            <Text color={theme.text.secondary}>
-              ... code is being written ...
-            </Text>
-          </Box>
-        );
-      }
-      const truncatedContent = content.slice(0, MAX_CODE_LINES_WHEN_PENDING);
-      const colorizedTruncatedCode = colorizeCode(
-        truncatedContent.join('\n'),
-        lang,
-        availableTerminalHeight,
-        terminalWidth - CODE_BLOCK_PREFIX_PADDING,
-        undefined,
-        settings,
-      );
-      return (
-        <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">
-          {colorizedTruncatedCode}
-          <Text color={theme.text.secondary}>... generating more ...</Text>
-        </Box>
-      );
-    }
-  }
 
   const fullContent = content.join('\n');
   const colorizedCode = colorizeCode(
     fullContent,
     lang,
-    availableTerminalHeight,
+    undefined,
     terminalWidth - CODE_BLOCK_PREFIX_PADDING,
     undefined,
     settings,

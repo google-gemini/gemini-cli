@@ -72,11 +72,13 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
+  onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
   isEmbeddedShellFocused?: boolean;
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
   popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
+  suggestionsPosition?: 'above' | 'below';
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -111,11 +113,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   approvalMode,
   onEscapePromptChange,
+  onSuggestionsVisibilityChange,
   vimHandleInput,
   isEmbeddedShellFocused,
   setQueueErrorMessage,
   streamingState,
   popAllMessages,
+  suggestionsPosition = 'below',
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -943,6 +947,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const activeCompletion = getActiveCompletion();
   const shouldShowSuggestions = activeCompletion.showSuggestions;
 
+  useEffect(() => {
+    if (onSuggestionsVisibilityChange) {
+      onSuggestionsVisibilityChange(shouldShowSuggestions);
+    }
+  }, [shouldShowSuggestions, onSuggestionsVisibilityChange]);
+
   const showAutoAcceptStyling =
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
   const showYoloStyling =
@@ -961,8 +971,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
+  const suggestionsNode = shouldShowSuggestions ? (
+    <Box paddingRight={2}>
+      <SuggestionsDisplay
+        suggestions={activeCompletion.suggestions}
+        activeIndex={activeCompletion.activeSuggestionIndex}
+        isLoading={activeCompletion.isLoadingSuggestions}
+        width={suggestionsWidth}
+        scrollOffset={activeCompletion.visibleStartIndex}
+        userInput={buffer.text}
+        mode={
+          buffer.text.startsWith('/') &&
+          !reverseSearchActive &&
+          !commandSearchActive
+            ? 'slash'
+            : 'reverse'
+        }
+        expandedIndex={expandedSuggestionIndex}
+      />
+    </Box>
+  ) : null;
+
   return (
     <>
+      {suggestionsPosition === 'above' && suggestionsNode}
       <Box
         borderStyle="round"
         borderColor={
@@ -1141,26 +1173,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           )}
         </Box>
       </Box>
-      {shouldShowSuggestions && (
-        <Box paddingRight={2}>
-          <SuggestionsDisplay
-            suggestions={activeCompletion.suggestions}
-            activeIndex={activeCompletion.activeSuggestionIndex}
-            isLoading={activeCompletion.isLoadingSuggestions}
-            width={suggestionsWidth}
-            scrollOffset={activeCompletion.visibleStartIndex}
-            userInput={buffer.text}
-            mode={
-              buffer.text.startsWith('/') &&
-              !reverseSearchActive &&
-              !commandSearchActive
-                ? 'slash'
-                : 'reverse'
-            }
-            expandedIndex={expandedSuggestionIndex}
-          />
-        </Box>
-      )}
+      {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
 };
