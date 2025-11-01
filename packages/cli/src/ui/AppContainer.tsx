@@ -102,6 +102,7 @@ import {
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
+import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -153,6 +154,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
   const [showDebugProfiler, setShowDebugProfiler] = useState(false);
+  const [copyModeEnabled, setCopyModeEnabled] = useState(false);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     initializationResult.geminiMdFileCount,
@@ -248,6 +250,8 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
     })();
     registerCleanup(async () => {
+      // Turn off mouse scroll.
+      disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
     });
@@ -344,9 +348,11 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [historyManager.history, logger]);
 
   const refreshStatic = useCallback(() => {
-    stdout.write(ansiEscapes.clearTerminal);
+    if (settings.merged.ui?.useAlternateBuffer === false) {
+      stdout.write(ansiEscapes.clearTerminal);
+    }
     setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, stdout]);
+  }, [setHistoryRemountKey, stdout, settings]);
 
   const {
     isThemeDialogOpen,
@@ -1009,9 +1015,25 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
+      if (copyModeEnabled) {
+        setCopyModeEnabled(false);
+        enableMouseEvents();
+        // We don't want to process any other keys if we're in copy mode.
+        return;
+      }
+
       // Debug log keystrokes if enabled
       if (settings.merged.general?.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
+      if (
+        settings.merged.ui?.useAlternateBuffer &&
+        keyMatchers[Command.TOGGLE_COPY_MODE](key)
+      ) {
+        setCopyModeEnabled(true);
+        disableMouseEvents();
+        return;
       }
 
       if (keyMatchers[Command.QUIT](key)) {
@@ -1078,6 +1100,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
       refreshStatic,
+      setCopyModeEnabled,
+      copyModeEnabled,
+      settings.merged.ui?.useAlternateBuffer,
     ],
   );
 
@@ -1294,6 +1319,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       showDebugProfiler,
+      copyModeEnabled,
     }),
     [
       isThemeDialogOpen,
@@ -1378,6 +1404,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showDebugProfiler,
       apiKeyDefaultValue,
       authState,
+      copyModeEnabled,
     ],
   );
 

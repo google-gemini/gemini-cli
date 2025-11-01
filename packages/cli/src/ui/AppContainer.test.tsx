@@ -108,6 +108,10 @@ vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
+vi.mock('./utils/mouse.js', () => ({
+  enableMouseEvents: vi.fn(),
+  disableMouseEvents: vi.fn(),
+}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -134,6 +138,7 @@ import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
+import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -1364,6 +1369,171 @@ describe('AppContainer State Management', () => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         unmount();
       });
+    });
+  });
+
+  describe('Copy Mode (CTRL+S)', () => {
+    let handleGlobalKeypress: (key: Key) => void;
+    let rerender: () => void;
+    let unmount: () => void;
+
+    const setupCopyModeTest = async (isAlternateMode = false) => {
+      // Update settings for this test run
+      const testSettings = {
+        ...mockSettings,
+        merged: {
+          ...mockSettings.merged,
+          ui: {
+            ...mockSettings.merged.ui,
+            useAlternateBuffer: isAlternateMode,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      const renderResult = render(
+        <AppContainer
+          config={mockConfig}
+          settings={testSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      rerender = () =>
+        renderResult.rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={testSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+      unmount = renderResult.unmount;
+    };
+
+    beforeEach(() => {
+      mockStdout.write.mockClear();
+      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
+        handleGlobalKeypress = callback;
+      });
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    describe.each([
+      {
+        isAlternateMode: false,
+        shouldEnable: false,
+        modeName: 'Normal Mode',
+      },
+      {
+        isAlternateMode: true,
+        shouldEnable: true,
+        modeName: 'Alternate Buffer Mode',
+      },
+    ])('$modeName', ({ isAlternateMode, shouldEnable }) => {
+      it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when Ctrl+S is pressed`, async () => {
+        await setupCopyModeTest(isAlternateMode);
+        mockStdout.write.mockClear(); // Clear initial enable call
+
+        act(() => {
+          handleGlobalKeypress({
+            name: 's',
+            ctrl: true,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\x13',
+          });
+        });
+        rerender();
+
+        if (shouldEnable) {
+          expect(disableMouseEvents).toHaveBeenCalled();
+        } else {
+          expect(disableMouseEvents).not.toHaveBeenCalled();
+        }
+        unmount();
+      });
+
+      if (shouldEnable) {
+        it('should toggle mouse back on when Ctrl+S is pressed again', async () => {
+          await setupCopyModeTest(isAlternateMode);
+          mockStdout.write.mockClear();
+
+          // Turn it on (disable mouse)
+          act(() => {
+            handleGlobalKeypress({
+              name: 's',
+              ctrl: true,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: '\x13',
+            });
+          });
+          rerender();
+          expect(disableMouseEvents).toHaveBeenCalled();
+
+          // Turn it off (enable mouse)
+          act(() => {
+            handleGlobalKeypress({
+              name: 'any', // Any key should exit copy mode
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: 'a',
+            });
+          });
+          rerender();
+
+          expect(enableMouseEvents).toHaveBeenCalled();
+          unmount();
+        });
+
+        it('should exit copy mode on any key press', async () => {
+          await setupCopyModeTest(isAlternateMode);
+
+          // Enter copy mode
+          act(() => {
+            handleGlobalKeypress({
+              name: 's',
+              ctrl: true,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: '\x13',
+            });
+          });
+          rerender();
+
+          mockStdout.write.mockClear();
+
+          // Press any other key
+          act(() => {
+            handleGlobalKeypress({
+              name: 'a',
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: 'a',
+            });
+          });
+          rerender();
+
+          // Should have re-enabled mouse
+          expect(enableMouseEvents).toHaveBeenCalled();
+          unmount();
+        });
+      }
     });
   });
 
