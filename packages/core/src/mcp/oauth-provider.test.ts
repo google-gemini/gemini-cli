@@ -27,6 +27,11 @@ vi.mock('./oauth-token-storage.js', () => {
     })),
   };
 });
+vi.mock('../utils/events.js', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
+  },
+}));
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
@@ -43,6 +48,7 @@ import type {
   OAuthAuthorizationServerMetadata,
   OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
+import { coreEvents } from '../utils/events.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -938,8 +944,10 @@ describe('MCPOAuthProvider', () => {
       expect(tokenStorage.deleteCredentials).toHaveBeenCalledWith(
         'test-server',
       );
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to refresh token'),
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Failed to refresh auth token'),
+        expect.any(Error),
       );
     });
 

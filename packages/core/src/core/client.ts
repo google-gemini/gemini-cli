@@ -49,10 +49,10 @@ import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
-import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export function isThinkingSupported(model: string) {
@@ -95,8 +95,17 @@ export class GeminiClient {
     this.lastPromptId = this.config.getSessionId();
   }
 
+  private updateTelemetryTokenCount() {
+    if (this.chat) {
+      uiTelemetryService.setLastPromptTokenCount(
+        this.chat.getLastPromptTokenCount(),
+      );
+    }
+  }
+
   async initialize() {
     this.chat = await this.startChat();
+    this.updateTelemetryTokenCount();
   }
 
   private getContentGeneratorOrFail(): ContentGenerator {
@@ -143,6 +152,7 @@ export class GeminiClient {
 
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
+    this.updateTelemetryTokenCount();
   }
 
   async resumeChat(
@@ -438,8 +448,7 @@ export class GeminiClient {
     );
 
     const remainingTokenCount =
-      tokenLimit(modelForLimitCheck) -
-      uiTelemetryService.getLastPromptTokenCount();
+      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
 
     if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
       yield {
@@ -520,6 +529,9 @@ export class GeminiClient {
         return turn;
       }
       yield event;
+
+      this.updateTelemetryTokenCount();
+
       if (event.type === GeminiEventType.InvalidStream) {
         if (this.config.getContinueOnFailedApiCall()) {
           if (isInvalidStreamRetry) {
@@ -685,6 +697,7 @@ export class GeminiClient {
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
         this.chat = await this.startChat(newHistory);
+        this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }
     }

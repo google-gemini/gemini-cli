@@ -92,10 +92,6 @@ export interface BugCommandSettings {
   urlTemplate: string;
 }
 
-export interface ChatCompressionSettings {
-  contextPercentageThreshold?: number;
-}
-
 export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
@@ -257,13 +253,14 @@ export interface ConfigParameters {
   listExtensions?: boolean;
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
+  enableExtensionReloading?: boolean;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
-  chatCompression?: ChatCompressionSettings;
+  compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
@@ -314,7 +311,7 @@ export class Config {
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
-  private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -350,6 +347,7 @@ export class Config {
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
+  private readonly enableExtensionReloading: boolean;
   private readonly _blockedMcpServers: Array<{
     name: string;
     extensionName: string;
@@ -361,7 +359,7 @@ export class Config {
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
-  private readonly chatCompression: ChatCompressionSettings | undefined;
+  private readonly compressionThreshold: number | undefined;
   private readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
@@ -466,7 +464,7 @@ export class Config {
     this.ideMode = params.ideMode ?? false;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
-    this.chatCompression = params.chatCompression;
+    this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
@@ -489,9 +487,7 @@ export class Config {
     this.useWriteTodos = params.useWriteTodos ?? false;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
-    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [
-      AuthType.LOGIN_WITH_GOOGLE,
-    ];
+    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
     this.codebaseInvestigatorSettings = {
@@ -507,6 +503,7 @@ export class Config {
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
+    this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -571,8 +568,6 @@ export class Config {
       if (this.model === DEFAULT_GEMINI_MODEL_AUTO) {
         this.model = DEFAULT_GEMINI_MODEL;
       }
-    } else if (this.useModelRouter && this.model === DEFAULT_GEMINI_MODEL) {
-      this.model = DEFAULT_GEMINI_MODEL_AUTO;
     }
 
     // Vertex and Genai have incompatible encryption and sending history with
@@ -759,6 +754,10 @@ export class Config {
     return this.mcpServers;
   }
 
+  setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {
+    this.mcpServers = mcpServers;
+  }
+
   getUserMemory(): string {
     return this.userMemory;
   }
@@ -942,6 +941,10 @@ export class Config {
     return this._enabledExtensions;
   }
 
+  getEnableExtensionReloading(): boolean {
+    return this.enableExtensionReloading;
+  }
+
   getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
     return this._blockedMcpServers;
   }
@@ -1012,8 +1015,8 @@ export class Config {
     this.fileSystemService = fileSystemService;
   }
 
-  getChatCompression(): ChatCompressionSettings | undefined {
-    return this.chatCompression;
+  getCompressionThreshold(): number | undefined {
+    return this.compressionThreshold;
   }
 
   isInteractiveShellEnabled(): boolean {

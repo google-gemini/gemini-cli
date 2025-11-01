@@ -21,7 +21,8 @@
  *
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
@@ -321,7 +322,7 @@ describe('SettingsDialog', () => {
         stdin.write(down as string);
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Disable Auto Update');
       });
 
@@ -330,7 +331,7 @@ describe('SettingsDialog', () => {
         stdin.write(up as string);
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
@@ -348,7 +349,7 @@ describe('SettingsDialog', () => {
         stdin.write(TerminalKeys.UP_ARROW);
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         // Should wrap to last setting (without relying on exact bullet character)
         expect(lastFrame()).toContain('Codebase Investigator Max Num Turns');
       });
@@ -367,7 +368,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
       // Wait for initial render and verify we're on Vim Mode (first setting)
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
@@ -375,7 +376,7 @@ describe('SettingsDialog', () => {
       act(() => {
         stdin.write(TerminalKeys.DOWN_ARROW as string);
       });
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Disable Auto Update');
       });
 
@@ -384,14 +385,14 @@ describe('SettingsDialog', () => {
         stdin.write(TerminalKeys.ENTER as string);
       });
       // Wait for the setting change to be processed
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(
           vi.mocked(saveModifiedSettings).mock.calls.length,
         ).toBeGreaterThan(0);
       });
 
       // Wait for the mock to be called
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
       });
 
@@ -439,7 +440,7 @@ describe('SettingsDialog', () => {
           stdin.write(TerminalKeys.ENTER as string);
         });
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
         });
 
@@ -513,7 +514,7 @@ describe('SettingsDialog', () => {
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
       // Wait for initial render
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
@@ -569,7 +570,7 @@ describe('SettingsDialog', () => {
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
       // Wait for initial render
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Hide Window Title');
       });
 
@@ -735,7 +736,7 @@ describe('SettingsDialog', () => {
       // Since we can't easily target specific settings, we test the general behavior
 
       // Should not show restart prompt initially
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).not.toContain(
           'To see changes, Gemini CLI must be restarted',
         );
@@ -836,7 +837,7 @@ describe('SettingsDialog', () => {
           });
         }
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(
             vi.mocked(saveModifiedSettings).mock.calls.length,
           ).toBeGreaterThan(0);
@@ -928,7 +929,7 @@ describe('SettingsDialog', () => {
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
       // Wait for initial render
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
@@ -978,7 +979,7 @@ describe('SettingsDialog', () => {
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
       // Wait for initial render
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
@@ -1096,7 +1097,7 @@ describe('SettingsDialog', () => {
         stdin.write('\u001B');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
       });
 
@@ -1198,8 +1199,11 @@ describe('SettingsDialog', () => {
         userSettings: {},
         systemSettings: {},
         workspaceSettings: {},
-        stdinActions: (stdin: { write: (data: string) => void }) =>
-          stdin.write('\t'),
+        stdinActions: (stdin: { write: (data: string) => void }) => {
+          act(() => {
+            stdin.write('\t');
+          });
+        },
       },
       {
         name: 'accessibility settings enabled',

@@ -4,9 +4,8 @@
     "outDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "composite": true,
-    "rootDir": ".",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["index.ts", "src"],
-  "exclude": ["node_modules", "dist", "**/*.snap", "**/*.wasm"]
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
+  "exclude": ["node_modules", "dist"]
 }
