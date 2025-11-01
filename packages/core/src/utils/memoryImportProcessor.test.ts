@@ -180,27 +180,165 @@ describe('memoryImportProcessor', () => {
       );
     });
 
-    it('should handle circular imports', async () => {
-      const content = 'Content @./circular.md more content';
-      const basePath = testPath('test', 'path');
-      const circularContent = 'Circular @./main.md content';
+    it('should handle circular imports gracefully', async () => {
+      const content = '@a.md';
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      // Setup circular import: a.md -> b.md -> a.md
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockImplementation(async (p) => {
+        const filePath = p as string;
+        if (filePath.endsWith('a.md')) {
+          return '@b.md';
+        }
+        if (filePath.endsWith('b.md')) {
+          return '@a.md';
+        }
+        return '';
+      });
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      expect(result.content).toContain('<!-- File already processed: a.md -->');
+    });
+
+    it('should not treat npm-style packages in code blocks as imports', async () => {
+      const content = [
+        '*   **Frontend:** `vitest` is used for testing. Run with `pnpm -F @google-cloud-pulse/frontend test`.',
+        '*   **Backend:** `jest` is used for testing. Run with `pnpm -F @google-cloud-pulse/backend test`.',
+      ].join('\n');
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      // No imports should be processed
+      expect(mockedFs.readFile).not.toHaveBeenCalled();
+
+      // The original content should be unchanged
+      expect(result.content).toBe(content);
+
+      // No error messages should be logged
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('should not treat python decorators in code blocks as imports', async () => {
+      const content = [
+        '```python',
+        '@app.route("/api")',
+        'def my_api():',
+        '  return "OK",',
+        '```',
+      ].join('\n');
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      // No imports should be processed
+      expect(mockedFs.readFile).not.toHaveBeenCalled();
+
+      // The original content should be unchanged
+      expect(result.content).toBe(content);
+
+      // No error messages should be logged
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('should not treat email addresses as imports', async () => {
+      const content = 'Contact us at contact@example.com';
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      // No imports should be processed
+      expect(mockedFs.readFile).not.toHaveBeenCalled();
+
+      // The original content should be unchanged
+      expect(result.content).toBe(content);
+
+      // No error messages should be logged
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('should not treat decorators as imports', async () => {
+      const content = 'This is a decorator @my-decorator';
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      // No imports should be processed
+      expect(mockedFs.readFile).not.toHaveBeenCalled();
+
+      // The original content should be unchanged
+      expect(result.content).toBe(content);
+
+      // No error messages should be logged
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('should handle subdirectory imports with extensions but ignore those without', async () => {
+      const content =
+        'Import with extension: @foo/bar.md and without: @foo/bar';
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+      const importedContent = 'Subdirectory content';
 
       mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile.mockResolvedValue(circularContent);
+      mockedFs.readFile.mockResolvedValueOnce(importedContent);
 
-      // Set up the import state to simulate we're already processing main.md
-      const importState = {
-        processedFiles: new Set<string>(),
-        maxDepth: 10,
-        currentDepth: 0,
-        currentFile: testPath('test', 'path', 'main.md'), // Simulate we're processing main.md
-      };
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
 
-      const result = await processImports(content, basePath, true, importState);
+      // Verify the valid import was processed
+      expect(result.content).toContain(importedContent);
+      expect(result.content).toContain('<!-- Imported from: foo/bar.md -->');
 
-      // The circular import should be detected when processing the nested import
-      expect(result.content).toContain(
-        '<!-- File already processed: ./main.md -->',
+      // Verify the invalid import was ignored
+      expect(result.content).toContain('@foo/bar');
+      expect(result.content).not.toContain('<!-- Imported from: foo/bar -->');
+      expect(mockedFs.readFile).toHaveBeenCalledTimes(1);
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, 'foo/bar.md'),
+        'utf-8',
       );
     });
 
