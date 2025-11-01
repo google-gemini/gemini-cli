@@ -11,7 +11,8 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
-import type { ApprovalMode } from '../config/config.js';
+import type { ApprovalMode } from '../policy/types.js';
+
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { FileDiff } from '../tools/tools.js';

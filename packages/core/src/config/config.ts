@@ -77,11 +77,7 @@ import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 
-export enum ApprovalMode {
-  DEFAULT = 'default',
-  AUTO_EDIT = 'autoEdit',
-  YOLO = 'yolo',
-}
+import { ApprovalMode } from '../policy/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
