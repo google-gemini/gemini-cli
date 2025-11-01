@@ -53,7 +53,7 @@ import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import { getPolicyErrorsForUI } from '../config/policy.js';
 import process from 'node:process';
-import { useHistory } from './hooks/useHistoryManager.js';
+import { useHistoryWithActivityMonitoring } from './hooks/useHistoryManagerWithActivity.js';
 import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
@@ -139,7 +139,7 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { settings, config, initializationResult } = props;
-  const historyManager = useHistory();
+  const historyManager = useHistoryWithActivityMonitoring();
   useMemoryMonitor(historyManager);
   const [corgiMode, setCorgiMode] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
