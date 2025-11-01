@@ -76,6 +76,7 @@ import type { UserTierId } from '../code_assist/types.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
+import { coreEvents } from '../utils/events.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -521,7 +522,15 @@ export class Config {
     }
 
     if (this.getProxy()) {
-      setGlobalProxy(this.getProxy() as string);
+      try {
+        setGlobalProxy(this.getProxy() as string);
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to set invalid proxy from configuration.',
+          error,
+        );
+      }
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
