@@ -8,7 +8,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EOL } from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, exec } from 'node:child_process';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -27,6 +27,21 @@ function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
 }
 
+function findRgInPath(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const command = process.platform === 'win32' ? 'where rg' : 'which rg';
+    exec(command, (error, stdout) => {
+      if (error) {
+        resolve(null);
+        return;
+      }
+      // On Windows, `where` can return multiple paths. We'll take the first one.
+      const firstPath = stdout.trim().split(EOL)[0];
+      resolve(firstPath || null);
+    });
+  });
+}
+
 async function resolveExistingRgPath(): Promise<string | null> {
   const binDir = Storage.getGlobalBinDir();
   for (const fileName of getRgCandidateFilenames()) {
@@ -41,6 +56,10 @@ async function resolveExistingRgPath(): Promise<string | null> {
 let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
 
 async function ensureRipgrepAvailable(): Promise<string | null> {
+  const systemRgPath = await findRgInPath();
+  if (systemRgPath) {
+    return systemRgPath;
+  }
   const existingPath = await resolveExistingRgPath();
   if (existingPath) {
     return existingPath;

@@ -22,7 +22,7 @@ import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { spawn, exec } from 'node:child_process';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 // Mock dependencies for canUseRipgrep
 vi.mock('@joshua.litt/get-ripgrep', () => ({
@@ -30,11 +30,17 @@ vi.mock('@joshua.litt/get-ripgrep', () => ({
 }));
 
 // Mock child_process for ripgrep calls
-vi.mock('child_process', () => ({
-  spawn: vi.fn(),
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    spawn: vi.fn(),
+    exec: vi.fn(),
+  };
+});
 
 const mockSpawn = vi.mocked(spawn);
+const mockExec = vi.mocked(exec);
 const downloadRipGrepMock = vi.mocked(downloadRipGrep);
 const originalGetGlobalBinDir = Storage.getGlobalBinDir.bind(Storage);
 const storageSpy = vi.spyOn(Storage, 'getGlobalBinDir');
@@ -44,6 +50,19 @@ describe('canUseRipgrep', () => {
   let binDir: string;
 
   beforeEach(async () => {
+    mockExec.mockReset();
+    // Default to rg not being in path
+    mockExec.mockImplementation(((
+      _command: string,
+      callback: (
+        err: import('child_process').ExecException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      callback(new Error('not found'), '', '');
+      return {} as import('child_process').ChildProcess;
+    }) as typeof exec);
     downloadRipGrepMock.mockReset();
     downloadRipGrepMock.mockResolvedValue(undefined);
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
@@ -55,6 +74,25 @@ describe('canUseRipgrep', () => {
   afterEach(async () => {
     storageSpy.mockImplementation(() => originalGetGlobalBinDir());
     await fs.rm(tempRootDir, { recursive: true, force: true });
+  });
+
+  it('should return true if ripgrep is in the system path', async () => {
+    const rgPath = '/usr/bin/rg';
+    mockExec.mockImplementation(((
+      _command: string,
+      callback: (
+        err: import('child_process').ExecException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      callback(null, rgPath, '');
+      return {} as import('child_process').ChildProcess;
+    }) as typeof exec);
+
+    const result = await canUseRipgrep();
+    expect(result).toBe(true);
+    expect(downloadRipGrepMock).not.toHaveBeenCalled();
   });
 
   it('should return true if ripgrep already exists', async () => {
@@ -132,6 +170,19 @@ describe('ensureRgPath', () => {
   let binDir: string;
 
   beforeEach(async () => {
+    mockExec.mockReset();
+    // Default to rg not being in path
+    mockExec.mockImplementation(((
+      _command: string,
+      callback: (
+        err: import('child_process').ExecException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      callback(new Error('not found'), '', '');
+      return {} as import('child_process').ChildProcess;
+    }) as typeof exec);
     downloadRipGrepMock.mockReset();
     downloadRipGrepMock.mockResolvedValue(undefined);
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
@@ -143,6 +194,25 @@ describe('ensureRgPath', () => {
   afterEach(async () => {
     storageSpy.mockImplementation(() => originalGetGlobalBinDir());
     await fs.rm(tempRootDir, { recursive: true, force: true });
+  });
+
+  it('should return rg path if ripgrep is in the system path', async () => {
+    const rgPath = '/usr/bin/rg';
+    mockExec.mockImplementation(((
+      _command: string,
+      callback: (
+        err: import('child_process').ExecException | null,
+        stdout: string,
+        stderr: string,
+      ) => void,
+    ) => {
+      callback(null, rgPath, '');
+      return {} as import('child_process').ChildProcess;
+    }) as typeof exec);
+
+    const result = await ensureRgPath();
+    expect(result).toBe(rgPath);
+    expect(downloadRipGrepMock).not.toHaveBeenCalled();
   });
 
   it('should return rg path if ripgrep already exists', async () => {
