@@ -208,6 +208,10 @@ export class McpClient {
     this.assertConnected();
     return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
   }
+
+  getServerConfig(): MCPServerConfig {
+    return this.serverConfig;
+  }
 }
 
 /**

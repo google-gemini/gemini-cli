@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { appEvents } from './../../utils/events.js';
+import { AppEvent, appEvents } from './../../utils/events.js';
 import { Box, Text } from 'ink';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { type McpClient, MCPServerStatus } from '@google/gemini-cli-core';
@@ -31,9 +31,9 @@ export const ConfigInitDisplay = () => {
       setMessage(`Connecting to MCP servers... (${connected}/${clients.size})`);
     };
 
-    appEvents.on('mcp-client-update', onChange);
+    appEvents.on(AppEvent.McpClientUpdate, onChange);
     return () => {
-      appEvents.off('mcp-client-update', onChange);
+      appEvents.off(AppEvent.McpClientUpdate, onChange);
     };
   }, [config]);
 

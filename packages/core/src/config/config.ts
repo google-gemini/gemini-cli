@@ -155,6 +155,7 @@ import {
   type ExtensionLoader,
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
+import { McpClientManager } from '../tools/mcp-client-manager.js';
 
 export type { FileFilteringOptions };
 export {
@@ -252,7 +253,8 @@ export interface ConfigParameters {
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
   enableExtensionReloading?: boolean;
-  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
+  allowedMcpServers?: string[];
+  blockedMcpServers?: string[];
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
@@ -290,6 +292,9 @@ export interface ConfigParameters {
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private mcpClientManager?: McpClientManager;
+  private allowedMcpServers: string[];
+  private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
   private agentRegistry!: AgentRegistry;
   private readonly sessionId: string;
@@ -344,10 +349,6 @@ export class Config {
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
-  private readonly _blockedMcpServers: Array<{
-    name: string;
-    extensionName: string;
-  }>;
   fallbackModelHandler?: FallbackModelHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
@@ -410,6 +411,8 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.allowedMcpServers = params.allowedMcpServers ?? [];
+    this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
@@ -451,7 +454,6 @@ export class Config {
     this._extensionLoader =
       params.extensionLoader ?? new SimpleExtensionLoader([]);
     this._enabledExtensions = params.enabledExtensions ?? [];
-    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
@@ -547,6 +549,15 @@ export class Config {
     await this.agentRegistry.initialize();
 
     this.toolRegistry = await this.createToolRegistry();
+    this.mcpClientManager = new McpClientManager(
+      this.toolRegistry,
+      this,
+      this.eventEmitter,
+    );
+    await Promise.all([
+      await this.mcpClientManager.startConfiguredMcpServers(),
+      await this.getExtensionLoader().start(this),
+    ]);
 
     await this.geminiClient.initialize();
   }
@@ -724,8 +735,23 @@ export class Config {
     return this.allowedTools;
   }
 
+  /**
+   * All the excluded tools from static configuration, loaded extensions, or
+   * other sources.
+   *
+   * May change over time.
+   */
   getExcludeTools(): string[] | undefined {
-    return this.excludeTools;
+    const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
+    for (const extension of this.getExtensionLoader().getExtensions()) {
+      if (!extension.isActive) {
+        continue;
+      }
+      for (const tool of extension.excludeTools || []) {
+        excludeToolsSet.add(tool);
+      }
+    }
+    return [...excludeToolsSet];
   }
 
   getToolDiscoveryCommand(): string | undefined {
@@ -740,8 +766,25 @@ export class Config {
     return this.mcpServerCommand;
   }
 
+  /**
+   * The user configured MCP servers (via gemini settings files).
+   *
+   * Does NOT include mcp servers configured by extensions.
+   */
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getMcpClientManager(): McpClientManager | undefined {
+    return this.mcpClientManager;
+  }
+
+  getAllowedMcpServers(): string[] | undefined {
+    return this.allowedMcpServers;
+  }
+
+  getBlockedMcpServers(): string[] | undefined {
+    return this.blockedMcpServers;
   }
 
   setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {
@@ -925,10 +968,6 @@ export class Config {
 
   getEnableExtensionReloading(): boolean {
     return this.enableExtensionReloading;
-  }
-
-  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
-    return this._blockedMcpServers;
   }
 
   getNoBrowser(): boolean {
@@ -1123,7 +1162,7 @@ export class Config {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.eventEmitter);
+    const registry = new ToolRegistry(this);
 
     // Set message bus on tool registry before discovery so MCP tools can access it
     if (this.getEnableMessageBusIntegration()) {
@@ -1226,6 +1265,7 @@ export class Config {
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
         const excludeTools = this.getExcludeTools() || [];
+
         const allowedTools = this.getAllowedTools();
 
         const isExcluded = excludeTools.includes(definition.name);
