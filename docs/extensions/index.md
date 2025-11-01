@@ -7,6 +7,9 @@ familiar and user-friendly format. With extensions, you can expand the
 capabilities of Gemini CLI and share those capabilities with others. They are
 designed to be easily installable and shareable.
 
+To see examples of extensions, you can browse a gallery of
+[Gemini CLI extensions](https://geminicli.com/extensions/browse/).
+
 See [getting started docs](getting-started-extensions.md) for a guide on
 creating your first extension.
 
@@ -173,6 +176,40 @@ The file has the following structure:
 When Gemini CLI starts, it loads all the extensions and merges their
 configurations. If there are any conflicts, the workspace configuration takes
 precedence.
+
+### Settings
+
+Extensions can define settings that the user will be prompted to provide upon
+installation. This is useful for things like API keys, URLs, or other
+configuration that the extension needs to function.
+
+To define settings, add a `settings` array to your `gemini-extension.json` file.
+Each object in the array should have the following properties:
+
+- `name`: A user-friendly name for the setting.
+- `description`: A description of the setting and what it's used for.
+- `envVar`: The name of the environment variable that the setting will be stored
+  as.
+- `sensitive`: Optional boolean. If true, obfuscates the input the user provides
+  and stores the secret in keychain storage. **Example**
+
+```json
+{
+  "name": "my-api-extension",
+  "version": "1.0.0",
+  "settings": [
+    {
+      "name": "API Key",
+      "description": "Your API key for the service.",
+      "envVar": "MY_API_KEY"
+    }
+  ]
+}
+```
+
+When a user installs this extension, they will be prompted to enter their API
+key. The value will be saved to a `.env` file in the extension's directory
+(e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
 
 ### Custom commands
 

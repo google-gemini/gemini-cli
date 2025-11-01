@@ -9,6 +9,7 @@ import { Text, Box } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 interface GeminiMessageProps {
   text: string;
@@ -23,6 +24,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const { renderMarkdown } = useUIState();
   const prefix = '✦ ';
   const prefixWidth = prefix.length;
 
@@ -39,6 +41,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
           isPending={isPending}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
+          renderMarkdown={renderMarkdown}
         />
       </Box>
     </Box>

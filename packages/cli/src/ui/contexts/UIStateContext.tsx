@@ -47,6 +47,8 @@ export interface UIState {
   isConfigInitialized: boolean;
   authError: string | null;
   isAuthDialogOpen: boolean;
+  isAwaitingApiKeyInput: boolean;
+  apiKeyDefaultValue?: string;
   editorError: string | null;
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;
@@ -56,7 +58,7 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isModelDialogOpen: boolean;
   isPermissionsDialogOpen: boolean;
-  slashCommands: readonly SlashCommand[];
+  slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
@@ -81,7 +83,7 @@ export interface UIState {
   showErrorDetails: boolean;
   filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
-  showToolDescriptions: boolean;
+  renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
@@ -89,10 +91,8 @@ export interface UIState {
   currentLoadingPhrase: string;
   historyRemountKey: number;
   messageQueue: string[];
+  queueErrorMessage: string | null;
   showAutoAcceptIndicator: ApprovalMode;
-  showWorkspaceMigrationDialog: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  workspaceExtensions: any[]; // Extension[]
   // Quota-related state
   userTier: UserTierId | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
@@ -122,6 +122,7 @@ export interface UIState {
   activePtyId: number | undefined;
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
+  showFullTodos: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

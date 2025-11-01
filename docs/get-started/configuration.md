@@ -65,11 +65,12 @@ locations for these files:
     controls over users' Gemini CLI setups.
 
 **Note on environment variables in settings:** String values within your
-`settings.json` files can reference environment variables using either
-`$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically
-resolved when the settings are loaded. For example, if you have an environment
-variable `MY_API_TOKEN`, you could use it in `settings.json` like this:
-`"apiKey": "$MY_API_TOKEN"`.
+`settings.json` and `gemini-extension.json` files can reference environment
+variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
+be automatically resolved when the settings are loaded. For example, if you have
+an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
+this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
 > **Note for Enterprise Users:** For guidance on deploying and managing Gemini
 > CLI in a corporate environment, please see the
@@ -110,12 +111,25 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable session checkpointing for recovery.
   - **Default:** `false`
 
+- **`general.enablePromptCompletion`** (boolean):
+  - **Description:** Enable AI-powered prompt completion suggestions while
+    typing.
+  - **Default:** `false`
+
+- **`general.debugKeystrokeLogging`** (boolean):
+  - **Description:** Enable debug logging of keystrokes to the console.
+  - **Default:** `false`
+
+- **`general.sessionRetention.enabled`** (boolean):
+  - **Description:** Enable automatic session cleanup.
+  - **Default:** `false`
+
 #### `output`
 
 - **`output.format`** (string):
   - **Description:** The format of the CLI output.
   - **Default:** `"text"`
-  - **Values:** `"text"`, `"json"`
+  - **Values:** `"text"`, `"json"`, `"stream-json"`
 
 #### `ui`
 
@@ -132,6 +146,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the window title bar.
   - **Default:** `false`
 
+- **`ui.showStatusInTitle`** (boolean):
+  - **Description:** Show Gemini CLI status and thoughts in the terminal window
+    title.
+  - **Default:** `false`
+
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI.
   - **Default:** `false`
@@ -140,8 +159,25 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the application banner.
   - **Default:** `false`
 
+- **`ui.hideContextSummary`** (boolean):
+  - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
+    input.
+  - **Default:** `false`
+
 - **`ui.hideFooter`** (boolean):
   - **Description:** Hide the footer from the UI.
+  - **Default:** `false`
+
+- **`ui.footer.hideCWD`** (boolean):
+  - **Description:** Hide the current working directory path in the footer.
+  - **Default:** `false`
+
+- **`ui.footer.hideSandboxStatus`** (boolean):
+  - **Description:** Hide the sandbox status indicator in the footer.
+  - **Default:** `false`
+
+- **`ui.footer.hideModelInfo`** (boolean):
+  - **Description:** Hide the model name and context usage in the footer.
   - **Default:** `false`
 
 - **`ui.showMemoryUsage`** (boolean):
@@ -155,6 +191,10 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.showCitations`** (boolean):
   - **Description:** Show citations for generated text in the chat.
   - **Default:** `true`
+
+- **`ui.useFullWidth`** (boolean):
+  - **Description:** Use the entire width of the terminal for output.
+  - **Default:** `false`
 
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
   - **Description:** Disable loading phrases for accessibility.
@@ -205,17 +245,21 @@ their corresponding top-level category object in your `settings.json` file.
     example `{"run_shell_command": {"tokenBudget": 2000}}`
   - **Default:** `undefined`
 
-- **`model.chatCompression.contextPercentageThreshold`** (number):
+- **`model.compressionThreshold`** (number):
   - **Description:** Sets the threshold for chat history compression as a
-    percentage of the model's total token limit. This is a value between 0 and 1
+    fraction of the model's total token limit. This is a value between 0 and 1
     that applies to both automatic compression and the manual `/compress`
     command. For example, a value of `0.6` will trigger compression when the
     chat history exceeds 60% of the token limit.
-  - **Default:** `0.7`
+  - **Default:** `0.2`
 
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
   - **Default:** `false`
+
+- **`model.enableShellOutputEfficiency`** (boolean):
+  - **Description:** Optimizes shell tool commands for token efficiency.
+  - **Default:** `true`
 
 #### `context`
 
@@ -256,6 +300,10 @@ their corresponding top-level category object in your `settings.json` file.
     the current tree when completing `@` prefixes in the prompt.
   - **Default:** `true`
 
+- **`context.fileFiltering.disableFuzzySearch`** (boolean):
+  - **Description:** Disable fuzzy search when searching for files.
+  - **Default:** `false`
+
 #### `tools`
 
 - **`tools.sandbox`** (boolean or string):
@@ -268,6 +316,15 @@ their corresponding top-level category object in your `settings.json` file.
     an interactive session cannot be started, it will fall back to a standard
     shell.
   - **Default:** `true`
+
+- **`tools.shell.showColor`** (boolean):
+  - **Description:** Show color in shell output.
+  - **Default:** `false`
+
+- **`tools.autoAccept`** (boolean):
+  - **Description:** Automatically accept and execute tool calls that are
+    considered safe (e.g., read-only operations).
+  - **Default:** `false`
 
 - **`tools.core`** (array of strings):
   - **Description:** This can be used to restrict the set of built-in tools
@@ -306,6 +363,31 @@ their corresponding top-level category object in your `settings.json` file.
       [`functionResponse.response.content`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functionresponse).
   - **Default:** `undefined`
 
+- **`tools.useRipgrep`** (boolean):
+  - **Description:** Use ripgrep for file content search instead of the fallback
+    implementation. Provides faster search performance.
+  - **Default:** `true`
+
+- **`tools.enableToolOutputTruncation`** (boolean):
+  - **Description:** Enable truncation of large tool outputs.
+  - **Default:** `true`
+
+- **`tools.truncateToolOutputThreshold`** (number):
+  - **Description:** Truncate tool output if it is larger than this many
+    characters. Set to -1 to disable.
+  - **Default:** `20000`
+
+- **`tools.truncateToolOutputLines`** (number):
+  - **Description:** The number of lines to keep when truncating tool output.
+  - **Default:** `1000`
+
+- **`tools.enableMessageBusIntegration`** (boolean):
+  - **Description:** Enable policy-based tool confirmation via message bus
+    integration. When enabled, tools will automatically respect policy engine
+    decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
+    implementations.
+  - **Default:** `false`
+
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
@@ -319,6 +401,18 @@ their corresponding top-level category object in your `settings.json` file.
 - **`mcp.excluded`** (array of strings):
   - **Description:** A denylist of MCP servers to exclude.
   - **Default:** `undefined`
+
+#### `useSmartEdit`
+
+- **`useSmartEdit`** (boolean):
+  - **Description:** Enable the smart-edit tool instead of the replace tool.
+  - **Default:** `true`
+
+#### `useWriteTodos`
+
+- **`useWriteTodos`** (boolean):
+  - **Description:** Enable the write_todos tool.
+  - **Default:** `false`
 
 #### `security`
 
@@ -355,6 +449,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`advanced.bugCommand`** (object):
   - **Description:** Configuration for the bug report command.
   - **Default:** `undefined`
+
+#### `experimental`
+
+- **`experimental.useModelRouter`** (boolean):
+  - **Description:** Enable model routing to route requests to the best model
+    based on complexity.
+  - **Default:** `false`
 
 #### `mcpServers`
 
@@ -630,17 +731,16 @@ for that specific session.
   - **Values:**
     - `text`: (Default) The standard human-readable output.
     - `json`: A machine-readable JSON output.
+    - `stream-json`: A streaming JSON output that emits real-time events.
   - **Note:** For structured output and scripting, use the
-    `--output-format json` flag.
+    `--output-format json` or `--output-format stream-json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
   - Sets the sandbox image URI.
 - **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
-- **`--all-files`** (**`-a`**):
-  - If set, recursively includes all files within the current directory as
-    context for the prompt.
+
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
 - **`--show-memory-usage`**:

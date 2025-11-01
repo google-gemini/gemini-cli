@@ -159,6 +159,107 @@ describe('classifyGoogleError', () => {
     expect((result as RetryableQuotaError).retryDelayMs).toBe(60000);
   });
 
+  it('should return RetryableQuotaError for another short retry delay', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 2\nPlease retry in 56.185908122s.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+          violations: [
+            {
+              quotaMetric:
+                'generativelanguage.googleapis.com/generate_content_free_tier_requests',
+              quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier',
+              quotaDimensions: {
+                location: 'global',
+                model: 'gemini-2.5-pro',
+              },
+              quotaValue: '2',
+            },
+          ],
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.Help',
+          links: [
+            {
+              description: 'Learn more about Gemini API quotas',
+              url: 'https://ai.google.dev/gemini-api/docs/rate-limits',
+            },
+          ],
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '56s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(56000);
+  });
+
+  it('should return RetryableQuotaError for Cloud Code RATE_LIMIT_EXCEEDED with retry delay', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'You have exhausted your capacity on this model. Your quota will reset after 0s.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-2.5-pro',
+            quotaResetDelay: '539.477544ms',
+            quotaResetTimeStamp: '2025-10-20T19:14:08Z',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '0.539477544s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBeCloseTo(
+      539.477544,
+    );
+  });
+
+  it('should return TerminalQuotaError for Cloud Code QUOTA_EXHAUSTED', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'You have exhausted your capacity on this model. Your quota will reset after 0s.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'QUOTA_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-2.5-pro',
+            quotaResetDelay: '539.477544ms',
+            quotaResetTimeStamp: '2025-10-20T19:14:08Z',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '0.539477544s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
   it('should prioritize daily limit over retry info', () => {
     const apiError: GoogleApiError = {
       code: 429,

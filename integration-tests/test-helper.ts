@@ -15,8 +15,42 @@ import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
+import { GEMINI_DIR } from '../packages/core/src/utils/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Get timeout based on environment
+function getDefaultTimeout() {
+  if (env['CI']) return 60000; // 1 minute in CI
+  if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
+  return 15000; // 15s locally
+}
+
+export async function poll(
+  predicate: () => boolean,
+  timeout: number,
+  interval: number,
+): Promise<boolean> {
+  const startTime = Date.now();
+  let attempts = 0;
+  while (Date.now() - startTime < timeout) {
+    attempts++;
+    const result = predicate();
+    if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
+      console.log(
+        `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
+      );
+    }
+    if (result) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+  if (env['VERBOSE'] === 'true') {
+    console.log(`Poll timed out after ${attempts} attempts`);
+  }
+  return false;
+}
 
 function sanitizeTestName(name: string) {
   return name
@@ -117,15 +151,6 @@ export function validateModelOutput(
   return true;
 }
 
-// Simulates typing a string one character at a time to avoid paste detection.
-export async function type(ptyProcess: pty.IPty, text: string) {
-  const delay = 5;
-  for (const char of text) {
-    ptyProcess.write(char);
-    await new Promise((resolve) => setTimeout(resolve, delay));
-  }
-}
-
 interface ParsedLog {
   attributes?: {
     'event.name'?: string;
@@ -133,6 +158,7 @@ interface ParsedLog {
     function_args?: string;
     success?: boolean;
     duration_ms?: number;
+    request_text?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -143,36 +169,130 @@ interface ParsedLog {
   }[];
 }
 
+export class InteractiveRun {
+  ptyProcess: pty.IPty;
+  public output = '';
+
+  constructor(ptyProcess: pty.IPty) {
+    this.ptyProcess = ptyProcess;
+    ptyProcess.onData((data) => {
+      this.output += data;
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
+        process.stdout.write(data);
+      }
+    });
+  }
+
+  async expectText(text: string, timeout?: number) {
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+    const found = await poll(
+      () => stripAnsi(this.output).toLowerCase().includes(text.toLowerCase()),
+      timeout,
+      200,
+    );
+    expect(found, `Did not find expected text: "${text}"`).toBe(true);
+  }
+
+  // This types slowly to make sure command is correct, but only work for short
+  // commands that are not multi-line, use sendKeys to type long prompts
+  async type(text: string) {
+    let typedSoFar = '';
+    for (const char of text) {
+      this.ptyProcess.write(char);
+      typedSoFar += char;
+
+      // Wait for the typed sequence so far to be echoed back.
+      const found = await poll(
+        () => stripAnsi(this.output).includes(typedSoFar),
+        5000, // 5s timeout per character (generous for CI)
+        10, // check frequently
+      );
+
+      if (!found) {
+        throw new Error(
+          `Timed out waiting for typed text to appear in output: "${typedSoFar}".\nStripped output:\n${stripAnsi(
+            this.output,
+          )}`,
+        );
+      }
+    }
+  }
+
+  // Types an entire string at once, necessary for some things like commands
+  // but may run into paste detection issues for larger strings.
+  async sendText(text: string) {
+    this.ptyProcess.write(text);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  // Simulates typing a string one character at a time to avoid paste detection.
+  async sendKeys(text: string) {
+    const delay = 5;
+    for (const char of text) {
+      this.ptyProcess.write(char);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  async kill() {
+    this.ptyProcess.kill();
+  }
+
+  expectExit(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () =>
+          reject(
+            new Error(`Test timed out: process did not exit within a minute.`),
+          ),
+        60000,
+      );
+      this.ptyProcess.onExit(({ exitCode }) => {
+        clearTimeout(timer);
+        resolve(exitCode);
+      });
+    });
+  }
+}
+
 export class TestRig {
   bundlePath: string;
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
-  _interactiveOutput = '';
+  // Path to the copied fake responses file for this test.
+  fakeResponsesPath?: string;
+  // Original fake responses file path for rewriting goldens in record mode.
+  originalFakeResponsesPath?: string;
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
     this.testDir = null;
   }
 
-  // Get timeout based on environment
-  getDefaultTimeout() {
-    if (env['CI']) return 60000; // 1 minute in CI
-    if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
-    return 15000; // 15s locally
-  }
-
   setup(
     testName: string,
-    options: { settings?: Record<string, unknown> } = {},
+    options: {
+      settings?: Record<string, unknown>;
+      fakeResponsesPath?: string;
+    } = {},
   ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
     this.testDir = join(env['INTEGRATION_TEST_FILE_DIR']!, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
+    if (options.fakeResponsesPath) {
+      this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
+      this.originalFakeResponsesPath = options.fakeResponsesPath;
+      if (process.env['REGENERATE_MODEL_GOLDENS'] !== 'true') {
+        fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      }
+    }
 
     // Create a settings file to point the CLI to the local collector
-    const geminiDir = join(this.testDir, '.gemini');
+    const geminiDir = join(this.testDir, GEMINI_DIR);
     mkdirSync(geminiDir, { recursive: true });
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
@@ -198,6 +318,8 @@ export class TestRig {
       model: DEFAULT_GEMINI_MODEL,
       sandbox:
         env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+      // Don't show the IDE connection dialog when running from VsCode
+      ide: { enabled: false, hasSeenNudge: true },
       ...options.settings, // Allow tests to override/add settings
     };
     writeFileSync(
@@ -236,16 +358,32 @@ export class TestRig {
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
       : [this.bundlePath, ...extraInitialArgs];
+    if (this.fakeResponsesPath) {
+      if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
+        initialArgs.push('--record-responses', this.fakeResponsesPath);
+      } else {
+        initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      }
+    }
     return { command, initialArgs };
   }
 
   run(
     promptOrOptions:
       | string
-      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
+      | {
+          prompt?: string;
+          stdin?: string;
+          stdinDoesNotEnd?: boolean;
+          yolo?: boolean;
+        },
     ...args: string[]
   ): Promise<string> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const yolo =
+      typeof promptOrOptions === 'string' || promptOrOptions.yolo !== false;
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
     const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
@@ -257,13 +395,13 @@ export class TestRig {
     };
 
     if (typeof promptOrOptions === 'string') {
-      commandArgs.push('--prompt', promptOrOptions);
+      commandArgs.push(promptOrOptions);
     } else if (
       typeof promptOrOptions === 'object' &&
       promptOrOptions !== null
     ) {
       if (promptOrOptions.prompt) {
-        commandArgs.push('--prompt', promptOrOptions.prompt);
+        commandArgs.push(promptOrOptions.prompt);
       }
       if (promptOrOptions.stdin) {
         execOptions.input = promptOrOptions.stdin;
@@ -436,10 +574,16 @@ export class TestRig {
   }
 
   async cleanup() {
+    if (
+      process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
+      this.fakeResponsesPath
+    ) {
+      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
+    }
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
-        execSync(`rm -rf ${this.testDir}`);
+        fs.rmSync(this.testDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
         if (env['VERBOSE'] === 'true') {
@@ -456,13 +600,13 @@ export class TestRig {
     if (!logFilePath) return;
 
     // Wait for telemetry file to exist and have content
-    await this.poll(
+    await poll(
       () => {
         if (!fs.existsSync(logFilePath)) return false;
         try {
           const content = readFileSync(logFilePath, 'utf-8');
           // Check if file has meaningful content (at least one complete JSON object)
-          return content.includes('"event.name"');
+          return content.includes('"scopeMetrics"');
         } catch {
           return false;
         }
@@ -474,12 +618,12 @@ export class TestRig {
 
   async waitForTelemetryEvent(eventName: string, timeout?: number) {
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
         const logs = this._readAndParseTelemetryLog();
         return logs.some(
@@ -493,35 +637,78 @@ export class TestRig {
     );
   }
 
-  async waitForToolCall(toolName: string, timeout?: number) {
+  async waitForToolCall(
+    toolName: string,
+    timeout?: number,
+    matchArgs?: (args: string) => boolean,
+  ) {
     // Use environment-specific timeout
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     // Wait for telemetry to be ready before polling for tool calls
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
         const toolLogs = this.readToolLogs();
-        return toolLogs.some((log) => log.toolRequest.name === toolName);
+        return toolLogs.some(
+          (log) =>
+            log.toolRequest.name === toolName &&
+            (matchArgs?.call(this, log.toolRequest.args) ?? true),
+        );
       },
       timeout,
       100,
     );
   }
 
-  async waitForAnyToolCall(toolNames: string[], timeout?: number) {
+  async expectToolCallSuccess(
+    toolNames: string[],
+    timeout?: number,
+    matchArgs?: (args: string) => boolean,
+  ) {
     // Use environment-specific timeout
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     // Wait for telemetry to be ready before polling for tool calls
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    const success = await poll(
+      () => {
+        const toolLogs = this.readToolLogs();
+        return toolNames.some((name) =>
+          toolLogs.some(
+            (log) =>
+              log.toolRequest.name === name &&
+              log.toolRequest.success &&
+              (matchArgs?.call(this, log.toolRequest.args) ?? true),
+          ),
+        );
+      },
+      timeout,
+      100,
+    );
+
+    expect(
+      success,
+      `Expected to find successful toolCalls for ${JSON.stringify(toolNames)}`,
+    ).toBe(true);
+  }
+
+  async waitForAnyToolCall(toolNames: string[], timeout?: number) {
+    // Use environment-specific timeout
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+
+    // Wait for telemetry to be ready before polling for tool calls
+    await this.waitForTelemetryReady();
+
+    return poll(
       () => {
         const toolLogs = this.readToolLogs();
         return toolNames.some((name) =>
@@ -531,32 +718,6 @@ export class TestRig {
       timeout,
       100,
     );
-  }
-
-  async poll(
-    predicate: () => boolean,
-    timeout: number,
-    interval: number,
-  ): Promise<boolean> {
-    const startTime = Date.now();
-    let attempts = 0;
-    while (Date.now() - startTime < timeout) {
-      attempts++;
-      const result = predicate();
-      if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
-        console.log(
-          `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
-        );
-      }
-      if (result) {
-        return true;
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval));
-    }
-    if (env['VERBOSE'] === 'true') {
-      console.log(`Poll timed out after ${attempts} attempts`);
-    }
-    return false;
   }
 
   _parseToolLogsFromStdout(stdout: string) {
@@ -792,6 +953,34 @@ export class TestRig {
     return apiRequests.pop() || null;
   }
 
+  async waitForMetric(metricName: string, timeout?: number) {
+    await this.waitForTelemetryReady();
+
+    const fullName = metricName.startsWith('gemini_cli.')
+      ? metricName
+      : `gemini_cli.${metricName}`;
+
+    return poll(
+      () => {
+        const logs = this._readAndParseTelemetryLog();
+        for (const logData of logs) {
+          if (logData.scopeMetrics) {
+            for (const scopeMetric of logData.scopeMetrics) {
+              for (const metric of scopeMetric.metrics) {
+                if (metric.descriptor.name === fullName) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        return false;
+      },
+      timeout ?? getDefaultTimeout(),
+      100,
+    );
+  }
+
   readMetric(metricName: string): Record<string, unknown> | null {
     const logs = this._readAndParseTelemetryLog();
     for (const logData of logs) {
@@ -808,31 +997,14 @@ export class TestRig {
     return null;
   }
 
-  async waitForText(text: string, timeout?: number) {
-    if (!timeout) {
-      timeout = this.getDefaultTimeout();
-    }
-    const found = await this.poll(
-      () =>
-        stripAnsi(this._interactiveOutput)
-          .toLowerCase()
-          .includes(text.toLowerCase()),
-      timeout,
-      200,
-    );
-    expect(found, `Did not find expected text: "${text}"`).toBe(true);
-  }
-
-  async runInteractive(...args: string[]): Promise<pty.IPty> {
+  async runInteractive(...args: string[]): Promise<InteractiveRun> {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs, ...args];
-
-    this._interactiveOutput = ''; // Reset output for the new run
 
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
-      rows: 30,
+      rows: 24,
       cwd: this.testDir!,
       env: Object.fromEntries(
         Object.entries(env).filter(([, v]) => v !== undefined),
@@ -842,16 +1014,9 @@ export class TestRig {
     const executable = command === 'node' ? process.execPath : command;
     const ptyProcess = pty.spawn(executable, commandArgs, options);
 
-    ptyProcess.onData((data) => {
-      this._interactiveOutput += data;
-      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-        process.stdout.write(data);
-      }
-    });
-
+    const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
-    await this.waitForText('Type your message', 30000);
-
-    return ptyProcess;
+    await run.expectText('  Type your message or @path/to/file', 30000);
+    return run;
   }
 }
