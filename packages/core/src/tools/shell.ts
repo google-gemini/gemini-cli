@@ -302,11 +302,23 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         : {};
       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
+        const resolvedConfig =
+          this.config.generationConfigService.getResolvedConfig({
+            model: 'summarizer-shell',
+          });
+
+        // TODO(joshualitt): Configure this entirely by alias after migrating
+        // all users of the settings.
+        const tokenBudget = summarizeConfig[SHELL_TOOL_NAME]?.tokenBudget;
+        if (tokenBudget) {
+          resolvedConfig.sdkConfig.maxOutputTokens = tokenBudget;
+        }
+
         const summary = await summarizeToolOutput(
           llmContent,
           this.config.getGeminiClient(),
           signal,
-          summarizeConfig[SHELL_TOOL_NAME].tokenBudget,
+          resolvedConfig,
         );
         return {
           llmContent: summary,

@@ -19,6 +19,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GENERATION_CONFIG,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -604,6 +605,38 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Skip the next speaker check.',
         showInDialog: true,
+      },
+    },
+  },
+
+  generation: {
+    type: 'object',
+    label: 'Generation',
+    category: 'Model',
+    requiresRestart: false,
+    default: DEFAULT_GENERATION_CONFIG,
+    description: 'Settings that control model generation.',
+    showInDialog: false,
+    properties: {
+      aliases: {
+        type: 'object',
+        label: 'Generation Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: DEFAULT_GENERATION_CONFIG.aliases,
+        description:
+          'Named presets for generation settings. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
+        showInDialog: false,
+      },
+      overrides: {
+        type: 'array',
+        label: 'Generation Settings Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Apply specific generation settings based on the agent or model being used. The most specific match will be used.',
+        showInDialog: false,
       },
     },
   },

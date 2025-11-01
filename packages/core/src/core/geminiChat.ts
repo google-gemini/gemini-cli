@@ -10,10 +10,9 @@
 import type {
   GenerateContentResponse,
   Content,
-  GenerateContentConfig,
-  SendMessageParameters,
   Part,
   Tool,
+  PartListUnion,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
@@ -38,6 +37,7 @@ import {
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
+import type { ResolvedModelConfig } from '../services/modelGenerationConfigService.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -189,7 +189,8 @@ export class GeminiChat {
 
   constructor(
     private readonly config: Config,
-    private readonly generationConfig: GenerateContentConfig = {},
+    private systemInstruction: string = '',
+    private tools: Tool[] = [],
     private history: Content[] = [],
   ) {
     validateHistory(history);
@@ -201,7 +202,7 @@ export class GeminiChat {
   }
 
   setSystemInstruction(sysInstr: string) {
-    this.generationConfig.systemInstruction = sysInstr;
+    this.systemInstruction = sysInstr;
   }
 
   /**
@@ -227,26 +228,24 @@ export class GeminiChat {
    * ```
    */
   async sendMessageStream(
-    model: string,
-    params: SendMessageParameters,
+    resolvedModelConfig: ResolvedModelConfig,
+    message: PartListUnion,
     prompt_id: string,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
-
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
     });
     this.sendPromise = streamDonePromise;
 
-    const userContent = createUserContent(params.message);
+    const userContent = createUserContent(message);
+    const model = resolvedModelConfig.model;
 
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
     if (!isFunctionResponse(userContent)) {
-      const userMessage = Array.isArray(params.message)
-        ? params.message
-        : [params.message];
+      const userMessage = Array.isArray(message) ? message : [message];
       const userMessageContent = partListUnionToString(toParts(userMessage));
       this.chatRecordingService.recordMessage({
         model,
@@ -276,18 +275,13 @@ export class GeminiChat {
             }
 
             // If this is a retry, set temperature to 1 to encourage different output.
-            const currentParams = { ...params };
             if (attempt > 0) {
-              currentParams.config = {
-                ...currentParams.config,
-                temperature: 1,
-              };
+              resolvedModelConfig.sdkConfig.temperature = 1;
             }
 
             const stream = await self.makeApiCallAndProcessStream(
-              model,
+              resolvedModelConfig,
               requestContents,
-              currentParams,
               prompt_id,
             );
 
@@ -347,11 +341,11 @@ export class GeminiChat {
   }
 
   private async makeApiCallAndProcessStream(
-    model: string,
+    resolvedModelConfig: ResolvedModelConfig,
     requestContents: Content[],
-    params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const { model, sdkConfig } = resolvedModelConfig;
     const apiCall = () => {
       const modelToUse = getEffectiveModel(
         this.config.isInFallbackMode(),
@@ -371,7 +365,11 @@ export class GeminiChat {
         {
           model: modelToUse,
           contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
+          config: {
+            ...sdkConfig,
+            systemInstruction: this.systemInstruction,
+            tools: this.tools,
+          },
         },
         prompt_id,
       );
@@ -386,7 +384,7 @@ export class GeminiChat {
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
-      signal: params.config?.abortSignal,
+      signal: sdkConfig.abortSignal,
     });
 
     return this.processStreamResponse(model, streamResponse);
@@ -459,8 +457,10 @@ export class GeminiChat {
     });
   }
 
-  setTools(tools: Tool[]): void {
-    this.generationConfig.tools = tools;
+  setTools() {
+    const toolRegistry = this.config.getToolRegistry();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    this.tools = [{ functionDeclarations: toolDeclarations }];
   }
 
   async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {

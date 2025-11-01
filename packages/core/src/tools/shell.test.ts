@@ -72,6 +72,12 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn(),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
+      generationConfigService: {
+        getResolvedConfig: vi.fn().mockResolvedValue({
+          model: 'mock-model',
+          config: {},
+        }),
+      },
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -309,6 +315,14 @@ describe('ShellTool', () => {
       (mockConfig.getSummarizeToolOutputConfig as Mock).mockReturnValue({
         [SHELL_TOOL_NAME]: { tokenBudget: 1000 },
       });
+      (
+        mockConfig.generationConfigService.getResolvedConfig as Mock
+      ).mockReturnValue({
+        model: 'mock-model',
+        sdkConfig: {
+          temperature: 0.5,
+        },
+      });
       vi.mocked(summarizer.summarizeToolOutput).mockResolvedValue(
         'summarized output',
       );
@@ -332,7 +346,13 @@ describe('ShellTool', () => {
         expect.any(String),
         mockConfig.getGeminiClient(),
         mockAbortSignal,
-        1000,
+        {
+          model: 'mock-model',
+          sdkConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0.5,
+          },
+        },
       );
       expect(result.llmContent).toBe('summarized output');
       expect(result.returnDisplay).toBe('long output');

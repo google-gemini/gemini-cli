@@ -60,6 +60,9 @@ import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
+import type { ModelGenerationServiceConfig } from '../services/modelGenerationConfigService.js';
+import { ModelGenerationConfigService } from '../services/modelGenerationConfigService.js';
+import { DEFAULT_GENERATION_CONFIG } from '../config/defaultGenerationConfig.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -286,6 +289,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  generation?: ModelGenerationServiceConfig;
 }
 
 export class Config {
@@ -296,6 +300,7 @@ export class Config {
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
+  readonly generationConfigService: ModelGenerationConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -525,6 +530,25 @@ export class Config {
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
+
+    // HACK: The settings loading logic doesn't currently merge the default
+    // generation config with the user's settings. This means if a user provides
+    // any `generation` settings (e.g., just `overrides`), the default `aliases`
+    // are lost. This hack manually merges the default aliases back in if they
+    // are missing from the user's config.
+    // TODO: Fix the settings loading logic to properly merge defaults and
+    // remove this hack.
+    let generationConfig = params.generation;
+    if (generationConfig && !generationConfig.aliases) {
+      generationConfig = {
+        ...generationConfig,
+        aliases: DEFAULT_GENERATION_CONFIG.aliases,
+      };
+    }
+
+    this.generationConfigService = new ModelGenerationConfigService(
+      generationConfig ?? DEFAULT_GENERATION_CONFIG,
+    );
   }
 
   /**

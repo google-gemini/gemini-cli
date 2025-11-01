@@ -12,7 +12,6 @@ import type {
   Content,
   Part,
   FunctionCall,
-  GenerateContentConfig,
   FunctionDeclaration,
   Schema,
 } from '@google/genai';
@@ -262,17 +261,27 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
-    const messageParams = {
-      message: message.parts || [],
-      config: {
-        abortSignal: signal,
-        tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
-      },
+    const modelConfig = this.definition.modelConfig;
+    const resolvedModelConfig =
+      this.runtimeContext.generationConfigService.getResolvedConfig({
+        agent: this.definition.name,
+        model: modelConfig.model,
+      });
+    resolvedModelConfig.sdkConfig.abortSignal = signal;
+    if (tools.length > 0) {
+      resolvedModelConfig.sdkConfig.tools = [{ functionDeclarations: tools }];
+    }
+    // TODO(joshualitt): Unify settings.
+    resolvedModelConfig.sdkConfig.temperature = modelConfig.temp;
+    resolvedModelConfig.sdkConfig.topP = modelConfig.top_p;
+    resolvedModelConfig.sdkConfig.thinkingConfig = {
+      includeThoughts: true,
+      thinkingBudget: modelConfig.thinkingBudget ?? -1,
     };
 
     const responseStream = await chat.sendMessageStream(
-      this.definition.modelConfig.model,
-      messageParams,
+      resolvedModelConfig,
+      message.parts || [],
       promptId,
     );
 
@@ -317,7 +326,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
   /** Initializes a `GeminiChat` instance for the agent run. */
   private async createChatObject(inputs: AgentInputs): Promise<GeminiChat> {
-    const { promptConfig, modelConfig } = this.definition;
+    const { promptConfig } = this.definition;
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
       throw new Error(
@@ -336,24 +345,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      const generationConfig: GenerateContentConfig = {
-        temperature: modelConfig.temp,
-        topP: modelConfig.top_p,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget: modelConfig.thinkingBudget ?? -1,
-        },
-      };
-
-      if (systemInstruction) {
-        generationConfig.systemInstruction = systemInstruction;
-      }
-
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.runtimeContext,
-        generationConfig,
+        systemInstruction,
+        [], // set in `callModel`,
         startHistory,
       );
+      if (systemInstruction) {
+        chat.setSystemInstruction(systemInstruction);
+      }
+      return chat;
     } catch (error) {
       await reportError(
         error,

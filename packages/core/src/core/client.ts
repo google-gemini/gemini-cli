@@ -28,11 +28,11 @@ import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import type { ResolvedModelConfig } from '../services/modelGenerationConfigService.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_THINKING_MODE,
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -52,10 +52,6 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
-export function isThinkingSupported(model: string) {
-  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
-}
-
 export function isThinkingDefault(model: string) {
   if (model.startsWith('gemini-2.5-flash-lite')) {
     return false;
@@ -67,10 +63,6 @@ const MAX_TURNS = 100;
 
 export class GeminiClient {
   private chat?: GeminiChat;
-  private readonly generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
@@ -86,7 +78,7 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
-  constructor(private readonly config: Config) {
+  constructor(readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
@@ -141,10 +133,7 @@ export class GeminiClient {
   }
 
   async setTools(): Promise<void> {
-    const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-    this.getChat().setTools(tools);
+    this.getChat().setTools();
   }
 
   async resetChat(): Promise<void> {
@@ -188,26 +177,7 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
-      const model = this.config.getModel();
-
-      const config: GenerateContentConfig = { ...this.generateContentConfig };
-
-      if (isThinkingSupported(model)) {
-        config.thinkingConfig = {
-          includeThoughts: true,
-          thinkingBudget: DEFAULT_THINKING_MODE,
-        };
-      }
-
-      return new GeminiChat(
-        this.config,
-        {
-          systemInstruction,
-          ...config,
-          tools,
-        },
-        history,
-      );
+      return new GeminiChat(this.config, systemInstruction, tools, history);
     } catch (error) {
       await reportError(
         error,
@@ -507,7 +477,13 @@ export class GeminiClient {
       this.currentSequenceModel = modelToUse;
     }
 
-    const resultStream = turn.run(modelToUse, request, linkedSignal);
+    const resolvedModelConfig =
+      this.config.generationConfigService.getResolvedConfig({
+        model: modelToUse,
+      });
+
+    resolvedModelConfig.sdkConfig.abortSignal = linkedSignal;
+    const resultStream = turn.run(resolvedModelConfig, request);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
@@ -560,6 +536,7 @@ export class GeminiClient {
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
         this.config.getBaseLlmClient(),
+        this.config,
         signal,
         prompt_id,
       );
@@ -589,31 +566,28 @@ export class GeminiClient {
 
   async generateContent(
     contents: Content[],
-    generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
-    model: string,
+    resolvedConfig: ResolvedModelConfig,
   ): Promise<GenerateContentResponse> {
-    let currentAttemptModel: string = model;
+    const { model: resolvedModel, sdkConfig: resolvedSettings } =
+      resolvedConfig;
 
-    const configToUse: GenerateContentConfig = {
-      ...this.generateContentConfig,
-      ...generationConfig,
-    };
-
+    let currentAttemptModel: string = resolvedModel;
+    let requestConfig: GenerateContentConfig | undefined = undefined;
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
 
-      const requestConfig: GenerateContentConfig = {
+      requestConfig = {
         abortSignal,
-        ...configToUse,
+        ...resolvedSettings,
         systemInstruction,
       };
 
       const apiCall = () => {
         const modelToUse = this.config.isInFallbackMode()
           ? DEFAULT_GEMINI_FLASH_MODEL
-          : model;
+          : resolvedModel;
         currentAttemptModel = modelToUse;
 
         return this.getContentGeneratorOrFail().generateContent(
@@ -647,7 +621,7 @@ export class GeminiClient {
         `Error generating content via API with model ${currentAttemptModel}.`,
         {
           requestContents: contents,
-          requestConfig: configToUse,
+          requestConfig,
         },
         'generateContent-api',
       );

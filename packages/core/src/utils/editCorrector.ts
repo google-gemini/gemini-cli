@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content, GenerateContentConfig } from '@google/genai';
+import type { Content } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { EditToolParams } from '../tools/edit.js';
@@ -16,20 +16,12 @@ import {
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import {
   isFunctionResponse,
   isFunctionCall,
 } from '../utils/messageInspectors.js';
 import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
-
-const EDIT_MODEL = DEFAULT_GEMINI_FLASH_LITE_MODEL;
-const EDIT_CONFIG: GenerateContentConfig = {
-  thinkingConfig: {
-    thinkingBudget: 0,
-  },
-};
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -419,12 +411,15 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
+    const resolvedConfig =
+      baseLlmClient.config.generationConfigService.getResolvedConfig({
+        model: 'edit-corrector',
+      });
     const result = await baseLlmClient.generateJson({
       contents,
       schema: OLD_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
+      resolvedConfig,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });
@@ -509,12 +504,15 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
+    const resolvedConfig =
+      baseLlmClient.config.generationConfigService.getResolvedConfig({
+        model: 'edit-corrector',
+      });
     const result = await baseLlmClient.generateJson({
       contents,
       schema: NEW_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
+      resolvedConfig,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });
@@ -580,12 +578,15 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
+    const resolvedConfig =
+      baseLlmClient.config.generationConfigService.getResolvedConfig({
+        model: 'edit-corrector',
+      });
     const result = await baseLlmClient.generateJson({
       contents,
       schema: CORRECT_NEW_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
+      resolvedConfig,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });
@@ -648,12 +649,15 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
+    const resolvedConfig =
+      baseLlmClient.config.generationConfigService.getResolvedConfig({
+        model: 'edit-corrector',
+      });
     const result = await baseLlmClient.generateJson({
       contents,
       schema: CORRECT_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
+      resolvedConfig,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });

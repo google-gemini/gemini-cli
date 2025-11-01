@@ -1,0 +1,104 @@
+{
+  "chat-base": {
+    "sdkConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "gemini-2.5-pro": {
+    "model": "gemini-2.5-pro",
+    "sdkConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "gemini-2.5-flash": {
+    "model": "gemini-2.5-flash",
+    "sdkConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "gemini-2.5-flash-lite": {
+    "model": "gemini-2.5-flash-lite",
+    "sdkConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "classifier": {
+    "model": "gemini-2.5-flash-lite",
+    "sdkConfig": {
+      "maxOutputTokens": 1024,
+      "thinkingConfig": {
+        "thinkingBudget": 512
+      }
+    }
+  },
+  "prompt-completion": {
+    "model": "gemini-2.5-flash-lite",
+    "sdkConfig": {
+      "temperature": 0.3,
+      "maxOutputTokens": 16000,
+      "thinkingConfig": {
+        "thinkingBudget": 0
+      }
+    }
+  },
+  "edit-corrector": {
+    "model": "gemini-2.5-flash-lite",
+    "sdkConfig": {
+      "thinkingConfig": {
+        "thinkingBudget": 0
+      }
+    }
+  },
+  "summarizer-default": {
+    "model": "gemini-2.5-flash-lite",
+    "sdkConfig": {
+      "maxOutputTokens": 2000
+    }
+  },
+  "summarizer-shell": {
+    "model": "gemini-2.5-flash-lite",
+    "sdkConfig": {
+      "maxOutputTokens": 2000
+    }
+  },
+  "web-search-tool": {
+    "model": "gemini-2.5-flash",
+    "sdkConfig": {
+      "tools": [
+        {
+          "googleSearch": {}
+        }
+      ]
+    }
+  },
+  "web-fetch-tool": {
+    "model": "gemini-2.5-flash",
+    "sdkConfig": {
+      "tools": [
+        {
+          "urlContext": {}
+        }
+      ]
+    }
+  }
+}
