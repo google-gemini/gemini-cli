@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { isSubpath } from '../utils/paths.js';
 import { detectIde, type IdeInfo } from '../ide/detect-ide.js';
 import { ideContextStore } from './ideContext.js';
@@ -517,7 +518,20 @@ export class IdeClient {
       };
     }
 
-    const ideWorkspacePaths = ideWorkspacePath.split(path.delimiter);
+    const ideWorkspacePaths = ideWorkspacePath
+      .split(path.delimiter)
+      .map((p) => {
+        try {
+          if (p.startsWith('file://')) {
+            return fileURLToPath(p);
+          }
+          return decodeURIComponent(p);
+        } catch (e) {
+          logger.error('Failed to decode workspace path component:', e);
+          return '';
+        }
+      })
+      .filter((e) => !!e);
     const realCwd = getRealPath(cwd);
     const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
       const idePath = getRealPath(workspacePath);
