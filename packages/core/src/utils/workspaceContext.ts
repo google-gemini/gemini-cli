@@ -128,7 +128,7 @@ export class WorkspaceContext {
     }
 
     const rawFilesystemPath = fs.realpathSync(normalizedPath);
-    return normalizePath(rawFilesystemPath);
+    return rawFilesystemPath.normalize('NFC');
   }
 
   /**
