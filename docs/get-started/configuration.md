@@ -475,7 +475,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings`** (object):
   - **Description:** Settings for the experimental codebase investigator.
-  - **Default:** `undefined`
+  - **Default:** `{}`
 
 #### `mcpServers`
 
