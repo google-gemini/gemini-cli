@@ -231,7 +231,6 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
-  console.log('Made from CLPD & Slymi');
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
   migrateDeprecatedSettings(
@@ -378,6 +377,7 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
+    console.log('Made from CLPD & Slymi');
     const config = await loadCliConfig(settings.merged, sessionId, argv);
 
     const policyEngine = config.getPolicyEngine();
