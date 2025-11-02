@@ -157,6 +157,85 @@ export class MCPOAuthProvider {
     return OAuthUtils.discoverOAuthConfig(mcpServerUrl);
   }
 
+  private async discoverAuthServerMetadataForRegistration(
+    authorizationUrl: string,
+  ): Promise<{
+    issuerUrl: string;
+    metadata: NonNullable<
+      Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
+    >;
+  }> {
+    const authUrl = new URL(authorizationUrl);
+
+    // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
+    // Extract issuer by removing the OIDC protocol-specific path suffix
+    // For example: http://localhost:8888/realms/my-realm/protocol/openid-connect/auth
+    //           -> http://localhost:8888/realms/my-realm
+    const oidcPatterns = [
+      '/protocol/openid-connect/auth',
+      '/protocol/openid-connect/authorize',
+      '/oauth2/authorize',
+      '/oauth/authorize',
+      '/authorize',
+    ];
+
+    let pathname = authUrl.pathname.replace(/\/$/, ''); // Trim trailing slash
+    for (const pattern of oidcPatterns) {
+      if (pathname.endsWith(pattern)) {
+        pathname = pathname.slice(0, -pattern.length);
+        break;
+      }
+    }
+
+    const issuerCandidates = new Set<string>();
+    issuerCandidates.add(authUrl.origin);
+
+    if (pathname) {
+      issuerCandidates.add(`${authUrl.origin}${pathname}`);
+
+      const versionSegmentPattern = /^v\d+(\.\d+)?$/i;
+      const segments = pathname.split('/').filter(Boolean);
+      const lastSegment = segments.at(-1);
+      if (lastSegment && versionSegmentPattern.test(lastSegment)) {
+        const withoutVersionPath = segments.slice(0, -1);
+        if (withoutVersionPath.length) {
+          issuerCandidates.add(
+            `${authUrl.origin}/${withoutVersionPath.join('/')}`,
+          );
+        }
+      }
+    }
+
+    const attemptedIssuers = Array.from(issuerCandidates);
+    let selectedIssuer = attemptedIssuers[0];
+    let discoveredMetadata: NonNullable<
+      Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
+    > | null = null;
+
+    for (const issuer of attemptedIssuers) {
+      debugLogger.debug(`   Trying issuer URL: ${issuer}`);
+      const metadata =
+        await OAuthUtils.discoverAuthorizationServerMetadata(issuer);
+      if (metadata) {
+        selectedIssuer = issuer;
+        discoveredMetadata = metadata;
+        break;
+      }
+    }
+
+    if (!discoveredMetadata) {
+      throw new Error(
+        `Failed to fetch authorization server metadata for client registration (attempted issuers: ${attemptedIssuers.join(', ')})`,
+      );
+    }
+
+    debugLogger.debug(`   Selected issuer URL: ${selectedIssuer}`);
+    return {
+      issuerUrl: selectedIssuer,
+      metadata: discoveredMetadata,
+    };
+  }
+
   /**
    * Generate PKCE parameters for OAuth flow.
    *
@@ -679,45 +758,11 @@ export class MCPOAuthProvider {
           );
         }
 
-        const authUrl = new URL(config.authorizationUrl);
-        // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
-        // Extract issuer by removing the OIDC protocol-specific path suffix
-        // For example: http://localhost:8888/realms/my-realm/protocol/openid-connect/auth
-        //           -> http://localhost:8888/realms/my-realm
-        let serverUrl = authUrl.origin; // Start with protocol://host:port
-
-        // Common OIDC endpoint patterns to strip
-        const oidcPatterns = [
-          '/protocol/openid-connect/auth',
-          '/protocol/openid-connect/authorize',
-          '/oauth2/authorize',
-          '/oauth/authorize',
-          '/authorize',
-        ];
-
-        // Try to extract issuer by removing known OIDC endpoint paths
-        let pathname = authUrl.pathname.replace(/\/$/, ''); // Trim trailing slash
-        for (const pattern of oidcPatterns) {
-          if (pathname.endsWith(pattern)) {
-            pathname = pathname.slice(0, -pattern.length);
-            break;
-          }
-        }
-
-        serverUrl = `${authUrl.origin}${pathname}`;
-
         debugLogger.debug('→ Attempting dynamic client registration...');
-        debugLogger.debug(`   Derived issuer URL: ${serverUrl}`);
-
-        // Get the authorization server metadata for registration
-        const authServerMetadata =
-          await OAuthUtils.discoverAuthorizationServerMetadata(serverUrl);
-
-        if (!authServerMetadata) {
-          throw new Error(
-            'Failed to fetch authorization server metadata for client registration',
+        const { metadata: authServerMetadata } =
+          await this.discoverAuthServerMetadataForRegistration(
+            config.authorizationUrl,
           );
-        }
         registrationUrl = authServerMetadata.registration_endpoint;
       }
 
