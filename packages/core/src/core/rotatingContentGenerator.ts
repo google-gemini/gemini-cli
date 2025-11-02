@@ -28,6 +28,8 @@ import {
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Config } from '../config/config.js';
 import { InstallationManager } from '../utils/installationManager.js';
+import type { UserTierId } from '../code_assist/types.js';
+import { LoggingContentGenerator } from './loggingContentGenerator.js';
 
 /**
  * A ContentGenerator wrapper that automatically rotates through multiple API keys
@@ -37,6 +39,10 @@ export class RotatingContentGenerator implements ContentGenerator {
   private currentGenerator: ContentGenerator | null = null;
   private readonly baseHeaders: Record<string, string>;
   private readonly httpOptions: { headers: Record<string, string> };
+
+  get userTier(): UserTierId | undefined {
+    return this.currentGenerator?.userTier;
+  }
 
   constructor(
     private readonly config: Config,
@@ -78,8 +84,13 @@ export class RotatingContentGenerator implements ContentGenerator {
       httpOptions: this.httpOptions,
     });
 
-    this.currentGenerator = googleGenAI.models;
-    return this.currentGenerator;
+    const generator = new LoggingContentGenerator(
+      googleGenAI.models,
+      this.config,
+    );
+    generator.userTier = this.currentGenerator?.userTier;
+    this.currentGenerator = generator;
+    return generator;
   }
 
   /**

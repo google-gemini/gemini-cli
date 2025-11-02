@@ -29,6 +29,7 @@ import {
   logApiResponse,
 } from '../telemetry/loggers.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import type { UserTierId } from '../code_assist/types.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
@@ -49,6 +50,14 @@ export class LoggingContentGenerator implements ContentGenerator {
 
   getWrapped(): ContentGenerator {
     return this.wrapped;
+  }
+
+  get userTier(): UserTierId | undefined {
+    return this.wrapped.userTier;
+  }
+
+  set userTier(userTier: UserTierId | undefined) {
+    this.wrapped.userTier = userTier;
   }
 
   private logApiRequest(
