@@ -14,6 +14,8 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  HookDefinition,
+  HookEventName,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -878,6 +880,16 @@ const SETTINGS_SCHEMA = {
           'Enable policy-based tool confirmation via message bus integration. When enabled, tools will automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.',
         showInDialog: true,
       },
+      enableHooks: {
+        type: 'boolean',
+        label: 'Enable Hooks System',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.',
+        showInDialog: false,
+      },
     },
   },
 
@@ -1198,6 +1210,18 @@ const SETTINGS_SCHEMA = {
         mergeStrategy: MergeStrategy.UNION,
       },
     },
+  },
+
+  hooks: {
+    type: 'object',
+    label: 'Hooks',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {} as { [K in HookEventName]?: HookDefinition[] },
+    description:
+      'Hook configurations for intercepting and customizing agent behavior.',
+    showInDialog: false,
+    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
   },
 } as const satisfies SettingsSchema;
 
