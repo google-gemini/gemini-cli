@@ -21,6 +21,10 @@ class DebugLogger {
     console.log(...args);
   }
 
+  info(...args: unknown[]): void {
+    console.info(...args);
+  }
+
   warn(...args: unknown[]): void {
     console.warn(...args);
   }
