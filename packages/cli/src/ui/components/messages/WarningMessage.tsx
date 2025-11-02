@@ -24,7 +24,7 @@ export const WarningMessage: React.FC<WarningMessageProps> = ({ text }) => {
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap" color={Colors.AccentYellow}>
-          <RenderInline text={text} />
+          <RenderInline text={text} defaultColor={Colors.AccentYellow} />
         </Text>
       </Box>
     </Box>
