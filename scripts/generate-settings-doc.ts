@@ -7,6 +7,7 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
+import prettier from 'prettier';
 
 const START_MARKER = '<!-- SETTINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- SETTINGS-AUTOGEN:END -->';
@@ -80,9 +81,12 @@ export async function main(argv = process.argv.slice(2)) {
 
   const before = doc.slice(0, startIndex + START_MARKER.length);
   const after = doc.slice(endIndex);
-  const nextDoc = `${before}\n${generatedBlock}\n${after}`;
+  const formattedDoc = await formatWithPrettier(
+    `${before}\n${generatedBlock}\n${after}`,
+    docPath,
+  );
 
-  if (normalizeForCompare(doc) === normalizeForCompare(nextDoc)) {
+  if (normalizeForCompare(doc) === normalizeForCompare(formattedDoc)) {
     if (!checkOnly) {
       console.log('Settings documentation already up to date.');
     }
@@ -97,8 +101,16 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  await writeFile(docPath, nextDoc);
+  await writeFile(docPath, formattedDoc);
   console.log('Settings documentation regenerated.');
+}
+
+async function formatWithPrettier(content: string, filePath: string) {
+  const options = await prettier.resolveConfig(filePath);
+  return prettier.format(content, {
+    ...options,
+    filepath: filePath,
+  });
 }
 
 async function loadSettingsSchemaModule() {
