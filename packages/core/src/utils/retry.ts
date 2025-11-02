@@ -37,10 +37,25 @@ export interface RetryOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Default retry configuration optimized for transient errors.
+ *
+ * These delays apply to network errors (fetch failures) and server errors (5xx).
+ * They do NOT apply to quota/rate limit errors (429) which have separate handling:
+ * - RetryableQuotaError: Uses server-provided retry delays (10-60s from Retry-After header)
+ * - Multi-API key rotation: Instantly switches keys with no delay
+ *
+ * Rationale for these values:
+ * - initialDelayMs (1s): Most transient errors resolve within 1-2 seconds
+ * - maxDelayMs (10s): Caps exponential backoff at a user-friendly level
+ * - Total worst-case wait: ~3.5s (1s + 2s with jitter) vs previous 15s+
+ * - Exponential backoff pattern: 1s → 2s → 4s (capped by maxAttempts=3)
+ * - Industry standard: AWS SDK uses 500ms-1s, we use 1s for extra safety
+ */
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: 3,
-  initialDelayMs: 5000,
-  maxDelayMs: 30000, // 30 seconds
+  initialDelayMs: 1000, // 1 second (was 5s)
+  maxDelayMs: 10000, // 10 seconds (was 30s)
   shouldRetryOnError: defaultShouldRetry,
 };
 

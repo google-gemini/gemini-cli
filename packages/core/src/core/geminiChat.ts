@@ -53,6 +53,19 @@ export type StreamEvent =
 
 /**
  * Options for retrying due to invalid content from the model.
+ *
+ * Invalid content errors occur when the model returns:
+ * - Empty response with no finish reason
+ * - Response with no actual text content (only thoughts)
+ *
+ * These are typically model processing hiccups, not rate limits or quota issues.
+ * They can be retried quickly with minimal delay.
+ *
+ * Rationale:
+ * - initialDelayMs (100ms): Invalid content is usually a transient model glitch
+ * - Linear backoff pattern: 100ms → 200ms (attempt * initialDelayMs)
+ * - Total worst-case wait: 300ms (vs previous 1500ms)
+ * - Safe to retry quickly because it's not a rate/quota issue
  */
 interface ContentRetryOptions {
   /** Total number of attempts to make (1 initial + N retries). */
@@ -63,7 +76,7 @@ interface ContentRetryOptions {
 
 const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
   maxAttempts: 2, // 1 initial call + 1 retry
-  initialDelayMs: 500,
+  initialDelayMs: 100, // 100ms (was 500ms)
 };
 
 /**
