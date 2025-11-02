@@ -54,7 +54,7 @@ export interface OAuthTokenResponse {
 }
 
 /**
- * Dynamic client registration request.
+ * Dynamic client registration request (RFC 7591).
  */
 export interface OAuthClientRegistrationRequest {
   client_name: string;
@@ -62,12 +62,11 @@ export interface OAuthClientRegistrationRequest {
   grant_types: string[];
   response_types: string[];
   token_endpoint_auth_method: string;
-  code_challenge_method?: string[];
   scope?: string;
 }
 
 /**
- * Dynamic client registration response.
+ * Dynamic client registration response (RFC 7591).
  */
 export interface OAuthClientRegistrationResponse {
   client_id: string;
@@ -78,7 +77,6 @@ export interface OAuthClientRegistrationResponse {
   grant_types: string[];
   response_types: string[];
   token_endpoint_auth_method: string;
-  code_challenge_method?: string[];
   scope?: string;
 }
 
@@ -125,7 +123,6 @@ export class MCPOAuthProvider {
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
       token_endpoint_auth_method: 'none', // Public client
-      code_challenge_method: ['S256'],
       scope: config.scopes?.join(' ') || '',
     };
 
@@ -683,9 +680,34 @@ export class MCPOAuthProvider {
         }
 
         const authUrl = new URL(config.authorizationUrl);
-        const serverUrl = `${authUrl.protocol}//${authUrl.host}`;
+        // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
+        // Extract issuer by removing the OIDC protocol-specific path suffix
+        // For example: http://localhost:8888/realms/my-realm/protocol/openid-connect/auth
+        //           -> http://localhost:8888/realms/my-realm
+        let serverUrl = authUrl.origin; // Start with protocol://host:port
+
+        // Common OIDC endpoint patterns to strip
+        const oidcPatterns = [
+          '/protocol/openid-connect/auth',
+          '/protocol/openid-connect/authorize',
+          '/oauth2/authorize',
+          '/oauth/authorize',
+          '/authorize',
+        ];
+
+        // Try to extract issuer by removing known OIDC endpoint paths
+        let pathname = authUrl.pathname;
+        for (const pattern of oidcPatterns) {
+          if (pathname.endsWith(pattern)) {
+            pathname = pathname.slice(0, -pattern.length);
+            break;
+          }
+        }
+
+        serverUrl = `${authUrl.origin}${pathname}`;
 
         debugLogger.debug('→ Attempting dynamic client registration...');
+        debugLogger.debug(`   Derived issuer URL: ${serverUrl}`);
 
         // Get the authorization server metadata for registration
         const authServerMetadata =
