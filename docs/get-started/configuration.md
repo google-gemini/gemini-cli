@@ -470,8 +470,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`experimental.extensionReloading`** (boolean):
-  - **Description:** Enable experimental extension reloading features.
-  - **Default:** `undefined`
+  - **Description:** Enables extension loading/unloading within the CLI session.
+  - **Default:** `false`
 
 - **`experimental.codebaseInvestigatorSettings`** (object):
   - **Description:** Settings for the experimental codebase investigator.
