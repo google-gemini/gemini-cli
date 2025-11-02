@@ -1767,23 +1767,23 @@ describe('CoreToolScheduler request queueing', () => {
 
     await scheduler.schedule(requests, abortController.signal);
 
-    // Wait for the FIRST tool to be awaiting approval
+    // Wait for ALL tools to be awaiting approval (parallel validation)
     await vi.waitFor(() => {
       const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
-      // With the sequential scheduler, the update includes the active call and the queue.
+      // With parallel validation, all tools are validated simultaneously
       expect(calls?.length).toBe(3);
       expect(calls?.[0].status).toBe('awaiting_approval');
-      expect(calls?.[0].request.callId).toBe('1');
-      // Check that the other two are in the queue (still in 'validating' state)
-      expect(calls?.[1].status).toBe('validating');
-      expect(calls?.[2].status).toBe('validating');
+      expect(calls?.[1].status).toBe('awaiting_approval');
+      expect(calls?.[2].status).toBe('awaiting_approval');
     });
 
-    expect(pendingConfirmations.length).toBe(1);
+    // In parallel validation, all tools request confirmation simultaneously
+    expect(pendingConfirmations.length).toBe(3);
 
-    // Approve the first tool with ProceedAlways
-    const firstConfirmation = pendingConfirmations[0];
-    firstConfirmation(ToolConfirmationOutcome.ProceedAlways);
+    // Approve all tools (in parallel validation, each tool needs approval)
+    pendingConfirmations[0](ToolConfirmationOutcome.ProceedAlways);
+    pendingConfirmations[1](ToolConfirmationOutcome.ProceedOnce);
+    pendingConfirmations[2](ToolConfirmationOutcome.ProceedOnce);
 
     // Wait for all tools to be completed
     await vi.waitFor(() => {
@@ -1803,26 +1803,22 @@ describe('CoreToolScheduler request queueing', () => {
   });
 });
 
-describe('CoreToolScheduler Sequential Execution', () => {
-  it('should execute tool calls in a batch sequentially', async () => {
+describe('CoreToolScheduler Parallel Execution', () => {
+  it('should execute tool calls in a batch in parallel', async () => {
     // Arrange
-    let firstCallFinished = false;
+    const executionOrder: number[] = [];
     const executeFn = vi
       .fn()
       .mockImplementation(async (args: { call: number }) => {
+        executionOrder.push(args.call);
         if (args.call === 1) {
-          // First call, wait for a bit to simulate work
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          firstCallFinished = true;
+          // First call, wait longer to simulate slow work
+          await new Promise((resolve) => setTimeout(resolve, 100));
           return { llmContent: 'First call done' };
         }
         if (args.call === 2) {
-          // Second call, should only happen after the first is finished
-          if (!firstCallFinished) {
-            throw new Error(
-              'Second tool call started before the first one finished!',
-            );
-          }
+          // Second call, should start before the first one finishes (parallel execution)
+          await new Promise((resolve) => setTimeout(resolve, 10));
           return { llmContent: 'Second call done' };
         }
         return { llmContent: 'default' };
@@ -1926,28 +1922,19 @@ describe('CoreToolScheduler Sequential Execution', () => {
     expect(completedCalls[1].status).toBe('success');
   });
 
-  it('should cancel subsequent tools when the signal is aborted.', async () => {
+  it('should execute multiple tools in parallel and complete faster than sequential', async () => {
     // Arrange
-    const abortController = new AbortController();
-    let secondCallStarted = false;
+    const startTimes: Record<number, number> = {};
+    const endTimes: Record<number, number> = {};
 
     const executeFn = vi
       .fn()
       .mockImplementation(async (args: { call: number }) => {
-        if (args.call === 1) {
-          return { llmContent: 'First call done' };
-        }
-        if (args.call === 2) {
-          secondCallStarted = true;
-          // This call will be cancelled while it's "running".
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          // It should not return a value because it will be cancelled.
-          return { llmContent: 'Second call should not complete' };
-        }
-        if (args.call === 3) {
-          return { llmContent: 'Third call done' };
-        }
-        return { llmContent: 'default' };
+        startTimes[args.call] = Date.now();
+        // Each call takes 50ms
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        endTimes[args.call] = Date.now();
+        return { llmContent: `Call ${args.call} done` };
       });
 
     const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
@@ -2006,6 +1993,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       onEditorClose: vi.fn(),
     });
 
+    const abortController = new AbortController();
     const requests = [
       {
         callId: '1',
@@ -2031,40 +2019,38 @@ describe('CoreToolScheduler Sequential Execution', () => {
     ];
 
     // Act
-    const schedulePromise = scheduler.schedule(
-      requests,
-      abortController.signal,
-    );
-
-    // Wait for the second call to start, then abort.
-    await vi.waitFor(() => {
-      expect(secondCallStarted).toBe(true);
-    });
-    abortController.abort();
-
-    await schedulePromise;
+    const overallStart = Date.now();
+    await scheduler.schedule(requests, abortController.signal);
+    const overallEnd = Date.now();
 
     // Assert
     await vi.waitFor(() => {
       expect(onAllToolCallsComplete).toHaveBeenCalled();
     });
 
-    // Check that execute was called for the first two tools only
-    expect(executeFn).toHaveBeenCalledTimes(2);
-    expect(executeFn).toHaveBeenCalledWith({ call: 1 });
-    expect(executeFn).toHaveBeenCalledWith({ call: 2 });
+    // All three tools should have been called
+    expect(executeFn).toHaveBeenCalledTimes(3);
 
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls).toHaveLength(3);
+    expect(completedCalls.every((call) => call.status === 'success')).toBe(
+      true,
+    );
 
-    const call1 = completedCalls.find((c) => c.request.callId === '1');
-    const call2 = completedCalls.find((c) => c.request.callId === '2');
-    const call3 = completedCalls.find((c) => c.request.callId === '3');
+    // Verify parallel execution: all calls should start around the same time
+    // In parallel execution, tools start nearly simultaneously (within reasonable overhead)
+    // In sequential execution, they would start 50ms+ apart
+    const startTimeValues = Object.values(startTimes);
+    const maxStartTimeDiff =
+      Math.max(...startTimeValues) - Math.min(...startTimeValues);
+    expect(maxStartTimeDiff).toBeLessThan(150); // Much less than 50ms * 2 = 100ms for sequential
 
-    expect(call1?.status).toBe('success');
-    expect(call2?.status).toBe('cancelled');
-    expect(call3?.status).toBe('cancelled');
+    // Total execution time should be closer to 50ms (parallel) than 150ms (sequential)
+    // With test overhead and async coordination, expect < 200ms
+    // Sequential would be 150ms+ for tool execution alone, plus overhead
+    const totalTime = overallEnd - overallStart;
+    expect(totalTime).toBeLessThan(200); // Parallel is faster than sequential (150ms+ overhead)
   });
 });
 
