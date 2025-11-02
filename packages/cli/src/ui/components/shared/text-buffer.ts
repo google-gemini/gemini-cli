@@ -2147,17 +2147,34 @@ export function useTextBuffer({
 
   const expandPlaceholders = useCallback(
     (input: string): string => {
-      let out = input;
+      if (state.pendingPastes.length === 0) return input;
+
+      const placeholderSet = new Set(
+        state.pendingPastes.map((p) => p.placeholder),
+      );
+      const candidates = findPlaceholderCandidates(input, placeholderSet);
+
+      if (candidates.length === 0) return input;
+
+      const placeholderToContent = new Map<string, string>();
       for (const item of state.pendingPastes) {
-        const idx = out.indexOf(item.placeholder);
-        if (idx !== -1) {
-          out =
-            out.slice(0, idx) +
-            item.content +
-            out.slice(idx + item.placeholder.length);
+        if (!placeholderToContent.has(item.placeholder)) {
+          placeholderToContent.set(item.placeholder, item.content);
         }
       }
-      return out;
+
+      let result = '';
+      let lastEnd = 0;
+
+      for (const candidate of candidates) {
+        result += input.slice(lastEnd, candidate.start);
+        const content = placeholderToContent.get(candidate.text);
+        result += content ?? candidate.text;
+        lastEnd = candidate.end;
+      }
+      result += input.slice(lastEnd);
+
+      return result;
     },
     [state.pendingPastes],
   );
