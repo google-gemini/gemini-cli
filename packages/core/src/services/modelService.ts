@@ -70,18 +70,27 @@ export class ModelService {
         .filter((model) => {
           const name = model.name || '';
           const displayName = model.displayName || '';
-          // Filter out non-generative models
+          const nameLower = name.toLowerCase();
+          const displayLower = displayName.toLowerCase();
+
           return (
-            !name.includes('embedding') &&
-            !name.includes('aqa') &&
-            !displayName.toLowerCase().includes('embedding') &&
+            !nameLower.includes('embedding') &&
+            !nameLower.includes('aqa') &&
+            !nameLower.includes('imagen') &&
+            !nameLower.includes('image') &&
+            !nameLower.includes('tts') &&
+            !nameLower.includes('text-to-speech') &&
+            !displayLower.includes('embedding') &&
+            !displayLower.includes('imagen') &&
+            !displayLower.includes('image') &&
+            !displayLower.includes('tts') &&
+            !displayLower.includes('text-to-speech') &&
             (model.supportedGenerationMethods?.includes('generateContent') ??
               true)
           );
         })
         .map((model) => {
           const name = model.name || '';
-          // Extract the model ID from the full name (e.g., "models/gemini-2.5-pro" -> "gemini-2.5-pro")
           const modelId = name.includes('/') ? name.split('/').pop()! : name;
 
           return {
@@ -92,20 +101,24 @@ export class ModelService {
           };
         })
         .sort((a, b) => {
-          // Sort by name, putting "pro" models first, then "flash", then others
-          const orderA = a.value.includes('pro')
-            ? 0
-            : a.value.includes('flash')
-              ? 1
-              : 2;
-          const orderB = b.value.includes('pro')
-            ? 0
-            : b.value.includes('flash')
-              ? 1
-              : 2;
+          const aHasLatest = a.value.includes('latest');
+          const bHasLatest = b.value.includes('latest');
+
+          if (aHasLatest && !bHasLatest) return -1;
+          if (!aHasLatest && bHasLatest) return 1;
+
+          const aHasPro = a.value.includes('pro');
+          const bHasPro = b.value.includes('pro');
+          const aHasFlash = a.value.includes('flash');
+          const bHasFlash = b.value.includes('flash');
+
+          const orderA = aHasPro ? 0 : aHasFlash ? 1 : 2;
+          const orderB = bHasPro ? 0 : bHasFlash ? 1 : 2;
+
           if (orderA !== orderB) {
             return orderA - orderB;
           }
+
           return a.value.localeCompare(b.value);
         });
     } catch (error) {
