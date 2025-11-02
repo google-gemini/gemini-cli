@@ -203,7 +203,7 @@ function renderSections(sections: Map<string, DocEntry[]>) {
 }
 
 function escapeBackticks(value: string): string {
-  return value.replace(/`/g, '\\`');
+  return value.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
 }
 
 function normalizeForCompare(content: string): string {

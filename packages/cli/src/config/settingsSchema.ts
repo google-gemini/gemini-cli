@@ -623,13 +623,13 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     properties: {
       fileName: {
-        type: 'object',
+        type: 'string',
         label: 'Context File Name',
         category: 'Context',
         requiresRestart: false,
         default: undefined as string | string[] | undefined,
         description:
-          'The name of the context file or files to load into memory.',
+          'The name of the context file or files to load into memory. Accepts either a single string or an array of strings.',
         showInDialog: false,
       },
       importFormat: {
@@ -732,13 +732,13 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     properties: {
       sandbox: {
-        type: 'object',
+        type: 'string',
         label: 'Sandbox',
         category: 'Tools',
         requiresRestart: true,
         default: undefined as boolean | string | undefined,
         description:
-          'Sandbox execution environment (can be a boolean or a path string).',
+          'Sandbox execution environment. Set to a boolean to enable/disable, or provide a string path to a sandbox profile.',
         showInDialog: false,
       },
       shell: {
