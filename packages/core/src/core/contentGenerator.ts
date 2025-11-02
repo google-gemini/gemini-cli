@@ -16,6 +16,8 @@ import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
+import { loadApiKeys } from './multiApiKeyStorage.js';
+import { RotatingContentGenerator } from './rotatingContentGenerator.js';
 
 import type { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
@@ -138,6 +140,18 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_GEMINI ||
       config.authType === AuthType.USE_VERTEX_AI
     ) {
+      // Check if multi-API key rotation is configured
+      const multiKeyData = await loadApiKeys();
+      if (multiKeyData && multiKeyData.keys.length > 0) {
+        // Use rotating content generator for multi-key support
+        const rotatingGenerator = new RotatingContentGenerator(
+          gcConfig,
+          config.vertexai || false,
+        );
+        return new LoggingContentGenerator(rotatingGenerator, gcConfig);
+      }
+
+      // Fall back to single API key mode
       let headers: Record<string, string> = { ...baseHeaders };
       if (gcConfig?.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
