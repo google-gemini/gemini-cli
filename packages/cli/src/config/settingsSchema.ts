@@ -294,7 +294,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: undefined as string | undefined,
-        description: 'The color theme for the UI.',
+        description:
+          'The color theme for the UI. See the CLI themes guide for available options.',
         showInDialog: false,
       },
       customThemes: {
@@ -452,7 +453,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: [] as string[],
-        description: 'Custom witty phrases to display during loading.',
+        description:
+          'Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.',
         showInDialog: false,
       },
       accessibility: {
@@ -585,7 +587,8 @@ const SETTINGS_SCHEMA = {
         default: undefined as
           | Record<string, { tokenBudget?: number }>
           | undefined,
-        description: 'Settings for summarizing tool output.',
+        description:
+          'Enables or disables summarization of tool output. Configure per-tool token budgets (for example {"run_shell_command": {"tokenBudget": 2000}}). Currently only the run_shell_command tool supports summarization.',
         showInDialog: false,
       },
       compressionThreshold: {
@@ -625,7 +628,8 @@ const SETTINGS_SCHEMA = {
         category: 'Context',
         requiresRestart: false,
         default: undefined as string | string[] | undefined,
-        description: 'The name of the context file.',
+        description:
+          'The name of the context file or files to load into memory.',
         showInDialog: false,
       },
       importFormat: {
@@ -663,7 +667,8 @@ const SETTINGS_SCHEMA = {
         category: 'Context',
         requiresRestart: false,
         default: false,
-        description: 'Whether to load memory files from include directories.',
+        description:
+          'Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.',
         showInDialog: true,
       },
       fileFiltering: {
@@ -699,7 +704,8 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Enable recursive file search functionality',
+            description:
+              'Enable recursive file search functionality when completing @ references in the prompt.',
             showInDialog: true,
           },
           disableFuzzySearch: {
@@ -791,7 +797,8 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'Paths to core tool definitions.',
+        description:
+          'Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.',
         showInDialog: false,
       },
       allowed: {
@@ -801,7 +808,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: undefined as string[] | undefined,
         description:
-          'A list of tool names that will bypass the confirmation dialog.',
+          'Tool names that bypass the confirmation dialog. Useful for trusted commands (for example ["run_shell_command(git)", "run_shell_command(npm test)"]). See shell tool command restrictions for matching details.',
         showInDialog: false,
       },
       exclude: {
@@ -829,7 +836,8 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as string | undefined,
-        description: 'Command to run for tool calls.',
+        description:
+          'Defines a custom shell command for invoking discovered tools. The command must take the tool name as the first argument, read JSON arguments from stdin, and emit JSON results on stdout.',
         showInDialog: false,
       },
       useRipgrep: {

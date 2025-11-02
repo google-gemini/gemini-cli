@@ -157,7 +157,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `ui`
 
 - **`ui.theme`** (string):
-  - **Description:** The color theme for the UI.
+  - **Description:** The color theme for the UI. See the CLI themes guide for
+    available options.
   - **Default:** `undefined`
 
 - **`ui.customThemes`** (object):
@@ -224,7 +225,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.customWittyPhrases`** (array):
-  - **Description:** Custom witty phrases to display during loading.
+  - **Description:** Custom witty phrases to display during loading. When
+    provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
@@ -268,7 +270,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `-1`
 
 - **`model.summarizeToolOutput`** (object):
-  - **Description:** Settings for summarizing tool output.
+  - **Description:** Enables or disables summarization of tool output. Configure
+    per-tool token budgets (for example {"run_shell_command": {"tokenBudget":
+    2000}}). Currently only the run_shell_command tool supports summarization.
   - **Default:** `undefined`
 
 - **`model.compressionThreshold`** (number):
@@ -284,7 +288,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `context`
 
 - **`context.fileName`** (object):
-  - **Description:** The name of the context file.
+  - **Description:** The name of the context file or files to load into memory.
   - **Default:** `undefined`
 
 - **`context.importFormat`** (string):
@@ -301,7 +305,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
 
 - **`context.loadMemoryFromIncludeDirectories`** (boolean):
-  - **Description:** Whether to load memory files from include directories.
+  - **Description:** Controls how /memory refresh loads GEMINI.md files. When
+    true, include directories are scanned; when false, only the current
+    directory is used.
   - **Default:** `false`
 
 - **`context.fileFiltering.respectGitIgnore`** (boolean):
@@ -315,7 +321,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
-  - **Description:** Enable recursive file search functionality
+  - **Description:** Enable recursive file search functionality when completing
+    @ references in the prompt.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -353,13 +360,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`tools.core`** (array):
-  - **Description:** Paths to core tool definitions.
+  - **Description:** Restrict the set of built-in tools with an allowlist. Match
+    semantics mirror tools.allowed; see the built-in tools documentation for
+    available names.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
 - **`tools.allowed`** (array):
-  - **Description:** A list of tool names that will bypass the confirmation
-    dialog.
+  - **Description:** Tool names that bypass the confirmation dialog. Useful for
+    trusted commands (for example ["run_shell_command(git)",
+    "run_shell_command(npm test)"]). See shell tool command restrictions for
+    matching details.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -374,7 +385,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`tools.callCommand`** (string):
-  - **Description:** Command to run for tool calls.
+  - **Description:** Defines a custom shell command for invoking discovered
+    tools. The command must take the tool name as the first argument, read JSON
+    arguments from stdin, and emit JSON results on stdout.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
