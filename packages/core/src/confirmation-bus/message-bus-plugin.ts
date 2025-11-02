@@ -15,7 +15,7 @@ import { type AnyDeclarativeTool } from '../index.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from './message-bus.js';
 import { MessageBusType, type ToolConfirmationResponse } from './types.js';
-import { AdkToolAdapter } from '../tools/tools.js';
+import { AdkToolAdapter, ToolConfirmationOutcome } from '../tools/tools.js';
 
 export class MessageBusPlugin extends BasePlugin {
   constructor(private readonly messageBus: MessageBus) {
@@ -47,6 +47,19 @@ export class MessageBusPlugin extends BasePlugin {
 
     const correlationId = randomUUID();
     if (confirmationDetails) {
+      // We wrap the original onConfirm in a fn that also registers the
+      // message bus response.
+      const originalOnConfirm = confirmationDetails.onConfirm;
+      confirmationDetails.onConfirm = async (
+        outcome: ToolConfirmationOutcome,
+      ) =>
+        this.handleConfirmation(
+          correlationId,
+          originalOnConfirm,
+          outcome,
+          new AbortController().signal,
+        );
+
       this.messageBus.publish({
         type: MessageBusType.TOOL_CONFIRMATION_DISPLAY_REQUEST,
         correlationId,
@@ -65,7 +78,7 @@ export class MessageBusPlugin extends BasePlugin {
             responseHandler,
           );
           if (response.confirmed) {
-            resolve(undefined); // Proceed with tool call
+            resolve(undefined);
           } else {
             // This will be caught by the runner and returned as a tool error
             reject(new Error('Tool execution was denied.'));
@@ -78,5 +91,23 @@ export class MessageBusPlugin extends BasePlugin {
         responseHandler,
       );
     });
+  }
+
+  private handleConfirmation(
+    correlationId: string,
+    onConfirm: (outcome: ToolConfirmationOutcome) => void,
+    outcome: ToolConfirmationOutcome,
+    _signal: AbortSignal,
+  ) {
+    const confirmed =
+      outcome === ToolConfirmationOutcome.ProceedOnce ||
+      outcome === ToolConfirmationOutcome.ProceedAlways;
+
+    this.messageBus.publish({
+      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      correlationId,
+      confirmed,
+    });
+    return onConfirm(outcome);
   }
 }
