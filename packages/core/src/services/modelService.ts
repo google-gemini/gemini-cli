@@ -101,6 +101,26 @@ export class ModelService {
           };
         })
         .sort((a, b) => {
+          const aHasLatest = a.value.includes('-latest');
+          const bHasLatest = b.value.includes('-latest');
+
+          if (aHasLatest && !bHasLatest) return -1;
+          if (!aHasLatest && bHasLatest) return 1;
+
+          if (aHasLatest && bHasLatest) {
+            const aHasPro = a.value.includes('pro');
+            const bHasPro = b.value.includes('pro');
+            const aHasFlash = a.value.includes('flash');
+            const bHasFlash = b.value.includes('flash');
+
+            const orderA = aHasPro ? 0 : aHasFlash ? 1 : 2;
+            const orderB = bHasPro ? 0 : bHasFlash ? 1 : 2;
+
+            if (orderA !== orderB) {
+              return orderA - orderB;
+            }
+          }
+
           const extractVersion = (modelName: string): number => {
             const match = modelName.match(/(\d+\.\d+)/);
             return match ? parseFloat(match[1]) : 0;
@@ -112,12 +132,6 @@ export class ModelService {
           if (aVersion !== bVersion) {
             return bVersion - aVersion;
           }
-
-          const aHasLatest = a.value.includes('latest');
-          const bHasLatest = b.value.includes('latest');
-
-          if (aHasLatest && !bHasLatest) return -1;
-          if (!aHasLatest && bHasLatest) return 1;
 
           const aHasPro = a.value.includes('pro');
           const bHasPro = b.value.includes('pro');
