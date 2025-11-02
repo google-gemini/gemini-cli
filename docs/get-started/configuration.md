@@ -125,7 +125,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.retryFetchErrors`** (boolean):
-  - **Description:** Whether to automatically retry on transient network errors for API calls.
+  - **Description:** Whether to automatically retry on "fetch failed" errors for API calls.
   - **Default:** `false`
 
 #### `output`
