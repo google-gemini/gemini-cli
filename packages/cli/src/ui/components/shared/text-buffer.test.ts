@@ -45,6 +45,7 @@ const initialState: TextBufferState = {
   viewportWidth: 80,
   viewportHeight: 24,
   visualLayout: defaultVisualLayout,
+  pendingPastes: [],
 };
 
 describe('textBufferReducer', () => {
@@ -542,6 +543,48 @@ describe('useTextBuffer', () => {
       const text2 = getBufferState(result).text;
       expect(countOcc(text2, ph)).toBe(1);
       expect(result.current.pastePlaceholders.length).toBe(1);
+    });
+
+    it('backspace correctly removes middle placeholder when same text with different content', () => {
+      // Manually create a state with 3 identical placeholders but different content
+      const ph = '[Pasted 10]';
+      const textA = 'AAAAAAAAAA';
+      const textB = 'BBBBBBBBBB';
+      const textC = 'CCCCCCCCCC';
+
+      const text = `${ph} ${ph} ${ph}`;
+      const phLen = cpLen(ph);
+
+      const state: TextBufferState = {
+        lines: [text],
+        cursorRow: 0,
+        cursorCol: phLen + 1 + phLen, // Position after second placeholder
+        preferredCol: null,
+        undoStack: [],
+        redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
+        viewportWidth: 80,
+        viewportHeight: 24,
+        visualLayout: {
+          visualLines: [],
+          logicalToVisualMap: [],
+          visualToLogicalMap: [],
+        },
+        pendingPastes: [
+          { placeholder: ph, content: textA },
+          { placeholder: ph, content: textB },
+          { placeholder: ph, content: textC },
+        ],
+      };
+
+      // Backspace to delete the middle placeholder
+      const result = textBufferReducer(state, { type: 'backspace' });
+
+      // Should keep first and third (A and C), not first and second (A and B)
+      expect(result.pendingPastes.length).toBe(2);
+      expect(result.pendingPastes[0].content).toBe(textA);
+      expect(result.pendingPastes[1].content).toBe(textC);
     });
 
     it('clearPendingPastes clears mapping without changing text', () => {
