@@ -730,6 +730,29 @@ export function SettingsDialog({
         if (editingKey) {
           commitEdit(editingKey);
         } else {
+          // Save any restart-required settings before closing
+          const restartRequiredSettings =
+            getRestartRequiredFromModified(modifiedSettings);
+          const restartRequiredSet = new Set(restartRequiredSettings);
+
+          if (restartRequiredSet.size > 0) {
+            saveModifiedSettings(
+              restartRequiredSet,
+              pendingSettings,
+              settings,
+              selectedScope,
+            );
+
+            setGlobalPendingChanges((prev) => {
+              if (prev.size === 0) return prev;
+              const next = new Map(prev);
+              for (const key of restartRequiredSet) {
+                next.delete(key);
+              }
+              return next;
+            });
+          }
+
           onSelect(undefined, selectedScope);
         }
       }
