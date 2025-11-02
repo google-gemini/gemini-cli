@@ -696,7 +696,7 @@ export class MCPOAuthProvider {
         ];
 
         // Try to extract issuer by removing known OIDC endpoint paths
-        let pathname = authUrl.pathname;
+        let pathname = authUrl.pathname.replace(/\/$/, ''); // Trim trailing slash
         for (const pattern of oidcPatterns) {
           if (pathname.endsWith(pattern)) {
             pathname = pathname.slice(0, -pattern.length);
