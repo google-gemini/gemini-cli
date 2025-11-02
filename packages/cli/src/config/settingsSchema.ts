@@ -5,8 +5,8 @@
  */
 
 // --------------------------------------------------------------------------
-// IMPORTANT: When adding a new setting, especially one with `showInDialog: true`,
-// please ensure it is also documented in `docs/get-started/configuration.md`.
+// IMPORTANT: After adding or updating settings, run `npm run docs:settings`
+// to regenerate the settings reference in `docs/get-started/configuration.md`.
 // --------------------------------------------------------------------------
 
 import type {

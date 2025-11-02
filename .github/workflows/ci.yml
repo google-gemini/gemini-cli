@@ -90,6 +90,9 @@ jobs:
       - name: 'Run Prettier'
         run: 'node scripts/lint.js --prettier'
 
+      - name: 'Verify settings docs'
+        run: 'npm run docs:settings -- --check'
+
       - name: 'Run sensitive keyword linter'
         run: 'node scripts/lint.js --sensitive-keywords'
 
