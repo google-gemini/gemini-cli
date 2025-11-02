@@ -79,9 +79,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
 
       try {
-        const contentGenerator = config.getContentGenerator();
-        const availableModels =
-          await ModelService.fetchAvailableModels(contentGenerator);
+        const availableModels = await ModelService.fetchAvailableModels(config);
 
         if (availableModels.length > 0) {
           // Add the Auto option at the top
