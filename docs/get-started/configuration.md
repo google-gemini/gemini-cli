@@ -736,15 +736,11 @@ for that specific session.
     `--output-format json` or `--output-format stream-json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
-- **`--sandbox-image`**:
-  - Sets the sandbox image URI.
 - **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
 
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
-- **`--show-memory-usage`**:
-  - Displays the current memory usage.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
 - **`--approval-mode <mode>`**:
@@ -760,22 +756,6 @@ for that specific session.
   - A comma-separated list of tool names that will bypass the confirmation
     dialog.
   - Example: `gemini --allowed-tools "ShellTool(git status)"`
-- **`--telemetry`**:
-  - Enables [telemetry](../cli/telemetry.md).
-- **`--telemetry-target`**:
-  - Sets the telemetry target. See [telemetry](../cli/telemetry.md) for more
-    information.
-- **`--telemetry-otlp-endpoint`**:
-  - Sets the OTLP endpoint for telemetry. See [telemetry](../cli/telemetry.md)
-    for more information.
-- **`--telemetry-otlp-protocol`**:
-  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`.
-    See [telemetry](../cli/telemetry.md) for more information.
-- **`--telemetry-log-prompts`**:
-  - Enables logging of prompts for telemetry. See
-    [telemetry](../cli/telemetry.md) for more information.
-- **`--checkpointing`**:
-  - Enables [checkpointing](../cli/checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all
     available extensions are used.
@@ -783,9 +763,6 @@ for that specific session.
   - Example: `gemini -e my-extension -e my-other-extension`
 - **`--list-extensions`** (**`-l`**):
   - Lists all available extensions and exits.
-- **`--proxy`**:
-  - Sets the proxy for the CLI.
-  - Example: `--proxy http://localhost:7890`.
 - **`--include-directories <dir1,dir2,...>`**:
   - Includes additional directories in the workspace for multi-directory
     support.
@@ -798,6 +775,14 @@ for that specific session.
     with screen readers.
 - **`--version`**:
   - Displays the version of the CLI.
+- **`--experimental-acp`**:
+  - Starts the agent in ACP mode.
+- **`--allowed-mcp-server-names`**:
+  - Allowed MCP server names.
+- **`--fake-responses`**:
+  - Path to a file with fake model responses for testing.
+- **`--record-responses`**:
+  - Path to a file to record model responses for testing.
 
 ## Context Files (Hierarchical Instructional Context)
 
