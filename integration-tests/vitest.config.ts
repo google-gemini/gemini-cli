@@ -8,6 +8,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    setupFiles: ['./vitest.setup.ts'],
     testTimeout: 300000, // 5 minutes
     globalSetup: './globalSetup.ts',
     reporters: ['default'],

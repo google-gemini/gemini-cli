@@ -147,7 +147,11 @@ export function setupLinters() {
 
 export function runESLint() {
   console.log('\nRunning ESLint...');
-  if (!runCommand('npm run lint')) {
+  if (
+    !runCommand(
+      'eslint . --ext .ts,.tsx && eslint integration-tests && eslint scripts',
+    )
+  ) {
     process.exit(1);
   }
 }

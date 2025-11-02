@@ -46,7 +46,7 @@ runs:
       uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
       with:
         registry: 'ghcr.io'
-        username: '${{ inputs.github-actor }}'
+        username: '${{ github.repository_owner }}'
         password: '${{ inputs.github-secret }}'
     - name: 'Get branch name'
       id: 'branch_name'

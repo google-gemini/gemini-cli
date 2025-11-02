@@ -1,56 +1,32 @@
-name: 'Testing: E2E'
-
 on:
-  push:
-    branches:
-      - 'main'
-  # This will run for PRs from the base repository, providing secrets.
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
-  # This will run for PRs from forks when a label is added.
-  pull_request_target:
-    types: ['labeled']
-  merge_group:
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      branch_ref:
-        description: 'Branch to run on'
+      version:
+        description: 'The version of the published package'
         required: true
-        default: 'main'
         type: 'string'
-
-concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
-  cancel-in-progress: |-
-    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+      cli-package-name:
+        description: 'The name of the CLI package to install'
+        required: true
+        type: 'string'
+      image-uri:
+        description: 'The URI of the built sandbox image.'
+        required: true
+        type: 'string'
+    secrets:
+      GEMINI_API_KEY:
+        required: true
 
 jobs:
-  merge_queue_skipper:
-    name: 'Merge Queue Skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    permissions: 'read-all'
-    outputs:
-      skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
-    steps:
-      - id: 'merge-queue-e2e-skipper'
-        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
-        with:
-          secret: '${{ secrets.GITHUB_TOKEN }}'
-    continue-on-error: true
-
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
-    needs: 'merge_queue_skipper'
     if: |
-      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
-      (github.event_name == 'push' ||
+      github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
-    runs-on: 'gemini-cli-ubuntu-16-core'
+      github.event.pull_request.head.repo.full_name == github.repository ||
+      github.event.label.name == 'maintainer:e2e:ok'
+    runs-on: 'ubuntu-latest'
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +35,6 @@ jobs:
           - 'sandbox:docker'
         node-version:
           - '20.x'
-
     steps:
       - name: 'Checkout (fork)'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -74,26 +49,34 @@ jobs:
         with:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
-      - name: 'Set up Node.js ${{ matrix.node-version }}'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+      - name: 'Setup NPMRC'
+        uses: './.github/actions/setup-npmrc'
         with:
-          node-version: '${{ matrix.node-version }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Log in to GitHub Container Registry'
+        uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
+        with:
+          registry: 'ghcr.io'
+          username: '${{ github.repository_owner }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: 'Pull sandbox image'
+        run: 'docker pull ${{ inputs.image-uri }}'
 
       - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Set up Docker'
-        if: "matrix.sandbox == 'sandbox:docker'"
-        uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+        env:
+          CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+          VERSION: '${{ inputs.version }}'
+        run: 'npm install ${{ env.CLI_PACKAGE_NAME }}@${{ env.VERSION }}'
 
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
           VERBOSE: 'true'
+          INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
+          GEMINI_SANDBOX_IMAGE: '${{ inputs.image-uri }}'
         shell: 'bash'
         run: |
           if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
@@ -104,14 +87,12 @@ jobs:
 
   e2e_mac:
     name: 'E2E Test (macOS)'
-    needs: 'merge_queue_skipper'
     if: |
-      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
-      (github.event_name == 'push' ||
+      github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      github.event.pull_request.head.repo.full_name == github.repository ||
+      github.event.label.name == 'maintainer:e2e:ok'
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
@@ -132,11 +113,16 @@ jobs:
         with:
           node-version: '20.x'
 
-      - name: 'Install dependencies'
-        run: 'npm ci'
+      - name: 'Setup NPMRC'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
 
-      - name: 'Build project'
-        run: 'npm run build'
+      - name: 'Install dependencies'
+        env:
+          CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+          VERSION: '${{ inputs.version }}'
+        run: 'npm install ${{ env.CLI_PACKAGE_NAME }}@${{ env.VERSION }}'
 
       - name: 'Fix rollup optional dependencies on macOS'
         if: "runner.os == 'macOS'"
@@ -149,19 +135,18 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
+          INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
         run: 'npm run test:integration:sandbox:none'
 
   e2e_windows:
     name: 'Slow E2E - Win'
-    needs: 'merge_queue_skipper'
     if: |
-      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
-      (github.event_name == 'push' ||
+      github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
-    runs-on: 'gemini-cli-windows-16-core'
+      github.event.pull_request.head.repo.full_name == github.repository ||
+      github.event.label.name == 'maintainer:e2e:ok'
+    runs-on: 'windows-latest'
     continue-on-error: true
 
     steps:
@@ -202,12 +187,16 @@ jobs:
           npm config set registry https://registry.npmjs.org/
         shell: 'pwsh'
 
-      - name: 'Install dependencies'
-        run: 'npm ci'
-        shell: 'pwsh'
+      - name: 'Setup NPMRC'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
 
-      - name: 'Build project'
-        run: 'npm run build'
+      - name: 'Install dependencies'
+        env:
+          CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+          VERSION: '${{ inputs.version }}'
+        run: 'npm install ${{ env.CLI_PACKAGE_NAME }}@${{ env.VERSION }}'
         shell: 'pwsh'
 
       - name: 'Run E2E tests'
@@ -219,6 +208,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
+          INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
         shell: 'pwsh'
         run: 'npm run test:integration:sandbox:none'
 
@@ -229,13 +219,13 @@ jobs:
         github.event_name == 'push' ||
         github.event_name == 'merge_group' ||
         github.event_name == 'workflow_dispatch' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
+        github.event.pull_request.head.repo.full_name == github.repository ||
+        github.event.label.name == 'maintainer:e2e:ok'
       )
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check E2E test results'
         run: |

@@ -227,7 +227,7 @@ jobs:
         run: 'npm ci'
 
       - name: 'Publish Release'
-        uses: './.github/actions/publish-release'
+        uses: './.github/actions/publish-release-deprecated'
         with:
           release-version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
           release-tag: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
@@ -293,7 +293,7 @@ jobs:
         run: 'npm ci'
 
       - name: 'Publish Release'
-        uses: './.github/actions/publish-release'
+        uses: './.github/actions/publish-release-deprecated'
         with:
           release-version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
           release-tag: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
