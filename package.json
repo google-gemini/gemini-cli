@@ -28,6 +28,7 @@
     "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
     "predocs:settings": "npm run build --workspace @google/gemini-cli-core",
+    "schema:settings": "tsx ./scripts/generate-settings-schema.ts",
     "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
     "build": "node scripts/build.js",
     "build-and-start": "npm run build && npm run start",

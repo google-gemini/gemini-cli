@@ -7,44 +7,23 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
-import prettier from 'prettier';
+import { generateSettingsSchema } from './generate-settings-schema.js';
+import {
+  escapeBackticks,
+  formatWithPrettier,
+  normalizeForCompare,
+} from './utils/autogen.js';
+
+import type {
+  SettingDefinition,
+  SettingsSchema,
+  SettingsSchemaType,
+} from '../packages/cli/src/config/settingsSchema.js';
 
 const START_MARKER = '<!-- SETTINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- SETTINGS-AUTOGEN:END -->';
 
 const MANUAL_TOP_LEVEL = new Set(['mcpServers', 'telemetry', 'extensions']);
-
-type SettingsType =
-  | 'boolean'
-  | 'string'
-  | 'number'
-  | 'array'
-  | 'object'
-  | 'enum';
-
-interface SettingDefinition {
-  type: SettingsType;
-  label: string;
-  category: string;
-  requiresRestart: boolean;
-  default: SettingsValue;
-  description?: string;
-  parentKey?: string;
-  childKey?: string;
-  key?: string;
-  properties?: SettingsSchema;
-  showInDialog?: boolean;
-  mergeStrategy?: string;
-  options?: ReadonlyArray<{ value: string | number; label: string }>;
-}
-
-type SettingsValue = boolean | string | number | string[] | object | undefined;
-
-interface SettingsSchema {
-  [key: string]: SettingDefinition;
-}
-
-type SettingsSchemaType = SettingsSchema;
 
 interface DocEntry {
   path: string;
@@ -57,6 +36,8 @@ interface DocEntry {
 
 export async function main(argv = process.argv.slice(2)) {
   const checkOnly = argv.includes('--check');
+
+  await generateSettingsSchema({ checkOnly });
 
   const repoRoot = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -103,14 +84,6 @@ export async function main(argv = process.argv.slice(2)) {
 
   await writeFile(docPath, formattedDoc);
   console.log('Settings documentation regenerated.');
-}
-
-async function formatWithPrettier(content: string, filePath: string) {
-  const options = await prettier.resolveConfig(filePath);
-  return prettier.format(content, {
-    ...options,
-    filepath: filePath,
-  });
 }
 
 async function loadSettingsSchemaModule() {
@@ -243,14 +216,6 @@ function renderSections(sections: Map<string, DocEntry[]>) {
   }
 
   return lines.join('\n').trimEnd();
-}
-
-function escapeBackticks(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-}
-
-function normalizeForCompare(content: string): string {
-  return content.replace(/\r\n/g, '\n').trimEnd();
 }
 
 if (process.argv[1]) {

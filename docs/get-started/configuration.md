@@ -36,6 +36,11 @@ overridden by higher numbers):
 Gemini CLI uses JSON settings files for persistent configuration. There are four
 locations for these files:
 
+> **Tip:** JSON-aware editors can use autocomplete and validation by pointing to
+> the generated schema at `schemas/settings.schema.json` in this repository.
+> When working outside the repo, reference the hosted schema at
+> `https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json`.
+
 - **System defaults file:**
   - **Location:** `/etc/gemini-cli/system-defaults.json` (Linux),
     `C:\ProgramData\gemini-cli\system-defaults.json` (Windows) or
@@ -335,8 +340,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `tools`
 
 - **`tools.sandbox`** (string):
-  - **Description:** Sandbox execution environment. Set to a boolean to
-    enable/disable, or provide a string path to a sandbox profile.
+  - **Description:** Sandbox execution environment. Set to a boolean to enable
+    or disable the sandbox, or provide a string path to a sandbox profile.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -415,9 +420,17 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.enableMessageBusIntegration`** (boolean):
   - **Description:** Enable policy-based tool confirmation via message bus
-    integration. When enabled, tools will automatically respect policy engine
+    integration. When enabled, tools automatically respect policy engine
     decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
     implementations.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`tools.enableHooks`** (boolean):
+  - **Description:** Enable the hooks system for intercepting and customizing
+    Gemini CLI behavior. When enabled, hooks configured in settings will execute
+    at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.).
+    Requires MessageBus integration.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -542,6 +555,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The model to use for the Codebase Investigator agent.
   - **Default:** `"gemini-2.5-pro"`
   - **Requires restart:** Yes
+
+#### `hooks`
+
+- **`hooks`** (object):
+  - **Description:** Hook configurations for intercepting and customizing agent
+    behavior.
+  - **Default:** `{}`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`

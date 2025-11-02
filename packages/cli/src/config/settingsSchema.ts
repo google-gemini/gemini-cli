@@ -57,6 +57,30 @@ export interface SettingEnumOption {
   label: string;
 }
 
+function oneLine(strings: TemplateStringsArray, ...values: unknown[]): string {
+  let result = '';
+  for (let i = 0; i < strings.length; i++) {
+    result += strings[i];
+    if (i < values.length) {
+      result += String(values[i]);
+    }
+  }
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+export interface SettingCollectionDefinition {
+  type: SettingsType;
+  description?: string;
+  properties?: SettingsSchema;
+  /** Enum type options  */
+  options?: readonly SettingEnumOption[];
+  /**
+   * Optional reference identifier for generators that emit a `$ref`.
+   * For example, a JSON schema generator can use this to point to a shared definition.
+   */
+  ref?: string;
+}
+
 export enum MergeStrategy {
   // Replace the old value with the new value. This is the default.
   REPLACE = 'replace',
@@ -83,6 +107,18 @@ export interface SettingDefinition {
   mergeStrategy?: MergeStrategy;
   /** Enum type options  */
   options?: readonly SettingEnumOption[];
+  /**
+   * For collection types (e.g. arrays), describes the shape of each item.
+   */
+  items?: SettingCollectionDefinition;
+  /**
+   * For map-like objects without explicit `properties`, describes the shape of the values.
+   */
+  additionalProperties?: SettingCollectionDefinition;
+  /**
+   * Optional reference identifier for generators that emit a `$ref`.
+   */
+  ref?: string;
 }
 
 export interface SettingsSchema {
@@ -108,6 +144,10 @@ const SETTINGS_SCHEMA = {
     description: 'Configuration for MCP servers.',
     showInDialog: false,
     mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+    additionalProperties: {
+      type: 'object',
+      ref: 'MCPServerConfig',
+    },
   },
 
   general: {
@@ -306,6 +346,10 @@ const SETTINGS_SCHEMA = {
         default: {} as Record<string, CustomTheme>,
         description: 'Custom theme definitions.',
         showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'CustomTheme',
+        },
       },
       hideWindowTitle: {
         type: 'boolean',
@@ -453,9 +497,12 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: [] as string[],
-        description:
-          'Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.',
+        description: oneLine`
+          Custom witty phrases to display during loading.
+          When provided, the CLI cycles through these instead of the defaults.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
       },
       accessibility: {
         type: 'object',
@@ -549,6 +596,7 @@ const SETTINGS_SCHEMA = {
     default: undefined as TelemetrySettings | undefined,
     description: 'Telemetry configuration.',
     showInDialog: false,
+    ref: 'TelemetrySettings',
   },
 
   model: {
@@ -587,9 +635,18 @@ const SETTINGS_SCHEMA = {
         default: undefined as
           | Record<string, { tokenBudget?: number }>
           | undefined,
-        description:
-          'Enables or disables summarization of tool output. Configure per-tool token budgets (for example {"run_shell_command": {"tokenBudget": 2000}}). Currently only the run_shell_command tool supports summarization.',
+        description: oneLine`
+          Enables or disables summarization of tool output.
+          Configure per-tool token budgets (for example {"run_shell_command": {"tokenBudget": 2000}}).
+          Currently only the run_shell_command tool supports summarization.
+        `,
         showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          description:
+            'Per-tool summarization settings with an optional tokenBudget.',
+          ref: 'SummarizeToolOutputSettings',
+        },
       },
       compressionThreshold: {
         type: 'number',
@@ -656,9 +713,12 @@ const SETTINGS_SCHEMA = {
         category: 'Context',
         requiresRestart: false,
         default: [] as string[],
-        description:
-          'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
+        description: oneLine`
+          Additional directories to include in the workspace context.
+          Missing directories will be skipped with a warning.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.CONCAT,
       },
       loadMemoryFromIncludeDirectories: {
@@ -667,8 +727,10 @@ const SETTINGS_SCHEMA = {
         category: 'Context',
         requiresRestart: false,
         default: false,
-        description:
-          'Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.',
+        description: oneLine`
+          Controls how /memory refresh loads GEMINI.md files.
+          When true, include directories are scanned; when false, only the current directory is used.
+        `,
         showInDialog: true,
       },
       fileFiltering: {
@@ -704,8 +766,9 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description:
-              'Enable recursive file search functionality when completing @ references in the prompt.',
+            description: oneLine`
+              Enable recursive file search functionality when completing @ references in the prompt.
+            `,
             showInDialog: true,
           },
           disableFuzzySearch: {
@@ -737,8 +800,10 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as boolean | string | undefined,
-        description:
-          'Sandbox execution environment. Set to a boolean to enable/disable, or provide a string path to a sandbox profile.',
+        description: oneLine`
+          Sandbox execution environment.
+          Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.
+        `,
         showInDialog: false,
       },
       shell: {
@@ -756,8 +821,10 @@ const SETTINGS_SCHEMA = {
             category: 'Tools',
             requiresRestart: true,
             default: true,
-            description:
-              'Use node-pty for an interactive shell experience. Fallback to child_process still applies.',
+            description: oneLine`
+              Use node-pty for an interactive shell experience.
+              Fallback to child_process still applies.
+            `,
             showInDialog: true,
           },
           pager: {
@@ -787,8 +854,9 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: false,
         default: false,
-        description:
-          'Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).',
+        description: oneLine`
+          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
+        `,
         showInDialog: true,
       },
       core: {
@@ -797,9 +865,12 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description:
-          'Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.',
+        description: oneLine`
+          Restrict the set of built-in tools with an allowlist.
+          Match semantics mirror tools.allowed; see the built-in tools documentation for available names.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
       },
       allowed: {
         type: 'array',
@@ -807,9 +878,13 @@ const SETTINGS_SCHEMA = {
         category: 'Advanced',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description:
-          'Tool names that bypass the confirmation dialog. Useful for trusted commands (for example ["run_shell_command(git)", "run_shell_command(npm test)"]). See shell tool command restrictions for matching details.',
+        description: oneLine`
+          Tool names that bypass the confirmation dialog.
+          Useful for trusted commands (for example ["run_shell_command(git)", "run_shell_command(npm test)"]).
+          See shell tool command restrictions for matching details.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
       },
       exclude: {
         type: 'array',
@@ -819,6 +894,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'Tool names to exclude from discovery.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
       discoveryCommand: {
@@ -836,8 +912,10 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as string | undefined,
-        description:
-          'Defines a custom shell command for invoking discovered tools. The command must take the tool name as the first argument, read JSON arguments from stdin, and emit JSON results on stdout.',
+        description: oneLine`
+          Defines a custom shell command for invoking discovered tools.
+          The command must take the tool name as the first argument, read JSON arguments from stdin, and emit JSON results on stdout.
+        `,
         showInDialog: false,
       },
       useRipgrep: {
@@ -884,8 +962,10 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: false,
-        description:
-          'Enable policy-based tool confirmation via message bus integration. When enabled, tools will automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.',
+        description: oneLine`
+          Enable policy-based tool confirmation via message bus integration.
+          When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
+        `,
         showInDialog: true,
       },
       enableHooks: {
@@ -927,6 +1007,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'A list of MCP servers to allow.',
         showInDialog: false,
+        items: { type: 'string' },
       },
       excluded: {
         type: 'array',
@@ -936,6 +1017,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'A list of MCP servers to exclude.',
         showInDialog: false,
+        items: { type: 'string' },
       },
     },
   },
@@ -1072,6 +1154,7 @@ const SETTINGS_SCHEMA = {
         default: ['DEBUG', 'DEBUG_MODE'] as string[],
         description: 'Environment variables to exclude from project context.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
       bugCommand: {
@@ -1082,6 +1165,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as BugCommandSettings | undefined,
         description: 'Configuration for the bug report command.',
         showInDialog: false,
+        ref: 'BugCommandSettings',
       },
     },
   },
@@ -1204,6 +1288,7 @@ const SETTINGS_SCHEMA = {
         default: [] as string[],
         description: 'List of disabled extensions.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
       workspacesWithMigrationNudge: {
@@ -1215,6 +1300,7 @@ const SETTINGS_SCHEMA = {
         description:
           'List of workspaces for which the migration nudge has been shown.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
     },
