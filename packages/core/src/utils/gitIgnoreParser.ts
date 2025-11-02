@@ -17,9 +17,20 @@ export class GitIgnoreParser implements GitIgnoreFilter {
   private projectRoot: string;
   private cache: Map<string, string[]> = new Map();
   private globalPatterns: string[] | undefined;
+  private processedExtraPatterns: string[] = [];
 
-  constructor(projectRoot: string) {
-    this.projectRoot = normalizePath(path.resolve(projectRoot));
+  constructor(
+    projectRoot: string,
+    private readonly extraPatterns?: string[],
+  ) {
+    this.projectRoot = path.resolve(projectRoot);
+    if (this.extraPatterns) {
+      // extraPatterns are assumed to be from project root (like .geminiignore)
+      this.processedExtraPatterns = this.processPatterns(
+        this.extraPatterns,
+        '.',
+      );
+    }
   }
 
   private loadPatternsForFile(patternsFilePath: string): string[] {
@@ -43,8 +54,15 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           .split(path.sep)
           .join(path.posix.sep);
 
-    return content
-      .split('\n')
+    const rawPatterns = content.split('\n');
+    return this.processPatterns(rawPatterns, relativeBaseDir);
+  }
+
+  private processPatterns(
+    rawPatterns: string[],
+    relativeBaseDir: string,
+  ): string[] {
+    return rawPatterns
       .map((p) => p.trimStart())
       .filter((p) => p !== '' && !p.startsWith('#'))
       .map((p) => {
@@ -161,7 +179,10 @@ export class GitIgnoreParser implements GitIgnoreFilter {
         const relativeDir = path.relative(this.projectRoot, normalizePath(dir));
         if (relativeDir) {
           const normalizedRelativeDir = relativeDir.replace(/\\/g, '/');
-          if (ig.ignores(normalizedRelativeDir)) {
+          const igPlusExtras = ignore()
+            .add(ig)
+            .add(this.processedExtraPatterns);
+          if (igPlusExtras.ignores(normalizedRelativeDir)) {
             // This directory is ignored by an ancestor's .gitignore.
             // According to git behavior, we don't need to process this
             // directory's .gitignore, as nothing inside it can be
@@ -186,6 +207,11 @@ export class GitIgnoreParser implements GitIgnoreFilter {
             this.cache.set(dir, []); // Cache miss
           }
         }
+      }
+
+      // Apply extra patterns (e.g. from .geminiignore) last for precedence
+      if (this.processedExtraPatterns.length > 0) {
+        ig.add(this.processedExtraPatterns);
       }
 
       return ig.ignores(normalizedPath);
