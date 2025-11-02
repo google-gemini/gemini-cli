@@ -5,7 +5,6 @@
  */
 
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
 
@@ -64,7 +63,7 @@ export async function main(argv = process.argv.slice(2)) {
   );
   const docPath = path.join(repoRoot, 'docs/get-started/configuration.md');
 
-  const { getSettingsSchema } = await loadSettingsSchemaModule(repoRoot);
+  const { getSettingsSchema } = await loadSettingsSchemaModule();
   const schema = getSettingsSchema();
   const sections = collectEntries(schema);
   const generatedBlock = renderSections(sections);
@@ -102,62 +101,9 @@ export async function main(argv = process.argv.slice(2)) {
   console.log('Settings documentation regenerated.');
 }
 
-async function loadSettingsSchemaModule(repoRoot: string) {
+async function loadSettingsSchemaModule() {
   const modulePath = '../packages/cli/src/config/settingsSchema.ts';
-  try {
-    return await import(modulePath);
-  } catch (error) {
-    if (
-      isMissingCoreModule(error) ||
-      isMissingWorkspaceBuild(error, '@google/gemini-cli')
-    ) {
-      await ensureWorkspaceBuilt(repoRoot, '@google/gemini-cli-core');
-      await ensureWorkspaceBuilt(repoRoot, '@google/gemini-cli');
-      return await import(modulePath);
-    }
-    throw error;
-  }
-}
-
-function isMissingCoreModule(error: unknown) {
-  return (
-    isModuleNotFound(error) &&
-    String((error as { message?: string }).message).includes(
-      '@google/gemini-cli-core',
-    )
-  );
-}
-
-function isMissingWorkspaceBuild(error: unknown, workspace: string) {
-  return (
-    isModuleNotFound(error) &&
-    String((error as { message?: string }).message).includes(workspace)
-  );
-}
-
-function isModuleNotFound(error: unknown): boolean {
-  return Boolean(
-    error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      (error as { code?: unknown }).code === 'ERR_MODULE_NOT_FOUND',
-  );
-}
-
-function ensureWorkspaceBuilt(repoRoot: string, workspace: string) {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn('npm', ['run', 'build', '--workspace', workspace], {
-      cwd: repoRoot,
-      stdio: 'inherit',
-      env: { ...process.env },
-    });
-
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Failed to build workspace ${workspace}`));
-    });
-  });
+  return import(modulePath);
 }
 
 function collectEntries(schema: SettingsSchemaType) {
