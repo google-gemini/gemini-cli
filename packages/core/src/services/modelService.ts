@@ -101,6 +101,18 @@ export class ModelService {
           };
         })
         .sort((a, b) => {
+          const extractVersion = (modelName: string): number => {
+            const match = modelName.match(/(\d+\.\d+)/);
+            return match ? parseFloat(match[1]) : 0;
+          };
+
+          const aVersion = extractVersion(a.value);
+          const bVersion = extractVersion(b.value);
+
+          if (aVersion !== bVersion) {
+            return bVersion - aVersion;
+          }
+
           const aHasLatest = a.value.includes('latest');
           const bHasLatest = b.value.includes('latest');
 

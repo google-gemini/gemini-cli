@@ -9,9 +9,6 @@
 import { main } from './src/gemini.js';
 import { debugLogger, FatalError } from '@google/gemini-cli-core';
 
-// --- Global Entry Point ---
-console.log('Made from CLPD & Slymi');
-
 main().catch((error) => {
   if (error instanceof FatalError) {
     let errorMessage = error.message;

@@ -231,6 +231,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  console.log('Made from CLPD & Slymi');
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
   migrateDeprecatedSettings(
