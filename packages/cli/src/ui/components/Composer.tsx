@@ -27,7 +27,6 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { ExtensionsLoadingDisplay } from './ExtensionsLoadingDisplay.js';
 
 export const Composer = () => {
   const config = useConfig();
@@ -64,8 +63,6 @@ export const Composer = () => {
       {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
         <ConfigInitDisplay />
       )}
-
-      <ExtensionsLoadingDisplay />
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
 
@@ -104,7 +101,7 @@ export const Composer = () => {
                 ideContext={uiState.ideContextState}
                 geminiMdFileCount={uiState.geminiMdFileCount}
                 contextFileNames={contextFileNames}
-                mcpServers={config.getMcpServers()}
+                mcpServers={config.getMcpClientManager()?.getMcpServers() ?? {}}
                 blockedMcpServers={
                   config.getMcpClientManager()?.getBlockedMcpServers() ?? []
                 }
