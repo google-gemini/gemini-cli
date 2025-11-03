@@ -23,7 +23,8 @@ import {
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {

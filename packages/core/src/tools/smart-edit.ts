@@ -24,7 +24,9 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import { type Config, ApprovalMode } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import {
   type ModifiableDeclarativeTool,

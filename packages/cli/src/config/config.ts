@@ -519,26 +519,8 @@ export async function loadCliConfig(
     approvalMode,
   );
 
-  // Debug: Log the merged policy configuration
-  // Only log when message bus integration is enabled (when policies are active)
   const enableMessageBusIntegration =
     settings.tools?.enableMessageBusIntegration ?? false;
-  if (enableMessageBusIntegration) {
-    debugLogger.debug('=== Policy Engine Configuration ===');
-    debugLogger.debug(
-      `Default decision: ${policyEngineConfig.defaultDecision}`,
-    );
-    debugLogger.debug(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
-    if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
-      debugLogger.debug('Rules (sorted by priority):');
-      policyEngineConfig.rules.forEach((rule, index) => {
-        debugLogger.debug(
-          `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
-        );
-      });
-    }
-    debugLogger.debug('===================================');
-  }
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
