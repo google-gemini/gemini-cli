@@ -49,6 +49,7 @@ export enum Command {
   SHOW_FULL_TODOS = 'showFullTodos',
   TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
   TOGGLE_MARKDOWN = 'toggleMarkdown',
+  TOGGLE_COPY_MODE = 'toggleCopyMode',
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
@@ -156,10 +157,11 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.PASTE_CLIPBOARD_IMAGE]: [{ key: 'v', ctrl: true }],
 
   // App level bindings
-  [Command.SHOW_ERROR_DETAILS]: [{ key: 'o', ctrl: true }],
+  [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
   [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
+  [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],

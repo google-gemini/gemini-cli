@@ -170,7 +170,7 @@ describe('git extension helpers', () => {
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        loadedSettings: loadSettings(tempWorkspaceDir),
+        settings: loadSettings(tempWorkspaceDir).merged,
       });
     });
 

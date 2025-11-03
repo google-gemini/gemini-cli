@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render as inkRender } from 'ink-testing-library';
+import { Box } from 'ink';
 import type React from 'react';
+import { act } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -15,8 +17,51 @@ import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
+import { MouseProvider } from '../ui/contexts/MouseContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
+
+// Wrapper around ink-testing-library's render that ensures act() is called
+export const render = (
+  tree: React.ReactElement,
+  terminalWidth?: number,
+): ReturnType<typeof inkRender> => {
+  let renderResult: ReturnType<typeof inkRender> =
+    undefined as unknown as ReturnType<typeof inkRender>;
+  act(() => {
+    renderResult = inkRender(tree);
+  });
+
+  if (terminalWidth !== undefined && renderResult?.stdout) {
+    // Override the columns getter on the stdout instance provided by ink-testing-library
+    Object.defineProperty(renderResult.stdout, 'columns', {
+      get: () => terminalWidth,
+      configurable: true,
+    });
+
+    // Trigger a rerender so Ink can pick up the new terminal width
+    act(() => {
+      renderResult.rerender(tree);
+    });
+  }
+
+  const originalUnmount = renderResult.unmount;
+  const originalRerender = renderResult.rerender;
+
+  return {
+    ...renderResult,
+    unmount: () => {
+      act(() => {
+        originalUnmount();
+      });
+    },
+    rerender: (newTree: React.ReactElement) => {
+      act(() => {
+        originalRerender(newTree);
+      });
+    },
+  };
+};
 
 const mockConfig = {
   getModel: () => 'gemini-pro',
@@ -75,6 +120,7 @@ export const renderWithProviders = (
     uiState: providedUiState,
     width,
     kittyProtocolEnabled = true,
+    mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
   }: {
     shellFocus?: boolean;
@@ -82,6 +128,7 @@ export const renderWithProviders = (
     uiState?: Partial<UIState>;
     width?: number;
     kittyProtocolEnabled?: boolean;
+    mouseEventsEnabled?: boolean;
     config?: Config;
   } = {},
 ): ReturnType<typeof render> => {
@@ -119,12 +166,78 @@ export const renderWithProviders = (
           <VimModeProvider settings={settings}>
             <ShellFocusContext.Provider value={shellFocus}>
               <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-                {component}
+                <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                  <Box
+                    width={terminalWidth}
+                    flexShrink={0}
+                    flexGrow={0}
+                    flexDirection="column"
+                  >
+                    {component}
+                  </Box>
+                </MouseProvider>
               </KeypressProvider>
             </ShellFocusContext.Provider>
           </VimModeProvider>
         </UIStateContext.Provider>
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
+    terminalWidth,
   );
 };
+
+export function renderHook<Result, Props>(
+  renderCallback: (props: Props) => Result,
+  options?: {
+    initialProps?: Props;
+    wrapper?: React.ComponentType<{ children: React.ReactNode }>;
+  },
+): {
+  result: { current: Result };
+  rerender: (props?: Props) => void;
+  unmount: () => void;
+} {
+  const result = { current: undefined as unknown as Result };
+  let currentProps = options?.initialProps as Props;
+
+  function TestComponent({
+    renderCallback,
+    props,
+  }: {
+    renderCallback: (props: Props) => Result;
+    props: Props;
+  }) {
+    result.current = renderCallback(props);
+    return null;
+  }
+
+  const Wrapper = options?.wrapper || (({ children }) => <>{children}</>);
+
+  let inkRerender: (tree: React.ReactElement) => void = () => {};
+  let unmount: () => void = () => {};
+
+  act(() => {
+    const renderResult = render(
+      <Wrapper>
+        <TestComponent renderCallback={renderCallback} props={currentProps} />
+      </Wrapper>,
+    );
+    inkRerender = renderResult.rerender;
+    unmount = renderResult.unmount;
+  });
+
+  function rerender(props?: Props) {
+    if (arguments.length > 0) {
+      currentProps = props as Props;
+    }
+    act(() => {
+      inkRerender(
+        <Wrapper>
+          <TestComponent renderCallback={renderCallback} props={currentProps} />
+        </Wrapper>,
+      );
+    });
+  }
+
+  return { result, rerender, unmount };
+}

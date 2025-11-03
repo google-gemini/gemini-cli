@@ -6,11 +6,17 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { ConfigParameters, SandboxConfig } from './config.js';
+import type {
+  ConfigParameters,
+  SandboxConfig,
+  HookDefinition,
+} from './config.js';
 import {
   Config,
   ApprovalMode,
   DEFAULT_FILE_FILTERING_OPTIONS,
+  HookType,
+  HookEventName,
 } from './config.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -139,6 +145,21 @@ vi.mock('../agents/subagent-tool-wrapper.js', () => ({
   SubagentToolWrapper: vi.fn(),
 }));
 
+const mockCoreEvents = vi.hoisted(() => ({
+  emitFeedback: vi.fn(),
+  emitModelChanged: vi.fn(),
+}));
+
+const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: mockCoreEvents,
+}));
+
+vi.mock('../utils/fetch.js', () => ({
+  setGlobalProxy: mockSetGlobalProxy,
+}));
+
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { uiTelemetryService } from '../telemetry/index.js';
@@ -226,7 +247,7 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      vi.mocked(createContentGeneratorConfig).mockReturnValue(
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue(
         mockContentConfig,
       );
 
@@ -251,7 +272,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
-        (_: Config, authType: AuthType | undefined) =>
+        async (_: Config, authType: AuthType | undefined) =>
           ({ authType }) as unknown as ContentGeneratorConfig,
       );
 
@@ -268,7 +289,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(baseParams);
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
-        (_: Config, authType: AuthType | undefined) =>
+        async (_: Config, authType: AuthType | undefined) =>
           ({ authType }) as unknown as ContentGeneratorConfig,
       );
 
@@ -556,28 +577,96 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('UseModelRouter Configuration', () => {
-    it('should default useModelRouter to false when not provided', () => {
-      const config = new Config(baseParams);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should set useModelRouter to true when provided as true', () => {
-      const paramsWithModelRouter: ConfigParameters = {
+  describe('Model Router with Auth', () => {
+    it('should disable model router by default for oauth-personal', async () => {
+      const config = new Config({
         ...baseParams,
         useModelRouter: true,
-      };
-      const config = new Config(paramsWithModelRouter);
+      });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       expect(config.getUseModelRouter()).toBe(true);
     });
 
-    it('should set useModelRouter to false when explicitly provided as false', () => {
-      const paramsWithModelRouter: ConfigParameters = {
+    it('should enable model router by default for other auth types', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+      });
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should disable model router for specified auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should enable model router for other auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [],
+      });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should keep model router disabled when useModelRouter is false', async () => {
+      const config = new Config({
         ...baseParams,
         useModelRouter: false,
-      };
-      const config = new Config(paramsWithModelRouter);
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
       expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should keep the user-chosen model after refreshAuth, even when model router is disabled for the auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      const chosenModel = 'gemini-1.5-pro-latest';
+      config.setModel(chosenModel);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getModel()).toBe(chosenModel);
+    });
+
+    it('should keep the user-chosen model after refreshAuth, when model router is enabled for the auth type', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        disableModelRouterForAuth: [AuthType.USE_GEMINI],
+      });
+      const chosenModel = 'gemini-1.5-pro-latest';
+      config.setModel(chosenModel);
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getUseModelRouter()).toBe(true);
+      expect(config.getModel()).toBe(chosenModel);
+    });
+
+    it('should NOT switch to auto model if cli provides specific model, even if router is enabled', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        model: 'gemini-flash-latest',
+      });
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getUseModelRouter()).toBe(true);
+      expect(config.getModel()).toBe('gemini-flash-latest');
     });
   });
 
@@ -838,6 +927,63 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTruncateToolOutputThreshold()).toBe(50000);
     });
   });
+
+  describe('Proxy Configuration Error Handling', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should call setGlobalProxy when proxy is configured', () => {
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'http://proxy.example.com:8080',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockSetGlobalProxy).toHaveBeenCalledWith(
+        'http://proxy.example.com:8080',
+      );
+    });
+
+    it('should not call setGlobalProxy when proxy is not configured', () => {
+      new Config(baseParams);
+
+      expect(mockSetGlobalProxy).not.toHaveBeenCalled();
+    });
+
+    it('should emit error feedback when setGlobalProxy throws an error', () => {
+      const proxyError = new Error('Invalid proxy URL');
+      mockSetGlobalProxy.mockImplementation(() => {
+        throw proxyError;
+      });
+
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'invalid-proxy',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
+        proxyError,
+      );
+    });
+
+    it('should not emit error feedback when setGlobalProxy succeeds', () => {
+      mockSetGlobalProxy.mockImplementation(() => {
+        // Success - no error thrown
+      });
+
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'http://proxy.example.com:8080',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('setApprovalMode with folder trust', () => {
@@ -1050,7 +1196,9 @@ describe('BaseLlmClient Lifecycle', () => {
     const authType = AuthType.USE_GEMINI;
     const mockContentConfig = { model: 'gemini-flash', apiKey: 'test-key' };
 
-    vi.mocked(createContentGeneratorConfig).mockReturnValue(mockContentConfig);
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
 
     await config.refreshAuth(authType);
 
@@ -1061,5 +1209,113 @@ describe('BaseLlmClient Lifecycle', () => {
       config.getContentGenerator(),
       config,
     );
+  });
+});
+
+describe('Config getHooks', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('should return undefined when no hooks are provided', () => {
+    const config = new Config(baseParams);
+    expect(config.getHooks()).toBeUndefined();
+  });
+
+  it('should return empty object when empty hooks are provided', () => {
+    const configWithEmptyHooks = new Config({
+      ...baseParams,
+      hooks: {},
+    });
+    expect(configWithEmptyHooks.getHooks()).toEqual({});
+  });
+
+  it('should return the hooks configuration when provided', () => {
+    const mockHooks: { [K in HookEventName]?: HookDefinition[] } = {
+      [HookEventName.BeforeTool]: [
+        {
+          matcher: 'write_file',
+          hooks: [
+            {
+              type: HookType.Command,
+              command: 'echo "test hook"',
+              timeout: 5000,
+            },
+          ],
+        },
+      ],
+      [HookEventName.AfterTool]: [
+        {
+          hooks: [
+            {
+              type: HookType.Command,
+              command: './hooks/after-tool.sh',
+              timeout: 10000,
+            },
+          ],
+        },
+      ],
+    };
+
+    const config = new Config({
+      ...baseParams,
+      hooks: mockHooks,
+    });
+
+    const retrievedHooks = config.getHooks();
+    expect(retrievedHooks).toEqual(mockHooks);
+    expect(retrievedHooks).toBe(mockHooks); // Should return the same reference
+  });
+
+  it('should return hooks with all supported event types', () => {
+    const allEventHooks: { [K in HookEventName]?: HookDefinition[] } = {
+      [HookEventName.BeforeAgent]: [
+        { hooks: [{ type: HookType.Command, command: 'test1' }] },
+      ],
+      [HookEventName.AfterAgent]: [
+        { hooks: [{ type: HookType.Command, command: 'test2' }] },
+      ],
+      [HookEventName.BeforeTool]: [
+        { hooks: [{ type: HookType.Command, command: 'test3' }] },
+      ],
+      [HookEventName.AfterTool]: [
+        { hooks: [{ type: HookType.Command, command: 'test4' }] },
+      ],
+      [HookEventName.BeforeModel]: [
+        { hooks: [{ type: HookType.Command, command: 'test5' }] },
+      ],
+      [HookEventName.AfterModel]: [
+        { hooks: [{ type: HookType.Command, command: 'test6' }] },
+      ],
+      [HookEventName.BeforeToolSelection]: [
+        { hooks: [{ type: HookType.Command, command: 'test7' }] },
+      ],
+      [HookEventName.Notification]: [
+        { hooks: [{ type: HookType.Command, command: 'test8' }] },
+      ],
+      [HookEventName.SessionStart]: [
+        { hooks: [{ type: HookType.Command, command: 'test9' }] },
+      ],
+      [HookEventName.SessionEnd]: [
+        { hooks: [{ type: HookType.Command, command: 'test10' }] },
+      ],
+      [HookEventName.PreCompress]: [
+        { hooks: [{ type: HookType.Command, command: 'test11' }] },
+      ],
+    };
+
+    const config = new Config({
+      ...baseParams,
+      hooks: allEventHooks,
+    });
+
+    const retrievedHooks = config.getHooks();
+    expect(retrievedHooks).toEqual(allEventHooks);
+    expect(Object.keys(retrievedHooks!)).toHaveLength(11); // All hook event types
   });
 });

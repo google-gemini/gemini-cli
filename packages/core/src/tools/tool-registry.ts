@@ -177,10 +177,19 @@ export class ToolRegistry {
   private tools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
   private mcpClientManager: McpClientManager;
+  private messageBus?: MessageBus;
 
   constructor(config: Config, eventEmitter?: EventEmitter) {
     this.config = config;
-    this.mcpClientManager = new McpClientManager(this, eventEmitter);
+    this.mcpClientManager = new McpClientManager(this, config, eventEmitter);
+  }
+
+  setMessageBus(messageBus: MessageBus): void {
+    this.messageBus = messageBus;
+  }
+
+  getMessageBus(): MessageBus | undefined {
+    return this.messageBus;
   }
 
   /**
@@ -235,7 +244,7 @@ export class ToolRegistry {
     await this.discoverAndRegisterToolsFromCommand();
 
     // discover tools using MCP servers, if configured
-    await this.mcpClientManager.discoverAllMcpTools(this.config);
+    await this.mcpClientManager.discoverAllMcpTools();
   }
 
   /**
@@ -250,7 +259,7 @@ export class ToolRegistry {
     this.config.getPromptRegistry().clear();
 
     // discover tools using MCP servers, if configured
-    await this.mcpClientManager.discoverAllMcpTools(this.config);
+    await this.mcpClientManager.discoverAllMcpTools();
   }
 
   /**

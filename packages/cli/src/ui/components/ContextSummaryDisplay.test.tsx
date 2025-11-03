@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
@@ -37,17 +37,18 @@ describe('<ContextSummaryDisplay />', () => {
   };
 
   it('should render on a single line on a wide screen', () => {
-    const { lastFrame } = renderWithWidth(120, baseProps);
+    const { lastFrame, unmount } = renderWithWidth(120, baseProps);
     const output = lastFrame()!;
     expect(output).toContain(
       'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server',
     );
     // Check for absence of newlines
     expect(output.includes('\n')).toBe(false);
+    unmount();
   });
 
   it('should render on multiple lines on a narrow screen', () => {
-    const { lastFrame } = renderWithWidth(60, baseProps);
+    const { lastFrame, unmount } = renderWithWidth(60, baseProps);
     const output = lastFrame()!;
     const expectedLines = [
       ' Using:',
@@ -57,17 +58,26 @@ describe('<ContextSummaryDisplay />', () => {
     ];
     const actualLines = output.split('\n');
     expect(actualLines).toEqual(expectedLines);
+    unmount();
   });
 
   it('should switch layout at the 80-column breakpoint', () => {
     // At 80 columns, should be on one line
-    const { lastFrame: wideFrame } = renderWithWidth(80, baseProps);
+    const { lastFrame: wideFrame, unmount: unmountWide } = renderWithWidth(
+      80,
+      baseProps,
+    );
     expect(wideFrame()!.includes('\n')).toBe(false);
+    unmountWide();
 
     // At 79 columns, should be on multiple lines
-    const { lastFrame: narrowFrame } = renderWithWidth(79, baseProps);
+    const { lastFrame: narrowFrame, unmount: unmountNarrow } = renderWithWidth(
+      79,
+      baseProps,
+    );
     expect(narrowFrame()!.includes('\n')).toBe(true);
     expect(narrowFrame()!.split('\n').length).toBe(4);
+    unmountNarrow();
   });
 
   it('should not render empty parts', () => {
@@ -77,9 +87,10 @@ describe('<ContextSummaryDisplay />', () => {
       contextFileNames: [],
       mcpServers: {},
     };
-    const { lastFrame } = renderWithWidth(60, props);
+    const { lastFrame, unmount } = renderWithWidth(60, props);
     const expectedLines = [' Using:', '   - 1 open file (ctrl+g to view)'];
     const actualLines = lastFrame()!.split('\n');
     expect(actualLines).toEqual(expectedLines);
+    unmount();
   });
 });
