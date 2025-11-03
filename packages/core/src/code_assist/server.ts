@@ -155,11 +155,12 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   async listExperiments(
-    metadata?: ClientMetadata,
+    metadata: ClientMetadata,
   ): Promise<ListExperimentsResponse> {
+    const projectId = this.projectId || '';
     const req: ListExperimentsRequest = {
-      project: this.projectId || '',
-      metadata,
+      project: projectId,
+      metadata: { ...metadata, duet_project: projectId },
     };
     return await this.requestPost<ListExperimentsResponse>(
       'listExperiments',

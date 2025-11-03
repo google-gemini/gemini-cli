@@ -44,6 +44,7 @@ export interface ClientMetadata {
   ide_version?: string;
   platform?: Platform;
   update_channel?: 'nightly' | 'preview' | 'stable';
+  duet_project?: string;
 }
 
 export type IdeType = 'GEMINI_CLI';

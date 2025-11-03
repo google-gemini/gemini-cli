@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isNightly, isPreview, ReleaseChannel } from '../../utils/channel.js';
+import { getReleaseChannel } from '../../utils/channel.js';
 import type { ClientMetadata, Platform } from './types.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -12,7 +12,7 @@ import path from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Cache all metadata that is static for the session.
+// Cache all client metadata.
 let clientMetadata: ClientMetadata | undefined;
 
 function getPlatform(): Platform {
@@ -37,16 +37,6 @@ function getPlatform(): Platform {
   return 'PLATFORM_UNSPECIFIED';
 }
 
-async function getUpdateChannel(): Promise<ReleaseChannel> {
-  if (await isNightly(__dirname)) {
-    return ReleaseChannel.NIGHTLY;
-  }
-  if (await isPreview(__dirname)) {
-    return ReleaseChannel.PREVIEW;
-  }
-  return ReleaseChannel.STABLE;
-}
-
 /**
  * Returns the client metadata.
  *
@@ -58,7 +48,7 @@ export async function getClientMetadata(): Promise<ClientMetadata> {
       ide_type: 'GEMINI_CLI',
       ide_version: process.env['CLI_VERSION'] || process.version,
       platform: getPlatform(),
-      update_channel: await getUpdateChannel(),
+      update_channel: await getReleaseChannel(__dirname),
     };
   }
   return clientMetadata;
