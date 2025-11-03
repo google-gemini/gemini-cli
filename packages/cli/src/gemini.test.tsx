@@ -404,7 +404,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 });
 
 describe('validateDnsResolutionOrder', () => {
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: MockInstance<typeof console.warn>;
 
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

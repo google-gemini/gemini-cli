@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type MockedFunction,
+  type MockInstance,
+} from 'vitest';
 import { execSync } from 'node:child_process';
 import * as os from 'node:os';
 import { detect as chardetDetect } from 'chardet';
@@ -24,10 +33,10 @@ import {
 } from './systemEncoding.js';
 
 describe('Shell Command Processor - Encoding Functions', () => {
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
-  let mockedExecSync: ReturnType<typeof vi.mocked<typeof execSync>>;
-  let mockedOsPlatform: ReturnType<typeof vi.mocked<() => string>>;
-  let mockedChardetDetect: ReturnType<typeof vi.mocked<typeof chardetDetect>>;
+  let consoleWarnSpy: MockInstance<typeof console.warn>;
+  let mockedExecSync: MockedFunction<typeof execSync>;
+  let mockedOsPlatform: MockedFunction<typeof os.platform>;
+  let mockedChardetDetect: MockedFunction<typeof chardetDetect>;
 
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

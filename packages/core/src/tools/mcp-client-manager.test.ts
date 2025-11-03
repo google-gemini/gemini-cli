@@ -34,8 +34,8 @@ describe('McpClientManager', () => {
       disconnect: vi.fn(),
       getStatus: vi.fn(),
     };
-    vi.mocked(McpClient).mockReturnValue(
-      mockedMcpClient as unknown as McpClient,
+    vi.mocked(McpClient).mockImplementation(
+      () => mockedMcpClient as unknown as InstanceType<typeof McpClient>,
     );
     const manager = new McpClientManager(
       {} as ToolRegistry,
@@ -64,8 +64,8 @@ describe('McpClientManager', () => {
       disconnect: vi.fn(),
       getStatus: vi.fn(),
     };
-    vi.mocked(McpClient).mockReturnValue(
-      mockedMcpClient as unknown as McpClient,
+    vi.mocked(McpClient).mockImplementation(
+      () => mockedMcpClient as unknown as InstanceType<typeof McpClient>,
     );
     const manager = new McpClientManager(
       {} as ToolRegistry,

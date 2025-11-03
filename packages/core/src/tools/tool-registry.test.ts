@@ -5,7 +5,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mocked } from 'vitest';
+import type { Mocked, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ConfigParameters } from '../config/config.js';
 import { Config, ApprovalMode } from '../config/config.js';
@@ -111,7 +111,9 @@ const baseConfigParams: ConfigParameters = {
 describe('ToolRegistry', () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
-  let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
+  let mockConfigGetToolDiscoveryCommand: MockInstance<
+    typeof Config.prototype.getToolDiscoveryCommand
+  >;
 
   beforeEach(() => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -261,7 +263,9 @@ describe('ToolRegistry', () => {
   describe('discoverTools', () => {
     it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      mockConfigGetToolDiscoveryCommand.mockImplementation(
+        () => discoveryCommand,
+      );
 
       const unsanitizedToolDeclaration: FunctionDeclaration = {
         name: 'tool-with-bad-format',
@@ -327,7 +331,9 @@ describe('ToolRegistry', () => {
 
     it('should return a DISCOVERED_TOOL_EXECUTION_ERROR on tool failure', async () => {
       const discoveryCommand = 'my-discovery-command';
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      mockConfigGetToolDiscoveryCommand.mockImplementation(
+        () => discoveryCommand,
+      );
       vi.spyOn(config, 'getToolCallCommand').mockReturnValue('my-call-command');
 
       const toolDeclaration: FunctionDeclaration = {
@@ -405,7 +411,7 @@ describe('ToolRegistry', () => {
         McpClientManager.prototype,
         'discoverAllMcpTools',
       );
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
+      mockConfigGetToolDiscoveryCommand.mockImplementation(() => undefined);
       vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
       const mcpServerConfigVal = {
         'my-mcp-server': {

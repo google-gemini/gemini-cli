@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  type Mocked,
+  type Mock,
+} from 'vitest';
 import { SubagentInvocation } from './invocation.js';
 import { AgentExecutor } from './executor.js';
 import type {
@@ -18,6 +26,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { type z } from 'zod';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 
 vi.mock('./executor.js');
 
@@ -128,13 +137,13 @@ describe('SubagentInvocation', () => {
 
   describe('execute', () => {
     let signal: AbortSignal;
-    let updateOutput: ReturnType<typeof vi.fn>;
+    let updateOutput: Mock<(output: string | AnsiOutput) => void>;
     const params = { task: 'Execute task' };
     let invocation: SubagentInvocation<z.ZodUnknown>;
 
     beforeEach(() => {
       signal = new AbortController().signal;
-      updateOutput = vi.fn();
+      updateOutput = vi.fn<(output: string | AnsiOutput) => void>();
       invocation = new SubagentInvocation<z.ZodUnknown>(
         params,
         testDefinition,

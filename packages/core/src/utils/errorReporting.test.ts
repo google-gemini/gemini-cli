@@ -4,17 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { reportError } from './errorReporting.js';
 
-// Use a type alias for SpyInstance as it's not directly exported
-type SpyInstance = ReturnType<typeof vi.spyOn>;
-
 describe('reportError', () => {
-  let consoleErrorSpy: SpyInstance;
+  let consoleErrorSpy: MockInstance<typeof console.error>;
   let testDir: string;
   const MOCK_TIMESTAMP = '2025-01-01T00-00-00-000Z';
 

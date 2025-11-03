@@ -23,7 +23,15 @@
 
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockedFunction,
+} from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
@@ -227,9 +235,11 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
 // Helper function to render SettingsDialog with standard wrapper
 const renderDialog = (
   settings: LoadedSettings,
-  onSelect: ReturnType<typeof vi.fn>,
+  onSelect: MockedFunction<
+    (settingName: string | undefined, scope: SettingScope) => void
+  >,
   options?: {
-    onRestartRequest?: ReturnType<typeof vi.fn>;
+    onRestartRequest?: MockedFunction<() => void>;
     availableTerminalHeight?: number;
   },
 ) =>
@@ -243,6 +253,11 @@ const renderDialog = (
       />
     </KeypressProvider>,
   );
+
+const createOnSelectMock = () =>
+  vi.fn<(settingName: string | undefined, scope: SettingScope) => void>();
+
+const createOnRestartRequestMock = () => vi.fn<() => void>();
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
@@ -258,7 +273,7 @@ describe('SettingsDialog', () => {
   describe('Initial Rendering', () => {
     it('should render the settings dialog with default state', () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect);
 
@@ -271,7 +286,7 @@ describe('SettingsDialog', () => {
 
     it('should accept availableTerminalHeight prop without errors', () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect, {
         availableTerminalHeight: 20,
@@ -286,7 +301,7 @@ describe('SettingsDialog', () => {
 
     it('should render settings list with visual indicators', () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect);
 
@@ -310,7 +325,7 @@ describe('SettingsDialog', () => {
       },
     ])('should navigate with $name', async ({ down, up }) => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
@@ -340,7 +355,7 @@ describe('SettingsDialog', () => {
 
     it('wraps around when at the top of the list', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
@@ -363,7 +378,7 @@ describe('SettingsDialog', () => {
       vi.mocked(saveModifiedSettings).mockClear();
 
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
@@ -431,7 +446,7 @@ describe('SettingsDialog', () => {
           settings.setValue(SettingScope.User, 'ui.theme', initialValue);
         }
 
-        const onSelect = vi.fn();
+        const onSelect = createOnSelectMock();
 
         const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -461,7 +476,7 @@ describe('SettingsDialog', () => {
 
     it('should toggle setting with Space key', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -475,7 +490,7 @@ describe('SettingsDialog', () => {
 
     it('should handle vim mode setting specially', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -493,7 +508,7 @@ describe('SettingsDialog', () => {
   describe('Scope Selection', () => {
     it('should switch between scopes', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -509,7 +524,7 @@ describe('SettingsDialog', () => {
 
     it('should reset to settings focus when scope is selected', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
@@ -532,7 +547,7 @@ describe('SettingsDialog', () => {
   describe('Restart Prompt', () => {
     it('should show restart prompt for restart-required settings', async () => {
       const settings = createMockSettings();
-      const onRestartRequest = vi.fn();
+      const onRestartRequest = createOnRestartRequestMock();
 
       const { unmount } = renderDialog(settings, vi.fn(), {
         onRestartRequest,
@@ -546,7 +561,7 @@ describe('SettingsDialog', () => {
 
     it('should handle restart request when r is pressed', async () => {
       const settings = createMockSettings();
-      const onRestartRequest = vi.fn();
+      const onRestartRequest = createOnRestartRequestMock();
 
       const { stdin, unmount } = renderDialog(settings, vi.fn(), {
         onRestartRequest,
@@ -565,7 +580,7 @@ describe('SettingsDialog', () => {
   describe('Escape Key Behavior', () => {
     it('should call onSelect with undefined when Escape is pressed', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
@@ -588,7 +603,7 @@ describe('SettingsDialog', () => {
   describe('Settings Persistence', () => {
     it('should persist settings across scope changes', async () => {
       const settings = createMockSettings({ vimMode: true });
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -608,7 +623,7 @@ describe('SettingsDialog', () => {
         { vimMode: false }, // System settings
         { autoUpdate: false }, // Workspace settings
       );
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect);
 
@@ -623,7 +638,7 @@ describe('SettingsDialog', () => {
       mockToggleVimEnabled.mockRejectedValue(new Error('Toggle failed'));
 
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -640,7 +655,7 @@ describe('SettingsDialog', () => {
   describe('Complex State Management', () => {
     it('should track modified settings correctly', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -657,7 +672,7 @@ describe('SettingsDialog', () => {
 
     it('should handle scrolling when there are many settings', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -675,7 +690,7 @@ describe('SettingsDialog', () => {
   describe('VimMode Integration', () => {
     it('should sync with VimModeContext when vim mode is toggled', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = render(
         <VimModeProvider settings={settings}>
@@ -702,7 +717,7 @@ describe('SettingsDialog', () => {
         { hideWindowTitle: true }, // System settings
         { ideMode: false }, // Workspace settings
       );
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect);
 
@@ -713,7 +728,7 @@ describe('SettingsDialog', () => {
 
     it('should handle immediate settings save for non-restart-required settings', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -728,7 +743,7 @@ describe('SettingsDialog', () => {
 
     it('should show restart prompt for restart-required settings', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
@@ -747,7 +762,7 @@ describe('SettingsDialog', () => {
 
     it('should clear restart prompt when switching scopes', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { unmount } = renderDialog(settings, onSelect);
 
@@ -763,7 +778,7 @@ describe('SettingsDialog', () => {
         { vimMode: true, hideWindowTitle: false }, // System settings
         {},
       );
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect);
 
@@ -778,7 +793,7 @@ describe('SettingsDialog', () => {
         { vimMode: true }, // System default
         {},
       );
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect);
 
@@ -827,7 +842,7 @@ describe('SettingsDialog', () => {
           },
         });
 
-        const onSelect = vi.fn();
+        const onSelect = createOnSelectMock();
 
         const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -871,7 +886,7 @@ describe('SettingsDialog', () => {
   describe('Keyboard Shortcuts Edge Cases', () => {
     it('should handle rapid key presses gracefully', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -894,7 +909,7 @@ describe('SettingsDialog', () => {
       'should handle $key to reset current setting to default',
       async ({ code }) => {
         const settings = createMockSettings({ vimMode: true });
-        const onSelect = vi.fn();
+        const onSelect = createOnSelectMock();
 
         const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -909,7 +924,7 @@ describe('SettingsDialog', () => {
 
     it('should handle navigation when only one setting exists', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -924,7 +939,7 @@ describe('SettingsDialog', () => {
 
     it('should properly handle Tab navigation between sections', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
@@ -952,7 +967,7 @@ describe('SettingsDialog', () => {
         {},
         {},
       );
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame } = renderDialog(settings, onSelect);
 
@@ -962,7 +977,7 @@ describe('SettingsDialog', () => {
 
     it('should handle missing setting definitions gracefully', () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       // Should not crash even if some settings are missing definitions
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -974,7 +989,7 @@ describe('SettingsDialog', () => {
   describe('Complex User Interactions', () => {
     it('should handle complete user workflow: navigate, toggle, change scope, exit', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { lastFrame, unmount } = renderDialog(settings, onSelect);
 
@@ -999,7 +1014,7 @@ describe('SettingsDialog', () => {
 
     it('should allow changing multiple settings without losing pending changes', async () => {
       const settings = createMockSettings();
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -1019,7 +1034,7 @@ describe('SettingsDialog', () => {
 
     it('should maintain state consistency during complex interactions', async () => {
       const settings = createMockSettings({ vimMode: true });
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
@@ -1038,7 +1053,7 @@ describe('SettingsDialog', () => {
 
     it('should handle restart workflow correctly', async () => {
       const settings = createMockSettings();
-      const onRestartRequest = vi.fn();
+      const onRestartRequest = createOnRestartRequestMock();
 
       const { stdin, unmount } = renderDialog(settings, vi.fn(), {
         onRestartRequest,
@@ -1059,7 +1074,7 @@ describe('SettingsDialog', () => {
   describe('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
       let settings = createMockSettings({ 'a.string.setting': 'initial' });
-      const onSelect = vi.fn();
+      const onSelect = createOnSelectMock();
 
       const { stdin, unmount, rerender } = render(
         <KeypressProvider kittyProtocolEnabled={false}>
@@ -1321,7 +1336,7 @@ describe('SettingsDialog', () => {
           systemSettings,
           workspaceSettings,
         );
-        const onSelect = vi.fn();
+        const onSelect = createOnSelectMock();
 
         const { lastFrame, stdin } = renderDialog(settings, onSelect);
 

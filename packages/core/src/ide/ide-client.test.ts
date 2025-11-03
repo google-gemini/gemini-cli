@@ -12,7 +12,7 @@ import {
   beforeEach,
   afterEach,
   type Mocked,
-  type Mock,
+  type MockedFunction,
 } from 'vitest';
 import { IdeClient, IDEConnectionStatus } from './ide-client.js';
 import * as fs from 'node:fs';
@@ -84,9 +84,21 @@ describe('IdeClient', () => {
       close: vi.fn(),
     } as unknown as Mocked<StdioClientTransport>;
 
-    vi.mocked(Client).mockReturnValue(mockClient);
-    vi.mocked(StreamableHTTPClientTransport).mockReturnValue(mockHttpTransport);
-    vi.mocked(StdioClientTransport).mockReturnValue(mockStdioTransport);
+    vi.mocked(Client).mockImplementation(
+      () => mockClient as unknown as InstanceType<typeof Client>,
+    );
+    vi.mocked(StreamableHTTPClientTransport).mockImplementation(
+      () =>
+        mockHttpTransport as unknown as InstanceType<
+          typeof StreamableHTTPClientTransport
+        >,
+    );
+    vi.mocked(StdioClientTransport).mockImplementation(
+      () =>
+        mockStdioTransport as unknown as InstanceType<
+          typeof StdioClientTransport
+        >,
+    );
 
     await IdeClient.getInstance();
   });
@@ -100,7 +112,7 @@ describe('IdeClient', () => {
       const config = { port: '8080' };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -126,7 +138,7 @@ describe('IdeClient', () => {
       const config = { stdio: { command: 'test-cmd', args: ['--foo'] } };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -151,7 +163,7 @@ describe('IdeClient', () => {
       };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -171,7 +183,7 @@ describe('IdeClient', () => {
         new Error('File not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -195,7 +207,7 @@ describe('IdeClient', () => {
         new Error('File not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -219,7 +231,7 @@ describe('IdeClient', () => {
       const config = { port: '8080' };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -242,7 +254,7 @@ describe('IdeClient', () => {
         new Error('File not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -284,7 +296,7 @@ describe('IdeClient', () => {
     it('should return undefined if no config files are found', async () => {
       vi.mocked(fs.promises.readFile).mockRejectedValue(new Error('not found'));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -305,7 +317,7 @@ describe('IdeClient', () => {
         new Error('not found'),
       ); // For old path
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue(['gemini-ide-server-12345-123.json']);
@@ -341,7 +353,7 @@ describe('IdeClient', () => {
         new Error('not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([
@@ -382,7 +394,7 @@ describe('IdeClient', () => {
         new Error('not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([
@@ -414,7 +426,7 @@ describe('IdeClient', () => {
         new Error('not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([
@@ -444,7 +456,7 @@ describe('IdeClient', () => {
         new Error('not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([
@@ -492,7 +504,7 @@ describe('IdeClient', () => {
         new Error('not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([
@@ -533,7 +545,7 @@ describe('IdeClient', () => {
         new Error('not found'),
       );
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([
@@ -568,7 +580,7 @@ describe('IdeClient', () => {
       const config = { port: '8080' };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -587,7 +599,7 @@ describe('IdeClient', () => {
       const config = { port: '8080' };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -608,7 +620,7 @@ describe('IdeClient', () => {
       const config = { port: '8080' };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -629,7 +641,7 @@ describe('IdeClient', () => {
       const config = { port: '8080' };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);
@@ -653,7 +665,7 @@ describe('IdeClient', () => {
       const config = { port: '8080', authToken };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       (
-        vi.mocked(fs.promises.readdir) as Mock<
+        vi.mocked(fs.promises.readdir) as unknown as MockedFunction<
           (path: fs.PathLike) => Promise<string[]>
         >
       ).mockResolvedValue([]);

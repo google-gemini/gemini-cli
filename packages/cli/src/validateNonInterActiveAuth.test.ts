@@ -12,7 +12,7 @@ import {
   beforeEach,
   afterEach,
   type MockInstance,
-  type Mock,
+  type MockedFunction,
 } from 'vitest';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import {
@@ -34,9 +34,9 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvGeminiApiKey: string | undefined;
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let processExitSpy: MockInstance;
-  let refreshAuthMock: Mock;
+  let consoleErrorSpy: MockInstance<typeof console.error>;
+  let processExitSpy: MockInstance<typeof process.exit>;
+  let refreshAuthMock: MockedFunction<(authType: AuthType) => Promise<void>>;
   let mockSettings: LoadedSettings;
 
   beforeEach(() => {
@@ -53,7 +53,9 @@ describe('validateNonInterActiveAuth', () => {
         throw new Error(`process.exit(${code}) called`);
       });
     vi.spyOn(auth, 'validateAuthMethod').mockReturnValue(null);
-    refreshAuthMock = vi.fn().mockImplementation(async () => 'refreshed');
+    refreshAuthMock = vi
+      .fn<(authType: AuthType) => Promise<void>>()
+      .mockImplementation(async () => {});
     mockSettings = {
       system: { path: '', settings: {} },
       systemDefaults: { path: '', settings: {} },

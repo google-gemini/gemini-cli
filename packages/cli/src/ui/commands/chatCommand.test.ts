@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mocked } from 'vitest';
+import type { Mocked, MockedFunction } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import type { SlashCommand, CommandContext } from './types.js';
@@ -132,11 +132,13 @@ describe('chatCommand', () => {
   describe('save subcommand', () => {
     let saveCommand: SlashCommand;
     const tag = 'my-tag';
-    let mockCheckpointExists: ReturnType<typeof vi.fn>;
+    let mockCheckpointExists: MockedFunction<(tag: string) => Promise<boolean>>;
 
     beforeEach(() => {
       saveCommand = getSubCommand('save');
-      mockCheckpointExists = vi.fn().mockResolvedValue(false);
+      mockCheckpointExists = vi
+        .fn<(tag: string) => Promise<boolean>>()
+        .mockResolvedValue(false);
       mockContext.services.logger.checkpointExists = mockCheckpointExists;
     });
 

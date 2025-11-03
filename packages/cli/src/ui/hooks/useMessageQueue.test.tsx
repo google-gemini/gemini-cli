@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockedFunction,
+} from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -12,10 +20,10 @@ import { useMessageQueue } from './useMessageQueue.js';
 import { StreamingState } from '../types.js';
 
 describe('useMessageQueue', () => {
-  let mockSubmitQuery: ReturnType<typeof vi.fn>;
+  let mockSubmitQuery: MockedFunction<(query: string) => void>;
 
   beforeEach(() => {
-    mockSubmitQuery = vi.fn();
+    mockSubmitQuery = vi.fn<(query: string) => void>();
     vi.useFakeTimers();
   });
 

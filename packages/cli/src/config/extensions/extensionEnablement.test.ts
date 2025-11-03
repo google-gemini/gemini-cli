@@ -7,7 +7,15 @@
 import * as path from 'node:path';
 import fs from 'node:fs';
 import * as os from 'node:os';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
 
 import {
@@ -276,7 +284,7 @@ describe('ExtensionEnablementManager', () => {
   });
 
   describe('validateExtensionOverrides', () => {
-    let coreEventsEmitSpy: ReturnType<typeof vi.spyOn>;
+    let coreEventsEmitSpy: MockInstance<typeof coreEvents.emitFeedback>;
 
     beforeEach(() => {
       coreEventsEmitSpy = vi.spyOn(coreEvents, 'emitFeedback');

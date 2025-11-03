@@ -8,7 +8,7 @@ import type React from 'react';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Mock } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { vi } from 'vitest';
 import type { Key } from './KeypressContext.js';
 import {
@@ -86,9 +86,12 @@ describe('KeypressContext - Kitty Protocol', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stdin = new MockStdin();
-    (useStdin as Mock).mockReturnValue({
-      stdin,
+    vi.mocked(useStdin).mockReturnValue({
+      stdin: stdin as unknown as NodeJS.ReadStream,
       setRawMode: mockSetRawMode,
+      isRawModeSupported: true,
+      internal_exitOnCtrlC: true,
+      internal_eventEmitter: stdin,
     });
   });
 
@@ -290,8 +293,8 @@ describe('KeypressContext - Kitty Protocol', () => {
   });
 
   describe('debug keystroke logging', () => {
-    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-    let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+    let consoleLogSpy: MockInstance<typeof console.log>;
+    let consoleWarnSpy: MockInstance<typeof console.warn>;
 
     beforeEach(() => {
       consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -586,9 +589,12 @@ describe('Drag and Drop Handling', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     stdin = new MockStdin();
-    (useStdin as Mock).mockReturnValue({
-      stdin,
+    vi.mocked(useStdin).mockReturnValue({
+      stdin: stdin as unknown as NodeJS.ReadStream,
       setRawMode: mockSetRawMode,
+      isRawModeSupported: true,
+      internal_exitOnCtrlC: true,
+      internal_eventEmitter: stdin,
     });
   });
 
@@ -678,9 +684,12 @@ describe('Kitty Sequence Parsing', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     stdin = new MockStdin();
-    (useStdin as Mock).mockReturnValue({
-      stdin,
+    vi.mocked(useStdin).mockReturnValue({
+      stdin: stdin as unknown as NodeJS.ReadStream,
       setRawMode: mockSetRawMode,
+      isRawModeSupported: true,
+      internal_exitOnCtrlC: true,
+      internal_eventEmitter: stdin,
     });
   });
 

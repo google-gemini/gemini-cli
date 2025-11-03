@@ -11,7 +11,8 @@ import {
   expect,
   beforeEach,
   afterEach,
-  type Mock,
+  type MockedFunction,
+  type MockInstance,
 } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
@@ -30,15 +31,16 @@ import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { AuthState, MessageType } from '../types.js';
 
-// Use a type alias for SpyInstance as it's not directly exported
-type SpyInstance = ReturnType<typeof vi.spyOn>;
-
 describe('useQuotaAndFallback', () => {
   let mockConfig: Config;
   let mockHistoryManager: UseHistoryManagerReturn;
-  let mockSetAuthState: Mock;
-  let mockSetModelSwitchedFromQuotaError: Mock;
-  let setFallbackHandlerSpy: SpyInstance;
+  let mockSetAuthState: MockedFunction<(state: AuthState) => void>;
+  let mockSetModelSwitchedFromQuotaError: MockedFunction<
+    (value: boolean) => void
+  >;
+  let setFallbackHandlerSpy: MockInstance<
+    typeof Config.prototype.setFallbackModelHandler
+  >;
   let mockGoogleApiError: GoogleApiError;
 
   beforeEach(() => {
@@ -62,8 +64,8 @@ describe('useQuotaAndFallback', () => {
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
     };
-    mockSetAuthState = vi.fn();
-    mockSetModelSwitchedFromQuotaError = vi.fn();
+    mockSetAuthState = vi.fn<(state: AuthState) => void>();
+    mockSetModelSwitchedFromQuotaError = vi.fn<(value: boolean) => void>();
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
@@ -200,8 +202,8 @@ describe('useQuotaAndFallback', () => {
             expect.any(Number),
           );
 
-          const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
-            .text;
+          const addItemMock = vi.mocked(mockHistoryManager.addItem);
+          const message = addItemMock.mock.calls[0]![0].text;
           for (const snippet of expectedMessageSnippets) {
             expect(message).toContain(snippet);
           }
@@ -389,7 +391,8 @@ describe('useQuotaAndFallback', () => {
 
       // Check for the second "Switched to fallback model" message
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
-      const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[1][0];
+      const addItemMock = vi.mocked(mockHistoryManager.addItem);
+      const lastCall = addItemMock.mock.calls[1]![0];
       expect(lastCall.type).toBe(MessageType.INFO);
       expect(lastCall.text).toContain('Switched to fallback model.');
     });

@@ -11,7 +11,8 @@ import {
   expect,
   beforeEach,
   afterEach,
-  type Mock,
+  type MockInstance,
+  type MockedFunction,
 } from 'vitest';
 import yargs, { type Argv } from 'yargs';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
@@ -29,13 +30,16 @@ vi.mock('fs/promises', () => ({
 describe('mcp remove command', () => {
   describe('unit tests with mocks', () => {
     let parser: Argv;
-    let mockSetValue: Mock;
+    let mockSetValue: MockedFunction<
+      (scope: SettingScope, key: string, value: unknown) => void
+    >;
     let mockSettings: Record<string, unknown>;
 
     beforeEach(async () => {
       vi.resetAllMocks();
 
-      mockSetValue = vi.fn();
+      mockSetValue =
+        vi.fn<(scope: SettingScope, key: string, value: unknown) => void>();
       mockSettings = {
         mcpServers: {
           'test-server': {
@@ -84,7 +88,7 @@ describe('mcp remove command', () => {
     let settingsDir: string;
     let settingsPath: string;
     let parser: Argv;
-    let cwdSpy: ReturnType<typeof vi.spyOn>;
+    let cwdSpy: MockInstance<typeof process.cwd>;
 
     beforeEach(() => {
       vi.resetAllMocks();
