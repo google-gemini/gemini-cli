@@ -150,12 +150,12 @@ export interface ExtensionEvents {
   extensionsStopping: ExtensionsStoppingEvent[];
 }
 
-interface ExtensionsStartingEvent {
+export interface ExtensionsStartingEvent {
   total: number;
   completed: number;
 }
 
-interface ExtensionsStoppingEvent {
+export interface ExtensionsStoppingEvent {
   total: number;
   completed: number;
 }
