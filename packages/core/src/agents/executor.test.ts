@@ -26,8 +26,16 @@ import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { z } from 'zod';
 import { promptIdContext } from '../utils/promptIdContext.js';
-import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
-import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
+import {
+  logAgentStart,
+  logAgentFinish,
+  logRecoveryAttempt,
+} from '../telemetry/loggers.js';
+import {
+  AgentStartEvent,
+  AgentFinishEvent,
+  RecoveryAttemptEvent,
+} from '../telemetry/types.js';
 import type {
   AgentDefinition,
   AgentInputs,
@@ -61,6 +69,7 @@ vi.mock('../utils/environmentContext.js');
 vi.mock('../telemetry/loggers.js', () => ({
   logAgentStart: vi.fn(),
   logAgentFinish: vi.fn(),
+  logRecoveryAttempt: vi.fn(),
 }));
 
 vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
@@ -81,6 +90,7 @@ const mockedGetDirectoryContextString = vi.mocked(getDirectoryContextString);
 const mockedPromptIdContext = vi.mocked(promptIdContext);
 const mockedLogAgentStart = vi.mocked(logAgentStart);
 const mockedLogAgentFinish = vi.mocked(logAgentFinish);
+const mockedLogRecoveryAttempt = vi.mocked(logRecoveryAttempt);
 
 // Constants for testing
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
@@ -1341,6 +1351,93 @@ describe('AgentExecutor', () => {
           }),
         }),
       );
+    });
+  });
+  describe('Telemetry and Logging', () => {
+    const mockWorkResponse = (id: string) => {
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'success',
+        request: {
+          callId: id,
+          name: LS_TOOL_NAME,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      });
+    };
+
+    beforeEach(() => {
+      mockedLogRecoveryAttempt.mockClear();
+    });
+
+    it('should log a RecoveryAttemptEvent when a recoverable error occurs and recovery fails', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(definition, mockConfig);
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (fails by calling no tools)
+      mockModelResponse([], 'I give up again.');
+
+      await executor.run({ goal: 'Turns recovery fail' }, signal);
+
+      expect(mockedLogRecoveryAttempt).toHaveBeenCalledTimes(1);
+      const recoveryEvent = mockedLogRecoveryAttempt.mock.calls[0][1];
+      expect(recoveryEvent).toBeInstanceOf(RecoveryAttemptEvent);
+      expect(recoveryEvent.agent_name).toBe(definition.name);
+      expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
+      expect(recoveryEvent.success).toBe(false);
+      expect(recoveryEvent.turn_count).toBe(1);
+      expect(recoveryEvent.duration_ms).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should log a successful RecoveryAttemptEvent when recovery succeeds', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(definition, mockConfig);
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered!' },
+            id: 't2',
+          },
+        ],
+        'Recovering from max turns',
+      );
+
+      await executor.run({ goal: 'Turns recovery success' }, signal);
+
+      expect(mockedLogRecoveryAttempt).toHaveBeenCalledTimes(1);
+      const recoveryEvent = mockedLogRecoveryAttempt.mock.calls[0][1];
+      expect(recoveryEvent).toBeInstanceOf(RecoveryAttemptEvent);
+      expect(recoveryEvent.success).toBe(true);
+      expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
     });
   });
 });
