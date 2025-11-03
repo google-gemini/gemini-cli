@@ -365,7 +365,7 @@ describe('useGeminiStream', () => {
     toolName: string,
     callId: string,
     confirmationType: 'edit' | 'info',
-    mockOnConfirm: vi.Mock,
+    mockOnConfirm: Mock,
     status: TrackedToolCall['status'] = 'awaiting_approval',
   ): TrackedWaitingToolCall => ({
     request: {
@@ -415,7 +415,7 @@ describe('useGeminiStream', () => {
       performMemoryRefresh?: () => Promise<void>;
       onAuthError?: () => void;
       onEditorClose?: () => void;
-      setModelSwitched?: vi.Mock;
+      setModelSwitched?: Mock;
       modelSwitched?: boolean;
     } = {},
   ) => {
