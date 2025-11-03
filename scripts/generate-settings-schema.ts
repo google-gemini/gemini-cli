@@ -43,6 +43,7 @@ interface JsonSchema {
   additionalProperties?: boolean | JsonSchema;
   required?: string[];
   $ref?: string;
+  anyOf?: JsonSchema[];
 }
 
 interface GenerateOptions {
@@ -301,6 +302,14 @@ const CUSTOM_DEFINITIONS: Record<string, JsonSchema> = {
       },
     },
     required: ['type', 'name'],
+  },
+  StringOrStringArray: {
+    description: 'Accepts either a single string or an array of strings.',
+    anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+  },
+  BooleanOrString: {
+    description: 'Accepts either a boolean flag or a string command name.',
+    anyOf: [{ type: 'boolean' }, { type: 'string' }],
   },
 };
 

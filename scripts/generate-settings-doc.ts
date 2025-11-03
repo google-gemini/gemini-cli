@@ -119,7 +119,7 @@ function collectEntries(schema: SettingsSchemaType) {
 
         sections.get(sectionKey)!.push({
           path: newPathSegments.join('.'),
-          type: definition.type,
+          type: formatType(definition),
           description: formatDescription(definition),
           defaultValue: formatDefaultValue(definition.default, {
             quoteStrings: true,
@@ -146,6 +146,17 @@ function formatDescription(definition: SettingDefinition) {
     return definition.description.trim();
   }
   return 'Description not provided.';
+}
+
+function formatType(definition: SettingDefinition): string {
+  switch (definition.ref) {
+    case 'StringOrStringArray':
+      return 'string | string[]';
+    case 'BooleanOrString':
+      return 'boolean | string';
+    default:
+      return definition.type;
+  }
 }
 
 function renderSections(sections: Map<string, DocEntry[]>) {

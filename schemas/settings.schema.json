@@ -416,7 +416,7 @@
           "title": "Context File Name",
           "description": "The name of the context file or files to load into memory. Accepts either a single string or an array of strings.",
           "markdownDescription": "The name of the context file or files to load into memory. Accepts either a single string or an array of strings.\n\n- Category: `Context`\n- Requires restart: `no`",
-          "type": "string"
+          "$ref": "#/$defs/StringOrStringArray"
         },
         "importFormat": {
           "title": "Memory Import Format",
@@ -500,7 +500,7 @@
           "title": "Sandbox",
           "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.",
           "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.\n\n- Category: `Tools`\n- Requires restart: `yes`",
-          "type": "string"
+          "$ref": "#/$defs/BooleanOrString"
         },
         "shell": {
           "title": "Shell",
@@ -1199,6 +1199,31 @@
         }
       },
       "required": ["type", "name"]
+    },
+    "StringOrStringArray": {
+      "description": "Accepts either a single string or an array of strings.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "BooleanOrString": {
+      "description": "Accepts either a boolean flag or a string command name.",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        }
+      ]
     }
   }
 }

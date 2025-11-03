@@ -292,7 +292,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `context`
 
-- **`context.fileName`** (string):
+- **`context.fileName`** (string | string[]):
   - **Description:** The name of the context file or files to load into memory.
     Accepts either a single string or an array of strings.
   - **Default:** `undefined`
@@ -339,7 +339,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `tools`
 
-- **`tools.sandbox`** (string):
+- **`tools.sandbox`** (boolean | string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
     or disable the sandbox, or provide a string path to a sandbox profile.
   - **Default:** `undefined`

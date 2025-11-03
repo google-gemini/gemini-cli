@@ -685,6 +685,7 @@ const SETTINGS_SCHEMA = {
         category: 'Context',
         requiresRestart: false,
         default: undefined as string | string[] | undefined,
+        ref: 'StringOrStringArray',
         description:
           'The name of the context file or files to load into memory. Accepts either a single string or an array of strings.',
         showInDialog: false,
@@ -800,6 +801,7 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as boolean | string | undefined,
+        ref: 'BooleanOrString',
         description: oneLine`
           Sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.
