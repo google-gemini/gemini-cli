@@ -456,6 +456,40 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable model routing to route requests to the best model
     based on complexity.
   - **Default:** `false`
+<<<<<<< HEAD
+=======
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.maxNumTurns`** (number):
+  - **Description:** Maximum number of turns for the Codebase Investigator
+    agent.
+  - **Default:** `15`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.maxTimeMinutes`** (number):
+  - **Description:** Maximum time for the Codebase Investigator agent (in
+    minutes).
+  - **Default:** `5`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
+  - **Description:** The thinking budget for the Codebase Investigator agent.
+  - **Default:** `8192`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.model`** (string):
+  - **Description:** The model to use for the Codebase Investigator agent.
+  - **Default:** `"gemini-2.5-pro"`
+  - **Requires restart:** Yes
+
+#### `hooks`
+
+- **`hooks`** (object):
+  - **Description:** Hook configurations for intercepting and customizing agent
+    behavior.
+  - **Default:** `{}`
+  <!-- SETTINGS-AUTOGEN:END -->
+>>>>>>> 59e0b10e (Cap Thinking Budget to prevent runaway thought loops (#12416))
 
 #### `mcpServers`
 
