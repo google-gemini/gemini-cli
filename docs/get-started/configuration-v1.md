@@ -692,8 +692,6 @@ for that specific session.
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See
     [telemetry](../cli/telemetry.md) for more information.
-- **`--checkpointing`**:
-  - Enables [checkpointing](../cli/checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all
     available extensions are used.
