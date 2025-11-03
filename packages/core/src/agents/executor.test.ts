@@ -571,22 +571,28 @@ describe('AgentExecutor', () => {
         },
       });
 
+      // Turn 2 (protocol violation)
       mockModelResponse([], 'I think I am done.');
+
+      // Turn 3 (recovery turn - also fails)
+      mockModelResponse([], 'I still give up.');
 
       const output = await executor.run({ goal: 'Strict test' }, signal);
 
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
 
-      const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
+      const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
 
-      expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
       expect(output.result).toBe(expectedError);
 
       // Telemetry check for error
       expect(mockedLogAgentFinish).toHaveBeenCalledWith(
         mockConfig,
         expect.objectContaining({
-          terminate_reason: AgentTerminateMode.ERROR,
+          terminate_reason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
         }),
       );
 
@@ -901,11 +907,13 @@ describe('AgentExecutor', () => {
 
       mockWorkResponse('t1');
       mockWorkResponse('t2');
+      // Recovery turn
+      mockModelResponse([], 'I give up');
 
       const output = await executor.run({ goal: 'Turns test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
     });
 
     it('should terminate with TIMEOUT if a model call takes too long', async () => {
@@ -931,6 +939,8 @@ describe('AgentExecutor', () => {
           });
         })();
       });
+      // Recovery turn
+      mockModelResponse([], 'I give up');
 
       const runPromise = executor.run({ goal: 'Timeout test' }, signal);
 
@@ -941,7 +951,7 @@ describe('AgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
       expect(output.result).toContain('Agent timed out after 0.5 minutes.');
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
 
       // Verify activity stream reported the timeout
       expect(activities).toContainEqual(
@@ -992,10 +1002,13 @@ describe('AgentExecutor', () => {
         };
       });
 
+      // Recovery turn
+      mockModelResponse([], 'I give up');
+
       const output = await executor.run({ goal: 'Timeout test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
     });
 
     it('should terminate when AbortSignal is triggered', async () => {
@@ -1017,6 +1030,317 @@ describe('AgentExecutor', () => {
       const output = await executor.run({ goal: 'Abort test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.ABORTED);
+    });
+  });
+
+  describe('run (Recovery Turns)', () => {
+    const mockWorkResponse = (id: string) => {
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'success',
+        request: {
+          callId: id,
+          name: LS_TOOL_NAME,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      });
+    };
+
+    it('should recover successfully if complete_task is called during the grace turn after MAX_TURNS', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered!' },
+            id: 't2',
+          },
+        ],
+        'Recovering from max turns',
+      );
+
+      const output = await executor.run({ goal: 'Turns recovery' }, signal);
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Recovered!');
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1); // 1 regular + 1 recovery
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: {
+            text: 'Execution limit reached (MAX_TURNS). Attempting one final recovery turn with a grace period.',
+          },
+        }),
+      );
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: { text: 'Graceful recovery succeeded.' },
+        }),
+      );
+    });
+
+    it('should fail if complete_task is NOT called during the grace turn after MAX_TURNS', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (fails by calling no tools)
+      mockModelResponse([], 'I give up again.');
+
+      const output = await executor.run(
+        { goal: 'Turns recovery fail' },
+        signal,
+      );
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
+      expect(output.result).toContain('Agent reached max turns limit');
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'recovery_turn',
+            error: 'Graceful recovery attempt failed. Reason: stop',
+          }),
+        }),
+      );
+    });
+
+    it('should recover successfully from a protocol violation (no complete_task)', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Normal work
+      mockWorkResponse('t1');
+
+      // Turn 2: Protocol violation (no tool calls)
+      mockModelResponse([], 'I think I am done, but I forgot the right tool.');
+
+      // Turn 3: Recovery turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered from violation!' },
+            id: 't3',
+          },
+        ],
+        'My mistake, here is the completion.',
+      );
+
+      const output = await executor.run({ goal: 'Violation recovery' }, signal);
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Recovered from violation!');
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: {
+            text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
+          },
+        }),
+      );
+    });
+
+    it('should fail recovery from a protocol violation if it violates again', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Normal work
+      mockWorkResponse('t1');
+
+      // Turn 2: Protocol violation (no tool calls)
+      mockModelResponse([], 'I think I am done, but I forgot the right tool.');
+
+      // Turn 3: Recovery turn (fails again)
+      mockModelResponse([], 'I still dont know what to do.');
+
+      const output = await executor.run(
+        { goal: 'Violation recovery fail' },
+        signal,
+      );
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
+      expect(output.result).toContain(
+        `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'`,
+      );
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'recovery_turn',
+            error: 'Graceful recovery attempt failed. Reason: stop',
+          }),
+        }),
+      );
+    });
+
+    it('should recover successfully from a TIMEOUT', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_time_minutes: 0.5, // 30 seconds
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock a model call that gets interrupted by the timeout.
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          // This promise never resolves, it waits for abort.
+          await new Promise<void>((resolve) => {
+            signal?.addEventListener('abort', () => resolve());
+          });
+        })();
+      });
+
+      // Recovery turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered from timeout!' },
+            id: 't2',
+          },
+        ],
+        'Apologies for the delay, finishing up.',
+      );
+
+      const runPromise = executor.run({ goal: 'Timeout recovery' }, signal);
+
+      // Advance time past the timeout to trigger the abort and recovery.
+      await vi.advanceTimersByTimeAsync(31 * 1000);
+
+      const output = await runPromise;
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2); // 1 failed + 1 recovery
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Recovered from timeout!');
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: {
+            text: 'Execution limit reached (TIMEOUT). Attempting one final recovery turn with a grace period.',
+          },
+        }),
+      );
+    });
+
+    it('should fail recovery from a TIMEOUT if the grace period also times out', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_time_minutes: 0.5, // 30 seconds
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          await new Promise<void>((resolve) =>
+            signal?.addEventListener('abort', () => resolve()),
+          );
+        })();
+      });
+
+      // Mock the recovery call to also be long-running
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          await new Promise<void>((resolve) =>
+            signal?.addEventListener('abort', () => resolve()),
+          );
+        })();
+      });
+
+      const runPromise = executor.run(
+        { goal: 'Timeout recovery fail' },
+        signal,
+      );
+
+      // 1. Trigger the main timeout
+      await vi.advanceTimersByTimeAsync(31 * 1000);
+      // 2. Let microtasks run (start recovery turn)
+      await vi.advanceTimersByTimeAsync(1);
+      // 3. Trigger the grace period timeout (60s)
+      await vi.advanceTimersByTimeAsync(61 * 1000);
+
+      const output = await runPromise;
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
+      expect(output.result).toContain('Agent timed out after 0.5 minutes.');
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'recovery_turn',
+            error: 'Graceful recovery attempt failed. Reason: stop',
+          }),
+        }),
+      );
     });
   });
 });
