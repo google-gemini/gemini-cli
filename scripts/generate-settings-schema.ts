@@ -15,7 +15,11 @@ import {
   type SettingsSchema,
   type SettingsSchemaType,
 } from '../packages/cli/src/config/settingsSchema.js';
-import { formatWithPrettier, normalizeForCompare } from './utils/autogen.js';
+import {
+  formatDefaultValue,
+  formatWithPrettier,
+  normalizeForCompare,
+} from './utils/autogen.js';
 
 const OUTPUT_RELATIVE_PATH = ['schemas', 'settings.schema.json'];
 const SCHEMA_ID =
@@ -392,75 +396,11 @@ function buildSettingSchema(
     base.default = definition.default as JsonValue;
   }
 
-  if (definition.ref) {
-    ensureDefinition(definition.ref, defs);
-    return { ...base, $ref: `#/$defs/${definition.ref}` };
-  }
+  const schemaShape = definition.ref
+    ? buildRefSchema(definition.ref, defs)
+    : buildSchemaForType(definition, pathSegments, defs);
 
-  switch (definition.type) {
-    case 'boolean':
-    case 'string':
-    case 'number':
-      return { ...base, type: definition.type };
-    case 'enum': {
-      const values = definition.options?.map((option) => option.value) ?? [];
-      const inferred = inferTypeFromValues(values);
-      return {
-        ...base,
-        type: inferred ?? undefined,
-        enum: values,
-      };
-    }
-    case 'array': {
-      const items = definition.items
-        ? buildCollectionSchema(
-            definition.items,
-            [...pathSegments, '<items>'],
-            defs,
-          )
-        : {};
-      return { ...base, type: 'array', items };
-    }
-    case 'object': {
-      const properties: Record<string, JsonSchema> = {};
-      if (definition.properties) {
-        for (const [childKey, childDefinition] of Object.entries(
-          definition.properties,
-        )) {
-          properties[childKey] = buildSettingSchema(
-            childDefinition,
-            [...pathSegments, childKey],
-            defs,
-          );
-        }
-      }
-
-      const schema: JsonSchema = {
-        ...base,
-        type: 'object',
-      };
-
-      if (Object.keys(properties).length > 0) {
-        schema.properties = properties;
-      }
-
-      if (definition.additionalProperties) {
-        schema.additionalProperties = buildCollectionSchema(
-          definition.additionalProperties,
-          [...pathSegments, '<additionalProperties>'],
-          defs,
-        );
-      } else if (!definition.properties) {
-        schema.additionalProperties = true;
-      } else {
-        schema.additionalProperties = false;
-      }
-
-      return schema;
-    }
-    default:
-      return base;
-  }
+  return { ...base, ...schemaShape };
 }
 
 function buildCollectionSchema(
@@ -469,46 +409,113 @@ function buildCollectionSchema(
   defs: Map<string, JsonSchema>,
 ): JsonSchema {
   if (collection.ref) {
-    ensureDefinition(collection.ref, defs);
-    return { $ref: `#/$defs/${collection.ref}` };
+    return buildRefSchema(collection.ref, defs);
   }
+  return buildSchemaForType(collection, pathSegments, defs);
+}
 
-  switch (collection.type) {
+function buildSchemaForType(
+  source: SettingDefinition | SettingCollectionDefinition,
+  pathSegments: string[],
+  defs: Map<string, JsonSchema>,
+): JsonSchema {
+  switch (source.type) {
     case 'boolean':
     case 'string':
     case 'number':
-      return { type: collection.type };
-    case 'enum': {
-      const values = collection.options?.map((option) => option.value) ?? [];
-      const inferred = inferTypeFromValues(values);
-      return {
-        type: inferred ?? undefined,
-        enum: values,
-      };
-    }
+      return { type: source.type };
+    case 'enum':
+      return buildEnumSchema(source.options);
     case 'array': {
-      const items = collection.properties
-        ? buildInlineObjectSchema(
-            collection.properties,
-            [...pathSegments, '<items>'],
-            defs,
-          )
-        : {};
+      const itemPath = [...pathSegments, '<items>'];
+      const items = isSettingDefinition(source)
+        ? source.items
+          ? buildCollectionSchema(source.items, itemPath, defs)
+          : {}
+        : source.properties
+          ? buildInlineObjectSchema(source.properties, itemPath, defs)
+          : {};
       return { type: 'array', items };
     }
-    case 'object': {
-      if (collection.properties) {
-        return buildInlineObjectSchema(
-          collection.properties,
-          pathSegments,
-          defs,
-        );
-      }
-      return { type: 'object', additionalProperties: true };
-    }
+    case 'object':
+      return isSettingDefinition(source)
+        ? buildObjectDefinitionSchema(source, pathSegments, defs)
+        : buildObjectCollectionSchema(source, pathSegments, defs);
     default:
       return {};
   }
+}
+
+function buildEnumSchema(
+  options:
+    | SettingDefinition['options']
+    | SettingCollectionDefinition['options'],
+): JsonSchema {
+  const values = options?.map((option) => option.value) ?? [];
+  const inferred = inferTypeFromValues(values);
+  return {
+    type: inferred ?? undefined,
+    enum: values,
+  };
+}
+
+function buildObjectDefinitionSchema(
+  definition: SettingDefinition,
+  pathSegments: string[],
+  defs: Map<string, JsonSchema>,
+): JsonSchema {
+  const properties = definition.properties
+    ? buildObjectProperties(definition.properties, pathSegments, defs)
+    : undefined;
+
+  const schema: JsonSchema = {
+    type: 'object',
+  };
+
+  if (properties && Object.keys(properties).length > 0) {
+    schema.properties = properties;
+  }
+
+  if (definition.additionalProperties) {
+    schema.additionalProperties = buildCollectionSchema(
+      definition.additionalProperties,
+      [...pathSegments, '<additionalProperties>'],
+      defs,
+    );
+  } else if (!definition.properties) {
+    schema.additionalProperties = true;
+  } else {
+    schema.additionalProperties = false;
+  }
+
+  return schema;
+}
+
+function buildObjectCollectionSchema(
+  collection: SettingCollectionDefinition,
+  pathSegments: string[],
+  defs: Map<string, JsonSchema>,
+): JsonSchema {
+  if (collection.properties) {
+    return buildInlineObjectSchema(collection.properties, pathSegments, defs);
+  }
+  return { type: 'object', additionalProperties: true };
+}
+
+function buildObjectProperties(
+  properties: SettingsSchema,
+  pathSegments: string[],
+  defs: Map<string, JsonSchema>,
+): Record<string, JsonSchema> {
+  const result: Record<string, JsonSchema> = {};
+  for (const [childKey, childDefinition] of Object.entries(properties)) {
+    result[childKey] = buildSettingSchema(
+      childDefinition,
+      [...pathSegments, childKey],
+      defs,
+    );
+  }
+  return result;
 }
 
 function buildInlineObjectSchema(
@@ -516,20 +523,26 @@ function buildInlineObjectSchema(
   pathSegments: string[],
   defs: Map<string, JsonSchema>,
 ): JsonSchema {
-  const childSchemas: Record<string, JsonSchema> = {};
-  for (const [childKey, childDefinition] of Object.entries(properties)) {
-    childSchemas[childKey] = buildSettingSchema(
-      childDefinition,
-      [...pathSegments, childKey],
-      defs,
-    );
-  }
-
+  const childSchemas = buildObjectProperties(properties, pathSegments, defs);
   return {
     type: 'object',
     properties: childSchemas,
     additionalProperties: false,
   };
+}
+
+function buildRefSchema(
+  ref: string,
+  defs: Map<string, JsonSchema>,
+): JsonSchema {
+  ensureDefinition(ref, defs);
+  return { $ref: `#/$defs/${ref}` };
+}
+
+function isSettingDefinition(
+  source: SettingDefinition | SettingCollectionDefinition,
+): source is SettingDefinition {
+  return 'label' in source;
 }
 
 function buildMarkdownDescription(definition: SettingDefinition): string {
@@ -548,34 +561,10 @@ function buildMarkdownDescription(definition: SettingDefinition): string {
   );
 
   if (definition.default !== undefined) {
-    lines.push(`- Default: \`${formatDefault(definition.default)}\``);
+    lines.push(`- Default: \`${formatDefaultValue(definition.default)}\``);
   }
 
   return lines.join('\n');
-}
-
-function formatDefault(value: unknown): string {
-  if (value === undefined) {
-    return 'undefined';
-  }
-
-  if (value === null) {
-    return 'null';
-  }
-
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
 }
 
 function inferTypeFromValues(

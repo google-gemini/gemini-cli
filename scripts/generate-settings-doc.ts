@@ -10,6 +10,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { generateSettingsSchema } from './generate-settings-schema.js';
 import {
   escapeBackticks,
+  formatDefaultValue,
   formatWithPrettier,
   normalizeForCompare,
 } from './utils/autogen.js';
@@ -120,10 +121,12 @@ function collectEntries(schema: SettingsSchemaType) {
           path: newPathSegments.join('.'),
           type: definition.type,
           description: formatDescription(definition),
-          defaultValue: formatDefault(definition.default),
+          defaultValue: formatDefaultValue(definition.default, {
+            quoteStrings: true,
+          }),
           requiresRestart: Boolean(definition.requiresRestart),
           enumValues: definition.options?.map((option) =>
-            formatDefault(option.value),
+            formatDefaultValue(option.value, { quoteStrings: true }),
           ),
         });
       }
@@ -143,45 +146,6 @@ function formatDescription(definition: SettingDefinition) {
     return definition.description.trim();
   }
   return 'Description not provided.';
-}
-
-function formatDefault(value: unknown): string {
-  if (value === undefined) {
-    return 'undefined';
-  }
-
-  if (value === null) {
-    return 'null';
-  }
-
-  if (typeof value === 'string') {
-    return JSON.stringify(value);
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return '[]';
-    }
-    return JSON.stringify(value);
-  }
-
-  if (typeof value === 'object') {
-    try {
-      const json = JSON.stringify(value);
-      if (json === '{}') {
-        return '{}';
-      }
-      return json;
-    } catch {
-      return '[object Object]';
-    }
-  }
-
-  return String(value);
 }
 
 function renderSections(sections: Map<string, DocEntry[]>) {
