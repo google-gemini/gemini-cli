@@ -26,6 +26,7 @@ import {
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
+import readline from 'node:readline';
 
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -57,30 +58,92 @@ export async function runNonInteractive(
 
     const abortController = new AbortController();
 
-    // Track if we're in the process of aborting to handle multiple signals
+    // Track cancellation state
     let isAborting = false;
+    let cancelMessageTimer: NodeJS.Timeout | null = null;
 
-    // Signal handler for graceful cancellation
-    const handleSignal = (signal: NodeJS.Signals) => {
-      if (isAborting) {
-        // Second signal: force exit immediately
-        process.stderr.write('\nForced exit\n');
-        process.exit(signal === 'SIGINT' ? 130 : 143);
+    // Setup stdin listener for Ctrl+C detection
+    let stdinWasRaw = false;
+    let rl: readline.Interface | null = null;
+
+    const setupStdinCancellation = () => {
+      // Only setup if stdin is a TTY (user can interact)
+      if (!process.stdin.isTTY) {
+        return;
       }
 
-      isAborting = true;
-      process.stderr.write('\nCancelling...\n');
-      abortController.abort();
-      // Note: Don't exit here - let the abort flow through the system
-      // and trigger handleCancellationError() which will exit with proper code
+      // Save original raw mode state
+      stdinWasRaw = process.stdin.isRaw || false;
+
+      // Enable raw mode to capture individual keypresses
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+
+      // Setup readline to emit keypress events
+      rl = readline.createInterface({
+        input: process.stdin,
+        escapeCodeTimeout: 0,
+      });
+      readline.emitKeypressEvents(process.stdin, rl);
+
+      // Listen for Ctrl+C
+      const keypressHandler = (
+        str: string,
+        key: { name?: string; ctrl?: boolean },
+      ) => {
+        // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
+        if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
+          // Only handle once
+          if (isAborting) {
+            return;
+          }
+
+          isAborting = true;
+
+          // Only show message if cancellation takes longer than 200ms
+          // This reduces verbosity for fast cancellations
+          cancelMessageTimer = setTimeout(() => {
+            process.stderr.write('\nCancelling...\n');
+          }, 200);
+
+          abortController.abort();
+          // Note: Don't exit here - let the abort flow through the system
+          // and trigger handleCancellationError() which will exit with proper code
+        }
+      };
+
+      process.stdin.on('keypress', keypressHandler);
     };
 
-    // Register signal handlers
-    const sigintHandler = () => handleSignal('SIGINT');
-    const sigtermHandler = () => handleSignal('SIGTERM');
+    const cleanupStdinCancellation = () => {
+      // Clear any pending cancel message timer
+      if (cancelMessageTimer) {
+        clearTimeout(cancelMessageTimer);
+        cancelMessageTimer = null;
+      }
+
+      // Cleanup readline and stdin listeners
+      if (rl) {
+        rl.close();
+        rl = null;
+      }
+
+      // Remove keypress listener
+      process.stdin.removeAllListeners('keypress');
+
+      // Restore stdin to original state
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(stdinWasRaw);
+        process.stdin.pause();
+      }
+    };
 
     try {
       consolePatcher.patch();
+
+      // Setup stdin cancellation listener
+      setupStdinCancellation();
+
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
         if (err.code === 'EPIPE') {
@@ -100,9 +163,6 @@ export async function runNonInteractive(
           model: config.getModel(),
         });
       }
-
-      process.on('SIGINT', sigintHandler);
-      process.on('SIGTERM', sigtermHandler);
 
       let query: Part[] | undefined;
 
@@ -310,9 +370,8 @@ export async function runNonInteractive(
     } catch (error) {
       handleError(error, config);
     } finally {
-      // Remove our signal handlers to avoid interfering with other cleanup
-      process.off('SIGINT', sigintHandler);
-      process.off('SIGTERM', sigtermHandler);
+      // Cleanup stdin cancellation before other cleanup
+      cleanupStdinCancellation();
 
       consolePatcher.cleanup();
       if (isTelemetrySdkInitialized()) {
