@@ -1515,12 +1515,12 @@ describe('AppContainer State Management', () => {
         />,
       );
 
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
       // Verify initial model
-      expect(capturedUIState.currentModel).toBe('initial-model');
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(capturedUIState?.currentModel).toBe('initial-model');
+        });
+      });
 
       // Get the registered handler for ModelChanged
       const handler = mockCoreEvents.on.mock.calls.find(
