@@ -23,7 +23,7 @@ export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
   const settings = useSettings();
-  const useAlternateBuffer = settings.merged.ui?.useAlternateBuffer ?? true;
+  const useAlternateBuffer = settings.merged.ui?.useAlternateBuffer ?? false;
 
   const {
     pendingHistoryItems,
