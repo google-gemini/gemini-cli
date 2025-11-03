@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type PolicyRule, PolicyDecision, type ApprovalMode } from './types.js';
+import {
+  type PolicyRule,
+  PolicyDecision,
+  type ApprovalMode,
+  type SafetyCheckerConfig,
+} from './types.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -37,6 +42,14 @@ const PolicyRuleSchema = z.object({
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
   modes: z.array(z.string()).optional(),
+  safety_checker: z
+    .object({
+      type: z.enum(['in-process', 'external']),
+      name: z.string(),
+      required_context: z.array(z.string()).optional(),
+      config: z.record(z.unknown()).optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -339,6 +352,9 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
+                  safety_checker: rule.safety_checker as
+                    | SafetyCheckerConfig
+                    | undefined,
                 };
 
                 // Compile regex pattern

@@ -64,8 +64,12 @@ export class PolicyEngine {
 
   /**
    * Check if a tool call is allowed based on the configured policies.
+   * Returns the decision and the matching rule (if any).
    */
-  check(toolCall: FunctionCall): PolicyDecision {
+  check(toolCall: FunctionCall): {
+    decision: PolicyDecision;
+    rule?: PolicyRule;
+  } {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
     if (toolCall.args && this.rules.some((rule) => rule.argsPattern)) {
@@ -82,7 +86,10 @@ export class PolicyEngine {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
-        return this.applyNonInteractiveMode(rule.decision);
+        return {
+          decision: this.applyNonInteractiveMode(rule.decision),
+          rule,
+        };
       }
     }
 
@@ -90,7 +97,9 @@ export class PolicyEngine {
     debugLogger.debug(
       `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
     );
-    return this.applyNonInteractiveMode(this.defaultDecision);
+    return {
+      decision: this.applyNonInteractiveMode(this.defaultDecision),
+    };
   }
 
   /**

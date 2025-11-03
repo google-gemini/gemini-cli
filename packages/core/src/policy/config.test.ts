@@ -641,4 +641,96 @@ priority = 150
 
     vi.doUnmock('node:fs/promises');
   });
+
+  it('should load safety_checker configuration from TOML', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const mockReaddir = vi.fn(
+      async (
+        path: string | Buffer | URL,
+        options?: Parameters<typeof actualFs.readdir>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return [
+            {
+              name: 'safety.toml',
+              isFile: () => true,
+              isDirectory: () => false,
+            },
+          ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
+        }
+        return actualFs.readdir(
+          path,
+          options as Parameters<typeof actualFs.readdir>[1],
+        );
+      },
+    );
+
+    const mockReadFile = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.readFile>[0],
+        options: Parameters<typeof actualFs.readFile>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies/safety.toml'))
+        ) {
+          return `
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 10
+
+[rule.safety_checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
+[rule.safety_checker.config]
+follow_symlinks = true
+`;
+        }
+        return actualFs.readFile(path, options);
+      },
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      readFile: mockReadFile,
+      readdir: mockReaddir,
+    }));
+
+    vi.resetModules();
+    const { createPolicyEngineConfig } = await import('./config.js');
+
+    const settings: PolicySettings = {};
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.DEFAULT,
+      '/tmp/mock/default/policies',
+    );
+
+    const rule = config.rules?.find(
+      (r) => r.toolName === 'write_file' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeDefined();
+    expect(rule?.safety_checker).toBeDefined();
+    expect(rule?.safety_checker?.type).toBe('in-process');
+    expect(rule?.safety_checker?.name).toBe('allowed-path');
+    expect(rule?.safety_checker?.required_context).toEqual(['environment']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((rule?.safety_checker as any)?.config?.follow_symlinks).toBe(true);
+
+    vi.doUnmock('node:fs/promises');
+  });
 });

@@ -1,0 +1,17 @@
+feat(safety): Introduce safety checker framework
+
+This commit introduces a new safety checker framework that provides an additional layer of validation for tool calls. This framework allows for more granular and dynamic checks to be performed even after a tool call has been allowed by the main policy engine.
+
+Key changes:
+
+- **Safety Checker Framework:** A new concept of "safety checkers" is introduced. These are functions that can perform additional validation on a tool call before it is executed. Checkers can be `in-process` (like the new `allowed-path` checker) or `external`.
+
+- **Policy Configuration:** Policy rules in TOML files can now include a `[rule.safety_checker]` section to associate a specific checker with a rule. This allows for fine-grained control over when a checker is run.
+
+- **Integration with MessageBus:** The `MessageBus` is now responsible for invoking the `CheckerRunner`. If a tool call is allowed by the policy engine but has an associated safety checker, the `MessageBus` will run the checker. If the checker denies the tool call, the operation is blocked.
+
+- **PolicyEngine API Change:** The `PolicyEngine.check()` method now returns an object containing both the `decision` and the `rule` that was matched. This allows the `MessageBus` to access the `safety_checker` configuration from the rule.
+
+- **Initial `allowed-path` Checker:** A new built-in `allowed-path` checker has been added to the `write.toml` policy for `write_file` and `replace` tools. This ensures that these tools can only write to paths within the project's working directory, preventing them from modifying files outside of the project.
+
+This new framework provides a powerful mechanism for adding more complex and context-aware safety checks, enhancing the overall security and reliability of the Gemini CLI.

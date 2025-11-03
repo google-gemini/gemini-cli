@@ -79,6 +79,8 @@ import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 
 import { ApprovalMode } from '../policy/types.js';
+import { CheckerRunner } from '../safety/checker-runner.js';
+import { ContextBuilder } from '../safety/context-builder.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -563,7 +565,16 @@ export class Config {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.policyEngine = new PolicyEngine(params.policyEngineConfig);
-    this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    const contextBuilder = new ContextBuilder(this);
+    const checkerRunner = new CheckerRunner(contextBuilder, {
+      // TODO: Determine the correct path for external checkers
+      checkersPath: path.join(this.targetDir, '.gemini', 'checkers'),
+    });
+    this.messageBus = new MessageBus(
+      this.policyEngine,
+      checkerRunner,
+      this.debugMode,
+    );
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };

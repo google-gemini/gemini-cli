@@ -54,7 +54,9 @@ describe('MessageBus', () => {
     });
 
     it('should emit confirmation response when policy allows', () => {
-      vi.spyOn(policyEngine, 'check').mockReturnValue(PolicyDecision.ALLOW);
+      vi.spyOn(policyEngine, 'check').mockReturnValue({
+        decision: PolicyDecision.ALLOW,
+      });
 
       const responseHandler = vi.fn();
       messageBus.subscribe(
@@ -79,7 +81,9 @@ describe('MessageBus', () => {
     });
 
     it('should emit rejection and response when policy denies', () => {
-      vi.spyOn(policyEngine, 'check').mockReturnValue(PolicyDecision.DENY);
+      vi.spyOn(policyEngine, 'check').mockReturnValue({
+        decision: PolicyDecision.DENY,
+      });
 
       const responseHandler = vi.fn();
       const rejectionHandler = vi.fn();
@@ -115,7 +119,9 @@ describe('MessageBus', () => {
     });
 
     it('should pass through to UI when policy says ASK_USER', () => {
-      vi.spyOn(policyEngine, 'check').mockReturnValue(PolicyDecision.ASK_USER);
+      vi.spyOn(policyEngine, 'check').mockReturnValue({
+        decision: PolicyDecision.ASK_USER,
+      });
 
       const requestHandler = vi.fn();
       messageBus.subscribe(
