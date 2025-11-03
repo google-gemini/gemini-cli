@@ -27,16 +27,17 @@ vi.mock('./mcp-client.js', async () => {
 });
 
 describe('McpClientManager', () => {
-  let mockedMcpClient: McpClient;
+  let mockedMcpClient: MockedObject<McpClient>;
   let mockConfig: MockedObject<Config>;
 
   beforeEach(() => {
-    mockedMcpClient = {
+    mockedMcpClient = vi.mockObject({
       connect: vi.fn(),
       discover: vi.fn(),
       disconnect: vi.fn(),
       getStatus: vi.fn(),
-    } as unknown as McpClient;
+      getServerConfig: vi.fn(),
+    } as unknown as McpClient);
     vi.mocked(McpClient).mockReturnValue(mockedMcpClient);
     mockConfig = vi.mockObject({
       isTrustedFolder: vi.fn().mockReturnValue(true),
@@ -145,5 +146,51 @@ describe('McpClientManager', () => {
     expect(manager.getBlockedMcpServers()).toEqual([
       { name: 'test-server', extensionName: '' },
     ]);
+  });
+
+  describe('restart', () => {
+    it('should restart all running servers', async () => {
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue({});
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+      expect(mockedMcpClient.discover).toHaveBeenCalledTimes(1);
+      await manager.restart();
+
+      expect(mockedMcpClient.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(2);
+      expect(mockedMcpClient.discover).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('restartServer', () => {
+    it('should restart the specified server', async () => {
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue({});
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+      expect(mockedMcpClient.discover).toHaveBeenCalledTimes(1);
+
+      await manager.restartServer('test-server');
+
+      expect(mockedMcpClient.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(2);
+      expect(mockedMcpClient.discover).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw an error if the server does not exist', async () => {
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      await expect(manager.restartServer('non-existent')).rejects.toThrow(
+        'No MCP server registered with the name "non-existent"',
+      );
+    });
   });
 });
