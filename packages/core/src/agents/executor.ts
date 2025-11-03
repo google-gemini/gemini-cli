@@ -159,6 +159,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
+    const { max_time_minutes } = this.definition.runConfig;
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(
+      () => timeoutController.abort(new Error('Agent timed out.')),
+      max_time_minutes * 60 * 1000,
+    );
+
+    // Combine the external signal with the internal timeout signal.
+    const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+
     logAgentStart(
       this.runtimeContext,
       new AgentStartEvent(this.agentId, this.definition.name),
@@ -180,8 +190,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           terminateReason = reason;
           break;
         }
-        if (signal.aborted) {
-          terminateReason = AgentTerminateMode.ABORTED;
+        if (combinedSignal.aborted) {
+          // Determine which signal caused the abort.
+          terminateReason = timeoutController.signal.aborted
+            ? AgentTerminateMode.TIMEOUT
+            : AgentTerminateMode.ABORTED;
           break;
         }
 
@@ -190,11 +203,19 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         const { functionCalls } = await promptIdContext.run(
           promptId,
           async () =>
-            this.callModel(chat, currentMessage, tools, signal, promptId),
+            this.callModel(
+              chat,
+              currentMessage,
+              tools,
+              combinedSignal,
+              promptId,
+            ),
         );
 
-        if (signal.aborted) {
-          terminateReason = AgentTerminateMode.ABORTED;
+        if (combinedSignal.aborted) {
+          terminateReason = timeoutController.signal.aborted
+            ? AgentTerminateMode.TIMEOUT
+            : AgentTerminateMode.ABORTED;
           break;
         }
 
@@ -210,7 +231,11 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         const { nextMessage, submittedOutput, taskCompleted } =
-          await this.processFunctionCalls(functionCalls, signal, promptId);
+          await this.processFunctionCalls(
+            functionCalls,
+            combinedSignal,
+            promptId,
+          );
 
         if (taskCompleted) {
           finalResult = submittedOutput ?? 'Task completed successfully.';
@@ -219,6 +244,14 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         currentMessage = nextMessage;
+      }
+
+      if (terminateReason === AgentTerminateMode.TIMEOUT) {
+        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        this.emitActivity('ERROR', {
+          error: finalResult,
+          context: 'timeout',
+        });
       }
 
       if (terminateReason === AgentTerminateMode.GOAL) {
@@ -234,9 +267,29 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         terminate_reason: terminateReason,
       };
     } catch (error) {
+      // Check if the error is an AbortError caused by our internal timeout.
+      if (
+        error instanceof Error &&
+        error.name === 'AbortError' &&
+        timeoutController.signal.aborted &&
+        !signal.aborted // Ensure the external signal was not the cause
+      ) {
+        terminateReason = AgentTerminateMode.TIMEOUT;
+        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        this.emitActivity('ERROR', {
+          error: finalResult,
+          context: 'timeout',
+        });
+        return {
+          result: finalResult,
+          terminate_reason: terminateReason,
+        };
+      }
+
       this.emitActivity('ERROR', { error: String(error) });
-      throw error; // Re-throw the error for the parent context to handle.
+      throw error; // Re-throw other errors or external aborts.
     } finally {
+      clearTimeout(timeoutId);
       logAgentFinish(
         this.runtimeContext,
         new AgentFinishEvent(
@@ -743,11 +796,6 @@ Important Rules:
 
     if (runConfig.max_turns && turnCounter >= runConfig.max_turns) {
       return AgentTerminateMode.MAX_TURNS;
-    }
-
-    const elapsedMinutes = (Date.now() - startTime) / (1000 * 60);
-    if (elapsedMinutes >= runConfig.max_time_minutes) {
-      return AgentTerminateMode.TIMEOUT;
     }
 
     return null;
