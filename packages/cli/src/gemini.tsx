@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, type RenderOptions } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
@@ -26,20 +26,21 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions } from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import {
   sessionId,
   logUserPrompt,
   AuthType,
   getOauthClient,
   UserPromptEvent,
+  debugLogger,
+  recordSlowRender,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -66,7 +67,11 @@ import {
   relaunchOnExitCode,
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
-import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
+import { ExtensionManager } from './config/extension-manager.js';
+import { createPolicyUpdater } from './config/policy.js';
+import { requestConsentNonInteractive } from './config/extensions/consent.js';
+
+const SLOW_RENDER_MS = 200;
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -79,7 +84,7 @@ export function validateDnsResolutionOrder(
     return order;
   }
   // We don't want to throw here, just warn and use the default.
-  console.warn(
+  debugLogger.warn(
     `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
   );
   return defaultValue;
@@ -95,7 +100,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   // Set target to 50% of total memory
   const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
   if (isDebugMode) {
-    console.debug(
+    debugLogger.debug(
       `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
     );
   }
@@ -106,7 +111,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
-      console.debug(
+      debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
@@ -203,7 +208,12 @@ export async function startInteractiveUI(
     {
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
-    },
+      onRender: ({ renderTime }: { renderTime: number }) => {
+        if (renderTime > SLOW_RENDER_MS) {
+          recordSlowRender(config, renderTime);
+        }
+      },
+    } as RenderOptions,
   );
 
   checkForUpdates(settings)
@@ -213,7 +223,7 @@ export async function startInteractiveUI(
     .catch((err) => {
       // Silently ignore update check errors.
       if (config.getDebugMode()) {
-        console.error('Update check failed:', err);
+        debugLogger.warn('Update check failed:', err);
       }
     });
 
@@ -223,14 +233,24 @@ export async function startInteractiveUI(
 export async function main() {
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
-  migrateDeprecatedSettings(settings);
+  migrateDeprecatedSettings(
+    settings,
+    // Temporary extension manager only used during this non-interactive UI phase.
+    new ExtensionManager({
+      workspaceDir: process.cwd(),
+      settings: settings.merged,
+      enabledExtensionOverrides: [],
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: null,
+    }),
+  );
   await cleanupCheckpoints();
 
   const argv = await parseArguments(settings.merged);
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
-    console.error(
+    debugLogger.error(
       'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
     );
     process.exit(1);
@@ -266,7 +286,9 @@ export async function main() {
     if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
+      debugLogger.warn(
+        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
+      );
     }
   }
 
@@ -276,7 +298,7 @@ export async function main() {
       ? getNodeMemoryArgs(isDebugMode)
       : [];
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
-    // We intentially omit the list of extensions here because extensions
+    // We intentionally omit the list of extensions here because extensions
     // should not impact auth or setting up the sandbox.
     // TODO(jacobr): refactor loadCliConfig so there is a minimal version
     // that only initializes enough config to enable refreshAuth or find
@@ -285,8 +307,6 @@ export async function main() {
     if (sandboxConfig) {
       const partialConfig = await loadCliConfig(
         settings.merged,
-        [],
-        new ExtensionEnablementManager(),
         sessionId,
         argv,
       );
@@ -308,7 +328,7 @@ export async function main() {
             settings.merged.security.auth.selectedType,
           );
         } catch (err) {
-          console.error('Error authenticating:', err);
+          debugLogger.error('Error authenticating:', err);
           process.exit(1);
         }
       }
@@ -357,25 +377,19 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    const extensionEnablementManager = new ExtensionEnablementManager(
-      argv.extensions,
-    );
-    const extensions = loadExtensions(extensionEnablementManager);
-    const config = await loadCliConfig(
-      settings.merged,
-      extensions,
-      extensionEnablementManager,
-      sessionId,
-      argv,
-    );
+    const config = await loadCliConfig(settings.merged, sessionId, argv);
+
+    const policyEngine = config.getPolicyEngine();
+    const messageBus = config.getMessageBus();
+    createPolicyUpdater(policyEngine, messageBus);
 
     // Cleanup sessions after config initialization
     await cleanupExpiredSessions(config, settings.merged);
 
     if (config.getListExtensions()) {
-      console.log('Installed extensions:');
-      for (const extension of extensions) {
-        console.log(`- ${extension.name}`);
+      debugLogger.log('Installed extensions:');
+      for (const extension of config.getExtensions()) {
+        debugLogger.log(`- ${extension.name}`);
       }
       process.exit(0);
     }
@@ -411,7 +425,7 @@ export async function main() {
     }
 
     if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, extensions, argv);
+      return runZedIntegration(config, settings, argv);
     }
 
     let input = config.getQuestion();
@@ -443,7 +457,7 @@ export async function main() {
       }
     }
     if (!input) {
-      console.error(
+      debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
       process.exit(1);
@@ -468,10 +482,19 @@ export async function main() {
     );
 
     if (config.getDebugMode()) {
-      console.log('Session ID: %s', sessionId);
+      debugLogger.log('Session ID: %s', sessionId);
     }
 
-    await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
+    const hasDeprecatedPromptArg = process.argv.some((arg) =>
+      arg.startsWith('--prompt'),
+    );
+    await runNonInteractive({
+      config: nonInteractiveConfig,
+      settings,
+      input,
+      prompt_id,
+      hasDeprecatedPromptArg,
+    });
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(0);

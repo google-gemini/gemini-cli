@@ -9,6 +9,10 @@
       {
         "label": "Architecture Overview",
         "slug": "docs/architecture"
+      },
+      {
+        "label": "Contribution Guide",
+        "slug": "docs/contributing"
       }
     ]
   },
@@ -112,6 +116,10 @@
       {
         "label": "Memory Import Processor",
         "slug": "docs/core/memport"
+      },
+      {
+        "label": "Policy Engine",
+        "slug": "docs/core/policy-engine"
       }
     ]
   },
@@ -145,6 +153,10 @@
       {
         "label": "Memory",
         "slug": "docs/tools/memory"
+      },
+      {
+        "label": "Todos",
+        "slug": "docs/tools/todos"
       },
       {
         "label": "MCP Servers",

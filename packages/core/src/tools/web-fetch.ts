@@ -23,12 +23,12 @@ import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -110,8 +110,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
@@ -199,21 +201,9 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Try message bus confirmation first if available
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false; // No confirmation needed
-      }
-      if (decision === 'DENY') {
-        throw new Error('Tool execution denied by policy.');
-      }
-      // if 'ASK_USER', fall through to legacy logic
-    }
-
     // Legacy confirmation flow (no message bus OR policy decision was ASK_USER)
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
@@ -269,7 +259,7 @@ ${textContent}
         DEFAULT_GEMINI_FLASH_MODEL,
       );
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Full response for prompt "${userPrompt.substring(
           0,
           50,
@@ -362,7 +352,7 @@ ${sourceListFormatted.join('\n')}`;
 
       const llmContent = responseText;
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Formatted tool response for prompt "${userPrompt}:\n\n":`,
         llmContent,
       );
@@ -395,7 +385,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   WebFetchToolParams,
   ToolResult
 > {
-  static readonly Name: string = WEB_FETCH_TOOL_NAME;
+  static readonly Name = WEB_FETCH_TOOL_NAME;
 
   constructor(
     private readonly config: Config,
@@ -410,7 +400,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
         properties: {
           prompt: {
             description:
-              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
+              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
             type: 'string',
           },
         },
@@ -421,10 +411,6 @@ export class WebFetchTool extends BaseDeclarativeTool<
       false, // canUpdateOutput
       messageBus,
     );
-    const proxy = config.getProxy();
-    if (proxy) {
-      setGlobalDispatcher(new ProxyAgent(proxy as string));
-    }
   }
 
   protected override validateToolParamValues(
@@ -450,7 +436,15 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
-    return new WebFetchToolInvocation(this.config, params, messageBus);
+    return new WebFetchToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

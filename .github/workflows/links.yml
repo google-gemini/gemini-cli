@@ -1,0 +1,23 @@
+name: 'Links'
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+  repository_dispatch:
+  workflow_dispatch:
+  schedule:
+    - cron: '00 18 * * *'
+
+jobs:
+  linkChecker:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Link Checker'
+        id: 'lychee'
+        uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
+        with:
+          args: '--verbose --no-progress ./**/*.md'

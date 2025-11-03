@@ -20,13 +20,15 @@ import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import { GrepTool } from '../tools/grep.js';
-import { RipGrepTool } from '../tools/ripGrep.js';
-import { LSTool } from '../tools/ls.js';
-import { MemoryTool } from '../tools/memoryTool.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { GLOB_TOOL_NAME, WEB_SEARCH_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
 import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
@@ -41,6 +43,7 @@ import { templateString } from './utils.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -504,7 +507,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       if (!allowedToolNames.has(functionCall.name as string)) {
         const error = `Unauthorized tool call: '${functionCall.name}' is not available to this agent.`;
 
-        console.warn(`[AgentExecutor] Blocked call: ${error}`);
+        debugLogger.warn(`[AgentExecutor] Blocked call: ${error}`);
 
         syncResponseParts.push({
           functionResponse: {
@@ -708,13 +711,12 @@ Important Rules:
     // Tools that are non-interactive. This is temporary until we have tool
     // confirmations for subagents.
     const allowlist = new Set([
-      LSTool.Name,
-      ReadFileTool.Name,
-      GrepTool.Name,
-      RipGrepTool.Name,
+      LS_TOOL_NAME,
+      READ_FILE_TOOL_NAME,
+      GREP_TOOL_NAME,
       GLOB_TOOL_NAME,
-      ReadManyFilesTool.Name,
-      MemoryTool.Name,
+      READ_MANY_FILES_TOOL_NAME,
+      MEMORY_TOOL_NAME,
       WEB_SEARCH_TOOL_NAME,
     ]);
     for (const tool of toolRegistry.getAllTools()) {
