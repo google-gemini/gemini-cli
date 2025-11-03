@@ -5,8 +5,8 @@
  */
 
 // --------------------------------------------------------------------------
-// IMPORTANT: When adding a new setting, especially one with `showInDialog: true`,
-// please ensure it is also documented in `docs/get-started/configuration.md`.
+// IMPORTANT: After adding or updating settings, run `npm run docs:settings`
+// to regenerate the settings reference in `docs/get-started/configuration.md`.
 // --------------------------------------------------------------------------
 
 import type {
@@ -14,7 +14,8 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
-  ChatCompressionSettings,
+  HookDefinition,
+  HookEventName,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -56,6 +57,30 @@ export interface SettingEnumOption {
   label: string;
 }
 
+function oneLine(strings: TemplateStringsArray, ...values: unknown[]): string {
+  let result = '';
+  for (let i = 0; i < strings.length; i++) {
+    result += strings[i];
+    if (i < values.length) {
+      result += String(values[i]);
+    }
+  }
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+export interface SettingCollectionDefinition {
+  type: SettingsType;
+  description?: string;
+  properties?: SettingsSchema;
+  /** Enum type options  */
+  options?: readonly SettingEnumOption[];
+  /**
+   * Optional reference identifier for generators that emit a `$ref`.
+   * For example, a JSON schema generator can use this to point to a shared definition.
+   */
+  ref?: string;
+}
+
 export enum MergeStrategy {
   // Replace the old value with the new value. This is the default.
   REPLACE = 'replace',
@@ -82,6 +107,18 @@ export interface SettingDefinition {
   mergeStrategy?: MergeStrategy;
   /** Enum type options  */
   options?: readonly SettingEnumOption[];
+  /**
+   * For collection types (e.g. arrays), describes the shape of each item.
+   */
+  items?: SettingCollectionDefinition;
+  /**
+   * For map-like objects without explicit `properties`, describes the shape of the values.
+   */
+  additionalProperties?: SettingCollectionDefinition;
+  /**
+   * Optional reference identifier for generators that emit a `$ref`.
+   */
+  ref?: string;
 }
 
 export interface SettingsSchema {
@@ -107,6 +144,10 @@ const SETTINGS_SCHEMA = {
     description: 'Configuration for MCP servers.',
     showInDialog: false,
     mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+    additionalProperties: {
+      type: 'object',
+      ref: 'MCPServerConfig',
+    },
   },
 
   general: {
@@ -293,7 +334,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: undefined as string | undefined,
-        description: 'The color theme for the UI.',
+        description:
+          'The color theme for the UI. See the CLI themes guide for available options.',
         showInDialog: false,
       },
       customThemes: {
@@ -304,6 +346,10 @@ const SETTINGS_SCHEMA = {
         default: {} as Record<string, CustomTheme>,
         description: 'Custom theme definitions.',
         showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'CustomTheme',
+        },
       },
       hideWindowTitle: {
         type: 'boolean',
@@ -389,6 +435,15 @@ const SETTINGS_SCHEMA = {
             description: 'Hide the model name and context usage in the footer.',
             showInDialog: true,
           },
+          hideContextPercentage: {
+            type: 'boolean',
+            label: 'Hide Context Window Percentage',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Hides the context window remaining percentage.',
+            showInDialog: true,
+          },
         },
       },
       hideFooter: {
@@ -442,8 +497,12 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: [] as string[],
-        description: 'Custom witty phrases to display during loading.',
+        description: oneLine`
+          Custom witty phrases to display during loading.
+          When provided, the CLI cycles through these instead of the defaults.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
       },
       accessibility: {
         type: 'object',
@@ -537,6 +596,7 @@ const SETTINGS_SCHEMA = {
     default: undefined as TelemetrySettings | undefined,
     description: 'Telemetry configuration.',
     showInDialog: false,
+    ref: 'TelemetrySettings',
   },
 
   model: {
@@ -575,17 +635,28 @@ const SETTINGS_SCHEMA = {
         default: undefined as
           | Record<string, { tokenBudget?: number }>
           | undefined,
-        description: 'Settings for summarizing tool output.',
+        description: oneLine`
+          Enables or disables summarization of tool output.
+          Configure per-tool token budgets (for example {"run_shell_command": {"tokenBudget": 2000}}).
+          Currently only the run_shell_command tool supports summarization.
+        `,
         showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          description:
+            'Per-tool summarization settings with an optional tokenBudget.',
+          ref: 'SummarizeToolOutputSettings',
+        },
       },
-      chatCompression: {
-        type: 'object',
-        label: 'Chat Compression',
+      compressionThreshold: {
+        type: 'number',
+        label: 'Compression Threshold',
         category: 'Model',
-        requiresRestart: false,
-        default: undefined as ChatCompressionSettings | undefined,
-        description: 'Chat compression settings.',
-        showInDialog: false,
+        requiresRestart: true,
+        default: 0.2 as number,
+        description:
+          'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
+        showInDialog: true,
       },
       skipNextSpeakerCheck: {
         type: 'boolean',
@@ -609,12 +680,14 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     properties: {
       fileName: {
-        type: 'object',
+        type: 'string',
         label: 'Context File Name',
         category: 'Context',
         requiresRestart: false,
         default: undefined as string | string[] | undefined,
-        description: 'The name of the context file.',
+        ref: 'StringOrStringArray',
+        description:
+          'The name of the context file or files to load into memory. Accepts either a single string or an array of strings.',
         showInDialog: false,
       },
       importFormat: {
@@ -641,9 +714,12 @@ const SETTINGS_SCHEMA = {
         category: 'Context',
         requiresRestart: false,
         default: [] as string[],
-        description:
-          'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
+        description: oneLine`
+          Additional directories to include in the workspace context.
+          Missing directories will be skipped with a warning.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.CONCAT,
       },
       loadMemoryFromIncludeDirectories: {
@@ -652,7 +728,10 @@ const SETTINGS_SCHEMA = {
         category: 'Context',
         requiresRestart: false,
         default: false,
-        description: 'Whether to load memory files from include directories.',
+        description: oneLine`
+          Controls how /memory refresh loads GEMINI.md files.
+          When true, include directories are scanned; when false, only the current directory is used.
+        `,
         showInDialog: true,
       },
       fileFiltering: {
@@ -688,7 +767,9 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Enable recursive file search functionality',
+            description: oneLine`
+              Enable recursive file search functionality when completing @ references in the prompt.
+            `,
             showInDialog: true,
           },
           disableFuzzySearch: {
@@ -715,13 +796,16 @@ const SETTINGS_SCHEMA = {
     showInDialog: false,
     properties: {
       sandbox: {
-        type: 'object',
+        type: 'string',
         label: 'Sandbox',
         category: 'Tools',
         requiresRestart: true,
         default: undefined as boolean | string | undefined,
-        description:
-          'Sandbox execution environment (can be a boolean or a path string).',
+        ref: 'BooleanOrString',
+        description: oneLine`
+          Sandbox execution environment.
+          Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.
+        `,
         showInDialog: false,
       },
       shell: {
@@ -739,8 +823,10 @@ const SETTINGS_SCHEMA = {
             category: 'Tools',
             requiresRestart: true,
             default: true,
-            description:
-              'Use node-pty for an interactive shell experience. Fallback to child_process still applies.',
+            description: oneLine`
+              Use node-pty for an interactive shell experience.
+              Fallback to child_process still applies.
+            `,
             showInDialog: true,
           },
           pager: {
@@ -770,8 +856,9 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: false,
         default: false,
-        description:
-          'Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).',
+        description: oneLine`
+          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
+        `,
         showInDialog: true,
       },
       core: {
@@ -780,8 +867,12 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'Paths to core tool definitions.',
+        description: oneLine`
+          Restrict the set of built-in tools with an allowlist.
+          Match semantics mirror tools.allowed; see the built-in tools documentation for available names.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
       },
       allowed: {
         type: 'array',
@@ -789,9 +880,13 @@ const SETTINGS_SCHEMA = {
         category: 'Advanced',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description:
-          'A list of tool names that will bypass the confirmation dialog.',
+        description: oneLine`
+          Tool names that bypass the confirmation dialog.
+          Useful for trusted commands (for example ["run_shell_command(git)", "run_shell_command(npm test)"]).
+          See shell tool command restrictions for matching details.
+        `,
         showInDialog: false,
+        items: { type: 'string' },
       },
       exclude: {
         type: 'array',
@@ -801,6 +896,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'Tool names to exclude from discovery.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
       discoveryCommand: {
@@ -818,7 +914,10 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: undefined as string | undefined,
-        description: 'Command to run for tool calls.',
+        description: oneLine`
+          Defines a custom shell command for invoking discovered tools.
+          The command must take the tool name as the first argument, read JSON arguments from stdin, and emit JSON results on stdout.
+        `,
         showInDialog: false,
       },
       useRipgrep: {
@@ -865,9 +964,21 @@ const SETTINGS_SCHEMA = {
         category: 'Tools',
         requiresRestart: true,
         default: false,
-        description:
-          'Enable policy-based tool confirmation via message bus integration. When enabled, tools will automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.',
+        description: oneLine`
+          Enable policy-based tool confirmation via message bus integration.
+          When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.
+        `,
         showInDialog: true,
+      },
+      enableHooks: {
+        type: 'boolean',
+        label: 'Enable Hooks System',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.',
+        showInDialog: false,
       },
     },
   },
@@ -898,6 +1009,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'A list of MCP servers to allow.',
         showInDialog: false,
+        items: { type: 'string' },
       },
       excluded: {
         type: 'array',
@@ -907,6 +1019,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'A list of MCP servers to exclude.',
         showInDialog: false,
+        items: { type: 'string' },
       },
     },
   },
@@ -1043,6 +1156,7 @@ const SETTINGS_SCHEMA = {
         default: ['DEBUG', 'DEBUG_MODE'] as string[],
         description: 'Environment variables to exclude from project context.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
       bugCommand: {
@@ -1053,6 +1167,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as BugCommandSettings | undefined,
         description: 'Configuration for the bug report command.',
         showInDialog: false,
+        ref: 'BugCommandSettings',
       },
     },
   },
@@ -1138,7 +1253,7 @@ const SETTINGS_SCHEMA = {
             label: 'Thinking Budget',
             category: 'Experimental',
             requiresRestart: true,
-            default: -1,
+            default: 8192,
             description:
               'The thinking budget for the Codebase Investigator agent.',
             showInDialog: false,
@@ -1175,6 +1290,7 @@ const SETTINGS_SCHEMA = {
         default: [] as string[],
         description: 'List of disabled extensions.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
       workspacesWithMigrationNudge: {
@@ -1186,13 +1302,294 @@ const SETTINGS_SCHEMA = {
         description:
           'List of workspaces for which the migration nudge has been shown.',
         showInDialog: false,
+        items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
     },
   },
+
+  hooks: {
+    type: 'object',
+    label: 'Hooks',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {} as { [K in HookEventName]?: HookDefinition[] },
+    description:
+      'Hook configurations for intercepting and customizing agent behavior.',
+    showInDialog: false,
+    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+  },
 } as const satisfies SettingsSchema;
 
 export type SettingsSchemaType = typeof SETTINGS_SCHEMA;
+
+export type SettingsJsonSchemaDefinition = Record<string, unknown>;
+
+export const SETTINGS_SCHEMA_DEFINITIONS: Record<
+  string,
+  SettingsJsonSchemaDefinition
+> = {
+  MCPServerConfig: {
+    type: 'object',
+    description:
+      'Definition of a Model Context Protocol (MCP) server configuration.',
+    additionalProperties: false,
+    properties: {
+      command: {
+        type: 'string',
+        description: 'Executable invoked for stdio transport.',
+      },
+      args: {
+        type: 'array',
+        description: 'Command-line arguments for the stdio transport command.',
+        items: { type: 'string' },
+      },
+      env: {
+        type: 'object',
+        description: 'Environment variables to set for the server process.',
+        additionalProperties: { type: 'string' },
+      },
+      cwd: {
+        type: 'string',
+        description: 'Working directory for the server process.',
+      },
+      url: {
+        type: 'string',
+        description: 'SSE transport URL.',
+      },
+      httpUrl: {
+        type: 'string',
+        description: 'Streaming HTTP transport URL.',
+      },
+      headers: {
+        type: 'object',
+        description: 'Additional HTTP headers sent to the server.',
+        additionalProperties: { type: 'string' },
+      },
+      tcp: {
+        type: 'string',
+        description: 'TCP address for websocket transport.',
+      },
+      timeout: {
+        type: 'number',
+        description: 'Timeout in milliseconds for MCP requests.',
+      },
+      trust: {
+        type: 'boolean',
+        description:
+          'Marks the server as trusted. Trusted servers may gain additional capabilities.',
+      },
+      description: {
+        type: 'string',
+        description: 'Human-readable description of the server.',
+      },
+      includeTools: {
+        type: 'array',
+        description:
+          'Subset of tools that should be enabled for this server. When omitted all tools are enabled.',
+        items: { type: 'string' },
+      },
+      excludeTools: {
+        type: 'array',
+        description:
+          'Tools that should be disabled for this server even if exposed.',
+        items: { type: 'string' },
+      },
+      extension: {
+        type: 'object',
+        description:
+          'Metadata describing the Gemini CLI extension that owns this MCP server.',
+        additionalProperties: { type: ['string', 'boolean', 'number'] },
+      },
+      oauth: {
+        type: 'object',
+        description: 'OAuth configuration for authenticating with the server.',
+        additionalProperties: true,
+      },
+      authProviderType: {
+        type: 'string',
+        description:
+          'Authentication provider used for acquiring credentials (for example `dynamic_discovery`).',
+        enum: [
+          'dynamic_discovery',
+          'google_credentials',
+          'service_account_impersonation',
+        ],
+      },
+      targetAudience: {
+        type: 'string',
+        description:
+          'OAuth target audience (CLIENT_ID.apps.googleusercontent.com).',
+      },
+      targetServiceAccount: {
+        type: 'string',
+        description:
+          'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+    },
+  },
+  TelemetrySettings: {
+    type: 'object',
+    description: 'Telemetry configuration for Gemini CLI.',
+    additionalProperties: false,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        description: 'Enables telemetry emission.',
+      },
+      target: {
+        type: 'string',
+        description:
+          'Telemetry destination (for example `stderr`, `stdout`, or `otlp`).',
+      },
+      otlpEndpoint: {
+        type: 'string',
+        description: 'Endpoint for OTLP exporters.',
+      },
+      otlpProtocol: {
+        type: 'string',
+        description: 'Protocol for OTLP exporters.',
+        enum: ['grpc', 'http'],
+      },
+      logPrompts: {
+        type: 'boolean',
+        description: 'Whether prompts are logged in telemetry payloads.',
+      },
+      outfile: {
+        type: 'string',
+        description: 'File path for writing telemetry output.',
+      },
+      useCollector: {
+        type: 'boolean',
+        description: 'Whether to forward telemetry to an OTLP collector.',
+      },
+    },
+  },
+  BugCommandSettings: {
+    type: 'object',
+    description: 'Configuration for the bug report helper command.',
+    additionalProperties: false,
+    properties: {
+      urlTemplate: {
+        type: 'string',
+        description:
+          'Template used to open a bug report URL. Variables in the template are populated at runtime.',
+      },
+    },
+    required: ['urlTemplate'],
+  },
+  SummarizeToolOutputSettings: {
+    type: 'object',
+    description:
+      'Controls summarization behavior for individual tools. All properties are optional.',
+    additionalProperties: false,
+    properties: {
+      tokenBudget: {
+        type: 'number',
+        description:
+          'Maximum number of tokens used when summarizing tool output.',
+      },
+    },
+  },
+  CustomTheme: {
+    type: 'object',
+    description:
+      'Custom theme definition used for styling Gemini CLI output. Colors are provided as hex strings or named ANSI colors.',
+    additionalProperties: false,
+    properties: {
+      type: {
+        type: 'string',
+        enum: ['custom'],
+        default: 'custom',
+      },
+      name: {
+        type: 'string',
+        description: 'Theme display name.',
+      },
+      text: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          primary: { type: 'string' },
+          secondary: { type: 'string' },
+          link: { type: 'string' },
+          accent: { type: 'string' },
+        },
+      },
+      background: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          primary: { type: 'string' },
+          diff: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              added: { type: 'string' },
+              removed: { type: 'string' },
+            },
+          },
+        },
+      },
+      border: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          default: { type: 'string' },
+          focused: { type: 'string' },
+        },
+      },
+      ui: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          comment: { type: 'string' },
+          symbol: { type: 'string' },
+          gradient: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
+      status: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          error: { type: 'string' },
+          success: { type: 'string' },
+          warning: { type: 'string' },
+        },
+      },
+      Background: { type: 'string' },
+      Foreground: { type: 'string' },
+      LightBlue: { type: 'string' },
+      AccentBlue: { type: 'string' },
+      AccentPurple: { type: 'string' },
+      AccentCyan: { type: 'string' },
+      AccentGreen: { type: 'string' },
+      AccentYellow: { type: 'string' },
+      AccentRed: { type: 'string' },
+      DiffAdded: { type: 'string' },
+      DiffRemoved: { type: 'string' },
+      Comment: { type: 'string' },
+      Gray: { type: 'string' },
+      DarkGray: { type: 'string' },
+      GradientColors: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    required: ['type', 'name'],
+  },
+  StringOrStringArray: {
+    description: 'Accepts either a single string or an array of strings.',
+    anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+  },
+  BooleanOrString: {
+    description: 'Accepts either a boolean flag or a string command name.',
+    anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  },
+};
 
 export function getSettingsSchema(): SettingsSchemaType {
   return SETTINGS_SCHEMA;
