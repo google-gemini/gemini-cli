@@ -199,7 +199,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         returnDisplay: `Found ${matchCount} ${matchTerm}`,
       };
     } catch (error) {
-      console.error(`Error during GrepLogic execution: ${error}`);
+      debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
@@ -388,7 +388,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (gitError: unknown) {
-          console.debug(
+          debugLogger.debug(
             `GrepLogic: git grep failed: ${getErrorMessage(
               gitError,
             )}. Falling back...`,
@@ -397,7 +397,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       // --- Strategy 2: System grep ---
-      console.debug(
+      debugLogger.debug(
         'GrepLogic: System grep is being considered as fallback strategy.',
       );
 
@@ -494,7 +494,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (grepError: unknown) {
-          console.debug(
+          debugLogger.debug(
             `GrepLogic: System grep failed: ${getErrorMessage(
               grepError,
             )}. Falling back...`,
@@ -503,7 +503,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       // --- Strategy 3: Pure JavaScript Fallback ---
-      console.debug(
+      debugLogger.debug(
         'GrepLogic: Falling back to JavaScript grep implementation.',
       );
       strategyUsed = 'javascript fallback';
@@ -541,7 +541,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         } catch (readError: unknown) {
           // Ignore errors like permission denied or file gone during read
           if (!isNodeError(readError) || readError.code !== 'ENOENT') {
-            console.debug(
+            debugLogger.debug(
               `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(
                 readError,
               )}`,
@@ -552,7 +552,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       return allMatches;
     } catch (error: unknown) {
-      console.error(
+      debugLogger.warn(
         `GrepLogic: Error in performGrepSearch (Strategy: ${strategyUsed}): ${getErrorMessage(
           error,
         )}`,

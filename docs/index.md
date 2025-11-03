@@ -50,6 +50,8 @@ This documentation is organized into the following sections:
 - **[Memport](./core/memport.md):** Using the Memory Import Processor.
 - **[Tools API](./core/tools-api.md):** Information on how the core manages and
   exposes tools.
+- **[Policy Engine](./core/policy-engine.md):** Use the Policy Engine for
+  fine-grained control over tool execution.
 
 ### Tools
 
@@ -68,6 +70,7 @@ This documentation is organized into the following sections:
   `google_web_search` tool.
 - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory`
   tool.
+- **[Todo Tool](./tools/todos.md):** Documentation for the `write_todos` tool.
 
 ### Extensions
 

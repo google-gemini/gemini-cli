@@ -27,6 +27,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
   WRITE_FILE_TOOL_NAME,
@@ -47,6 +48,10 @@ import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
+import { ExtensionManager } from './extension-manager.js';
+import type { ExtensionLoader } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
+import { requestConsentNonInteractive } from './extensions/consent.js';
+import { promptForSetting } from './extensions/extensionSettings.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -68,6 +73,8 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
+  fakeResponses: string | undefined;
+  recordResponses: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -193,6 +200,16 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'The format of the CLI output.',
           choices: ['text', 'json', 'stream-json'],
         })
+        .option('fake-responses', {
+          type: 'string',
+          description: 'Path to a file with fake model responses for testing.',
+          hidden: true,
+        })
+        .option('record-responses', {
+          type: 'string',
+          description: 'Path to a file to record model responses for testing.',
+          hidden: true,
+        })
         .deprecateOption(
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
@@ -287,7 +304,7 @@ export async function loadHierarchicalGeminiMemory(
   debugMode: boolean,
   fileService: FileDiscoveryService,
   settings: Settings,
-  extensions: GeminiCLIExtension[],
+  extensionLoader: ExtensionLoader,
   folderTrust: boolean,
   memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
@@ -313,7 +330,7 @@ export async function loadHierarchicalGeminiMemory(
     includeDirectoriesToReadGemini,
     debugMode,
     fileService,
-    extensions,
+    extensionLoader,
     folderTrust,
     memoryImportFormat,
     fileFilteringOptions,
@@ -362,12 +379,15 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export async function loadCliConfig(
   settings: Settings,
-  allExtensions: GeminiCLIExtension[],
   sessionId: string,
   argv: CliArgs,
   cwd: string = process.cwd(),
 ): Promise<Config> {
   const debugMode = isDebugMode(argv);
+
+  if (argv.sandbox) {
+    process.env['GEMINI_SANDBOX'] = 'true';
+  }
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';
 
@@ -389,14 +409,28 @@ export async function loadCliConfig(
 
   const fileService = new FileDiscoveryService(cwd);
 
-  const fileFiltering = {
+  const memoryFileFiltering = {
     ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+    ...settings.context?.fileFiltering,
+  };
+
+  const fileFiltering = {
+    ...DEFAULT_FILE_FILTERING_OPTIONS,
     ...settings.context?.fileFiltering,
   };
 
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
+
+  const extensionManager = new ExtensionManager({
+    settings,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    workspaceDir: cwd,
+    enabledExtensionOverrides: argv.extensions,
+  });
+  await extensionManager.loadExtensions();
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =
@@ -408,13 +442,13 @@ export async function loadCliConfig(
       debugMode,
       fileService,
       settings,
-      allExtensions,
+      extensionManager,
       trustedFolder,
       memoryImportFormat,
-      fileFiltering,
+      memoryFileFiltering,
     );
 
-  let mcpServers = mergeMcpServers(settings, allExtensions);
+  let mcpServers = mergeMcpServers(settings, extensionManager.getExtensions());
   const question = argv.promptInteractive || argv.prompt || '';
 
   // Determine approval mode with backward compatibility
@@ -442,6 +476,21 @@ export async function loadCliConfig(
       argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
   }
 
+  // Override approval mode if disableYoloMode is set.
+  if (settings.security?.disableYoloMode) {
+    if (approvalMode === ApprovalMode.YOLO) {
+      debugLogger.error('YOLO mode is disabled by the "disableYolo" setting.');
+      throw new FatalConfigError(
+        'Cannot start in YOLO mode when it is disabled by settings',
+      );
+    }
+    approvalMode = ApprovalMode.DEFAULT;
+  } else if (approvalMode === ApprovalMode.YOLO) {
+    debugLogger.warn(
+      'YOLO mode is enabled. All tool calls will be automatically approved.',
+    );
+  }
+
   // Force approval mode to default if the folder is not trusted.
   if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
     debugLogger.warn(
@@ -465,7 +514,31 @@ export async function loadCliConfig(
     throw err;
   }
 
-  const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
+  const policyEngineConfig = await createPolicyEngineConfig(
+    settings,
+    approvalMode,
+  );
+
+  // Debug: Log the merged policy configuration
+  // Only log when message bus integration is enabled (when policies are active)
+  const enableMessageBusIntegration =
+    settings.tools?.enableMessageBusIntegration ?? false;
+  if (enableMessageBusIntegration) {
+    debugLogger.debug('=== Policy Engine Configuration ===');
+    debugLogger.debug(
+      `Default decision: ${policyEngineConfig.defaultDecision}`,
+    );
+    debugLogger.debug(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
+    if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
+      debugLogger.debug('Rules (sorted by priority):');
+      policyEngineConfig.rules.forEach((rule, index) => {
+        debugLogger.debug(
+          `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
+        );
+      });
+    }
+    debugLogger.debug('===================================');
+  }
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -510,7 +583,7 @@ export async function loadCliConfig(
 
   const excludeTools = mergeExcludeTools(
     settings,
-    allExtensions,
+    extensionManager.getExtensions(),
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
@@ -583,6 +656,7 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
+    disableYoloMode: settings.security?.disableYoloMode,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -605,12 +679,13 @@ export async function loadCliConfig(
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
     enabledExtensions: argv.extensions,
-    extensions: allExtensions,
+    extensionLoader: extensionManager,
+    enableExtensionReloading: settings.experimental?.extensionReloading,
     blockedMcpServers,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
-    chatCompression: settings.model?.chatCompression,
+    compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
     trustedFolder,
@@ -629,12 +704,16 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
-    enableMessageBusIntegration:
-      settings.tools?.enableMessageBusIntegration ?? false,
+    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    fakeResponses: argv.fakeResponses,
+    recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
+    // TODO: loading of hooks based on workspace trust
+    enableHooks: settings.tools?.enableHooks ?? false,
+    hooks: settings.hooks || {},
   });
 }
 

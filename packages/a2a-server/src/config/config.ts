@@ -21,6 +21,8 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
   type GeminiCLIExtension,
+  type ExtensionLoader,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -29,10 +31,10 @@ import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export async function loadConfig(
   settings: Settings,
-  extensions: GeminiCLIExtension[],
+  extensionLoader: ExtensionLoader,
   taskId: string,
 ): Promise<Config> {
-  const mcpServers = mergeMcpServers(settings, extensions);
+  const mcpServers = mergeMcpServers(settings, extensionLoader.getExtensions());
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
@@ -70,6 +72,7 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust: settings.folderTrust === true,
+    extensionLoader,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
@@ -78,7 +81,7 @@ export async function loadConfig(
     [workspaceDir],
     false,
     fileService,
-    extensions,
+    extensionLoader,
     settings.folderTrust === true,
   );
   configParams.userMemory = memoryContent;
@@ -125,7 +128,7 @@ export function mergeMcpServers(
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
       if (mcpServers[key]) {
-        console.warn(
+        debugLogger.warn(
           `Skipping extension MCP config for server with key "${key}" as it already exists.`,
         );
         return;

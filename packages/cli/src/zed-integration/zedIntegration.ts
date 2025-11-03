@@ -11,7 +11,7 @@ import type {
   GeminiChat,
   ToolResult,
   ToolCallConfirmationDetails,
-  GeminiCLIExtension,
+  FilterFilesOptions,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -30,6 +30,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -61,7 +62,6 @@ export function resolveModel(model: string, isInFallbackMode: boolean): string {
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
-  extensions: GeminiCLIExtension[],
   argv: CliArgs,
 ) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;
@@ -74,8 +74,7 @@ export async function runZedIntegration(
   console.debug = console.error;
 
   new acp.AgentSideConnection(
-    (client: acp.Client) =>
-      new GeminiAgent(config, settings, extensions, argv, client),
+    (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
     stdout,
     stdin,
   );
@@ -88,7 +87,6 @@ class GeminiAgent {
   constructor(
     private config: Config,
     private settings: LoadedSettings,
-    private extensions: GeminiCLIExtension[],
     private argv: CliArgs,
     private client: acp.Client,
   ) {}
@@ -157,7 +155,7 @@ class GeminiAgent {
         );
         isAuthenticated = true;
       } catch (e) {
-        console.error(`Authentication failed: ${e}`);
+        debugLogger.error(`Authentication failed: ${e}`);
       }
     }
 
@@ -202,13 +200,7 @@ class GeminiAgent {
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
 
-    const config = await loadCliConfig(
-      settings,
-      this.extensions,
-      sessionId,
-      this.argv,
-      cwd,
-    );
+    const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
 
     await config.initialize();
     return config;
@@ -570,7 +562,8 @@ class Session {
 
     // Get centralized file discovery service
     const fileDiscovery = this.config.getFileService();
-    const respectGitIgnore = this.config.getFileFilteringRespectGitIgnore();
+    const fileFilteringOptions: FilterFilesOptions =
+      this.config.getFileFilteringOptions();
 
     const pathSpecsToRead: string[] = [];
     const contentLabelsForDisplay: string[] = [];
@@ -586,13 +579,10 @@ class Session {
 
     for (const atPathPart of atPathCommandParts) {
       const pathName = atPathPart.fileData!.fileUri;
-      // Check if path should be ignored by git
-      if (fileDiscovery.shouldGitIgnoreFile(pathName)) {
+      // Check if path should be ignored
+      if (fileDiscovery.shouldIgnoreFile(pathName, fileFilteringOptions)) {
         ignoredPaths.push(pathName);
-        const reason = respectGitIgnore
-          ? 'git-ignored and will be skipped'
-          : 'ignored by custom patterns';
-        console.warn(`Path ${pathName} is ${reason}.`);
+        debugLogger.warn(`Path ${pathName} is ignored and will be skipped.`);
         continue;
       }
       let currentPathSpec = pathName;
@@ -659,7 +649,7 @@ class Session {
                 );
               }
             } catch (globError) {
-              console.error(
+              debugLogger.error(
                 `Error during glob search for ${pathName}: ${getErrorMessage(globError)}`,
               );
             }
@@ -669,7 +659,7 @@ class Session {
             );
           }
         } else {
-          console.error(
+          debugLogger.error(
             `Error stating path ${pathName}. Path ${pathName} will be skipped.`,
           );
         }
@@ -729,9 +719,8 @@ class Session {
     initialQueryText = initialQueryText.trim();
     // Inform user about ignored paths
     if (ignoredPaths.length > 0) {
-      const ignoreType = respectGitIgnore ? 'git-ignored' : 'custom-ignored';
       this.debug(
-        `Ignored ${ignoredPaths.length} ${ignoreType} files: ${ignoredPaths.join(', ')}`,
+        `Ignored ${ignoredPaths.length} files: ${ignoredPaths.join(', ')}`,
       );
     }
 
@@ -739,14 +728,13 @@ class Session {
 
     if (pathSpecsToRead.length === 0 && embeddedContext.length === 0) {
       // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-      console.warn('No valid file paths found in @ commands to read.');
+      debugLogger.warn('No valid file paths found in @ commands to read.');
       return [{ text: initialQueryText }];
     }
 
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
         paths: pathSpecsToRead,
-        respectGitIgnore, // Use configuration setting
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;
@@ -802,7 +790,7 @@ class Session {
             }
           }
         } else {
-          console.warn(
+          debugLogger.warn(
             'read_many_files tool returned no content or empty content.',
           );
         }
@@ -855,7 +843,7 @@ class Session {
 
   debug(msg: string) {
     if (this.config.getDebugMode()) {
-      console.warn(msg);
+      debugLogger.warn(msg);
     }
   }
 }

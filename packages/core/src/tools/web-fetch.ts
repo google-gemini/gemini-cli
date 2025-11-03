@@ -21,14 +21,18 @@ import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import {
+  fetchWithTimeout,
+  isPrivateIp,
+  setGlobalProxy,
+} from '../utils/fetch.js';
 import { convert } from 'html-to-text';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -201,21 +205,9 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Try message bus confirmation first if available
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false; // No confirmation needed
-      }
-      if (decision === 'DENY') {
-        throw new Error('Tool execution denied by policy.');
-      }
-      // if 'ASK_USER', fall through to legacy logic
-    }
-
     // Legacy confirmation flow (no message bus OR policy decision was ASK_USER)
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
@@ -271,7 +263,7 @@ ${textContent}
         DEFAULT_GEMINI_FLASH_MODEL,
       );
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Full response for prompt "${userPrompt.substring(
           0,
           50,
@@ -364,7 +356,7 @@ ${sourceListFormatted.join('\n')}`;
 
       const llmContent = responseText;
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Formatted tool response for prompt "${userPrompt}:\n\n":`,
         llmContent,
       );
@@ -425,7 +417,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
     );
     const proxy = config.getProxy();
     if (proxy) {
-      setGlobalDispatcher(new ProxyAgent(proxy as string));
+      setGlobalProxy(proxy);
     }
   }
 
