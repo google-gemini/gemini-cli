@@ -28,7 +28,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
-const MAX_HISTORY_LENGTH = 1000;
+const MAX_HISTORY_LENGTH = 5000;
 
 /**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
@@ -353,7 +353,7 @@ export class LoopDetectionService {
     const totalDistance =
       recentIndices[recentIndices.length - 1] - recentIndices[0];
     const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
-    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 1.5;
+    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 5;
 
     return averageDistance <= maxAllowedDistance;
   }
