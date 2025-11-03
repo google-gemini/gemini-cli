@@ -41,6 +41,7 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
+import { coreEvents } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -76,7 +77,6 @@ import type { UserTierId } from '../code_assist/types.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
-import { coreEvents } from '../utils/events.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -711,7 +711,10 @@ export class Config {
       return;
     }
 
-    this.model = newModel;
+    if (this.model !== newModel) {
+      this.model = newModel;
+      coreEvents.emitModelChanged(newModel);
+    }
   }
 
   isInFallbackMode(): boolean {
