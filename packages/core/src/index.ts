@@ -38,6 +38,7 @@ export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
 export * from './core/apiKeyCredentialStorage.js';
+export * from './core/hfApiKeyStorage.js';
 
 // Export utilities
 export * from './utils/paths.js';
