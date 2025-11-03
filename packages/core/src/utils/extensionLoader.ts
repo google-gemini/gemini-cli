@@ -62,21 +62,22 @@ export abstract class ExtensionLoader {
       total: this.startingCount,
       completed: this.startCompletedCount,
     });
-
-    await this.config.getMcpClientManager()!.startExtension(extension);
-    // TODO: Move all extension features here, including at least:
-    // - context file loading
-    // - custom command loading
-    // - excluded tool configuration
-
-    this.startCompletedCount++;
-    this.eventEmitter?.emit('extensionsStarting', {
-      total: this.startingCount,
-      completed: this.startCompletedCount,
-    });
-    if (this.startingCount === this.startCompletedCount) {
-      this.startingCount = 0;
-      this.startCompletedCount = 0;
+    try {
+      await this.config.getMcpClientManager()!.startExtension(extension);
+      // TODO: Move all extension features here, including at least:
+      // - context file loading
+      // - custom command loading
+      // - excluded tool configuration
+    } finally {
+      this.startCompletedCount++;
+      this.eventEmitter?.emit('extensionsStarting', {
+        total: this.startingCount,
+        completed: this.startCompletedCount,
+      });
+      if (this.startingCount === this.startCompletedCount) {
+        this.startingCount = 0;
+        this.startCompletedCount = 0;
+      }
     }
   }
 
@@ -113,20 +114,22 @@ export abstract class ExtensionLoader {
       completed: this.stopCompletedCount,
     });
 
-    await this.config.getMcpClientManager()!.stopExtension(extension);
-    // TODO: Remove all extension features here, including at least:
-    // - context files
-    // - custom commands
-    // - excluded tools
-
-    this.stopCompletedCount++;
-    this.eventEmitter?.emit('extensionsStopping', {
-      total: this.stoppingCount,
-      completed: this.stopCompletedCount,
-    });
-    if (this.stoppingCount === this.stopCompletedCount) {
-      this.stoppingCount = 0;
-      this.stopCompletedCount = 0;
+    try {
+      await this.config.getMcpClientManager()!.stopExtension(extension);
+      // TODO: Remove all extension features here, including at least:
+      // - context files
+      // - custom commands
+      // - excluded tools
+    } finally {
+      this.stopCompletedCount++;
+      this.eventEmitter?.emit('extensionsStopping', {
+        total: this.stoppingCount,
+        completed: this.stopCompletedCount,
+      });
+      if (this.stoppingCount === this.stopCompletedCount) {
+        this.stoppingCount = 0;
+        this.stopCompletedCount = 0;
+      }
     }
   }
 
