@@ -36,6 +36,11 @@ overridden by higher numbers):
 Gemini CLI uses JSON settings files for persistent configuration. There are four
 locations for these files:
 
+> **Tip:** JSON-aware editors can use autocomplete and validation by pointing to
+> the generated schema at `schemas/settings.schema.json` in this repository.
+> When working outside the repo, reference the hosted schema at
+> `https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json`.
+
 - **System defaults file:**
   - **Location:** `/etc/gemini-cli/system-defaults.json` (Linux),
     `C:\ProgramData\gemini-cli\system-defaults.json` (Windows) or
@@ -89,6 +94,8 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 Settings are organized into categories. All settings should be placed within
 their corresponding top-level category object in your `settings.json` file.
 
+<!-- SETTINGS-AUTOGEN:START -->
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
@@ -96,11 +103,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 - **`general.vimMode`** (boolean):
-  - **Description:** Enable Vim keybindings.
+  - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
 - **`general.disableAutoUpdate`** (boolean):
-  - **Description:** Disable automatic updates.
+  - **Description:** Disable automatic updates
   - **Default:** `false`
 
 - **`general.disableUpdateNag`** (boolean):
@@ -108,12 +115,19 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.checkpointing.enabled`** (boolean):
-  - **Description:** Enable session checkpointing for recovery.
+  - **Description:** Enable session checkpointing for recovery
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`general.enablePromptCompletion`** (boolean):
   - **Description:** Enable AI-powered prompt completion suggestions while
     typing.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`general.retryFetchErrors`** (boolean):
+  - **Description:** Retry on "exception TypeError: fetch failed sending
+    request" errors.
   - **Default:** `false`
 
 - **`general.debugKeystrokeLogging`** (boolean):
@@ -121,21 +135,35 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.sessionRetention.enabled`** (boolean):
-  - **Description:** Enable automatic session cleanup.
+  - **Description:** Enable automatic session cleanup
   - **Default:** `false`
+
+- **`general.sessionRetention.maxAge`** (string):
+  - **Description:** Maximum age of sessions to keep (e.g., "30d", "7d", "24h",
+    "1w")
+  - **Default:** `undefined`
+
+- **`general.sessionRetention.maxCount`** (number):
+  - **Description:** Alternative: Maximum number of sessions to keep (most
+    recent)
+  - **Default:** `undefined`
+
+- **`general.sessionRetention.minRetention`** (string):
+  - **Description:** Minimum retention period (safety limit, defaults to "1d")
+  - **Default:** `"1d"`
 
 #### `output`
 
-- **`output.format`** (string):
+- **`output.format`** (enum):
   - **Description:** The format of the CLI output.
   - **Default:** `"text"`
-  - **Values:** `"text"`, `"json"`, `"stream-json"`
+  - **Values:** `"text"`, `"json"`
 
 #### `ui`
 
 - **`ui.theme`** (string):
-  - **Description:** The color theme for the UI. See [Themes](../cli/themes.md)
-    for available options.
+  - **Description:** The color theme for the UI. See the CLI themes guide for
+    available options.
   - **Default:** `undefined`
 
 - **`ui.customThemes`** (object):
@@ -143,29 +171,26 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `{}`
 
 - **`ui.hideWindowTitle`** (boolean):
-  - **Description:** Hide the window title bar.
+  - **Description:** Hide the window title bar
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI status and thoughts in the terminal window
-    title.
+    title
   - **Default:** `false`
 
 - **`ui.hideTips`** (boolean):
-  - **Description:** Hide helpful tips in the UI.
+  - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
 - **`ui.hideBanner`** (boolean):
-  - **Description:** Hide the application banner.
+  - **Description:** Hide the application banner
   - **Default:** `false`
 
 - **`ui.hideContextSummary`** (boolean):
   - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
     input.
-  - **Default:** `false`
-
-- **`ui.hideFooter`** (boolean):
-  - **Description:** Hide the footer from the UI.
   - **Default:** `false`
 
 - **`ui.footer.hideCWD`** (boolean):
@@ -180,8 +205,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the model name and context usage in the footer.
   - **Default:** `false`
 
+- **`ui.footer.hideContextPercentage`** (boolean):
+  - **Description:** Hides the context window remaining percentage.
+  - **Default:** `true`
+
+- **`ui.hideFooter`** (boolean):
+  - **Description:** Hide the footer from the UI
+  - **Default:** `false`
+
 - **`ui.showMemoryUsage`** (boolean):
-  - **Description:** Display memory usage information in the UI.
+  - **Description:** Display memory usage information in the UI
   - **Default:** `false`
 
 - **`ui.showLineNumbers`** (boolean):
@@ -190,32 +223,34 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.showCitations`** (boolean):
   - **Description:** Show citations for generated text in the chat.
-  - **Default:** `true`
+  - **Default:** `false`
 
 - **`ui.useFullWidth`** (boolean):
   - **Description:** Use the entire width of the terminal for output.
   - **Default:** `false`
 
+- **`ui.customWittyPhrases`** (array):
+  - **Description:** Custom witty phrases to display during loading. When
+    provided, the CLI cycles through these instead of the defaults.
+  - **Default:** `[]`
+
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
-  - **Description:** Disable loading phrases for accessibility.
+  - **Description:** Disable loading phrases for accessibility
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`ui.accessibility.screenReader`** (boolean):
-  - **Description:** Show plaintext interactive view that is more screen reader
-    friendly.
+  - **Description:** Render output in plain-text to be more screen reader
+    accessible
   - **Default:** `false`
-
-- **`ui.customWittyPhrases`** (array of strings):
-  - **Description:** A list of custom phrases to display during loading states.
-    When provided, the CLI will cycle through these phrases instead of the
-    default ones.
-  - **Default:** `[]`
+  - **Requires restart:** Yes
 
 #### `ide`
 
 - **`ide.enabled`** (boolean):
-  - **Description:** Enable IDE integration mode.
+  - **Description:** Enable IDE integration mode
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`ide.hasSeenNudge`** (boolean):
   - **Description:** Whether the user has seen the IDE integration nudge.
@@ -224,8 +259,9 @@ their corresponding top-level category object in your `settings.json` file.
 #### `privacy`
 
 - **`privacy.usageStatisticsEnabled`** (boolean):
-  - **Description:** Enable collection of usage statistics.
+  - **Description:** Enable collection of usage statistics
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 #### `model`
 
@@ -239,32 +275,26 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `-1`
 
 - **`model.summarizeToolOutput`** (object):
-  - **Description:** Enables or disables the summarization of tool output. You
-    can specify the token budget for the summarization using the `tokenBudget`
-    setting. Note: Currently only the `run_shell_command` tool is supported. For
-    example `{"run_shell_command": {"tokenBudget": 2000}}`
+  - **Description:** Enables or disables summarization of tool output. Configure
+    per-tool token budgets (for example {"run_shell_command": {"tokenBudget":
+    2000}}). Currently only the run_shell_command tool supports summarization.
   - **Default:** `undefined`
 
 - **`model.compressionThreshold`** (number):
-  - **Description:** Sets the threshold for chat history compression as a
-    fraction of the model's total token limit. This is a value between 0 and 1
-    that applies to both automatic compression and the manual `/compress`
-    command. For example, a value of `0.6` will trigger compression when the
-    chat history exceeds 60% of the token limit.
+  - **Description:** The fraction of context usage at which to trigger context
+    compression (e.g. 0.2, 0.3).
   - **Default:** `0.2`
+  - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
-  - **Default:** `false`
-
-- **`model.enableShellOutputEfficiency`** (boolean):
-  - **Description:** Optimizes shell tool commands for token efficiency.
   - **Default:** `true`
 
 #### `context`
 
-- **`context.fileName`** (string or array of strings):
-  - **Description:** The name of the context file(s).
+- **`context.fileName`** (string | string[]):
+  - **Description:** The name of the context file or files to load into memory.
+    Accepts either a single string or an array of strings.
   - **Default:** `undefined`
 
 - **`context.importFormat`** (string):
@@ -280,42 +310,51 @@ their corresponding top-level category object in your `settings.json` file.
     Missing directories will be skipped with a warning.
   - **Default:** `[]`
 
-- **`context.loadFromIncludeDirectories`** (boolean):
-  - **Description:** Controls the behavior of the `/memory refresh` command. If
-    set to `true`, `GEMINI.md` files should be loaded from all directories that
-    are added. If set to `false`, `GEMINI.md` should only be loaded from the
-    current directory.
+- **`context.loadMemoryFromIncludeDirectories`** (boolean):
+  - **Description:** Controls how /memory refresh loads GEMINI.md files. When
+    true, include directories are scanned; when false, only the current
+    directory is used.
   - **Default:** `false`
 
 - **`context.fileFiltering.respectGitIgnore`** (boolean):
-  - **Description:** Respect .gitignore files when searching.
+  - **Description:** Respect .gitignore files when searching
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`context.fileFiltering.respectGeminiIgnore`** (boolean):
-  - **Description:** Respect .geminiignore files when searching.
+  - **Description:** Respect .geminiignore files when searching
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
-  - **Description:** Whether to enable searching recursively for filenames under
-    the current tree when completing `@` prefixes in the prompt.
+  - **Description:** Enable recursive file search functionality when completing
+    @ references in the prompt.
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`context.fileFiltering.disableFuzzySearch`** (boolean):
   - **Description:** Disable fuzzy search when searching for files.
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 #### `tools`
 
-- **`tools.sandbox`** (boolean or string):
-  - **Description:** Sandbox execution environment (can be a boolean or a path
-    string).
+- **`tools.sandbox`** (boolean | string):
+  - **Description:** Sandbox execution environment. Set to a boolean to enable
+    or disable the sandbox, or provide a string path to a sandbox profile.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 - **`tools.shell.enableInteractiveShell`** (boolean):
-  - **Description:** Enables interactive terminal for running shell commands. If
-    an interactive session cannot be started, it will fall back to a standard
-    shell.
+  - **Description:** Use node-pty for an interactive shell experience. Fallback
+    to child_process still applies.
   - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`tools.shell.pager`** (string):
+  - **Description:** The pager command to use for shell output. Defaults to
+    `cat`.
+  - **Default:** `"cat"`
 
 - **`tools.shell.showColor`** (boolean):
   - **Description:** Show color in shell output.
@@ -326,42 +365,37 @@ their corresponding top-level category object in your `settings.json` file.
     considered safe (e.g., read-only operations).
   - **Default:** `false`
 
-- **`tools.core`** (array of strings):
-  - **Description:** This can be used to restrict the set of built-in tools
-    [with an allowlist](../cli/enterprise.md#restricting-tool-access). See
-    [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core
-    tools. The match semantics are the same as `tools.allowed`.
+- **`tools.core`** (array):
+  - **Description:** Restrict the set of built-in tools with an allowlist. Match
+    semantics mirror tools.allowed; see the built-in tools documentation for
+    available names.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
-- **`tools.exclude`** (array of strings):
+- **`tools.allowed`** (array):
+  - **Description:** Tool names that bypass the confirmation dialog. Useful for
+    trusted commands (for example ["run_shell_command(git)",
+    "run_shell_command(npm test)"]). See shell tool command restrictions for
+    matching details.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`tools.exclude`** (array):
   - **Description:** Tool names to exclude from discovery.
   - **Default:** `undefined`
-
-- **`tools.allowed`** (array of strings):
-  - **Description:** A list of tool names that will bypass the confirmation
-    dialog. This is useful for tools that you trust and use frequently. For
-    example, `["run_shell_command(git)", "run_shell_command(npm test)"]` will
-    skip the confirmation dialog to run any `git` and `npm test` commands. See
-    [Shell Tool command restrictions](../tools/shell.md#command-restrictions)
-    for details on prefix matching, command chaining, etc.
-  - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 - **`tools.discoveryCommand`** (string):
   - **Description:** Command to run for tool discovery.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 - **`tools.callCommand`** (string):
-  - **Description:** Defines a custom shell command for calling a specific tool
-    that was discovered using `tools.discoveryCommand`. The shell command must
-    meet the following criteria:
-    - It must take function `name` (exactly as in
-      [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations))
-      as the first command line argument.
-    - It must read function arguments as JSON on `stdin`, analogous to
-      [`functionCall.args`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functioncall).
-    - It must return function output as JSON on `stdout`, analogous to
-      [`functionResponse.response.content`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functionresponse).
+  - **Description:** Defines a custom shell command for invoking discovered
+    tools. The command must take the tool name as the first argument, read JSON
+    arguments from stdin, and emit JSON results on stdout.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 - **`tools.useRipgrep`** (boolean):
   - **Description:** Use ripgrep for file content search instead of the fallback
@@ -371,36 +405,51 @@ their corresponding top-level category object in your `settings.json` file.
 - **`tools.enableToolOutputTruncation`** (boolean):
   - **Description:** Enable truncation of large tool outputs.
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`tools.truncateToolOutputThreshold`** (number):
   - **Description:** Truncate tool output if it is larger than this many
     characters. Set to -1 to disable.
-  - **Default:** `20000`
+  - **Default:** `4000000`
+  - **Requires restart:** Yes
 
 - **`tools.truncateToolOutputLines`** (number):
   - **Description:** The number of lines to keep when truncating tool output.
   - **Default:** `1000`
+  - **Requires restart:** Yes
 
 - **`tools.enableMessageBusIntegration`** (boolean):
   - **Description:** Enable policy-based tool confirmation via message bus
-    integration. When enabled, tools will automatically respect policy engine
+    integration. When enabled, tools automatically respect policy engine
     decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
     implementations.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`tools.enableHooks`** (boolean):
+  - **Description:** Enable the hooks system for intercepting and customizing
+    Gemini CLI behavior. When enabled, hooks configured in settings will execute
+    at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.).
+    Requires MessageBus integration.
+  - **Default:** `false`
+  - **Requires restart:** Yes
 
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
   - **Description:** Command to start an MCP server.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
-- **`mcp.allowed`** (array of strings):
-  - **Description:** An allowlist of MCP servers to allow.
+- **`mcp.allowed`** (array):
+  - **Description:** A list of MCP servers to allow.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
-- **`mcp.excluded`** (array of strings):
-  - **Description:** A denylist of MCP servers to exclude.
+- **`mcp.excluded`** (array):
+  - **Description:** A list of MCP servers to exclude.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 #### `useSmartEdit`
 
@@ -411,38 +460,50 @@ their corresponding top-level category object in your `settings.json` file.
 #### `useWriteTodos`
 
 - **`useWriteTodos`** (boolean):
-  - **Description:** Enable the write_todos tool.
+  - **Description:** Enable the write_todos_list tool.
   - **Default:** `false`
 
 #### `security`
 
+- **`security.disableYoloMode`** (boolean):
+  - **Description:** Disable YOLO mode, even if enabled by a flag.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`security.auth.selectedType`** (string):
   - **Description:** The currently selected authentication type.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 - **`security.auth.enforcedType`** (string):
-  - **Description:** The required auth type (useful for enterprises).
+  - **Description:** The required auth type. If this does not match the selected
+    auth type, the user will be prompted to re-authenticate.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 - **`security.auth.useExternal`** (boolean):
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
-  - **Description:** Automatically configure Node.js memory limits.
+  - **Description:** Automatically configure Node.js memory limits
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`advanced.dnsResolutionOrder`** (string):
   - **Description:** The DNS resolution order.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
 
-- **`advanced.excludedEnvVars`** (array of strings):
+- **`advanced.excludedEnvVars`** (array):
   - **Description:** Environment variables to exclude from project context.
   - **Default:** `["DEBUG","DEBUG_MODE"]`
 
@@ -452,10 +513,56 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
+- **`experimental.extensionManagement`** (boolean):
+  - **Description:** Enable extension management features.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.extensionReloading`** (boolean):
+  - **Description:** Enables extension loading/unloading within the CLI session.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.useModelRouter`** (boolean):
   - **Description:** Enable model routing to route requests to the best model
     based on complexity.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
+  - **Description:** Enable the Codebase Investigator agent.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.maxNumTurns`** (number):
+  - **Description:** Maximum number of turns for the Codebase Investigator
+    agent.
+  - **Default:** `15`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.maxTimeMinutes`** (number):
+  - **Description:** Maximum time for the Codebase Investigator agent (in
+    minutes).
+  - **Default:** `5`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
+  - **Description:** The thinking budget for the Codebase Investigator agent.
+  - **Default:** `-1`
+  - **Requires restart:** Yes
+
+- **`experimental.codebaseInvestigatorSettings.model`** (string):
+  - **Description:** The model to use for the Codebase Investigator agent.
+  - **Default:** `"gemini-2.5-pro"`
+  - **Requires restart:** Yes
+
+#### `hooks`
+
+- **`hooks`** (object):
+  - **Description:** Hook configurations for intercepting and customizing agent
+    behavior.
+  - **Default:** `{}`
+  <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`
 
