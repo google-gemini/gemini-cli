@@ -564,6 +564,16 @@ const SETTINGS_SCHEMA = {
         description: 'Whether the user has seen the IDE integration nudge.',
         showInDialog: false,
       },
+      defaultIdePath: {
+        type: 'string',
+        label: 'Default IDE Path',
+        category: 'IDE',
+        requiresRestart: false,
+        default: '',
+        description:
+          'Path to the default IDE executable to open projects with.',
+        showInDialog: false,
+      },
     },
   },
 

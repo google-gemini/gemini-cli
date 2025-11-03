@@ -332,6 +332,13 @@
           "markdownDescription": "Whether the user has seen the IDE integration nudge.\n\n- Category: `IDE`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "defaultIdePath": {
+          "title": "Default IDE Path",
+          "description": "Path to the default IDE executable to open projects with.",
+          "markdownDescription": "Path to the default IDE executable to open projects with.\n\n- Category: `IDE`\n- Requires restart: `no`\n- Default: ``",
+          "default": "",
+          "type": "string"
         }
       },
       "additionalProperties": false

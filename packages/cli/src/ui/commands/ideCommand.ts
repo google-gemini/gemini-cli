@@ -140,11 +140,13 @@ export const ideCommand = async (): Promise<SlashCommand> => {
       name: 'ide',
       description: 'Manage IDE integration',
       kind: CommandKind.BUILT_IN,
-      action: (): SlashCommandActionReturn =>
+      action: (_context): SlashCommandActionReturn =>
         ({
-          type: 'message',
-          messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
+          type: 'confirm_action',
+          prompt: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.\n\nDo you want to open your current directory in your configured IDE?`,
+          originalInvocation: {
+            raw: '/open-ide',
+          },
         }) as const,
     };
   }

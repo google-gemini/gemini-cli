@@ -256,6 +256,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Whether the user has seen the IDE integration nudge.
   - **Default:** `false`
 
+- **`ide.defaultIdePath`** (string):
+  - **Description:** Path to the default IDE executable to open projects with.
+  - **Default:** `""`
+
 #### `privacy`
 
 - **`privacy.usageStatisticsEnabled`** (boolean):
