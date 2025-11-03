@@ -46,8 +46,8 @@ export class KeychainTokenStorage
       const moduleName = 'keytar';
       const module = await import(moduleName);
       this.keytarModule = module.default || module;
-    } catch (error) {
-      coreEvents.emitFeedback('error', "Failed to load 'keytar' module", error);
+    } catch (_) {
+      //Keytar is optional so we shouldn't raise an error of log anything.
     }
     return this.keytarModule;
   }
