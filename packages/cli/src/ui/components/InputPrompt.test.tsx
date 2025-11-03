@@ -130,6 +130,7 @@ describe('InputPrompt', () => {
       moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
       }),
+      moveToVisualPosition: vi.fn(),
       killLineRight: vi.fn(),
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
@@ -1590,28 +1591,42 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('resets reverse search state on Escape', async () => {
-      const { stdin, stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
+    it.each([
+      { name: 'standard', kittyProtocolEnabled: false, escapeSequence: '\x1B' },
+      {
+        name: 'kitty',
+        kittyProtocolEnabled: true,
+        escapeSequence: '\u001b[27u',
+      },
+    ])(
+      'resets reverse search state on Escape ($name)',
+      async ({ kittyProtocolEnabled, escapeSequence }) => {
+        const { stdin, stdout, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          { kittyProtocolEnabled },
+        );
 
-      await act(async () => {
-        stdin.write('\x12');
-      });
-      await act(async () => {
-        stdin.write('\x1B');
-      });
-      await act(async () => {
-        stdin.write('\u001b[27u'); // Press kitty escape key
-      });
+        await act(async () => {
+          stdin.write('\x12');
+        });
 
-      await waitFor(() => {
-        expect(stdout.lastFrame()).not.toContain('(r:)');
-        expect(stdout.lastFrame()).not.toContain('echo hello');
-      });
+        // Wait for reverse search to be active
+        await waitFor(() => {
+          expect(stdout.lastFrame()).toContain('(r:)');
+        });
 
-      unmount();
-    });
+        await act(async () => {
+          stdin.write(escapeSequence);
+        });
+
+        await waitFor(() => {
+          expect(stdout.lastFrame()).not.toContain('(r:)');
+          expect(stdout.lastFrame()).not.toContain('echo hello');
+        });
+
+        unmount();
+      },
+    );
 
     it('completes the highlighted entry on Tab and exits reverse-search', async () => {
       // Mock the reverse search completion
@@ -1934,6 +1949,77 @@ describe('InputPrompt', () => {
       });
       unmount();
     });
+  });
+
+  describe('mouse interaction', () => {
+    it.each([
+      {
+        name: 'first line, first char',
+        relX: 0,
+        relY: 0,
+        mouseCol: 5,
+        mouseRow: 2,
+      },
+      {
+        name: 'first line, middle char',
+        relX: 6,
+        relY: 0,
+        mouseCol: 11,
+        mouseRow: 2,
+      },
+      {
+        name: 'second line, first char',
+        relX: 0,
+        relY: 1,
+        mouseCol: 5,
+        mouseRow: 3,
+      },
+      {
+        name: 'second line, end char',
+        relX: 5,
+        relY: 1,
+        mouseCol: 10,
+        mouseRow: 3,
+      },
+    ])(
+      'should move cursor on mouse click - $name',
+      async ({ relX, relY, mouseCol, mouseRow }) => {
+        props.buffer.text = 'hello world\nsecond line';
+        props.buffer.lines = ['hello world', 'second line'];
+        props.buffer.viewportVisualLines = ['hello world', 'second line'];
+        props.buffer.visualToLogicalMap = [
+          [0, 0],
+          [1, 0],
+        ];
+        props.buffer.visualCursor = [0, 11];
+        props.buffer.visualScrollRow = 0;
+
+        const { stdin, stdout, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          { mouseEventsEnabled: true },
+        );
+
+        // Wait for initial render
+        await waitFor(() => {
+          expect(stdout.lastFrame()).toContain('hello world');
+        });
+
+        // Simulate left mouse press at calculated coordinates.
+        // Assumes inner box is at x=4, y=1 based on border(1)+padding(1)+prompt(2) and border-top(1).
+        await act(async () => {
+          stdin.write(`\x1b[<0;${mouseCol};${mouseRow}M`);
+        });
+
+        await waitFor(() => {
+          expect(props.buffer.moveToVisualPosition).toHaveBeenCalledWith(
+            relY,
+            relX,
+          );
+        });
+
+        unmount();
+      },
+    );
   });
 
   describe('queued message editing', () => {

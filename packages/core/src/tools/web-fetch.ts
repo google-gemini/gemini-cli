@@ -23,11 +23,7 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
 import { getResponseText } from '../utils/partUtils.js';
-import {
-  fetchWithTimeout,
-  isPrivateIp,
-  setGlobalProxy,
-} from '../utils/fetch.js';
+import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -417,10 +413,6 @@ export class WebFetchTool extends BaseDeclarativeTool<
       false, // canUpdateOutput
       messageBus,
     );
-    const proxy = config.getProxy();
-    if (proxy) {
-      setGlobalProxy(proxy);
-    }
   }
 
   protected override validateToolParamValues(
