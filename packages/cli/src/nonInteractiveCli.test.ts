@@ -1008,8 +1008,4 @@ describe('runNonInteractive', () => {
     );
     expect(processStdoutSpy).toHaveBeenCalledWith('file.txt');
   });
-
-  // Note: Signal handling tests removed as we now use stdin-based cancellation
-  // instead of SIGINT/SIGTERM handlers. Stdin cancellation is tested through
-  // manual testing and the AbortSignal is tested throughout the other tests.
 });
