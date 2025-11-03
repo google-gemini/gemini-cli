@@ -91,6 +91,7 @@ describe('mcpCommand', () => {
       getGeminiClient: vi.fn(),
       getMcpClientManager: vi.fn().mockImplementation(() => ({
         getBlockedMcpServers: vi.fn(),
+        getMcpServers: vi.fn(),
       })),
     };
 

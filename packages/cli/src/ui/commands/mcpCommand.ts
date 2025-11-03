@@ -158,7 +158,7 @@ const authCommand: SlashCommand = {
     const { config } = context.services;
     if (!config) return [];
 
-    const mcpServers = config.getMcpServers() || {};
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
     return Object.keys(mcpServers).filter((name) =>
       name.startsWith(partialArg),
     );
