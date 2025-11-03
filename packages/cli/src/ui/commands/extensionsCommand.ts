@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { listExtensions } from '@google/gemini-cli-core';
+import { debugLogger, listExtensions } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { MessageType, type HistoryItemExtensionsList } from '../types.js';
@@ -15,6 +15,8 @@ import {
 } from './types.js';
 import open from 'open';
 import process from 'node:process';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { SettingScope } from '../../config/settings.js';
 
 async function listAction(context: CommandContext) {
   const historyItem: HistoryItemExtensionsList = {
@@ -159,6 +161,101 @@ async function exploreAction(context: CommandContext) {
   }
 }
 
+function getEnableDisableContext(
+  context: CommandContext,
+  args: string,
+): {
+  extensionManager: ExtensionManager;
+  name: string;
+  scope: SettingScope;
+} | null {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error('Cannot disable extensions in this environment');
+    return null;
+  }
+  const parts = args.split(' ');
+  if (parts.length !== 1 && (parts.length !== 3 || parts[2] !== '--scope')) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions disable <extension-names>|--all [--scope=<user|workspace|session>]',
+      },
+      Date.now(),
+    );
+    return null;
+  }
+  const name = parts[0];
+  let scope: SettingScope = SettingScope.Session;
+  if (parts.length === 3) {
+    switch (parts[2]) {
+      case 'workspace':
+        scope = SettingScope.Workspace;
+        break;
+      case 'user':
+        scope = SettingScope.User;
+        break;
+      case 'session':
+      case '':
+      case null:
+      case undefined:
+        break;
+      default:
+        debugLogger.error(`Unsupported scope ${parts[2]}`);
+        return null;
+    }
+  }
+  return {
+    extensionManager: extensionLoader,
+    name,
+    scope,
+  };
+}
+
+async function disableAction(context: CommandContext, args: string) {
+  const enableContext = getEnableDisableContext(context, args);
+  if (!enableContext) return;
+
+  const { name, scope, extensionManager } = enableContext;
+  await extensionManager.disableExtension(name!, scope);
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Extension "${name}" disabled for the scope "${scope}"`,
+    },
+    Date.now(),
+  );
+}
+
+async function enableAction(context: CommandContext, args: string) {
+  const enableContext = getEnableDisableContext(context, args);
+  if (!enableContext) return;
+
+  const { name, scope, extensionManager } = enableContext;
+  await extensionManager.enableExtension(name!, scope);
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Extension "${name}" enabled for the scope "${scope}"`,
+    },
+    Date.now(),
+  );
+}
+
+async function completeExtensions(context: CommandContext, partialArg: string) {
+  const extensions = context.services.config?.getExtensions() ?? [];
+  const extensionNames = extensions.map((ext) => ext.name);
+  const suggestions = extensionNames.filter((name) =>
+    name.startsWith(partialArg),
+  );
+
+  if ('--all'.startsWith(partialArg) || 'all'.startsWith(partialArg)) {
+    suggestions.unshift('--all');
+  }
+
+  return suggestions;
+}
+
 const listExtensionsCommand: SlashCommand = {
   name: 'list',
   description: 'List active extensions',
@@ -171,21 +268,23 @@ const updateExtensionsCommand: SlashCommand = {
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
   action: updateAction,
-  completion: async (context, partialArg) => {
-    const extensions = context.services.config
-      ? listExtensions(context.services.config)
-      : [];
-    const extensionNames = extensions.map((ext) => ext.name);
-    const suggestions = extensionNames.filter((name) =>
-      name.startsWith(partialArg),
-    );
+  completion: completeExtensions,
+};
 
-    if ('--all'.startsWith(partialArg) || 'all'.startsWith(partialArg)) {
-      suggestions.unshift('--all');
-    }
+const disableCommand: SlashCommand = {
+  name: 'disable',
+  description: 'Disable an extension',
+  kind: CommandKind.BUILT_IN,
+  action: disableAction,
+  completion: completeExtensions,
+};
 
-    return suggestions;
-  },
+const enableCommand: SlashCommand = {
+  name: 'enable',
+  description: 'Enable an extension',
+  kind: CommandKind.BUILT_IN,
+  action: enableAction,
+  completion: completeExtensions,
 };
 
 const exploreExtensionsCommand: SlashCommand = {
@@ -203,6 +302,8 @@ export const extensionsCommand: SlashCommand = {
     listExtensionsCommand,
     updateExtensionsCommand,
     exploreExtensionsCommand,
+    disableCommand,
+    enableCommand,
   ],
   action: (context, args) =>
     // Default to list if no subcommand is provided

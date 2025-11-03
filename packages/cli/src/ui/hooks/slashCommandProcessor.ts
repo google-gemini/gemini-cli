@@ -257,13 +257,13 @@ export const useSlashCommandProcessor = (
     // TODO: Ideally this would happen more directly inside the ExtensionLoader,
     // but the CommandService today is not conducive to that since it isn't a
     // long lived service but instead gets fully re-created based on reload
-    // events.
+    // events within this hook.
     const extensionEventListener = (
-      event: ExtensionsStartingEvent | ExtensionsStoppingEvent,
+      _event: ExtensionsStartingEvent | ExtensionsStoppingEvent,
     ) => {
       // We only care once at least one extension has completed
       // starting/stopping
-      if (event.completed > 0) reloadCommands();
+      reloadCommands();
     };
     appEvents.on('extensionsStarting', extensionEventListener);
     appEvents.on('extensionsStopping', extensionEventListener);

@@ -157,6 +157,7 @@ export enum SettingScope {
   Workspace = 'Workspace',
   System = 'System',
   SystemDefaults = 'SystemDefaults',
+  Session = 'Session',
 }
 
 export interface CheckpointingSettings {
