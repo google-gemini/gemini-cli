@@ -548,7 +548,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
   - **Description:** The thinking budget for the Codebase Investigator agent.
-  - **Default:** `-1`
+  - **Default:** `8192`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
