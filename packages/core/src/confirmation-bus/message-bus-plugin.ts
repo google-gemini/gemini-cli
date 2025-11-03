@@ -16,9 +16,13 @@ import { randomUUID } from 'node:crypto';
 import type { MessageBus } from './message-bus.js';
 import { MessageBusType, type ToolConfirmationResponse } from './types.js';
 import { AdkToolAdapter, ToolConfirmationOutcome } from '../tools/tools.js';
+import { ApprovalMode, type Config } from '../config/config.js';
 
 export class MessageBusPlugin extends BasePlugin {
-  constructor(private readonly messageBus: MessageBus) {
+  constructor(
+    private readonly messageBus: MessageBus,
+    private readonly config: Config,
+  ) {
     super('message-bus-plugin');
   }
 
@@ -30,6 +34,10 @@ export class MessageBusPlugin extends BasePlugin {
     toolArgs: { [key: string]: unknown };
     toolContext: ToolContext;
   }): Promise<{ [key: string]: unknown } | undefined> {
+    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return Promise.resolve(undefined);
+    }
+
     let declarativeTool: AnyDeclarativeTool;
     if (tool instanceof AdkToolAdapter) {
       declarativeTool = tool.tool;

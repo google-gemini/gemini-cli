@@ -264,6 +264,7 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
 
       const messageBusPlugin = new MessageBusPlugin(
         this.config.getMessageBus(),
+        this.config,
       );
 
       const runner = new InMemoryRunner({
