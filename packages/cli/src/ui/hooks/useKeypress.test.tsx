@@ -38,7 +38,7 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe('useKeypress', () => {
+describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
@@ -50,7 +50,7 @@ describe('useKeypress', () => {
       return null;
     }
     return render(
-      <KeypressProvider kittyProtocolEnabled={false}>
+      <KeypressProvider kittyProtocolEnabled={useKitty}>
         <TestComponent />
       </KeypressProvider>,
     );
@@ -58,6 +58,7 @@ describe('useKeypress', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
     stdin = new MockStdin();
     (useStdin as Mock).mockReturnValue({
       stdin,
@@ -186,21 +187,28 @@ describe('useKeypress', () => {
       expect(onKeypress).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle paste false alarm', () => {
+    it('should handle paste false alarm', async () => {
       renderKeypressHook(true);
 
       act(() => {
         stdin.write(PASTE_START.slice(0, 5));
         stdin.write('do');
       });
-      expect(onKeypress).toHaveBeenCalledWith(
-        expect.objectContaining({ sequence: '\x1B[200d' }),
-      );
-      expect(onKeypress).toHaveBeenCalledWith(
-        expect.objectContaining({ sequence: 'o' }),
-      );
 
-      expect(onKeypress).toHaveBeenCalledTimes(2);
+      if (useKitty) {
+        vi.advanceTimersByTime(60); // wait for kitty timeout
+        expect(onKeypress).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ sequence: '\x1B[200do' }),
+        );
+      } else {
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({ sequence: '\x1B[200d' }),
+        );
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({ sequence: 'o' }),
+        );
+        expect(onKeypress).toHaveBeenCalledTimes(2);
+      }
     });
 
     it('should handle back to back pastes', () => {
@@ -240,11 +248,11 @@ describe('useKeypress', () => {
       const pasteText = 'pasted';
       await act(async () => {
         stdin.write(PASTE_START.slice(0, 3));
-        await new Promise((r) => setTimeout(r, 50));
+        vi.advanceTimersByTime(50);
         stdin.write(PASTE_START.slice(3) + pasteText.slice(0, 3));
-        await new Promise((r) => setTimeout(r, 50));
+        vi.advanceTimersByTime(50);
         stdin.write(pasteText.slice(3) + PASTE_END.slice(0, 3));
-        await new Promise((r) => setTimeout(r, 50));
+        vi.advanceTimersByTime(50);
         stdin.write(PASTE_END.slice(3));
       });
       expect(onKeypress).toHaveBeenCalledWith(
