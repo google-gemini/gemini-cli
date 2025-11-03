@@ -328,7 +328,7 @@ export class LoopDetectionService {
    * 2. Verify actual content matches to prevent hash collisions
    * 3. Track all positions where this chunk appears
    * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
-   *    within a small average distance (≤ 1.5 * chunk size)
+   *    within a small average distance (≤ 5 * chunk size)
    */
   private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
     const existingIndices = this.contentStats.get(hash);
