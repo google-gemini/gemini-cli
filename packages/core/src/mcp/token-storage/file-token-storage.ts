@@ -11,7 +11,6 @@ import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials } from './types.js';
 import { GEMINI_DIR } from '../../utils/paths.js';
-import { debugLogger } from '../../utils/debugLogger.js';
 
 export class FileTokenStorage extends BaseTokenStorage {
   private readonly tokenFilePath: string;
@@ -78,7 +77,6 @@ export class FileTokenStorage extends BaseTokenStorage {
     } catch (error: unknown) {
       const err = error as NodeJS.ErrnoException & { message?: string };
       if (err.code === 'ENOENT') {
-        debugLogger.error('Token file does not exist');
         return new Map();
       }
       if (
