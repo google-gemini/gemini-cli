@@ -195,39 +195,23 @@ class GeminiAgent {
     const mergedMcpServers = { ...this.settings.merged.mcpServers };
 
     for (const config of mcpServers) {
-      if ('type' in config && config.type === 'sse') {
-        mergedMcpServers[config.name] = new MCPServerConfig(
-          undefined, // command
-          undefined, // args
-          undefined, // env
-          undefined, // cwd
-          config.url,
-          undefined, // httpUrl
-          Object.fromEntries(
-            config.headers.map(
-              ({ name, value }: { name: string; value: string }) => [
-                name,
-                value,
-              ],
-            ),
+      if (
+        'type' in config &&
+        (config.type === 'sse' || config.type === 'http')
+      ) {
+        const headers = Object.fromEntries(
+          config.headers.map(
+            ({ name, value }: { name: string; value: string }) => [name, value],
           ),
         );
-      } else if ('type' in config && config.type === 'http') {
         mergedMcpServers[config.name] = new MCPServerConfig(
           undefined, // command
           undefined, // args
           undefined, // env
           undefined, // cwd
-          undefined, // url (for SSE)
-          config.url, // httpUrl
-          Object.fromEntries(
-            config.headers.map(
-              ({ name, value }: { name: string; value: string }) => [
-                name,
-                value,
-              ],
-            ),
-          ),
+          config.type === 'sse' ? config.url : undefined,
+          config.type === 'http' ? config.url : undefined,
+          headers,
         );
       } else {
         const { command, args, env: rawEnv, name } = config;
