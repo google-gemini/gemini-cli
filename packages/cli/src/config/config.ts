@@ -670,7 +670,8 @@ export async function loadCliConfig(
       process.env['HTTPS_PROXY'] ||
       process.env['https_proxy'] ||
       process.env['HTTP_PROXY'] ||
-      process.env['http_proxy'],
+      process.env['http_proxy'] ||
+      settings.advanced?.proxy,
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,

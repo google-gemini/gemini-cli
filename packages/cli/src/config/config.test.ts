@@ -606,6 +606,27 @@ describe('loadCliConfig', () => {
         expect(config.getProxy()).toBe(expected);
       });
     });
+
+    it('should set proxy when advanced.proxy is present in settings', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {
+        advanced: { proxy: 'http://localhost:7890' }
+      };
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getProxy()).toBe('http://localhost:7890');
+    });
+
+    it('should prioritize environment variables over settings.json for proxy (env http://localhost:7891, settings http://localhost:7890)', async () => {
+      vi.stubEnv('http_proxy', 'http://localhost:7891');
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {
+        advanced: { proxy: 'http://localhost:7890' }
+      };
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getProxy()).toBe('http://localhost:7891');
+    });
   });
 
   it('should use default fileFilter options when unconfigured', async () => {

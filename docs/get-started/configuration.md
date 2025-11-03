@@ -503,6 +503,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`advanced.proxy`** (string):
+  - **Description:** Proxy for gemini client, like schema://user:password@host:port
+  - **Default:** `undefined`
+
 - **`advanced.excludedEnvVars`** (array):
   - **Description:** Environment variables to exclude from project context.
   - **Default:** `["DEBUG","DEBUG_MODE"]`

@@ -1148,6 +1148,15 @@ const SETTINGS_SCHEMA = {
         description: 'The DNS resolution order.',
         showInDialog: false,
       },
+      proxy: {
+        type: 'string',
+        label: 'Proxy',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'Proxy for gemini client, like schema://user:password@host:port',
+        showInDialog: false,
+      },
       excludedEnvVars: {
         type: 'array',
         label: 'Excluded Project Environment Variables',
