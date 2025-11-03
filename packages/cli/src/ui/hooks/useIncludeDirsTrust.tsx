@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
 import {
@@ -24,17 +24,13 @@ export function useIncludeDirsTrust(
   setCustomDialog: (dialog: React.ReactNode | null) => void,
   setGeminiMdFileCount: (count: number) => void,
 ) {
-  const [includeDirsTrustChecked, setIncludeDirsTrustChecked] = useState(false);
   const { addItem } = historyManager;
 
   useEffect(() => {
-    // Don't run this until the initial trust is determined or if it has already run.
-    if (isTrustedFolder === undefined || includeDirsTrustChecked || !config) {
+    // Don't run this until the initial trust is determined.
+    if (isTrustedFolder === undefined || !config) {
       return;
     }
-
-    // Mark as checked regardless of the outcome to prevent re-running.
-    setIncludeDirsTrustChecked(true);
 
     const pendingDirs = config.getPendingIncludeDirectories();
     if (pendingDirs.length === 0) {
@@ -44,38 +40,9 @@ export function useIncludeDirsTrust(
     console.log('Inside useIncludeDirsTrust');
 
     // If folder trust is disabled, isTrustedFolder will be undefined.
-    // In that case, we can just add the directories without checking them.
-    if (config.getFolderTrust() === false) {
-      const added: string[] = [];
-      const errors: string[] = [];
-      const workspaceContext = config.getWorkspaceContext();
-      for (const pathToAdd of pendingDirs) {
-        try {
-          workspaceContext.addDirectory(expandHomeDir(pathToAdd.trim()));
-          added.push(pathToAdd.trim());
-        } catch (e) {
-          const error = e as Error;
-          errors.push(`Error adding '${pathToAdd.trim()}': ${error.message}`);
-        }
-      }
-
-      if (added.length > 0 || errors.length > 0) {
-        finishAddingDirectories(
-          config,
-          settings,
-          addItem,
-          setGeminiMdFileCount,
-          added,
-          errors,
-          true, // silentOnSuccess
-        );
-      }
-      config.clearPendingIncludeDirectories();
-      return;
-    }
-
-    // If the user decided not to trust the main folder, don't proceed.
-    if (isTrustedFolder === false) {
+    // In that case, or if the user decided not to trust the main folder,
+    // we can just add the directories without checking them.
+    if (config.getFolderTrust() === false || isTrustedFolder === false) {
       const added: string[] = [];
       const errors: string[] = [];
       const workspaceContext = config.getWorkspaceContext();
@@ -174,7 +141,6 @@ export function useIncludeDirsTrust(
     }
   }, [
     isTrustedFolder,
-    includeDirsTrustChecked,
     config,
     settings,
     addItem,
