@@ -325,19 +325,18 @@ describe('FixLLMEditWithInstruction', () => {
     'should return null if the LLM call times out',
     { timeout: 60000 },
     async () => {
-      mockGenerateJson.mockImplementation(
-        async ({ abortSignal }) =>
-          // This promise will reject when the abort signal is aborted,
-          // which is what a real implementation should do.
-          new Promise((_resolve, reject) => {
-            if (abortSignal?.aborted) {
-              return reject(new DOMException('Aborted', 'AbortError'));
-            }
-            abortSignal?.addEventListener('abort', () => {
-              reject(new DOMException('Aborted', 'AbortError'));
-            });
-          }),
-      );
+      mockGenerateJson.mockImplementation(async ({ abortSignal }) => {
+        // Simulate a long-running operation that never resolves on its own.
+        // It will only reject when the abort signal is triggered by the timeout.
+        new Promise((_resolve, reject) => {
+          if (abortSignal?.aborted) {
+            return reject(new DOMException('Aborted', 'AbortError'));
+          }
+          abortSignal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+      });
 
       const testPromptId = 'test-prompt-id-timeout';
 
@@ -353,8 +352,7 @@ describe('FixLLMEditWithInstruction', () => {
         ),
       );
 
-      // Let the timers advance just past the timeout.
-      // The timeout is 40000ms in llm-edit-fixer.ts.
+      // Let the timers advance just past the 40000ms default timeout.
       await vi.advanceTimersByTimeAsync(40001);
 
       const result = await fixPromise;
