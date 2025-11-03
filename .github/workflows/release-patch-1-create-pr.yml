@@ -1,5 +1,8 @@
 name: 'Release: Patch (1) Create PR'
 
+run-name: >-
+  Release Patch (1) Create PR | S:${{ inputs.channel }} | C:${{ inputs.commit }} ${{ inputs.original_pr && format('| PR:#{0}', inputs.original_pr) || '' }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -96,12 +99,12 @@ jobs:
               --channel="${PATCH_CHANNEL}" \
               --pullRequestNumber="${ORIGINAL_PR}" \
               --dry-run="${DRY_RUN}"
-            echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
           } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
             cat >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
           )
+          echo "EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       - name: 'Comment on Original PR'
         if: 'always() && inputs.original_pr'

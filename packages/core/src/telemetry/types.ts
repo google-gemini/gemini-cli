@@ -67,7 +67,9 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_tools?: string;
   output_format: OutputFormat;
   extensions_count: number;
+  extensions: string;
   extension_ids: string;
+  auth_type?: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -101,7 +103,9 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.output_format = config.getOutputFormat();
     const extensions = config.getExtensions();
     this.extensions_count = extensions.length;
+    this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
+    this.auth_type = generatorConfig?.authType;
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -133,8 +137,10 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       mcp_tools: this.mcp_tools,
       mcp_tools_count: this.mcp_tools_count,
       output_format: this.output_format,
+      extensions: this.extensions,
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
+      auth_type: this.auth_type,
     };
   }
 
@@ -217,6 +223,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   tool_type: 'native' | 'mcp';
   content_length?: number;
   mcp_server_name?: string;
+  extension_name?: string;
   extension_id?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
@@ -263,6 +270,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       ) {
         this.tool_type = 'mcp';
         this.mcp_server_name = call.tool.serverName;
+        this.extension_name = call.tool.extensionName;
         this.extension_id = call.tool.extensionId;
       } else {
         this.tool_type = 'native';
@@ -313,6 +321,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       tool_type: this.tool_type,
       content_length: this.content_length,
       mcp_server_name: this.mcp_server_name,
+      extension_name: this.extension_name,
       extension_id: this.extension_id,
       metadata: this.metadata,
     };

@@ -84,6 +84,7 @@ describe('handleAtCommand', () => {
         getReadManyFilesExcludes: () => [],
       }),
       getUsageStatisticsEnabled: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
@@ -183,7 +184,7 @@ describe('handleAtCommand', () => {
     const relativeDirPath = getRelativePath(dirPath);
     const relativeFilePath = getRelativePath(filePath);
     const query = `@${dirPath}`;
-    const resolvedGlob = `${relativeDirPath}/**`;
+    const resolvedGlob = path.join(relativeDirPath, '**');
 
     const result = await handleAtCommand({
       query,
@@ -1138,7 +1139,7 @@ describe('handleAtCommand', () => {
     it('should handle absolute directory paths correctly', async () => {
       const fileContent =
         'export default function test() { return "absolute dir test"; }';
-      const subDirPath = 'src/utils';
+      const subDirPath = path.join('src', 'utils');
       const fileName = 'helper.ts';
       await createTestFile(
         path.join(testRootDir, subDirPath, fileName),
@@ -1159,7 +1160,7 @@ describe('handleAtCommand', () => {
       expect(result.shouldProceed).toBe(true);
       expect(result.processedQuery).toEqual(
         expect.arrayContaining([
-          { text: `Check @${subDirPath}/** please.` },
+          { text: `Check @${path.join(subDirPath, '**')} please.` },
           expect.objectContaining({
             text: '\n--- Content from referenced files ---',
           }),
@@ -1167,7 +1168,7 @@ describe('handleAtCommand', () => {
       );
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        expect.stringContaining(`using glob: ${subDirPath}/**`),
+        expect.stringContaining(`using glob: ${path.join(subDirPath, '**')}`),
       );
     });
 
