@@ -229,6 +229,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Use the entire width of the terminal for output.
   - **Default:** `false`
 
+- **`ui.useAlternateBuffer`** (boolean):
+  - **Description:** Use an alternate screen buffer for the UI, preserving shell
+    history.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
