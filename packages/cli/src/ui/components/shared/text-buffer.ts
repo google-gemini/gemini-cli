@@ -2016,6 +2016,36 @@ export function useTextBuffer({
     dispatch({ type: 'move_to_offset', payload: { offset } });
   }, []);
 
+  const moveToVisualPosition = useCallback(
+    (visRow: number, visCol: number): void => {
+      const { visualLines, visualToLogicalMap } = visualLayout;
+      // Clamp visRow to valid range
+      const clampedVisRow = Math.max(
+        0,
+        Math.min(visRow, visualLines.length - 1),
+      );
+      const visualLine = visualLines[clampedVisRow] || '';
+      // Clamp visCol to the length of the visual line
+      const clampedVisCol = Math.max(0, Math.min(visCol, cpLen(visualLine)));
+
+      if (visualToLogicalMap[clampedVisRow]) {
+        const [logRow, logStartCol] = visualToLogicalMap[clampedVisRow];
+        const newCursorRow = logRow;
+        const newCursorCol = logStartCol + clampedVisCol;
+
+        dispatch({
+          type: 'set_cursor',
+          payload: {
+            cursorRow: newCursorRow,
+            cursorCol: newCursorCol,
+            preferredCol: clampedVisCol,
+          },
+        });
+      }
+    },
+    [visualLayout],
+  );
+
   const returnValue: TextBuffer = useMemo(
     () => ({
       lines,
@@ -2041,6 +2071,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
 
@@ -2104,6 +2135,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
       killLineRight,
@@ -2265,6 +2297,7 @@ export interface TextBuffer {
     replacementText: string,
   ) => void;
   moveToOffset(offset: number): void;
+  moveToVisualPosition(visualRow: number, visualCol: number): void;
 
   // Vim-specific operations
   /**
