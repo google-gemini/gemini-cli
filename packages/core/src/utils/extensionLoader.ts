@@ -37,7 +37,11 @@ export abstract class ExtensionLoader {
     } else {
       throw new Error('Already started, you may only call `start` once.');
     }
-    await Promise.all(this.getExtensions().map(this.startExtension.bind(this)));
+    await Promise.all(
+      this.getExtensions()
+        .filter((e) => e.isActive)
+        .map(this.startExtension.bind(this)),
+    );
   }
 
   /**
@@ -158,7 +162,7 @@ interface ExtensionsStoppingEvent {
 
 export class SimpleExtensionLoader extends ExtensionLoader {
   constructor(
-    private readonly extensions: GeminiCLIExtension[],
+    protected readonly extensions: GeminiCLIExtension[],
     eventEmitter?: EventEmitter<ExtensionEvents>,
   ) {
     super(eventEmitter);
@@ -166,5 +170,25 @@ export class SimpleExtensionLoader extends ExtensionLoader {
 
   getExtensions(): GeminiCLIExtension[] {
     return this.extensions;
+  }
+
+  /// Adds `extension` to the list of extensions and calls
+  /// `maybeStartExtension`.
+  ///
+  /// This is intended for dynamic loading of extensions after calling `start`.
+  async loadExtension(extension: GeminiCLIExtension) {
+    this.extensions.push(extension);
+    await this.maybeStartExtension(extension);
+  }
+
+  /// Removes `extension` from the list of extensions and calls
+  // `maybeStopExtension` if it was found.
+  ///
+  /// This is intended for dynamic unloading of extensions after calling `start`.
+  async unloadExtension(extension: GeminiCLIExtension) {
+    const index = this.extensions.indexOf(extension);
+    if (index === -1) return;
+    this.extensions.splice(index, 1);
+    await this.maybeStopExtension(extension);
   }
 }

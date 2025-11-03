@@ -102,9 +102,9 @@ export const Composer = () => {
                 geminiMdFileCount={uiState.geminiMdFileCount}
                 contextFileNames={contextFileNames}
                 mcpServers={config.getMcpServers()}
-                blockedMcpServers={config
-                  .getMcpClientManager()
-                  ?.getBlockedMcpServers() ?? []}
+                blockedMcpServers={
+                  config.getMcpClientManager()?.getBlockedMcpServers() ?? []
+                }
               />
             )
           )}
