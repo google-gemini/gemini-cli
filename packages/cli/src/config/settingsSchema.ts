@@ -1263,7 +1263,7 @@ const SETTINGS_SCHEMA = {
             label: 'Thinking Budget',
             category: 'Experimental',
             requiresRestart: true,
-            default: -1,
+            default: 8192,
             description:
               'The thinking budget for the Codebase Investigator agent.',
             showInDialog: false,
