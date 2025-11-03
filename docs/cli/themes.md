@@ -88,6 +88,11 @@ color keys. For example:
 - `DiffRemoved` (optional, for removed lines in diffs)
 - `DiffModified` (optional, for modified lines in diffs)
 
+You can also override individual UI text roles by adding a nested `text` object.
+This object supports the keys `primary`, `secondary`, `link`, `accent`, and
+`response`. When `text.response` is provided it takes precedence over
+`text.primary` for rendering model responses in chat.
+
 **Required Properties:**
 
 - `name` (must match the key in the `customThemes` object and be a string)
