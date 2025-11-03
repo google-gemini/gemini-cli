@@ -13,11 +13,11 @@ import type {
   LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
 } from './types.js';
 import type {
   ListExperimentsRequest,
   ListExperimentsResponse,
-  ClientMetadata,
 } from './experiments/types.js';
 import type {
   CountTokensParameters,
@@ -163,7 +163,7 @@ export class CodeAssistServer implements ContentGenerator {
     const projectId = this.projectId;
     const req: ListExperimentsRequest = {
       project: projectId,
-      metadata: { ...metadata, duet_project: projectId },
+      metadata: { ...metadata, duetProject: projectId },
     };
     return await this.requestPost<ListExperimentsResponse>(
       'listExperiments',

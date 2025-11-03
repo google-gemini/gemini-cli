@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ClientMetadata } from '../types.js';
+
 export interface ListExperimentsRequest {
   project: string;
   metadata?: ClientMetadata;
@@ -38,21 +40,3 @@ export interface FilteredFlag {
   name?: string;
   reason?: string;
 }
-
-export interface ClientMetadata {
-  ide_type?: IdeType;
-  ide_version?: string;
-  platform?: Platform;
-  update_channel?: 'nightly' | 'preview' | 'stable';
-  duet_project?: string;
-}
-
-export type IdeType = 'GEMINI_CLI';
-
-export type Platform =
-  | 'PLATFORM_UNSPECIFIED'
-  | 'DARWIN_AMD64'
-  | 'DARWIN_ARM64'
-  | 'LINUX_AMD64'
-  | 'LINUX_ARM64'
-  | 'WINDOWS_AMD64';
