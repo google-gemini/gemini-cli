@@ -156,4 +156,17 @@ describe('CoreEventEmitter', () => {
     });
     expect(listener.mock.calls[2][0]).toMatchObject({ message: 'Buffered 2' });
   });
+
+  describe('ModelChanged Event', () => {
+    it('should emit ModelChanged event with correct payload', () => {
+      const listener = vi.fn();
+      events.on(CoreEvent.ModelChanged, listener);
+
+      const newModel = 'gemini-2.5-pro';
+      events.emitModelChanged(newModel);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({ model: newModel });
+    });
+  });
 });

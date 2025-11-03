@@ -48,6 +48,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  type ModelChangedPayload,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -258,16 +259,22 @@ export const AppContainer = (props: AppContainerProps) => {
     [historyManager.addItem],
   );
 
-  // Subscribe to fallback mode changes from core
+  // Subscribe to fallback mode and model changes from core
   useEffect(() => {
     const handleFallbackModeChanged = () => {
       const effectiveModel = getEffectiveModel();
       setCurrentModel(effectiveModel);
     };
 
+    const handleModelChanged = (payload: ModelChangedPayload) => {
+      setCurrentModel(payload.model);
+    };
+
     coreEvents.on(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+    coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
     return () => {
       coreEvents.off(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+      coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
     };
   }, [getEffectiveModel]);
 
