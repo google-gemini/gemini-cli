@@ -65,7 +65,8 @@
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
-    }
+    },
+    "vite": "7.1.11"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
