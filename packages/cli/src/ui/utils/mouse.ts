@@ -37,6 +37,40 @@ export interface MouseEvent {
 
 export type MouseHandler = (event: MouseEvent) => void;
 
+export function getMouseEventName(
+  buttonCode: number,
+  isRelease: boolean,
+): MouseEventName | null {
+  const isMove = (buttonCode & 32) !== 0;
+
+  if (buttonCode === 66) {
+    return 'scroll-left';
+  } else if (buttonCode === 67) {
+    return 'scroll-right';
+  } else if ((buttonCode & 64) === 64) {
+    if ((buttonCode & 1) === 0) {
+      return 'scroll-up';
+    } else {
+      return 'scroll-down';
+    }
+  } else if (isMove) {
+    return 'move';
+  } else {
+    const button = buttonCode & 3;
+    const type = isRelease ? 'release' : 'press';
+    switch (button) {
+      case 0:
+        return `left-${type}`;
+      case 1:
+        return `middle-${type}`;
+      case 2:
+        return `right-${type}`;
+      default:
+        return null;
+    }
+  }
+}
+
 export function parseSGRMouseEvent(
   buffer: string,
 ): { event: MouseEvent; length: number } | null {
@@ -52,39 +86,8 @@ export function parseSGRMouseEvent(
     const shift = (buttonCode & 4) !== 0;
     const meta = (buttonCode & 8) !== 0;
     const ctrl = (buttonCode & 16) !== 0;
-    const isMove = (buttonCode & 32) !== 0;
 
-    let name: MouseEventName | null = null;
-
-    if (buttonCode === 66) {
-      name = 'scroll-left';
-    } else if (buttonCode === 67) {
-      name = 'scroll-right';
-    } else if ((buttonCode & 64) === 64) {
-      if ((buttonCode & 1) === 0) {
-        name = 'scroll-up';
-      } else {
-        name = 'scroll-down';
-      }
-    } else if (isMove) {
-      name = 'move';
-    } else {
-      const button = buttonCode & 3;
-      const type = isRelease ? 'release' : 'press';
-      switch (button) {
-        case 0:
-          name = `left-${type}`;
-          break;
-        case 1:
-          name = `middle-${type}`;
-          break;
-        case 2:
-          name = `right-${type}`;
-          break;
-        default:
-          break;
-      }
-    }
+    const name = getMouseEventName(buttonCode, isRelease);
 
     if (name) {
       return {

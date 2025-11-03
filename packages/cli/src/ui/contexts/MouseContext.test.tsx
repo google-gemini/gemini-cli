@@ -26,13 +26,11 @@ class MockStdin extends EventEmitter {
   setRawMode = vi.fn();
   override on = this.addListener;
   override removeListener = super.removeListener;
-  write = vi.fn();
   resume = vi.fn();
   pause = vi.fn();
 
-  // Helper to simulate a keypress event
-  send(data: string) {
-    this.emit('data', Buffer.from(data));
+  write(text: string) {
+    this.emit('data', text);
   }
 }
 
@@ -64,7 +62,7 @@ describe('MouseContext', () => {
     });
 
     act(() => {
-      stdin.send('\x1b[<0;10;20M');
+      stdin.write('\x1b[<0;10;20M');
     });
 
     expect(handler).toHaveBeenCalledTimes(1);
@@ -74,7 +72,7 @@ describe('MouseContext', () => {
     });
 
     act(() => {
-      stdin.send('\x1b[<0;10;20M');
+      stdin.write('\x1b[<0;10;20M');
     });
 
     expect(handler).toHaveBeenCalledTimes(1);
@@ -87,7 +85,7 @@ describe('MouseContext', () => {
     });
 
     act(() => {
-      stdin.send('\x1b[<0;10;20M');
+      stdin.write('\x1b[<0;10;20M');
     });
 
     expect(handler).not.toHaveBeenCalled();
@@ -181,7 +179,7 @@ describe('MouseContext', () => {
         const { result } = renderHook(() => useMouseContext(), { wrapper });
         act(() => result.current.subscribe(mouseHandler));
 
-        act(() => stdin.send(sequence));
+        act(() => stdin.write(sequence));
 
         expect(mouseHandler).toHaveBeenCalledWith(
           expect.objectContaining({ ...expected }),
