@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Cache all client metadata.
-let clientMetadata: ClientMetadata | undefined;
+let clientMetadataPromise: Promise<ClientMetadata> | undefined;
 
 function getPlatform(): Platform {
   const platform = process.platform;
@@ -43,13 +43,13 @@ function getPlatform(): Platform {
  * The client metadata is cached so that it is only computed once per session.
  */
 export async function getClientMetadata(): Promise<ClientMetadata> {
-  if (!clientMetadata) {
-    clientMetadata = {
-      ide_type: 'GEMINI_CLI',
-      ide_version: process.env['CLI_VERSION'] || process.version,
-      platform: getPlatform(),
-      update_channel: await getReleaseChannel(__dirname),
-    };
+  if (!clientMetadataPromise) {
+    clientMetadataPromise = (async () => ({
+        ide_type: 'GEMINI_CLI',
+        ide_version: process.env['CLI_VERSION'] || process.version,
+        platform: getPlatform(),
+        update_channel: await getReleaseChannel(__dirname),
+      }))();
   }
-  return clientMetadata;
+  return await clientMetadataPromise;
 }

@@ -157,7 +157,10 @@ export class CodeAssistServer implements ContentGenerator {
   async listExperiments(
     metadata: ClientMetadata,
   ): Promise<ListExperimentsResponse> {
-    const projectId = this.projectId || '';
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
     const req: ListExperimentsRequest = {
       project: projectId,
       metadata: { ...metadata, duet_project: projectId },

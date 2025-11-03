@@ -13,7 +13,7 @@ export interface Experiments {
   experimentIds: number[];
 }
 
-let experiments: Experiments | undefined;
+let experimentsPromise: Promise<Experiments> | undefined;
 
 /**
  * Gets the experiments from the server.
@@ -23,14 +23,16 @@ let experiments: Experiments | undefined;
 export async function getExperiments(
   server: CodeAssistServer,
 ): Promise<Experiments> {
-  if (experiments) {
-    return experiments;
+  if (experimentsPromise) {
+    return await experimentsPromise;
   }
 
-  const metadata = await getClientMetadata();
-  const response = await server.listExperiments(metadata);
-  experiments = parseExperiments(response);
-  return experiments;
+  experimentsPromise = (async () => {
+    const metadata = await getClientMetadata();
+    const response = await server.listExperiments(metadata);
+    return parseExperiments(response);
+  })();
+  return await experimentsPromise;
 }
 
 function parseExperiments(response: ListExperimentsResponse): Experiments {
