@@ -1323,6 +1323,274 @@ const SETTINGS_SCHEMA = {
 
 export type SettingsSchemaType = typeof SETTINGS_SCHEMA;
 
+export type SettingsJsonSchemaDefinition = Record<string, unknown>;
+
+export const SETTINGS_SCHEMA_DEFINITIONS: Record<
+  string,
+  SettingsJsonSchemaDefinition
+> = {
+  MCPServerConfig: {
+    type: 'object',
+    description:
+      'Definition of a Model Context Protocol (MCP) server configuration.',
+    additionalProperties: false,
+    properties: {
+      command: {
+        type: 'string',
+        description: 'Executable invoked for stdio transport.',
+      },
+      args: {
+        type: 'array',
+        description: 'Command-line arguments for the stdio transport command.',
+        items: { type: 'string' },
+      },
+      env: {
+        type: 'object',
+        description: 'Environment variables to set for the server process.',
+        additionalProperties: { type: 'string' },
+      },
+      cwd: {
+        type: 'string',
+        description: 'Working directory for the server process.',
+      },
+      url: {
+        type: 'string',
+        description: 'SSE transport URL.',
+      },
+      httpUrl: {
+        type: 'string',
+        description: 'Streaming HTTP transport URL.',
+      },
+      headers: {
+        type: 'object',
+        description: 'Additional HTTP headers sent to the server.',
+        additionalProperties: { type: 'string' },
+      },
+      tcp: {
+        type: 'string',
+        description: 'TCP address for websocket transport.',
+      },
+      timeout: {
+        type: 'number',
+        description: 'Timeout in milliseconds for MCP requests.',
+      },
+      trust: {
+        type: 'boolean',
+        description:
+          'Marks the server as trusted. Trusted servers may gain additional capabilities.',
+      },
+      description: {
+        type: 'string',
+        description: 'Human-readable description of the server.',
+      },
+      includeTools: {
+        type: 'array',
+        description:
+          'Subset of tools that should be enabled for this server. When omitted all tools are enabled.',
+        items: { type: 'string' },
+      },
+      excludeTools: {
+        type: 'array',
+        description:
+          'Tools that should be disabled for this server even if exposed.',
+        items: { type: 'string' },
+      },
+      extension: {
+        type: 'object',
+        description:
+          'Metadata describing the Gemini CLI extension that owns this MCP server.',
+        additionalProperties: { type: ['string', 'boolean', 'number'] },
+      },
+      oauth: {
+        type: 'object',
+        description: 'OAuth configuration for authenticating with the server.',
+        additionalProperties: true,
+      },
+      authProviderType: {
+        type: 'string',
+        description:
+          'Authentication provider used for acquiring credentials (for example `dynamic_discovery`).',
+        enum: [
+          'dynamic_discovery',
+          'google_credentials',
+          'service_account_impersonation',
+        ],
+      },
+      targetAudience: {
+        type: 'string',
+        description:
+          'OAuth target audience (CLIENT_ID.apps.googleusercontent.com).',
+      },
+      targetServiceAccount: {
+        type: 'string',
+        description:
+          'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+    },
+  },
+  TelemetrySettings: {
+    type: 'object',
+    description: 'Telemetry configuration for Gemini CLI.',
+    additionalProperties: false,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        description: 'Enables telemetry emission.',
+      },
+      target: {
+        type: 'string',
+        description:
+          'Telemetry destination (for example `stderr`, `stdout`, or `otlp`).',
+      },
+      otlpEndpoint: {
+        type: 'string',
+        description: 'Endpoint for OTLP exporters.',
+      },
+      otlpProtocol: {
+        type: 'string',
+        description: 'Protocol for OTLP exporters.',
+        enum: ['grpc', 'http'],
+      },
+      logPrompts: {
+        type: 'boolean',
+        description: 'Whether prompts are logged in telemetry payloads.',
+      },
+      outfile: {
+        type: 'string',
+        description: 'File path for writing telemetry output.',
+      },
+      useCollector: {
+        type: 'boolean',
+        description: 'Whether to forward telemetry to an OTLP collector.',
+      },
+    },
+  },
+  BugCommandSettings: {
+    type: 'object',
+    description: 'Configuration for the bug report helper command.',
+    additionalProperties: false,
+    properties: {
+      urlTemplate: {
+        type: 'string',
+        description:
+          'Template used to open a bug report URL. Variables in the template are populated at runtime.',
+      },
+    },
+    required: ['urlTemplate'],
+  },
+  SummarizeToolOutputSettings: {
+    type: 'object',
+    description:
+      'Controls summarization behavior for individual tools. All properties are optional.',
+    additionalProperties: false,
+    properties: {
+      tokenBudget: {
+        type: 'number',
+        description:
+          'Maximum number of tokens used when summarizing tool output.',
+      },
+    },
+  },
+  CustomTheme: {
+    type: 'object',
+    description:
+      'Custom theme definition used for styling Gemini CLI output. Colors are provided as hex strings or named ANSI colors.',
+    additionalProperties: false,
+    properties: {
+      type: {
+        type: 'string',
+        enum: ['custom'],
+        default: 'custom',
+      },
+      name: {
+        type: 'string',
+        description: 'Theme display name.',
+      },
+      text: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          primary: { type: 'string' },
+          secondary: { type: 'string' },
+          link: { type: 'string' },
+          accent: { type: 'string' },
+        },
+      },
+      background: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          primary: { type: 'string' },
+          diff: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              added: { type: 'string' },
+              removed: { type: 'string' },
+            },
+          },
+        },
+      },
+      border: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          default: { type: 'string' },
+          focused: { type: 'string' },
+        },
+      },
+      ui: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          comment: { type: 'string' },
+          symbol: { type: 'string' },
+          gradient: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
+      status: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          error: { type: 'string' },
+          success: { type: 'string' },
+          warning: { type: 'string' },
+        },
+      },
+      Background: { type: 'string' },
+      Foreground: { type: 'string' },
+      LightBlue: { type: 'string' },
+      AccentBlue: { type: 'string' },
+      AccentPurple: { type: 'string' },
+      AccentCyan: { type: 'string' },
+      AccentGreen: { type: 'string' },
+      AccentYellow: { type: 'string' },
+      AccentRed: { type: 'string' },
+      DiffAdded: { type: 'string' },
+      DiffRemoved: { type: 'string' },
+      Comment: { type: 'string' },
+      Gray: { type: 'string' },
+      DarkGray: { type: 'string' },
+      GradientColors: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    required: ['type', 'name'],
+  },
+  StringOrStringArray: {
+    description: 'Accepts either a single string or an array of strings.',
+    anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+  },
+  BooleanOrString: {
+    description: 'Accepts either a boolean flag or a string command name.',
+    anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  },
+};
+
 export function getSettingsSchema(): SettingsSchemaType {
   return SETTINGS_SCHEMA;
 }
