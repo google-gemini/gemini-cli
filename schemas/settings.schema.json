@@ -832,8 +832,8 @@
             "thinkingBudget": {
               "title": "Thinking Budget",
               "description": "The thinking budget for the Codebase Investigator agent.",
-              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `-1`",
-              "default": -1,
+              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `8192`",
+              "default": 8192,
               "type": "number"
             },
             "model": {
