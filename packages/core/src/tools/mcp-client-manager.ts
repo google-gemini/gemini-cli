@@ -267,7 +267,7 @@ export class McpClientManager {
         try {
           await this.maybeDiscoverMcpServer(name, client.getServerConfig());
         } catch (error) {
-          console.error(
+          debugLogger.error(
             `Error restarting client '${name}': ${getErrorMessage(error)}`,
           );
         }
