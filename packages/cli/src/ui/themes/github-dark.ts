@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const githubDarkColors: ColorsTheme = {
   type: 'dark',
@@ -21,6 +22,7 @@ const githubDarkColors: ColorsTheme = {
   DiffRemoved: '#502125',
   Comment: '#6A737D',
   Gray: '#6A737D',
+  DarkGray: interpolateColor('#6A737D', '#24292e', 0.5),
   GradientColors: ['#79B8FF', '#85E89D'],
 };
 
