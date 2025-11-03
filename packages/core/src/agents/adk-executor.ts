@@ -53,6 +53,7 @@ import { templateString } from './utils.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
 import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
 import { MessageBusPlugin } from '../confirmation-bus/message-bus-plugin.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 async function createAdkAgent<TOutput extends z.ZodTypeAny>(
   config: Config,
@@ -244,6 +245,12 @@ export class AdkAgentExecutor<TOutput extends z.ZodTypeAny>
   }
 
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
+    debugLogger.debug(
+      '[ADK Executor] Running agent as subagent: ',
+      this.definition.name,
+    );
+    debugLogger.debug('[ADK Executor] Using model: ', this.config.getModel());
+
     const startTime = Date.now();
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
 
