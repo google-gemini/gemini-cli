@@ -56,6 +56,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   output_format: OutputFormat;
   extensions_count: number;
   extension_ids: string;
+  gha_name?: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -90,6 +91,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     const extensions = config.getExtensions();
     this.extensions_count = extensions.length;
     this.extension_ids = extensions.map((e) => e.id).join(',');
+    this.gha_name = config.getGhaName();
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -123,6 +125,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       output_format: this.output_format,
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
+      gha_name: this.gha_name,
     };
   }
 

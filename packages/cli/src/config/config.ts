@@ -651,6 +651,7 @@ export async function loadCliConfig(
       settings.experimental?.codebaseInvestigatorSettings,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
+    ghaName: process.env['GHA_NAME'],
   });
 }
 

@@ -456,6 +456,12 @@ export class ClearcutLogger {
         value: event.extension_ids.toString(),
       },
     ];
+    if (event.gha_name) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GHA_NAME,
+        value: event.gha_name,
+      });
+    }
     this.sessionData = data;
 
     // Flush start event immediately

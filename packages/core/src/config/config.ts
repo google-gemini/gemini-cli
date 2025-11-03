@@ -285,6 +285,7 @@ export interface ConfigParameters {
   enableShellOutputEfficiency?: boolean;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  ghaName?: string;
 }
 
 export class Config {
@@ -382,6 +383,7 @@ export class Config {
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly disableYoloMode: boolean;
+  private readonly ghaName: string | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -499,6 +501,7 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.ghaName = params.ghaName;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -874,6 +877,10 @@ export class Config {
 
   getUsageStatisticsEnabled(): boolean {
     return this.usageStatisticsEnabled;
+  }
+
+  getGhaName(): string | undefined {
+    return this.ghaName;
   }
 
   getExperimentalZedIntegration(): boolean {
