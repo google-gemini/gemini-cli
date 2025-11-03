@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from 'react'; // Added useRef
 export const useLoadingIndicator = (
   streamingState: StreamingState,
   customWittyPhrases?: string[],
+  isInteractiveShellWaiting: boolean = false,
 ) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
@@ -23,6 +24,7 @@ export const useLoadingIndicator = (
   const currentLoadingPhrase = usePhraseCycler(
     isPhraseCyclingActive,
     isWaiting,
+    isInteractiveShellWaiting,
     customWittyPhrases,
   );
 
