@@ -50,12 +50,18 @@ const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
   mockExecuteToolCall: vi.fn(),
 }));
 
+let mockChatHistory: Content[] = [];
+
 vi.mock('../core/geminiChat.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../core/geminiChat.js')>();
   return {
     ...actual,
     GeminiChat: vi.fn().mockImplementation(() => ({
       sendMessageStream: mockSendMessageStream,
+      getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
+      setHistory: vi.fn((newHistory: Content[]) => {
+        mockChatHistory = newHistory;
+      }),
     })),
   };
 });
@@ -204,6 +210,8 @@ describe('AgentExecutor', () => {
       () =>
         ({
           sendMessageStream: mockSendMessageStream,
+          getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
+          getLastPromptTokenCount: vi.fn(() => 100),
         }) as unknown as GeminiChat,
     );
 
