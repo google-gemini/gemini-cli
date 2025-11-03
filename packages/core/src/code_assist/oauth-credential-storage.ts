@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 import { GEMINI_DIR } from '../utils/paths.js';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents } from '../utils/events.js';
 
 const KEYCHAIN_SERVICE_NAME = 'gemini-cli-oauth';
 const MAIN_ACCOUNT_KEY = 'main-account';
