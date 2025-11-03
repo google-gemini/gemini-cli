@@ -145,6 +145,7 @@ describe('SubagentInvocation', () => {
     it('should initialize and run the executor successfully', async () => {
       const mockOutput = {
         result: 'Analysis complete.',
+        displayResult: 'Analysis complete.',
         terminate_reason: AgentTerminateMode.GOAL,
       };
       mockExecutorInstance.run.mockResolvedValue(mockOutput);
@@ -163,11 +164,14 @@ describe('SubagentInvocation', () => {
       expect(result.llmContent).toEqual([
         {
           text: expect.stringContaining(
-            "Subagent 'MockAgent' finished.\nTermination Reason: GOAL\nResult:\nAnalysis complete.",
+            "Subagent 'MockAgent' finished.\nTermination Reason: GOAL\nResult:\nAnalysis complete.\nThe result has also been saved to a file:",
           ),
         },
       ]);
-      expect(result.returnDisplay).toContain('Result:\nAnalysis complete.');
+      expect(result.returnDisplay).toContain(
+        'Result summary: Analysis complete.',
+      );
+      expect(result.returnDisplay).toContain('Full result saved to');
       expect(result.returnDisplay).toContain('Termination Reason:\n GOAL');
     });
 
@@ -189,7 +193,11 @@ describe('SubagentInvocation', () => {
             data: { text: ' Still thinking.' },
           } as SubagentActivityEvent);
         }
-        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+        return {
+          result: 'Done',
+          displayResult: 'Done',
+          terminate_reason: AgentTerminateMode.GOAL,
+        };
       });
 
       await invocation.execute(signal, updateOutput);
@@ -218,7 +226,11 @@ describe('SubagentInvocation', () => {
             data: { error: 'Failed' },
           } as SubagentActivityEvent);
         }
-        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+        return {
+          result: 'Done',
+          displayResult: 'Done',
+          terminate_reason: AgentTerminateMode.GOAL,
+        };
       });
 
       await invocation.execute(signal, updateOutput);
@@ -240,13 +252,17 @@ describe('SubagentInvocation', () => {
             data: { text: 'Thinking silently.' },
           } as SubagentActivityEvent);
         }
-        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+        return {
+          result: 'Done',
+          displayResult: 'Done',
+          terminate_reason: AgentTerminateMode.GOAL,
+        };
       });
 
       // Execute without the optional callback
       const result = await invocation.execute(signal);
       expect(result.error).toBeUndefined();
-      expect(result.returnDisplay).toContain('Result:\nDone');
+      expect(result.returnDisplay).toContain('Result summary: Done');
     });
 
     it('should handle executor run failure', async () => {
