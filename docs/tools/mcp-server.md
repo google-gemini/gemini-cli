@@ -969,7 +969,8 @@ gemini mcp add --transport sse --header "Authorization: Bearer abc123" secure-ss
 ### Listing Servers (`gemini mcp list`)
 
 To view all MCP servers currently configured, use the `list` command. It
-displays each server's name, configuration details, and connection status.
+displays each server's name, configuration details, and connection status. This
+command has no flags.
 
 **Command:**
 
@@ -995,6 +996,10 @@ server's name.
 ```bash
 gemini mcp remove <name>
 ```
+
+**Options (Flags):**
+
+- `-s, --scope`: Configuration scope (user or project). [default: "project"]
 
 **Example:**
 

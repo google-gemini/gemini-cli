@@ -93,7 +93,7 @@ export const ShellConfirmationDialog: React.FC<
           >
             {commands.map((cmd) => (
               <Text key={cmd} color={theme.text.link}>
-                <RenderInline text={cmd} />
+                <RenderInline text={cmd} defaultColor={theme.text.link} />
               </Text>
             ))}
           </Box>
