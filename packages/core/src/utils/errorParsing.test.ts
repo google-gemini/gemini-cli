@@ -18,7 +18,7 @@ describe('parseAndFormatApiError', () => {
     const errorMessage =
       'got status: 400 Bad Request. {"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"}}';
     const expected =
-      '[API Error: API key not valid. Please pass a valid API key. (Status: INVALID_ARGUMENT)]';
+      'API Error: API key not valid. Please pass a valid API key. (Status: INVALID_ARGUMENT)';
     expect(parseAndFormatApiError(errorMessage)).toBe(expected);
   });
 
@@ -32,7 +32,7 @@ describe('parseAndFormatApiError', () => {
       'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
-    expect(result).toContain('[API Error: Rate limit exceeded');
+    expect(result).toContain('API Error: Rate limit exceeded');
     expect(result).toContain(
       'Possible quota limitations in place or slow response times detected. Switching to the gemini-2.5-flash model',
     );
@@ -42,28 +42,28 @@ describe('parseAndFormatApiError', () => {
     const errorMessage =
       'got status: 429 Too Many Requests. {"error":{"code":429,"message":"Rate limit exceeded","status":"RESOURCE_EXHAUSTED"}}';
     const result = parseAndFormatApiError(errorMessage, AuthType.USE_VERTEX_AI);
-    expect(result).toContain('[API Error: Rate limit exceeded');
+    expect(result).toContain('API Error: Rate limit exceeded');
     expect(result).toContain(vertexMessage);
   });
 
   it('should return the original message if it is not a JSON error', () => {
     const errorMessage = 'This is a plain old error message';
     expect(parseAndFormatApiError(errorMessage)).toBe(
-      `[API Error: ${errorMessage}]`,
+      `API Error: ${errorMessage}`,
     );
   });
 
   it('should return the original message for malformed JSON', () => {
     const errorMessage = '[Stream Error: {"error": "malformed}';
     expect(parseAndFormatApiError(errorMessage)).toBe(
-      `[API Error: ${errorMessage}]`,
+      `API Error: ${errorMessage}`,
     );
   });
 
   it('should handle JSON that does not match the ApiError structure', () => {
     const errorMessage = '[Stream Error: {"not_an_error": "some other json"}]';
     expect(parseAndFormatApiError(errorMessage)).toBe(
-      `[API Error: ${errorMessage}]`,
+      `API Error: ${errorMessage}`,
     );
   });
 
@@ -95,8 +95,21 @@ describe('parseAndFormatApiError', () => {
       message: 'A structured error occurred',
       status: 500,
     };
-    const expected = '[API Error: A structured error occurred]';
+    const expected = 'API Error: A structured error occurred';
     expect(parseAndFormatApiError(error)).toBe(expected);
+  });
+
+  it('should unwrap JSON messages inside a StructuredError', () => {
+    const nestedMessage =
+      '{"error":{"message":"{\\n  \\"error\\": {\\n    \\"code\\": 400,\\n    \\"message\\": \\"API key not valid. Please pass a valid API key.\\",\\n    \\"status\\": \\"INVALID_ARGUMENT\\",\\n    \\"details\\": []\\n  }\\n}\\n","code":400,"status":"Bad Request"}}';
+    const error: StructuredError = {
+      message: `Failed to generate JSON content: ${nestedMessage}`,
+    };
+
+    const result = parseAndFormatApiError(error);
+    expect(result).toBe(
+      'API Error: API key not valid. Please pass a valid API key. (Status: Bad Request)',
+    );
   });
 
   it('should format a 429 StructuredError with the vertex message', () => {
@@ -105,13 +118,13 @@ describe('parseAndFormatApiError', () => {
       status: 429,
     };
     const result = parseAndFormatApiError(error, AuthType.USE_VERTEX_AI);
-    expect(result).toContain('[API Error: Rate limit exceeded]');
+    expect(result).toContain('API Error: Rate limit exceeded');
     expect(result).toContain(vertexMessage);
   });
 
   it('should handle an unknown error type', () => {
     const error = 12345;
-    const expected = '[API Error: An unknown error occurred.]';
+    const expected = 'API Error: An unknown error occurred.';
     expect(parseAndFormatApiError(error)).toBe(expected);
   });
 });

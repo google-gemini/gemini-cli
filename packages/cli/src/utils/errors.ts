@@ -62,7 +62,7 @@ function getNumericExitCode(errorCode: string | number): number {
  * Handles errors consistently for both JSON and text output formats.
  * In JSON mode, outputs formatted JSON error and exits.
  * In streaming JSON mode, emits a result event with error status.
- * In text mode, outputs error message and re-throws.
+ * In text mode, outputs error message and exits.
  */
 export function handleError(
   error: unknown,
@@ -103,8 +103,9 @@ export function handleError(
     console.error(formattedError);
     process.exit(getNumericExitCode(errorCode));
   } else {
+    const errorCode = customErrorCode ?? extractErrorCode(error);
     console.error(errorMessage);
-    throw error;
+    process.exit(getNumericExitCode(errorCode));
   }
 }
 
