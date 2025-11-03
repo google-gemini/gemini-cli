@@ -19,6 +19,10 @@ import {
 } from '../../utils/textUtils.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { findPlaceholderCandidates } from '../../utils/parse.js';
+
+// When the pasted content is larger than this threshold, it will be inserted as a placeholder
+const LARGE_PASTE_CHAR_THRESHOLD = 1000;
 
 export type Direction =
   | 'left'
@@ -528,6 +532,11 @@ interface UndoHistoryEntry {
   cursorCol: number;
 }
 
+interface PendingPasteItem {
+  placeholder: string;
+  content: string;
+}
+
 function calculateInitialCursorPosition(
   initialLines: string[],
   offset: number,
@@ -859,6 +868,7 @@ export interface TextBufferState {
   viewportWidth: number;
   viewportHeight: number;
   visualLayout: VisualLayout;
+  pendingPastes: PendingPasteItem[];
 }
 
 const historyLimit = 100;
@@ -879,6 +889,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
+  | { type: 'insert_large_paste_placeholder'; payload: { content: string } }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -914,6 +925,8 @@ export type TextBufferAction =
   | { type: 'move_to_offset'; payload: { offset: number } }
   | { type: 'create_undo_snapshot' }
   | { type: 'set_viewport'; payload: { width: number; height: number } }
+  | { type: 'clear_pending_pastes' }
+  | { type: 'prune_pending_pastes' }
   | { type: 'vim_delete_word_forward'; payload: { count: number } }
   | { type: 'vim_delete_word_backward'; payload: { count: number } }
   | { type: 'vim_delete_word_end'; payload: { count: number } }
@@ -967,6 +980,21 @@ function textBufferReducerLogic(
   const currentLineLen = (r: number): number => cpLen(currentLine(r));
 
   switch (action.type) {
+    case 'clear_pending_pastes': {
+      if (state.pendingPastes.length === 0) return state;
+      return { ...state, pendingPastes: [] };
+    }
+
+    case 'prune_pending_pastes': {
+      if (state.pendingPastes.length === 0) return state;
+      const textAll = state.lines.join('\n');
+      const pruned = state.pendingPastes.filter((p) =>
+        textAll.includes(p.placeholder),
+      );
+      if (pruned.length === state.pendingPastes.length) return state;
+      return { ...state, pendingPastes: pruned };
+    }
+
     case 'set_text': {
       let nextState = state;
       if (action.pushToUndo !== false) {
@@ -1040,7 +1068,94 @@ function textBufferReducerLogic(
       };
     }
 
+    case 'insert_large_paste_placeholder': {
+      const { content } = action.payload;
+      const contentLen = toCodePoints(content).length;
+      const nextState = pushUndoLocal(state);
+      const lineContent = currentLine(nextState.cursorRow);
+      const col = nextState.cursorCol;
+      const lineLenNow = cpLen(lineContent);
+      const charBefore = col > 0 ? cpSlice(lineContent, col - 1, col) : '';
+      const charAfter =
+        col < lineLenNow ? cpSlice(lineContent, col, col + 1) : '';
+      const placeholder = `[Pasted Content ${contentLen} chars]`;
+      let textToInsert = placeholder;
+      if (charBefore && charBefore !== ' ' && charBefore !== '\n')
+        textToInsert = ' ' + textToInsert;
+      if (!charAfter || (charAfter !== ' ' && charAfter !== '\n'))
+        textToInsert = textToInsert + ' ';
+      const replaced = replaceRangeInternal(
+        nextState,
+        nextState.cursorRow,
+        nextState.cursorCol,
+        nextState.cursorRow,
+        nextState.cursorCol,
+        textToInsert,
+      );
+      return {
+        ...replaced,
+        pendingPastes: [...replaced.pendingPastes, { placeholder, content }],
+      };
+    }
+
     case 'backspace': {
+      if (state.pendingPastes && state.pendingPastes.length > 0) {
+        const textAll = state.lines.join('\n');
+        const offset = logicalPosToOffset(
+          state.lines,
+          state.cursorRow,
+          state.cursorCol,
+        );
+        const placeholderCandidates = findPlaceholderCandidates(
+          textAll,
+          new Set(state.pendingPastes.map((p) => p.placeholder)),
+        );
+        const hitIndex = placeholderCandidates.findIndex(
+          (ph) => ph.end === offset,
+        );
+        if (hitIndex !== -1) {
+          const hitPlaceholder = placeholderCandidates[hitIndex];
+          const [startRow, startCol] = offsetToLogicalPos(
+            textAll,
+            hitPlaceholder.start,
+          );
+          const [endRow, endCol] = offsetToLogicalPos(
+            textAll,
+            hitPlaceholder.end,
+          );
+          const nextState = pushUndoLocal(state);
+          const replaced = replaceRangeInternal(
+            nextState,
+            startRow,
+            startCol,
+            endRow,
+            endCol,
+            '',
+          );
+          // Delete the corresponding placeholder in pendingPastes
+          const sameTextBefore =
+            placeholderCandidates
+              .slice(0, hitIndex + 1)
+              .filter((ph) => ph.text === hitPlaceholder.text).length - 1;
+          let count = 0;
+          const newPending = [...replaced.pendingPastes];
+          for (let j = 0; j < newPending.length; j++) {
+            if (newPending[j].placeholder === hitPlaceholder.text) {
+              if (count === sameTextBefore) {
+                newPending.splice(j, 1);
+                break;
+              }
+              count++;
+            }
+          }
+          return {
+            ...replaced,
+            pendingPastes: newPending,
+            preferredCol: null,
+          };
+        }
+      }
+
       const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
@@ -1571,6 +1686,7 @@ export function useTextBuffer({
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       visualLayout,
+      pendingPastes: [],
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -1589,6 +1705,11 @@ export function useTextBuffer({
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
+
+  // Prune pending pastes when text changes
+  useEffect(() => {
+    dispatch({ type: 'prune_pending_pastes' });
+  }, [text]);
 
   const visualCursor = useMemo(
     () => calculateVisualCursorFromLayout(visualLayout, [cursorRow, cursorCol]),
@@ -1920,6 +2041,14 @@ export function useTextBuffer({
       if (key.paste) {
         // Do not do any other processing on pastes so ensure we handle them
         // before all other cases.
+        const len = toCodePoints(input).length;
+        if (len > LARGE_PASTE_CHAR_THRESHOLD) {
+          dispatch({
+            type: 'insert_large_paste_placeholder',
+            payload: { content: input },
+          });
+          return;
+        }
         insert(input, { paste: key.paste });
         return;
       }
@@ -1959,9 +2088,9 @@ export function useTextBuffer({
         key.name === 'backspace' ||
         input === '\x7f' ||
         (key.ctrl && key.name === 'h')
-      )
+      ) {
         backspace();
-      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
+      } else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (key.ctrl && !key.shift && key.name === 'z') undo();
       else if (key.ctrl && key.shift && key.name === 'z') redo();
       else if (input && !key.ctrl && !key.meta && key.name !== 'tab') {
@@ -2016,6 +2145,49 @@ export function useTextBuffer({
     dispatch({ type: 'move_to_offset', payload: { offset } });
   }, []);
 
+  const expandPlaceholders = useCallback(
+    (input: string): string => {
+      if (state.pendingPastes.length === 0) return input;
+
+      const placeholderSet = new Set(
+        state.pendingPastes.map((p) => p.placeholder),
+      );
+      const candidates = findPlaceholderCandidates(input, placeholderSet);
+
+      if (candidates.length === 0) return input;
+
+      const placeholderToContent = new Map<string, string>();
+      for (const item of state.pendingPastes) {
+        if (!placeholderToContent.has(item.placeholder)) {
+          placeholderToContent.set(item.placeholder, item.content);
+        }
+      }
+
+      let result = '';
+      let lastEnd = 0;
+
+      for (const candidate of candidates) {
+        result += input.slice(lastEnd, candidate.start);
+        const content = placeholderToContent.get(candidate.text);
+        result += content ?? candidate.text;
+        lastEnd = candidate.end;
+      }
+      result += input.slice(lastEnd);
+
+      return result;
+    },
+    [state.pendingPastes],
+  );
+
+  const clearPendingPastes = useCallback((): void => {
+    dispatch({ type: 'clear_pending_pastes' });
+  }, []);
+
+  const pastePlaceholders = useMemo(
+    () => state.pendingPastes.map((p) => p.placeholder),
+    [state.pendingPastes],
+  );
+
   const returnValue: TextBuffer = useMemo(
     () => ({
       lines,
@@ -2029,6 +2201,7 @@ export function useTextBuffer({
       visualCursor,
       visualScrollRow,
       visualToLogicalMap,
+      pastePlaceholders,
 
       setText,
       insert,
@@ -2037,6 +2210,8 @@ export function useTextBuffer({
       del,
       move,
       undo,
+      expandPlaceholders,
+      clearPendingPastes,
       redo,
       replaceRange,
       replaceRangeByOffset,
@@ -2143,6 +2318,9 @@ export function useTextBuffer({
       vimMoveToLine,
       vimEscapeInsertMode,
       visualToLogicalMap,
+      clearPendingPastes,
+      pastePlaceholders,
+      expandPlaceholders,
     ],
   );
   return returnValue;
@@ -2173,6 +2351,7 @@ export interface TextBuffer {
    * begins within the logical buffer. Indices are code-point based.
    */
   visualToLogicalMap: Array<[number, number]>;
+  pastePlaceholders: string[]; // Current placeholder tokens to highlight
 
   // Actions
 
@@ -2191,6 +2370,14 @@ export interface TextBuffer {
   move: (dir: Direction) => void;
   undo: () => void;
   redo: () => void;
+  /**
+   * Expand placeholder tokens into their original content.
+   */
+  expandPlaceholders: (input: string) => string;
+  /**
+   * Clear all pending paste placeholders.
+   */
+  clearPendingPastes: () => void;
   /**
    * Replaces the text within the specified range with new text.
    * Handles both single-line and multi-line ranges.
