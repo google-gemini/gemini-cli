@@ -305,7 +305,15 @@ describe('CoreToolScheduler', () => {
         if (name === 'mockTool3') return mockTool3;
         return undefined;
       },
-      ...createMockToolRegistry(mockTool1),
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => undefined,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
     } as unknown as ToolRegistry;
 
     const mockConfig = createMockConfig({
@@ -686,97 +694,34 @@ describe('convertToFunctionResponse', () => {
     {
       name: 'simple string',
       input: 'Simple text output',
-      expected: [
-        {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { output: 'Simple text output' },
-          },
-        },
-      ],
     },
     {
       name: 'single Part with text',
       input: { text: 'Text from Part object' } as Part,
-      expected: [
-        {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { output: 'Text from Part object' },
-          },
-        },
-      ],
     },
     {
       name: 'PartListUnion array with single text Part',
       input: [{ text: 'Text from array' }] as PartListUnion,
-      expected: [
-        {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { output: 'Text from array' },
-          },
-        },
-      ],
     },
     {
       name: 'empty string',
       input: '',
-      expected: [
-        {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { output: '' },
-          },
-        },
-      ],
     },
     {
       name: 'empty array',
       input: [] as PartListUnion,
-      expected: [
-        {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { output: 'Tool execution succeeded.' },
-          },
-        },
-      ],
     },
     {
       name: 'empty Part object',
       input: {} as Part,
-      expected: [
-        {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { output: 'Tool execution succeeded.' },
-          },
-        },
-      ],
     },
     {
       name: 'generic Part (functionCall)',
       input: { functionCall: { name: 'test', args: {} } } as Part,
-      expected: [
-        {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { output: 'Tool execution succeeded.' },
-          },
-        },
-      ],
     },
-  ])('should handle $name llmContent', ({ input, expected }) => {
+  ])('should handle $name llmContent', ({ input }) => {
     const result = convertToFunctionResponse(toolName, callId, input);
-    expect(result).toEqual(expected);
+    expect(result).toMatchSnapshot();
   });
 
   it.each([
@@ -820,16 +765,7 @@ describe('convertToFunctionResponse', () => {
       { text: 'Another text part' },
     ];
     const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
-      ...llmContent,
-    ]);
+    expect(result).toMatchSnapshot();
   });
 });
 
@@ -2009,18 +1945,7 @@ describe('truncateAndSaveToFile', () => {
       content,
     );
 
-    // Should contain the first and last lines with 1/5 head and 4/5 tail
-    const head = Math.floor(TRUNCATE_LINES / 5);
-    const beginning = lines.slice(0, head);
-    const end = lines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-
-    expect(result.content).toContain(
-      'Tool output was too large and has been truncated',
-    );
-    expect(result.content).toContain('Truncated part of the output:');
-    expect(result.content).toContain(expectedTruncated);
+    expect(result.content).toMatchSnapshot();
   });
 
   it('should wrap and truncate content when content has few but long lines', async () => {
@@ -2051,17 +1976,7 @@ describe('truncateAndSaveToFile', () => {
       expectedFileContent,
     );
 
-    // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
-    const head = Math.floor(TRUNCATE_LINES / 5);
-    const beginning = wrappedLines.slice(0, head);
-    const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-    expect(result.content).toContain(
-      'Tool output was too large and has been truncated',
-    );
-    expect(result.content).toContain('Truncated part of the output:');
-    expect(result.content).toContain(expectedTruncated);
+    expect(result.content).toMatchSnapshot();
   });
 
   it('should handle file write errors gracefully', async () => {
@@ -2128,16 +2043,7 @@ describe('truncateAndSaveToFile', () => {
       TRUNCATE_LINES,
     );
 
-    expect(result.content).toContain(
-      'read_file tool with the absolute file path above',
-    );
-    expect(result.content).toContain('read_file tool with offset=0, limit=100');
-    expect(result.content).toContain(
-      'read_file tool with offset=N to skip N lines',
-    );
-    expect(result.content).toContain(
-      'read_file tool with limit=M to read only M lines',
-    );
+    expect(result.content).toMatchSnapshot();
   });
 
   it('should sanitize callId to prevent path traversal', async () => {

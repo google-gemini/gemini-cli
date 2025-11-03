@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Gemini Client (client.ts) > sendMessageStream > Editor context delta > sends full context when history is cleared, even if editor state is unchanged 1`] = `
+"Here is the user's editor context as a JSON object. This is for your information only.
+\`\`\`json
+{
+  "activeFile": {
+    "path": "/path/to/active/file.ts",
+    "cursor": {
+      "line": 5,
+      "character": 10
+    },
+    "selectedText": "hello"
+  }
+}
+\`\`\`"
+`;
+
+exports[`Gemini Client (client.ts) > sendMessageStream > IDE context with pending tool calls > should send a context DELTA on the next message after a skipped context 1`] = `
+"Here is a summary of changes in the user's editor context, in JSON format. This is for your information only.
+\`\`\`json
+{
+  "changes": {
+    "filesOpened": [
+      "/path/to/fileC.ts"
+    ],
+    "filesClosed": [
+      "/path/to/fileA.ts"
+    ],
+    "activeFileChanged": {
+      "path": "/path/to/fileC.ts"
+    }
+  }
+}
+\`\`\`"
+`;
+
+exports[`Gemini Client (client.ts) > sendMessageStream > should include editor context when ideMode is enabled 1`] = `
+{
+  "parts": [
+    {
+      "text": "Here is the user's editor context as a JSON object. This is for your information only.
+\`\`\`json
+{
+  "activeFile": {
+    "path": "/path/to/active/file.ts",
+    "cursor": {
+      "line": 5,
+      "character": 10
+    },
+    "selectedText": "hello"
+  },
+  "otherOpenFiles": [
+    "/path/to/recent/file1.ts",
+    "/path/to/recent/file2.ts"
+  ]
+}
+\`\`\`",
+    },
+  ],
+  "role": "user",
+}
+`;
