@@ -12,7 +12,6 @@ import {
   type PolicySettings,
   createPolicyEngineConfig as createCorePolicyEngineConfig,
   createPolicyUpdater as createCorePolicyUpdater,
-  getPolicyErrorsForUI as getCorePolicyErrorsForUI,
 } from '@google/gemini-cli-core';
 import { type Settings } from './settings.js';
 
@@ -37,13 +36,8 @@ export function createPolicyUpdater(
 ) {
   return createCorePolicyUpdater(policyEngine, messageBus);
 }
+<<<<<<< HEAD
 
-/**
- * Gets and clears any policy errors that were stored during config loading.
- * This should be called once the UI is ready to display errors.
- *
- * @returns Array of formatted error messages, or empty array if no errors
- */
-export function getPolicyErrorsForUI(): string[] {
-  return getCorePolicyErrorsForUI();
-}
+
+=======
+>>>>>>> 1b69692a9 (Address PR feedback from abhipatel12)

@@ -21,13 +21,16 @@ import {
   type UpdatePolicy,
 } from '../confirmation-bus/types.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
+import { coreEvents } from '../utils/events.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 
-// Store policy loading errors to be displayed after UI is ready
-let storedPolicyErrors: string[] = [];
+// Policy tier constants for priority calculation
+export const DEFAULT_POLICY_TIER = 1;
+export const USER_POLICY_TIER = 2;
+export const ADMIN_POLICY_TIER = 3;
 
 /**
  * Gets the list of directories to search for policy files, in order of increasing priority
@@ -64,7 +67,6 @@ export function getPolicyTier(
   const USER_POLICIES_DIR = Storage.getUserPoliciesDir();
   const ADMIN_POLICIES_DIR = Storage.getSystemPoliciesDir();
 
-  // Normalize paths for comparison
   const normalizedDir = path.resolve(dir);
   const normalizedUser = path.resolve(USER_POLICIES_DIR);
   const normalizedAdmin = path.resolve(ADMIN_POLICIES_DIR);
@@ -73,21 +75,19 @@ export function getPolicyTier(
     defaultPoliciesDir &&
     normalizedDir === path.resolve(defaultPoliciesDir)
   ) {
-    return 1;
+    return DEFAULT_POLICY_TIER;
   }
   if (normalizedDir === path.resolve(DEFAULT_CORE_POLICIES_DIR)) {
-    return 1;
+    return DEFAULT_POLICY_TIER;
   }
   if (normalizedDir === normalizedUser) {
-    return 2;
+    return USER_POLICY_TIER;
   }
   if (normalizedDir === normalizedAdmin) {
-    return 3;
+    return ADMIN_POLICY_TIER;
   }
 
-  // Default to tier 1 if unknown, or maybe it should be 2 (user) if it's some other random dir?
-  // Sticking to CLI behavior of defaulting to 1.
-  return 1;
+  return DEFAULT_POLICY_TIER;
 }
 
 /**
@@ -120,10 +120,12 @@ export async function createPolicyEngineConfig(
     (dir) => getPolicyTier(dir, defaultPoliciesDir),
   );
 
-  // Store any errors encountered during TOML loading
-  // These will be emitted by getPolicyErrorsForUI() after the UI is ready.
+  // Emit any errors encountered during TOML loading to the UI
+  // coreEvents has a buffer that will display these once the UI is ready
   if (errors.length > 0) {
-    storedPolicyErrors = errors.map((error) => formatPolicyError(error));
+    for (const error of errors) {
+      coreEvents.emitFeedback('error', formatPolicyError(error));
+    }
   }
 
   const rules: PolicyRule[] = [...tomlRules];
