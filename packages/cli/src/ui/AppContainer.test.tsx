@@ -47,7 +47,7 @@ import {
   UIActionsContext,
   type UIActions,
 } from './contexts/UIActionsContext.js';
-import { useContext } from 'react';
+import { useContext, act } from 'react';
 
 // Mock useStdout to capture terminal title writes
 let mockStdout: { write: ReturnType<typeof vi.fn> };
@@ -1394,6 +1394,42 @@ describe('AppContainer State Management', () => {
         }),
         expect.any(Number),
       );
+    });
+
+    it('updates currentModel when ModelChanged event is received', async () => {
+      // Arrange: Mock initial model
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
+
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Verify initial model
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(capturedUIState?.currentModel).toBe('initial-model');
+        });
+      });
+
+      // Get the registered handler for ModelChanged
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ModelChanged,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      // Act: Simulate ModelChanged event
+      act(() => {
+        handler({ model: 'new-model' });
+      });
+
+      // Assert: Verify model is updated
+      expect(capturedUIState.currentModel).toBe('new-model');
+      unmount();
     });
   });
 });
