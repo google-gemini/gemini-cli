@@ -9,7 +9,6 @@ import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
-import { waitFor } from '../../test-utils/async.js';
 import {
   useReactToolScheduler,
   mapToDisplay,
@@ -295,19 +294,17 @@ describe('useReactToolScheduler', () => {
 
     await scheduleAndWaitForExecution(result.current[1], request);
 
-    await waitFor(() => {
-      expect(mockTool.execute).toHaveBeenCalledWith(request.args);
-      expect(completedToolCalls).toHaveLength(1);
-      expect(completedToolCalls[0].status).toBe('success');
-      expect(completedToolCalls[0].request).toBe(request);
+    expect(mockTool.execute).toHaveBeenCalledWith(request.args);
+    expect(completedToolCalls).toHaveLength(1);
+    expect(completedToolCalls[0].status).toBe('success');
+    expect(completedToolCalls[0].request).toBe(request);
 
-      if (
-        completedToolCalls[0].status === 'success' ||
-        completedToolCalls[0].status === 'error'
-      ) {
-        expect(completedToolCalls[0].response).toMatchSnapshot();
-      }
-    });
+    if (
+      completedToolCalls[0].status === 'success' ||
+      completedToolCalls[0].status === 'error'
+    ) {
+      expect(completedToolCalls[0].response).toMatchSnapshot();
+    }
   });
 
   it('should clear previous tool calls when scheduling new ones', async () => {
@@ -471,25 +468,23 @@ describe('useReactToolScheduler', () => {
 
       await scheduleAndWaitForExecution(result.current[1], request);
 
-      await waitFor(() => {
-        expect(completedToolCalls).toHaveLength(1);
-        expect(completedToolCalls[0].status).toBe('error');
-        expect(completedToolCalls[0].request).toBe(request);
+      expect(completedToolCalls).toHaveLength(1);
+      expect(completedToolCalls[0].status).toBe('error');
+      expect(completedToolCalls[0].request).toBe(request);
 
-        if (expectedErrorContains) {
-          expectedErrorContains.forEach((errorText) => {
-            expect(
-              (completedToolCalls[0] as any).response.error.message,
-            ).toContain(errorText);
-          });
-        }
+      if (expectedErrorContains) {
+        expectedErrorContains.forEach((errorText) => {
+          expect(
+            (completedToolCalls[0] as any).response.error.message,
+          ).toContain(errorText);
+        });
+      }
 
-        if (expectedError) {
-          expect((completedToolCalls[0] as any).response.error.message).toBe(
-            expectedError.message,
-          );
-        }
-      });
+      if (expectedError) {
+        expect((completedToolCalls[0] as any).response.error.message).toBe(
+          expectedError.message,
+        );
+      }
     },
   );
 
