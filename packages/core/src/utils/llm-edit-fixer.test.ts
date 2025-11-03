@@ -325,18 +325,19 @@ describe('FixLLMEditWithInstruction', () => {
     'should return null if the LLM call times out',
     { timeout: 60000 },
     async () => {
-      mockGenerateJson.mockImplementation(async ({ abortSignal }) => {
-        // Simulate a long-running operation that never resolves on its own.
-        // It will only reject when the abort signal is triggered by the timeout.
-        new Promise((_resolve, reject) => {
-          if (abortSignal?.aborted) {
-            return reject(new DOMException('Aborted', 'AbortError'));
-          }
-          abortSignal?.addEventListener('abort', () => {
-            reject(new DOMException('Aborted', 'AbortError'));
-          });
-        });
-      });
+      mockGenerateJson.mockImplementation(
+        async ({ abortSignal }) =>
+          // Simulate a long-running operation that never resolves on its own.
+          // It will only reject when the abort signal is triggered by the timeout.
+          new Promise((_resolve, reject) => {
+            if (abortSignal?.aborted) {
+              return reject(new DOMException('Aborted', 'AbortError'));
+            }
+            abortSignal?.addEventListener('abort', () => {
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          }),
+      );
 
       const testPromptId = 'test-prompt-id-timeout';
 
