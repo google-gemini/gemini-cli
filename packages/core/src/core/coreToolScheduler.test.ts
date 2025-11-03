@@ -177,36 +177,72 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
 async function waitForStatus(
   onToolCallsUpdate: Mock,
   status: 'awaiting_approval' | 'executing' | 'success' | 'error' | 'cancelled',
-  timeout = 5000,
 ): Promise<ToolCall> {
-  return new Promise((resolve, reject) => {
-    const startTime = Date.now();
-    const check = () => {
-      if (Date.now() - startTime > timeout) {
-        const seenStatuses = onToolCallsUpdate.mock.calls
-          .flatMap((call) => call[0])
-          .map((toolCall: ToolCall) => toolCall.status);
-        reject(
-          new Error(
-            `Timed out waiting for status "${status}". Seen statuses: ${seenStatuses.join(
-              ', ',
-            )}`,
-          ),
-        );
-        return;
-      }
-
-      const foundCall = onToolCallsUpdate.mock.calls
+  return vi.waitFor(() => {
+    const foundCall = onToolCallsUpdate.mock.calls
+      .flatMap((call) => call[0])
+      .find((toolCall: ToolCall) => toolCall.status === status);
+    if (!foundCall) {
+      const seenStatuses = onToolCallsUpdate.mock.calls
         .flatMap((call) => call[0])
-        .find((toolCall: ToolCall) => toolCall.status === status);
-      if (foundCall) {
-        resolve(foundCall);
-      } else {
-        setTimeout(check, 10); // Check again in 10ms
-      }
-    };
-    check();
+        .map((toolCall: ToolCall) => toolCall.status);
+      throw new Error(
+        `Waiting for status "${status}". Seen: ${seenStatuses.join(', ')}`,
+      );
+    }
+    return foundCall;
   });
+}
+
+/**
+ * Helper to create a mock config with common defaults
+ */
+function createMockConfig(overrides?: Partial<Config>): Config {
+  return {
+    getSessionId: () => 'test-session-id',
+    getUsageStatisticsEnabled: () => true,
+    getDebugMode: () => false,
+    getApprovalMode: () => ApprovalMode.DEFAULT,
+    getAllowedTools: () => [],
+    getContentGeneratorConfig: () => ({
+      model: 'test-model',
+      authType: 'oauth-personal',
+    }),
+    getShellExecutionConfig: () => ({
+      terminalWidth: 90,
+      terminalHeight: 30,
+    }),
+    storage: { getProjectTempDir: () => '/tmp' },
+    getTruncateToolOutputThreshold: () =>
+      DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+    getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    getUseSmartEdit: () => false,
+    getUseModelRouter: () => false,
+    getGeminiClient: () => null,
+    getEnableMessageBusIntegration: () => false,
+    getMessageBus: () => null,
+    getPolicyEngine: () => null,
+    ...overrides,
+  } as unknown as Config;
+}
+
+/**
+ * Helper to create a mock tool registry
+ */
+function createMockToolRegistry(tool: unknown): ToolRegistry {
+  return {
+    getTool: () => tool,
+    getToolByName: () => tool,
+    getFunctionDeclarations: () => [],
+    tools: new Map(),
+    discovery: {},
+    registerTool: () => {},
+    getToolByDisplayName: () => tool,
+    getTools: () => [],
+    discoverTools: async () => {},
+    getAllTools: () => [],
+    getToolsByServer: () => [],
+  } as unknown as ToolRegistry;
 }
 
 describe('CoreToolScheduler', () => {
@@ -215,52 +251,12 @@ describe('CoreToolScheduler', () => {
       name: 'mockTool',
       shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
     });
-    const declarativeTool = mockTool;
-    const mockToolRegistry = {
-      getTool: () => declarativeTool,
-      getFunctionDeclarations: () => [],
-      tools: new Map(),
-      discovery: {},
-      registerTool: () => {},
-      getToolByName: () => declarativeTool,
-      getToolByDisplayName: () => declarativeTool,
-      getTools: () => [],
-      discoverTools: async () => {},
-      getAllTools: () => [],
-      getToolsByServer: () => [],
-    } as unknown as ToolRegistry;
-
+    const mockToolRegistry = createMockToolRegistry(mockTool);
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
-
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -303,54 +299,20 @@ describe('CoreToolScheduler', () => {
         if (name === 'mockTool3') return mockTool3;
         return undefined;
       },
-      getFunctionDeclarations: () => [],
-      tools: new Map(),
-      discovery: {},
-      registerTool: () => {},
       getToolByName: (name: string) => {
         if (name === 'mockTool1') return mockTool1;
         if (name === 'mockTool2') return mockTool2;
         if (name === 'mockTool3') return mockTool3;
         return undefined;
       },
-      getToolByDisplayName: () => undefined,
-      getTools: () => [],
-      discoverTools: async () => {},
-      getAllTools: () => [],
-      getToolsByServer: () => [],
+      ...createMockToolRegistry(mockTool1),
     } as unknown as ToolRegistry;
 
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
-
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -446,37 +408,11 @@ describe('CoreToolScheduler', () => {
       getToolsByServer: () => [],
     } as unknown as ToolRegistry;
 
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
-
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -689,37 +625,11 @@ describe('CoreToolScheduler with payload', () => {
       getToolsByServer: () => [],
     } as unknown as ToolRegistry;
 
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
-
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getAllowedTools: () => [],
-      getContentGeneratorConfig: () => ({
-        model: 'test-model',
-        authType: 'oauth-personal',
-      }),
-      getShellExecutionConfig: () => ({
-        terminalWidth: 90,
-        terminalHeight: 30,
-      }),
-      storage: {
-        getProjectTempDir: () => '/tmp',
-      },
-      getTruncateToolOutputThreshold: () =>
-        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getToolRegistry: () => mockToolRegistry,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
-      getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
-      getMessageBus: () => null,
-      getPolicyEngine: () => null,
-    } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -772,87 +682,138 @@ describe('convertToFunctionResponse', () => {
   const toolName = 'testTool';
   const callId = 'call1';
 
-  it('should handle simple string llmContent', () => {
-    const llmContent = 'Simple text output';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Simple text output' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a single Part with text', () => {
-    const llmContent: Part = { text: 'Text from Part object' };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Text from Part object' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a PartListUnion array with a single text Part', () => {
-    const llmContent: PartListUnion = [{ text: 'Text from array' }];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Text from array' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent with inlineData', () => {
-    const llmContent: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64...' },
-    };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {
-            output: 'Binary content of type image/png was processed.',
+  it.each([
+    {
+      name: 'simple string',
+      input: 'Simple text output',
+      expected: [
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Simple text output' },
           },
         },
-      },
-      llmContent,
-    ]);
-  });
-
-  it('should handle llmContent with fileData', () => {
-    const llmContent: Part = {
-      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
-    };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {
-            output: 'Binary content of type application/pdf was processed.',
+      ],
+    },
+    {
+      name: 'single Part with text',
+      input: { text: 'Text from Part object' } as Part,
+      expected: [
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Text from Part object' },
           },
         },
-      },
-      llmContent,
-    ]);
+      ],
+    },
+    {
+      name: 'PartListUnion array with single text Part',
+      input: [{ text: 'Text from array' }] as PartListUnion,
+      expected: [
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Text from array' },
+          },
+        },
+      ],
+    },
+    {
+      name: 'empty string',
+      input: '',
+      expected: [
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: '' },
+          },
+        },
+      ],
+    },
+    {
+      name: 'empty array',
+      input: [] as PartListUnion,
+      expected: [
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Tool execution succeeded.' },
+          },
+        },
+      ],
+    },
+    {
+      name: 'empty Part object',
+      input: {} as Part,
+      expected: [
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Tool execution succeeded.' },
+          },
+        },
+      ],
+    },
+    {
+      name: 'generic Part (functionCall)',
+      input: { functionCall: { name: 'test', args: {} } } as Part,
+      expected: [
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Tool execution succeeded.' },
+          },
+        },
+      ],
+    },
+  ])('should handle $name llmContent', ({ input, expected }) => {
+    const result = convertToFunctionResponse(toolName, callId, input);
+    expect(result).toEqual(expected);
   });
 
-  it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
+  it.each([
+    {
+      name: 'inlineData',
+      input: {
+        inlineData: { mimeType: 'image/png', data: 'base64...' },
+      } as Part,
+      outputMsg: 'Binary content of type image/png was processed.',
+    },
+    {
+      name: 'fileData',
+      input: {
+        fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+      } as Part,
+      outputMsg: 'Binary content of type application/pdf was processed.',
+    },
+    {
+      name: 'array with single inlineData Part',
+      input: [
+        { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
+      ] as PartListUnion,
+      outputMsg: 'Binary content of type image/gif was processed.',
+    },
+  ])('should handle $name and include content', ({ input, outputMsg }) => {
+    const result = convertToFunctionResponse(toolName, callId, input);
+    expect(result[0]).toEqual({
+      functionResponse: {
+        name: toolName,
+        id: callId,
+        response: { output: outputMsg },
+      },
+    });
+    expect(result.length).toBeGreaterThan(1);
+  });
+
+  it('should handle array of multiple Parts (text and inlineData)', () => {
     const llmContent: PartListUnion = [
       { text: 'Some textual description' },
       { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
@@ -868,81 +829,6 @@ describe('convertToFunctionResponse', () => {
         },
       },
       ...llmContent,
-    ]);
-  });
-
-  it('should handle llmContent as an array with a single inlineData Part', () => {
-    const llmContent: PartListUnion = [
-      { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
-    ];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {
-            output: 'Binary content of type image/gif was processed.',
-          },
-        },
-      },
-      ...llmContent,
-    ]);
-  });
-
-  it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
-    const llmContent: Part = { functionCall: { name: 'test', args: {} } };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle empty string llmContent', () => {
-    const llmContent = '';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: '' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as an empty array', () => {
-    const llmContent: PartListUnion = [];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
-    const llmContent: Part = {}; // An empty part object
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
     ]);
   });
 });
@@ -1811,13 +1697,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
       .fn()
       .mockImplementation(async (args: { call: number }) => {
         if (args.call === 1) {
-          // First call, wait for a bit to simulate work
-          await new Promise((resolve) => setTimeout(resolve, 50));
           firstCallFinished = true;
           return { llmContent: 'First call done' };
         }
         if (args.call === 2) {
-          // Second call, should only happen after the first is finished
           if (!firstCallFinished) {
             throw new Error(
               'Second tool call started before the first one finished!',
@@ -1939,9 +1822,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
         }
         if (args.call === 2) {
           secondCallStarted = true;
-          // This call will be cancelled while it's "running".
+          // Simulate async work that can be cancelled
           await new Promise((resolve) => setTimeout(resolve, 100));
-          // It should not return a value because it will be cancelled.
           return { llmContent: 'Second call should not complete' };
         }
         if (args.call === 3) {
@@ -2073,6 +1955,14 @@ describe('truncateAndSaveToFile', () => {
   const THRESHOLD = 40_000;
   const TRUNCATE_LINES = 1000;
 
+  function wrapContent(content: string, wrapWidth = 120): string[] {
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    return wrappedLines;
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -2141,11 +2031,7 @@ describe('truncateAndSaveToFile', () => {
 
     mockWriteFile.mockResolvedValue(undefined);
 
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
+    const wrappedLines = wrapContent(content, wrapWidth);
     const expectedFileContent = wrappedLines.join('\n');
 
     const result = await truncateAndSaveToFile(
@@ -2208,11 +2094,7 @@ describe('truncateAndSaveToFile', () => {
 
     mockWriteFile.mockResolvedValue(undefined);
 
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
+    const wrappedLines = wrapContent(content, wrapWidth);
     const expectedFileContent = wrappedLines.join('\n');
 
     const result = await truncateAndSaveToFile(
@@ -2266,11 +2148,7 @@ describe('truncateAndSaveToFile', () => {
 
     mockWriteFile.mockResolvedValue(undefined);
 
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
+    const wrappedLines = wrapContent(content, wrapWidth);
     const expectedFileContent = wrappedLines.join('\n');
 
     await truncateAndSaveToFile(
