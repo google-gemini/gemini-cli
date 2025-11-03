@@ -20,6 +20,7 @@ import {
   type Part,
   type GenerateContentResponse,
   type GenerateContentConfig,
+  type Content,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
