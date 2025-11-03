@@ -147,6 +147,7 @@ vi.mock('../agents/subagent-tool-wrapper.js', () => ({
 
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
+  emitModelChanged: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
