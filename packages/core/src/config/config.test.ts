@@ -958,7 +958,7 @@ describe('Server Config (config.ts)', () => {
 
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
-        'Failed to set invalid proxy from configuration.',
+        'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
         proxyError,
       );
     });

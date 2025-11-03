@@ -521,13 +521,14 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    if (this.getProxy()) {
+    const proxy = this.getProxy();
+    if (proxy) {
       try {
-        setGlobalProxy(this.getProxy() as string);
+        setGlobalProxy(proxy);
       } catch (error) {
         coreEvents.emitFeedback(
           'error',
-          'Failed to set invalid proxy from configuration.',
+          'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
           error,
         );
       }
