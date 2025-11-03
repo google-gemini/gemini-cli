@@ -22,6 +22,7 @@ const ansiColors: ColorsTheme = {
   DiffRemoved: '#4D0000',
   Comment: 'gray',
   Gray: 'gray',
+  DarkGray: 'gray',
   GradientColors: ['cyan', 'green'],
 };
 
