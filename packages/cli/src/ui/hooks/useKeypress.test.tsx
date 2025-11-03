@@ -5,7 +5,7 @@
  */
 
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { useKeypress } from './useKeypress.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { useStdin } from 'ink';
@@ -194,7 +194,7 @@ describe('useKeypress', () => {
         stdin.write('do');
       });
       expect(onKeypress).toHaveBeenCalledWith(
-        expect.objectContaining({ code: '[200d' }),
+        expect.objectContaining({ sequence: '\x1B[200d' }),
       );
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ sequence: 'o' }),

@@ -35,6 +35,7 @@ import type {
   SmartEditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
 } from '../types.js';
@@ -90,6 +91,7 @@ export enum EventNames {
   SMART_EDIT_CORRECTION = 'smart_edit_correction',
   AGENT_START = 'agent_start',
   AGENT_FINISH = 'agent_finish',
+  RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
 }
 
@@ -479,6 +481,7 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT,
         value: event.extensions_count.toString(),
       },
+      // We deliberately do not log the names of extensions here, to be safe.
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
@@ -562,6 +565,12 @@ export class ClearcutLogger {
           });
         }
       }
+    }
+    if (event.extension_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      });
     }
 
     const logEvent = this.createLogEvent(EventNames.TOOL_CALL, data);
@@ -775,6 +784,13 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_STATUS,
         value: JSON.stringify(event.status),
+      });
+    }
+
+    if (event.extension_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
       });
     }
 
@@ -1213,6 +1229,40 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_FINISH, data));
+    this.flushIfNeeded();
+  }
+
+  logRecoveryAttemptEvent(event: RecoveryAttemptEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        value: event.agent_id,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        value: event.agent_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_RECOVERY_REASON,
+        value: event.reason,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_RECOVERY_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_RECOVERY_SUCCESS,
+        value: event.success.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_TURN_COUNT,
+        value: event.turn_count.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.RECOVERY_ATTEMPT, data),
+    );
     this.flushIfNeeded();
   }
 
