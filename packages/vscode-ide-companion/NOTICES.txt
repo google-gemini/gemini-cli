@@ -692,7 +692,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ============================================================
-debug@4.4.1
+debug@4.4.3
 (git://github.com/debug-js/debug.git)
 
 (The MIT License)

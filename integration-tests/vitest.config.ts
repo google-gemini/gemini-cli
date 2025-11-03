@@ -14,11 +14,7 @@ export default defineConfig({
     include: ['**/*.test.ts'],
     retry: 2,
     fileParallelism: true,
-    poolOptions: {
-      threads: {
-        minThreads: 8,
-        maxThreads: 16,
-      },
-    },
+    pool: 'threads',
+    maxWorkers: 16,
   },
 });

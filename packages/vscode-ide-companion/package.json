@@ -134,7 +134,7 @@
     "eslint": "^9.25.1",
     "npm-run-all2": "^8.0.2",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.6"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.1",

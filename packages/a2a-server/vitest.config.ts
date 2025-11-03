@@ -31,12 +31,8 @@ export default defineConfig({
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
     },
-    poolOptions: {
-      threads: {
-        minThreads: 8,
-        maxThreads: 16,
-      },
-    },
+    pool: 'threads',
+    maxWorkers: 16,
     server: {
       deps: {
         inline: [/@google\/gemini-cli-core/],
