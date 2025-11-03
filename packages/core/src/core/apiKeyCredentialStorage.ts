@@ -39,7 +39,12 @@ export async function saveApiKey(
   apiKey: string | null | undefined,
 ): Promise<void> {
   if (!apiKey || apiKey.trim() === '') {
-    await storage.deleteCredentials(DEFAULT_API_KEY_ENTRY);
+    try {
+      await storage.deleteCredentials(DEFAULT_API_KEY_ENTRY);
+    } catch (error: unknown) {
+      // Ignore errors when deleting, as it might not exist
+      debugLogger.warn('Failed to delete API key from storage:', error);
+    }
     return;
   }
 
