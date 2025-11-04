@@ -1716,8 +1716,14 @@ describe('AppContainer State Management', () => {
       const mockCodeAssistServer = {};
       const mockExperiments = { flags: { testFlag: { booleanValue: true } } };
 
-      vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer as any);
-      vi.mocked(getExperiments).mockResolvedValue(mockExperiments as any);
+      vi.mocked(getCodeAssistServer).mockReturnValue(
+        mockCodeAssistServer as unknown as ReturnType<
+          typeof getCodeAssistServer
+        >,
+      );
+      vi.mocked(getExperiments).mockResolvedValue(
+        mockExperiments as unknown as ReturnType<typeof getExperiments>,
+      );
       vi.spyOn(mockConfig, 'setExperiments');
 
       const { unmount } = render(
