@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
+import { useInactivityTimer } from './useInactivityTimer.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 
@@ -33,23 +34,13 @@ export const usePhraseCycler = (
   const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
     loadingPhrases[0],
   );
-  const [showShellFocusHint, setShowShellFocusHint] = useState(false);
+  const showShellFocusHint = useInactivityTimer(
+    isInteractiveShellWaiting,
+    lastOutputTime,
+    5000,
+  );
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstRequestTipRef = useRef(false);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isInteractiveShellWaiting) {
-      // Reset the timer whenever isInteractiveShellWaiting becomes true OR lastOutputTime changes.
-      setShowShellFocusHint(false);
-      timer = setTimeout(() => {
-        setShowShellFocusHint(true);
-      }, 5000);
-    } else {
-      setShowShellFocusHint(false);
-    }
-    return () => clearTimeout(timer);
-  }, [isInteractiveShellWaiting, lastOutputTime]);
 
   useEffect(() => {
     if (isInteractiveShellWaiting && showShellFocusHint) {
