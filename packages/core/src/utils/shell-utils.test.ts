@@ -715,6 +715,7 @@ describe('getShellConfiguration', () => {
       entries: Array<{ name: string; text: string }>;
       allowed: boolean;
       disallowed: string[];
+      allowlistedCommands?: string[];
     };
 
     const scenarios: PowerShellScenario[] = [
@@ -750,11 +751,30 @@ describe('getShellConfiguration', () => {
         disallowed: ['whoami'],
       },
       {
+        label: 'allows additional pipeline commands when allowlisted',
+        command: 'dir; whoami',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'whoami', text: 'whoami' },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['dir', 'whoami'],
+      },
+      {
         label: 'blocks commands hidden inside conditionals',
         command: 'if ($true) { whoami }',
         entries: [{ name: 'whoami', text: 'whoami' }],
         allowed: false,
         disallowed: ['whoami'],
+      },
+      {
+        label: 'allows commands inside conditionals when allowlisted',
+        command: 'if ($true) { whoami }',
+        entries: [{ name: 'whoami', text: 'whoami' }],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['whoami'],
       },
       {
         label: 'detects static scriptblock creation and invocation',
@@ -777,6 +797,28 @@ describe('getShellConfiguration', () => {
         ],
       },
       {
+        label: 'allows static scriptblock invocation when allowlisted',
+        command: "dir; [scriptblock]::Create('calc').Invoke()",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          {
+            name: '[scriptblock]::Create',
+            text: "[scriptblock]::Create('calc')",
+          },
+          {
+            name: "[scriptblock]::Create('calc').Invoke",
+            text: "[scriptblock]::Create('calc').Invoke()",
+          },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: [
+          'dir',
+          "[scriptblock]::Create('calc')",
+          "[scriptblock]::Create('calc').Invoke()",
+        ],
+      },
+      {
         label: 'detects call operator invocations via variables',
         command: "dir; $cmd = 'whoami'; & $cmd",
         entries: [
@@ -785,6 +827,17 @@ describe('getShellConfiguration', () => {
         ],
         allowed: false,
         disallowed: ['& $cmd'],
+      },
+      {
+        label: 'allows variable call operator when allowlisted',
+        command: "dir; $cmd = 'whoami'; & $cmd",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: '& $cmd', text: '& $cmd' },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['dir', '& $cmd'],
       },
       {
         label: 'detects call operator invocations of scriptblocks',
@@ -796,6 +849,18 @@ describe('getShellConfiguration', () => {
         ],
         allowed: false,
         disallowed: ['& { whoami }', 'whoami'],
+      },
+      {
+        label: 'allows scriptblock call operator when allowlisted',
+        command: 'dir; & { whoami }',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: '& { whoami }', text: '& { whoami }' },
+          { name: 'whoami', text: 'whoami' },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['dir', '& { whoami }', 'whoami'],
       },
       {
         label: 'detects static .NET method invocation',
@@ -811,6 +876,20 @@ describe('getShellConfiguration', () => {
         disallowed: ["[Diagnostics.Process]::Start('whoami')"],
       },
       {
+        label: 'allows static .NET invocation when allowlisted',
+        command: "dir; [Diagnostics.Process]::Start('whoami')",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          {
+            name: '[Diagnostics.Process]::Start',
+            text: "[Diagnostics.Process]::Start('whoami')",
+          },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['dir', "[Diagnostics.Process]::Start('whoami')"],
+      },
+      {
         label: 'detects instance method invocation',
         command: 'dir; (Get-Process)[0].Kill()',
         entries: [
@@ -822,6 +901,22 @@ describe('getShellConfiguration', () => {
         disallowed: ['Get-Process', '((Get-Process)[0]).Kill()'],
       },
       {
+        label: 'allows instance method invocation when allowlisted',
+        command: 'dir; (Get-Process)[0].Kill()',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'Get-Process', text: 'Get-Process' },
+          { name: '(Get-Process)[0].Kill', text: '((Get-Process)[0]).Kill()' },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: [
+          'dir',
+          'Get-Process',
+          '((Get-Process)[0]).Kill()',
+        ],
+      },
+      {
         label: 'detects scriptblock delegates invoked via variables',
         command: 'dir; $sb = { whoami }; $sb.Invoke()',
         entries: [
@@ -831,6 +926,18 @@ describe('getShellConfiguration', () => {
         ],
         allowed: false,
         disallowed: ['whoami', '$sb.Invoke()'],
+      },
+      {
+        label: 'allows scriptblock delegate invocation when allowlisted',
+        command: 'dir; $sb = { whoami }; $sb.Invoke()',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'whoami', text: 'whoami' },
+          { name: '$sb.Invoke', text: '$sb.Invoke()' },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['dir', 'whoami', '$sb.Invoke()'],
       },
       {
         label: 'detects call operator with expandable strings',
@@ -846,6 +953,20 @@ describe('getShellConfiguration', () => {
         disallowed: ['& "$env:ComSpec" /c whoami'],
       },
       {
+        label: 'allows call operator expandable string when allowlisted',
+        command: 'dir; & "$env:ComSpec" /c whoami',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          {
+            name: '& "$env:ComSpec" /c whoami',
+            text: '& "$env:ComSpec" /c whoami',
+          },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['dir', '& "$env:ComSpec" /c whoami'],
+      },
+      {
         label: 'detects call operator with nested command expressions',
         command: "dir; & (Join-Path $pwd 'whoami.exe')",
         entries: [
@@ -858,6 +979,25 @@ describe('getShellConfiguration', () => {
         ],
         allowed: false,
         disallowed: [
+          "Join-Path $pwd 'whoami.exe'",
+          "& (Join-Path $pwd 'whoami.exe')",
+        ],
+      },
+      {
+        label: 'allows nested command expression when allowlisted',
+        command: "dir; & (Join-Path $pwd 'whoami.exe')",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'Join-Path', text: "Join-Path $pwd 'whoami.exe'" },
+          {
+            name: "& (Join-Path $pwd 'whoami.exe')",
+            text: "& (Join-Path $pwd 'whoami.exe')",
+          },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: [
+          'dir',
           "Join-Path $pwd 'whoami.exe'",
           "& (Join-Path $pwd 'whoami.exe')",
         ],
