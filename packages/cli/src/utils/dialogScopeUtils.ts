@@ -40,7 +40,7 @@ export function getScopeMessageForSetting(
   settings: LoadedSettings,
 ): string {
   const otherScopes = Object.values(SettingScope).filter(
-    (scope) => scope !== selectedScope,
+    (scope) => scope !== selectedScope && scope !== SettingScope.Session,
   );
 
   const modifiedInOtherScopes = otherScopes.filter((scope) => {
