@@ -30,7 +30,7 @@ export interface ReadFileToolParams {
   /**
    * The absolute path to the file to read
    */
-  absolute_path: string;
+  file_path: string;
 
   /**
    * The line number to start reading from (optional)
@@ -59,19 +59,19 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     const relativePath = makeRelative(
-      this.params.absolute_path,
+      this.params.file_path,
       this.config.getTargetDir(),
     );
     return shortenPath(relativePath);
   }
 
   override toolLocations(): ToolLocation[] {
-    return [{ path: this.params.absolute_path, line: this.params.offset }];
+    return [{ path: this.params.file_path, line: this.params.offset }];
   }
 
   async execute(): Promise<ToolResult> {
     const result = await processSingleFileContent(
-      this.params.absolute_path,
+      this.params.file_path,
       this.config.getTargetDir(),
       this.config.getFileSystemService(),
       this.params.offset,
@@ -111,9 +111,9 @@ ${result.llmContent}`;
       typeof result.llmContent === 'string'
         ? result.llmContent.split('\n').length
         : undefined;
-    const mimetype = getSpecificMimeType(this.params.absolute_path);
+    const mimetype = getSpecificMimeType(this.params.file_path);
     const programming_language = getProgrammingLanguage({
-      absolute_path: this.params.absolute_path,
+      file_path: this.params.file_path,
     });
     logFileOperation(
       this.config,
@@ -122,7 +122,7 @@ ${result.llmContent}`;
         FileOperation.READ,
         lines,
         mimetype,
-        path.extname(this.params.absolute_path),
+        path.extname(this.params.file_path),
         programming_language,
       ),
     );
@@ -154,7 +154,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
       Kind.Read,
       {
         properties: {
-          absolute_path: {
+          file_path: {
             description:
               process.platform === 'win32'
                 ? "The absolute path to the file to read (e.g., 'C:\\Users\\project\\file.txt'). Relative paths are not supported. You must provide an absolute path."
@@ -172,7 +172,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
             type: 'number',
           },
         },
-        required: ['absolute_path'],
+        required: ['file_path'],
         type: 'object',
       },
       true,
@@ -184,9 +184,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
-    const filePath = params.absolute_path;
-    if (params.absolute_path.trim() === '') {
-      return "The 'absolute_path' parameter must be non-empty.";
+    const filePath = params.file_path;
+    if (params.file_path.trim() === '') {
+      return "The 'file_path' parameter must be non-empty.";
     }
 
     if (!path.isAbsolute(filePath)) {
@@ -214,9 +214,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
 
     const fileService = this.config.getFileService();
     const fileFilteringOptions = this.config.getFileFilteringOptions();
-    if (
-      fileService.shouldIgnoreFile(params.absolute_path, fileFilteringOptions)
-    ) {
+    if (fileService.shouldIgnoreFile(params.file_path, fileFilteringOptions)) {
       return `File path '${filePath}' is ignored by configured ignore patterns.`;
     }
 
