@@ -81,6 +81,7 @@ import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -639,7 +640,7 @@ export class Config {
           this.setExperiments(experiments);
         })
         .catch((e) => {
-          console.error(e);
+          debugLogger.error('Failed to fetch experiments', e);
         });
     } else {
       this.experiments = undefined;
@@ -1091,7 +1092,11 @@ export class Config {
     }
 
     if (this.experimentsPromise) {
-      await this.experimentsPromise;
+      try {
+        await this.experimentsPromise;
+      } catch (e) {
+        debugLogger.debug('Failed to fetch experiments', e);
+      }
     }
 
     const remoteThreshold =
