@@ -36,8 +36,3 @@ export function createPolicyUpdater(
 ) {
   return createCorePolicyUpdater(policyEngine, messageBus);
 }
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 1b69692a9 (Address PR feedback from abhipatel12)
