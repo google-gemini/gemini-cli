@@ -75,10 +75,12 @@ export function useReactToolScheduler(
   MarkToolsAsSubmittedFn,
   React.Dispatch<React.SetStateAction<TrackedToolCall[]>>,
   CancelAllFn,
+  number,
 ] {
   const [toolCallsForDisplay, setToolCallsForDisplay] = useState<
     TrackedToolCall[]
   >([]);
+  const [lastToolOutputTime, setLastToolOutputTime] = useState<number>(0);
 
   // Store callbacks in refs to keep them up-to-date without causing re-renders.
   const onCompleteRef = useRef(onComplete);
@@ -99,6 +101,7 @@ export function useReactToolScheduler(
 
   const outputUpdateHandler: OutputUpdateHandler = useCallback(
     (toolCallId, outputChunk) => {
+      setLastToolOutputTime(Date.now());
       setToolCallsForDisplay((prevCalls) =>
         prevCalls.map((tc) => {
           if (tc.request.callId === toolCallId && tc.status === 'executing') {
@@ -217,6 +220,7 @@ export function useReactToolScheduler(
     markToolsAsSubmitted,
     setToolCallsForDisplay,
     cancelAllToolCalls,
+    lastToolOutputTime,
   ];
 }
 

@@ -22,6 +22,7 @@ export const usePhraseCycler = (
   isActive: boolean,
   isWaiting: boolean,
   isInteractiveShellWaiting: boolean,
+  lastOutputTime: number = 0,
   customPhrases?: string[],
 ) => {
   const loadingPhrases =
@@ -39,6 +40,8 @@ export const usePhraseCycler = (
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isInteractiveShellWaiting) {
+      // Reset the timer whenever isInteractiveShellWaiting becomes true OR lastOutputTime changes.
+      setShowShellFocusHint(false);
       timer = setTimeout(() => {
         setShowShellFocusHint(true);
       }, 5000);
@@ -46,7 +49,7 @@ export const usePhraseCycler = (
       setShowShellFocusHint(false);
     }
     return () => clearTimeout(timer);
-  }, [isInteractiveShellWaiting]);
+  }, [isInteractiveShellWaiting, lastOutputTime]);
 
   useEffect(() => {
     if (isInteractiveShellWaiting && showShellFocusHint) {

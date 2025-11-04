@@ -679,6 +679,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    lastOutputTime,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -1090,6 +1091,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     streamingState,
     settings.merged.ui?.customWittyPhrases,
     !!activePtyId && !embeddedShellFocused,
+    lastOutputTime,
   );
 
   const handleGlobalKeypress = useCallback(
