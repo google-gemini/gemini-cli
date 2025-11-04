@@ -873,6 +873,19 @@ describe('getShellConfiguration', () => {
         allowed: false,
         disallowed: ['Write-Output $(whoami)', 'whoami'],
       },
+      {
+        label:
+          'allows subexpression command when all invocations are allowlisted',
+        command: 'dir; Write-Output $(whoami)',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'Write-Output', text: 'Write-Output $(whoami)' },
+          { name: 'whoami', text: 'whoami' },
+        ],
+        allowed: true,
+        disallowed: [],
+        allowlistedCommands: ['dir', 'Write-Output $(whoami)', 'whoami'],
+      },
     ];
 
     beforeEach(() => {
@@ -920,30 +933,33 @@ describe('getShellConfiguration', () => {
       }
     });
 
-    describe.each(scenarios)('$label', ({ command, allowed, disallowed }) => {
-      it('applies the allowlist expectations', () => {
-        const configForTest = {
-          getCoreTools: () => [],
-          getExcludeTools: () => [],
-          getAllowedTools: () => [],
-        } as unknown as Config;
+    describe.each(scenarios)(
+      '$label',
+      ({ command, allowed, disallowed, allowlistedCommands }) => {
+        it('applies the allowlist expectations', () => {
+          const configForTest = {
+            getCoreTools: () => [],
+            getExcludeTools: () => [],
+            getAllowedTools: () => [],
+          } as unknown as Config;
 
-        const result = checkCommandPermissions(
-          command,
-          configForTest,
-          new Set(['dir']),
-        );
+          const result = checkCommandPermissions(
+            command,
+            configForTest,
+            new Set(allowlistedCommands ?? ['dir']),
+          );
 
-        if (allowed) {
-          expect(result.allAllowed).toBe(true);
-          expect(result.disallowedCommands).toEqual([]);
-        } else {
-          expect(result.allAllowed).toBe(false);
-          expect(result.disallowedCommands).toEqual(disallowed);
-          expect(result.blockReason ?? '').toContain('Disallowed commands');
-        }
-      });
-    });
+          if (allowed) {
+            expect(result.allAllowed).toBe(true);
+            expect(result.disallowedCommands).toEqual([]);
+          } else {
+            expect(result.allAllowed).toBe(false);
+            expect(result.disallowedCommands).toEqual(disallowed);
+            expect(result.blockReason ?? '').toContain('Disallowed commands');
+          }
+        });
+      },
+    );
   });
 
   describe('on Windows', () => {
