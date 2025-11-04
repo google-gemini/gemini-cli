@@ -543,13 +543,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.codebaseInvestigatorSettings.maxNumTurns`** (number):
   - **Description:** Maximum number of turns for the Codebase Investigator
     agent.
-  - **Default:** `10`
+  - **Default:** `15`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.maxTimeMinutes`** (number):
   - **Description:** Maximum time for the Codebase Investigator agent (in
     minutes).
-  - **Default:** `3`
+  - **Default:** `5`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
