@@ -17,7 +17,7 @@ function ruleMatches(
   rule: PolicyRule,
   toolCall: FunctionCall,
   stringifiedArgs: string | undefined,
-  serverName?: string,
+  serverName: string | undefined,
 ): boolean {
   // Check tool name if specified
   if (rule.toolName) {
@@ -73,7 +73,10 @@ export class PolicyEngine {
   /**
    * Check if a tool call is allowed based on the configured policies.
    */
-  check(toolCall: FunctionCall, serverName?: string): PolicyDecision {
+  check(
+    toolCall: FunctionCall,
+    serverName: string | undefined,
+  ): PolicyDecision {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
     if (toolCall.args && this.rules.some((rule) => rule.argsPattern)) {
