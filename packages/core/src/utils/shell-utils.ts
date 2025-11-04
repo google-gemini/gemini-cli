@@ -199,6 +199,17 @@ foreach ($node in $invocationNodes) {
   if ($node -is [System.Management.Automation.Language.CommandAst]) {
     $name = $node.GetCommandName()
     if ([string]::IsNullOrWhiteSpace($name)) {
+      if ($node.CommandElements.Count -gt 0) {
+        $firstElement = $node.CommandElements[0]
+        if ($firstElement -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+          $name = $firstElement.Value
+        } else {
+          $name = $firstElement.Extent.Text
+        }
+      }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($name)) {
       continue
     }
     Add-CommandObject -Start $node.Extent.StartOffset -Name $name -Text $node.Extent.Text
