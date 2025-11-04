@@ -17,21 +17,23 @@ describe('Flicker Detector', () => {
         'flicker-detector.max-height.responses',
       ),
     });
+    try {
+      const run = await rig.runInteractive();
+      const prompt = 'Tell me a fun fact.';
+      await run.type(prompt);
+      await run.type('\r');
 
-    const run = await rig.runInteractive();
-    const prompt = 'Tell me a fun fact.';
-    await run.type(prompt);
-    await run.type('\r');
+      const hasUserPromptEvent = await rig.waitForTelemetryEvent('user_prompt');
+      expect(hasUserPromptEvent).toBe(true);
 
-    const hasUserPromptEvent = await rig.waitForTelemetryEvent('user_prompt');
-    expect(hasUserPromptEvent).toBe(true);
+      const hasSessionCountMetric = await rig.waitForMetric('session.count');
+      expect(hasSessionCountMetric).toBe(true);
 
-    const hasSessionCountMetric = await rig.waitForMetric('session.count');
-    expect(hasSessionCountMetric).toBe(true);
-
-    // We expect NO flicker event to be found.
-    const flickerMetric = rig.readMetric('ui.flicker.count');
-    expect(flickerMetric).toBeNull();
-    await rig.cleanup();
+      // We expect NO flicker event to be found.
+      const flickerMetric = rig.readMetric('ui.flicker.count');
+      expect(flickerMetric).toBeNull();
+    } finally {
+      await rig.cleanup();
+    }
   });
 });
