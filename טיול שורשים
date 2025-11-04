@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✈️ מסע שורשים פרטי ביוקרה | החוויה הבלתי נשכחת</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Rubik:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ======================================= */
+        /* === הגדרות גלובליות ועיצוב בסיסי === */
+        /* ======================================= */
+        body {
+            font-family: 'Rubik', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #1a1a1a;
+            direction: rtl; 
+            text-align: right;
+            line-height: 1.7;
+            background-color: #f0f0f0;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Cormorant Garamond', serif; /* פונט אלגנטי לכותרות */
+            color: #4a2d1d; /* חום-שוקולד עשיר */
+            text-align: center;
+        }
+        
+        h2 {
+            font-size: 2.8em;
+            margin-bottom: 25px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            padding: 0 25px;
+        }
+        
+        /* ======================================= */
+        /* === אפקטי PARALLAX ו-GLASSMORPHISM === */
+        /* ======================================= */
+        .parallax-section {
+            padding: 120px 0;
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed; /* אפקט Parallax */
+            position: relative;
+        }
+
+        .section-content {
+            position: relative;
+            z-index: 2;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            /* אפקט Glassmorphism (זכוכית) */
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        /* ======================================= */
+        /* === כפתור CTA (קריאה לפעולה) === */
+        /* ======================================= */
+        .cta-button {
+            display: inline-block;
+            background-color: #4a2d1d; /* חום כהה יוקרתי */
+            color: white;
+            padding: 16px 35px;
+            text-decoration: none;
+            border-radius: 50px; 
+            font-size: 1.3em;
+            transition: all 0.4s ease; 
+            border: 2px solid #4a2d1d;
+        }
+
+        .cta-button:hover {
+            background-color: white;
+            color: #4a2d1d;
+            border: 2px solid #4a2d1d;
+            transform: scale(1.05); /* אפקט קפיצה קטן */
+        }
+        
+        /* ======================================= */
+        /* === 1. HERO SECTION === */
+        /* ======================================= */
+        .hero {
+            /* תמונה לדוגמה: נוף קלאסי מזרח אירופי - החלף לקישור תמונה אמיתית! */
+            background-image: url('https://picsum.photos/seed/poland/1600/1000'); 
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero .section-content {
+            background-color: rgba(255, 255, 255, 0.15); 
+            color: white;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 4.5em;
+            margin-bottom: 0.2em;
+            color: #f7e6c4; /* זהב בהיר */
+        }
+        
+        .hero p {
+            font-size: 1.8em;
+            margin-bottom: 1.5em;
+            font-weight: 300;
+        }
+
+        /* ======================================= */
+        /* === 2. STORY SECTION === */
+        /* ======================================= */
+        .story-section {
+            background-color: #ffffff;
+            padding: 80px 0;
+            text-align: center;
+        }
+
+        .story-text {
+            font-size: 1.2em;
+            max-width: 900px;
+            margin: 30px auto;
+            text-align: justify;
+        }
+
+        /* ======================================= */
+        /* === 3. FEATURES SECTION === */
+        /* ======================================= */
+        .features-section {
+            /* תמונה לדוגמה: פנים מלון יוקרתי או כשרות - החלף לקישור תמונה אמיתית! */
+            background-image: url('https://picsum.photos/seed/luxuryhotel/1600/900');
+        }
+
+        .features-section .section-content {
+            background-color: rgba(74, 45, 29, 0.8); /* חום כהה שקוף */
+            color: white;
+            text-align: center;
+        }
+
+        .features-grid {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            margin-top: 40px;
+            gap: 20px;
+        }
+
+        .feature-item {
+            width: 30%;
+            min-width: 280px;
+            padding: 25px;
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #1a1a1a;
+            border-radius: 8px;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+
+        .feature-item:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .feature-item h3 {
+            color: #7b0000; /* אדום יין */
+            font-size: 1.8em;
+        }
+        
+        /* ======================================= */
+        /* === 4. GALLERY & AREAS SECTION === */
+        /* ======================================= */
+        .gallery-section {
+            /* תמונה לדוגמה: אתר שורשים דרמטי בלילה - החלף לקישור תמונה אמיתית! */
+            background-image: url('https://picsum.photos/seed/synagogue/1600/800');
+            padding: 100px 0;
+        }
+        
+        .gallery-section .section-content {
+            background-color: rgba(0, 0, 0, 0.6); 
+            color: white;
+            text-align: center;
+        }
+        
+        .area-list {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+        
+        .area-list li {
+            background-color: #4a2d1d;
+            color: white;
+            padding: 12px 25px;
+            margin: 10px;
+            border-radius: 30px;
+            font-size: 1.15em;
+            transition: background-color 0.3s ease;
+        }
+
+        .area-list li:hover {
+            background-color: #7b0000;
+        }
+        
+        /* ======================================= */
+        /* === 5. CONTACT FORM SECTION === */
+        /* ======================================= */
+        .contact-form {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+            background-color: #f7f3ed; 
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: right;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+            color: #4a2d1d;
+        }
+
+        .form-group input, 
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box; 
+            font-size: 1em;
+            font-family: 'Rubik', sans-serif;
+        }
+
+        .whatsapp-button {
+            width: 100%;
+            background-color: #25D366; 
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.3em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .whatsapp-button:hover {
+            background-color: #128C7E;
+        }
+        
+        /* ======================================= */
+        /* === FOOTER === */
+        /* ======================================= */
+        footer {
+            background-color: #1a1a1a;
+            color: #f7e6c4;
+            text-align: center;
+            padding: 25px 0;
+            font-size: 0.9em;
+        }
+        
+        /* ======================================= */
+        /* === רספונסיביות למסכים קטנים === */
+        /* ======================================= */
+        @media (max-width: 900px) {
+            .hero h1 {
+                font-size: 3em;
+            }
+            .hero p {
+                font-size: 1.5em;
+            }
+            .features-grid {
+                flex-direction: column;
+                align-items: center;
+            }
+            .feature-item {
+                width: 80%;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header class="hero parallax-section">
+        <div class="container">
+            <div class="section-content">
+                <h1>המסע הפרטי שלך אל העבר</h1>
+                <p><strong>טיולי שורשים באלגנטיות:</strong> איכות כשרות בלתי מתפשרת, מלונות חמישה כוכבים ורגעים אישיים. <br>במזרח אירופה, בדרך שלך.</p>
+                <a href="#contact" class="cta-button">בנה את המסע האישי שלך</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="story-section">
+        <div class="container">
+            <h2>למה לעשות את הדרך לבד?</h2>
+            <div class="story-text">
+                
+                <p><strong>"הרגע בו אתה דורך על אדמתם של אבותיך, הוא רגע המגיע ביוקרה."</strong></p>
+                <p>טיול שורשים הוא לא עוד חופשה. זוהי חקירה אינטימית ומרגשת. אנחנו מאמינים שהחיבור הזה צריך להתרחש בתנאים הטובים ביותר, הרחק מההמולה של קבוצות גדולות. המסע שלנו הוא מפת דרכים מדויקת, מותאמת אישית לסיפור המשפחתי שלך, ובליווי מדריכים מומחי היסטוריה יהודית. אנו מטפלים בכל פרט, מהרגע שאתה נוחת ועד שאתה חוזר, כך שתוכל להתמסר אך ורק לחוויה העמוקה של החיבור מחדש.</p>
+                <p>השקענו את כל הידע שלנו כדי להבטיח שהכשרות תהיה מהודרת, והמלונות – הטובים ביותר שיש לאזור להציע. הטיול הזה הוא המורשת שלך, ואנחנו מטפלים בה בכבוד הראוי.</p>
+                </div>
+            <a href="#features" class="cta-button">גלה את ההבטחה שלנו</a>
+        </div>
+    </section>
+
+    <section id="features" class="features-section parallax-section">
+        <div class="container">
+            <div class="section-content">
+                <h2>הבטחת היוקרה והאיכות הבלתי נשכחת</h2>
+                <div class="features-grid">
+                    
+                    <div class="feature-item">
+                        <h3>כשרות גלאט למהדרין</h3>
+                        <p>הקפדה קפדנית על כללי הכשרות, ללא פשרות. כל ארוחה, בכל מלון, נבחרת בקפידה ובהשגחה גבוהה.</p>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <h3>מלונות חמישה כוכבים</h3>
+                        <p>אנו בוחרים רק את המלונות היוקרתיים והמפוארים ביותר, המשלבים נוחות מודרנית עם אווירה קלאסית ואלגנטית.</p>
+                    </div>
+                    
+                    <div class="feature-item">
+                        <h3>אינטימיות ופרטיות</h3>
+                        <p>טיול פרטי לגמרי: יחיד, זוג או משפחה קטנה. המסע הוא רק שלך, ללא לחץ קבוצתי או לו"ז צפוף.</p>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="gallery-section parallax-section">
+        <div class="container">
+            <div class="section-content">
+                <h2>היכן נחפש את הדרך?</h2>
+                <p style="font-size: 1.4em;">המומחיות שלנו היא הפינות הנעלמות של ההיסטוריה היהודית במזרח אירופה:</p>
+                <ul class="area-list">
+                    <li>פולין הקדומה והחדשה</li>
+                    <li>הונגריה (בודפשט וסביבותיה)</li>
+                    <li>אוקראינה (לבוב, קייב)</li>
+                    <li>מולדובה ורומניה העשירות</li>
+                    <li>מסלולים ייחודיים ומותאמים אישית</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    
+    <section id="contact" class="story-section">
+        <div class="container">
+            <h2>✉️ התחל את המסע – שלח בקשה אישית</h2>
+            <p style="font-size: 1.2em;">מלא את הפרטים הבאים, ואנו נבנה עבורך את המסע המושלם. הבקשה תישלח ישירות אלינו בווּאטסאפ:</p>
+            
+            <form id="whatsappForm" class="contact-form" onsubmit="sendWhatsAppMessage(event)">
+                
+                <div class="form-group">
+                    <label for="preferredTime">תקופת זמן מועדפת (למשל: סוף חורף 2026, קיץ 2025)</label>
+                    <input type="text" id="preferredTime" required placeholder="חורף 2026 / יוני 2025">
+                </div>
+
+                <div class="form-group">
+                    <label for="targetCountry">מדינה מבוקשת (אפשר לבחור יותר מאחת או 'לא סגור')</label>
+                    <select id="targetCountry" required>
+                        <option value="לא סגור">טרם הוחלט / מחפש ייעוץ</option>
+                        <option value="פולין">פולין</option>
+                        <option value="הונגריה">הונגריה</option>
+                        <option value="אוקראינה">אוקראינה</option>
+                        <option value="מולדובה">מולדובה</option>
+                        <option value="רומניה">רומניה</option>
+                        <option value="אחר">מדינה אחרת (נא לציין בפרטים)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="familyDetails">פרטי השורשים (עיר המוצא של הסבים, שמות חשובים, וכו')</label>
+                    <textarea id="familyDetails" rows="4" placeholder="דוגמה: עיר המוצא היא קראקוב, פולין. מחפש מידע על סבא יעקב וסבתא רחל." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="userName">שם מלא וטלפון ליצירת קשר</label>
+                    <input type="text" id="userName" required placeholder="שם: 05X-XXXXXXX">
+                </div>
+
+                <button type="submit" class="whatsapp-button">שלח בקשה בווּאטסאפ עכשיו</button>
+            </form>
+
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            &copy; 2025 מסעות שורשים פרטיים ביוקרה. ליווי אישי ואיכות ללא פשרות.
+        </div>
+    </footer>
+    
+    <script>
+        function sendWhatsAppMessage(event) {
+            // מונע את שליחת הטופס הרגילה 
+            event.preventDefault(); 
+
+            // 1. איסוף הנתונים מהטופס
+            const preferredTime = document.getElementById('preferredTime').value.trim();
+            const targetCountry = document.getElementById('targetCountry').value;
+            const familyDetails = document.getElementById('familyDetails').value.trim();
+            const userName = document.getElementById('userName').value.trim();
+            
+            // מספר הווּאטסאפ שלך (972524778148)
+            const phoneNumber = '972524778148'; 
+
+            // 2. בניית הודעת הווּאטסאפ בלשון גבוהה ויפה
+            let message = "שלום רב,\n";
+            message += "אני פונה אליכם לאחר שהתרשמתי עמוקות מרמת השירות והאיכות שאתם מציעים במסעות השורשים הפרטיים.\n\n";
+            message += "ברצוני לבדוק אפשרות לתכנון מסע שורשים אישי.\n";
+            
+            message += "--- פרטי הבקשה ---\n";
+            message += "👤 *מגיש הבקשה:* " + userName + "\n";
+            message += "🗓️ *תקופת זמן מועדפת:* " + preferredTime + "\n";
+            message += "🌍 *מדינה/אזור עיקרי:* " + targetCountry + "\n";
+            message += "📖 *פרטים היסטוריים ודגשים (שורשים):* " + familyDetails + "\n\n";
+
+            message += "אודה לכם על יצירת קשר לצורך תכנון המסלול המדויק והצעת מחיר בהתאם לסטנדרט היוקרה שלכם.\n";
+            message += "בכבוד רב.\n";
+
+            // 3. קידוד ההודעה לפורמט URL והרכבת הקישור
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+            
+            // 4. ניווט המשתמש לווּאטסאפ ואיפוס הטופס
+            window.open(whatsappUrl, '_blank');
+            document.getElementById('whatsappForm').reset();
+        }
+    </script>
+
+</body>
+</html>
