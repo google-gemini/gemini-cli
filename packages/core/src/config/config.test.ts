@@ -1311,4 +1311,34 @@ describe('Config getHooks', () => {
     expect(retrievedHooks).toEqual(allEventHooks);
     expect(Object.keys(retrievedHooks!)).toHaveLength(11); // All hook event types
   });
+
+  describe('setModel', () => {
+    it('should allow setting a pro model and disable fallback mode', () => {
+      const config = new Config(baseParams);
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      const proModel = 'gemini-2.5-pro';
+      config.setModel(proModel);
+
+      expect(config.getModel()).toBe(proModel);
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
+    });
+
+    it('should not disable fallback mode when a non-pro model is set', () => {
+      const config = new Config(baseParams);
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      const flashLiteModel = 'gemini-2.5-flash-lite';
+      config.setModel(flashLiteModel);
+
+      expect(config.getModel()).toBe(flashLiteModel);
+      expect(config.isInFallbackMode()).toBe(true);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(
+        flashLiteModel,
+      );
+    });
+  });
 });
