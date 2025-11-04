@@ -190,8 +190,20 @@ export class ShellExecutionService {
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix } = getShellConfiguration();
+      const { executable, argsPrefix, shell } = getShellConfiguration();
       const spawnArgs = [...argsPrefix, commandToExecute];
+
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        GEMINI_CLI: '1',
+        TERM: 'xterm-256color',
+        PAGER: 'cat',
+      };
+
+      if (shell === 'powershell') {
+        // Force Constrained Language Mode for PowerShell invocations to harden against risky .NET access.
+        env.__PSLockdownPolicy = '4';
+      }
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
@@ -199,12 +211,7 @@ export class ShellExecutionService {
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: 'cat',
-        },
+        env,
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
@@ -403,20 +410,26 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix } = getShellConfiguration();
+      const { executable, argsPrefix, shell } = getShellConfiguration();
       const args = [...argsPrefix, commandToExecute];
+
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        GEMINI_CLI: '1',
+        TERM: 'xterm-256color',
+        PAGER: shellExecutionConfig.pager ?? 'cat',
+      };
+
+      if (shell === 'powershell') {
+        env.__PSLockdownPolicy = '4';
+      }
 
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
         name: 'xterm',
         cols,
         rows,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: shellExecutionConfig.pager ?? 'cat',
-        },
+        env,
         handleFlowControl: true,
       });
 

@@ -543,6 +543,28 @@ describe('ShellExecutionService', () => {
         expect.any(Object),
       );
     });
+
+    it('enforces Constrained Language Mode for PowerShell PTY sessions', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const originalLockdown = process.env.__PSLockdownPolicy;
+      process.env.__PSLockdownPolicy = '2';
+
+      try {
+        await simulateExecution('dir', (pty) => {
+          const envArg = mockPtySpawn.mock.calls[0][2]?.env as
+            | NodeJS.ProcessEnv
+            | undefined;
+          expect(envArg?.__PSLockdownPolicy).toBe('4');
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        });
+      } finally {
+        if (originalLockdown === undefined) {
+          delete process.env.__PSLockdownPolicy;
+        } else {
+          process.env.__PSLockdownPolicy = originalLockdown;
+        }
+      }
+    });
   });
 
   describe('AnsiOutput rendering', () => {
@@ -705,6 +727,33 @@ describe('ShellExecutionService child_process fallback', () => {
         type: 'data',
         chunk: 'file1.txt\na warning',
       });
+    });
+
+    it('enforces Constrained Language Mode for PowerShell child processes', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const originalLockdown = process.env.__PSLockdownPolicy;
+      delete process.env.__PSLockdownPolicy;
+
+      try {
+        await simulateExecution('dir', (cp) => {
+          cp.emit('exit', 0, null);
+          cp.emit('close', 0, null);
+        });
+
+        expect(mockCpSpawn).toHaveBeenCalledWith(
+          'powershell.exe',
+          ['-NoProfile', '-Command', 'dir'],
+          expect.objectContaining({
+            env: expect.objectContaining({ __PSLockdownPolicy: '4' }),
+          }),
+        );
+      } finally {
+        if (originalLockdown === undefined) {
+          delete process.env.__PSLockdownPolicy;
+        } else {
+          process.env.__PSLockdownPolicy = originalLockdown;
+        }
+      }
     });
 
     it('should strip ANSI codes from output', async () => {
