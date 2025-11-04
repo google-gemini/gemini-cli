@@ -282,6 +282,14 @@ EOF`,
     );
   });
 
+  it('should block simple prompt transformation expansions', () => {
+    const result = isCommandAllowed('echo ${foo@P}', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      'Command rejected because it could not be parsed safely',
+    );
+  });
+
   describe('command substitution', () => {
     it('should allow command substitution using `$(...)`', () => {
       const result = isCommandAllowed('echo $(goodCommand --safe)', config);
@@ -481,6 +489,11 @@ describe('getCommandRoots', () => {
     const roots = getCommandRoots(
       'echo "${var1=aa\\140 env| ls -l\\140}${var1@P}"',
     );
+    expect(roots).toEqual([]);
+  });
+
+  it('should not return roots for prompt transformation expansions', () => {
+    const roots = getCommandRoots('echo ${foo@P}');
     expect(roots).toEqual([]);
   });
 });

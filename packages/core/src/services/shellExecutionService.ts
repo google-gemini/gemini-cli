@@ -24,8 +24,9 @@ const { Terminal } = pkg;
 const SIGKILL_TIMEOUT_MS = 200;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
-const BASH_SHOPT_GUARD =
-  'shopt -u promptvars nullglob extglob nocaseglob dotglob;';
+const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
+const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
+const BASH_SHOPT_GUARD_LONG_PREFIX = `shopt --unset ${BASH_SHOPT_OPTIONS}`;
 
 function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   if (shell !== 'bash') {
@@ -35,9 +36,7 @@ function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   const trimmed = command.trimStart();
   if (
     trimmed.startsWith(BASH_SHOPT_GUARD) ||
-    trimmed.startsWith(
-      'shopt --unset promptvars nullglob extglob nocaseglob dotglob',
-    )
+    trimmed.startsWith(BASH_SHOPT_GUARD_LONG_PREFIX)
   ) {
     return command;
   }

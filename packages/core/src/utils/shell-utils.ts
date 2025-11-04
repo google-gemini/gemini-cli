@@ -266,14 +266,16 @@ function hasPromptCommandTransform(root: Node): boolean {
     }
 
     if (current.type === 'expansion') {
-      const operatorNode = current.child(2);
-      const transformNode = current.child(3);
+      for (let i = 0; i < current.namedChildCount; i += 1) {
+        const operatorNode = current.namedChild(i);
+        const transformNode = current.namedChild(i + 1);
 
-      if (
-        operatorNode?.text === '@' &&
-        transformNode?.text?.toLowerCase() === 'p'
-      ) {
-        return true;
+        if (
+          operatorNode?.text === '@' &&
+          transformNode?.text?.toLowerCase() === 'p'
+        ) {
+          return true;
+        }
       }
     }
 
