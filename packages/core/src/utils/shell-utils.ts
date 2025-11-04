@@ -266,9 +266,16 @@ function hasPromptCommandTransform(root: Node): boolean {
     }
 
     if (current.type === 'expansion') {
-      const expansionText = current.text.toLowerCase();
-      if (expansionText.includes('@p')) {
-        return true;
+      for (let i = 0; i < current.childCount - 1; i += 1) {
+        const operatorNode = current.child(i);
+        const transformNode = current.child(i + 1);
+
+        if (
+          operatorNode?.type === '@' &&
+          transformNode?.text?.toLowerCase() === 'p'
+        ) {
+          return true;
+        }
       }
     }
 
