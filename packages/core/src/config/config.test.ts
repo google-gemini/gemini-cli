@@ -6,18 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type {
-  ConfigParameters,
-  SandboxConfig,
-  HookDefinition,
-} from './config.js';
-import {
-  Config,
-  ApprovalMode,
-  DEFAULT_FILE_FILTERING_OPTIONS,
-  HookType,
-  HookEventName,
-} from './config.js';
+import type { ConfigParameters, SandboxConfig } from './config.js';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { ApprovalMode } from '../policy/types.js';
+import type { HookDefinition } from '../hooks/types.js';
+import { HookType, HookEventName } from '../hooks/types.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
@@ -143,6 +136,21 @@ vi.mock('../agents/registry.js', () => {
 
 vi.mock('../agents/subagent-tool-wrapper.js', () => ({
   SubagentToolWrapper: vi.fn(),
+}));
+
+const mockCoreEvents = vi.hoisted(() => ({
+  emitFeedback: vi.fn(),
+  emitModelChanged: vi.fn(),
+}));
+
+const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: mockCoreEvents,
+}));
+
+vi.mock('../utils/fetch.js', () => ({
+  setGlobalProxy: mockSetGlobalProxy,
 }));
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
@@ -910,6 +918,63 @@ describe('Server Config (config.ts)', () => {
       // 4 * (32000 - 1000) = 124000
       // custom threshold is 50000
       expect(config.getTruncateToolOutputThreshold()).toBe(50000);
+    });
+  });
+
+  describe('Proxy Configuration Error Handling', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should call setGlobalProxy when proxy is configured', () => {
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'http://proxy.example.com:8080',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockSetGlobalProxy).toHaveBeenCalledWith(
+        'http://proxy.example.com:8080',
+      );
+    });
+
+    it('should not call setGlobalProxy when proxy is not configured', () => {
+      new Config(baseParams);
+
+      expect(mockSetGlobalProxy).not.toHaveBeenCalled();
+    });
+
+    it('should emit error feedback when setGlobalProxy throws an error', () => {
+      const proxyError = new Error('Invalid proxy URL');
+      mockSetGlobalProxy.mockImplementation(() => {
+        throw proxyError;
+      });
+
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'invalid-proxy',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
+        proxyError,
+      );
+    });
+
+    it('should not emit error feedback when setGlobalProxy succeeds', () => {
+      mockSetGlobalProxy.mockImplementation(() => {
+        // Success - no error thrown
+      });
+
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'http://proxy.example.com:8080',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });
