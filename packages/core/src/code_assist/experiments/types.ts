@@ -12,10 +12,10 @@ export interface ListExperimentsRequest {
 }
 
 export interface ListExperimentsResponse {
-  experiment_ids?: number[];
+  experimentIds?: number[];
   flags?: Flag[];
-  filtered_flags?: FilteredFlag[];
-  debug_string?: string;
+  filteredFlags?: FilteredFlag[];
+  debugString?: string;
 }
 
 export interface Flag {

@@ -44,6 +44,6 @@ function parseExperiments(response: ListExperimentsResponse): Experiments {
   }
   return {
     flags,
-    experimentIds: response.experiment_ids ?? [],
+    experimentIds: response.experimentIds ?? [],
   };
 }
