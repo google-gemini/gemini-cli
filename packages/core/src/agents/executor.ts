@@ -30,8 +30,16 @@ import {
   WEB_SEARCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
-import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
-import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
+import {
+  logAgentStart,
+  logAgentFinish,
+  logRecoveryAttempt,
+} from '../telemetry/loggers.js';
+import {
+  AgentStartEvent,
+  AgentFinishEvent,
+  RecoveryAttemptEvent,
+} from '../telemetry/types.js';
 import type {
   AgentDefinition,
   AgentInputs,
@@ -269,6 +277,9 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       text: `Execution limit reached (${reason}). Attempting one final recovery turn with a grace period.`,
     });
 
+    const recoveryStartTime = Date.now();
+    let success = false;
+
     const gracePeriodMs = GRACE_PERIOD_MS;
     const graceTimeoutController = new AbortController();
     const graceTimeoutId = setTimeout(
@@ -305,6 +316,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         this.emitActivity('THOUGHT_CHUNK', {
           text: 'Graceful recovery succeeded.',
         });
+        success = true;
         return turnResult.finalResult ?? 'Task completed during grace period.';
       }
 
@@ -323,6 +335,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       return null;
     } finally {
       clearTimeout(graceTimeoutId);
+      logRecoveryAttempt(
+        this.runtimeContext,
+        new RecoveryAttemptEvent(
+          this.agentId,
+          this.definition.name,
+          reason,
+          Date.now() - recoveryStartTime,
+          success,
+          turnCounter,
+        ),
+      );
     }
   }
 

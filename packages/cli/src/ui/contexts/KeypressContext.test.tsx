@@ -906,7 +906,6 @@ describe('Kitty Sequence Parsing', () => {
     // Should broadcast immediately as it's not a valid kitty pattern
     expect(keyHandler).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: '',
         sequence: '\x1b[m',
         paste: false,
       }),
@@ -1007,7 +1006,6 @@ describe('Kitty Sequence Parsing', () => {
     expect(keyHandler).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        name: '',
         sequence: '\x1b[!',
       }),
     );

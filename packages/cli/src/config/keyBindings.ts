@@ -31,6 +31,10 @@ export enum Command {
   NAVIGATION_UP = 'navigationUp',
   NAVIGATION_DOWN = 'navigationDown',
 
+  // Dialog navigation
+  DIALOG_NAVIGATION_UP = 'dialogNavigationUp',
+  DIALOG_NAVIGATION_DOWN = 'dialogNavigationDown',
+
   // Auto-completion
   ACCEPT_SUGGESTION = 'acceptSuggestion',
   COMPLETION_UP = 'completionUp',
@@ -100,8 +104,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.ESCAPE]: [{ key: 'escape' }],
 
   // Cursor movement
-  [Command.HOME]: [{ key: 'a', ctrl: true }],
-  [Command.END]: [{ key: 'e', ctrl: true }],
+  [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
+  [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
 
   // Text deletion
   [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
@@ -118,15 +122,33 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // History navigation
   [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
-  [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true }],
-  [Command.NAVIGATION_UP]: [{ key: 'up' }],
-  [Command.NAVIGATION_DOWN]: [{ key: 'down' }],
+  [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true, shift: false }],
+  [Command.NAVIGATION_UP]: [{ key: 'up', shift: false }],
+  [Command.NAVIGATION_DOWN]: [{ key: 'down', shift: false }],
+
+  // Dialog navigation
+  // Navigation shortcuts appropriate for dialogs where we do not need to accept
+  // text input.
+  [Command.DIALOG_NAVIGATION_UP]: [
+    { key: 'up', shift: false },
+    { key: 'k', shift: false },
+  ],
+  [Command.DIALOG_NAVIGATION_DOWN]: [
+    { key: 'down', shift: false },
+    { key: 'j', shift: false },
+  ],
 
   // Auto-completion
   [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
   // Completion navigation (arrow or Ctrl+P/N)
-  [Command.COMPLETION_UP]: [{ key: 'up' }, { key: 'p', ctrl: true }],
-  [Command.COMPLETION_DOWN]: [{ key: 'down' }, { key: 'n', ctrl: true }],
+  [Command.COMPLETION_UP]: [
+    { key: 'up', shift: false },
+    { key: 'p', ctrl: true, shift: false },
+  ],
+  [Command.COMPLETION_DOWN]: [
+    { key: 'down', shift: false },
+    { key: 'n', ctrl: true, shift: false },
+  ],
 
   // Text input
   // Must also exclude shift to allow shift+enter for newline
