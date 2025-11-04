@@ -33,8 +33,30 @@ export interface UserFeedbackPayload {
   error?: unknown;
 }
 
+/**
+ * Payload for the 'fallback-mode-changed' event.
+ */
+export interface FallbackModeChangedPayload {
+  /**
+   * Whether fallback mode is now active.
+   */
+  isInFallbackMode: boolean;
+}
+
+/**
+ * Payload for the 'model-changed' event.
+ */
+export interface ModelChangedPayload {
+  /**
+   * The new model that was set.
+   */
+  model: string;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
+  FallbackModeChanged = 'fallback-mode-changed',
+  ModelChanged = 'model-changed',
 }
 
 export class CoreEventEmitter extends EventEmitter {
@@ -67,6 +89,23 @@ export class CoreEventEmitter extends EventEmitter {
   }
 
   /**
+   * Notifies subscribers that fallback mode has changed.
+   * This is synchronous and doesn't use backlog (UI should already be initialized).
+   */
+  emitFallbackModeChanged(isInFallbackMode: boolean): void {
+    const payload: FallbackModeChangedPayload = { isInFallbackMode };
+    this.emit(CoreEvent.FallbackModeChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that the model has changed.
+   */
+  emitModelChanged(model: string): void {
+    const payload: ModelChangedPayload = { model };
+    this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
    */
@@ -83,6 +122,14 @@ export class CoreEventEmitter extends EventEmitter {
     listener: (payload: UserFeedbackPayload) => void,
   ): this;
   override on(
+    event: CoreEvent.FallbackModeChanged,
+    listener: (payload: FallbackModeChangedPayload) => void,
+  ): this;
+  override on(
+    event: CoreEvent.ModelChanged,
+    listener: (payload: ModelChangedPayload) => void,
+  ): this;
+  override on(
     event: string | symbol,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     listener: (...args: any[]) => void,
@@ -95,6 +142,14 @@ export class CoreEventEmitter extends EventEmitter {
     listener: (payload: UserFeedbackPayload) => void,
   ): this;
   override off(
+    event: CoreEvent.FallbackModeChanged,
+    listener: (payload: FallbackModeChangedPayload) => void,
+  ): this;
+  override off(
+    event: CoreEvent.ModelChanged,
+    listener: (payload: ModelChangedPayload) => void,
+  ): this;
+  override off(
     event: string | symbol,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     listener: (...args: any[]) => void,
@@ -105,6 +160,14 @@ export class CoreEventEmitter extends EventEmitter {
   override emit(
     event: CoreEvent.UserFeedback,
     payload: UserFeedbackPayload,
+  ): boolean;
+  override emit(
+    event: CoreEvent.FallbackModeChanged,
+    payload: FallbackModeChangedPayload,
+  ): boolean;
+  override emit(
+    event: CoreEvent.ModelChanged,
+    payload: ModelChangedPayload,
   ): boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   override emit(event: string | symbol, ...args: any[]): boolean {

@@ -32,6 +32,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
@@ -41,12 +42,13 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
+import { coreEvents } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
-import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
@@ -55,10 +57,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import {
-  logCliConfiguration,
-  logRipgrepFallback,
-} from '../telemetry/loggers.js';
+import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
@@ -76,15 +75,15 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
+import { getCodeAssistServer } from '../code_assist/codeAssist.js';
+import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
+import { getExperiments } from '../code_assist/experiments/experiments.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
-export enum ApprovalMode {
-  DEFAULT = 'default',
-  AUTO_EDIT = 'autoEdit',
-  YOLO = 'yolo',
-}
+import { ApprovalMode } from '../policy/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -93,10 +92,6 @@ export interface AccessibilitySettings {
 
 export interface BugCommandSettings {
   urlTemplate: string;
-}
-
-export interface ChatCompressionSettings {
-  contextPercentageThreshold?: number;
 }
 
 export interface SummarizeToolOutputSettings {
@@ -141,6 +136,7 @@ export interface GeminiCLIExtension {
   contextFiles: string[];
   excludeTools?: string[];
   id: string;
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
 }
 
 export interface ExtensionInstallMetadata {
@@ -157,7 +153,12 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
-import { debugLogger } from '../utils/debugLogger.js';
+
+import {
+  type ExtensionLoader,
+  SimpleExtensionLoader,
+} from '../utils/extensionLoader.js';
+import { McpClientManager } from '../tools/mcp-client-manager.js';
 
 export type { FileFilteringOptions };
 export {
@@ -252,15 +253,17 @@ export interface ConfigParameters {
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
   listExtensions?: boolean;
-  extensions?: GeminiCLIExtension[];
+  extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
-  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
+  enableExtensionReloading?: boolean;
+  allowedMcpServers?: string[];
+  blockedMcpServers?: string[];
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
-  chatCompression?: ChatCompressionSettings;
+  compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
@@ -279,17 +282,27 @@ export interface ConfigParameters {
   output?: OutputSettings;
   useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
+  disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
   fakeResponses?: string;
+  recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  enableHooks?: boolean;
+  experiments?: Experiments;
+  hooks?: {
+    [K in HookEventName]?: HookDefinition[];
+  };
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private mcpClientManager?: McpClientManager;
+  private allowedMcpServers: string[];
+  private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
   private agentRegistry!: AgentRegistry;
   private readonly sessionId: string;
@@ -309,7 +322,7 @@ export class Config {
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
-  private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -341,12 +354,9 @@ export class Config {
   private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
-  private readonly _extensions: GeminiCLIExtension[];
+  private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
-  private readonly _blockedMcpServers: Array<{
-    name: string;
-    extensionName: string;
-  }>;
+  private readonly enableExtensionReloading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
@@ -354,7 +364,7 @@ export class Config {
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
-  private readonly chatCompression: ChatCompressionSettings | undefined;
+  private readonly compressionThreshold: number | undefined;
   private readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
@@ -376,14 +386,23 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private readonly useModelRouter: boolean;
+  private useModelRouter: boolean;
+  private readonly initialUseModelRouter: boolean;
+  private readonly disableModelRouterForAuth?: AuthType[];
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
   readonly fakeResponses?: string;
+  readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly enableHooks: boolean;
+  private readonly hooks:
+    | { [K in HookEventName]?: HookDefinition[] }
+    | undefined;
+  private experiments: Experiments | undefined;
+  private experimentsPromise: Promise<void> | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -406,6 +425,8 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.allowedMcpServers = params.allowedMcpServers ?? [];
+    this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
@@ -444,16 +465,16 @@ export class Config {
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
     this.listExtensions = params.listExtensions ?? false;
-    this._extensions = params.extensions ?? [];
+    this._extensionLoader =
+      params.extensionLoader ?? new SimpleExtensionLoader([]);
     this._enabledExtensions = params.enabledExtensions ?? [];
-    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
-    this.chatCompression = params.chatCompression;
+    this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
@@ -473,14 +494,24 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? false;
-    this.useModelRouter = params.useModelRouter ?? false;
+    this.useWriteTodos = params.useWriteTodos ?? true;
+    this.initialUseModelRouter = params.useModelRouter ?? false;
+    this.useModelRouter = this.initialUseModelRouter;
+    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
+    this.enableHooks = params.enableHooks ?? false;
+
+    // Enable MessageBus integration if:
+    // 1. Explicitly enabled via setting, OR
+    // 2. Hooks are enabled and hooks are configured
+    const hasHooks = params.hooks && Object.keys(params.hooks).length > 0;
+    const hooksNeedMessageBus = this.enableHooks && hasHooks;
     this.enableMessageBusIntegration =
-      params.enableMessageBusIntegration ?? false;
+      params.enableMessageBusIntegration ??
+      (hooksNeedMessageBus ? true : false);
     this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? false,
-      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
-      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 5,
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
+      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
       thinkingBudget:
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
@@ -490,8 +521,10 @@ export class Config {
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
+    this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
+    this.recordResponses = params.recordResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
@@ -502,6 +535,8 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.hooks = params.hooks;
+    this.experiments = params.experiments;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -511,8 +546,17 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    if (this.getProxy()) {
-      setGlobalProxy(this.getProxy() as string);
+    const proxy = this.getProxy();
+    if (proxy) {
+      try {
+        setGlobalProxy(proxy);
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
+          error,
+        );
+      }
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
@@ -538,6 +582,15 @@ export class Config {
     await this.agentRegistry.initialize();
 
     this.toolRegistry = await this.createToolRegistry();
+    this.mcpClientManager = new McpClientManager(
+      this.toolRegistry,
+      this,
+      this.eventEmitter,
+    );
+    await Promise.all([
+      await this.mcpClientManager.startConfiguredMcpServers(),
+      await this.getExtensionLoader().start(this),
+    ]);
 
     await this.geminiClient.initialize();
   }
@@ -547,6 +600,14 @@ export class Config {
   }
 
   async refreshAuth(authMethod: AuthType) {
+    this.useModelRouter = this.initialUseModelRouter;
+    if (this.disableModelRouterForAuth?.includes(authMethod)) {
+      this.useModelRouter = false;
+      if (this.model === DEFAULT_GEMINI_MODEL_AUTO) {
+        this.model = DEFAULT_GEMINI_MODEL;
+      }
+    }
+
     // Vertex and Genai have incompatible encryption and sending history with
     // thoughtSignature from Genai to Vertex will fail, we need to strip them
     if (
@@ -557,7 +618,7 @@ export class Config {
       this.geminiClient.stripThoughtsFromHistory();
     }
 
-    const newContentGeneratorConfig = createContentGeneratorConfig(
+    const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
     );
@@ -572,11 +633,22 @@ export class Config {
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
+    const codeAssistServer = getCodeAssistServer(this);
+    if (codeAssistServer) {
+      this.experimentsPromise = getExperiments(codeAssistServer)
+        .then((experiments) => {
+          this.setExperiments(experiments);
+        })
+        .catch((e) => {
+          debugLogger.error('Failed to fetch experiments', e);
+        });
+    } else {
+      this.experiments = undefined;
+      this.experimentsPromise = undefined;
+    }
+
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
-
-    // Logging the cli configuration here as the auth related configuration params would have been loaded by this point
-    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
   }
 
   getUserTier(): UserTierId | undefined {
@@ -625,7 +697,10 @@ export class Config {
       return;
     }
 
-    this.model = newModel;
+    if (this.model !== newModel) {
+      this.model = newModel;
+      coreEvents.emitModelChanged(newModel);
+    }
   }
 
   isInFallbackMode(): boolean {
@@ -710,8 +785,23 @@ export class Config {
     return this.allowedTools;
   }
 
+  /**
+   * All the excluded tools from static configuration, loaded extensions, or
+   * other sources.
+   *
+   * May change over time.
+   */
   getExcludeTools(): string[] | undefined {
-    return this.excludeTools;
+    const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
+    for (const extension of this.getExtensionLoader().getExtensions()) {
+      if (!extension.isActive) {
+        continue;
+      }
+      for (const tool of extension.excludeTools || []) {
+        excludeToolsSet.add(tool);
+      }
+    }
+    return [...excludeToolsSet];
   }
 
   getToolDiscoveryCommand(): string | undefined {
@@ -726,8 +816,29 @@ export class Config {
     return this.mcpServerCommand;
   }
 
+  /**
+   * The user configured MCP servers (via gemini settings files).
+   *
+   * Does NOT include mcp servers configured by extensions.
+   */
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getMcpClientManager(): McpClientManager | undefined {
+    return this.mcpClientManager;
+  }
+
+  getAllowedMcpServers(): string[] | undefined {
+    return this.allowedMcpServers;
+  }
+
+  getBlockedMcpServers(): string[] | undefined {
+    return this.blockedMcpServers;
+  }
+
+  setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {
+    this.mcpServers = mcpServers;
   }
 
   getUserMemory(): string {
@@ -892,7 +1003,11 @@ export class Config {
   }
 
   getExtensions(): GeminiCLIExtension[] {
-    return this._extensions;
+    return this._extensionLoader.getExtensions();
+  }
+
+  getExtensionLoader(): ExtensionLoader {
+    return this._extensionLoader;
   }
 
   // The list of explicitly enabled extensions, if any were given, may contain
@@ -901,8 +1016,8 @@ export class Config {
     return this._enabledExtensions;
   }
 
-  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
-    return this._blockedMcpServers;
+  getEnableExtensionReloading(): boolean {
+    return this.enableExtensionReloading;
   }
 
   getNoBrowser(): boolean {
@@ -971,8 +1086,26 @@ export class Config {
     this.fileSystemService = fileSystemService;
   }
 
-  getChatCompression(): ChatCompressionSettings | undefined {
-    return this.chatCompression;
+  async getCompressionThreshold(): Promise<number | undefined> {
+    if (this.compressionThreshold) {
+      return this.compressionThreshold;
+    }
+
+    if (this.experimentsPromise) {
+      try {
+        await this.experimentsPromise;
+      } catch (e) {
+        debugLogger.debug('Failed to fetch experiments', e);
+      }
+    }
+
+    const remoteThreshold =
+      this.experiments?.flags['GeminiCLIContextCompression__threshold_fraction']
+        ?.floatValue;
+    if (remoteThreshold === 0) {
+      return undefined;
+    }
+    return remoteThreshold;
   }
 
   isInteractiveShellEnabled(): boolean {
@@ -1092,12 +1225,21 @@ export class Config {
     return this.enableMessageBusIntegration;
   }
 
+  getEnableHooks(): boolean {
+    return this.enableHooks;
+  }
+
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.eventEmitter);
+    const registry = new ToolRegistry(this);
+
+    // Set message bus on tool registry before discovery so MCP tools can access it
+    if (this.getEnableMessageBusIntegration()) {
+      registry.setMessageBus(this.messageBus);
+    }
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1133,19 +1275,11 @@ export class Config {
         // This first implementation is only focused on the general case of
         // the tool registry.
         const messageBusEnabled = this.getEnableMessageBusIntegration();
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
-          );
-        }
+
         const toolArgs = messageBusEnabled
           ? [...args, this.getMessageBus()]
           : args;
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
-          );
-        }
+
         registry.registerTool(new ToolClass(...toolArgs));
       }
     };
@@ -1195,6 +1329,7 @@ export class Config {
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
         const excludeTools = this.getExcludeTools() || [];
+
         const allowedTools = this.getAllowedTools();
 
         const isExcluded = excludeTools.includes(definition.name);
@@ -1215,6 +1350,27 @@ export class Config {
 
     await registry.discoverAllTools();
     return registry;
+  }
+
+  /**
+   * Get hooks configuration
+   */
+  getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
+    return this.hooks;
+  }
+
+  /**
+   * Get experiments configuration
+   */
+  getExperiments(): Experiments | undefined {
+    return this.experiments;
+  }
+
+  /**
+   * Set experiments configuration
+   */
+  setExperiments(experiments: Experiments): void {
+    this.experiments = experiments;
   }
 }
 // Export model constants for use in CLI

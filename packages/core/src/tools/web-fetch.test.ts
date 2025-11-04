@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { WebFetchTool, parsePrompt } from './web-fetch.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import * as fetchUtils from '../utils/fetch.js';
@@ -521,7 +521,7 @@ describe('WebFetchTool', () => {
 
       // Should reject with error when denied
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool execution denied by policy',
+        'Tool execution for "WebFetch" denied by policy.',
       );
     });
 
@@ -559,7 +559,7 @@ describe('WebFetchTool', () => {
       abortController.abort();
 
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool execution denied by policy.',
+        'Tool execution for "WebFetch" denied by policy.',
       );
     });
 

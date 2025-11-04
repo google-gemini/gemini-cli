@@ -18,9 +18,9 @@ on:
         required: true
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  group: '${{ github.workflow }}-${{ github.head_ref || github.event.workflow_run.head_branch || github.ref }}'
   cancel-in-progress: |-
-    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+    ${{ github.event_name != 'push' && github.event_name != 'merge_group' }}
 
 permissions:
   contents: 'read'
@@ -99,6 +99,7 @@ jobs:
 
   set_pending_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
+    permissions: 'write-all'
     if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
     needs:
       - 'parse_run_context'
@@ -286,6 +287,7 @@ jobs:
 
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
+    permissions: 'write-all'
     if: "github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'"
     needs:
       - 'parse_run_context'

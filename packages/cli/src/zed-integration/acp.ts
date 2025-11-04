@@ -11,6 +11,7 @@ import * as schema from './schema.js';
 export * from './schema.js';
 
 import type { WritableStream, ReadableStream } from 'node:stream/web';
+import { coreEvents } from '@google/gemini-cli-core';
 
 export class AgentSideConnection implements Client {
   #connection: Connection;
@@ -281,7 +282,7 @@ class Connection {
       })
       .catch((error) => {
         // Continue processing writes on error
-        console.error('ACP write error:', error);
+        coreEvents.emitFeedback('error', 'ACP write error.', error);
       });
     return this.#writeQueue;
   }
