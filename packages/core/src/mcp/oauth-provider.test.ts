@@ -253,6 +253,7 @@ describe('MCPOAuthProvider', () => {
       delete configWithoutAuth.tokenUrl;
 
       const mockResourceMetadata = {
+        resource: 'https://api.example.com',
         authorization_servers: ['https://discovered.auth.com'],
       };
 
