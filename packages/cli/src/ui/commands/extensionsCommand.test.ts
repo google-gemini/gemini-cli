@@ -7,7 +7,11 @@
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import { completeExtensions, extensionsCommand } from './extensionsCommand.js';
+import {
+  completeExtensions,
+  completeExtensionsAndScopes,
+  extensionsCommand,
+} from './extensionsCommand.js';
 import { type CommandContext, type SlashCommand } from './types.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { type ExtensionUpdateAction } from '../state/extensions.js';
@@ -161,8 +165,22 @@ describe('extensionsCommand', () => {
       if (command) {
         mockContext.invocation!.name = command;
       }
-      const suggestions = await completeExtensions(mockContext, partialArg);
+      const suggestions = completeExtensions(mockContext, partialArg);
       expect(suggestions).toEqual(expected);
+    });
+  });
+
+  describe('completeExtensionsAndScopes', () => {
+    it('expands the list of suggestions with --scope args', () => {
+      const suggestions = completeExtensionsAndScopes(mockContext, 'ext');
+      expect(suggestions).toEqual([
+        'ext-one --scope user',
+        'ext-one --scope workspace',
+        'ext-one --scope session',
+        'ext-two --scope user',
+        'ext-two --scope workspace',
+        'ext-two --scope session',
+      ]);
     });
   });
 
