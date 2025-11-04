@@ -75,10 +75,12 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
+import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
+import { getExperiments } from '../code_assist/experiments/experiments.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -399,6 +401,7 @@ export class Config {
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
   private experiments: Experiments | undefined;
+  private experimentsPromise: Promise<void> | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -628,6 +631,20 @@ export class Config {
 
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
+
+    const codeAssistServer = getCodeAssistServer(this);
+    if (codeAssistServer) {
+      this.experimentsPromise = getExperiments(codeAssistServer)
+        .then((experiments) => {
+          this.setExperiments(experiments);
+        })
+        .catch((e) => {
+          console.error(e);
+        });
+    } else {
+      this.experiments = undefined;
+      this.experimentsPromise = undefined;
+    }
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
@@ -1068,10 +1085,15 @@ export class Config {
     this.fileSystemService = fileSystemService;
   }
 
-  getCompressionThreshold(): number | undefined {
+  async getCompressionThreshold(): Promise<number | undefined> {
     if (this.compressionThreshold) {
       return this.compressionThreshold;
     }
+
+    if (this.experimentsPromise) {
+      await this.experimentsPromise;
+    }
+
     const remoteThreshold =
       this.experiments?.flags['GeminiCLIContextCompression__threshold_fraction']
         ?.floatValue;

@@ -274,7 +274,7 @@ describe('CodeAssistServer', () => {
 
     expect(server.requestPost).toHaveBeenCalledWith('listExperiments', {
       project: 'test-project',
-      metadata: { ide_version: 'v0.1.0', duet_project: 'test-project' },
+      metadata: { ideVersion: 'v0.1.0', duetProject: 'test-project' },
     });
     expect(response).toEqual(mockResponse);
   });
