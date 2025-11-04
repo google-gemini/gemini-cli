@@ -15,6 +15,7 @@ import { USER_SETTINGS_DIR } from '../config/settings.js';
 import { promisify } from 'node:util';
 import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import {
+  coreEvents,
   debugLogger,
   FatalSandboxError,
   GEMINI_DIR,
@@ -87,9 +88,8 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
         osReleaseContent.match(/^ID_LIKE=.*debian.*/m) || // Covers derivatives
         osReleaseContent.match(/^ID_LIKE=.*ubuntu.*/m) // Covers derivatives
       ) {
-        // note here and below we use console.error for informational messages on stderr
-        console.error(
-          'INFO: Defaulting to use current user UID/GID for Debian/Ubuntu-based Linux.',
+        debugLogger.log(
+          'Defaulting to use current user UID/GID for Debian/Ubuntu-based Linux.',
         );
         return true;
       }
@@ -216,8 +216,7 @@ export async function start_sandbox(
           `Missing macos seatbelt profile file '${profileFile}'`,
         );
       }
-      // Log on STDERR so it doesn't clutter the output on STDOUT
-      console.error(`using macos seatbelt (profile: ${profile}) ...`);
+      debugLogger.log(`using macos seatbelt (profile: ${profile}) ...`);
       // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
       const nodeOptions = [
         ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
@@ -319,7 +318,7 @@ export async function start_sandbox(
         //   console.info(data.toString());
         // });
         proxyProcess.stderr?.on('data', (data) => {
-          console.error(data.toString());
+          debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
         });
         proxyProcess.on('close', (code, signal) => {
           if (sandboxProcess?.pid) {
@@ -348,7 +347,7 @@ export async function start_sandbox(
       });
     }
 
-    console.error(`hopping into sandbox (command: ${config.command}) ...`);
+    debugLogger.log(`hopping into sandbox (command: ${config.command}) ...`);
 
     // determine full path for gemini-cli to distinguish linked vs installed setting
     const gcPath = fs.realpathSync(process.argv[1]);
@@ -373,7 +372,7 @@ export async function start_sandbox(
             'run `npm link ./packages/cli` under gemini-cli repo to switch to linked binary.',
         );
       } else {
-        console.error('building sandbox ...');
+        debugLogger.log('building sandbox ...');
         const gcRoot = gcPath.split('/packages/')[0];
         // if project folder has sandbox.Dockerfile under project settings folder, use that
         let buildArgs = '';
@@ -382,7 +381,7 @@ export async function start_sandbox(
           'sandbox.Dockerfile',
         );
         if (isCustomProjectSandbox) {
-          console.error(`using ${projectSandboxDockerfile} for sandbox`);
+          debugLogger.log(`using ${projectSandboxDockerfile} for sandbox`);
           buildArgs += `-f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
         }
         execSync(
@@ -497,7 +496,7 @@ export async function start_sandbox(
               `Missing mount path '${from}' listed in SANDBOX_MOUNTS`,
             );
           }
-          console.error(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
+          debugLogger.log(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
           args.push('--volume', mount);
         }
       }
@@ -679,7 +678,7 @@ export async function start_sandbox(
       for (let env of process.env['SANDBOX_ENV'].split(',')) {
         if ((env = env.trim())) {
           if (env.includes('=')) {
-            console.error(`SANDBOX_ENV: ${env}`);
+            debugLogger.log(`SANDBOX_ENV: ${env}`);
             args.push('--env', env);
           } else {
             throw new FatalSandboxError(
@@ -789,7 +788,7 @@ export async function start_sandbox(
       //   console.info(data.toString());
       // });
       proxyProcess.stderr?.on('data', (data) => {
-        console.error(data.toString().trim());
+        debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
       });
       proxyProcess.on('close', (code, signal) => {
         if (sandboxProcess?.pid) {
@@ -818,7 +817,7 @@ export async function start_sandbox(
 
     return new Promise<number>((resolve, reject) => {
       sandboxProcess.on('error', (err) => {
-        console.error('Sandbox process error:', err);
+        coreEvents.emitFeedback('error', 'Sandbox process error', err);
         reject(err);
       });
 
@@ -939,13 +938,13 @@ async function ensureSandboxImageIsPresent(
   sandbox: string,
   image: string,
 ): Promise<boolean> {
-  console.info(`Checking for sandbox image: ${image}`);
+  debugLogger.log(`Checking for sandbox image: ${image}`);
   if (await imageExists(sandbox, image)) {
-    console.info(`Sandbox image ${image} found locally.`);
+    debugLogger.log(`Sandbox image ${image} found locally.`);
     return true;
   }
 
-  console.info(`Sandbox image ${image} not found locally.`);
+  debugLogger.log(`Sandbox image ${image} not found locally.`);
   if (image === LOCAL_DEV_SANDBOX_IMAGE_NAME) {
     // user needs to build the image themselves
     return false;
@@ -954,7 +953,7 @@ async function ensureSandboxImageIsPresent(
   if (await pullImage(sandbox, image)) {
     // After attempting to pull, check again to be certain
     if (await imageExists(sandbox, image)) {
-      console.info(`Sandbox image ${image} is now available after pulling.`);
+      debugLogger.log(`Sandbox image ${image} is now available after pulling.`);
       return true;
     } else {
       debugLogger.warn(
@@ -964,7 +963,8 @@ async function ensureSandboxImageIsPresent(
     }
   }
 
-  console.error(
+  coreEvents.emitFeedback(
+    'error',
     `Failed to obtain sandbox image ${image} after check and pull attempt.`,
   );
   return false; // Pull command failed or image still not present
