@@ -426,6 +426,18 @@ class EditToolInvocation
       abortSignal,
     );
 
+    // If the self-correction attempt timed out, return the original error.
+    if (fixedEdit === null) {
+      return {
+        currentContent: contentForLlmEditFixer,
+        newContent: currentContent,
+        occurrences: 0,
+        isNewFile: false,
+        error: initialError,
+        originalLineEnding,
+      };
+    }
+
     if (fixedEdit.noChangesRequired) {
       return {
         currentContent,
