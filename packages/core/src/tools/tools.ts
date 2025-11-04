@@ -216,6 +216,7 @@ export abstract class BaseToolInvocation<
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall,
         correlationId,
+        serverName: this._serverName,
       };
 
       try {
