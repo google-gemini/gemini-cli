@@ -38,7 +38,7 @@ function createShellEnvironment(
 
   if (shell === 'powershell') {
     // Force Constrained Language Mode for PowerShell invocations to harden against risky .NET access.
-    env.__PSLockdownPolicy = '4';
+    env['__PSLockdownPolicy'] = '4';
   }
 
   return env;
