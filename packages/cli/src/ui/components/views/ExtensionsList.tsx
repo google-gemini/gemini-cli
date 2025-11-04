@@ -48,6 +48,7 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
               break;
             case ExtensionUpdateState.UP_TO_DATE:
             case ExtensionUpdateState.NOT_UPDATABLE:
+            case ExtensionUpdateState.UPDATED:
               stateColor = 'green';
               break;
             case undefined:

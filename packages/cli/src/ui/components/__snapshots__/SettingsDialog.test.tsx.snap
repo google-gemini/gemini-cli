@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`SettingsDialog > Snapshot Tests > should render default state correctly 1`] = `
+exports[`SettingsDialog > Initial Rendering > should render settings list with visual indicators 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Settings                                                                                       │
@@ -35,42 +35,7 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render focused on scope selector 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Settings                                                                                       │
-│                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
-│                                                                                                  │
-│   Disable Auto Update                                  false                                     │
-│                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
-│                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
-│                                                                                                  │
-│   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│ ▼                                                                                                │
-│                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`SettingsDialog > Snapshot Tests > should render with accessibility settings enabled 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Settings                                                                                       │
@@ -105,7 +70,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with all boolean settings disabled 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Settings                                                                                       │
@@ -140,77 +105,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with different scope selected (System) 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Settings                                                                                       │
-│                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode (Modified in System)                        false                                     │
-│                                                                                                  │
-│   Disable Auto Update (Modified in System)             false                                     │
-│                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
-│                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
-│                                                                                                  │
-│   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│ ▼                                                                                                │
-│                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`SettingsDialog > Snapshot Tests > should render with different scope selected (Workspace) 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Settings                                                                                       │
-│                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode (Modified in Workspace)                     false                                     │
-│                                                                                                  │
-│   Disable Auto Update                                  false                                     │
-│                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Debug Keystroke Logging (Modified in Workspace)      false                                     │
-│                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
-│   Enable Session Cleanup                               false                                     │
-│                                                                                                  │
-│   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│ ▼                                                                                                │
-│                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`SettingsDialog > Snapshot Tests > should render with file filtering settings configured 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Settings                                                                                       │
@@ -245,7 +140,77 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and number settings 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ > Settings                                                                                       │
+│                                                                                                  │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             false                                     │
+│                                                                                                  │
+│   Disable Auto Update                                  false                                     │
+│                                                                                                  │
+│   Enable Prompt Completion                             false                                     │
+│                                                                                                  │
+│   Debug Keystroke Logging                              false                                     │
+│                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
+│   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
+│                                                                                                  │
+│ ▼                                                                                                │
+│                                                                                                  │
+│                                                                                                  │
+│   Apply To                                                                                       │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+│                                                                                                  │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│   Settings                                                                                       │
+│                                                                                                  │
+│ ▲                                                                                                │
+│   Vim Mode                                             false                                     │
+│                                                                                                  │
+│   Disable Auto Update                                  false                                     │
+│                                                                                                  │
+│   Enable Prompt Completion                             false                                     │
+│                                                                                                  │
+│   Debug Keystroke Logging                              false                                     │
+│                                                                                                  │
+│   Session Retention                                    undefined                                 │
+│                                                                                                  │
+│   Enable Session Cleanup                               false                                     │
+│                                                                                                  │
+│   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
+│                                                                                                  │
+│ ▼                                                                                                │
+│                                                                                                  │
+│                                                                                                  │
+│ > Apply To                                                                                       │
+│ ● 1. User Settings                                                                               │
+│   2. Workspace Settings                                                                          │
+│   3. System Settings                                                                             │
+│                                                                                                  │
+│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Settings                                                                                       │
@@ -280,7 +245,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with tools and security settings 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Settings                                                                                       │
@@ -315,7 +280,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with various boolean settings enabled 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Settings                                                                                       │

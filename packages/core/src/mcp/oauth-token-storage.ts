@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents } from '../utils/events.js';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';

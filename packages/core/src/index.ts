@@ -11,6 +11,8 @@ export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
 export * from './policy/types.js';
 export * from './policy/policy-engine.js';
+export * from './policy/toml-loader.js';
+export * from './policy/config.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 
@@ -37,6 +39,7 @@ export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
+export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
 export * from './utils/paths.js';
@@ -135,3 +138,6 @@ export { Storage } from './config/storage.js';
 
 // Export test utils
 export * from './test-utils/index.js';
+
+// Export hook types
+export * from './hooks/types.js';

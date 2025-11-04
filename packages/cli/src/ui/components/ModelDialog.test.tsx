@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render, cleanup } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { cleanup } from 'ink-testing-library';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -80,16 +81,17 @@ describe('<ModelDialog />', () => {
   });
 
   it('renders the title and help text', () => {
-    const { lastFrame } = renderComponent();
+    const { lastFrame, unmount } = renderComponent();
     expect(lastFrame()).toContain('Select Model');
     expect(lastFrame()).toContain('(Press Esc to close)');
     expect(lastFrame()).toContain(
-      '> To use a specific Gemini model, use the --model flag.',
+      '> To use a specific Gemini model on startup, use the --model flag.',
     );
+    unmount();
   });
 
   it('passes all model options to DescriptiveRadioButtonSelect', () => {
-    renderComponent();
+    const { unmount } = renderComponent();
     expect(mockedSelect).toHaveBeenCalledTimes(1);
 
     const props = mockedSelect.mock.calls[0][0];
@@ -99,11 +101,12 @@ describe('<ModelDialog />', () => {
     expect(props.items[2].value).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     expect(props.items[3].value).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     expect(props.showNumbers).toBe(true);
+    unmount();
   });
 
   it('initializes with the model from ConfigContext', () => {
     const mockGetModel = vi.fn(() => DEFAULT_GEMINI_FLASH_MODEL);
-    renderComponent({}, { getModel: mockGetModel });
+    const { unmount } = renderComponent({}, { getModel: mockGetModel });
 
     expect(mockGetModel).toHaveBeenCalled();
     expect(mockedSelect).toHaveBeenCalledWith(
@@ -112,10 +115,11 @@ describe('<ModelDialog />', () => {
       }),
       undefined,
     );
+    unmount();
   });
 
   it('initializes with "auto" model if context is not provided', () => {
-    renderComponent({}, undefined);
+    const { unmount } = renderComponent({}, undefined);
 
     expect(mockedSelect).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -123,13 +127,14 @@ describe('<ModelDialog />', () => {
       }),
       undefined,
     );
+    unmount();
   });
 
   it('initializes with "auto" model if getModel returns undefined', () => {
     const mockGetModel = vi.fn(() => undefined);
     // @ts-expect-error This test validates component robustness when getModel
     // returns an unexpected undefined value.
-    renderComponent({}, { getModel: mockGetModel });
+    const { unmount } = renderComponent({}, { getModel: mockGetModel });
 
     expect(mockGetModel).toHaveBeenCalled();
 
@@ -142,10 +147,11 @@ describe('<ModelDialog />', () => {
       undefined,
     );
     expect(mockedSelect).toHaveBeenCalledTimes(1);
+    unmount();
   });
 
   it('calls config.setModel and onClose when DescriptiveRadioButtonSelect.onSelect is triggered', () => {
-    const { props, mockConfig } = renderComponent({}, {}); // Pass empty object for contextValue
+    const { props, mockConfig, unmount } = renderComponent({}, {}); // Pass empty object for contextValue
 
     const childOnSelect = mockedSelect.mock.calls[0][0].onSelect;
     expect(childOnSelect).toBeDefined();
@@ -155,17 +161,19 @@ describe('<ModelDialog />', () => {
     // Assert against the default mock provided by renderComponent
     expect(mockConfig?.setModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
     expect(props.onClose).toHaveBeenCalledTimes(1);
+    unmount();
   });
 
   it('does not pass onHighlight to DescriptiveRadioButtonSelect', () => {
-    renderComponent();
+    const { unmount } = renderComponent();
 
     const childOnHighlight = mockedSelect.mock.calls[0][0].onHighlight;
     expect(childOnHighlight).toBeUndefined();
+    unmount();
   });
 
   it('calls onClose prop when "escape" key is pressed', () => {
-    const { props } = renderComponent();
+    const { props, unmount } = renderComponent();
 
     expect(mockedUseKeypress).toHaveBeenCalled();
 
@@ -193,11 +201,12 @@ describe('<ModelDialog />', () => {
       sequence: '',
     });
     expect(props.onClose).toHaveBeenCalledTimes(1);
+    unmount();
   });
 
   it('updates initialIndex when config context changes', () => {
     const mockGetModel = vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO);
-    const { rerender } = render(
+    const { rerender, unmount } = render(
       <ConfigContext.Provider
         value={{ getModel: mockGetModel } as unknown as Config}
       >
@@ -219,5 +228,6 @@ describe('<ModelDialog />', () => {
     // Should be called at least twice: initial render + re-render after context change
     expect(mockedSelect).toHaveBeenCalledTimes(2);
     expect(mockedSelect.mock.calls[1][0].initialIndex).toBe(3);
+    unmount();
   });
 });
