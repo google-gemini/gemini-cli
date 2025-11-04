@@ -171,7 +171,9 @@ function getEnableDisableContext(
 } | null {
   const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
-    debugLogger.error('Cannot disable extensions in this environment');
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
     return null;
   }
   const parts = args.split(' ');
@@ -179,9 +181,8 @@ function getEnableDisableContext(
   if (
     name === '' ||
     !(
-      parts.length === 1 ||
-      (parts.length === 2 && parts[1].startsWith('--scope=')) ||
-      (parts.length === 3 && parts[1] === '--scope')
+      (parts.length === 2 && parts[1].startsWith('--scope=')) || // --scope=<scope>
+      (parts.length === 3 && parts[1] === '--scope') // --scope <scope>
     )
   ) {
     context.ui.addItem(
@@ -193,35 +194,32 @@ function getEnableDisableContext(
     );
     return null;
   }
-  let scope: SettingScope = SettingScope.Session;
+  let scope: SettingScope;
+  // Transform `--scope=<scope>` to `--scope <scope>`.
   if (parts.length === 2) {
     parts.push(...parts[1].split('='));
     parts.splice(1, 1);
   }
-  if (parts.length === 3) {
-    switch (parts[2]) {
-      case 'workspace':
-        scope = SettingScope.Workspace;
-        break;
-      case 'user':
-        scope = SettingScope.User;
-        break;
-      case 'session':
-      case '':
-      case null:
-      case undefined:
-        break;
-      default:
-        context.ui.addItem(
-          {
-            type: MessageType.ERROR,
-            text: `Unsupported scope ${parts[2]}, should be one of "user", "workspace", or "session"`,
-          },
-          Date.now(),
-        );
-        debugLogger.error();
-        return null;
-    }
+  switch (parts[2]) {
+    case 'workspace':
+      scope = SettingScope.Workspace;
+      break;
+    case 'user':
+      scope = SettingScope.User;
+      break;
+    case 'session':
+      scope = SettingScope.Session;
+      break;
+    default:
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Unsupported scope ${parts[2]}, should be one of "user", "workspace", or "session"`,
+        },
+        Date.now(),
+      );
+      debugLogger.error();
+      return null;
   }
   let names: string[] = [];
   if (name === '--all') {

@@ -469,14 +469,6 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('should call enableExtension with session as the default scope', async () => {
-      await enableAction!(mockContext, inactiveExt.name);
-      expect(mockEnableExtension).toHaveBeenCalledWith(
-        inactiveExt.name,
-        SettingScope.Session,
-      );
-    });
-
     it('should call enableExtension with the provided scope', async () => {
       await enableAction!(mockContext, `${inactiveExt.name} --scope=user`);
       expect(mockEnableExtension).toHaveBeenCalledWith(
@@ -496,7 +488,7 @@ describe('extensionsCommand', () => {
         inactiveExt,
         { ...inactiveExt, name: 'another-inactive-ext' },
       ]);
-      await enableAction!(mockContext, '--all');
+      await enableAction!(mockContext, '--all --scope session');
       expect(mockEnableExtension).toHaveBeenCalledWith(
         inactiveExt.name,
         SettingScope.Session,
@@ -532,14 +524,6 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('should call disableExtension with session as the default scope', async () => {
-      await disableAction!(mockContext, activeExt.name);
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        activeExt.name,
-        SettingScope.Session,
-      );
-    });
-
     it('should call disableExtension with the provided scope', async () => {
       await disableAction!(mockContext, `${activeExt.name} --scope=user`);
       expect(mockDisableExtension).toHaveBeenCalledWith(
@@ -559,7 +543,7 @@ describe('extensionsCommand', () => {
         activeExt,
         { ...activeExt, name: 'another-active-ext' },
       ]);
-      await disableAction!(mockContext, '--all');
+      await disableAction!(mockContext, '--all --scope session');
       expect(mockDisableExtension).toHaveBeenCalledWith(
         activeExt.name,
         SettingScope.Session,
