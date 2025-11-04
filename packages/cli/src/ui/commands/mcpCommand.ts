@@ -43,7 +43,7 @@ const authCommand: SlashCommand = {
       };
     }
 
-    const mcpServers = config.getMcpServers() || {};
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() ?? {};
 
     if (!serverName) {
       // List servers that support OAuth
@@ -119,20 +119,20 @@ const authCommand: SlashCommand = {
       );
 
       // Trigger tool re-discovery to pick up authenticated server
-      const toolRegistry = config.getToolRegistry();
-      if (toolRegistry) {
+      const mcpClientManager = config.getMcpClientManager();
+      if (mcpClientManager) {
         context.ui.addItem(
           {
             type: 'info',
-            text: `Re-discovering tools from '${serverName}'...`,
+            text: `Restarting MCP server '${serverName}'...`,
           },
           Date.now(),
         );
-        await toolRegistry.discoverToolsForServer(serverName);
+        await mcpClientManager.restartServer(serverName);
       }
       // Update the client with the new tools
       const geminiClient = config.getGeminiClient();
-      if (geminiClient) {
+      if (geminiClient?.isInitialized()) {
         await geminiClient.setTools();
       }
 
@@ -158,7 +158,7 @@ const authCommand: SlashCommand = {
     const { config } = context.services;
     if (!config) return [];
 
-    const mcpServers = config.getMcpServers() || {};
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
     return Object.keys(mcpServers).filter((name) =>
       name.startsWith(partialArg),
     );
@@ -188,9 +188,10 @@ const listAction = async (
     };
   }
 
-  const mcpServers = config.getMcpServers() || {};
+  const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
   const serverNames = Object.keys(mcpServers);
-  const blockedMcpServers = config.getBlockedMcpServers() || [];
+  const blockedMcpServers =
+    config.getMcpClientManager()?.getBlockedMcpServers() || [];
 
   const connectingServers = serverNames.filter(
     (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
@@ -299,12 +300,12 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    const toolRegistry = config.getToolRegistry();
-    if (!toolRegistry) {
+    const mcpClientManager = config.getMcpClientManager();
+    if (!mcpClientManager) {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Could not retrieve tool registry.',
+        content: 'Could not retrieve mcp client manager.',
       };
     }
 
@@ -316,11 +317,11 @@ const refreshCommand: SlashCommand = {
       Date.now(),
     );
 
-    await toolRegistry.restartMcpServers();
+    await mcpClientManager.restart();
 
     // Update the client with the new tools
     const geminiClient = config.getGeminiClient();
-    if (geminiClient) {
+    if (geminiClient?.isInitialized()) {
       await geminiClient.setTools();
     }
 
