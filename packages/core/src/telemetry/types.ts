@@ -74,7 +74,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
-    const mcpServers = config.getMcpServers();
+    const mcpServers =
+      config.getMcpClientManager()?.getMcpServers() ?? config.getMcpServers();
 
     let useGemini = false;
     let useVertex = false;
