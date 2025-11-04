@@ -9,7 +9,7 @@ import type {
   OAuthAuthorizationServerMetadata,
   OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
-import { OAuthUtils } from './oauth-utils.js';
+import { OAuthResourceValidationError, OAuthUtils } from './oauth-utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock fetch globally
@@ -109,7 +109,7 @@ describe('OAuthUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null when resource metadata does not match expected resource', async () => {
+    it('should throw when resource metadata does not match expected resource', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -119,15 +119,15 @@ describe('OAuthUtils', () => {
           }),
       });
 
-      const result = await OAuthUtils.fetchProtectedResourceMetadata(
-        'https://example.com/.well-known/oauth-protected-resource',
-        'https://different.example.com',
-      );
-
-      expect(result).toBeNull();
+      await expect(
+        OAuthUtils.fetchProtectedResourceMetadata(
+          'https://example.com/.well-known/oauth-protected-resource',
+          'https://different.example.com',
+        ),
+      ).rejects.toBeInstanceOf(OAuthResourceValidationError);
     });
 
-    it('should return null when resource metadata is missing the resource field', async () => {
+    it('should throw when resource metadata is missing the resource field', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -136,12 +136,30 @@ describe('OAuthUtils', () => {
           }),
       });
 
+      await expect(
+        OAuthUtils.fetchProtectedResourceMetadata(
+          'https://example.com/.well-known/oauth-protected-resource',
+          'https://example.com',
+        ),
+      ).rejects.toBeInstanceOf(OAuthResourceValidationError);
+    });
+
+    it('should accept equivalent resource URLs with trailing slashes', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            resource: 'https://example.com/mcp/',
+            authorization_servers: ['https://auth.example.com'],
+          }),
+      });
+
       const result = await OAuthUtils.fetchProtectedResourceMetadata(
         'https://example.com/.well-known/oauth-protected-resource',
-        'https://example.com',
+        'https://example.com/mcp',
       );
 
-      expect(result).toBeNull();
+      expect(result?.resource).toBe('https://example.com/mcp/');
     });
   });
 
@@ -244,6 +262,38 @@ describe('OAuthUtils', () => {
         3,
         'https://auth.example.com/mcp/.well-known/openid-configuration',
       );
+    });
+  });
+
+  describe('discoverOAuthConfig', () => {
+    it('should not fallback when protected resource metadata validation fails', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resource: 'https://attacker.example.com/mcp',
+              authorization_servers: ['https://auth.example.com'],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+        });
+
+      const authSpy = vi
+        .spyOn(OAuthUtils, 'discoverAuthorizationServerMetadata')
+        .mockResolvedValue(null);
+
+      try {
+        const result = await OAuthUtils.discoverOAuthConfig(
+          'https://example.com/mcp',
+        );
+
+        expect(result).toBeNull();
+        expect(authSpy).not.toHaveBeenCalled();
+      } finally {
+        authSpy.mockRestore();
+      }
     });
   });
 

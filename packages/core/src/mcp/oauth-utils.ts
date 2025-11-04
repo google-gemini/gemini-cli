@@ -38,6 +38,13 @@ export interface OAuthProtectedResourceMetadata {
   resource_encryption_enc_values_supported?: string[];
 }
 
+export class OAuthResourceValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OAuthResourceValidationError';
+  }
+}
+
 export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
 
 /**
@@ -104,33 +111,37 @@ export class OAuthUtils {
       }
 
       if (!metadata.resource) {
-        debugLogger.warn(
-          `Protected resource metadata at ${resourceMetadataUrl} is missing the required 'resource' parameter. Ignoring metadata per RFC 9728.`,
+        throw new OAuthResourceValidationError(
+          `Protected resource metadata at ${resourceMetadataUrl} is missing the required 'resource' parameter.`,
         );
-        return null;
       }
 
       try {
-        const normalizedExpected = new URL(expectedResource).toString();
-        const normalizedMetadataResource = new URL(
+        const normalizedExpected =
+          this.normalizeResourceForComparison(expectedResource);
+        const normalizedMetadataResource = this.normalizeResourceForComparison(
           metadata.resource,
-        ).toString();
+        );
 
         if (normalizedExpected !== normalizedMetadataResource) {
-          debugLogger.warn(
-            `Protected resource metadata at ${resourceMetadataUrl} declares resource '${metadata.resource}', but the expected resource is '${expectedResource}'. Ignoring metadata to prevent impersonation per RFC 9728.`,
+          throw new OAuthResourceValidationError(
+            `Protected resource metadata at ${resourceMetadataUrl} declares resource '${metadata.resource}', but the expected resource is '${expectedResource}'.`,
           );
-          return null;
         }
       } catch (error) {
-        debugLogger.warn(
+        if (error instanceof OAuthResourceValidationError) {
+          throw error;
+        }
+        throw new OAuthResourceValidationError(
           `Failed to validate protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
         );
-        return null;
       }
 
       return metadata;
     } catch (error) {
+      if (error instanceof OAuthResourceValidationError) {
+        throw error;
+      }
       debugLogger.debug(
         `Failed to fetch protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
       );
@@ -260,6 +271,7 @@ export class OAuthUtils {
   ): Promise<MCPOAuthConfig | null> {
     try {
       const normalizedServerUrl = new URL(serverUrl).toString();
+      let resourceValidationFailed = false;
       // First try standard root-based discovery
       const metadataUrlsToTry: string[] = [];
 
@@ -277,28 +289,44 @@ export class OAuthUtils {
       }
 
       for (const metadataUrl of metadataUrlsToTry) {
-        const resourceMetadata = await this.fetchProtectedResourceMetadata(
-          metadataUrl,
-          normalizedServerUrl,
-        );
+        try {
+          const resourceMetadata = await this.fetchProtectedResourceMetadata(
+            metadataUrl,
+            normalizedServerUrl,
+          );
 
-        if (resourceMetadata?.authorization_servers?.length) {
-          // Use the first authorization server
-          const authServerUrl = resourceMetadata.authorization_servers[0];
-          const authServerMetadata =
-            await this.discoverAuthorizationServerMetadata(authServerUrl);
+          if (resourceMetadata?.authorization_servers?.length) {
+            // Use the first authorization server
+            const authServerUrl = resourceMetadata.authorization_servers[0];
+            const authServerMetadata =
+              await this.discoverAuthorizationServerMetadata(authServerUrl);
 
-          if (authServerMetadata) {
-            const config = this.metadataToOAuthConfig(authServerMetadata);
-            if (authServerMetadata.registration_endpoint) {
-              debugLogger.log(
-                'Dynamic client registration is supported at:',
-                authServerMetadata.registration_endpoint,
-              );
+            if (authServerMetadata) {
+              const config = this.metadataToOAuthConfig(authServerMetadata);
+              if (authServerMetadata.registration_endpoint) {
+                debugLogger.log(
+                  'Dynamic client registration is supported at:',
+                  authServerMetadata.registration_endpoint,
+                );
+              }
+              return config;
             }
-            return config;
           }
+        } catch (error) {
+          if (error instanceof OAuthResourceValidationError) {
+            debugLogger.warn(error.message);
+            resourceValidationFailed = true;
+            continue;
+          }
+          throw error;
         }
+      }
+
+      if (resourceValidationFailed) {
+        debugLogger.warn(
+          `Skipping OAuth discovery fallback at ${serverUrl} because protected resource metadata validation failed.`,
+        );
+        return null;
       }
 
       // Fallback: try well-known endpoints at the base URL
@@ -357,10 +385,19 @@ export class OAuthUtils {
       return null;
     }
 
-    const resourceMetadata = await this.fetchProtectedResourceMetadata(
-      resourceMetadataUri,
-      expectedResource,
-    );
+    let resourceMetadata: OAuthProtectedResourceMetadata | null;
+    try {
+      resourceMetadata = await this.fetchProtectedResourceMetadata(
+        resourceMetadataUri,
+        expectedResource,
+      );
+    } catch (error) {
+      if (error instanceof OAuthResourceValidationError) {
+        debugLogger.warn(error.message);
+        return null;
+      }
+      throw error;
+    }
     if (!resourceMetadata?.authorization_servers?.length) {
       return null;
     }
@@ -406,6 +443,13 @@ export class OAuthUtils {
   static buildResourceParameter(endpointUrl: string): string {
     const url = new URL(endpointUrl);
     return `${url.protocol}//${url.host}${url.pathname}`;
+  }
+
+  private static normalizeResourceForComparison(resource: string): string {
+    const url = new URL(resource);
+    const normalizedPath = url.pathname.replace(/\/+$/, '') || '/';
+    const pathForComparison = normalizedPath === '/' ? '' : normalizedPath;
+    return `${url.origin}${pathForComparison}${url.search}`;
   }
 
   /**
