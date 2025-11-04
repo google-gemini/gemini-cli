@@ -169,7 +169,10 @@ function Get-InvocationName {
   switch ($Node.GetType().FullName) {
     'System.Management.Automation.Language.InvokeMemberExpressionAst' {
       $invokeNode = [System.Management.Automation.Language.InvokeMemberExpressionAst]$Node
-      $expressionText = $invokeNode.Expression?.Extent.Text
+      $expressionText = ''
+      if ($invokeNode.Expression) {
+        $expressionText = $invokeNode.Expression.Extent.Text
+      }
       $memberName = $invokeNode.Member
       if (-not [string]::IsNullOrWhiteSpace($expressionText) -and -not [string]::IsNullOrWhiteSpace($memberName)) {
         $separator = if ($invokeNode.Static) { '::' } else { '.' }
