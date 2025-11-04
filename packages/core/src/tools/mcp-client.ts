@@ -160,6 +160,7 @@ export class McpClient {
     if (this.status !== MCPServerStatus.CONNECTED) {
       return;
     }
+    this.toolRegistry.removeMcpToolsByServer(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -627,18 +628,10 @@ export async function discoverTools(
           mcpServerConfig.trust,
           undefined,
           cliConfig,
+          mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
           messageBus,
         );
-
-        if (
-          cliConfig.getDebugMode?.() &&
-          cliConfig.getEnableMessageBusIntegration?.()
-        ) {
-          debugLogger.log(
-            `[DEBUG] Discovered MCP tool '${funcDecl.name}' from server '${mcpServerName}' with messageBus: ${messageBus ? 'YES' : 'NO'}`,
-          );
-        }
 
         discoveredTools.push(tool);
       } catch (error) {

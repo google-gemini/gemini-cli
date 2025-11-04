@@ -32,6 +32,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
@@ -41,6 +42,7 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
+import { coreEvents } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -77,11 +79,7 @@ import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 
-export enum ApprovalMode {
-  DEFAULT = 'default',
-  AUTO_EDIT = 'autoEdit',
-  YOLO = 'yolo',
-}
+import { ApprovalMode } from '../policy/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -90,10 +88,6 @@ export interface AccessibilitySettings {
 
 export interface BugCommandSettings {
   urlTemplate: string;
-}
-
-export interface ChatCompressionSettings {
-  contextPercentageThreshold?: number;
 }
 
 export interface SummarizeToolOutputSettings {
@@ -138,6 +132,7 @@ export interface GeminiCLIExtension {
   contextFiles: string[];
   excludeTools?: string[];
   id: string;
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
 }
 
 export interface ExtensionInstallMetadata {
@@ -154,7 +149,7 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
-import { debugLogger } from '../utils/debugLogger.js';
+
 import {
   type ExtensionLoader,
   SimpleExtensionLoader,
@@ -255,13 +250,14 @@ export interface ConfigParameters {
   listExtensions?: boolean;
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
+  enableExtensionReloading?: boolean;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
-  chatCompression?: ChatCompressionSettings;
+  compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
@@ -289,6 +285,10 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  enableHooks?: boolean;
+  hooks?: {
+    [K in HookEventName]?: HookDefinition[];
+  };
 }
 
 export class Config {
@@ -312,7 +312,7 @@ export class Config {
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
-  private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
+  private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -346,6 +346,7 @@ export class Config {
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
+  private readonly enableExtensionReloading: boolean;
   private readonly _blockedMcpServers: Array<{
     name: string;
     extensionName: string;
@@ -357,7 +358,7 @@ export class Config {
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
-  private readonly chatCompression: ChatCompressionSettings | undefined;
+  private readonly compressionThreshold: number | undefined;
   private readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
@@ -390,6 +391,10 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly enableHooks: boolean;
+  private readonly hooks:
+    | { [K in HookEventName]?: HookDefinition[] }
+    | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -460,7 +465,7 @@ export class Config {
     this.ideMode = params.ideMode ?? false;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
-    this.chatCompression = params.chatCompression;
+    this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
@@ -480,14 +485,20 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
-    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [
-      AuthType.LOGIN_WITH_GOOGLE,
-    ];
+    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
+    this.enableHooks = params.enableHooks ?? false;
+
+    // Enable MessageBus integration if:
+    // 1. Explicitly enabled via setting, OR
+    // 2. Hooks are enabled and hooks are configured
+    const hasHooks = params.hooks && Object.keys(params.hooks).length > 0;
+    const hooksNeedMessageBus = this.enableHooks && hasHooks;
     this.enableMessageBusIntegration =
-      params.enableMessageBusIntegration ?? false;
+      params.enableMessageBusIntegration ??
+      (hooksNeedMessageBus ? true : false);
     this.codebaseInvestigatorSettings = {
       enabled: params.codebaseInvestigatorSettings?.enabled ?? false,
       maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
@@ -501,6 +512,7 @@ export class Config {
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
+    this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -514,6 +526,7 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.hooks = params.hooks;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -523,8 +536,17 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    if (this.getProxy()) {
-      setGlobalProxy(this.getProxy() as string);
+    const proxy = this.getProxy();
+    if (proxy) {
+      try {
+        setGlobalProxy(proxy);
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
+          error,
+        );
+      }
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
@@ -565,8 +587,6 @@ export class Config {
       if (this.model === DEFAULT_GEMINI_MODEL_AUTO) {
         this.model = DEFAULT_GEMINI_MODEL;
       }
-    } else if (this.useModelRouter && this.model === DEFAULT_GEMINI_MODEL) {
-      this.model = DEFAULT_GEMINI_MODEL_AUTO;
     }
 
     // Vertex and Genai have incompatible encryption and sending history with
@@ -644,7 +664,10 @@ export class Config {
       return;
     }
 
-    this.model = newModel;
+    if (this.model !== newModel) {
+      this.model = newModel;
+      coreEvents.emitModelChanged(newModel);
+    }
   }
 
   isInFallbackMode(): boolean {
@@ -747,6 +770,10 @@ export class Config {
 
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {
+    this.mcpServers = mcpServers;
   }
 
   getUserMemory(): string {
@@ -924,6 +951,10 @@ export class Config {
     return this._enabledExtensions;
   }
 
+  getEnableExtensionReloading(): boolean {
+    return this.enableExtensionReloading;
+  }
+
   getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
     return this._blockedMcpServers;
   }
@@ -994,8 +1025,8 @@ export class Config {
     this.fileSystemService = fileSystemService;
   }
 
-  getChatCompression(): ChatCompressionSettings | undefined {
-    return this.chatCompression;
+  getCompressionThreshold(): number | undefined {
+    return this.compressionThreshold;
   }
 
   isInteractiveShellEnabled(): boolean {
@@ -1115,6 +1146,10 @@ export class Config {
     return this.enableMessageBusIntegration;
   }
 
+  getEnableHooks(): boolean {
+    return this.enableHooks;
+  }
+
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
   }
@@ -1161,19 +1196,11 @@ export class Config {
         // This first implementation is only focused on the general case of
         // the tool registry.
         const messageBusEnabled = this.getEnableMessageBusIntegration();
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
-          );
-        }
+
         const toolArgs = messageBusEnabled
           ? [...args, this.getMessageBus()]
           : args;
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
-          );
-        }
+
         registry.registerTool(new ToolClass(...toolArgs));
       }
     };
@@ -1243,6 +1270,13 @@ export class Config {
 
     await registry.discoverAllTools();
     return registry;
+  }
+
+  /**
+   * Get hooks configuration
+   */
+  getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
+    return this.hooks;
   }
 }
 // Export model constants for use in CLI

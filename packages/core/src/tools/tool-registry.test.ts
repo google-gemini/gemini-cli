@@ -8,7 +8,9 @@
 import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ConfigParameters } from '../config/config.js';
-import { Config, ApprovalMode } from '../config/config.js';
+import { Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import type { FunctionDeclaration, CallableTool } from '@google/genai';
