@@ -537,19 +537,19 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.maxNumTurns`** (number):
   - **Description:** Maximum number of turns for the Codebase Investigator
     agent.
-  - **Default:** `15`
+  - **Default:** `10`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.maxTimeMinutes`** (number):
   - **Description:** Maximum time for the Codebase Investigator agent (in
     minutes).
-  - **Default:** `5`
+  - **Default:** `3`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
