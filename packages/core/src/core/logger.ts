@@ -9,6 +9,7 @@ import { promises as fs } from 'node:fs';
 import type { Content } from '@google/genai';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -158,7 +159,7 @@ export class Logger {
           : 0;
       this.initialized = true;
     } catch (err) {
-      console.error('Failed to initialize logger:', err);
+      coreEvents.emitFeedback('error', 'Failed to initialize logger:', err);
       this.initialized = false;
     }
   }
@@ -315,7 +316,7 @@ export class Logger {
 
   async saveCheckpoint(conversation: Content[], tag: string): Promise<void> {
     if (!this.initialized) {
-      console.error(
+      debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
       );
       return;
@@ -325,13 +326,13 @@ export class Logger {
     try {
       await fs.writeFile(path, JSON.stringify(conversation, null, 2), 'utf-8');
     } catch (error) {
-      console.error('Error writing to checkpoint file:', error);
+      debugLogger.error('Error writing to checkpoint file:', error);
     }
   }
 
   async loadCheckpoint(tag: string): Promise<Content[]> {
     if (!this.initialized) {
-      console.error(
+      debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
       );
       return [];
@@ -354,14 +355,17 @@ export class Logger {
         // This is okay, it just means the checkpoint doesn't exist in either format.
         return [];
       }
-      console.error(`Failed to read or parse checkpoint file ${path}:`, error);
+      debugLogger.error(
+        `Failed to read or parse checkpoint file ${path}:`,
+        error,
+      );
       return [];
     }
   }
 
   async deleteCheckpoint(tag: string): Promise<boolean> {
     if (!this.initialized || !this.geminiDir) {
-      console.error(
+      debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot delete checkpoint.',
       );
       return false;
@@ -377,7 +381,10 @@ export class Logger {
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code !== 'ENOENT') {
-        console.error(`Failed to delete checkpoint file ${newPath}:`, error);
+        debugLogger.error(
+          `Failed to delete checkpoint file ${newPath}:`,
+          error,
+        );
         throw error; // Rethrow unexpected errors
       }
       // It's okay if it doesn't exist.
@@ -392,7 +399,10 @@ export class Logger {
       } catch (error) {
         const nodeError = error as NodeJS.ErrnoException;
         if (nodeError.code !== 'ENOENT') {
-          console.error(`Failed to delete checkpoint file ${oldPath}:`, error);
+          debugLogger.error(
+            `Failed to delete checkpoint file ${oldPath}:`,
+            error,
+          );
           throw error; // Rethrow unexpected errors
         }
         // It's okay if it doesn't exist.
@@ -421,7 +431,7 @@ export class Logger {
         return false; // It truly doesn't exist in either format.
       }
       // A different error occurred.
-      console.error(
+      debugLogger.error(
         `Failed to check checkpoint existence for ${
           filePath ?? `path for tag "${tag}"`
         }:`,
