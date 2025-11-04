@@ -154,11 +154,39 @@ function Add-CommandObject {
     return
   }
 
+  if ($script:commandObjects | Where-Object { $_.start -eq $Start }) {
+    return
+  }
+
   $script:commandObjects += [PSCustomObject]@{
     start = $Start
     name = $Name.Trim()
     text = $trimmedText
   }
+}
+
+function Add-CommandFromCommandAst {
+  param(
+    [System.Management.Automation.Language.CommandAst]$CommandAst
+  )
+
+  $name = $CommandAst.GetCommandName()
+  if ([string]::IsNullOrWhiteSpace($name)) {
+    if ($CommandAst.CommandElements.Count -gt 0) {
+      $firstElement = $CommandAst.CommandElements[0]
+      if ($firstElement -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+        $name = $firstElement.Value
+      } elseif ($firstElement) {
+        $name = $firstElement.Extent.Text
+      }
+    }
+  }
+
+  if ([string]::IsNullOrWhiteSpace($name)) {
+    return
+  }
+
+  Add-CommandObject -Start $CommandAst.Extent.StartOffset -Name $name -Text $CommandAst.Extent.Text
 }
 
 function Get-InvocationName {
@@ -191,28 +219,26 @@ $invocationNodes = $ast.FindAll({
     return (
       $node -is [System.Management.Automation.Language.CommandAst] -or
       $node -is [System.Management.Automation.Language.CommandExpressionAst] -or
-      $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst]
+      $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -or
+      $node -is [System.Management.Automation.Language.PipelineAst]
     )
   }, $true)
 
 foreach ($node in $invocationNodes) {
-  if ($node -is [System.Management.Automation.Language.CommandAst]) {
-    $name = $node.GetCommandName()
-    if ([string]::IsNullOrWhiteSpace($name)) {
-      if ($node.CommandElements.Count -gt 0) {
-        $firstElement = $node.CommandElements[0]
-        if ($firstElement -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
-          $name = $firstElement.Value
-        } else {
-          $name = $firstElement.Extent.Text
-        }
+  if ($node -is [System.Management.Automation.Language.PipelineAst]) {
+    foreach ($element in $node.PipelineElements) {
+      if ($element -is [System.Management.Automation.Language.CommandAst]) {
+        Add-CommandFromCommandAst -CommandAst $element
+      } elseif ($element -is [System.Management.Automation.Language.CommandExpressionAst]) {
+        $name = Get-InvocationName -Node $element
+        Add-CommandObject -Start $element.Extent.StartOffset -Name $name -Text $element.Extent.Text
       }
     }
+    continue
+  }
 
-    if ([string]::IsNullOrWhiteSpace($name)) {
-      continue
-    }
-    Add-CommandObject -Start $node.Extent.StartOffset -Name $name -Text $node.Extent.Text
+  if ($node -is [System.Management.Automation.Language.CommandAst]) {
+    Add-CommandFromCommandAst -CommandAst $node
     continue
   }
 
