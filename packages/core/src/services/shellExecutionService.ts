@@ -212,7 +212,7 @@ export class ShellExecutionService {
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['inherit', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
