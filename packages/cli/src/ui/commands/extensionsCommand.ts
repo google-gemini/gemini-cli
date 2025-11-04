@@ -166,7 +166,7 @@ function getEnableDisableContext(
   args: string,
 ): {
   extensionManager: ExtensionManager;
-  name: string;
+  names: string[];
   scope: SettingScope;
 } | null {
   const extensionLoader = context.services.config?.getExtensionLoader();
@@ -175,18 +175,29 @@ function getEnableDisableContext(
     return null;
   }
   const parts = args.split(' ');
-  if (parts.length !== 1 && (parts.length !== 3 || parts[2] !== '--scope')) {
+  const name = parts[0];
+  if (
+    name === '' ||
+    !(
+      parts.length === 1 ||
+      (parts.length === 2 && parts[1].startsWith('--scope=')) ||
+      (parts.length === 3 && parts[1] === '--scope')
+    )
+  ) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Usage: /extensions disable <extension-names>|--all [--scope=<user|workspace|session>]',
+        text: `Usage: /extensions ${context.invocation?.name} <extension> [--scope=<user|workspace|session>]`,
       },
       Date.now(),
     );
     return null;
   }
-  const name = parts[0];
   let scope: SettingScope = SettingScope.Session;
+  if (parts.length === 2) {
+    parts.push(...parts[1].split('='));
+    parts.splice(1, 1);
+  }
   if (parts.length === 3) {
     switch (parts[2]) {
       case 'workspace':
@@ -201,13 +212,34 @@ function getEnableDisableContext(
       case undefined:
         break;
       default:
-        debugLogger.error(`Unsupported scope ${parts[2]}`);
+        context.ui.addItem(
+          {
+            type: MessageType.ERROR,
+            text: `Unsupported scope ${parts[2]}, should be one of "user", "workspace", or "session"`,
+          },
+          Date.now(),
+        );
+        debugLogger.error();
         return null;
     }
   }
+  let names: string[] = [];
+  if (name === '--all') {
+    let extensions = extensionLoader.getExtensions();
+    if (context.invocation?.name === 'enable') {
+      extensions = extensions.filter((ext) => !ext.isActive);
+    }
+    if (context.invocation?.name === 'disable') {
+      extensions = extensions.filter((ext) => ext.isActive);
+    }
+    names = extensions.map((ext) => ext.name);
+  } else {
+    names = [name];
+  }
+
   return {
     extensionManager: extensionLoader,
-    name,
+    names,
     scope,
   };
 }
@@ -216,34 +248,50 @@ async function disableAction(context: CommandContext, args: string) {
   const enableContext = getEnableDisableContext(context, args);
   if (!enableContext) return;
 
-  const { name, scope, extensionManager } = enableContext;
-  await extensionManager.disableExtension(name!, scope);
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: `Extension "${name}" disabled for the scope "${scope}"`,
-    },
-    Date.now(),
-  );
+  const { names, scope, extensionManager } = enableContext;
+  for (const name of names) {
+    await extensionManager.disableExtension(name!, scope);
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${name}" disabled for the scope "${scope}"`,
+      },
+      Date.now(),
+    );
+  }
 }
 
 async function enableAction(context: CommandContext, args: string) {
   const enableContext = getEnableDisableContext(context, args);
   if (!enableContext) return;
 
-  const { name, scope, extensionManager } = enableContext;
-  await extensionManager.enableExtension(name!, scope);
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: `Extension "${name}" enabled for the scope "${scope}"`,
-    },
-    Date.now(),
-  );
+  const { names, scope, extensionManager } = enableContext;
+  for (const name of names) {
+    await extensionManager.enableExtension(name!, scope);
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${name}" enabled for the scope "${scope}"`,
+      },
+      Date.now(),
+    );
+  }
 }
 
-async function completeExtensions(context: CommandContext, partialArg: string) {
-  const extensions = context.services.config?.getExtensions() ?? [];
+/**
+ * Exported for testing.
+ */
+export async function completeExtensions(
+  context: CommandContext,
+  partialArg: string,
+) {
+  let extensions = context.services.config?.getExtensions() ?? [];
+  if (context.invocation?.name === 'enable') {
+    extensions = extensions.filter((ext) => !ext.isActive);
+  }
+  if (context.invocation?.name === 'disable') {
+    extensions = extensions.filter((ext) => ext.isActive);
+  }
   const extensionNames = extensions.map((ext) => ext.name);
   const suggestions = extensionNames.filter((name) =>
     name.startsWith(partialArg),
@@ -294,18 +342,24 @@ const exploreExtensionsCommand: SlashCommand = {
   action: exploreAction,
 };
 
-export const extensionsCommand: SlashCommand = {
-  name: 'extensions',
-  description: 'Manage extensions',
-  kind: CommandKind.BUILT_IN,
-  subCommands: [
-    listExtensionsCommand,
-    updateExtensionsCommand,
-    exploreExtensionsCommand,
-    disableCommand,
-    enableCommand,
-  ],
-  action: (context, args) =>
-    // Default to list if no subcommand is provided
-    listExtensionsCommand.action!(context, args),
-};
+export function extensionsCommand(
+  enableExtensionReloading?: boolean,
+): SlashCommand {
+  const conditionalCommands = enableExtensionReloading
+    ? [disableCommand, enableCommand]
+    : [];
+  return {
+    name: 'extensions',
+    description: 'Manage extensions',
+    kind: CommandKind.BUILT_IN,
+    subCommands: [
+      listExtensionsCommand,
+      updateExtensionsCommand,
+      exploreExtensionsCommand,
+      ...conditionalCommands,
+    ],
+    action: (context, args) =>
+      // Default to list if no subcommand is provided
+      listExtensionsCommand.action!(context, args),
+  };
+}
