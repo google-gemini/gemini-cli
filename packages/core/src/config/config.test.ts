@@ -267,7 +267,7 @@ describe('Server Config (config.ts)', () => {
           experiments: {
             flags: {
               GeminiCLIContextCompression__threshold_fraction: {
-                floatValue: 0,
+                floatValue: 0.0,
               },
             },
           },
@@ -281,8 +281,6 @@ describe('Server Config (config.ts)', () => {
       });
     });
   });
-    
-    
 
   describe('refreshAuth', () => {
     it('should refresh auth and update config', async () => {
