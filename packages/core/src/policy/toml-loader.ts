@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  type PolicyRule,
-  PolicyDecision,
-  type ApprovalMode,
-} from '@google/gemini-cli-core';
+import { type PolicyRule, PolicyDecision, type ApprovalMode } from './types.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';

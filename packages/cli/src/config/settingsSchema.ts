@@ -491,6 +491,16 @@ const SETTINGS_SCHEMA = {
         description: 'Use the entire width of the terminal for output.',
         showInDialog: true,
       },
+      useAlternateBuffer: {
+        type: 'boolean',
+        label: 'Use Alternate Screen Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -1037,7 +1047,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use Write Todos',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
+    default: true,
     description: 'Enable the write_todos_list tool.',
     showInDialog: false,
   },
