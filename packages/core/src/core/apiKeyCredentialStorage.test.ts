@@ -79,4 +79,10 @@ describe('ApiKeyCredentialStorage', () => {
     await clearApiKey();
     expect(deleteCredentialsMock).toHaveBeenCalledWith('default-api-key');
   });
+
+  it('should not throw when clearing an API key fails', async () => {
+    deleteCredentialsMock.mockRejectedValueOnce(new Error('Failed to delete'));
+    await expect(saveApiKey('')).resolves.not.toThrow();
+    expect(deleteCredentialsMock).toHaveBeenCalledWith('default-api-key');
+  });
 });

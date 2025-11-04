@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -40,6 +40,7 @@ import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
+import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -127,6 +128,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     number | null
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const innerBoxRef = useRef<DOMElement>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -355,6 +357,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       console.error('Error handling clipboard image:', error);
     }
   }, [buffer, config]);
+
+  const handleMouse = useCallback(
+    (event: MouseEvent) => {
+      if (event.name === 'left-press' && innerBoxRef.current) {
+        const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
+        // Terminal mouse events are 1-based, Ink layout is 0-based.
+        const mouseX = event.col - 1;
+        const mouseY = event.row - 1;
+        if (
+          mouseX >= x &&
+          mouseX < x + width &&
+          mouseY >= y &&
+          mouseY < y + height
+        ) {
+          const relX = mouseX - x;
+          const relY = mouseY - y;
+          const visualRow = buffer.visualScrollRow + relY;
+          buffer.moveToVisualPosition(visualRow, relX);
+        }
+      }
+    },
+    [buffer],
+  );
+
+  useMouse(handleMouse, { isActive: focus && !isEmbeddedShellFocused });
 
   const handleInput = useCallback(
     (key: Key) => {
@@ -972,7 +999,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             '>'
           )}{' '}
         </Text>
-        <Box flexGrow={1} flexDirection="column">
+        <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
           {buffer.text.length === 0 && placeholder ? (
             showCursor ? (
               <Text>

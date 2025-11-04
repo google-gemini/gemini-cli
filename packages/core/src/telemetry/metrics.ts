@@ -12,6 +12,7 @@ import type {
   ModelRoutingEvent,
   ModelSlashCommandEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
@@ -38,6 +39,9 @@ const MODEL_SLASH_COMMAND_CALL_COUNT =
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
 const AGENT_DURATION_MS = 'gemini_cli.agent.duration';
 const AGENT_TURNS = 'gemini_cli.agent.turns';
+const AGENT_RECOVERY_ATTEMPT_COUNT = 'gemini_cli.agent.recovery_attempt.count';
+const AGENT_RECOVERY_ATTEMPT_DURATION =
+  'gemini_cli.agent.recovery_attempt.duration';
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
@@ -57,6 +61,7 @@ const REGRESSION_PERCENTAGE_CHANGE =
   'gemini_cli.performance.regression.percentage_change';
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
 const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
+const SLOW_RENDER_LATENCY = 'gemini_cli.ui.slow_render.latency';
 const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
 
 const baseMetricDefinition = {
@@ -174,6 +179,16 @@ const COUNTER_DEFINITIONS = {
       terminate_reason: string;
     },
   },
+  [AGENT_RECOVERY_ATTEMPT_COUNT]: {
+    description: 'Counts agent recovery attempts.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (agentRecoveryAttemptCounter = c),
+    attributes: {} as {
+      agent_name: string;
+      reason: string;
+      success: boolean;
+    },
+  },
   [FLICKER_FRAME_COUNT]: {
     description:
       'Counts UI frames that flicker (render taller than the terminal).',
@@ -227,11 +242,27 @@ const HISTOGRAM_DEFINITIONS = {
       agent_name: string;
     },
   },
+  [SLOW_RENDER_LATENCY]: {
+    description: 'Counts UI frames that take too long to render.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (slowRenderHistogram = h),
+    attributes: {} as Record<string, never>,
+  },
   [AGENT_TURNS]: {
     description: 'Number of turns taken by agents.',
     unit: 'turns',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (agentTurnsHistogram = h),
+    attributes: {} as {
+      agent_name: string;
+    },
+  },
+  [AGENT_RECOVERY_ATTEMPT_DURATION]: {
+    description: 'Duration of agent recovery attempts in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (agentRecoveryAttemptDurationHistogram = h),
     attributes: {} as {
       agent_name: string;
     },
@@ -470,8 +501,11 @@ let modelSlashCommandCallCounter: Counter | undefined;
 let agentRunCounter: Counter | undefined;
 let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
+let agentRecoveryAttemptCounter: Counter | undefined;
+let agentRecoveryAttemptDurationHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
+let slowRenderHistogram: Histogram | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -661,6 +695,16 @@ export function recordExitFail(config: Config): void {
 }
 
 /**
+ * Records a metric for when a UI frame is slow in rendering
+ */
+export function recordSlowRender(config: Config, renderLatency: number): void {
+  if (!slowRenderHistogram || !isMetricsInitialized) return;
+  slowRenderHistogram.record(renderLatency, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+  });
+}
+
+/**
  * Records a metric for when an invalid chunk is received from a stream.
  */
 export function recordInvalidChunk(config: Config): void {
@@ -750,6 +794,32 @@ export function recordAgentRunMetrics(
   });
 
   agentTurnsHistogram.record(event.turn_count, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+  });
+}
+
+export function recordRecoveryAttemptMetrics(
+  config: Config,
+  event: RecoveryAttemptEvent,
+): void {
+  if (
+    !agentRecoveryAttemptCounter ||
+    !agentRecoveryAttemptDurationHistogram ||
+    !isMetricsInitialized
+  )
+    return;
+
+  const commonAttributes = baseMetricDefinition.getCommonAttributes(config);
+
+  agentRecoveryAttemptCounter.add(1, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+    reason: event.reason,
+    success: event.success,
+  });
+
+  agentRecoveryAttemptDurationHistogram.record(event.duration_ms, {
     ...commonAttributes,
     agent_name: event.agent_name,
   });

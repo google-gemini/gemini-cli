@@ -628,18 +628,10 @@ export async function discoverTools(
           mcpServerConfig.trust,
           undefined,
           cliConfig,
+          mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
           messageBus,
         );
-
-        if (
-          cliConfig.getDebugMode?.() &&
-          cliConfig.getEnableMessageBusIntegration?.()
-        ) {
-          debugLogger.log(
-            `[DEBUG] Discovered MCP tool '${funcDecl.name}' from server '${mcpServerName}' with messageBus: ${messageBus ? 'YES' : 'NO'}`,
-          );
-        }
 
         discoveredTools.push(tool);
       } catch (error) {
