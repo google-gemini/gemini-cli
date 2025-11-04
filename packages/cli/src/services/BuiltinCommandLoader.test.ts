@@ -97,6 +97,7 @@ describe('BuiltinCommandLoader', () => {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getUseModelRouter: () => false,
       getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -222,6 +223,7 @@ describe('BuiltinCommandLoader profile', () => {
       getUseModelRouter: () => false,
       getCheckpointingEnabled: () => false,
       getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
   });
 
