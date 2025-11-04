@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import {
@@ -296,60 +296,52 @@ describe('extensionSettings', () => {
   });
 
   describe('promptForSetting', () => {
-    it('should use prompts with type "password" for sensitive settings', async () => {
-      const setting: ExtensionSetting = {
-        name: 'API Key',
-        description: 'Your secret key',
-        envVar: 'API_KEY',
-        sensitive: true,
-      };
-      vi.mocked(prompts).mockResolvedValue({ value: 'secret-key' });
+    it.each([
+      {
+        description:
+          'should use prompts with type "password" for sensitive settings',
+        setting: {
+          name: 'API Key',
+          description: 'Your secret key',
+          envVar: 'API_KEY',
+          sensitive: true,
+        },
+        expectedType: 'password',
+        promptValue: 'secret-key',
+      },
+      {
+        description:
+          'should use prompts with type "text" for non-sensitive settings',
+        setting: {
+          name: 'Username',
+          description: 'Your public username',
+          envVar: 'USERNAME',
+          sensitive: false,
+        },
+        expectedType: 'text',
+        promptValue: 'test-user',
+      },
+      {
+        description: 'should default to "text" if sensitive is undefined',
+        setting: {
+          name: 'Username',
+          description: 'Your public username',
+          envVar: 'USERNAME',
+        },
+        expectedType: 'text',
+        promptValue: 'test-user',
+      },
+    ])('$description', async ({ setting, expectedType, promptValue }) => {
+      vi.mocked(prompts).mockResolvedValue({ value: promptValue });
 
-      const result = await promptForSetting(setting);
-
-      expect(prompts).toHaveBeenCalledWith({
-        type: 'password',
-        name: 'value',
-        message: 'API Key\nYour secret key',
-      });
-      expect(result).toBe('secret-key');
-    });
-
-    it('should use prompts with type "text" for non-sensitive settings', async () => {
-      const setting: ExtensionSetting = {
-        name: 'Username',
-        description: 'Your public username',
-        envVar: 'USERNAME',
-        // sensitive: false,
-      };
-      vi.mocked(prompts).mockResolvedValue({ value: 'test-user' });
-
-      const result = await promptForSetting(setting);
-
-      expect(prompts).toHaveBeenCalledWith({
-        type: 'text',
-        name: 'value',
-        message: 'Username\nYour public username',
-      });
-      expect(result).toBe('test-user');
-    });
-
-    it('should default to "text" if sensitive is undefined', async () => {
-      const setting: ExtensionSetting = {
-        name: 'Username',
-        description: 'Your public username',
-        envVar: 'USERNAME',
-      };
-      vi.mocked(prompts).mockResolvedValue({ value: 'test-user' });
-
-      const result = await promptForSetting(setting);
+      const result = await promptForSetting(setting as ExtensionSetting);
 
       expect(prompts).toHaveBeenCalledWith({
-        type: 'text',
+        type: expectedType,
         name: 'value',
-        message: 'Username\nYour public username',
+        message: `${setting.name}\n${setting.description}`,
       });
-      expect(result).toBe('test-user');
+      expect(result).toBe(promptValue);
     });
   });
 });
