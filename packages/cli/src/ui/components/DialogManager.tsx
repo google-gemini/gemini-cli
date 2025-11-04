@@ -9,14 +9,14 @@ import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
+import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
-import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
@@ -31,10 +31,14 @@ import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
+  terminalWidth: number;
 }
 
 // Props for DialogManager
-export const DialogManager = ({ addItem }: DialogManagerProps) => {
+export const DialogManager = ({
+  addItem,
+  terminalWidth,
+}: DialogManagerProps) => {
   const config = useConfig();
   const settings = useSettings();
 
@@ -45,15 +49,6 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
 
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
-  }
-  if (uiState.showWorkspaceMigrationDialog) {
-    return (
-      <WorkspaceMigrationDialog
-        workspaceExtensions={uiState.workspaceExtensions}
-        onOpen={uiActions.onWorkspaceMigrationDialogOpen}
-        onClose={uiActions.onWorkspaceMigrationDialogClose}
-      />
-    );
   }
   if (uiState.proQuotaRequest) {
     return (
@@ -94,20 +89,21 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
   }
   if (uiState.confirmationRequest) {
     return (
-      <Box flexDirection="column">
-        {uiState.confirmationRequest.prompt}
-        <Box paddingY={1}>
-          <RadioButtonSelect
-            items={[
-              { label: 'Yes', value: true, key: 'Yes' },
-              { label: 'No', value: false, key: 'No' },
-            ]}
-            onSelect={(value: boolean) => {
-              uiState.confirmationRequest!.onConfirm(value);
-            }}
-          />
-        </Box>
-      </Box>
+      <ConsentPrompt
+        prompt={uiState.confirmationRequest.prompt}
+        onConfirm={uiState.confirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.confirmUpdateExtensionRequests.length > 0) {
+    const request = uiState.confirmUpdateExtensionRequests[0];
+    return (
+      <ConsentPrompt
+        prompt={request.prompt}
+        onConfirm={request.onConfirm}
+        terminalWidth={terminalWidth}
+      />
     );
   }
   if (uiState.isThemeDialogOpen) {
@@ -120,6 +116,7 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
         )}
         <ThemeDialog
           onSelect={uiActions.handleThemeSelect}
+          onCancel={uiActions.closeThemeDialog}
           onHighlight={uiActions.handleThemeHighlight}
           settings={settings}
           availableTerminalHeight={
@@ -152,6 +149,18 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
           uiActions.onAuthError('Authentication cancelled.');
         }}
       />
+    );
+  }
+  if (uiState.isAwaitingApiKeyInput) {
+    return (
+      <Box flexDirection="column">
+        <ApiAuthDialog
+          onSubmit={uiActions.handleApiKeySubmit}
+          onCancel={uiActions.handleApiKeyCancel}
+          error={uiState.authError}
+          defaultValue={uiState.apiKeyDefaultValue}
+        />
+      </Box>
     );
   }
   if (uiState.isAuthDialogOpen) {

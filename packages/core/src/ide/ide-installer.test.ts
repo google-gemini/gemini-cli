@@ -119,7 +119,24 @@ describe('ide-installer', () => {
             'google.gemini-cli-vscode-ide-companion',
             '--force',
           ],
-          { stdio: 'pipe' },
+          { stdio: 'pipe', shell: false },
+        );
+      });
+
+      it('installs the extension using code cli on windows', async () => {
+        const { installer } = setup({
+          platform: 'win32',
+          execSync: () => 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+        });
+        await installer.install();
+        expect(child_process.spawnSync).toHaveBeenCalledWith(
+          'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+          [
+            '--install-extension',
+            'google.gemini-cli-vscode-ide-companion',
+            '--force',
+          ],
+          { stdio: 'pipe', shell: true },
         );
       });
 

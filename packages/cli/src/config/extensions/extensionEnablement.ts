@@ -6,7 +6,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Extension } from '../extension.js';
+import { coreEvents, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import { ExtensionStorage } from './storage.js';
 
 export interface ExtensionEnablementConfig {
   overrides: string[];
@@ -112,21 +113,23 @@ export class ExtensionEnablementManager {
   // only the ones in this list.
   private enabledExtensionNamesOverride: string[];
 
-  constructor(configDir: string, enabledExtensionNames?: string[]) {
-    this.configDir = configDir;
-    this.configFilePath = path.join(configDir, 'extension-enablement.json');
+  constructor(enabledExtensionNames?: string[]) {
+    this.configDir = ExtensionStorage.getUserExtensionsDir();
+    this.configFilePath = path.join(
+      this.configDir,
+      'extension-enablement.json',
+    );
     this.enabledExtensionNamesOverride =
       enabledExtensionNames?.map((name) => name.toLowerCase()) ?? [];
   }
 
-  validateExtensionOverrides(extensions: Extension[]) {
+  validateExtensionOverrides(extensions: GeminiCLIExtension[]) {
     for (const name of this.enabledExtensionNamesOverride) {
+      if (name === 'none') continue;
       if (
-        !extensions.some(
-          (ext) => ext.config.name.toLowerCase() === name.toLowerCase(),
-        )
+        !extensions.some((ext) => ext.name.toLowerCase() === name.toLowerCase())
       ) {
-        console.error(`Extension not found: ${name}`);
+        coreEvents.emitFeedback('error', `Extension not found: ${name}`);
       }
     }
   }
@@ -151,7 +154,11 @@ export class ExtensionEnablementManager {
 
     // If we have explicit overrides, only enable those extensions.
     if (this.enabledExtensionNamesOverride.length > 0) {
-      return this.enabledExtensionNamesOverride.includes(extensionName);
+      // When checking against overrides ONLY, we use a case insensitive match.
+      // The override names are already lowercased in the constructor.
+      return this.enabledExtensionNamesOverride.includes(
+        extensionName.toLocaleLowerCase(),
+      );
     }
 
     // Otherwise, we use the configuration settings
@@ -181,7 +188,11 @@ export class ExtensionEnablementManager {
       ) {
         return {};
       }
-      console.error('Error reading extension enablement config:', error);
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to read extension enablement config.',
+        error,
+      );
       return {};
     }
   }

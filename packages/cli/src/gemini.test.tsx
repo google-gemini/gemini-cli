@@ -32,13 +32,25 @@ class MockProcessExitError extends Error {
 }
 
 // Mock dependencies
-vi.mock('./config/settings.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./config/settings.js')>();
-  return {
-    ...actual,
-    loadSettings: vi.fn(),
-  };
-});
+vi.mock('./config/settings.js', () => ({
+  loadSettings: vi.fn().mockReturnValue({
+    merged: {
+      advanced: {},
+      security: { auth: {} },
+      ui: {},
+    },
+    setValue: vi.fn(),
+    forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    errors: [],
+  }),
+  migrateDeprecatedSettings: vi.fn(),
+  SettingScope: {
+    User: 'user',
+    Workspace: 'workspace',
+    System: 'system',
+    SystemDefaults: 'system-defaults',
+  },
+}));
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
@@ -158,6 +170,22 @@ describe('gemini.tsx main function', () => {
         getScreenReader: () => false,
         getGeminiMdFileCount: () => 0,
         getProjectRoot: () => '/',
+        getPolicyEngine: vi.fn(),
+        getMessageBus: () => ({
+          subscribe: vi.fn(),
+        }),
+        getToolRegistry: vi.fn(),
+        getContentGeneratorConfig: vi.fn(),
+        getModel: () => 'gemini-pro',
+        getEmbeddingModel: () => 'embedding-001',
+        getApprovalMode: () => 'default',
+        getCoreTools: () => [],
+        getTelemetryEnabled: () => false,
+        getTelemetryLogPromptsEnabled: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
+        getOutputFormat: () => 'text',
+        getExtensions: () => [],
+        getUsageStatisticsEnabled: () => false,
       } as unknown as Config;
     });
     vi.mocked(loadSettings).mockReturnValue({
@@ -289,6 +317,22 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExperimentalZedIntegration: () => false,
       getScreenReader: () => false,
       getGeminiMdFileCount: () => 0,
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({
+        subscribe: vi.fn(),
+      }),
+      getToolRegistry: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-001',
+      getApprovalMode: () => 'default',
+      getCoreTools: () => [],
+      getTelemetryEnabled: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getExtensions: () => [],
+      getUsageStatisticsEnabled: () => false,
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       errors: [],
@@ -303,33 +347,24 @@ describe('gemini.tsx main function kitty protocol', () => {
     vi.mocked(parseArguments).mockResolvedValue({
       model: undefined,
       sandbox: undefined,
-      sandboxImage: undefined,
       debug: undefined,
       prompt: undefined,
       promptInteractive: undefined,
-      allFiles: undefined,
-      showMemoryUsage: undefined,
+      query: undefined,
       yolo: undefined,
       approvalMode: undefined,
-      telemetry: undefined,
-      checkpointing: undefined,
-      telemetryTarget: undefined,
-      telemetryOtlpEndpoint: undefined,
-      telemetryOtlpProtocol: undefined,
-      telemetryLogPrompts: undefined,
-      telemetryOutfile: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
       extensions: undefined,
       listExtensions: undefined,
-      proxy: undefined,
       includeDirectories: undefined,
       screenReader: undefined,
       useSmartEdit: undefined,
       useWriteTodos: undefined,
-      promptWords: undefined,
       outputFormat: undefined,
+      fakeResponses: undefined,
+      recordResponses: undefined,
     });
 
     await main();
@@ -367,8 +402,7 @@ describe('validateDnsResolutionOrder', () => {
 
   it('should return the default "ipv4first" and log a warning for an invalid string', () => {
     expect(validateDnsResolutionOrder('invalid-value')).toBe('ipv4first');
-    expect(consoleWarnSpy).toHaveBeenCalledOnce();
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
+    expect(consoleWarnSpy).toHaveBeenCalledExactlyOnceWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
   });
@@ -405,6 +439,7 @@ describe('startInteractiveUI', () => {
   vi.mock('./utils/cleanup.js', () => ({
     cleanupCheckpoints: vi.fn(() => Promise.resolve()),
     registerCleanup: vi.fn(),
+    runExitCleanup: vi.fn(),
   }));
 
   vi.mock('ink', () => ({
@@ -470,7 +505,7 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getCliVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(1);
+    expect(registerCleanup).toHaveBeenCalledTimes(2);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
@@ -480,5 +515,48 @@ describe('startInteractiveUI', () => {
     // We need a small delay to let it execute
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      screenReader: true,
+      expectedCalls: [],
+      name: 'should not disable line wrapping in screen reader mode',
+    },
+    {
+      screenReader: false,
+      expectedCalls: [['\x1b[?7l']],
+      name: 'should disable line wrapping when not in screen reader mode',
+    },
+  ])('$name', async ({ screenReader, expectedCalls }) => {
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const mockConfigWithScreenReader = {
+      ...mockConfig,
+      getScreenReader: () => screenReader,
+    } as Config;
+
+    const mockInitializationResult = {
+      authError: null,
+      themeError: null,
+      shouldOpenAuthDialog: false,
+      geminiMdFileCount: 0,
+    };
+
+    await startInteractiveUI(
+      mockConfigWithScreenReader,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+
+    if (expectedCalls.length > 0) {
+      expect(writeSpy).toHaveBeenCalledWith(expectedCalls[0][0]);
+    } else {
+      expect(writeSpy).not.toHaveBeenCalledWith('\x1b[?7l');
+    }
+    writeSpy.mockRestore();
   });
 });

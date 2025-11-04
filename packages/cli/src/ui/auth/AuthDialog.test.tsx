@@ -73,7 +73,7 @@ describe('AuthDialog', () => {
     settings: LoadedSettings;
     setAuthState: (state: AuthState) => void;
     authError: string | null;
-    onAuthError: (error: string) => void;
+    onAuthError: (error: string | null) => void;
   };
   const originalEnv = { ...process.env };
 
@@ -191,7 +191,7 @@ describe('AuthDialog', () => {
         AuthType.USE_GEMINI,
       );
       expect(props.setAuthState).toHaveBeenCalledWith(
-        AuthState.Unauthenticated,
+        AuthState.AwaitingApiKeyInput,
       );
     });
 

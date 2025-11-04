@@ -10,13 +10,14 @@ import { homedir } from 'node:os';
 
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
+  debugLogger,
+  GEMINI_DIR,
   getErrorMessage,
   type TelemetrySettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
-export const SETTINGS_DIRECTORY_NAME = '.gemini';
-export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
+export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
 // Reconcile with https://github.com/google-gemini/gemini-cli/blob/b09bc6656080d4d12e1d06734aae2ec33af5c1ed/packages/cli/src/config/settings.ts#L53
@@ -76,7 +77,7 @@ export function loadSettings(workspaceDir: string): Settings {
 
   const workspaceSettingsPath = path.join(
     workspaceDir,
-    SETTINGS_DIRECTORY_NAME,
+    GEMINI_DIR,
     'settings.json',
   );
 
@@ -97,10 +98,10 @@ export function loadSettings(workspaceDir: string): Settings {
   }
 
   if (settingsErrors.length > 0) {
-    console.error('Errors loading settings:');
+    debugLogger.error('Errors loading settings:');
     for (const error of settingsErrors) {
-      console.error(`  Path: ${error.path}`);
-      console.error(`  Message: ${error.message}`);
+      debugLogger.error(`  Path: ${error.path}`);
+      debugLogger.error(`  Message: ${error.message}`);
     }
   }
 

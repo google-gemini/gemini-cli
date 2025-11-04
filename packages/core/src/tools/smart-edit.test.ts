@@ -25,6 +25,7 @@ vi.mock('../utils/llm-edit-fixer.js', () => ({
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
     generateJson: mockGenerateJson,
+    getHistory: vi.fn().mockResolvedValue([]),
   })),
 }));
 
@@ -64,6 +65,7 @@ describe('SmartEditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let fileSystemService: StandardFileSystemService;
   let baseLlmClient: BaseLlmClient;
 
   beforeEach(() => {
@@ -74,27 +76,36 @@ describe('SmartEditTool', () => {
 
     geminiClient = {
       generateJson: mockGenerateJson,
+      getHistory: vi.fn().mockResolvedValue([]),
     };
 
     baseLlmClient = {
       generateJson: mockGenerateJson,
     } as unknown as BaseLlmClient;
 
+    fileSystemService = new StandardFileSystemService();
+
     mockConfig = {
+      getUsageStatisticsEnabled: vi.fn(() => true),
+      getSessionId: vi.fn(() => 'mock-session-id'),
+      getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
+      getUseSmartEdit: vi.fn(() => false),
+      getUseModelRouter: vi.fn(() => false),
+      getProxy: vi.fn(() => undefined),
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
-      getFileSystemService: () => new StandardFileSystemService(),
+      getFileSystemService: () => fileSystemService,
       getIdeMode: () => false,
       getApiKey: () => 'test-api-key',
       getModel: () => 'test-model',
       getSandbox: () => false,
       getDebugMode: () => false,
       getQuestion: () => undefined,
-      getFullContext: () => false,
+
       getToolDiscoveryCommand: () => undefined,
       getToolCallCommand: () => undefined,
       getMcpServerCommand: () => undefined,
@@ -195,7 +206,7 @@ describe('SmartEditTool', () => {
 
     it('should perform an exact replacement', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -211,7 +222,7 @@ describe('SmartEditTool', () => {
 
     it('should perform a flexible, whitespace-insensitive replacement', async () => {
       const content = '  hello\n    world\n';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -227,7 +238,7 @@ describe('SmartEditTool', () => {
 
     it('should return 0 occurrences if no match is found', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -240,76 +251,27 @@ describe('SmartEditTool', () => {
       expect(result.newContent).toBe(content);
       expect(result.occurrences).toBe(0);
     });
-  });
-  describe('correctPath', () => {
-    it('should correct a relative path if it is unambiguous', () => {
-      const testFile = 'unique.txt';
-      fs.writeFileSync(path.join(rootDir, testFile), 'content');
 
-      const params: EditToolParams = {
-        file_path: testFile,
-        instruction: 'An instruction',
-        old_string: 'old',
-        new_string: 'new',
-      };
+    it('should perform a regex-based replacement for flexible intra-line whitespace', async () => {
+      // This case would fail with the previous exact and line-trimming flexible logic
+      // because the whitespace *within* the line is different.
+      const content = '  function  myFunc( a, b ) {\n    return a + b;\n  }';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'test',
+          old_string: 'function myFunc(a, b) {', // Note the normalized whitespace
+          new_string: 'const yourFunc = (a, b) => {',
+        },
+        currentContent: content,
+        abortSignal,
+      });
 
-      const validationResult = (tool as any).correctPath(params);
-
-      expect(validationResult).toBeNull();
-      expect(params.file_path).toBe(path.join(rootDir, testFile));
-    });
-
-    it('should correct a partial relative path if it is unambiguous', () => {
-      const subDir = path.join(rootDir, 'sub');
-      fs.mkdirSync(subDir);
-      const testFile = 'file.txt';
-      const partialPath = path.join('sub', testFile);
-      const fullPath = path.join(subDir, testFile);
-      fs.writeFileSync(fullPath, 'content');
-
-      const params: EditToolParams = {
-        file_path: partialPath,
-        instruction: 'An instruction',
-        old_string: 'old',
-        new_string: 'new',
-      };
-
-      const validationResult = (tool as any).correctPath(params);
-
-      expect(validationResult).toBeNull();
-      expect(params.file_path).toBe(fullPath);
-    });
-
-    it('should return an error for a relative path that does not exist', () => {
-      const params: EditToolParams = {
-        file_path: 'test.txt',
-        instruction: 'An instruction',
-        old_string: 'old',
-        new_string: 'new',
-      };
-      const result = (tool as any).correctPath(params);
-      expect(result).toMatch(/File not found for 'test.txt'/);
-    });
-
-    it('should return an error for an ambiguous path', () => {
-      const subDir1 = path.join(rootDir, 'module1');
-      const subDir2 = path.join(rootDir, 'module2');
-      fs.mkdirSync(subDir1, { recursive: true });
-      fs.mkdirSync(subDir2, { recursive: true });
-
-      const ambiguousFile = 'component.ts';
-      fs.writeFileSync(path.join(subDir1, ambiguousFile), 'content 1');
-      fs.writeFileSync(path.join(subDir2, ambiguousFile), 'content 2');
-
-      const params: EditToolParams = {
-        file_path: ambiguousFile,
-        instruction: 'An instruction',
-        old_string: 'old',
-        new_string: 'new',
-      };
-
-      const validationResult = (tool as any).correctPath(params);
-      expect(validationResult).toMatch(/ambiguous and matches multiple files/);
+      // The indentation from the original line should be preserved and applied to the new string.
+      const expectedContent =
+        '  const yourFunc = (a, b) => {\n    return a + b;\n  }';
+      expect(result.newContent).toBe(expectedContent);
+      expect(result.occurrences).toBe(1);
     });
   });
 
@@ -421,7 +383,7 @@ describe('SmartEditTool', () => {
       const params: EditToolParams = {
         file_path: filePath,
         instruction: 'Replace original with brand new',
-        old_string: 'original text that is slightly wrong', // This will fail first
+        old_string: 'wrong text', // This will fail first
         new_string: 'brand new text',
       };
 
@@ -439,35 +401,6 @@ describe('SmartEditTool', () => {
       expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return NO_CHANGE if FixLLMEditWithInstruction determines no changes are needed', async () => {
-      const initialContent = 'The price is $100.';
-      fs.writeFileSync(filePath, initialContent, 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Ensure the price is $100',
-        old_string: 'price is $50', // Incorrect old string
-        new_string: 'price is $100',
-      };
-
-      mockFixLLMEditWithInstruction.mockResolvedValueOnce({
-        noChangesRequired: true,
-        search: '',
-        replace: '',
-        explanation: 'The price is already correctly set to $100.',
-      });
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error?.type).toBe(
-        ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
-      );
-      expect(result.llmContent).toMatch(
-        /A secondary check by an LLM determined/,
-      );
-      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
     });
 
     it('should preserve CRLF line endings when editing a file', async () => {
@@ -502,6 +435,84 @@ describe('SmartEditTool', () => {
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContentWithCRLF);
+    });
+
+    it('should return NO_CHANGE if FixLLMEditWithInstruction determines no changes are needed', async () => {
+      const initialContent = 'The price is $100.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Ensure the price is $100',
+        old_string: 'price is $50', // Incorrect old string
+        new_string: 'price is $100',
+      };
+
+      mockFixLLMEditWithInstruction.mockResolvedValueOnce({
+        noChangesRequired: true,
+        search: '',
+        replace: '',
+        explanation: 'The price is already correctly set to $100.',
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(
+        ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
+      );
+      expect(result.llmContent).toMatch(
+        /A secondary check by an LLM determined/,
+      );
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
+    });
+  });
+
+  describe('self-correction with content refresh to pull in external edits', () => {
+    const testFile = 'test.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+    });
+
+    it('should use refreshed file content for self-correction if file was modified externally', async () => {
+      const initialContent = 'This is the original content.';
+      const externallyModifiedContent =
+        'This is the externally modified content.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction:
+          'Replace "externally modified content" with "externally modified string"',
+        old_string: 'externally modified content', // This will fail the first attempt, triggering self-correction.
+        new_string: 'externally modified string',
+      };
+
+      // Spy on `readTextFile` to simulate an external file change between reads.
+      const readTextFileSpy = vi
+        .spyOn(fileSystemService, 'readTextFile')
+        .mockResolvedValueOnce(initialContent) // First call in `calculateEdit`
+        .mockResolvedValueOnce(externallyModifiedContent); // Second call in `attemptSelfCorrection`
+
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      // Assert that the file was read twice (initial read, then re-read for hash comparison).
+      expect(readTextFileSpy).toHaveBeenCalledTimes(2);
+
+      // Assert that the self-correction LLM was called with the updated content and a specific message.
+      expect(mockFixLLMEditWithInstruction).toHaveBeenCalledWith(
+        expect.any(String), // instruction
+        params.old_string,
+        params.new_string,
+        expect.stringContaining(
+          'However, the file has been modified by either the user or an external process',
+        ), // errorForLlmEditFixer
+        externallyModifiedContent, // The new content for correction
+        expect.any(Object), // baseLlmClient
+        expect.any(Object), // abortSignal
+      );
     });
   });
 
@@ -647,6 +658,93 @@ describe('SmartEditTool', () => {
       ).rejects.toBe(abortError);
 
       calculateSpy.mockRestore();
+    });
+  });
+
+  describe('multiple file edits', () => {
+    it('should perform multiple removals and report correct diff stats', async () => {
+      const numFiles = 10;
+      const files: Array<{
+        path: string;
+        initialContent: string;
+        toRemove: string;
+      }> = [];
+      const expectedLinesRemoved: number[] = [];
+      const actualLinesRemoved: number[] = [];
+
+      // 1. Create 10 files with 5-10 lines each
+      for (let i = 0; i < numFiles; i++) {
+        const fileName = `test-file-${i}.txt`;
+        const filePath = path.join(rootDir, fileName);
+        const numLines = Math.floor(Math.random() * 6) + 5; // 5 to 10 lines
+        const lines = Array.from(
+          { length: numLines },
+          (_, j) => `File ${i}, Line ${j + 1}`,
+        );
+        const content = lines.join('\n') + '\n';
+
+        // Determine which lines to remove (2 or 3 lines)
+        const numLinesToRemove = Math.floor(Math.random() * 2) + 2; // 2 or 3
+        expectedLinesRemoved.push(numLinesToRemove);
+        const startLineToRemove = 1; // Start removing from the second line
+        const linesToRemove = lines.slice(
+          startLineToRemove,
+          startLineToRemove + numLinesToRemove,
+        );
+        const toRemove = linesToRemove.join('\n') + '\n';
+
+        fs.writeFileSync(filePath, content, 'utf8');
+        files.push({
+          path: filePath,
+          initialContent: content,
+          toRemove,
+        });
+      }
+
+      // 2. Create and execute 10 tool calls for removal
+      for (const file of files) {
+        const params: EditToolParams = {
+          file_path: file.path,
+          instruction: `Remove lines from the file`,
+          old_string: file.toRemove,
+          new_string: '', // Removing the content
+          ai_proposed_string: '',
+        };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
+
+        if (
+          result.returnDisplay &&
+          typeof result.returnDisplay === 'object' &&
+          'diffStat' in result.returnDisplay &&
+          result.returnDisplay.diffStat
+        ) {
+          actualLinesRemoved.push(
+            result.returnDisplay.diffStat?.model_removed_lines,
+          );
+        } else if (result.error) {
+          console.error(`Edit failed for ${file.path}:`, result.error);
+        }
+      }
+
+      // 3. Assert that the content was removed from each file
+      for (const file of files) {
+        const finalContent = fs.readFileSync(file.path, 'utf8');
+        const expectedContent = file.initialContent.replace(file.toRemove, '');
+        expect(finalContent).toBe(expectedContent);
+        expect(finalContent).not.toContain(file.toRemove);
+      }
+
+      // 4. Assert that the total number of removed lines matches the diffStat total
+      const totalExpectedRemoved = expectedLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      const totalActualRemoved = actualLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      expect(totalActualRemoved).toBe(totalExpectedRemoved);
     });
   });
 });

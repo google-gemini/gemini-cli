@@ -12,6 +12,7 @@ import {
   type CommandContext,
   type SlashCommand,
 } from '../commands/types.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Type alias for improved type safety based on actual fzf result structure
 type FzfCommandResult = {
@@ -32,9 +33,9 @@ interface FzfCommandCacheEntry {
 function logErrorSafely(error: unknown, context: string): void {
   if (error instanceof Error) {
     // Log full error details securely for debugging
-    console.error(`[${context}]`, error);
+    debugLogger.warn(`[${context}]`, error);
   } else {
-    console.error(`[${context}] Non-error thrown:`, error);
+    debugLogger.warn(`[${context}] Non-error thrown:`, error);
   }
 }
 
@@ -189,7 +190,7 @@ function useCommandSuggestions(
 
         // Safety check: ensure leafCommand and completion exist
         if (!leafCommand?.completion) {
-          console.warn(
+          debugLogger.warn(
             'Attempted argument completion without completion function',
           );
           return;
