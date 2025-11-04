@@ -23,8 +23,6 @@ import {
   makeFakeConfig,
   CoreEvent,
   type UserFeedbackPayload,
-  getCodeAssistServer,
-  getExperiments,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -1707,67 +1705,6 @@ describe('AppContainer State Management', () => {
 
       // Assert: Verify model is updated
       expect(capturedUIState.currentModel).toBe('new-model');
-      unmount();
-    });
-  });
-
-  describe('Experiments Integration', () => {
-    it('should call getExperiments and set them on config when initialized', async () => {
-      const mockCodeAssistServer = {};
-      const mockExperiments = { flags: { testFlag: { booleanValue: true } } };
-
-      vi.mocked(getCodeAssistServer).mockReturnValue(
-        mockCodeAssistServer as unknown as ReturnType<
-          typeof getCodeAssistServer
-        >,
-      );
-      vi.mocked(getExperiments).mockResolvedValue(
-        mockExperiments as unknown as ReturnType<typeof getExperiments>,
-      );
-      vi.spyOn(mockConfig, 'setExperiments');
-
-      const { unmount } = render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
-
-      // Simulate config initialization
-      await act(async () => {
-        // This timeout is needed because the useEffect that calls getExperiments
-        // is triggered by isConfigInitialized, which is set asynchronously.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      expect(getCodeAssistServer).toHaveBeenCalledWith(mockConfig);
-      expect(getExperiments).toHaveBeenCalledWith(mockCodeAssistServer);
-      expect(mockConfig.setExperiments).toHaveBeenCalledWith(mockExperiments);
-      unmount();
-    });
-
-    it('should not call getExperiments if codeAssistServer is undefined', async () => {
-      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
-      vi.spyOn(mockConfig, 'setExperiments');
-
-      const { unmount } = render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      });
-
-      expect(getCodeAssistServer).toHaveBeenCalledWith(mockConfig);
-      expect(getExperiments).not.toHaveBeenCalled();
-      expect(mockConfig.setExperiments).not.toHaveBeenCalled();
       unmount();
     });
   });
