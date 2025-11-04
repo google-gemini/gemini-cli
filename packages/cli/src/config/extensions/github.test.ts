@@ -250,6 +250,147 @@ describe('git extension helpers', () => {
       );
       expect(result).toBe(expected);
     });
+
+    // Tests for local extension update detection (Issue #10028)
+    describe('local extension update detection', () => {
+      let localExtensionDir: string;
+
+      beforeEach(async () => {
+        localExtensionDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'gemini-test-local-ext-'),
+        );
+      });
+
+      afterEach(async () => {
+        await fs.rm(localExtensionDir, { recursive: true, force: true });
+      });
+
+      it('should return UPDATE_AVAILABLE when local extension version differs from source', async () => {
+        // Create source extension config with newer version
+        const sourceExtensionDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'gemini-test-source-ext-'),
+        );
+        const sourceExtensionPath = path.join(
+          sourceExtensionDir,
+          'gemini-extension.json',
+        );
+        await fs.writeFile(
+          sourceExtensionPath,
+          JSON.stringify({ name: 'local-ext', version: '1.2.0' }),
+        );
+
+        // Extension with older version (simulating installed version)
+        const extension: GeminiCLIExtension = {
+          name: 'local-ext',
+          id: 'local-ext-id',
+          path: localExtensionDir,
+          version: '1.1.0', // Older version
+          isActive: true,
+          installMetadata: {
+            type: 'local',
+            source: sourceExtensionDir,
+          },
+          contextFiles: [],
+        };
+
+        const result = await checkForExtensionUpdate(
+          extension,
+          extensionManager,
+        );
+        expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
+
+        await fs.rm(sourceExtensionDir, { recursive: true, force: true });
+      });
+
+      it('should return UP_TO_DATE when local extension version matches source', async () => {
+        // Create source extension config with same version
+        const sourceExtensionDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'gemini-test-source-ext-'),
+        );
+        const sourceExtensionPath = path.join(
+          sourceExtensionDir,
+          'gemini-extension.json',
+        );
+        await fs.writeFile(
+          sourceExtensionPath,
+          JSON.stringify({ name: 'local-ext', version: '1.1.0' }),
+        );
+
+        // Extension with same version
+        const extension: GeminiCLIExtension = {
+          name: 'local-ext',
+          id: 'local-ext-id',
+          path: localExtensionDir,
+          version: '1.1.0', // Same version
+          isActive: true,
+          installMetadata: {
+            type: 'local',
+            source: sourceExtensionDir,
+          },
+          contextFiles: [],
+        };
+
+        const result = await checkForExtensionUpdate(
+          extension,
+          extensionManager,
+        );
+        expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
+
+        await fs.rm(sourceExtensionDir, { recursive: true, force: true });
+      });
+
+      it('should throw error when local extension source path cannot be loaded', async () => {
+        const nonExistentPath = path.join(
+          os.tmpdir(),
+          'non-existent-extension',
+        );
+
+        const extension: GeminiCLIExtension = {
+          name: 'local-ext',
+          id: 'local-ext-id',
+          path: localExtensionDir,
+          version: '1.1.0',
+          isActive: true,
+          installMetadata: {
+            type: 'local',
+            source: nonExistentPath, // Non-existent path
+          },
+          contextFiles: [],
+        };
+
+        // loadExtensionConfig throws an error when path doesn't exist
+        await expect(
+          checkForExtensionUpdate(extension, extensionManager),
+        ).rejects.toThrow('Configuration file not found');
+      });
+
+      it('should throw error when local extension config file is missing', async () => {
+        // Create empty directory (no config file)
+        const sourceExtensionDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'gemini-test-source-ext-'),
+        );
+
+        const extension: GeminiCLIExtension = {
+          name: 'local-ext',
+          id: 'local-ext-id',
+          path: localExtensionDir,
+          version: '1.1.0',
+          isActive: true,
+          installMetadata: {
+            type: 'local',
+            source: sourceExtensionDir,
+          },
+          contextFiles: [],
+        };
+
+        // loadExtensionConfig throws an error when config file is missing
+        await expect(
+          checkForExtensionUpdate(extension, extensionManager),
+        ).rejects.toThrow('Configuration file not found');
+
+        await fs.rm(sourceExtensionDir, { recursive: true, force: true });
+      });
+    });
   });
 
   describe('fetchReleaseFromGithub', () => {

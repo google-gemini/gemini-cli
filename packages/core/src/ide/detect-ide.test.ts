@@ -4,17 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 
 describe('detectIde', () => {
   const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
   const ideProcessInfoNoCode = { pid: 123, command: 'some/path/to/fork' };
 
+  // Clear CURSOR_TRACE_ID once before all tests since environment variables
+  // are inherited from the parent process and not stubbed within tests.
+  // This prevents CURSOR_TRACE_ID from interfering with IDE detection tests.
+  beforeAll(() => {
+    delete process.env['CURSOR_TRACE_ID'];
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
-    // Clear Cursor-specific environment variables that might interfere with tests
-    delete process.env['CURSOR_TRACE_ID'];
   });
 
   it('should return undefined if TERM_PROGRAM is not vscode', () => {
@@ -93,10 +98,9 @@ describe('detectIde', () => {
 describe('detectIde with ideInfoFromFile', () => {
   const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
 
+  // CURSOR_TRACE_ID is already cleared in the parent describe's beforeAll
   afterEach(() => {
     vi.unstubAllEnvs();
-    // Explicitly clear CURSOR_TRACE_ID to prevent interference
-    delete process.env['CURSOR_TRACE_ID'];
   });
 
   it('should use the name and displayName from the file', () => {
