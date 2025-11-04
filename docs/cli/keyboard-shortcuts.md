@@ -15,7 +15,7 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 | `Ctrl+T`    | Toggle the display of the todo list.                                                                                  |
 | `Ctrl+Y`    | Toggle auto-approval (YOLO mode) for all tool calls.                                                                  |
 | `Shift+Tab` | Toggle auto-accepting edits approval mode.                                                                            |
-| `Option+M`  | Toggle Markdown rendering for messages (raw markdown mode).                                                           |
+| `Meta+M`  | Toggle Markdown rendering for messages (raw markdown mode).                                                           |
 | `F12`       | Toggle the display of the debug console.                                                                              |
 
 ## Input Prompt
@@ -74,11 +74,12 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 | -------- | --------------------------------- |
 | `Ctrl+G` | See context CLI received from IDE |
 
-## Meta+key combos on mac
+## Meta+key combos on macOS
 
-On Mac, all Meta+char combos should work normally except for these three which
-are mapped to special functionality.
+On macOS, all Meta+char combos should work normally except for these three which
+are mapped to special functionality, as mentioned above.
 
-- `meta+b`: "∫" back one word
-- `meta+f`: "ƒ" forward one word
-- `meta+m`: "µ" toggle markup view
+- `Meta+B`: "∫" Back one word
+- `Meta+F`: "ƒ" Forward one word
+- `Meta+M`: "µ" Toggle markup view
+
