@@ -230,6 +230,49 @@ describe('Server Config (config.ts)', () => {
         'Config was already initialized',
       );
     });
+
+    describe('getCompressionThreshold', () => {
+      it('should return the local compression threshold if it is set', async () => {
+        const config = new Config({
+          ...baseParams,
+          compressionThreshold: 0.5,
+        });
+        expect(await config.getCompressionThreshold()).toBe(0.5);
+      });
+
+      it('should return the remote experiment threshold if it is a positive number', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              GeminiCLIContextCompression__threshold_fraction: {
+                floatValue: 0.8,
+              },
+            },
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getCompressionThreshold()).toBe(0.8);
+      });
+
+      it('should return undefined if the remote experiment threshold is 0', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              GeminiCLIContextCompression__threshold_fraction: {
+                floatValue: 0.0,
+              },
+            },
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getCompressionThreshold()).toBeUndefined();
+      });
+
+      it('should return undefined if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getCompressionThreshold()).toBeUndefined();
+      });
+    });
   });
 
   describe('refreshAuth', () => {
@@ -1310,5 +1353,50 @@ describe('Config getHooks', () => {
     const retrievedHooks = config.getHooks();
     expect(retrievedHooks).toEqual(allEventHooks);
     expect(Object.keys(retrievedHooks!)).toHaveLength(11); // All hook event types
+  });
+});
+
+describe('Config getExperiments', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('should return undefined when no experiments are provided', () => {
+    const config = new Config(baseParams);
+    expect(config.getExperiments()).toBeUndefined();
+  });
+
+  it('should return empty object when empty experiments are provided', () => {
+    const configWithEmptyExps = new Config({
+      ...baseParams,
+      experiments: { flags: {}, experimentIds: [] },
+    });
+    expect(configWithEmptyExps.getExperiments()).toEqual({
+      flags: {},
+      experimentIds: [],
+    });
+  });
+
+  it('should return the experiments configuration when provided', () => {
+    const mockExps = {
+      flags: {
+        testFlag: { boolValue: true },
+      },
+      experimentIds: [],
+    };
+
+    const config = new Config({
+      ...baseParams,
+      experiments: mockExps,
+    });
+
+    const retrievedExps = config.getExperiments();
+    expect(retrievedExps).toEqual(mockExps);
+    expect(retrievedExps).toBe(mockExps); // Should return the same reference
   });
 });
