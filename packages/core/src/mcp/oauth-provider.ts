@@ -101,32 +101,24 @@ const HTTP_OK = 200;
  */
 function getAvailablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
-    let port = 0;
-    try {
-      const portStr = process.env['OAUTH_CALLBACK_PORT'];
-      if (portStr) {
-        port = parseInt(portStr, 10);
-        if (isNaN(port) || port <= 0 || port > 65535) {
-          return reject(
-            new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`),
-          );
-        }
-        return resolve(port);
+    const portStr = process.env['OAUTH_CALLBACK_PORT'];
+    if (portStr) {
+      const port = parseInt(portStr, 10);
+      if (isNaN(port) || port <= 0 || port > 65535) {
+        return reject(
+          new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`),
+        );
       }
-      const server = net.createServer();
-      server.listen(0, () => {
-        const address = server.address()! as net.AddressInfo;
-        port = address.port;
-      });
-      server.on('listening', () => {
-        server.close();
-        server.unref();
-      });
-      server.on('error', (e) => reject(e));
-      server.on('close', () => resolve(port));
-    } catch (e) {
-      reject(e);
+      return resolve(port);
     }
+
+    const server = net.createServer();
+    server.unref();
+    server.on('error', reject);
+    server.listen(0, () => {
+      const { port } = server.address() as net.AddressInfo;
+      server.close(() => resolve(port));
+    });
   });
 }
 
