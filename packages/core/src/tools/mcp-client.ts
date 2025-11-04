@@ -332,19 +332,31 @@ async function handleAutomaticOAuth(
   try {
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
+    // Determine the configured MCP server URL (HTTP preferred, fallback to SSE)
+    const configuredServerUrl =
+      mcpServerConfig.httpUrl || mcpServerConfig.url || null;
+
     // Always try to parse the resource metadata URI from the www-authenticate header
     let oauthConfig;
     const resourceMetadataUri =
       OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
-    if (resourceMetadataUri) {
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
+    if (resourceMetadataUri && configuredServerUrl) {
+      oauthConfig = await OAuthUtils.discoverOAuthConfig(configuredServerUrl, {
+        resourceMetadataUrl,
+      });
+    } else if (resourceMetadataUri && !configuredServerUrl) {
+      debugLogger.warn(
+        `Received OAuth resource metadata URI for '${mcpServerName}' but no MCP server URL is configured. Skipping automatic OAuth discovery.`,
+      );
     } else if (hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
-      const serverUrl = new URL(
-        mcpServerConfig.httpUrl || mcpServerConfig.url!,
-      );
-      const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
+      if (!configuredServerUrl) {
+        debugLogger.warn(
+          `No MCP server URL is available for '${mcpServerName}' to perform OAuth discovery.`,
+        );
+      } else {
+        oauthConfig = await OAuthUtils.discoverOAuthConfig(configuredServerUrl);
+      }
     }
 
     if (!oauthConfig) {
@@ -1036,13 +1048,17 @@ export async function connectToMcpServer(
         );
 
         if (hasNetworkTransport(mcpServerConfig)) {
-          const serverUrl = new URL(
-            mcpServerConfig.httpUrl || mcpServerConfig.url!,
-          );
-          const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
+          const configuredServerUrl =
+            mcpServerConfig.httpUrl || mcpServerConfig.url;
+          if (!configuredServerUrl) {
+            throw new Error(
+              `Could not determine MCP server URL for '${mcpServerName}' during OAuth discovery.`,
+            );
+          }
 
-          // Try to discover OAuth configuration from the base URL
-          const oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
+          // Try to discover OAuth configuration using the configured MCP server URL
+          const oauthConfig =
+            await OAuthUtils.discoverOAuthConfig(configuredServerUrl);
           if (oauthConfig) {
             debugLogger.log(
               `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,

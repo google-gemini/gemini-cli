@@ -607,12 +607,23 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
       new Error(`401 Unauthorized\nwww-authenticate: ${wwwAuthHeader}`),
     );
+    vi.mocked(OAuthUtils.parseWWWAuthenticateHeader).mockReturnValue(
+      'http://test-server.com/.well-known/oauth-protected-resource',
+    );
 
-    vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
-      authorizationUrl: authUrl,
-      tokenUrl,
-      scopes: ['test-scope'],
-    });
+    vi.mocked(OAuthUtils.parseWWWAuthenticateHeader).mockReturnValue(null);
+
+    const discoverArgs: unknown[][] = [];
+    vi.mocked(OAuthUtils.discoverOAuthConfig).mockImplementation(
+      async (...args: unknown[]) => {
+        discoverArgs.push(args);
+        return {
+          authorizationUrl: authUrl,
+          tokenUrl,
+          scopes: ['test-scope'],
+        };
+      },
+    );
 
     // We need this to be an any type because we dig into its private state.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -634,6 +645,8 @@ describe('connectToMcpServer with OAuth', () => {
     expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
+    expect(discoverArgs.length).toBeGreaterThan(0);
+    expect(discoverArgs[0]?.[0]).toBe(serverUrl);
 
     const authHeader =
       capturedTransport._requestInit?.headers?.['Authorization'];

@@ -700,6 +700,7 @@ export class MCPOAuthProvider {
             const discoveredConfig =
               await OAuthUtils.discoverOAuthFromWWWAuthenticate(
                 wwwAuthenticate,
+                mcpServerUrl,
               );
             if (discoveredConfig) {
               // Merge discovered config with existing config, preserving clientId and clientSecret

@@ -10,6 +10,7 @@ import type {
   OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
 import { OAuthUtils } from './oauth-utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -21,6 +22,7 @@ describe('OAuthUtils', () => {
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -102,6 +104,41 @@ describe('OAuthUtils', () => {
 
       const result = await OAuthUtils.fetchProtectedResourceMetadata(
         'https://example.com/.well-known/oauth-protected-resource',
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when resource metadata does not match expected resource', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            resource: 'https://api.example.com',
+            authorization_servers: ['https://auth.example.com'],
+          }),
+      });
+
+      const result = await OAuthUtils.fetchProtectedResourceMetadata(
+        'https://example.com/.well-known/oauth-protected-resource',
+        'https://different.example.com',
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when resource metadata is missing the resource field', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            authorization_servers: ['https://auth.example.com'],
+          }),
+      });
+
+      const result = await OAuthUtils.fetchProtectedResourceMetadata(
+        'https://example.com/.well-known/oauth-protected-resource',
+        'https://example.com',
       );
 
       expect(result).toBeNull();

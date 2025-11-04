@@ -89,13 +89,47 @@ export class OAuthUtils {
    */
   static async fetchProtectedResourceMetadata(
     resourceMetadataUrl: string,
+    expectedResource?: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
       const response = await fetch(resourceMetadataUrl);
       if (!response.ok) {
         return null;
       }
-      return (await response.json()) as OAuthProtectedResourceMetadata;
+      const metadata =
+        (await response.json()) as OAuthProtectedResourceMetadata;
+
+      if (!expectedResource) {
+        return metadata;
+      }
+
+      if (!metadata.resource) {
+        debugLogger.warn(
+          `Protected resource metadata at ${resourceMetadataUrl} is missing the required 'resource' parameter. Ignoring metadata per RFC 9728.`,
+        );
+        return null;
+      }
+
+      try {
+        const normalizedExpected = new URL(expectedResource).toString();
+        const normalizedMetadataResource = new URL(
+          metadata.resource,
+        ).toString();
+
+        if (normalizedExpected !== normalizedMetadataResource) {
+          debugLogger.warn(
+            `Protected resource metadata at ${resourceMetadataUrl} declares resource '${metadata.resource}', but the expected resource is '${expectedResource}'. Ignoring metadata to prevent impersonation per RFC 9728.`,
+          );
+          return null;
+        }
+      } catch (error) {
+        debugLogger.warn(
+          `Failed to validate protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
+        );
+        return null;
+      }
+
+      return metadata;
     } catch (error) {
       debugLogger.debug(
         `Failed to fetch protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
@@ -222,42 +256,48 @@ export class OAuthUtils {
    */
   static async discoverOAuthConfig(
     serverUrl: string,
+    options: { resourceMetadataUrl?: string } = {},
   ): Promise<MCPOAuthConfig | null> {
     try {
+      const normalizedServerUrl = new URL(serverUrl).toString();
       // First try standard root-based discovery
-      const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
+      const metadataUrlsToTry: string[] = [];
 
-      // Try to get the protected resource metadata at root
-      let resourceMetadata = await this.fetchProtectedResourceMetadata(
-        wellKnownUrls.protectedResource,
-      );
+      if (options.resourceMetadataUrl) {
+        metadataUrlsToTry.push(options.resourceMetadataUrl);
+      } else {
+        const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
+        metadataUrlsToTry.push(wellKnownUrls.protectedResource);
 
-      // If root discovery fails and we have a path, try path-based discovery
-      if (!resourceMetadata) {
         const url = new URL(serverUrl);
         if (url.pathname && url.pathname !== '/') {
           const pathBasedUrls = this.buildWellKnownUrls(serverUrl, true);
-          resourceMetadata = await this.fetchProtectedResourceMetadata(
-            pathBasedUrls.protectedResource,
-          );
+          metadataUrlsToTry.push(pathBasedUrls.protectedResource);
         }
       }
 
-      if (resourceMetadata?.authorization_servers?.length) {
-        // Use the first authorization server
-        const authServerUrl = resourceMetadata.authorization_servers[0];
-        const authServerMetadata =
-          await this.discoverAuthorizationServerMetadata(authServerUrl);
+      for (const metadataUrl of metadataUrlsToTry) {
+        const resourceMetadata = await this.fetchProtectedResourceMetadata(
+          metadataUrl,
+          normalizedServerUrl,
+        );
 
-        if (authServerMetadata) {
-          const config = this.metadataToOAuthConfig(authServerMetadata);
-          if (authServerMetadata.registration_endpoint) {
-            debugLogger.log(
-              'Dynamic client registration is supported at:',
-              authServerMetadata.registration_endpoint,
-            );
+        if (resourceMetadata?.authorization_servers?.length) {
+          // Use the first authorization server
+          const authServerUrl = resourceMetadata.authorization_servers[0];
+          const authServerMetadata =
+            await this.discoverAuthorizationServerMetadata(authServerUrl);
+
+          if (authServerMetadata) {
+            const config = this.metadataToOAuthConfig(authServerMetadata);
+            if (authServerMetadata.registration_endpoint) {
+              debugLogger.log(
+                'Dynamic client registration is supported at:',
+                authServerMetadata.registration_endpoint,
+              );
+            }
+            return config;
           }
-          return config;
         }
       }
 
@@ -309,6 +349,7 @@ export class OAuthUtils {
    */
   static async discoverOAuthFromWWWAuthenticate(
     wwwAuthenticate: string,
+    expectedResource?: string,
   ): Promise<MCPOAuthConfig | null> {
     const resourceMetadataUri =
       this.parseWWWAuthenticateHeader(wwwAuthenticate);
@@ -316,8 +357,10 @@ export class OAuthUtils {
       return null;
     }
 
-    const resourceMetadata =
-      await this.fetchProtectedResourceMetadata(resourceMetadataUri);
+    const resourceMetadata = await this.fetchProtectedResourceMetadata(
+      resourceMetadataUri,
+      expectedResource,
+    );
     if (!resourceMetadata?.authorization_servers?.length) {
       return null;
     }
