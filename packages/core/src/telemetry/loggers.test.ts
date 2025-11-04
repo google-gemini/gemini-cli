@@ -192,11 +192,9 @@ describe('loggers', () => {
         getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringAllowBuildArtifacts: () => false,
         getDebugMode: () => true,
-        getMcpServers: () => ({
-          'test-server': {
-            command: 'test-command',
-          },
-        }),
+        getMcpServers: () => {
+          throw new Error('Should not call');
+        },
         getQuestion: () => 'test-question',
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
@@ -206,6 +204,13 @@ describe('loggers', () => {
             { name: 'ext-one', id: 'id-one' },
             { name: 'ext-two', id: 'id-two' },
           ] as GeminiCLIExtension[],
+        getMcpClientManager: () => ({
+          getMcpServers: () => ({
+            'test-server': {
+              command: 'test-command',
+            },
+          }),
+        }),
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
