@@ -20,12 +20,12 @@ export interface ListExperimentsResponse {
 
 export interface Flag {
   name?: string;
-  bool_value?: boolean;
-  float_value?: number;
-  int_value?: string; // int64
-  string_value?: string;
-  int32_list_value?: Int32List;
-  string_list_value?: StringList;
+  boolValue?: boolean;
+  floatValue?: number;
+  intValue?: string; // int64
+  stringValue?: string;
+  int32_listValue?: Int32List;
+  stringListValue?: StringList;
 }
 
 export interface Int32List {

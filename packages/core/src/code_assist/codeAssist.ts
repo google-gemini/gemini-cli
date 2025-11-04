@@ -12,6 +12,7 @@ import type { HttpOptions } from './server.js';
 import { CodeAssistServer } from './server.js';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from '../core/loggingContentGenerator.js';
+import { getExperiments } from './experiments/experiments.js';
 
 export async function createCodeAssistContentGenerator(
   httpOptions: HttpOptions,
@@ -25,13 +26,15 @@ export async function createCodeAssistContentGenerator(
   ) {
     const authClient = await getOauthClient(authType, config);
     const userData = await setupUser(authClient);
-    return new CodeAssistServer(
+    const server = new CodeAssistServer(
       authClient,
       userData.projectId,
       httpOptions,
       sessionId,
       userData.userTier,
     );
+    config.setExperiments(await getExperiments(server));
+    return server;
   }
 
   throw new Error(`Unsupported authType: ${authType}`);

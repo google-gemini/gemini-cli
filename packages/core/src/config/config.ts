@@ -74,6 +74,7 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
+import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
@@ -333,6 +334,7 @@ export interface ConfigParameters {
   ptyInfo?: string;
   disableYoloMode?: boolean;
   enableHooks?: boolean;
+  experiments?: Experiments;
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
@@ -442,6 +444,7 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private experiments: Experiments | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -574,6 +577,7 @@ export class Config {
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
+    this.experiments = params.experiments;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1073,6 +1077,15 @@ export class Config {
   }
 
   getCompressionThreshold(): number | undefined {
+    const threshold =
+      this.experiments?.flags[
+        'DuetAiRemoteRag__max_distance_rag_for_selected_code'
+      ]?.floatValue;
+    console.error(this.experiments?.flags);
+    console.error(threshold);
+    if (threshold !== undefined && threshold !== 0) {
+      return threshold;
+    }
     return this.compressionThreshold;
   }
 
@@ -1332,6 +1345,20 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get experiments configuration
+   */
+  getExperiments(): Experiments | undefined {
+    return this.experiments;
+  }
+
+  /**
+   * Set experiments configuration
+   */
+  setExperiments(experiments: Experiments): void {
+    this.experiments = experiments;
   }
 }
 // Export model constants for use in CLI
