@@ -253,6 +253,14 @@ describe('ShellExecutionService', () => {
       await handle.result;
       expect(handle.pid).toBe(12345);
     });
+
+    it('should correctly decode multi-byte characters with ANSI color codes', async () => {
+      const { result } = await simulateExecution('echo "你好，紅色"', (pty) => {
+        pty.onData.mock.calls[0][0]('\u001b[31m你好，紅色\u001b[0m');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+      expect(result.output.trim()).toBe('你好，紅色');
+    });
   });
 
   describe('pty interaction', () => {
@@ -773,6 +781,15 @@ describe('ShellExecutionService child_process fallback', () => {
       ).toBe(true);
       expect(outputWithoutMessage.endsWith('c'.repeat(20))).toBe(true);
     }, 20000);
+
+    it('should correctly decode multi-byte characters with ANSI color codes', async () => {
+      const { result } = await simulateExecution('echo "你好，紅色"', (cp) => {
+        const coloredString = '\u001b[31m你好，紅色\u001b[0m';
+        cp.stdout?.emit('data', Buffer.from(coloredString, 'utf-8'));
+        cp.emit('exit', 0, null);
+      });
+      expect(result.output.trim()).toBe('你好，紅色');
+    });
   });
 
   describe('Failed Execution', () => {
