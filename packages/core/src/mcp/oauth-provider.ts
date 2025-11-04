@@ -6,7 +6,7 @@
 
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
-import * as net from 'node:net';
+import type * as net from 'node:net';
 import { URL } from 'node:url';
 import type { EventEmitter } from 'node:events';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
@@ -92,35 +92,6 @@ interface PKCEParams {
 
 const REDIRECT_PATH = '/oauth/callback';
 const HTTP_OK = 200;
-
-/**
- * Get an available port for the OAuth callback server.
- * Uses the same approach as the Google OAuth implementation.
- *
- * @returns A promise that resolves to an available port number
- */
-function getAvailablePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const portStr = process.env['OAUTH_CALLBACK_PORT'];
-    if (portStr) {
-      const port = parseInt(portStr, 10);
-      if (isNaN(port) || port <= 0 || port > 65535) {
-        return reject(
-          new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`),
-        );
-      }
-      return resolve(port);
-    }
-
-    const server = net.createServer();
-    server.unref();
-    server.on('error', reject);
-    server.listen(0, () => {
-      const { port } = server.address() as net.AddressInfo;
-      server.close(() => resolve(port));
-    });
-  });
-}
 
 /**
  * Provider for handling OAuth authentication for MCP servers.
@@ -290,34 +261,44 @@ export class MCPOAuthProvider {
 
   /**
    * Start a local HTTP server to handle OAuth callback.
+   * The server will listen on the specified port (or port 0 for OS assignment).
    *
    * @param expectedState The state parameter to validate
-   * @param redirectPort The port to use for the callback server
-   * @returns Promise that resolves with the authorization code
+   * @returns Object containing the port (available immediately) and a promise for the auth response
    */
-  private async startCallbackServer(
-    expectedState: string,
-    redirectPort: number,
-  ): Promise<OAuthAuthorizationResponse> {
-    return new Promise((resolve, reject) => {
-      const server = http.createServer(
-        async (req: http.IncomingMessage, res: http.ServerResponse) => {
-          try {
-            const url = new URL(req.url!, `http://localhost:${redirectPort}`);
+  private startCallbackServer(expectedState: string): {
+    port: Promise<number>;
+    response: Promise<OAuthAuthorizationResponse>;
+  } {
+    let portResolve: (port: number) => void;
+    let portReject: (error: Error) => void;
+    const portPromise = new Promise<number>((resolve, reject) => {
+      portResolve = resolve;
+      portReject = reject;
+    });
 
-            if (url.pathname !== REDIRECT_PATH) {
-              res.writeHead(404);
-              res.end('Not found');
-              return;
-            }
+    const responsePromise = new Promise<OAuthAuthorizationResponse>(
+      (resolve, reject) => {
+        let serverPort: number;
 
-            const code = url.searchParams.get('code');
-            const state = url.searchParams.get('state');
-            const error = url.searchParams.get('error');
+        const server = http.createServer(
+          async (req: http.IncomingMessage, res: http.ServerResponse) => {
+            try {
+              const url = new URL(req.url!, `http://localhost:${serverPort}`);
 
-            if (error) {
-              res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
-              res.end(`
+              if (url.pathname !== REDIRECT_PATH) {
+                res.writeHead(404);
+                res.end('Not found');
+                return;
+              }
+
+              const code = url.searchParams.get('code');
+              const state = url.searchParams.get('state');
+              const error = url.searchParams.get('error');
+
+              if (error) {
+                res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
+                res.end(`
               <html>
                 <body>
                   <h1>Authentication Failed</h1>
@@ -327,28 +308,28 @@ export class MCPOAuthProvider {
                 </body>
               </html>
             `);
-              server.close();
-              reject(new Error(`OAuth error: ${error}`));
-              return;
-            }
+                server.close();
+                reject(new Error(`OAuth error: ${error}`));
+                return;
+              }
 
-            if (!code || !state) {
-              res.writeHead(400);
-              res.end('Missing code or state parameter');
-              return;
-            }
+              if (!code || !state) {
+                res.writeHead(400);
+                res.end('Missing code or state parameter');
+                return;
+              }
 
-            if (state !== expectedState) {
-              res.writeHead(400);
-              res.end('Invalid state parameter');
-              server.close();
-              reject(new Error('State mismatch - possible CSRF attack'));
-              return;
-            }
+              if (state !== expectedState) {
+                res.writeHead(400);
+                res.end('Invalid state parameter');
+                server.close();
+                reject(new Error('State mismatch - possible CSRF attack'));
+                return;
+              }
 
-            // Send success response to browser
-            res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
-            res.end(`
+              // Send success response to browser
+              res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
+              res.end(`
             <html>
               <body>
                 <h1>Authentication Successful!</h1>
@@ -358,31 +339,57 @@ export class MCPOAuthProvider {
             </html>
           `);
 
-            server.close();
-            resolve({ code, state });
-          } catch (error) {
-            server.close();
-            reject(error);
-          }
-        },
-      );
-
-      server.on('error', reject);
-      server.listen(redirectPort, () => {
-        debugLogger.log(
-          `OAuth callback server listening on port ${redirectPort}`,
+              server.close();
+              resolve({ code, state });
+            } catch (error) {
+              server.close();
+              reject(error);
+            }
+          },
         );
-      });
 
-      // Timeout after 5 minutes
-      setTimeout(
-        () => {
-          server.close();
-          reject(new Error('OAuth callback timeout'));
-        },
-        5 * 60 * 1000,
-      );
-    });
+        server.on('error', (error) => {
+          portReject(error);
+          reject(error);
+        });
+
+        // Determine which port to use (env var or OS-assigned)
+        const portStr = process.env['OAUTH_CALLBACK_PORT'];
+        let listenPort = 0; // Default to OS-assigned port
+        if (portStr) {
+          const envPort = parseInt(portStr, 10);
+          if (isNaN(envPort) || envPort <= 0 || envPort > 65535) {
+            const error = new Error(
+              `Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`,
+            );
+            portReject(error);
+            reject(error);
+            return;
+          }
+          listenPort = envPort;
+        }
+
+        server.listen(listenPort, () => {
+          const address = server.address() as net.AddressInfo;
+          serverPort = address.port;
+          debugLogger.log(
+            `OAuth callback server listening on port ${serverPort}`,
+          );
+          portResolve(serverPort); // Resolve port promise immediately
+        });
+
+        // Timeout after 5 minutes
+        setTimeout(
+          () => {
+            server.close();
+            reject(new Error('OAuth callback timeout'));
+          },
+          5 * 60 * 1000,
+        );
+      },
+    );
+
+    return { port: portPromise, response: responsePromise };
   }
 
   /**
@@ -782,10 +789,17 @@ export class MCPOAuthProvider {
       }
     }
 
-    // Allocate a dynamic port for the OAuth callback server
-    // This must be done before client registration so we can register the correct redirect URI
-    const redirectPort = await getAvailablePort();
-    debugLogger.debug(`Allocated port ${redirectPort} for OAuth callback`);
+    // Generate PKCE parameters
+    const pkceParams = this.generatePKCEParams();
+
+    // Start callback server first to allocate port
+    // This ensures we only create one server and eliminates race conditions
+    const callbackServer = this.startCallbackServer(pkceParams.state);
+
+    // Wait for server to start and get the allocated port
+    // We need this port for client registration and auth URL building
+    const redirectPort = await callbackServer.port;
+    debugLogger.debug(`Callback server listening on port ${redirectPort}`);
 
     // If no client ID is provided, try dynamic client registration
     if (!config.clientId) {
@@ -836,9 +850,6 @@ export class MCPOAuthProvider {
       );
     }
 
-    // Generate PKCE parameters
-    const pkceParams = this.generatePKCEParams();
-
     // Build authorization URL
     const authUrl = this.buildAuthorizationUrl(
       config,
@@ -855,13 +866,7 @@ ${authUrl}
 💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.
 ⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
 
-    // Start callback server
-    const callbackPromise = this.startCallbackServer(
-      pkceParams.state,
-      redirectPort,
-    );
-
-    // Open browser securely
+    // Open browser securely (callback server is already running)
     try {
       await openBrowserSecurely(authUrl);
     } catch (error) {
@@ -872,7 +877,7 @@ ${authUrl}
     }
 
     // Wait for callback
-    const { code } = await callbackPromise;
+    const { code } = await callbackServer.response;
 
     debugLogger.debug(
       '✓ Authorization code received, exchanging for tokens...',
