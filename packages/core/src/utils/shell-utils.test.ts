@@ -271,6 +271,25 @@ EOF`,
     );
   });
 
+  it('should block commands containing prompt transformations', () => {
+    const result = isCommandAllowed(
+      'echo "${var1=aa\\140 env| ls -l\\140}${var1@P}"',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      'Command rejected because it could not be parsed safely',
+    );
+  });
+
+  it('should block simple prompt transformation expansions', () => {
+    const result = isCommandAllowed('echo ${foo@P}', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      'Command rejected because it could not be parsed safely',
+    );
+  });
+
   describe('command substitution', () => {
     it('should allow command substitution using `$(...)`', () => {
       const result = isCommandAllowed('echo $(goodCommand --safe)', config);
@@ -464,6 +483,18 @@ describe('getCommandRoots', () => {
   it('should include backtick substitutions', () => {
     const result = getCommandRoots('echo `badCommand --danger`');
     expect(result).toEqual(['echo', 'badCommand']);
+  });
+
+  it('should treat parameter expansions with prompt transformations as unsafe', () => {
+    const roots = getCommandRoots(
+      'echo "${var1=aa\\140 env| ls -l\\140}${var1@P}"',
+    );
+    expect(roots).toEqual([]);
+  });
+
+  it('should not return roots for prompt transformation expansions', () => {
+    const roots = getCommandRoots('echo ${foo@P}');
+    expect(roots).toEqual([]);
   });
 });
 
