@@ -186,7 +186,10 @@ describe('ShellExecutionService', () => {
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'bash',
-        ['-c', 'ls -l'],
+        [
+          '-c',
+          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l',
+        ],
         expect.any(Object),
       );
       expect(result.exitCode).toBe(0);
@@ -539,7 +542,10 @@ describe('ShellExecutionService', () => {
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'bash',
-        ['-c', 'ls "foo bar"'],
+        [
+          '-c',
+          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
+        ],
         expect.any(Object),
       );
     });
@@ -713,7 +719,10 @@ describe('ShellExecutionService child_process fallback', () => {
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'bash',
-        ['-c', 'ls -l'],
+        [
+          '-c',
+          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l',
+        ],
         expect.objectContaining({ shell: false, detached: true }),
       );
       expect(result.exitCode).toBe(0);
@@ -1030,7 +1039,10 @@ describe('ShellExecutionService child_process fallback', () => {
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'bash',
-        ['-c', 'ls "foo bar"'],
+        [
+          '-c',
+          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
+        ],
         expect.objectContaining({
           shell: false,
           detached: true,

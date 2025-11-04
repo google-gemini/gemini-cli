@@ -12,7 +12,7 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
-import { getShellConfiguration } from '../utils/shell-utils.js';
+import { getShellConfiguration, type ShellType } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
@@ -23,6 +23,22 @@ const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
+
+const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
+const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
+
+function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
+  if (shell !== 'bash') {
+    return command;
+  }
+
+  const trimmed = command.trimStart();
+  if (trimmed.startsWith(BASH_SHOPT_GUARD)) {
+    return command;
+  }
+
+  return `${BASH_SHOPT_GUARD} ${command}`;
+}
 
 /** A structured result from a shell command execution. */
 export interface ShellExecutionResult {
@@ -191,7 +207,8 @@ export class ShellExecutionService {
     try {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
-      const spawnArgs = [...argsPrefix, commandToExecute];
+      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      const spawnArgs = [...argsPrefix, guardedCommand];
 
       const env: NodeJS.ProcessEnv = {
         ...process.env,
@@ -411,7 +428,8 @@ export class ShellExecutionService {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
-      const args = [...argsPrefix, commandToExecute];
+      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      const args = [...argsPrefix, guardedCommand];
 
       const env: NodeJS.ProcessEnv = {
         ...process.env,
