@@ -40,7 +40,7 @@ describe('list_directory', () => {
 
     try {
       await rig.expectToolCallSuccess(['list_directory']);
-    } catch {
+    } catch (e) {
       // Add debugging information
       if (!result.includes('file1.txt') || !result.includes('subdir')) {
         const allTools = printDebugInfo(rig, result, {
@@ -56,6 +56,7 @@ describe('list_directory', () => {
             .map((t) => t.toolRequest.args),
         );
       }
+      throw e;
     }
 
     // Validate model output - will throw if no output, warn if missing expected content
