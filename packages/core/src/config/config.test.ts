@@ -232,15 +232,15 @@ describe('Server Config (config.ts)', () => {
     });
 
     describe('getCompressionThreshold', () => {
-      it('should return the local compression threshold if it is set', () => {
+      it('should return the local compression threshold if it is set', async () => {
         const config = new Config({
           ...baseParams,
           compressionThreshold: 0.5,
         });
-        expect(config.getCompressionThreshold()).toBe(0.5);
+        expect(await config.getCompressionThreshold()).toBe(0.5);
       });
 
-      it('should return the remote experiment threshold if it is a positive number', () => {
+      it('should return the remote experiment threshold if it is a positive number', async () => {
         const config = new Config({
           ...baseParams,
           experiments: {
@@ -251,10 +251,10 @@ describe('Server Config (config.ts)', () => {
             },
           },
         } as unknown as ConfigParameters);
-        expect(config.getCompressionThreshold()).toBe(0.8);
+        expect(await config.getCompressionThreshold()).toBe(0.8);
       });
 
-      it('should return undefined if the remote experiment threshold is 0', () => {
+      it('should return undefined if the remote experiment threshold is 0', async () => {
         const config = new Config({
           ...baseParams,
           experiments: {
@@ -265,12 +265,12 @@ describe('Server Config (config.ts)', () => {
             },
           },
         } as unknown as ConfigParameters);
-        expect(config.getCompressionThreshold()).toBeUndefined();
+        expect(await config.getCompressionThreshold()).toBeUndefined();
       });
 
-      it('should return undefined if there are no experiments', () => {
+      it('should return undefined if there are no experiments', async () => {
         const config = new Config(baseParams);
-        expect(config.getCompressionThreshold()).toBeUndefined();
+        expect(await config.getCompressionThreshold()).toBeUndefined();
       });
     });
   });
