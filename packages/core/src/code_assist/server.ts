@@ -15,6 +15,11 @@ import type {
   SetCodeAssistGlobalUserSettingRequest,
 } from './types.js';
 import type {
+  ListExperimentsRequest,
+  ListExperimentsResponse,
+  ClientMetadata,
+} from './experiments/types.js';
+import type {
   CountTokensParameters,
   CountTokensResponse,
   EmbedContentParameters,
@@ -147,6 +152,23 @@ export class CodeAssistServer implements ContentGenerator {
     _req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     throw Error();
+  }
+
+  async listExperiments(
+    metadata: ClientMetadata,
+  ): Promise<ListExperimentsResponse> {
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
+    const req: ListExperimentsRequest = {
+      project: projectId,
+      metadata: { ...metadata, duet_project: projectId },
+    };
+    return await this.requestPost<ListExperimentsResponse>(
+      'listExperiments',
+      req,
+    );
   }
 
   async requestPost<T>(
