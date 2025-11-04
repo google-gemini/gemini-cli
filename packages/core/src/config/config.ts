@@ -62,9 +62,9 @@ import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type { ModelGenerationServiceConfig } from '../services/modelGenerationConfigService.js';
-import { ModelGenerationConfigService } from '../services/modelGenerationConfigService.js';
-import { DEFAULT_GENERATION_CONFIG } from '../config/defaultGenerationConfig.js';
+import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -290,7 +290,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
-  generation?: ModelGenerationServiceConfig;
+  modelConfigs?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
@@ -308,7 +308,7 @@ export class Config {
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
-  readonly generationConfigService: ModelGenerationConfigService;
+  readonly generationConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -565,16 +565,16 @@ export class Config {
     // are missing from the user's config.
     // TODO: Fix the settings loading logic to properly merge defaults and
     // remove this hack.
-    let generationConfig = params.generation;
-    if (generationConfig && !generationConfig.aliases) {
-      generationConfig = {
-        ...generationConfig,
-        aliases: DEFAULT_GENERATION_CONFIG.aliases,
+    let modelConfigs = params.modelConfigs;
+    if (modelConfigs && !modelConfigs.aliases) {
+      modelConfigs = {
+        ...modelConfigs,
+        aliases: DEFAULT_MODEL_CONFIGS.aliases,
       };
     }
 
-    this.generationConfigService = new ModelGenerationConfigService(
-      generationConfig ?? DEFAULT_GENERATION_CONFIG,
+    this.generationConfigService = new ModelConfigService(
+      modelConfigs ?? DEFAULT_MODEL_CONFIGS,
     );
   }
 

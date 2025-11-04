@@ -6,53 +6,54 @@
 
 import type { GenerateContentConfig } from '@google/genai';
 
-export interface GenerationContext {
-  agent?: string;
-  model: string; // Can be a model name or an alias
+// The primary key for the ModelConfig is the model string. However, we also
+// support a secondary key to limit the override scope, typically an agent name.
+export interface ModelConfigKey {
+  model: string;
+  overrideScope?: string;
 }
 
-export interface GenerationSettings {
+export interface ModelConfig {
   model?: string;
-  config?: Partial<GenerateContentConfig>;
+  generateContentConfig?: GenerateContentConfig;
 }
 
-export interface GenerationOverride {
+export interface ModelConfigOverride {
   match: {
-    agent?: string;
     model?: string; // Can be a model name or an alias
+    overrideScope?: string;
   };
-  settings: GenerationSettings;
+  modelConfig: ModelConfig;
 }
 
-export interface GenerationAlias {
+export interface ModelConfigAlias {
   extends?: string;
-  settings: GenerationSettings;
+  modelConfig: ModelConfig;
 }
 
-export interface ModelGenerationServiceConfig {
-  aliases?: Record<string, GenerationAlias>;
-  overrides?: GenerationOverride[];
-  config?: Partial<GenerateContentConfig>;
+export interface ModelConfigServiceConfig {
+  aliases?: Record<string, ModelConfigAlias>;
+  overrides?: ModelConfigOverride[];
 }
 
-export type ResolvedModelConfig = _ResolvedGenerationSettings & {
+export type ResolvedModelConfig = _ResolvedModelConfig & {
   readonly _brand: unique symbol;
 };
 
-export interface _ResolvedGenerationSettings {
+export interface _ResolvedModelConfig {
   model: string; // The actual, resolved model name
-
-  sdkConfig: GenerateContentConfig;
+  generateContentConfig: GenerateContentConfig;
 }
 
-export class ModelGenerationConfigService {
-  constructor(private readonly config: ModelGenerationServiceConfig) {}
+export class ModelConfigService {
+  // TODO(joshualitt): Process config to build a typed alias hierarchy.
+  constructor(private readonly config: ModelConfigServiceConfig) {}
 
   private resolveAlias(
     aliasName: string,
-    aliases: Record<string, GenerationAlias>,
+    aliases: Record<string, ModelConfigAlias>,
     visited = new Set<string>(),
-  ): GenerationAlias {
+  ): ModelConfigAlias {
     if (visited.has(aliasName)) {
       throw new Error(
         `Circular alias dependency: ${[...visited, aliasName].join(' -> ')}`,
@@ -72,32 +73,32 @@ export class ModelGenerationConfigService {
     const baseAlias = this.resolveAlias(alias.extends, aliases, visited);
 
     return {
-      settings: {
-        model: alias.settings.model ?? baseAlias.settings.model,
-        config: this.deepMerge(
-          baseAlias.settings.config,
-          alias.settings.config,
+      modelConfig: {
+        model: alias.modelConfig.model ?? baseAlias.modelConfig.model,
+        generateContentConfig: this.deepMerge(
+          baseAlias.modelConfig.generateContentConfig,
+          alias.modelConfig.generateContentConfig,
         ),
       },
     };
   }
 
-  private internalGetResolvedConfig(context: GenerationContext): {
+  private internalGetResolvedConfig(context: ModelConfigKey): {
     model: string | undefined;
-    sdkConfig: Partial<GenerateContentConfig>;
+    generateContentConfig: GenerateContentConfig;
   } {
     const config = this.config || {};
-    const { aliases = {}, overrides = [], config: globalConfig = {} } = config;
+    const { aliases = {}, overrides = [] } = config;
     let baseModel: string | undefined = context.model;
-    let resolvedConfig: Partial<GenerateContentConfig> = { ...globalConfig };
+    let resolvedConfig: GenerateContentConfig = {};
 
     // Step 1: Alias Resolution
     if (aliases[context.model]) {
       const resolvedAlias = this.resolveAlias(context.model, aliases);
-      baseModel = resolvedAlias.settings.model; // This can now be undefined
+      baseModel = resolvedAlias.modelConfig.model; // This can now be undefined
       resolvedConfig = this.deepMerge(
         resolvedConfig,
-        resolvedAlias.settings.config,
+        resolvedAlias.modelConfig.generateContentConfig,
       );
     }
 
@@ -123,18 +124,19 @@ export class ModelGenerationConfigService {
           if (key === 'model') {
             return value === context.model || value === finalContext.model;
           }
-          if (key === 'agent' && value === 'core') {
-            // The 'core' agent is special. It should match if the agent is
-            // explicitly 'core' or if the agent is not specified.
-            return context.agent === 'core' || !context.agent;
+          if (key === 'overrideScope' && value === 'core') {
+            // The 'core' overrideScope is special. It should match if the
+            // overrideScope is explicitly 'core' or if the overrideScope
+            // is not specified.
+            return context.overrideScope === 'core' || !context.overrideScope;
           }
-          return finalContext[key as keyof GenerationContext] === value;
+          return finalContext[key as keyof ModelConfigKey] === value;
         });
 
         if (isMatch) {
           return {
             specificity: matchEntries.length,
-            settings: override.settings,
+            modelConfig: override.modelConfig,
             index,
           };
         }
@@ -157,21 +159,24 @@ export class ModelGenerationConfigService {
 
     // Apply matching overrides
     for (const match of matches) {
-      if (match.settings.model) {
-        baseModel = match.settings.model;
+      if (match.modelConfig.model) {
+        baseModel = match.modelConfig.model;
       }
-      if (match.settings.config) {
-        resolvedConfig = this.deepMerge(resolvedConfig, match.settings.config);
+      if (match.modelConfig.generateContentConfig) {
+        resolvedConfig = this.deepMerge(
+          resolvedConfig,
+          match.modelConfig.generateContentConfig,
+        );
       }
     }
 
     return {
       model: baseModel,
-      sdkConfig: resolvedConfig,
+      generateContentConfig: resolvedConfig,
     };
   }
 
-  getResolvedConfig(context: GenerationContext): ResolvedModelConfig {
+  getResolvedConfig(context: ModelConfigKey): ResolvedModelConfig {
     const resolved = this.internalGetResolvedConfig(context);
 
     if (!resolved.model) {
@@ -182,7 +187,7 @@ export class ModelGenerationConfigService {
 
     return {
       model: resolved.model,
-      sdkConfig: resolved.sdkConfig as GenerateContentConfig,
+      generateContentConfig: resolved.generateContentConfig,
     } as ResolvedModelConfig;
   }
 
@@ -191,6 +196,16 @@ export class ModelGenerationConfigService {
   }
 
   private deepMerge(
+    config1: GenerateContentConfig | undefined,
+    config2: GenerateContentConfig | undefined,
+  ): Record<string, unknown> {
+    return this.genericDeepMerge(
+      config1 as Record<string, unknown> | undefined,
+      config2 as Record<string, unknown> | undefined,
+    );
+  }
+
+  private genericDeepMerge(
     ...objects: Array<Record<string, unknown> | undefined>
   ): Record<string, unknown> {
     return objects.reduce((acc: Record<string, unknown>, obj) => {

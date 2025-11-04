@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ModelGenerationServiceConfig } from '../services/modelGenerationConfigService.js';
+import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 
-export const DEFAULT_GENERATION_CONFIG: ModelGenerationServiceConfig = {
+export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
   aliases: {
     base: {
-      settings: {
-        config: {
+      modelConfig: {
+        generateContentConfig: {
           temperature: 0,
           topP: 1,
         },
@@ -18,8 +18,8 @@ export const DEFAULT_GENERATION_CONFIG: ModelGenerationServiceConfig = {
     },
     'chat-base': {
       extends: 'base',
-      settings: {
-        config: {
+      modelConfig: {
+        generateContentConfig: {
           thinkingConfig: {
             includeThoughts: true,
             thinkingBudget: -1,
@@ -29,27 +29,27 @@ export const DEFAULT_GENERATION_CONFIG: ModelGenerationServiceConfig = {
     },
     'gemini-2.5-pro': {
       extends: 'chat-base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-pro',
       },
     },
     'gemini-2.5-flash': {
       extends: 'chat-base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash',
       },
     },
     'gemini-2.5-flash-lite': {
       extends: 'chat-base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash-lite',
       },
     },
     classifier: {
       extends: 'base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash-lite',
-        config: {
+        generateContentConfig: {
           maxOutputTokens: 1024,
           thinkingConfig: {
             thinkingBudget: 512,
@@ -59,9 +59,9 @@ export const DEFAULT_GENERATION_CONFIG: ModelGenerationServiceConfig = {
     },
     'prompt-completion': {
       extends: 'base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash-lite',
-        config: {
+        generateContentConfig: {
           temperature: 0.3,
           maxOutputTokens: 16000,
           thinkingConfig: {
@@ -72,9 +72,9 @@ export const DEFAULT_GENERATION_CONFIG: ModelGenerationServiceConfig = {
     },
     'edit-corrector': {
       extends: 'base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash-lite',
-        config: {
+        generateContentConfig: {
           thinkingConfig: {
             thinkingBudget: 0,
           },
@@ -83,36 +83,36 @@ export const DEFAULT_GENERATION_CONFIG: ModelGenerationServiceConfig = {
     },
     'summarizer-default': {
       extends: 'base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash-lite',
-        config: {
+        generateContentConfig: {
           maxOutputTokens: 2000,
         },
       },
     },
     'summarizer-shell': {
       extends: 'base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash-lite',
-        config: {
+        generateContentConfig: {
           maxOutputTokens: 2000,
         },
       },
     },
     'web-search-tool': {
       extends: 'base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash',
-        config: {
+        generateContentConfig: {
           tools: [{ googleSearch: {} }],
         },
       },
     },
     'web-fetch-tool': {
       extends: 'base',
-      settings: {
+      modelConfig: {
         model: 'gemini-2.5-flash',
-        config: {
+        generateContentConfig: {
           tools: [{ urlContext: {} }],
         },
       },

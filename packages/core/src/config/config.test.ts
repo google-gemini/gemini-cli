@@ -31,7 +31,7 @@ import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { DEFAULT_GENERATION_CONFIG } from './defaultGenerationConfig.js';
+import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -1237,13 +1237,13 @@ describe('Generation Config Merging (HACK)', () => {
     const userOverrides = [
       {
         match: { model: 'test-model' },
-        settings: { config: { temperature: 0.1 } },
+        modelConfig: { generateContentConfig: { temperature: 0.1 } },
       },
     ];
 
     const params: ConfigParameters = {
       ...baseParams,
-      generation: {
+      modelConfigs: {
         overrides: userOverrides,
       },
     };
@@ -1253,7 +1253,7 @@ describe('Generation Config Merging (HACK)', () => {
     const serviceConfig = (config.generationConfigService as any).config;
 
     // Assert that the default aliases are present
-    expect(serviceConfig.aliases).toEqual(DEFAULT_GENERATION_CONFIG.aliases);
+    expect(serviceConfig.aliases).toEqual(DEFAULT_MODEL_CONFIGS.aliases);
     // Assert that the user's overrides are present
     expect(serviceConfig.overrides).toEqual(userOverrides);
   });
@@ -1261,13 +1261,13 @@ describe('Generation Config Merging (HACK)', () => {
   it('should use user-provided aliases if they exist', () => {
     const userAliases = {
       'my-alias': {
-        settings: { model: 'my-model' },
+        modelConfig: { model: 'my-model' },
       },
     };
 
     const params: ConfigParameters = {
       ...baseParams,
-      generation: {
+      modelConfigs: {
         aliases: userAliases,
       },
     };
@@ -1288,7 +1288,7 @@ describe('Generation Config Merging (HACK)', () => {
     const serviceConfig = (config.generationConfigService as any).config;
 
     // Assert that the full default config is used
-    expect(serviceConfig).toEqual(DEFAULT_GENERATION_CONFIG);
+    expect(serviceConfig).toEqual(DEFAULT_MODEL_CONFIGS);
   });
 });
 

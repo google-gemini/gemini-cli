@@ -5,26 +5,20 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ModelGenerationConfigService } from './modelGenerationConfigService.js';
-import type { ModelGenerationServiceConfig } from './modelGenerationConfigService.js';
+import { ModelConfigService } from './modelConfigService.js';
+import type { ModelConfigServiceConfig } from './modelConfigService.js';
 
 // This test suite is designed to validate the end-to-end logic of the
-// ModelGenerationConfigService with a complex, realistic configuration.
+// ModelConfigService with a complex, realistic configuration.
 // It tests the interplay of global settings, alias inheritance, and overrides
 // of varying specificities.
-describe('ModelGenerationConfigService Integration', () => {
-  const complexConfig: ModelGenerationServiceConfig = {
-    // Global defaults that should apply to everything unless overridden.
-    config: {
-      temperature: 0.8,
-      topP: 1.0,
-      stopSequences: ['STOP'],
-    },
+describe('ModelConfigService Integration', () => {
+  const complexConfig: ModelConfigServiceConfig = {
     aliases: {
       // Abstract base with no model
       base: {
-        settings: {
-          config: {
+        modelConfig: {
+          generateContentConfig: {
             topP: 0.95,
             topK: 64,
           },
@@ -32,17 +26,17 @@ describe('ModelGenerationConfigService Integration', () => {
       },
       'default-text-model': {
         extends: 'base',
-        settings: {
+        modelConfig: {
           model: 'gemini-1.5-pro-latest',
-          config: {
+          generateContentConfig: {
             topK: 40, // Override base
           },
         },
       },
       'creative-writer': {
         extends: 'default-text-model',
-        settings: {
-          config: {
+        modelConfig: {
+          generateContentConfig: {
             temperature: 0.9, // Override global
             topK: 50, // Override parent
           },
@@ -50,9 +44,9 @@ describe('ModelGenerationConfigService Integration', () => {
       },
       'fast-classifier': {
         extends: 'base',
-        settings: {
+        modelConfig: {
           model: 'gemini-1.5-flash-latest',
-          config: {
+          generateContentConfig: {
             temperature: 0.1,
             candidateCount: 4,
           },
@@ -63,17 +57,17 @@ describe('ModelGenerationConfigService Integration', () => {
       // Broad override for all flash models
       {
         match: { model: 'gemini-1.5-flash-latest' },
-        settings: {
-          config: {
+        modelConfig: {
+          generateContentConfig: {
             maxOutputTokens: 2048,
           },
         },
       },
       // Specific override for the 'core' agent
       {
-        match: { agent: 'core' },
-        settings: {
-          config: {
+        match: { overrideScope: 'core' },
+        modelConfig: {
+          generateContentConfig: {
             temperature: 0.5,
             stopSequences: ['AGENT_STOP'],
           },
@@ -81,9 +75,9 @@ describe('ModelGenerationConfigService Integration', () => {
       },
       // Highly specific override for the 'fast-classifier' when used by the 'core' agent
       {
-        match: { model: 'fast-classifier', agent: 'core' },
-        settings: {
-          config: {
+        match: { model: 'fast-classifier', overrideScope: 'core' },
+        modelConfig: {
+          generateContentConfig: {
             temperature: 0.0,
             maxOutputTokens: 4096,
           },
@@ -91,15 +85,15 @@ describe('ModelGenerationConfigService Integration', () => {
       },
       // Override to provide a model for the abstract alias
       {
-        match: { model: 'base', agent: 'core' },
-        settings: {
+        match: { model: 'base', overrideScope: 'core' },
+        modelConfig: {
           model: 'gemini-1.5-pro-latest',
         },
       },
     ],
   };
 
-  const service = new ModelGenerationConfigService(complexConfig);
+  const service = new ModelConfigService(complexConfig);
 
   it('should resolve a simple model, applying core agent defaults', () => {
     const resolved = service.getResolvedConfig({
@@ -107,9 +101,8 @@ describe('ModelGenerationConfigService Integration', () => {
     });
 
     expect(resolved.model).toBe('gemini-test-model');
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.5, // from agent override
-      topP: 1.0, // from global
       stopSequences: ['AGENT_STOP'], // from agent override
     });
   });
@@ -120,7 +113,7 @@ describe('ModelGenerationConfigService Integration', () => {
     });
 
     expect(resolved.model).toBe('gemini-1.5-pro-latest'); // from alias
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.5, // from agent override
       topP: 0.95, // from base
       topK: 40, // from alias
@@ -134,7 +127,7 @@ describe('ModelGenerationConfigService Integration', () => {
     });
 
     expect(resolved.model).toBe('gemini-1.5-pro-latest'); // from default-text-model
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.5, // from agent override
       topP: 0.95, // from base
       topK: 50, // from alias
@@ -149,7 +142,7 @@ describe('ModelGenerationConfigService Integration', () => {
     });
 
     expect(resolved.model).toBe('gemini-1.5-flash-latest'); // from alias
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       topP: 0.95, // from base
       topK: 64, // from base
       candidateCount: 4, // from alias
@@ -162,13 +155,12 @@ describe('ModelGenerationConfigService Integration', () => {
   it('should apply settings for an unknown model but a known agent', () => {
     const resolved = service.getResolvedConfig({
       model: 'gemini-test-model',
-      agent: 'core',
+      overrideScope: 'core',
     });
 
     expect(resolved.model).toBe('gemini-test-model');
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.5, // from agent override
-      topP: 1.0, // from global
       stopSequences: ['AGENT_STOP'], // from agent override
     });
   });
@@ -176,11 +168,11 @@ describe('ModelGenerationConfigService Integration', () => {
   it('should apply the most specific override for a known inherited alias and agent', () => {
     const resolved = service.getResolvedConfig({
       model: 'fast-classifier',
-      agent: 'core',
+      overrideScope: 'core',
     });
 
     expect(resolved.model).toBe('gemini-1.5-flash-latest');
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       // Inherited from 'base'
       topP: 0.95,
       topK: 64,
@@ -197,11 +189,11 @@ describe('ModelGenerationConfigService Integration', () => {
   it('should correctly apply agent override on top of a multi-level inherited alias', () => {
     const resolved = service.getResolvedConfig({
       model: 'creative-writer',
-      agent: 'core',
+      overrideScope: 'core',
     });
 
     expect(resolved.model).toBe('gemini-1.5-pro-latest'); // from default-text-model
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.5, // from agent override (wins over alias)
       topP: 0.95, // from base
       topK: 50, // from creative-writer alias
@@ -212,11 +204,11 @@ describe('ModelGenerationConfigService Integration', () => {
   it('should resolve an abstract alias if a specific override provides the model', () => {
     const resolved = service.getResolvedConfig({
       model: 'base',
-      agent: 'core',
+      overrideScope: 'core',
     });
 
     expect(resolved.model).toBe('gemini-1.5-pro-latest'); // from override
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.5, // from agent override
       topP: 0.95, // from base alias
       topK: 64, // from base alias
@@ -226,15 +218,17 @@ describe('ModelGenerationConfigService Integration', () => {
 
   it('should not apply core agent overrides when a different agent is specified', () => {
     const resolved = service.getResolvedConfig({
-      model: 'gemini-test-model',
-      agent: 'non-core-agent',
+      model: 'fast-classifier',
+      overrideScope: 'non-core-agent',
     });
 
-    expect(resolved.model).toBe('gemini-test-model');
-    expect(resolved.sdkConfig).toEqual({
-      temperature: 0.8, // from global
-      topP: 1.0, // from global
-      stopSequences: ['STOP'], // from global
+    expect(resolved.model).toBe('gemini-1.5-flash-latest');
+    expect(resolved.generateContentConfig).toEqual({
+      candidateCount: 4, // from alias
+      maxOutputTokens: 2048, // from override of model
+      temperature: 0.1, // from alias
+      topK: 64, // from base
+      topP: 0.95, // from base
     });
   });
 });

@@ -7,8 +7,8 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { ModelGenerationConfigService } from './modelGenerationConfigService.js';
-import { DEFAULT_GENERATION_CONFIG } from '../config/defaultGenerationConfig.js';
+import { ModelConfigService } from './modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 
 const GOLDEN_FILE_PATH = path.resolve(
   process.cwd(),
@@ -18,10 +18,10 @@ const GOLDEN_FILE_PATH = path.resolve(
   'resolved-aliases.golden.json',
 );
 
-describe('ModelGenerationConfigService Golden Test', () => {
+describe('ModelConfigService Golden Test', () => {
   it('should match the golden file for resolved default aliases', async () => {
-    const service = new ModelGenerationConfigService(DEFAULT_GENERATION_CONFIG);
-    const aliases = Object.keys(DEFAULT_GENERATION_CONFIG.aliases ?? {});
+    const service = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+    const aliases = Object.keys(DEFAULT_MODEL_CONFIGS.aliases ?? {});
 
     const resolvedAliases: Record<string, unknown> = {};
     for (const alias of aliases) {

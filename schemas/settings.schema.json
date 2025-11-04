@@ -412,15 +412,15 @@
       },
       "additionalProperties": false
     },
-    "generation": {
-      "title": "Generation",
-      "description": "Settings that control model generation.",
-      "markdownDescription": "Settings that control model generation.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\"aliases\":{\"base\":{\"settings\":{\"config\":{\"temperature\":0,\"topP\":1}}},\"chat-base\":{\"extends\":\"base\",\"settings\":{\"config\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingBudget\":-1}}}},\"gemini-2.5-pro\":{\"extends\":\"chat-base\",\"settings\":{\"model\":\"gemini-2.5-pro\"}},\"gemini-2.5-flash\":{\"extends\":\"chat-base\",\"settings\":{\"model\":\"gemini-2.5-flash\"}},\"gemini-2.5-flash-lite\":{\"extends\":\"chat-base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\"}},\"classifier\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"maxOutputTokens\":1024,\"thinkingConfig\":{\"thinkingBudget\":512}}}},\"prompt-completion\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"temperature\":0.3,\"maxOutputTokens\":16000,\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"edit-corrector\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"summarizer-default\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"maxOutputTokens\":2000}}},\"summarizer-shell\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"maxOutputTokens\":2000}}},\"web-search-tool\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash\",\"config\":{\"tools\":[{\"googleSearch\":{}}]}}},\"web-fetch-tool\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash\",\"config\":{\"tools\":[{\"urlContext\":{}}]}}}}}`",
+    "modelConfigs": {
+      "title": "Model Configs",
+      "description": "Model configurations.",
+      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\"aliases\":{\"base\":{\"modelConfig\":{\"generateContentConfig\":{\"temperature\":0,\"topP\":1}}},\"chat-base\":{\"extends\":\"base\",\"modelConfig\":{\"generateContentConfig\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingBudget\":-1}}}},\"gemini-2.5-pro\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-pro\"}},\"gemini-2.5-flash\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\"}},\"gemini-2.5-flash-lite\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\"}},\"classifier\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":1024,\"thinkingConfig\":{\"thinkingBudget\":512}}}},\"prompt-completion\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"temperature\":0.3,\"maxOutputTokens\":16000,\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"edit-corrector\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"summarizer-default\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"summarizer-shell\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"web-search-tool\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\",\"generateContentConfig\":{\"tools\":[{\"googleSearch\":{}}]}}},\"web-fetch-tool\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\",\"generateContentConfig\":{\"tools\":[{\"urlContext\":{}}]}}}}}`",
       "default": {
         "aliases": {
           "base": {
-            "settings": {
-              "config": {
+            "modelConfig": {
+              "generateContentConfig": {
                 "temperature": 0,
                 "topP": 1
               }
@@ -428,8 +428,8 @@
           },
           "chat-base": {
             "extends": "base",
-            "settings": {
-              "config": {
+            "modelConfig": {
+              "generateContentConfig": {
                 "thinkingConfig": {
                   "includeThoughts": true,
                   "thinkingBudget": -1
@@ -439,27 +439,27 @@
           },
           "gemini-2.5-pro": {
             "extends": "chat-base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-pro"
             }
           },
           "gemini-2.5-flash": {
             "extends": "chat-base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash"
             }
           },
           "gemini-2.5-flash-lite": {
             "extends": "chat-base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash-lite"
             }
           },
           "classifier": {
             "extends": "base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash-lite",
-              "config": {
+              "generateContentConfig": {
                 "maxOutputTokens": 1024,
                 "thinkingConfig": {
                   "thinkingBudget": 512
@@ -469,9 +469,9 @@
           },
           "prompt-completion": {
             "extends": "base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash-lite",
-              "config": {
+              "generateContentConfig": {
                 "temperature": 0.3,
                 "maxOutputTokens": 16000,
                 "thinkingConfig": {
@@ -482,9 +482,9 @@
           },
           "edit-corrector": {
             "extends": "base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash-lite",
-              "config": {
+              "generateContentConfig": {
                 "thinkingConfig": {
                   "thinkingBudget": 0
                 }
@@ -493,27 +493,27 @@
           },
           "summarizer-default": {
             "extends": "base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash-lite",
-              "config": {
+              "generateContentConfig": {
                 "maxOutputTokens": 2000
               }
             }
           },
           "summarizer-shell": {
             "extends": "base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash-lite",
-              "config": {
+              "generateContentConfig": {
                 "maxOutputTokens": 2000
               }
             }
           },
           "web-search-tool": {
             "extends": "base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash",
-              "config": {
+              "generateContentConfig": {
                 "tools": [
                   {
                     "googleSearch": {}
@@ -524,9 +524,9 @@
           },
           "web-fetch-tool": {
             "extends": "base",
-            "settings": {
+            "modelConfig": {
               "model": "gemini-2.5-flash",
-              "config": {
+              "generateContentConfig": {
                 "tools": [
                   {
                     "urlContext": {}
@@ -540,13 +540,13 @@
       "type": "object",
       "properties": {
         "aliases": {
-          "title": "Generation Aliases",
-          "description": "Named presets for generation settings. Can be used in place of a model name and can inherit from other aliases using an `extends` property.",
-          "markdownDescription": "Named presets for generation settings. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\"base\":{\"settings\":{\"config\":{\"temperature\":0,\"topP\":1}}},\"chat-base\":{\"extends\":\"base\",\"settings\":{\"config\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingBudget\":-1}}}},\"gemini-2.5-pro\":{\"extends\":\"chat-base\",\"settings\":{\"model\":\"gemini-2.5-pro\"}},\"gemini-2.5-flash\":{\"extends\":\"chat-base\",\"settings\":{\"model\":\"gemini-2.5-flash\"}},\"gemini-2.5-flash-lite\":{\"extends\":\"chat-base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\"}},\"classifier\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"maxOutputTokens\":1024,\"thinkingConfig\":{\"thinkingBudget\":512}}}},\"prompt-completion\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"temperature\":0.3,\"maxOutputTokens\":16000,\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"edit-corrector\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"summarizer-default\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"maxOutputTokens\":2000}}},\"summarizer-shell\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash-lite\",\"config\":{\"maxOutputTokens\":2000}}},\"web-search-tool\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash\",\"config\":{\"tools\":[{\"googleSearch\":{}}]}}},\"web-fetch-tool\":{\"extends\":\"base\",\"settings\":{\"model\":\"gemini-2.5-flash\",\"config\":{\"tools\":[{\"urlContext\":{}}]}}}}`",
+          "title": "Model Config Aliases",
+          "description": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.",
+          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\"base\":{\"modelConfig\":{\"generateContentConfig\":{\"temperature\":0,\"topP\":1}}},\"chat-base\":{\"extends\":\"base\",\"modelConfig\":{\"generateContentConfig\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingBudget\":-1}}}},\"gemini-2.5-pro\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-pro\"}},\"gemini-2.5-flash\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\"}},\"gemini-2.5-flash-lite\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\"}},\"classifier\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":1024,\"thinkingConfig\":{\"thinkingBudget\":512}}}},\"prompt-completion\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"temperature\":0.3,\"maxOutputTokens\":16000,\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"edit-corrector\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"summarizer-default\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"summarizer-shell\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"web-search-tool\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\",\"generateContentConfig\":{\"tools\":[{\"googleSearch\":{}}]}}},\"web-fetch-tool\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\",\"generateContentConfig\":{\"tools\":[{\"urlContext\":{}}]}}}}`",
           "default": {
             "base": {
-              "settings": {
-                "config": {
+              "modelConfig": {
+                "generateContentConfig": {
                   "temperature": 0,
                   "topP": 1
                 }
@@ -554,8 +554,8 @@
             },
             "chat-base": {
               "extends": "base",
-              "settings": {
-                "config": {
+              "modelConfig": {
+                "generateContentConfig": {
                   "thinkingConfig": {
                     "includeThoughts": true,
                     "thinkingBudget": -1
@@ -565,27 +565,27 @@
             },
             "gemini-2.5-pro": {
               "extends": "chat-base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-pro"
               }
             },
             "gemini-2.5-flash": {
               "extends": "chat-base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash"
               }
             },
             "gemini-2.5-flash-lite": {
               "extends": "chat-base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash-lite"
               }
             },
             "classifier": {
               "extends": "base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash-lite",
-                "config": {
+                "generateContentConfig": {
                   "maxOutputTokens": 1024,
                   "thinkingConfig": {
                     "thinkingBudget": 512
@@ -595,9 +595,9 @@
             },
             "prompt-completion": {
               "extends": "base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash-lite",
-                "config": {
+                "generateContentConfig": {
                   "temperature": 0.3,
                   "maxOutputTokens": 16000,
                   "thinkingConfig": {
@@ -608,9 +608,9 @@
             },
             "edit-corrector": {
               "extends": "base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash-lite",
-                "config": {
+                "generateContentConfig": {
                   "thinkingConfig": {
                     "thinkingBudget": 0
                   }
@@ -619,27 +619,27 @@
             },
             "summarizer-default": {
               "extends": "base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash-lite",
-                "config": {
+                "generateContentConfig": {
                   "maxOutputTokens": 2000
                 }
               }
             },
             "summarizer-shell": {
               "extends": "base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash-lite",
-                "config": {
+                "generateContentConfig": {
                   "maxOutputTokens": 2000
                 }
               }
             },
             "web-search-tool": {
               "extends": "base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash",
-                "config": {
+                "generateContentConfig": {
                   "tools": [
                     {
                       "googleSearch": {}
@@ -650,9 +650,9 @@
             },
             "web-fetch-tool": {
               "extends": "base",
-              "settings": {
+              "modelConfig": {
                 "model": "gemini-2.5-flash",
-                "config": {
+                "generateContentConfig": {
                   "tools": [
                     {
                       "urlContext": {}
@@ -666,9 +666,9 @@
           "additionalProperties": true
         },
         "overrides": {
-          "title": "Generation Settings Overrides",
-          "description": "Apply specific generation settings based on the agent or model being used. The most specific match will be used.",
-          "markdownDescription": "Apply specific generation settings based on the agent or model being used. The most specific match will be used.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `[]`",
+          "title": "Model Config Overrides",
+          "description": "Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.",
+          "markdownDescription": "Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `[]`",
           "default": [],
           "type": "array",
           "items": {}

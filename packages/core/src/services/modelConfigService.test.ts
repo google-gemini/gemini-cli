@@ -5,17 +5,17 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { ModelGenerationServiceConfig } from './modelGenerationConfigService.js';
-import { ModelGenerationConfigService } from './modelGenerationConfigService.js';
+import type { ModelConfigServiceConfig } from './modelConfigService.js';
+import { ModelConfigService } from './modelConfigService.js';
 
-describe('ModelGenerationConfigService', () => {
+describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {
-    const config: ModelGenerationServiceConfig = {
+    const config: ModelConfigServiceConfig = {
       aliases: {
         classifier: {
-          settings: {
+          modelConfig: {
             model: 'gemini-1.5-flash-latest',
-            config: {
+            generateContentConfig: {
               temperature: 0,
               topP: 0.9,
             },
@@ -24,42 +24,23 @@ describe('ModelGenerationConfigService', () => {
       },
       overrides: [],
     };
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({ model: 'classifier' });
 
     expect(resolved.model).toBe('gemini-1.5-flash-latest');
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0,
       topP: 0.9,
     });
   });
 
-  it('should apply global defaults when no alias or override matches', () => {
-    const config: ModelGenerationServiceConfig = {
-      config: {
-        temperature: 0.7,
-        topK: 40,
-      },
-      aliases: {},
-      overrides: [],
-    };
-    const service = new ModelGenerationConfigService(config);
-    const resolved = service.getResolvedConfig({ model: 'gemini-pro' });
-
-    expect(resolved.model).toBe('gemini-pro');
-    expect(resolved.sdkConfig).toEqual({
-      temperature: 0.7,
-      topK: 40,
-    });
-  });
-
   it('should apply a simple override on top of an alias', () => {
-    const config: ModelGenerationServiceConfig = {
+    const config: ModelConfigServiceConfig = {
       aliases: {
         classifier: {
-          settings: {
+          modelConfig: {
             model: 'gemini-1.5-flash-latest',
-            config: {
+            generateContentConfig: {
               temperature: 0,
               topP: 0.9,
             },
@@ -69,8 +50,8 @@ describe('ModelGenerationConfigService', () => {
       overrides: [
         {
           match: { model: 'classifier' },
-          settings: {
-            config: {
+          modelConfig: {
+            generateContentConfig: {
               temperature: 0.5,
               maxOutputTokens: 1000,
             },
@@ -78,11 +59,11 @@ describe('ModelGenerationConfigService', () => {
         },
       ],
     };
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({ model: 'classifier' });
 
     expect(resolved.model).toBe('gemini-1.5-flash-latest');
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.5,
       topP: 0.9,
       maxOutputTokens: 1000,
@@ -90,57 +71,62 @@ describe('ModelGenerationConfigService', () => {
   });
 
   it('should apply the most specific override rule', () => {
-    const config: ModelGenerationServiceConfig = {
+    const config: ModelConfigServiceConfig = {
       aliases: {},
       overrides: [
         {
           match: { model: 'gemini-pro' },
-          settings: { config: { temperature: 0.5 } },
+          modelConfig: { generateContentConfig: { temperature: 0.5 } },
         },
         {
-          match: { model: 'gemini-pro', agent: 'my-agent' },
-          settings: { config: { temperature: 0.1 } },
+          match: { model: 'gemini-pro', overrideScope: 'my-agent' },
+          modelConfig: { generateContentConfig: { temperature: 0.1 } },
         },
       ],
     };
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({
       model: 'gemini-pro',
-      agent: 'my-agent',
+      overrideScope: 'my-agent',
     });
 
     expect(resolved.model).toBe('gemini-pro');
-    expect(resolved.sdkConfig).toEqual({ temperature: 0.1 });
+    expect(resolved.generateContentConfig).toEqual({ temperature: 0.1 });
   });
 
   it('should use the last override in case of a tie in specificity', () => {
-    const config: ModelGenerationServiceConfig = {
+    const config: ModelConfigServiceConfig = {
       aliases: {},
       overrides: [
         {
           match: { model: 'gemini-pro' },
-          settings: { config: { temperature: 0.5, topP: 0.8 } },
+          modelConfig: {
+            generateContentConfig: { temperature: 0.5, topP: 0.8 },
+          },
         },
         {
           match: { model: 'gemini-pro' },
-          settings: { config: { temperature: 0.1 } },
+          modelConfig: { generateContentConfig: { temperature: 0.1 } },
         },
       ],
     };
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({ model: 'gemini-pro' });
 
     expect(resolved.model).toBe('gemini-pro');
-    expect(resolved.sdkConfig).toEqual({ temperature: 0.1, topP: 0.8 });
+    expect(resolved.generateContentConfig).toEqual({
+      temperature: 0.1,
+      topP: 0.8,
+    });
   });
 
   it('should correctly pass through generation config from an alias', () => {
-    const config: ModelGenerationServiceConfig = {
+    const config: ModelConfigServiceConfig = {
       aliases: {
         'thinking-alias': {
-          settings: {
+          modelConfig: {
             model: 'gemini-pro',
-            config: {
+            generateContentConfig: {
               candidateCount: 500,
             },
           },
@@ -148,19 +134,19 @@ describe('ModelGenerationConfigService', () => {
       },
       overrides: [],
     };
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({ model: 'thinking-alias' });
 
-    expect(resolved.sdkConfig).toEqual({ candidateCount: 500 });
+    expect(resolved.generateContentConfig).toEqual({ candidateCount: 500 });
   });
 
   it('should let an override generation config win over an alias config', () => {
-    const config: ModelGenerationServiceConfig = {
+    const config: ModelConfigServiceConfig = {
       aliases: {
         'thinking-alias': {
-          settings: {
+          modelConfig: {
             model: 'gemini-pro',
-            config: {
+            generateContentConfig: {
               candidateCount: 500,
             },
           },
@@ -169,33 +155,29 @@ describe('ModelGenerationConfigService', () => {
       overrides: [
         {
           match: { model: 'thinking-alias' },
-          settings: {
-            config: {
+          modelConfig: {
+            generateContentConfig: {
               candidateCount: 1000,
             },
           },
         },
       ],
     };
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({ model: 'thinking-alias' });
 
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       candidateCount: 1000,
     });
   });
 
   it('should merge settings from global, alias, and multiple matching overrides', () => {
-    const config: ModelGenerationServiceConfig = {
-      config: {
-        temperature: 0.7,
-        topP: 1.0,
-      },
+    const config: ModelConfigServiceConfig = {
       aliases: {
         'test-alias': {
-          settings: {
+          modelConfig: {
             model: 'gemini-test-model',
-            config: {
+            generateContentConfig: {
               topP: 0.9,
               topK: 50,
             },
@@ -205,25 +187,25 @@ describe('ModelGenerationConfigService', () => {
       overrides: [
         {
           match: { model: 'gemini-test-model' },
-          settings: {
-            config: {
+          modelConfig: {
+            generateContentConfig: {
               topK: 40,
               maxOutputTokens: 2048,
             },
           },
         },
         {
-          match: { agent: 'test-agent' },
-          settings: {
-            config: {
+          match: { overrideScope: 'test-agent' },
+          modelConfig: {
+            generateContentConfig: {
               maxOutputTokens: 4096,
             },
           },
         },
         {
-          match: { model: 'gemini-test-model', agent: 'test-agent' },
-          settings: {
-            config: {
+          match: { model: 'gemini-test-model', overrideScope: 'test-agent' },
+          modelConfig: {
+            generateContentConfig: {
               temperature: 0.2,
             },
           },
@@ -231,14 +213,14 @@ describe('ModelGenerationConfigService', () => {
       ],
     };
 
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({
       model: 'test-alias',
-      agent: 'test-agent',
+      overrideScope: 'test-agent',
     });
 
     expect(resolved.model).toBe('gemini-test-model');
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       // From global, overridden by most specific override
       temperature: 0.2,
       // From alias, not overridden
@@ -251,16 +233,13 @@ describe('ModelGenerationConfigService', () => {
   });
 
   it('should match an agent:core override when agent is undefined', () => {
-    const config: ModelGenerationServiceConfig = {
-      config: {
-        temperature: 0.7,
-      },
+    const config: ModelConfigServiceConfig = {
       aliases: {},
       overrides: [
         {
-          match: { agent: 'core' },
-          settings: {
-            config: {
+          match: { overrideScope: 'core' },
+          modelConfig: {
+            generateContentConfig: {
               temperature: 0.1,
             },
           },
@@ -268,26 +247,26 @@ describe('ModelGenerationConfigService', () => {
       ],
     };
 
-    const service = new ModelGenerationConfigService(config);
+    const service = new ModelConfigService(config);
     const resolved = service.getResolvedConfig({
       model: 'gemini-pro',
-      agent: undefined, // Explicitly undefined
+      overrideScope: undefined, // Explicitly undefined
     });
 
     expect(resolved.model).toBe('gemini-pro');
-    expect(resolved.sdkConfig).toEqual({
+    expect(resolved.generateContentConfig).toEqual({
       temperature: 0.1,
     });
   });
 
   describe('alias inheritance', () => {
     it('should resolve a simple "extends" chain', () => {
-      const config: ModelGenerationServiceConfig = {
+      const config: ModelConfigServiceConfig = {
         aliases: {
           base: {
-            settings: {
+            modelConfig: {
               model: 'gemini-1.5-pro-latest',
-              config: {
+              generateContentConfig: {
                 temperature: 0.7,
                 topP: 0.9,
               },
@@ -295,29 +274,29 @@ describe('ModelGenerationConfigService', () => {
           },
           'flash-variant': {
             extends: 'base',
-            settings: {
+            modelConfig: {
               model: 'gemini-1.5-flash-latest',
             },
           },
         },
       };
-      const service = new ModelGenerationConfigService(config);
+      const service = new ModelConfigService(config);
       const resolved = service.getResolvedConfig({ model: 'flash-variant' });
 
       expect(resolved.model).toBe('gemini-1.5-flash-latest');
-      expect(resolved.sdkConfig).toEqual({
+      expect(resolved.generateContentConfig).toEqual({
         temperature: 0.7,
         topP: 0.9,
       });
     });
 
     it('should override parent properties from child alias', () => {
-      const config: ModelGenerationServiceConfig = {
+      const config: ModelConfigServiceConfig = {
         aliases: {
           base: {
-            settings: {
+            modelConfig: {
               model: 'gemini-1.5-pro-latest',
-              config: {
+              generateContentConfig: {
                 temperature: 0.7,
                 topP: 0.9,
               },
@@ -325,32 +304,32 @@ describe('ModelGenerationConfigService', () => {
           },
           'flash-variant': {
             extends: 'base',
-            settings: {
+            modelConfig: {
               model: 'gemini-1.5-flash-latest',
-              config: {
+              generateContentConfig: {
                 temperature: 0.2,
               },
             },
           },
         },
       };
-      const service = new ModelGenerationConfigService(config);
+      const service = new ModelConfigService(config);
       const resolved = service.getResolvedConfig({ model: 'flash-variant' });
 
       expect(resolved.model).toBe('gemini-1.5-flash-latest');
-      expect(resolved.sdkConfig).toEqual({
+      expect(resolved.generateContentConfig).toEqual({
         temperature: 0.2,
         topP: 0.9,
       });
     });
 
     it('should resolve a multi-level "extends" chain', () => {
-      const config: ModelGenerationServiceConfig = {
+      const config: ModelConfigServiceConfig = {
         aliases: {
           base: {
-            settings: {
+            modelConfig: {
               model: 'gemini-1.5-pro-latest',
-              config: {
+              generateContentConfig: {
                 temperature: 0.7,
                 topP: 0.9,
               },
@@ -358,40 +337,40 @@ describe('ModelGenerationConfigService', () => {
           },
           'base-flash': {
             extends: 'base',
-            settings: {
+            modelConfig: {
               model: 'gemini-1.5-flash-latest',
             },
           },
           'classifier-flash': {
             extends: 'base-flash',
-            settings: {
-              config: {
+            modelConfig: {
+              generateContentConfig: {
                 temperature: 0,
               },
             },
           },
         },
       };
-      const service = new ModelGenerationConfigService(config);
+      const service = new ModelConfigService(config);
       const resolved = service.getResolvedConfig({
         model: 'classifier-flash',
       });
 
       expect(resolved.model).toBe('gemini-1.5-flash-latest');
-      expect(resolved.sdkConfig).toEqual({
+      expect(resolved.generateContentConfig).toEqual({
         temperature: 0,
         topP: 0.9,
       });
     });
 
     it('should throw an error for circular dependencies', () => {
-      const config: ModelGenerationServiceConfig = {
+      const config: ModelConfigServiceConfig = {
         aliases: {
-          a: { extends: 'b', settings: {} },
-          b: { extends: 'a', settings: {} },
+          a: { extends: 'b', modelConfig: {} },
+          b: { extends: 'a', modelConfig: {} },
         },
       };
-      const service = new ModelGenerationConfigService(config);
+      const service = new ModelConfigService(config);
       expect(() => service.getResolvedConfig({ model: 'a' })).toThrow(
         'Circular alias dependency: a -> b -> a',
       );
@@ -399,47 +378,47 @@ describe('ModelGenerationConfigService', () => {
 
     describe('abstract aliases', () => {
       it('should allow an alias to extend an abstract alias without a model', () => {
-        const config: ModelGenerationServiceConfig = {
+        const config: ModelConfigServiceConfig = {
           aliases: {
             'abstract-base': {
-              settings: {
-                config: {
+              modelConfig: {
+                generateContentConfig: {
                   temperature: 0.1,
                 },
               },
             },
             'concrete-child': {
               extends: 'abstract-base',
-              settings: {
+              modelConfig: {
                 model: 'gemini-1.5-pro-latest',
-                config: {
+                generateContentConfig: {
                   topP: 0.9,
                 },
               },
             },
           },
         };
-        const service = new ModelGenerationConfigService(config);
+        const service = new ModelConfigService(config);
         const resolved = service.getResolvedConfig({ model: 'concrete-child' });
 
         expect(resolved.model).toBe('gemini-1.5-pro-latest');
-        expect(resolved.sdkConfig).toEqual({
+        expect(resolved.generateContentConfig).toEqual({
           temperature: 0.1,
           topP: 0.9,
         });
       });
 
       it('should throw an error if a resolved alias chain has no model', () => {
-        const config: ModelGenerationServiceConfig = {
+        const config: ModelConfigServiceConfig = {
           aliases: {
             'abstract-base': {
-              settings: {
-                config: { temperature: 0.7 },
+              modelConfig: {
+                generateContentConfig: { temperature: 0.7 },
               },
             },
           },
         };
-        const service = new ModelGenerationConfigService(config);
+        const service = new ModelConfigService(config);
         expect(() =>
           service.getResolvedConfig({ model: 'abstract-base' }),
         ).toThrow(
@@ -448,11 +427,11 @@ describe('ModelGenerationConfigService', () => {
       });
 
       it('should resolve an abstract alias if an override provides the model', () => {
-        const config: ModelGenerationServiceConfig = {
+        const config: ModelConfigServiceConfig = {
           aliases: {
             'abstract-base': {
-              settings: {
-                config: {
+              modelConfig: {
+                generateContentConfig: {
                   temperature: 0.1,
                 },
               },
@@ -461,32 +440,32 @@ describe('ModelGenerationConfigService', () => {
           overrides: [
             {
               match: { model: 'abstract-base' },
-              settings: {
+              modelConfig: {
                 model: 'gemini-1.5-flash-latest',
               },
             },
           ],
         };
-        const service = new ModelGenerationConfigService(config);
+        const service = new ModelConfigService(config);
         const resolved = service.getResolvedConfig({ model: 'abstract-base' });
 
         expect(resolved.model).toBe('gemini-1.5-flash-latest');
-        expect(resolved.sdkConfig).toEqual({
+        expect(resolved.generateContentConfig).toEqual({
           temperature: 0.1,
         });
       });
     });
 
     it('should throw an error if an extended alias does not exist', () => {
-      const config: ModelGenerationServiceConfig = {
+      const config: ModelConfigServiceConfig = {
         aliases: {
           'bad-alias': {
             extends: 'non-existent',
-            settings: {},
+            modelConfig: {},
           },
         },
       };
-      const service = new ModelGenerationConfigService(config);
+      const service = new ModelConfigService(config);
       expect(() => service.getResolvedConfig({ model: 'bad-alias' })).toThrow(
         'Alias "non-existent" not found.',
       );
@@ -495,12 +474,12 @@ describe('ModelGenerationConfigService', () => {
 
   describe('deep merging', () => {
     it('should deep merge nested config objects from aliases and overrides', () => {
-      const config: ModelGenerationServiceConfig = {
+      const config: ModelConfigServiceConfig = {
         aliases: {
           'base-safe': {
-            settings: {
+            modelConfig: {
               model: 'gemini-pro',
-              config: {
+              generateContentConfig: {
                 safetySettings: {
                   HARM_CATEGORY_HARASSMENT: 'BLOCK_ONLY_HIGH',
                   HARM_CATEGORY_HATE_SPEECH: 'BLOCK_ONLY_HIGH',
@@ -513,8 +492,8 @@ describe('ModelGenerationConfigService', () => {
         overrides: [
           {
             match: { model: 'base-safe' },
-            settings: {
-              config: {
+            modelConfig: {
+              generateContentConfig: {
                 safetySettings: {
                   HARM_CATEGORY_HATE_SPEECH: 'BLOCK_NONE',
                   HARM_CATEGORY_SEXUALLY_EXPLICIT: 'BLOCK_MEDIUM_AND_ABOVE',
@@ -525,11 +504,11 @@ describe('ModelGenerationConfigService', () => {
           },
         ],
       };
-      const service = new ModelGenerationConfigService(config);
+      const service = new ModelConfigService(config);
       const resolved = service.getResolvedConfig({ model: 'base-safe' });
 
       expect(resolved.model).toBe('gemini-pro');
-      expect(resolved.sdkConfig.safetySettings).toEqual({
+      expect(resolved.generateContentConfig.safetySettings).toEqual({
         // From alias
         HARM_CATEGORY_HARASSMENT: 'BLOCK_ONLY_HIGH',
         // From alias, overridden by override
