@@ -28,6 +28,7 @@ import type { AnyToolInvocation } from '../index.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
+const mockSpawnSync = vi.hoisted(() => vi.fn());
 vi.mock('os', () => ({
   default: {
     platform: mockPlatform,
@@ -36,6 +37,14 @@ vi.mock('os', () => ({
   platform: mockPlatform,
   homedir: mockHomedir,
 }));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual =
+    (await importOriginal()) as typeof import('node:child_process');
+  return {
+    ...actual,
+    spawnSync: mockSpawnSync,
+  };
+});
 
 const mockQuote = vi.hoisted(() => vi.fn());
 vi.mock('shell-quote', () => ({
@@ -663,6 +672,239 @@ describe('getShellConfiguration', () => {
     expect(config.executable).toBe('bash');
     expect(config.argsPrefix).toEqual(['-c']);
     expect(config.shell).toBe('bash');
+  });
+
+  describe('PowerShell invocation parsing', () => {
+    const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
+    const originalComSpec = process.env['ComSpec'];
+
+    type PowerShellScenario = {
+      label: string;
+      command: string;
+      entries: Array<{ name: string; text: string }>;
+      allowed: boolean;
+      disallowed: string[];
+    };
+
+    const scenarios: PowerShellScenario[] = [
+      {
+        label: 'allows a single allowlisted command',
+        command: 'dir',
+        entries: [{ name: 'dir', text: 'dir' }],
+        allowed: true,
+        disallowed: [],
+      },
+      {
+        label: 'allows looping with only allowlisted commands',
+        command: 'for ($i=0; $i -lt 2; $i++) { dir }',
+        entries: [{ name: 'dir', text: 'dir' }],
+        allowed: true,
+        disallowed: [],
+      },
+      {
+        label: 'allows redirection when root command is allowed',
+        command: 'dir *> out.txt',
+        entries: [{ name: 'dir', text: 'dir *> out.txt' }],
+        allowed: true,
+        disallowed: [],
+      },
+      {
+        label: 'blocks additional pipeline commands',
+        command: 'dir; whoami',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'whoami', text: 'whoami' },
+        ],
+        allowed: false,
+        disallowed: ['whoami'],
+      },
+      {
+        label: 'blocks commands hidden inside conditionals',
+        command: 'if ($true) { whoami }',
+        entries: [{ name: 'whoami', text: 'whoami' }],
+        allowed: false,
+        disallowed: ['whoami'],
+      },
+      {
+        label: 'detects static scriptblock creation and invocation',
+        command: "dir; [scriptblock]::Create('calc').Invoke()",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          {
+            name: '[scriptblock]::Create',
+            text: "[scriptblock]::Create('calc')",
+          },
+          {
+            name: "[scriptblock]::Create('calc').Invoke",
+            text: "[scriptblock]::Create('calc').Invoke()",
+          },
+        ],
+        allowed: false,
+        disallowed: [
+          "[scriptblock]::Create('calc')",
+          "[scriptblock]::Create('calc').Invoke()",
+        ],
+      },
+      {
+        label: 'detects call operator invocations via variables',
+        command: "dir; $cmd = 'whoami'; & $cmd",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: '& $cmd', text: '& $cmd' },
+        ],
+        allowed: false,
+        disallowed: ['& $cmd'],
+      },
+      {
+        label: 'detects call operator invocations of scriptblocks',
+        command: 'dir; & { whoami }',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: '& { whoami }', text: '& { whoami }' },
+          { name: 'whoami', text: 'whoami' },
+        ],
+        allowed: false,
+        disallowed: ['& { whoami }', 'whoami'],
+      },
+      {
+        label: 'detects static .NET method invocation',
+        command: "dir; [Diagnostics.Process]::Start('whoami')",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          {
+            name: '[Diagnostics.Process]::Start',
+            text: "[Diagnostics.Process]::Start('whoami')",
+          },
+        ],
+        allowed: false,
+        disallowed: ["[Diagnostics.Process]::Start('whoami')"],
+      },
+      {
+        label: 'detects instance method invocation',
+        command: 'dir; (Get-Process)[0].Kill()',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'Get-Process', text: 'Get-Process' },
+          { name: '(Get-Process)[0].Kill', text: '((Get-Process)[0]).Kill()' },
+        ],
+        allowed: false,
+        disallowed: ['Get-Process', '((Get-Process)[0]).Kill()'],
+      },
+      {
+        label: 'detects scriptblock delegates invoked via variables',
+        command: 'dir; $sb = { whoami }; $sb.Invoke()',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'whoami', text: 'whoami' },
+          { name: '$sb.Invoke', text: '$sb.Invoke()' },
+        ],
+        allowed: false,
+        disallowed: ['whoami', '$sb.Invoke()'],
+      },
+      {
+        label: 'detects call operator with expandable strings',
+        command: 'dir; & "$env:ComSpec" /c whoami',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          {
+            name: '& "$env:ComSpec" /c whoami',
+            text: '& "$env:ComSpec" /c whoami',
+          },
+        ],
+        allowed: false,
+        disallowed: ['& "$env:ComSpec" /c whoami'],
+      },
+      {
+        label: 'detects call operator with nested command expressions',
+        command: "dir; & (Join-Path $pwd 'whoami.exe')",
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'Join-Path', text: "Join-Path $pwd 'whoami.exe'" },
+          {
+            name: "& (Join-Path $pwd 'whoami.exe')",
+            text: "& (Join-Path $pwd 'whoami.exe')",
+          },
+        ],
+        allowed: false,
+        disallowed: [
+          "Join-Path $pwd 'whoami.exe'",
+          "& (Join-Path $pwd 'whoami.exe')",
+        ],
+      },
+      {
+        label: 'detects subexpression command substitution',
+        command: 'dir; Write-Output $(whoami)',
+        entries: [
+          { name: 'dir', text: 'dir' },
+          { name: 'Write-Output', text: 'Write-Output $(whoami)' },
+          { name: 'whoami', text: 'whoami' },
+        ],
+        allowed: false,
+        disallowed: ['Write-Output $(whoami)', 'whoami'],
+      },
+    ];
+
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      process.env['ComSpec'] =
+        'C\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+
+      const scenarioResults = new Map(
+        scenarios.map((scenario) => [
+          scenario.command,
+          {
+            success: true,
+            commands: scenario.entries,
+          },
+        ]),
+      );
+
+      mockSpawnSync.mockImplementation((_exe, _args, options) => {
+        const env = (options as { env?: NodeJS.ProcessEnv } | undefined)?.env;
+        const commandText = env?.[POWERSHELL_COMMAND_ENV] ?? '';
+        const payload = scenarioResults.get(commandText);
+        const stdout = JSON.stringify(payload ?? { success: false });
+        return {
+          status: 0,
+          stdout,
+          stderr: '',
+        } as unknown as ReturnType<typeof mockSpawnSync>;
+      });
+    });
+
+    afterEach(() => {
+      mockSpawnSync.mockReset();
+      if (originalComSpec === undefined) {
+        delete process.env['ComSpec'];
+      } else {
+        process.env['ComSpec'] = originalComSpec;
+      }
+    });
+
+    describe.each(scenarios)('$label', ({ command, allowed, disallowed }) => {
+      it('applies the allowlist expectations', () => {
+        const configForTest = {
+          getCoreTools: () => [],
+          getExcludeTools: () => [],
+          getAllowedTools: () => [],
+        } as unknown as Config;
+
+        const result = checkCommandPermissions(
+          command,
+          configForTest,
+          new Set(['dir']),
+        );
+
+        if (allowed) {
+          expect(result.allAllowed).toBe(true);
+          expect(result.disallowedCommands).toEqual([]);
+        } else {
+          expect(result.allAllowed).toBe(false);
+          expect(result.disallowedCommands).toEqual(disallowed);
+          expect(result.blockReason ?? '').toContain('Disallowed commands');
+        }
+      });
+    });
   });
 
   describe('on Windows', () => {

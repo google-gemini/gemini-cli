@@ -136,21 +136,87 @@ if ($errors -and $errors.Count -gt 0) {
   Write-Output '{"success":false}'
   exit 0
 }
-$commandAsts = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
 $commandObjects = @()
-foreach ($commandAst in $commandAsts) {
-  $name = $commandAst.GetCommandName()
-  if ([string]::IsNullOrWhiteSpace($name)) {
-    continue
+
+function Add-CommandObject {
+  param(
+    [int]$Start,
+    [string]$Name,
+    [string]$Text
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Name)) {
+    return
   }
-  $commandObjects += [PSCustomObject]@{
-    name = $name
-    text = $commandAst.Extent.Text.Trim()
+
+  $trimmedText = $Text.Trim()
+  if ([string]::IsNullOrWhiteSpace($trimmedText)) {
+    return
+  }
+
+  $script:commandObjects += [PSCustomObject]@{
+    start = $Start
+    name = $Name.Trim()
+    text = $trimmedText
   }
 }
+
+function Get-InvocationName {
+  param(
+    [System.Management.Automation.Language.Ast]$Node
+  )
+
+  switch ($Node.GetType().FullName) {
+    'System.Management.Automation.Language.InvokeMemberExpressionAst' {
+      $invokeNode = [System.Management.Automation.Language.InvokeMemberExpressionAst]$Node
+      $expressionText = $invokeNode.Expression?.Extent.Text
+      $memberName = $invokeNode.Member
+      if (-not [string]::IsNullOrWhiteSpace($expressionText) -and -not [string]::IsNullOrWhiteSpace($memberName)) {
+        $separator = if ($invokeNode.Static) { '::' } else { '.' }
+        return ($expressionText.Trim() + $separator + $memberName.Trim())
+      }
+      return $invokeNode.Extent.Text.Trim()
+    }
+    default {
+      return $Node.Extent.Text.Trim()
+    }
+  }
+}
+
+$invocationNodes = $ast.FindAll({
+    param($node)
+    return (
+      $node -is [System.Management.Automation.Language.CommandAst] -or
+      $node -is [System.Management.Automation.Language.CommandExpressionAst] -or
+      $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst]
+    )
+  }, $true)
+
+foreach ($node in $invocationNodes) {
+  if ($node -is [System.Management.Automation.Language.CommandAst]) {
+    $name = $node.GetCommandName()
+    if ([string]::IsNullOrWhiteSpace($name)) {
+      continue
+    }
+    Add-CommandObject -Start $node.Extent.StartOffset -Name $name -Text $node.Extent.Text
+    continue
+  }
+
+  $name = Get-InvocationName -Node $node
+  Add-CommandObject -Start $node.Extent.StartOffset -Name $name -Text $node.Extent.Text
+}
+
+$sortedCommands = $commandObjects | Sort-Object start
+$finalCommands = $sortedCommands | ForEach-Object {
+  [PSCustomObject]@{
+    name = $_.name
+    text = $_.text
+  }
+}
+
 [PSCustomObject]@{
   success = $true
-  commands = $commandObjects
+  commands = $finalCommands
 } | ConvertTo-Json -Compress
 `,
   'utf16le',
