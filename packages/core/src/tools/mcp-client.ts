@@ -342,7 +342,7 @@ async function handleAutomaticOAuth(
       OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
     if (resourceMetadataUri && configuredServerUrl) {
       oauthConfig = await OAuthUtils.discoverOAuthConfig(configuredServerUrl, {
-        resourceMetadataUrl,
+        resourceMetadataUrl: resourceMetadataUri,
       });
     } else if (resourceMetadataUri && !configuredServerUrl) {
       debugLogger.warn(

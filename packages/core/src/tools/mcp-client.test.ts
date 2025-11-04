@@ -611,8 +611,6 @@ describe('connectToMcpServer with OAuth', () => {
       'http://test-server.com/.well-known/oauth-protected-resource',
     );
 
-    vi.mocked(OAuthUtils.parseWWWAuthenticateHeader).mockReturnValue(null);
-
     const discoverArgs: unknown[][] = [];
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockImplementation(
       async (...args: unknown[]) => {
@@ -646,7 +644,13 @@ describe('connectToMcpServer with OAuth', () => {
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
     expect(discoverArgs.length).toBeGreaterThan(0);
-    expect(discoverArgs[0]?.[0]).toBe(serverUrl);
+    expect(discoverArgs[0]).toEqual([
+      serverUrl,
+      {
+        resourceMetadataUrl:
+          'http://test-server.com/.well-known/oauth-protected-resource',
+      },
+    ]);
 
     const authHeader =
       capturedTransport._requestInit?.headers?.['Authorization'];
