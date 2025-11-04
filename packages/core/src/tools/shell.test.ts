@@ -137,7 +137,7 @@ describe('ShellTool', () => {
 
     it('should throw an error for a relative directory path', () => {
       expect(() =>
-        shellTool.build({ command: 'ls', directory: 'rel/path' }),
+        shellTool.build({ command: 'ls', dir_path: 'rel/path' }),
       ).toThrow('Directory must be an absolute path.');
     });
 
@@ -146,7 +146,7 @@ describe('ShellTool', () => {
         createMockWorkspaceContext('/test/dir', ['/another/workspace']),
       );
       expect(() =>
-        shellTool.build({ command: 'ls', directory: '/not/in/workspace' }),
+        shellTool.build({ command: 'ls', dir_path: '/not/in/workspace' }),
       ).toThrow(
         "Directory '/not/in/workspace' is not within any of the registered workspace directories.",
       );
@@ -158,7 +158,7 @@ describe('ShellTool', () => {
       );
       const invocation = shellTool.build({
         command: 'ls',
-        directory: '/test/dir/subdir',
+        dir_path: '/test/dir/subdir',
       });
       expect(invocation).toBeDefined();
     });
@@ -214,7 +214,7 @@ describe('ShellTool', () => {
       );
       const invocation = shellTool.build({
         command: 'ls',
-        directory: '/test/dir/subdir',
+        dir_path: '/test/dir/subdir',
       });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution();
@@ -305,7 +305,7 @@ describe('ShellTool', () => {
 
     it('should throw an error for invalid directory', () => {
       expect(() =>
-        shellTool.build({ command: 'ls', directory: 'nonexistent' }),
+        shellTool.build({ command: 'ls', dir_path: 'nonexistent' }),
       ).toThrow('Directory must be an absolute path.');
     });
 
