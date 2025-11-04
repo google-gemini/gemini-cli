@@ -24,7 +24,6 @@ export class AllowedPathChecker implements InProcessChecker {
     const { toolCall, context } = input;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const config = (toolCall as any).config as AllowedPathConfig | undefined;
-    const followSymlinks = config?.follow_symlinks ?? false;
 
     // Build list of allowed directories
     const allowedDirs = [
@@ -54,11 +53,7 @@ export class AllowedPathChecker implements InProcessChecker {
 
     // Check each path
     for (const p of pathsToCheck) {
-      const resolvedPath = this.safelyResolvePath(
-        p,
-        context.environment.cwd,
-        followSymlinks,
-      );
+      const resolvedPath = this.safelyResolvePath(p, context.environment.cwd);
 
       if (!resolvedPath) {
         // If path cannot be resolved, deny it
@@ -73,7 +68,6 @@ export class AllowedPathChecker implements InProcessChecker {
         const resolvedDir = this.safelyResolvePath(
           dir,
           context.environment.cwd,
-          followSymlinks,
         );
         if (!resolvedDir) return false;
         return this.isPathAllowed(resolvedPath, resolvedDir);
@@ -90,16 +84,25 @@ export class AllowedPathChecker implements InProcessChecker {
     return { allowed: true };
   }
 
-  private safelyResolvePath(
-    inputPath: string,
-    cwd: string,
-    followSymlinks: boolean,
-  ): string | null {
+  private safelyResolvePath(inputPath: string, cwd: string): string | null {
     try {
-      let resolved = path.resolve(cwd, inputPath);
-      if (followSymlinks && fs.existsSync(resolved)) {
-        resolved = fs.realpathSync(resolved);
+      const resolved = path.resolve(cwd, inputPath);
+
+      // Walk up the directory tree until we find a path that exists
+      let current = resolved;
+      // Stop at root (dirname(root) === root on many systems, or it becomes empty/'.' depending on implementation)
+      while (current && current !== path.dirname(current)) {
+        if (fs.existsSync(current)) {
+          const canonical = fs.realpathSync(current);
+          // Re-construct the full path from this canonical base
+          const relative = path.relative(current, resolved);
+          // path.join handles empty relative paths correctly (returns canonical)
+          return path.join(canonical, relative);
+        }
+        current = path.dirname(current);
       }
+
+      // Fallback if nothing exists (unlikely if root exists)
       return resolved;
     } catch (_error) {
       return null;

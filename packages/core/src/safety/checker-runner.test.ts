@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { spawn } from 'node:child_process';
 import { CheckerRunner } from './checker-runner.js';
 import { ContextBuilder } from './context-builder.js';
 import { CheckerRegistry } from './registry.js';
@@ -15,6 +16,7 @@ import type { Config } from '../config/config.js';
 // Mock dependencies
 vi.mock('./registry.js');
 vi.mock('./context-builder.js');
+vi.mock('node:child_process');
 
 describe('CheckerRunner', () => {
   let runner: CheckerRunner;
@@ -119,5 +121,51 @@ describe('CheckerRunner', () => {
       'environment',
     ]);
     expect(mockContextBuilder.buildFullContext).not.toHaveBeenCalled();
+  });
+
+  describe('External Checkers', () => {
+    const mockExternalConfig = {
+      type: 'external' as const,
+      name: 'python-checker',
+    };
+
+    it('should spawn external checker directly', async () => {
+      const mockCheckerPath = '/mock/dist/python-checker';
+      vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const mockStdout = {
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'data') {
+            callback(Buffer.from(JSON.stringify({ allowed: true })));
+          }
+        }),
+      };
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: mockStdout,
+        stderr: { on: vi.fn() },
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'close') {
+            // Defer the close callback slightly to allow stdout 'data' to be registered
+            setTimeout(() => callback(0), 0);
+          }
+        }),
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      const result = await runner.runChecker(mockToolCall, mockExternalConfig);
+
+      expect(result.allowed).toBe(true);
+      expect(spawn).toHaveBeenCalledWith(
+        mockCheckerPath,
+        [],
+        expect.anything(),
+      );
+    });
   });
 });

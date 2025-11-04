@@ -20,6 +20,7 @@ describe('AllowedPathChecker', () => {
   beforeEach(() => {
     checker = new AllowedPathChecker();
     vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+    vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.statSync).mockReturnValue({
       isDirectory: () => true,
     } as fs.Stats);
@@ -67,7 +68,10 @@ describe('AllowedPathChecker', () => {
   });
 
   it('should deny paths using ../ to escape', async () => {
-    vi.mocked(fs.realpathSync).mockReturnValue('/home/user/secret.txt');
+    vi.mocked(fs.realpathSync).mockImplementation((p) => {
+      if (p.toString().endsWith('/secret.txt')) return '/home/user/secret.txt';
+      return p.toString();
+    });
     const input = createInput({ path: '/home/user/project/../secret.txt' });
     const result = await checker.check(input);
     expect(result.allowed).toBe(false);
@@ -100,6 +104,43 @@ describe('AllowedPathChecker', () => {
     // Re-reading built-in.ts might be needed if this test fails in reality.
     // For now, trusting the mock.
     const input = createInput({ path: '/home/user/project/new-file.txt' });
+    const result = await checker.check(input);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('should deny access if path contains a symlink pointing outside allowed directories', async () => {
+    // Mock a symlink: /home/user/project/symlink -> /etc/passwd
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const pathStr = p.toString();
+      return (
+        pathStr.startsWith('/home/user/project') || pathStr === '/etc/passwd'
+      );
+    });
+    vi.mocked(fs.realpathSync).mockImplementation((p) => {
+      if (p.toString() === '/home/user/project/symlink') return '/etc/passwd';
+      return p.toString();
+    });
+
+    const input = createInput({ path: '/home/user/project/symlink' });
+    const result = await checker.check(input);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain(
+      'outside of the allowed workspace directories',
+    );
+  });
+
+  it('should allow access if path contains a symlink pointing INSIDE allowed directories', async () => {
+    // Mock a symlink: /home/user/project/symlink-inside -> /home/user/project/real-file
+    vi.mocked(fs.existsSync).mockImplementation((p) =>
+      p.toString().startsWith('/home/user/project'),
+    );
+    vi.mocked(fs.realpathSync).mockImplementation((p) => {
+      if (p.toString() === '/home/user/project/symlink-inside')
+        return '/home/user/project/real-file';
+      return p.toString();
+    });
+
+    const input = createInput({ path: '/home/user/project/symlink-inside' });
     const result = await checker.check(input);
     expect(result.allowed).toBe(true);
   });

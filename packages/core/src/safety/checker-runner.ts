@@ -134,7 +134,7 @@ export class CheckerRunner {
     input: SafetyCheckInput,
   ): Promise<SafetyCheckResult> {
     return new Promise((resolve) => {
-      const child = spawn('node', [checkerPath], {
+      const child = spawn(checkerPath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 

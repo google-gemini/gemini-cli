@@ -733,4 +733,88 @@ follow_symlinks = true
 
     vi.doUnmock('node:fs/promises');
   });
+
+  it('should reject invalid in-process checker names', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const mockReaddir = vi.fn(
+      async (
+        path: string | Buffer | URL,
+        options?: Parameters<typeof actualFs.readdir>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return [
+            {
+              name: 'invalid_safety.toml',
+              isFile: () => true,
+              isDirectory: () => false,
+            },
+          ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
+        }
+        return actualFs.readdir(
+          path,
+          options as Parameters<typeof actualFs.readdir>[1],
+        );
+      },
+    );
+
+    const mockReadFile = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.readFile>[0],
+        options: Parameters<typeof actualFs.readFile>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(
+              nodePath.normalize('.gemini/policies/invalid_safety.toml'),
+            )
+        ) {
+          return `
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 10
+
+[rule.safety_checker]
+type = "in-process"
+name = "invalid-name"
+`;
+        }
+        return actualFs.readFile(path, options);
+      },
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      readFile: mockReadFile,
+      readdir: mockReaddir,
+    }));
+
+    vi.resetModules();
+    const { createPolicyEngineConfig } = await import('./config.js');
+
+    const settings: PolicySettings = {};
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.DEFAULT,
+      '/tmp/mock/default/policies',
+    );
+
+    // The rule should be rejected because 'invalid-name' is not in the enum
+    const rule = config.rules?.find((r) => r.toolName === 'write_file');
+    expect(rule).toBeUndefined();
+
+    vi.doUnmock('node:fs/promises');
+  });
 });

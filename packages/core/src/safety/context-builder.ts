@@ -66,23 +66,45 @@ export class ContextBuilder {
   }
 
   /**
-   * Filters out sensitive keys from the config object.
+   * Filters out sensitive keys from the config object recursively.
    */
   private filterSensitiveConfig(): Record<string, unknown> {
-    const filtered: Record<string, unknown> = {};
+    // Cast to unknown first because Config has specific types, but we want to treat it generically
+    return this.filterValue(this.config as unknown) as Record<string, unknown>;
+  }
 
-    for (const [key, value] of Object.entries(this.config)) {
-      // Skip if key contains sensitive terms
-      const keyLower = key.toLowerCase();
-      const isSensitive = ContextBuilder.SENSITIVE_CONFIG_KEYS.some(
-        (sensitive) => keyLower.includes(sensitive.toLowerCase()),
-      );
-
-      if (!isSensitive && typeof value !== 'function') {
-        filtered[key] = value;
-      }
+  private filterValue(value: unknown): unknown {
+    if (typeof value === 'function') {
+      return undefined;
     }
 
-    return filtered;
+    if (Array.isArray(value)) {
+      return value.map((item) => this.filterValue(item));
+    }
+
+    if (value !== null && typeof value === 'object') {
+      const filtered: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        if (this.isSensitiveKey(key)) {
+          continue;
+        }
+        const filteredVal = this.filterValue(val);
+        if (filteredVal !== undefined) {
+          filtered[key] = filteredVal;
+        }
+      }
+      return filtered;
+    }
+
+    return value;
+  }
+
+  private isSensitiveKey(key: string): boolean {
+    const keyLower = key.toLowerCase();
+    return ContextBuilder.SENSITIVE_CONFIG_KEYS.some((sensitive) =>
+      keyLower.includes(sensitive.toLowerCase()),
+    );
   }
 }

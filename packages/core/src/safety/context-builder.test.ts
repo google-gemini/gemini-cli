@@ -42,13 +42,15 @@ describe('ContextBuilder', () => {
     expect(context.config).toBeDefined();
   });
 
-  it('should filter out sensitive config keys', () => {
+  it('should filter out sensitive config keys recursively', () => {
     const context = contextBuilder.buildFullContext();
     expect(context.config).not.toHaveProperty('apiKey');
     expect(context.config).toHaveProperty('somePublicConfig', 'public-value');
-    // Note: The current implementation only filters top-level keys.
-    // If deep filtering is implemented, update this test.
-    expect(context.config).toHaveProperty('nested');
+    const config = context.config as {
+      nested: { secretToken?: string; public: string };
+    };
+    expect(config.nested).not.toHaveProperty('secretToken');
+    expect(config.nested).toHaveProperty('public', 'visible');
   });
 
   it('should build minimal context with only required keys', () => {

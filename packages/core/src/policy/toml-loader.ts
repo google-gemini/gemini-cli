@@ -43,12 +43,22 @@ const PolicyRuleSchema = z.object({
     }),
   modes: z.array(z.string()).optional(),
   safety_checker: z
-    .object({
-      type: z.enum(['in-process', 'external']),
-      name: z.string(),
-      required_context: z.array(z.string()).optional(),
-      config: z.record(z.unknown()).optional(),
-    })
+    .discriminatedUnion('type', [
+      z.object({
+        type: z.literal('in-process'),
+        // Restrict to known in-process checkers.
+        // Currently only 'allowed-path' is supported.
+        name: z.enum(['allowed-path']),
+        required_context: z.array(z.string()).optional(),
+        config: z.record(z.unknown()).optional(),
+      }),
+      z.object({
+        type: z.literal('external'),
+        name: z.string(),
+        required_context: z.array(z.string()).optional(),
+        config: z.record(z.unknown()).optional(),
+      }),
+    ])
     .optional(),
 });
 
