@@ -1077,13 +1077,16 @@ export class Config {
   }
 
   getCompressionThreshold(): number | undefined {
-    const threshold =
+    if (this.compressionThreshold) {
+      return this.compressionThreshold;
+    }
+    const remoteThreshold =
       this.experiments?.flags['GeminiCLIContextCompression__threshold_fraction']
         ?.floatValue;
-    if (threshold !== undefined && threshold !== 0) {
-      return threshold;
+    if (remoteThreshold === 0) {
+      return undefined;
     }
-    return this.compressionThreshold;
+    return remoteThreshold;
   }
 
   isInteractiveShellEnabled(): boolean {

@@ -237,7 +237,52 @@ describe('Server Config (config.ts)', () => {
         'Config was already initialized',
       );
     });
+
+    describe('getCompressionThreshold', () => {
+      it('should return the local compression threshold if it is set', () => {
+        const config = new Config({
+          ...baseParams,
+          compressionThreshold: 0.5,
+        });
+        expect(config.getCompressionThreshold()).toBe(0.5);
+      });
+
+      it('should return the remote experiment threshold if it is a positive number', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              GeminiCLIContextCompression__threshold_fraction: {
+                floatValue: 0.8,
+              },
+            },
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getCompressionThreshold()).toBe(0.8);
+      });
+
+      it('should return undefined if the remote experiment threshold is 0', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              GeminiCLIContextCompression__threshold_fraction: {
+                floatValue: 0,
+              },
+            },
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getCompressionThreshold()).toBeUndefined();
+      });
+
+      it('should return undefined if there are no experiments', () => {
+        const config = new Config(baseParams);
+        expect(config.getCompressionThreshold()).toBeUndefined();
+      });
+    });
   });
+    
+    
 
   describe('refreshAuth', () => {
     it('should refresh auth and update config', async () => {

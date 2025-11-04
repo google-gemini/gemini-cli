@@ -49,6 +49,8 @@ import {
   coreEvents,
   CoreEvent,
   type ModelChangedPayload,
+  getExperiments,
+  getCodeAssistServer,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -257,6 +259,20 @@ export const AppContainer = (props: AppContainerProps) => {
       await ideClient.disconnect();
     });
   }, [config]);
+
+  useEffect(() => {
+    if (!isConfigInitialized) {
+      return;
+    }
+
+    (async () => {
+      const codeAssistServer = getCodeAssistServer(config);
+      if (codeAssistServer) {
+        const experiments = await getExperiments(codeAssistServer);
+        config.setExperiments(experiments);
+      }
+    })();
+  }, [isConfigInitialized, config]);
 
   useEffect(
     () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
