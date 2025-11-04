@@ -38,6 +38,7 @@ import {
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -453,9 +454,34 @@ export function SettingsDialog({
   const showScrollUp = items.length > effectiveMaxItemsToShow;
   const showScrollDown = items.length > effectiveMaxItemsToShow;
 
+  const saveRestartRequiredSettings = () => {
+    const restartRequiredSettings =
+      getRestartRequiredFromModified(modifiedSettings);
+    const restartRequiredSet = new Set(restartRequiredSettings);
+
+    if (restartRequiredSet.size > 0) {
+      saveModifiedSettings(
+        restartRequiredSet,
+        pendingSettings,
+        settings,
+        selectedScope,
+      );
+
+      // Remove saved keys from global pending changes
+      setGlobalPendingChanges((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Map(prev);
+        for (const key of restartRequiredSet) {
+          next.delete(key);
+        }
+        return next;
+      });
+    }
+  };
+
   useKeypress(
     (key) => {
-      const { name, ctrl } = key;
+      const { name } = key;
       if (name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
@@ -498,11 +524,11 @@ export function SettingsDialog({
             }
             return;
           }
-          if (name === 'escape') {
+          if (keyMatchers[Command.ESCAPE](key)) {
             commitEdit(editingKey);
             return;
           }
-          if (name === 'return') {
+          if (keyMatchers[Command.RETURN](key)) {
             commitEdit(editingKey);
             return;
           }
@@ -539,18 +565,18 @@ export function SettingsDialog({
             return;
           }
           // Home and End keys
-          if (name === 'home') {
+          if (keyMatchers[Command.HOME](key)) {
             setEditCursorPos(0);
             return;
           }
-          if (name === 'end') {
+          if (keyMatchers[Command.END](key)) {
             setEditCursorPos(cpLen(editBuffer));
             return;
           }
           // Block other keys while editing
           return;
         }
-        if (name === 'up' || name === 'k') {
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
           // If editing, commit first
           if (editingKey) {
             commitEdit(editingKey);
@@ -566,7 +592,7 @@ export function SettingsDialog({
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
-        } else if (name === 'down' || name === 'j') {
+        } else if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           // If editing, commit first
           if (editingKey) {
             commitEdit(editingKey);
@@ -580,7 +606,7 @@ export function SettingsDialog({
           } else if (newIndex >= scrollOffset + effectiveMaxItemsToShow) {
             setScrollOffset(newIndex - effectiveMaxItemsToShow + 1);
           }
-        } else if (name === 'return' || name === 'space') {
+        } else if (keyMatchers[Command.RETURN](key) || name === 'space') {
           const currentItem = items[activeSettingIndex];
           if (
             currentItem?.type === 'number' ||
@@ -595,7 +621,10 @@ export function SettingsDialog({
           if (currentItem?.type === 'number') {
             startEditing(currentItem.value, key.sequence);
           }
-        } else if (ctrl && (name === 'c' || name === 'l')) {
+        } else if (
+          keyMatchers[Command.CLEAR_INPUT](key) ||
+          keyMatchers[Command.CLEAR_SCREEN](key)
+        ) {
           // Ctrl+C or Ctrl+L: Clear current setting and reset to default
           const currentSetting = items[activeSettingIndex];
           if (currentSetting) {
@@ -699,37 +728,18 @@ export function SettingsDialog({
       }
       if (showRestartPrompt && name === 'r') {
         // Only save settings that require restart (non-restart settings were already saved immediately)
-        const restartRequiredSettings =
-          getRestartRequiredFromModified(modifiedSettings);
-        const restartRequiredSet = new Set(restartRequiredSettings);
-
-        if (restartRequiredSet.size > 0) {
-          saveModifiedSettings(
-            restartRequiredSet,
-            pendingSettings,
-            settings,
-            selectedScope,
-          );
-
-          // Remove saved keys from global pending changes
-          setGlobalPendingChanges((prev) => {
-            if (prev.size === 0) return prev;
-            const next = new Map(prev);
-            for (const key of restartRequiredSet) {
-              next.delete(key);
-            }
-            return next;
-          });
-        }
+        saveRestartRequiredSettings();
 
         setShowRestartPrompt(false);
         setRestartRequiredSettings(new Set()); // Clear restart-required settings
         if (onRestartRequest) onRestartRequest();
       }
-      if (name === 'escape') {
+      if (keyMatchers[Command.ESCAPE](key)) {
         if (editingKey) {
           commitEdit(editingKey);
         } else {
+          // Save any restart-required settings before closing
+          saveRestartRequiredSettings();
           onSelect(undefined, selectedScope);
         }
       }
