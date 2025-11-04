@@ -279,7 +279,7 @@ async function enableAction(context: CommandContext, args: string) {
 /**
  * Exported for testing.
  */
-export async function completeExtensions(
+export function completeExtensions(
   context: CommandContext,
   partialArg: string,
 ) {
@@ -302,6 +302,17 @@ export async function completeExtensions(
   return suggestions;
 }
 
+export function completeExtensionsAndScopes(
+  context: CommandContext,
+  partialArg: string,
+) {
+  return completeExtensions(context, partialArg).flatMap((s) => [
+    `${s} --scope user`,
+    `${s} --scope workspace`,
+    `${s} --scope session`,
+  ]);
+}
+
 const listExtensionsCommand: SlashCommand = {
   name: 'list',
   description: 'List active extensions',
@@ -322,7 +333,7 @@ const disableCommand: SlashCommand = {
   description: 'Disable an extension',
   kind: CommandKind.BUILT_IN,
   action: disableAction,
-  completion: completeExtensions,
+  completion: completeExtensionsAndScopes,
 };
 
 const enableCommand: SlashCommand = {
@@ -330,7 +341,7 @@ const enableCommand: SlashCommand = {
   description: 'Enable an extension',
   kind: CommandKind.BUILT_IN,
   action: enableAction,
-  completion: completeExtensions,
+  completion: completeExtensionsAndScopes,
 };
 
 const exploreExtensionsCommand: SlashCommand = {
