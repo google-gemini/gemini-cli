@@ -88,6 +88,7 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
     { key: { name: 'right', sequence: '\x1b[C' } },
     { key: { name: 'up', sequence: '\x1b[A' } },
     { key: { name: 'down', sequence: '\x1b[B' } },
+    { key: { name: 'tab', sequence: '\x1b[Z', shift: true } },
   ])('should listen for keypress when active for key $key.name', ({ key }) => {
     renderKeypressHook(true);
     act(() => stdin.write(key.sequence));
