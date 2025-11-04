@@ -275,6 +275,13 @@
           "default": false,
           "type": "boolean"
         },
+        "useAlternateBuffer": {
+          "title": "Use Alternate Screen Buffer",
+          "description": "Use an alternate screen buffer for the UI, preserving shell history.",
+          "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
@@ -668,8 +675,8 @@
     "useWriteTodos": {
       "title": "Use Write Todos",
       "description": "Enable the write_todos_list tool.",
-      "markdownDescription": "Enable the write_todos_list tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
-      "default": false,
+      "markdownDescription": "Enable the write_todos_list tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+      "default": true,
       "type": "boolean"
     },
     "security": {
@@ -832,8 +839,8 @@
             "thinkingBudget": {
               "title": "Thinking Budget",
               "description": "The thinking budget for the Codebase Investigator agent.",
-              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `-1`",
-              "default": -1,
+              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `8192`",
+              "default": 8192,
               "type": "number"
             },
             "model": {

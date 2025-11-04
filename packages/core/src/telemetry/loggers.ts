@@ -46,6 +46,7 @@ import type {
   SmartEditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
 } from './types.js';
@@ -63,6 +64,7 @@ import {
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordAgentRunMetrics,
+  recordRecoveryAttemptMetrics,
   recordLinesChanged,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
@@ -634,6 +636,23 @@ export function logAgentFinish(config: Config, event: AgentFinishEvent): void {
   logger.emit(logRecord);
 
   recordAgentRunMetrics(config, event);
+}
+
+export function logRecoveryAttempt(
+  config: Config,
+  event: RecoveryAttemptEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logRecoveryAttemptEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+
+  recordRecoveryAttemptMetrics(config, event);
 }
 
 export function logWebFetchFallbackAttempt(
