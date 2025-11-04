@@ -138,3 +138,6 @@ export { Storage } from './config/storage.js';
 
 // Export test utils
 export * from './test-utils/index.js';
+
+// Export hook types
+export * from './hooks/types.js';

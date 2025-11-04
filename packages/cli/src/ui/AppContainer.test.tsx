@@ -295,6 +295,7 @@ describe('AppContainer State Management', () => {
       getExtensions: vi.fn().mockReturnValue([]),
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
+      start: vi.fn(),
     } as unknown as ExtensionManager);
     vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
       mockExtensionManager,

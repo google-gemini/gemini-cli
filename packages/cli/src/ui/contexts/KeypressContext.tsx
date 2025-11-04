@@ -686,12 +686,8 @@ export function KeypressProvider({
       }
 
       // Always check if this could start a sequence we need to buffer (Kitty or Mouse)
-      // We only want to intercept if it starts with ESC[ (CSI) or is EXACTLY ESC (waiting for more).
       // Other ESC sequences (like Alt+Key which is ESC+Key) should be let through if readline parsed them.
-      const isCSI = key.sequence.startsWith(`${ESC}[`);
-      const isExactEsc = key.sequence === ESC;
-      const shouldBuffer = isCSI || isExactEsc;
-
+      const shouldBuffer = couldBeKittySequence(key.sequence);
       const isExcluded = [
         PASTE_MODE_START,
         PASTE_MODE_END,
