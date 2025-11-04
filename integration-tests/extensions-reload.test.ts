@@ -27,7 +27,7 @@ describe('extension reloading', () => {
         hello: () => ({ content: [{ type: 'text', text: 'world' }] }),
       });
       const extension = {
-        name: 'test-extension',
+        name: 'test-extension-reload',
         version: '0.0.1',
         mcpServers: {
           'test-server': {
@@ -46,7 +46,11 @@ describe('extension reloading', () => {
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
       // defensive cleanup from previous tests.
       try {
-        await rig.runCommand(['extensions', 'uninstall', 'test-extension']);
+        await rig.runCommand([
+          'extensions',
+          'uninstall',
+          'test-extension-reload',
+        ]);
       } catch {
         /* empty */
       }
@@ -55,7 +59,7 @@ describe('extension reloading', () => {
         ['extensions', 'install', `${rig.testDir!}`],
         { stdin: 'y\n' },
       );
-      expect(result).toContain('test-extension');
+      expect(result).toContain('test-extension-reload');
 
       // Now create the update, but its not installed yet
       const serverB = new TestMcpServer();
@@ -74,33 +78,33 @@ describe('extension reloading', () => {
       await run.sendText('/extensions list');
       await run.type('\r');
       await run.expectText(
-        'test-extension (v0.0.1) - active (update available)',
+        'test-extension-reload (v0.0.1) - active (update available)',
       );
       await run.sendText('/mcp list');
       await run.type('\r');
       await run.expectText(
-        'test-server (from test-extension) - Ready (1 tool)',
+        'test-server (from test-extension-reload) - Ready (1 tool)',
       );
       await run.expectText('- hello');
 
       // Update the extension, expect the list to update, and mcp servers as well.
-      await run.sendText('/extensions update test-extension');
+      await run.sendText('/extensions update test-extension-reload');
       await run.type('\r');
       await run.expectText(
         ` * test-server (remote): http://localhost:${portB}/mcp`,
       );
       await run.type('\r'); // consent
       await run.expectText(
-        'Extension "test-extension" successfully updated: 0.0.1 → 0.0.2',
+        'Extension "test-extension-reload" successfully updated: 0.0.1 → 0.0.2',
       );
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await run.sendText('/extensions list');
       await run.type('\r');
-      await run.expectText('test-extension (v0.0.2) - active (updated)');
+      await run.expectText('test-extension-reload (v0.0.2) - active (updated)');
       await run.sendText('/mcp list');
       await run.type('\r');
       await run.expectText(
-        'test-server (from test-extension) - Ready (1 tool)',
+        'test-server (from test-extension-reload) - Ready (1 tool)',
       );
       await run.expectText('- goodbye');
       await run.sendText('/quit');
@@ -109,7 +113,11 @@ describe('extension reloading', () => {
       // Clean things up.
       await serverA.stop();
       await serverB.stop();
-      await rig.runCommand(['extensions', 'uninstall', 'test-extension']);
+      await rig.runCommand([
+        'extensions',
+        'uninstall',
+        'test-extension-reload',
+      ]);
       await rig.cleanup();
     },
   );
