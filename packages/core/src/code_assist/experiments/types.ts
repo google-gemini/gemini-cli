@@ -24,7 +24,7 @@ export interface Flag {
   floatValue?: number;
   intValue?: string; // int64
   stringValue?: string;
-  int32_listValue?: Int32List;
+  int32ListValue?: Int32List;
   stringListValue?: StringList;
 }
 

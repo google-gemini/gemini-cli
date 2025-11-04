@@ -1078,11 +1078,8 @@ export class Config {
 
   getCompressionThreshold(): number | undefined {
     const threshold =
-      this.experiments?.flags[
-        'DuetAiRemoteRag__max_distance_rag_for_selected_code'
-      ]?.floatValue;
-    console.error(this.experiments?.flags);
-    console.error(threshold);
+      this.experiments?.flags['GeminiCLIContextCompression__threshold_fraction']
+        ?.floatValue;
     if (threshold !== undefined && threshold !== 0) {
       return threshold;
     }
