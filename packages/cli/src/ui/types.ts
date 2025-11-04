@@ -23,6 +23,8 @@ export enum AuthState {
   Unauthenticated = 'unauthenticated',
   // Auth dialog is open for user to select auth method
   Updating = 'updating',
+  // Waiting for user to input API key
+  AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
 }

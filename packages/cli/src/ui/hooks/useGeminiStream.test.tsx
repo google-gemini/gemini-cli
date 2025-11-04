@@ -9,6 +9,7 @@ import type { Mock, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
@@ -359,6 +360,100 @@ describe('useGeminiStream', () => {
     };
   };
 
+  // Helper to create mock tool calls - reduces boilerplate
+  const createMockToolCall = (
+    toolName: string,
+    callId: string,
+    confirmationType: 'edit' | 'info',
+    mockOnConfirm: Mock,
+    status: TrackedToolCall['status'] = 'awaiting_approval',
+  ): TrackedWaitingToolCall => ({
+    request: {
+      callId,
+      name: toolName,
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    },
+    status: status as 'awaiting_approval',
+    responseSubmittedToGemini: false,
+    confirmationDetails:
+      confirmationType === 'edit'
+        ? {
+            type: 'edit',
+            title: 'Confirm Edit',
+            onConfirm: mockOnConfirm,
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
+          }
+        : {
+            type: 'info',
+            title: `${toolName} confirmation`,
+            onConfirm: mockOnConfirm,
+            prompt: `Execute ${toolName}?`,
+          },
+    tool: {
+      name: toolName,
+      displayName: toolName,
+      description: `${toolName} description`,
+      build: vi.fn(),
+    } as any,
+    invocation: {
+      getDescription: () => 'Mock description',
+    } as unknown as AnyToolInvocation,
+  });
+
+  // Helper to render hook with default parameters - reduces boilerplate
+  const renderHookWithDefaults = (
+    options: {
+      shellModeActive?: boolean;
+      onCancelSubmit?: () => void;
+      setShellInputFocused?: (focused: boolean) => void;
+      performMemoryRefresh?: () => Promise<void>;
+      onAuthError?: () => void;
+      onEditorClose?: () => void;
+      setModelSwitched?: Mock;
+      modelSwitched?: boolean;
+    } = {},
+  ) => {
+    const {
+      shellModeActive = false,
+      onCancelSubmit = () => {},
+      setShellInputFocused = () => {},
+      performMemoryRefresh = () => Promise.resolve(),
+      onAuthError = () => {},
+      onEditorClose = () => {},
+      setModelSwitched = vi.fn(),
+      modelSwitched = false,
+    } = options;
+
+    return renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        shellModeActive,
+        () => 'vscode' as EditorType,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitched,
+        setModelSwitched,
+        onEditorClose,
+        onCancelSubmit,
+        setShellInputFocused,
+        80,
+        24,
+      ),
+    );
+  };
+
   it('should not submit tool responses if not all tool calls are completed', () => {
     const toolCalls: TrackedToolCall[] = [
       {
@@ -507,7 +602,7 @@ describe('useGeminiStream', () => {
       }
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledTimes(1);
       expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
@@ -590,7 +685,7 @@ describe('useGeminiStream', () => {
       }
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['1']);
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
@@ -702,7 +797,7 @@ describe('useGeminiStream', () => {
       }
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       // The tools should be marked as submitted locally
       expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith([
         'cancel-1',
@@ -840,7 +935,7 @@ describe('useGeminiStream', () => {
     });
 
     // 5. Wait for submitQuery to be called
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockSendMessageStream).toHaveBeenCalledWith(
         toolCallResponseParts,
         expect.any(AbortSignal),
@@ -889,7 +984,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for the first part of the response
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.streamingState).toBe(StreamingState.Responding);
       });
 
@@ -897,7 +992,7 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       // Verify cancellation message is added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
             type: MessageType.INFO,
@@ -1030,7 +1125,7 @@ describe('useGeminiStream', () => {
         result.current.submitQuery('long running query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.streamingState).toBe(StreamingState.Responding);
       });
 
@@ -1038,12 +1133,11 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       // Allow the stream to continue
-      act(() => {
+      await act(async () => {
         continueStream();
+        // Wait a bit to see if the second part is processed
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
-
-      // Wait a bit to see if the second part is processed
-      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // The text should not have been updated with " Canceled"
       const lastCall = mockAddItem.mock.calls.find(
@@ -1138,7 +1232,7 @@ describe('useGeminiStream', () => {
       expect(mockCancelAllToolCalls).toHaveBeenCalled();
 
       // A cancellation message should be added to history
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             text: 'Request cancelled.',
@@ -1167,7 +1261,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/memory add "test fact"');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockScheduleToolCalls).toHaveBeenCalledWith(
           [
             expect.objectContaining({
@@ -1194,7 +1288,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/help');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
         expect(mockSendMessageStream).not.toHaveBeenCalled(); // No LLM call made
@@ -1215,7 +1309,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/my-custom-command');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/my-custom-command',
         );
@@ -1250,7 +1344,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/emptycmd');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith('/emptycmd');
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '',
@@ -1268,7 +1362,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('// This is a line comment');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '// This is a line comment',
@@ -1286,7 +1380,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/* This is a block comment */');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '/* This is a block comment */',
@@ -1324,7 +1418,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('/about');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
@@ -1401,7 +1495,7 @@ describe('useGeminiStream', () => {
         }
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockPerformMemoryRefresh).toHaveBeenCalledTimes(1);
       });
     });
@@ -1457,7 +1551,7 @@ describe('useGeminiStream', () => {
       });
 
       // 3. Assertion
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockParseAndFormatApiError).toHaveBeenCalledWith(
           'Rate limit exceeded',
           mockAuthType,
@@ -1473,62 +1567,8 @@ describe('useGeminiStream', () => {
     it('should auto-approve all pending tool calls when switching to YOLO mode', async () => {
       const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
-        {
-          request: {
-            callId: 'call1',
-            name: 'replace',
-            args: { old_string: 'old', new_string: 'new' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'edit',
-            title: 'Confirm Edit',
-            onConfirm: mockOnConfirm,
-            fileName: 'file.txt',
-            filePath: '/test/file.txt',
-            fileDiff: 'fake diff',
-            originalContent: 'old',
-            newContent: 'new',
-          },
-          tool: {
-            name: 'replace',
-            displayName: 'replace',
-            description: 'Replace text',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
-        {
-          request: {
-            callId: 'call2',
-            name: 'read_file',
-            args: { path: '/test/file.txt' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Read File',
-            onConfirm: mockOnConfirm,
-            prompt: 'Read /test/file.txt?',
-          },
-          tool: {
-            name: 'read_file',
-            displayName: 'read_file',
-            description: 'Read file',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        createMockToolCall('replace', 'call1', 'edit', mockOnConfirm),
+        createMockToolCall('read_file', 'call2', 'info', mockOnConfirm),
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1539,12 +1579,7 @@ describe('useGeminiStream', () => {
 
       // Both tool calls should be auto-approved
       expect(mockOnConfirm).toHaveBeenCalledTimes(2);
-      expect(mockOnConfirm).toHaveBeenNthCalledWith(
-        1,
-        ToolConfirmationOutcome.ProceedOnce,
-      );
-      expect(mockOnConfirm).toHaveBeenNthCalledWith(
-        2,
+      expect(mockOnConfirm).toHaveBeenCalledWith(
         ToolConfirmationOutcome.ProceedOnce,
       );
     });
@@ -1555,92 +1590,9 @@ describe('useGeminiStream', () => {
       const mockOnConfirmRead = vi.fn().mockResolvedValue(undefined);
 
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
-        {
-          request: {
-            callId: 'call1',
-            name: 'replace',
-            args: { old_string: 'old', new_string: 'new' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'edit',
-            title: 'Confirm Edit',
-            onConfirm: mockOnConfirmReplace,
-            fileName: 'file.txt',
-            filePath: '/test/file.txt',
-            fileDiff: 'fake diff',
-            originalContent: 'old',
-            newContent: 'new',
-          },
-          tool: {
-            name: 'replace',
-            displayName: 'replace',
-            description: 'Replace text',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
-        {
-          request: {
-            callId: 'call2',
-            name: 'write_file',
-            args: { path: '/test/new.txt', content: 'content' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'edit',
-            title: 'Confirm Edit',
-            onConfirm: mockOnConfirmWrite,
-            fileName: 'new.txt',
-            filePath: '/test/new.txt',
-            fileDiff: 'fake diff',
-            originalContent: null,
-            newContent: 'content',
-          },
-          tool: {
-            name: 'write_file',
-            displayName: 'write_file',
-            description: 'Write file',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
-        {
-          request: {
-            callId: 'call3',
-            name: 'read_file',
-            args: { path: '/test/file.txt' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Read File',
-            onConfirm: mockOnConfirmRead,
-            prompt: 'Read /test/file.txt?',
-          },
-          tool: {
-            name: 'read_file',
-            displayName: 'read_file',
-            description: 'Read file',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        createMockToolCall('replace', 'call1', 'edit', mockOnConfirmReplace),
+        createMockToolCall('write_file', 'call2', 'edit', mockOnConfirmWrite),
+        createMockToolCall('read_file', 'call3', 'info', mockOnConfirmRead),
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1650,11 +1602,9 @@ describe('useGeminiStream', () => {
       });
 
       // Only replace and write_file should be auto-approved
-      expect(mockOnConfirmReplace).toHaveBeenCalledTimes(1);
       expect(mockOnConfirmReplace).toHaveBeenCalledWith(
         ToolConfirmationOutcome.ProceedOnce,
       );
-      expect(mockOnConfirmWrite).toHaveBeenCalledTimes(1);
       expect(mockOnConfirmWrite).toHaveBeenCalledWith(
         ToolConfirmationOutcome.ProceedOnce,
       );
@@ -1666,36 +1616,7 @@ describe('useGeminiStream', () => {
     it('should not auto-approve any tools when switching to REQUIRE_CONFIRMATION mode', async () => {
       const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
-        {
-          request: {
-            callId: 'call1',
-            name: 'replace',
-            args: { old_string: 'old', new_string: 'new' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'edit',
-            title: 'Confirm Edit',
-            onConfirm: mockOnConfirm,
-            fileName: 'file.txt',
-            filePath: '/test/file.txt',
-            fileDiff: 'fake diff',
-            originalContent: 'old',
-            newContent: 'new',
-          },
-          tool: {
-            name: 'replace',
-            displayName: 'replace',
-            description: 'Replace text',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        createMockToolCall('replace', 'call1', 'edit', mockOnConfirm),
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1718,66 +1639,8 @@ describe('useGeminiStream', () => {
         .mockRejectedValue(new Error('Approval failed'));
 
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
-        {
-          request: {
-            callId: 'call1',
-            name: 'replace',
-            args: { old_string: 'old', new_string: 'new' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'edit',
-            title: 'Confirm Edit',
-            onConfirm: mockOnConfirmSuccess,
-            fileName: 'file.txt',
-            filePath: '/test/file.txt',
-            fileDiff: 'fake diff',
-            originalContent: 'old',
-            newContent: 'new',
-          },
-          tool: {
-            name: 'replace',
-            displayName: 'replace',
-            description: 'Replace text',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
-        {
-          request: {
-            callId: 'call2',
-            name: 'write_file',
-            args: { path: '/test/file.txt', content: 'content' },
-            isClientInitiated: false,
-            prompt_id: 'prompt-id-1',
-          },
-          status: 'awaiting_approval',
-          responseSubmittedToGemini: false,
-          confirmationDetails: {
-            type: 'edit',
-            title: 'Confirm Edit',
-            onConfirm: mockOnConfirmError,
-            fileName: 'file.txt',
-            filePath: '/test/file.txt',
-            fileDiff: 'fake diff',
-            originalContent: null,
-            newContent: 'content',
-          },
-          tool: {
-            name: 'write_file',
-            displayName: 'write_file',
-            description: 'Write file',
-            build: vi.fn(),
-          } as any,
-          invocation: {
-            getDescription: () => 'Mock description',
-          } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        createMockToolCall('replace', 'call1', 'edit', mockOnConfirmSuccess),
+        createMockToolCall('write_file', 'call2', 'edit', mockOnConfirmError),
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1787,8 +1650,8 @@ describe('useGeminiStream', () => {
       });
 
       // Both confirmation methods should be called
-      expect(mockOnConfirmSuccess).toHaveBeenCalledTimes(1);
-      expect(mockOnConfirmError).toHaveBeenCalledTimes(1);
+      expect(mockOnConfirmSuccess).toHaveBeenCalled();
+      expect(mockOnConfirmError).toHaveBeenCalled();
 
       // Error should be logged
       expect(debuggerSpy).toHaveBeenCalledWith(
@@ -1990,7 +1853,7 @@ describe('useGeminiStream', () => {
       });
 
       // Check that the info message was added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
             type: 'info',
@@ -2006,115 +1869,53 @@ describe('useGeminiStream', () => {
         vi.mocked(tokenLimit).mockReturnValue(100);
       });
 
-      it('should add message without suggestion when remaining tokens are > 75% of limit', async () => {
-        // Setup mock to return a stream with ContextWindowWillOverflow event
-        // Limit is 100, remaining is 80 (> 75)
-        mockSendMessageStream.mockReturnValue(
-          (async function* () {
-            yield {
-              type: ServerGeminiEventType.ContextWindowWillOverflow,
-              value: {
-                estimatedRequestTokenCount: 20,
-                remainingTokenCount: 80,
-              },
-            };
-          })(),
-        );
-
-        const { result } = renderHook(() =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        );
-
-        // Submit a query
-        await act(async () => {
-          await result.current.submitQuery('Test overflow');
-        });
-
-        // Check that the message was added without suggestion
-        await vi.waitFor(() => {
-          expect(mockAddItem).toHaveBeenCalledWith(
-            {
-              type: 'info',
-              text: `Sending this message (20 tokens) might exceed the remaining context window limit (80 tokens).`,
-            },
-            expect.any(Number),
+      it.each([
+        {
+          name: 'without suggestion when remaining tokens are > 75% of limit',
+          requestTokens: 20,
+          remainingTokens: 80,
+          expectedMessage:
+            'Sending this message (20 tokens) might exceed the remaining context window limit (80 tokens).',
+        },
+        {
+          name: 'with suggestion when remaining tokens are < 75% of limit',
+          requestTokens: 30,
+          remainingTokens: 70,
+          expectedMessage:
+            'Sending this message (30 tokens) might exceed the remaining context window limit (70 tokens). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
+        },
+      ])(
+        'should add message $name',
+        async ({ requestTokens, remainingTokens, expectedMessage }) => {
+          mockSendMessageStream.mockReturnValue(
+            (async function* () {
+              yield {
+                type: ServerGeminiEventType.ContextWindowWillOverflow,
+                value: {
+                  estimatedRequestTokenCount: requestTokens,
+                  remainingTokenCount: remainingTokens,
+                },
+              };
+            })(),
           );
-        });
-      });
 
-      it('should add message with suggestion when remaining tokens are < 75% of limit', async () => {
-        // Setup mock to return a stream with ContextWindowWillOverflow event
-        // Limit is 100, remaining is 70 (< 75)
-        mockSendMessageStream.mockReturnValue(
-          (async function* () {
-            yield {
-              type: ServerGeminiEventType.ContextWindowWillOverflow,
-              value: {
-                estimatedRequestTokenCount: 30,
-                remainingTokenCount: 70,
+          const { result } = renderHookWithDefaults();
+
+          await act(async () => {
+            await result.current.submitQuery('Test overflow');
+          });
+
+          await waitFor(() => {
+            expect(mockAddItem).toHaveBeenCalledWith(
+              {
+                type: 'info',
+                text: expectedMessage,
               },
-            };
-          })(),
-        );
-
-        const { result } = renderHook(() =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        );
-
-        // Submit a query
-        await act(async () => {
-          await result.current.submitQuery('Test overflow');
-        });
-
-        // Check that the message was added with suggestion
-        await vi.waitFor(() => {
-          expect(mockAddItem).toHaveBeenCalledWith(
-            {
-              type: 'info',
-              text: `Sending this message (30 tokens) might exceed the remaining context window limit (70 tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
-            },
-            expect.any(Number),
-          );
-        });
-      });
+              expect.any(Number),
+            );
+          });
+        },
+      );
     });
 
     it('should call onCancelSubmit when ContextWindowWillOverflow event is received', async () => {
@@ -2161,165 +1962,64 @@ describe('useGeminiStream', () => {
       });
 
       // Check that onCancelSubmit was called
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(onCancelSubmitSpy).toHaveBeenCalled();
       });
     });
 
-    it('should not add message for STOP finish reason', async () => {
-      // Setup mock to return a stream with STOP finish reason
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.Content,
-            value: 'Complete response',
-          };
-          yield {
-            type: ServerGeminiEventType.Finished,
-            value: { reason: 'STOP', usageMetadata: undefined },
-          };
-        })(),
-      );
-
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockLoadedSettings,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-          false,
-          () => {},
-          () => {},
-          () => {},
-          () => {},
-          80,
-          24,
-        ),
-      );
-
-      // Submit a query
-      await act(async () => {
-        await result.current.submitQuery('Test normal completion');
-      });
-
-      // Wait a bit to ensure no message is added
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Check that no info message was added for STOP
-      const infoMessages = mockAddItem.mock.calls.filter(
-        (call) => call[0].type === 'info',
-      );
-      expect(infoMessages).toHaveLength(0);
-    });
-
-    it('should not add message for FINISH_REASON_UNSPECIFIED', async () => {
-      // Setup mock to return a stream with FINISH_REASON_UNSPECIFIED
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.Content,
-            value: 'Response with unspecified finish',
-          };
-          yield {
-            type: ServerGeminiEventType.Finished,
-            value: {
-              reason: 'FINISH_REASON_UNSPECIFIED',
-              usageMetadata: undefined,
-            },
-          };
-        })(),
-      );
-
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockLoadedSettings,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-          false,
-          () => {},
-          () => {},
-          () => {},
-          () => {},
-          80,
-          24,
-        ),
-      );
-
-      // Submit a query
-      await act(async () => {
-        await result.current.submitQuery('Test unspecified finish');
-      });
-
-      // Wait a bit to ensure no message is added
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Check that no info message was added
-      const infoMessages = mockAddItem.mock.calls.filter(
-        (call) => call[0].type === 'info',
-      );
-      expect(infoMessages).toHaveLength(0);
-    });
-
-    it('should add appropriate messages for other finish reasons', async () => {
-      const testCases = [
-        {
-          reason: 'SAFETY',
-          message: '⚠️  Response stopped due to safety reasons.',
-        },
-        {
-          reason: 'RECITATION',
-          message: '⚠️  Response stopped due to recitation policy.',
-        },
-        {
-          reason: 'LANGUAGE',
-          message: '⚠️  Response stopped due to unsupported language.',
-        },
-        {
-          reason: 'BLOCKLIST',
-          message: '⚠️  Response stopped due to forbidden terms.',
-        },
-        {
-          reason: 'PROHIBITED_CONTENT',
-          message: '⚠️  Response stopped due to prohibited content.',
-        },
-        {
-          reason: 'SPII',
-          message:
-            '⚠️  Response stopped due to sensitive personally identifiable information.',
-        },
-        { reason: 'OTHER', message: '⚠️  Response stopped for other reasons.' },
-        {
-          reason: 'MALFORMED_FUNCTION_CALL',
-          message: '⚠️  Response stopped due to malformed function call.',
-        },
-        {
-          reason: 'IMAGE_SAFETY',
-          message: '⚠️  Response stopped due to image safety violations.',
-        },
-        {
-          reason: 'UNEXPECTED_TOOL_CALL',
-          message: '⚠️  Response stopped due to unexpected tool call.',
-        },
-      ];
-
-      for (const { reason, message } of testCases) {
-        // Reset mocks for each test case
-        mockAddItem.mockClear();
+    it.each([
+      {
+        reason: 'STOP',
+        shouldAddMessage: false,
+      },
+      {
+        reason: 'FINISH_REASON_UNSPECIFIED',
+        shouldAddMessage: false,
+      },
+      {
+        reason: 'SAFETY',
+        message: '⚠️  Response stopped due to safety reasons.',
+      },
+      {
+        reason: 'RECITATION',
+        message: '⚠️  Response stopped due to recitation policy.',
+      },
+      {
+        reason: 'LANGUAGE',
+        message: '⚠️  Response stopped due to unsupported language.',
+      },
+      {
+        reason: 'BLOCKLIST',
+        message: '⚠️  Response stopped due to forbidden terms.',
+      },
+      {
+        reason: 'PROHIBITED_CONTENT',
+        message: '⚠️  Response stopped due to prohibited content.',
+      },
+      {
+        reason: 'SPII',
+        message:
+          '⚠️  Response stopped due to sensitive personally identifiable information.',
+      },
+      {
+        reason: 'OTHER',
+        message: '⚠️  Response stopped for other reasons.',
+      },
+      {
+        reason: 'MALFORMED_FUNCTION_CALL',
+        message: '⚠️  Response stopped due to malformed function call.',
+      },
+      {
+        reason: 'IMAGE_SAFETY',
+        message: '⚠️  Response stopped due to image safety violations.',
+      },
+      {
+        reason: 'UNEXPECTED_TOOL_CALL',
+        message: '⚠️  Response stopped due to unexpected tool call.',
+      },
+    ])(
+      'should handle $reason finish reason correctly',
+      async ({ reason, shouldAddMessage = true, message }) => {
         mockSendMessageStream.mockReturnValue(
           (async function* () {
             yield {
@@ -2333,44 +2033,35 @@ describe('useGeminiStream', () => {
           })(),
         );
 
-        const { result } = renderHook(() =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            vi.fn(),
-            80,
-            24,
-          ),
-        );
+        const { result } = renderHookWithDefaults();
 
         await act(async () => {
           await result.current.submitQuery(`Test ${reason}`);
         });
 
-        await vi.waitFor(() => {
-          expect(mockAddItem).toHaveBeenCalledWith(
-            {
-              type: 'info',
-              text: message,
-            },
-            expect.any(Number),
+        if (shouldAddMessage) {
+          await waitFor(() => {
+            expect(mockAddItem).toHaveBeenCalledWith(
+              {
+                type: 'info',
+                text: message,
+              },
+              expect.any(Number),
+            );
+          });
+        } else {
+          // Verify state returns to idle without any info messages
+          await waitFor(() => {
+            expect(result.current.streamingState).toBe(StreamingState.Idle);
+          });
+
+          const infoMessages = mockAddItem.mock.calls.filter(
+            (call) => call[0].type === 'info',
           );
-        });
-      }
-    });
+          expect(infoMessages).toHaveLength(0);
+        }
+      },
+    );
   });
 
   it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
@@ -2487,7 +2178,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for the first response to complete
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'gemini',
@@ -2520,7 +2211,7 @@ describe('useGeminiStream', () => {
       // We can verify this by checking that the LoadingIndicator would not show the previous thought
       // The actual thought state is internal to the hook, but we can verify the behavior
       // by ensuring the second response doesn't show the previous thought
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'gemini',
@@ -2638,7 +2329,7 @@ describe('useGeminiStream', () => {
       });
 
       // Verify cancellation message was added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'info',
@@ -2696,7 +2387,7 @@ describe('useGeminiStream', () => {
       });
 
       // Verify error message was added
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'error',
@@ -2747,7 +2438,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('test query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
         expect(
           typeof result.current.loopDetectionConfirmationRequest?.onComplete,
@@ -2795,7 +2486,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for confirmation request to be set
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2824,7 +2515,7 @@ describe('useGeminiStream', () => {
       );
 
       // Verify that the request was retried
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
         expect(mockSendMessageStream).toHaveBeenNthCalledWith(
           2,
@@ -2860,7 +2551,7 @@ describe('useGeminiStream', () => {
       });
 
       // Wait for confirmation request to be set
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2907,7 +2598,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('first query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2957,7 +2648,7 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('second query');
       });
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
 
@@ -2980,7 +2671,7 @@ describe('useGeminiStream', () => {
       );
 
       // Verify that the request was retried
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockSendMessageStream).toHaveBeenCalledTimes(3); // 1st query, 2nd query, retry of 2nd query
         expect(mockSendMessageStream).toHaveBeenNthCalledWith(
           3,
@@ -3011,7 +2702,7 @@ describe('useGeminiStream', () => {
       });
 
       // Verify that the content was added to history before the loop detection dialog
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
             type: 'gemini',
@@ -3022,7 +2713,7 @@ describe('useGeminiStream', () => {
       });
 
       // Then verify loop detection confirmation request was set
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
     });

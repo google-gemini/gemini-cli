@@ -14,7 +14,8 @@ import {
   type Mock,
 } from 'vitest';
 import { act, useEffect } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useCommandCompletion } from './useCommandCompletion.js';
 import type { CommandContext } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -170,7 +171,7 @@ describe('useCommandCompletion', () => {
 
         const { result } = renderCommandCompletionHook('@file');
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(result.current.suggestions).toHaveLength(1);
         });
 
@@ -184,7 +185,7 @@ describe('useCommandCompletion', () => {
           );
         });
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(result.current.showSuggestions).toBe(false);
         });
       });
@@ -210,7 +211,7 @@ describe('useCommandCompletion', () => {
         const text = '@src/a\\ file.txt';
         renderCommandCompletionHook(text);
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(useAtCompletion).toHaveBeenLastCalledWith(
             expect.objectContaining({
               enabled: true,
@@ -226,7 +227,7 @@ describe('useCommandCompletion', () => {
 
         renderCommandCompletionHook(text, cursorOffset);
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(useAtCompletion).toHaveBeenLastCalledWith(
             expect.objectContaining({
               enabled: true,
@@ -268,7 +269,7 @@ describe('useCommandCompletion', () => {
             shellModeActive,
           );
 
-          await vi.waitFor(() => {
+          await waitFor(() => {
             expect(result.current.suggestions.length).toBe(expectedSuggestions);
             expect(result.current.showSuggestions).toBe(
               expectedShowSuggestions,
@@ -317,7 +318,7 @@ describe('useCommandCompletion', () => {
       it('should navigate up through suggestions with wrap-around', async () => {
         const { result } = renderCommandCompletionHook('/');
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(result.current.suggestions.length).toBe(5);
         });
 
@@ -333,7 +334,7 @@ describe('useCommandCompletion', () => {
       it('should navigate down through suggestions with wrap-around', async () => {
         const { result } = renderCommandCompletionHook('/');
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(result.current.suggestions.length).toBe(5);
         });
 
@@ -352,7 +353,7 @@ describe('useCommandCompletion', () => {
       it('should handle navigation with multiple suggestions', async () => {
         const { result } = renderCommandCompletionHook('/');
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(result.current.suggestions.length).toBe(5);
         });
 
@@ -379,7 +380,7 @@ describe('useCommandCompletion', () => {
 
         const { result } = renderCommandCompletionHook('/');
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(result.current.suggestions.length).toBe(
             mockSuggestions.length,
           );
@@ -398,7 +399,7 @@ describe('useCommandCompletion', () => {
 
       const { result } = renderCommandCompletionHook('/mem');
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
       });
 
@@ -416,7 +417,7 @@ describe('useCommandCompletion', () => {
 
       const { result } = renderCommandCompletionHook('@src/fi');
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
       });
 
@@ -437,7 +438,7 @@ describe('useCommandCompletion', () => {
 
       const { result } = renderCommandCompletionHook(text, cursorOffset);
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
       });
 
@@ -457,7 +458,7 @@ describe('useCommandCompletion', () => {
 
       const { result } = renderCommandCompletionHook('@src/comp');
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
       });
 
@@ -477,7 +478,7 @@ describe('useCommandCompletion', () => {
 
       const { result } = renderCommandCompletionHook('@src\\comp');
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
       });
 

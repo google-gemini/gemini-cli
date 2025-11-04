@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../../test-utils/render.js';
 import type { CompressionDisplayProps } from './CompressionMessage.js';
 import { CompressionMessage } from './CompressionMessage.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
@@ -27,10 +27,11 @@ describe('<CompressionMessage />', () => {
   describe('pending state', () => {
     it('renders pending message when compression is in progress', () => {
       const props = createCompressionProps({ isPending: true });
-      const { lastFrame } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
 
       expect(output).toContain('Compressing chat history');
+      unmount();
     });
   });
 
@@ -42,13 +43,14 @@ describe('<CompressionMessage />', () => {
         newTokenCount: 50,
         compressionStatus: CompressionStatus.COMPRESSED,
       });
-      const { lastFrame } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
 
       expect(output).toContain('✦');
       expect(output).toContain(
         'Chat history compressed from 100 to 50 tokens.',
       );
+      unmount();
     });
 
     it('renders success message for large successful compressions', () => {
@@ -57,14 +59,16 @@ describe('<CompressionMessage />', () => {
         { original: 700000, new: 350000 }, // Very large compression
       ];
 
-      testCases.forEach(({ original, new: newTokens }) => {
+      for (const { original, new: newTokens } of testCases) {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
           compressionStatus: CompressionStatus.COMPRESSED,
         });
-        const { lastFrame } = render(<CompressionMessage {...props} />);
+        const { lastFrame, unmount } = render(
+          <CompressionMessage {...props} />,
+        );
         const output = lastFrame();
 
         expect(output).toContain('✦');
@@ -73,7 +77,8 @@ describe('<CompressionMessage />', () => {
         );
         expect(output).not.toContain('Skipping compression');
         expect(output).not.toContain('did not reduce size');
-      });
+        unmount();
+      }
     });
   });
 
@@ -86,13 +91,14 @@ describe('<CompressionMessage />', () => {
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
-      const { lastFrame } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
 
       expect(output).toContain('✦');
       expect(output).toContain(
         'Compression was not beneficial for this history size.',
       );
+      unmount();
     });
 
     it('renders skip message when token counts are equal', () => {
@@ -103,12 +109,13 @@ describe('<CompressionMessage />', () => {
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
-      const { lastFrame } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
 
       expect(output).toContain(
         'Compression was not beneficial for this history size.',
       );
+      unmount();
     });
   });
 
@@ -132,18 +139,21 @@ describe('<CompressionMessage />', () => {
         },
       ];
 
-      testCases.forEach(({ original, new: newTokens, expected }) => {
+      for (const { original, new: newTokens, expected } of testCases) {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
           compressionStatus: CompressionStatus.COMPRESSED,
         });
-        const { lastFrame } = render(<CompressionMessage {...props} />);
+        const { lastFrame, unmount } = render(
+          <CompressionMessage {...props} />,
+        );
         const output = lastFrame();
 
         expect(output).toContain(expected);
-      });
+        unmount();
+      }
     });
 
     it('shows skip message for small histories when new tokens >= original tokens', () => {
@@ -153,7 +163,7 @@ describe('<CompressionMessage />', () => {
         { original: 49999, new: 50000 }, // Just under 50k threshold
       ];
 
-      testCases.forEach(({ original, new: newTokens }) => {
+      for (const { original, new: newTokens } of testCases) {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
@@ -161,14 +171,17 @@ describe('<CompressionMessage />', () => {
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
-        const { lastFrame } = render(<CompressionMessage {...props} />);
+        const { lastFrame, unmount } = render(
+          <CompressionMessage {...props} />,
+        );
         const output = lastFrame();
 
         expect(output).toContain(
           'Compression was not beneficial for this history size.',
         );
         expect(output).not.toContain('compressed from');
-      });
+        unmount();
+      }
     });
 
     it('shows compression failure message for large histories when new tokens >= original tokens', () => {
@@ -178,7 +191,7 @@ describe('<CompressionMessage />', () => {
         { original: 100000, new: 100000 }, // Large history, same count
       ];
 
-      testCases.forEach(({ original, new: newTokens }) => {
+      for (const { original, new: newTokens } of testCases) {
         const props = createCompressionProps({
           isPending: false,
           originalTokenCount: original,
@@ -186,13 +199,16 @@ describe('<CompressionMessage />', () => {
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
-        const { lastFrame } = render(<CompressionMessage {...props} />);
+        const { lastFrame, unmount } = render(
+          <CompressionMessage {...props} />,
+        );
         const output = lastFrame();
 
         expect(output).toContain('compression did not reduce size');
         expect(output).not.toContain('compressed from');
         expect(output).not.toContain('Compression was not beneficial');
-      });
+        unmount();
+      }
     });
   });
 });

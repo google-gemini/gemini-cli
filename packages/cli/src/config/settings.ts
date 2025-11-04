@@ -64,7 +64,7 @@ const MIGRATION_MAP: Record<string, string> = {
   autoAccept: 'tools.autoAccept',
   autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
   bugCommand: 'advanced.bugCommand',
-  chatCompression: 'model.chatCompression',
+  chatCompression: 'model.compressionThreshold',
   checkpointing: 'general.checkpointing',
   coreTools: 'tools.core',
   contextFileName: 'context.fileName',
@@ -75,6 +75,7 @@ const MIGRATION_MAP: Record<string, string> = {
   disableUpdateNag: 'general.disableUpdateNag',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
   enableMessageBusIntegration: 'tools.enableMessageBusIntegration',
+  enableHooks: 'tools.enableHooks',
   enablePromptCompletion: 'general.enablePromptCompletion',
   enforcedAuthType: 'security.auth.enforcedType',
   excludeTools: 'tools.exclude',
@@ -617,10 +618,10 @@ export function loadSettings(
                   'utf-8',
                 );
               } catch (e) {
-                console.error(
-                  `Error migrating settings file on disk: ${getErrorMessage(
-                    e,
-                  )}`,
+                coreEvents.emitFeedback(
+                  'error',
+                  'Failed to migrate settings file.',
+                  e,
                 );
               }
             } else {

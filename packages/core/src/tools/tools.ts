@@ -306,6 +306,7 @@ export abstract class DeclarativeTool<
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
     readonly messageBus?: MessageBus,
+    readonly extensionName?: string,
     readonly extensionId?: string,
   ) {}
 
