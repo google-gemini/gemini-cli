@@ -6,6 +6,7 @@
 
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
+import * as net from 'node:net';
 import { URL } from 'node:url';
 import type { EventEmitter } from 'node:events';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
@@ -89,9 +90,45 @@ interface PKCEParams {
   state: string;
 }
 
-const REDIRECT_PORT = 7777;
 const REDIRECT_PATH = '/oauth/callback';
 const HTTP_OK = 200;
+
+/**
+ * Get an available port for the OAuth callback server.
+ * Uses the same approach as the Google OAuth implementation.
+ *
+ * @returns A promise that resolves to an available port number
+ */
+function getAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let port = 0;
+    try {
+      const portStr = process.env['OAUTH_CALLBACK_PORT'];
+      if (portStr) {
+        port = parseInt(portStr, 10);
+        if (isNaN(port) || port <= 0 || port > 65535) {
+          return reject(
+            new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`),
+          );
+        }
+        return resolve(port);
+      }
+      const server = net.createServer();
+      server.listen(0, () => {
+        const address = server.address()! as net.AddressInfo;
+        port = address.port;
+      });
+      server.on('listening', () => {
+        server.close();
+        server.unref();
+      });
+      server.on('error', (e) => reject(e));
+      server.on('close', () => resolve(port));
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
 
 /**
  * Provider for handling OAuth authentication for MCP servers.
@@ -108,14 +145,16 @@ export class MCPOAuthProvider {
    *
    * @param registrationUrl The client registration endpoint URL
    * @param config OAuth configuration
+   * @param redirectPort The port to use for the redirect URI
    * @returns The registered client information
    */
   private async registerClient(
     registrationUrl: string,
     config: MCPOAuthConfig,
+    redirectPort: number,
   ): Promise<OAuthClientRegistrationResponse> {
     const redirectUri =
-      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
 
     const registrationRequest: OAuthClientRegistrationRequest = {
       client_name: 'Gemini CLI MCP Client',
@@ -261,16 +300,18 @@ export class MCPOAuthProvider {
    * Start a local HTTP server to handle OAuth callback.
    *
    * @param expectedState The state parameter to validate
+   * @param redirectPort The port to use for the callback server
    * @returns Promise that resolves with the authorization code
    */
   private async startCallbackServer(
     expectedState: string,
+    redirectPort: number,
   ): Promise<OAuthAuthorizationResponse> {
     return new Promise((resolve, reject) => {
       const server = http.createServer(
         async (req: http.IncomingMessage, res: http.ServerResponse) => {
           try {
-            const url = new URL(req.url!, `http://localhost:${REDIRECT_PORT}`);
+            const url = new URL(req.url!, `http://localhost:${redirectPort}`);
 
             if (url.pathname !== REDIRECT_PATH) {
               res.writeHead(404);
@@ -335,9 +376,9 @@ export class MCPOAuthProvider {
       );
 
       server.on('error', reject);
-      server.listen(REDIRECT_PORT, () => {
+      server.listen(redirectPort, () => {
         debugLogger.log(
-          `OAuth callback server listening on port ${REDIRECT_PORT}`,
+          `OAuth callback server listening on port ${redirectPort}`,
         );
       });
 
@@ -357,16 +398,18 @@ export class MCPOAuthProvider {
    *
    * @param config OAuth configuration
    * @param pkceParams PKCE parameters
+   * @param redirectPort The port to use for the redirect URI
    * @param mcpServerUrl The MCP server URL to use as the resource parameter
    * @returns The authorization URL
    */
   private buildAuthorizationUrl(
     config: MCPOAuthConfig,
     pkceParams: PKCEParams,
+    redirectPort: number,
     mcpServerUrl?: string,
   ): string {
     const redirectUri =
-      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
 
     const params = new URLSearchParams({
       client_id: config.clientId!,
@@ -413,6 +456,7 @@ export class MCPOAuthProvider {
    * @param config OAuth configuration
    * @param code Authorization code
    * @param codeVerifier PKCE code verifier
+   * @param redirectPort The port to use for the redirect URI
    * @param mcpServerUrl The MCP server URL to use as the resource parameter
    * @returns The token response
    */
@@ -420,10 +464,11 @@ export class MCPOAuthProvider {
     config: MCPOAuthConfig,
     code: string,
     codeVerifier: string,
+    redirectPort: number,
     mcpServerUrl?: string,
   ): Promise<OAuthTokenResponse> {
     const redirectUri =
-      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
 
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -745,6 +790,11 @@ export class MCPOAuthProvider {
       }
     }
 
+    // Allocate a dynamic port for the OAuth callback server
+    // This must be done before client registration so we can register the correct redirect URI
+    const redirectPort = await getAvailablePort();
+    debugLogger.debug(`Allocated port ${redirectPort} for OAuth callback`);
+
     // If no client ID is provided, try dynamic client registration
     if (!config.clientId) {
       let registrationUrl = config.registrationUrl;
@@ -771,6 +821,7 @@ export class MCPOAuthProvider {
         const clientRegistration = await this.registerClient(
           registrationUrl,
           config,
+          redirectPort,
         );
 
         config.clientId = clientRegistration.client_id;
@@ -800,6 +851,7 @@ export class MCPOAuthProvider {
     const authUrl = this.buildAuthorizationUrl(
       config,
       pkceParams,
+      redirectPort,
       mcpServerUrl,
     );
 
@@ -812,7 +864,10 @@ ${authUrl}
 ⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
 
     // Start callback server
-    const callbackPromise = this.startCallbackServer(pkceParams.state);
+    const callbackPromise = this.startCallbackServer(
+      pkceParams.state,
+      redirectPort,
+    );
 
     // Open browser securely
     try {
@@ -836,6 +891,7 @@ ${authUrl}
       config,
       code,
       pkceParams.codeVerifier,
+      redirectPort,
       mcpServerUrl,
     );
 
