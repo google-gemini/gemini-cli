@@ -705,7 +705,7 @@ describe('getShellConfiguration', () => {
     expect(config.shell).toBe('bash');
   });
 
-  describe('PowerShell invocation parsing', () => {
+  describeWindowsOnly('PowerShell invocation parsing', () => {
     const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
     const originalComSpec = process.env['ComSpec'];
 
@@ -894,7 +894,15 @@ describe('getShellConfiguration', () => {
         const env = (options as { env?: NodeJS.ProcessEnv } | undefined)?.env;
         const commandText = env?.[POWERSHELL_COMMAND_ENV] ?? '';
         const payload = scenarioResults.get(commandText);
-        const stdout = JSON.stringify(payload ?? { success: false });
+        if (!payload) {
+          return {
+            status: 1,
+            stdout: '',
+            stderr: '',
+          } as unknown as ReturnType<typeof mockSpawnSync>;
+        }
+
+        const stdout = JSON.stringify(payload);
         return {
           status: 0,
           stdout,
