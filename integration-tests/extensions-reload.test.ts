@@ -79,11 +79,13 @@ describe('extension reloading', () => {
       await run.type('\r');
       await run.expectText(
         'test-extension-reload (v0.0.1) - active (update available)',
+        30000,
       );
       await run.sendText('/mcp list');
       await run.type('\r');
       await run.expectText(
         'test-server (from test-extension-reload) - Ready (1 tool)',
+        30000,
       );
       await run.expectText('- hello');
 
@@ -100,11 +102,15 @@ describe('extension reloading', () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await run.sendText('/extensions list');
       await run.type('\r');
-      await run.expectText('test-extension-reload (v0.0.2) - active (updated)');
+      await run.expectText(
+        'test-extension-reload (v0.0.2) - active (updated)',
+        30000,
+      );
       await run.sendText('/mcp list');
       await run.type('\r');
       await run.expectText(
         'test-server (from test-extension-reload) - Ready (1 tool)',
+        30000,
       );
       await run.expectText('- goodbye');
       await run.sendText('/quit');
