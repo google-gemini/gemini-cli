@@ -5,15 +5,13 @@
  */
 
 import { useEffect, useState } from 'react';
-import { appEvents } from './../../utils/events.js';
+import { AppEvent, appEvents } from './../../utils/events.js';
 import { Box, Text } from 'ink';
-import { useConfig } from '../contexts/ConfigContext.js';
 import { type McpClient, MCPServerStatus } from '@google/gemini-cli-core';
 import { GeminiSpinner } from './GeminiRespondingSpinner.js';
 import { theme } from '../semantic-colors.js';
 
 export const ConfigInitDisplay = () => {
-  const config = useConfig();
   const [message, setMessage] = useState('Initializing...');
 
   useEffect(() => {
@@ -31,11 +29,11 @@ export const ConfigInitDisplay = () => {
       setMessage(`Connecting to MCP servers... (${connected}/${clients.size})`);
     };
 
-    appEvents.on('mcp-client-update', onChange);
+    appEvents.on(AppEvent.McpClientUpdate, onChange);
     return () => {
-      appEvents.off('mcp-client-update', onChange);
+      appEvents.off(AppEvent.McpClientUpdate, onChange);
     };
-  }, [config]);
+  }, []);
 
   return (
     <Box marginTop={1}>
