@@ -22,7 +22,7 @@ const settingsPath = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
 
 const screenReaderNudgeFilePath = path.join(
   Storage.getGlobalTempDir(),
-  'hasSeenScreenReaderNudge',
+  'seen_screen_reader_nudge.json',
 );
 
 export const Notifications = () => {
@@ -34,8 +34,9 @@ export const Notifications = () => {
   const showInitError =
     initError && streamingState !== StreamingState.Responding;
 
-  const [hasSeenScreenReaderNudge, setHasSeenScreenReaderNudge] =
-    useState(true);
+  const [hasSeenScreenReaderNudge, setHasSeenScreenReaderNudge] = useState<
+    boolean | undefined
+  >(undefined);
 
   useEffect(() => {
     const checkScreenReaderNudge = async () => {
@@ -83,7 +84,7 @@ export const Notifications = () => {
         <Text>
           You are currently in screen reader-friendly view. To switch out, open{' '}
           {settingsPath} and remove the entry for {'"screenReader"'}. This will
-          disappear on re-start.
+          disappear on next run.
         </Text>
       )}
       {updateInfo && <UpdateNotification message={updateInfo.message} />}
