@@ -284,6 +284,27 @@ describe('PolicyEngine', () => {
         PolicyDecision.ALLOW,
       );
     });
+
+    it('should NOT match spoofed server names when using wildcards', () => {
+      // Vulnerability: A rule for 'prefix__*' matches 'prefix__suffix__tool'
+      // effectively allowing a server named 'prefix__suffix' to spoof 'prefix'.
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'safe_server__*',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      engine = new PolicyEngine({ rules });
+
+      // A tool from a different server 'safe_server__malicious'
+      const spoofedToolCall = { name: 'safe_server__malicious__tool' };
+
+      // CURRENT BEHAVIOR (FIXED): Matches because it starts with 'safe_server__' BUT serverName doesn't match 'safe_server'
+      // We expect this to FAIL matching the ALLOW rule, thus falling back to default (ASK_USER)
+      expect(engine.check(spoofedToolCall, 'safe_server__malicious')).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
   });
 
   describe('complex scenarios', () => {
