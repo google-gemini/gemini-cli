@@ -1550,7 +1550,7 @@ describe('loadCliConfig compressionThreshold', () => {
       },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getCompressionThreshold()).toBe(0.5);
+    expect(await config.getCompressionThreshold()).toBe(0.5);
   });
 
   it('should have undefined compressionThreshold if not in settings', async () => {
@@ -1558,7 +1558,7 @@ describe('loadCliConfig compressionThreshold', () => {
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getCompressionThreshold()).toBeUndefined();
+    expect(await config.getCompressionThreshold()).toBeUndefined();
   });
 });
 
