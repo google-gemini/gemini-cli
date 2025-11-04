@@ -633,15 +633,6 @@ export async function discoverTools(
           messageBus,
         );
 
-        if (
-          cliConfig.getDebugMode?.() &&
-          cliConfig.getEnableMessageBusIntegration?.()
-        ) {
-          debugLogger.log(
-            `[DEBUG] Discovered MCP tool '${funcDecl.name}' from server '${mcpServerName}' with messageBus: ${messageBus ? 'YES' : 'NO'}`,
-          );
-        }
-
         discoveredTools.push(tool);
       } catch (error) {
         coreEvents.emitFeedback(

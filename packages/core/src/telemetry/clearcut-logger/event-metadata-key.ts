@@ -464,4 +464,13 @@ export enum EventMetadataKey {
 
   // Logs the reason for agent termination.
   GEMINI_CLI_AGENT_TERMINATE_REASON = 115,
+
+  // Logs the reason for an agent recovery attempt.
+  GEMINI_CLI_AGENT_RECOVERY_REASON = 122,
+
+  // Logs the duration of an agent recovery attempt in milliseconds.
+  GEMINI_CLI_AGENT_RECOVERY_DURATION_MS = 123,
+
+  // Logs whether the agent recovery attempt was successful.
+  GEMINI_CLI_AGENT_RECOVERY_SUCCESS = 124,
 }

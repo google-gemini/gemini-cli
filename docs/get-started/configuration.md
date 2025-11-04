@@ -229,6 +229,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Use the entire width of the terminal for output.
   - **Default:** `false`
 
+- **`ui.useAlternateBuffer`** (boolean):
+  - **Description:** Use an alternate screen buffer for the UI, preserving shell
+    history.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
@@ -461,7 +467,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`useWriteTodos`** (boolean):
   - **Description:** Enable the write_todos_list tool.
-  - **Default:** `false`
+  - **Default:** `true`
 
 #### `security`
 
@@ -548,7 +554,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
   - **Description:** The thinking budget for the Codebase Investigator agent.
-  - **Default:** `-1`
+  - **Default:** `8192`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.model`** (string):
