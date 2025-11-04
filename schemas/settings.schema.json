@@ -818,22 +818,22 @@
             "enabled": {
               "title": "Enable Codebase Investigator",
               "description": "Enable the Codebase Investigator agent.",
-              "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "maxNumTurns": {
               "title": "Codebase Investigator Max Num Turns",
               "description": "Maximum number of turns for the Codebase Investigator agent.",
-              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `15`",
-              "default": 15,
+              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `10`",
+              "default": 10,
               "type": "number"
             },
             "maxTimeMinutes": {
               "title": "Max Time (Minutes)",
               "description": "Maximum time for the Codebase Investigator agent (in minutes).",
-              "markdownDescription": "Maximum time for the Codebase Investigator agent (in minutes).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `5`",
-              "default": 5,
+              "markdownDescription": "Maximum time for the Codebase Investigator agent (in minutes).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `3`",
+              "default": 3,
               "type": "number"
             },
             "thinkingBudget": {
