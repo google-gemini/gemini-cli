@@ -45,11 +45,6 @@ export function getScopeMessageForSetting(
   selectedScope: LoadableSettingScope,
   settings: LoadedSettings,
 ): string {
-  if (!isLoadableSettingScope(selectedScope)) {
-    throw new Error(
-      `Unsupported scope "${selectedScope}" for setting ${settingKey}`,
-    );
-  }
   const otherScopes = Object.values(SettingScope)
     .filter(isLoadableSettingScope)
     .filter((scope) => scope !== selectedScope);
