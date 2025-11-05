@@ -16,7 +16,10 @@ import {
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useEditorSettings } from './useEditorSettings.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { MessageType, type HistoryItem } from '../types.js';
 import {
@@ -186,7 +189,10 @@ describe('useEditorSettings', () => {
     render(<TestComponent />);
 
     const editorType: EditorType = 'vscode';
-    const scopes = [SettingScope.User, SettingScope.Workspace];
+    const scopes: LoadableSettingScope[] = [
+      SettingScope.User,
+      SettingScope.Workspace,
+    ];
 
     scopes.forEach((scope) => {
       act(() => {

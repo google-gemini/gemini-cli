@@ -12,7 +12,10 @@ import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -20,7 +23,7 @@ import { ScopeSelector } from './shared/ScopeSelector.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string, scope: SettingScope) => void;
+  onSelect: (themeName: string, scope: LoadableSettingScope) => void;
 
   /** Callback function when the dialog is cancelled */
   onCancel: () => void;
@@ -41,7 +44,7 @@ export function ThemeDialog({
   availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+  const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
 
@@ -97,12 +100,12 @@ export function ThemeDialog({
     onHighlight(themeName);
   };
 
-  const handleScopeHighlight = useCallback((scope: SettingScope) => {
+  const handleScopeHighlight = useCallback((scope: LoadableSettingScope) => {
     setSelectedScope(scope);
   }, []);
 
   const handleScopeSelect = useCallback(
-    (scope: SettingScope) => {
+    (scope: LoadableSettingScope) => {
       onSelect(highlightedThemeName, scope);
     },
     [onSelect, highlightedThemeName],

@@ -67,7 +67,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       docsCommand,
       directoryCommand,
       editorCommand,
-      extensionsCommand,
+      extensionsCommand(this.config?.getEnableExtensionReloading()),
       helpCommand,
       await ideCommand(),
       initCommand,
