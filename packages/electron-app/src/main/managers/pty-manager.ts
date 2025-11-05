@@ -211,7 +211,9 @@ export class PtyManager {
   }
 
   private async getTerminalCwd() {
-    const { loadSettings } = await import('@google/gemini-cli');
+    const { loadSettings } = await import(
+      '@google/gemini-cli/dist/src/config/settings.js'
+    );
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
     if (settings.terminalCwd && typeof settings.terminalCwd === 'string') {
@@ -221,7 +223,9 @@ export class PtyManager {
   }
 
   private async getEnv() {
-    const { loadSettings } = await import('@google/gemini-cli');
+    const { loadSettings } = await import(
+      '@google/gemini-cli/dist/src/config/settings.js'
+    );
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
 

@@ -40,7 +40,7 @@ vi.mock('node:os', () => ({
   },
 }));
 
-vi.mock('@google/gemini-cli', () => ({
+vi.mock('@google/gemini-cli/dist/src/config/settings.js', () => ({
   loadSettings: vi.fn().mockResolvedValue({
     merged: {},
     forScope: vi.fn().mockReturnValue({
@@ -50,6 +50,9 @@ vi.mock('@google/gemini-cli', () => ({
   }),
   saveSettings: vi.fn(),
   SettingScope: { User: 'User', System: 'System', Workspace: 'Workspace' },
+}));
+
+vi.mock('@google/gemini-cli/dist/src/config/settingsSchema.js', () => ({
   getSettingsSchema: vi.fn().mockReturnValue({
     'test.string': { type: 'string' },
     'test.number': { type: 'number' },

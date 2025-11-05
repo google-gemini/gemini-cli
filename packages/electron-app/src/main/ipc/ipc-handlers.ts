@@ -223,7 +223,9 @@ export function registerIpcHandlers(windowManager: WindowManager) {
   });
 
   ipcMain.handle('settings:get', async () => {
-    const { loadSettings } = await import('@google/gemini-cli');
+    const { loadSettings } = await import(
+      '@google/gemini-cli/dist/src/config/settings.js'
+    );
     const settings = await loadSettings(os.homedir());
     const merged = settings.merged as CliSettings;
 
@@ -243,7 +245,9 @@ export function registerIpcHandlers(windowManager: WindowManager) {
 
   ipcMain.handle('settings:get-schema', async () => {
     try {
-      const { getSettingsSchema } = await import('@google/gemini-cli');
+      const { getSettingsSchema } = await import(
+        '@google/gemini-cli/dist/src/config/settingsSchema.js'
+      );
       return getSettingsSchema();
     } catch (error) {
       console.error('[IPC] Failed to load settings schema:', error);
@@ -252,7 +256,12 @@ export function registerIpcHandlers(windowManager: WindowManager) {
   });
 
   ipcMain.handle('themes:get', async () => {
-    const { loadSettings, themeManager } = await import('@google/gemini-cli');
+    const { loadSettings } = await import(
+      '@google/gemini-cli/dist/src/config/settings.js'
+    );
+    const { themeManager } = await import(
+      '@google/gemini-cli/dist/src/ui/themes/theme-manager.js'
+    );
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
     themeManager.loadCustomThemes(settings.customThemes);
@@ -266,8 +275,12 @@ export function registerIpcHandlers(windowManager: WindowManager) {
     }
     const { changes, scope = 'User' } = parseResult.data;
 
-    const { loadSettings, saveSettings, SettingScope, getSettingsSchema } =
-      await import('@google/gemini-cli');
+    const { loadSettings, saveSettings, SettingScope } = await import(
+      '@google/gemini-cli/dist/src/config/settings.js'
+    );
+    const { getSettingsSchema } = await import(
+      '@google/gemini-cli/dist/src/config/settingsSchema.js'
+    );
     try {
       const loadedSettings = await loadSettings(os.homedir());
 

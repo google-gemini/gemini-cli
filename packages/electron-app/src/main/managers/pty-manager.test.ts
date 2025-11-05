@@ -66,7 +66,7 @@ vi.mock('../config/paths', () => ({
 }));
 
 // Mock settings
-vi.mock('@google/gemini-cli', () => ({
+vi.mock('@google/gemini-cli/dist/src/config/settings.js', () => ({
   loadSettings: vi.fn().mockResolvedValue({
     merged: {},
   }),

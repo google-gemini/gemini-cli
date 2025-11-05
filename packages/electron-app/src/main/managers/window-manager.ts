@@ -104,7 +104,12 @@ export class WindowManager {
   }
 
   async getThemeFromSettings() {
-    const { loadSettings, themeManager } = await import('@google/gemini-cli');
+    const { loadSettings } = await import(
+      '@google/gemini-cli/dist/src/config/settings.js'
+    );
+    const { themeManager } = await import(
+      '@google/gemini-cli/dist/src/ui/themes/theme-manager.js'
+    );
     const { merged } = await loadSettings(os.homedir());
     const settings = merged as CliSettings;
     const themeName = settings.theme;
