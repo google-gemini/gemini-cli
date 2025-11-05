@@ -771,9 +771,11 @@ export class ShellExecutionService {
         if (
           e instanceof Error &&
           (('code' in e && e.code === 'ESRCH') ||
-            e.message === 'Cannot resize a pty that has already exited')
+            e.message.includes('Cannot resize a pty that has already exited'))
         ) {
-          // ignore
+          // On Unix, we get an ESRCH error.
+          // On Windows, we get a message-based error.
+          // In both cases, it's safe to ignore.
         } else {
           throw e;
         }
