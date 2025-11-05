@@ -4,34 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as fs from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { AllowedPathChecker } from './built-in.js';
 import type { SafetyCheckInput } from './protocol.js';
 import type { FunctionCall } from '@google/genai';
 
-vi.mock('node:fs');
-
 describe('AllowedPathChecker', () => {
   let checker: AllowedPathChecker;
-  const mockCwd = path.resolve('/home/user/project');
-  const mockWorkspaces = [
-    path.resolve('/home/user/project'),
-    path.resolve('/home/user/other-project'),
-  ];
+  let testRootDir: string;
+  let mockCwd: string;
+  let mockWorkspaces: string[];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     checker = new AllowedPathChecker();
-    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.statSync).mockReturnValue({
-      isDirectory: () => true,
-    } as fs.Stats);
+    testRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'safety-test-'));
+    mockCwd = path.join(testRootDir, 'home', 'user', 'project');
+    await fs.mkdir(mockCwd, { recursive: true });
+    mockWorkspaces = [
+      mockCwd,
+      path.join(testRootDir, 'home', 'user', 'other-project'),
+    ];
+    await fs.mkdir(mockWorkspaces[1], { recursive: true });
   });
 
-  afterEach(() => {
-    vi.resetAllMocks();
+  afterEach(async () => {
+    await fs.rm(testRootDir, { recursive: true, force: true });
   });
 
   const createInput = (
@@ -53,54 +53,67 @@ describe('AllowedPathChecker', () => {
   });
 
   it('should allow paths within CWD', async () => {
+    const filePath = path.join(mockCwd, 'file.txt');
+    await fs.writeFile(filePath, 'test content');
     const input = createInput({
-      path: path.resolve('/home/user/project/file.txt'),
+      path: filePath,
     });
     const result = await checker.check(input);
     expect(result.allowed).toBe(true);
   });
 
   it('should allow paths within workspace roots', async () => {
+    const filePath = path.join(mockWorkspaces[1], 'data.json');
+    await fs.writeFile(filePath, 'test content');
     const input = createInput({
-      path: path.resolve('/home/user/other-project/data.json'),
+      path: filePath,
     });
     const result = await checker.check(input);
     expect(result.allowed).toBe(true);
   });
 
   it('should deny paths outside allowed areas', async () => {
-    const input = createInput({ path: path.resolve('/etc/passwd') });
+    const outsidePath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(outsidePath), { recursive: true });
+    await fs.writeFile(outsidePath, 'secret');
+    const input = createInput({ path: outsidePath });
     const result = await checker.check(input);
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain('outside of the allowed workspace');
   });
 
   it('should deny paths using ../ to escape', async () => {
-    const secretPath = path.resolve('/home/user/secret.txt');
-    vi.mocked(fs.realpathSync).mockImplementation((p) => {
-      if (p.toString().endsWith('secret.txt')) return secretPath;
-      return p.toString();
-    });
+    const secretPath = path.join(testRootDir, 'home', 'user', 'secret.txt');
+    await fs.writeFile(secretPath, 'secret');
     const input = createInput({
-      path: path.resolve('/home/user/project/../secret.txt'),
+      path: path.join(mockCwd, '..', 'secret.txt'),
     });
     const result = await checker.check(input);
     expect(result.allowed).toBe(false);
   });
 
   it('should allow additional paths from config', async () => {
+    const safeDir = path.join(testRootDir, 'tmp', 'safe');
+    await fs.mkdir(safeDir, { recursive: true });
+    const filePath = path.join(safeDir, 'file.txt');
+    await fs.writeFile(filePath, 'safe content');
     const input = createInput(
-      { path: '/tmp/safe/file.txt' },
-      { additional_allowed_paths: ['/tmp/safe'] },
+      { path: filePath },
+      { additional_allowed_paths: [safeDir] },
     );
     const result = await checker.check(input);
     expect(result.allowed).toBe(true);
   });
 
   it('should check multiple path arguments', async () => {
-    const passwdPath = path.resolve('/etc/passwd');
+    const passwdPath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(passwdPath), { recursive: true });
+    await fs.writeFile(passwdPath, 'secret');
+    const srcPath = path.join(mockCwd, 'src.txt');
+    await fs.writeFile(srcPath, 'source content');
+
     const input = createInput({
-      source: path.resolve('/home/user/project/src.txt'),
+      source: srcPath,
       destination: passwdPath,
     });
     const result = await checker.check(input);
@@ -109,33 +122,21 @@ describe('AllowedPathChecker', () => {
   });
 
   it('should handle non-existent paths gracefully if they are inside allowed dir', async () => {
-    // realpathSync throws for non-existent files usually, but we mocked it to return the path.
-    // In a real scenario, if the file doesn't exist, we might want to check its parent directory.
-    // The current implementation uses realpathSync which might fail for new files.
-    // Let's assume for now we are checking existing paths or the implementation handles it.
-    // Re-reading built-in.ts might be needed if this test fails in reality.
-    // For now, trusting the mock.
     const input = createInput({
-      path: path.resolve('/home/user/project/new-file.txt'),
+      path: path.join(mockCwd, 'new-file.txt'),
     });
     const result = await checker.check(input);
     expect(result.allowed).toBe(true);
   });
 
   it('should deny access if path contains a symlink pointing outside allowed directories', async () => {
-    const projectRoot = path.resolve('/home/user/project');
-    const symlinkPath = path.join(projectRoot, 'symlink');
-    const targetPath = path.resolve('/etc/passwd');
+    const symlinkPath = path.join(mockCwd, 'symlink');
+    const targetPath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.writeFile(targetPath, 'secret');
 
-    // Mock a symlink: /home/user/project/symlink -> /etc/passwd
-    vi.mocked(fs.existsSync).mockImplementation((p) => {
-      const pathStr = p.toString();
-      return pathStr.startsWith(projectRoot) || pathStr === targetPath;
-    });
-    vi.mocked(fs.realpathSync).mockImplementation((p) => {
-      if (p.toString() === symlinkPath) return targetPath;
-      return p.toString();
-    });
+    // Create symlink: mockCwd/symlink -> targetPath
+    await fs.symlink(targetPath, symlinkPath);
 
     const input = createInput({ path: symlinkPath });
     const result = await checker.check(input);
@@ -146,18 +147,12 @@ describe('AllowedPathChecker', () => {
   });
 
   it('should allow access if path contains a symlink pointing INSIDE allowed directories', async () => {
-    const projectRoot = path.resolve('/home/user/project');
-    const symlinkPath = path.join(projectRoot, 'symlink-inside');
-    const realFilePath = path.join(projectRoot, 'real-file');
+    const symlinkPath = path.join(mockCwd, 'symlink-inside');
+    const realFilePath = path.join(mockCwd, 'real-file');
+    await fs.writeFile(realFilePath, 'real content');
 
-    // Mock a symlink: /home/user/project/symlink-inside -> /home/user/project/real-file
-    vi.mocked(fs.existsSync).mockImplementation((p) =>
-      p.toString().startsWith(projectRoot),
-    );
-    vi.mocked(fs.realpathSync).mockImplementation((p) => {
-      if (p.toString() === symlinkPath) return realFilePath;
-      return p.toString();
-    });
+    // Create symlink: mockCwd/symlink-inside -> mockCwd/real-file
+    await fs.symlink(realFilePath, symlinkPath);
 
     const input = createInput({ path: symlinkPath });
     const result = await checker.check(input);
