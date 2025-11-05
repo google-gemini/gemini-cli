@@ -19,8 +19,26 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { AuthType } from '@google/gemini-cli-core';
 
-export const Footer: React.FC = () => {
+interface FooterProps {
+  authType: AuthType | undefined;
+  version: string;
+}
+
+const Version = ({ authType, version }: FooterProps) => {
+  return (
+    <Box>
+      <Text>
+        <Text color={theme.text.secondary}>{version}</Text>
+        <Text color={theme.ui.comment}> | </Text>
+        <Text color={theme.text.secondary}>{authType}</Text>
+      </Text>
+    </Box>
+  );
+};
+
+export const Footer = ({ authType, version }: FooterProps) => {
   const uiState = useUIState();
   const config = useConfig();
   const settings = useSettings();
@@ -132,12 +150,7 @@ export const Footer: React.FC = () => {
               </Text>
             </Text>
           ) : (
-            <Text color={theme.status.error}>
-              no sandbox
-              {mainAreaWidth >= 100 && (
-                <Text color={theme.text.secondary}> (see /docs)</Text>
-              )}
-            </Text>
+            <Version authType={authType} version={version} />
           )}
         </Box>
       )}

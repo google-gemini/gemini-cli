@@ -152,6 +152,7 @@ export async function startInteractiveUI(
   startupWarnings: string[],
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
+  authType: AuthType | undefined,
 ) {
   // When not in screen reader mode, disable line wrapping.
   // We rely on Ink to manage all line wrapping by forcing all content to be
@@ -207,6 +208,7 @@ export async function startInteractiveUI(
                     startupWarnings={startupWarnings}
                     version={version}
                     initializationResult={initializationResult}
+                    authType={authType}
                   />
                 </VimModeProvider>
               </SessionStatsProvider>
@@ -463,6 +465,7 @@ export async function main() {
         startupWarnings,
         process.cwd(),
         initializationResult,
+        settings.merged.security?.auth?.selectedType,
       );
       return;
     }

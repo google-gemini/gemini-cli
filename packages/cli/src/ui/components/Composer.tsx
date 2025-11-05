@@ -22,6 +22,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
+import { useAppContext } from '../contexts/AppContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
@@ -35,6 +36,7 @@ export const Composer = () => {
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled } = useVimMode();
+  const { authType, version } = useAppContext();
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
@@ -164,7 +166,9 @@ export const Composer = () => {
         />
       )}
 
-      {!settings.merged.ui?.hideFooter && !isScreenReaderEnabled && <Footer />}
+      {!settings.merged.ui?.hideFooter && !isScreenReaderEnabled && (
+        <Footer authType={authType} version={version} />
+      )}
     </Box>
   );
 };

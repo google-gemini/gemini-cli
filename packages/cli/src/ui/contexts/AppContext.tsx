@@ -5,10 +5,12 @@
  */
 
 import { createContext, useContext } from 'react';
+import { AuthType } from '@google/gemini-cli-core';
 
 export interface AppState {
   version: string;
   startupWarnings: string[];
+  authType: AuthType | undefined;
 }
 
 export const AppContext = createContext<AppState | null>(null);

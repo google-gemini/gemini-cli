@@ -32,6 +32,8 @@ const defaultProps = {
   targetDir:
     '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
   branchName: 'main',
+  authType: 'test-auth',
+  version: '1.0.0',
 };
 
 const mockSessionStats: SessionStatsState = {
@@ -63,14 +65,32 @@ const mockSessionStats: SessionStatsState = {
 
 describe('<Footer />', () => {
   it('renders the component', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: {
-        branchName: defaultProps.branchName,
-        sessionStats: mockSessionStats,
+    const { lastFrame } = renderWithProviders(
+      <Footer authType={defaultProps.authType} version={defaultProps.version} />,
+      {
+        width: 120,
+        uiState: {
+          branchName: defaultProps.branchName,
+          sessionStats: mockSessionStats,
+        },
       },
-    });
+    );
     expect(lastFrame()).toBeDefined();
+  });
+
+  it('displays the version and auth mode', () => {
+    const { lastFrame } = renderWithProviders(
+      <Footer authType={defaultProps.authType} version={defaultProps.version} />,
+      {
+        width: 120,
+        uiState: {
+          branchName: defaultProps.branchName,
+          sessionStats: mockSessionStats,
+        },
+      },
+    );
+    expect(lastFrame()).toContain(defaultProps.version);
+    expect(lastFrame()).toContain(defaultProps.authType);
   });
 
   describe('path display', () => {

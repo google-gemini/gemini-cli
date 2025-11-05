@@ -118,12 +118,15 @@ function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   });
 }
 
+import { AuthType } from '@google/gemini-cli-core';
+
 interface AppContainerProps {
   config: Config;
   settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
   initializationResult: InitializationResult;
+  authType: AuthType | undefined;
 }
 
 /**
@@ -1475,6 +1478,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
             value={{
               version: props.version,
               startupWarnings: props.startupWarnings || [],
+              authType: props.authType,
             }}
           >
             <ShellFocusContext.Provider value={isFocused}>
