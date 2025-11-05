@@ -11,6 +11,7 @@ import { ContextBuilder } from './context-builder.js';
 import { CheckerRegistry } from './registry.js';
 import type { InProcessCheckerConfig } from '../policy/types.js';
 import type { SafetyCheckResult } from './protocol.js';
+import { SafetyCheckDecision } from './protocol.js';
 import type { Config } from '../config/config.js';
 
 // Mock dependencies
@@ -47,7 +48,9 @@ describe('CheckerRunner', () => {
   });
 
   it('should run in-process checker successfully', async () => {
-    const mockResult: SafetyCheckResult = { allowed: true };
+    const mockResult: SafetyCheckResult = {
+      decision: SafetyCheckDecision.ALLOW,
+    };
     const mockChecker = {
       check: vi.fn().mockResolvedValue(mockResult),
     };
@@ -74,7 +77,7 @@ describe('CheckerRunner', () => {
 
     const result = await runner.runChecker(mockToolCall, mockInProcessConfig);
 
-    expect(result.allowed).toBe(false);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
     expect(result.reason).toContain('Failed to run in-process checker');
     expect(result.reason).toContain('Checker failed');
   });
@@ -84,7 +87,7 @@ describe('CheckerRunner', () => {
     const mockChecker = {
       check: vi.fn().mockImplementation(async () => {
         await new Promise((resolve) => setTimeout(resolve, 6000)); // Longer than default 5s timeout
-        return { allowed: true };
+        return { decision: SafetyCheckDecision.ALLOW };
       }),
     };
     vi.mocked(mockRegistry.resolveInProcess).mockReturnValue(mockChecker);
@@ -96,7 +99,7 @@ describe('CheckerRunner', () => {
     vi.advanceTimersByTime(5001);
 
     const result = await runPromise;
-    expect(result.allowed).toBe(false);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
     expect(result.reason).toContain('timed out');
 
     vi.useRealTimers();
@@ -108,7 +111,7 @@ describe('CheckerRunner', () => {
       required_context: ['environment'],
     };
     const mockChecker = {
-      check: vi.fn().mockResolvedValue({ allowed: true }),
+      check: vi.fn().mockResolvedValue({ decision: SafetyCheckDecision.ALLOW }),
     };
     vi.mocked(mockRegistry.resolveInProcess).mockReturnValue(mockChecker);
     vi.mocked(mockContextBuilder.buildMinimalContext).mockReturnValue({
@@ -139,7 +142,11 @@ describe('CheckerRunner', () => {
       const mockStdout = {
         on: vi.fn().mockImplementation((event, callback) => {
           if (event === 'data') {
-            callback(Buffer.from(JSON.stringify({ allowed: true })));
+            callback(
+              Buffer.from(
+                JSON.stringify({ decision: SafetyCheckDecision.ALLOW }),
+              ),
+            );
           }
         }),
       };
@@ -160,7 +167,7 @@ describe('CheckerRunner', () => {
 
       const result = await runner.runChecker(mockToolCall, mockExternalConfig);
 
-      expect(result.allowed).toBe(true);
+      expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
       expect(spawn).toHaveBeenCalledWith(
         mockCheckerPath,
         [],

@@ -10,6 +10,7 @@ import { PolicyDecision } from '../policy/types.js';
 import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
+import { SafetyCheckDecision } from '../safety/protocol.js';
 
 export class MessageBus extends EventEmitter {
   constructor(
@@ -69,7 +70,7 @@ export class MessageBus extends EventEmitter {
               rule.safety_checker,
             );
 
-            if (!result.allowed) {
+            if (result.decision !== SafetyCheckDecision.ALLOW) {
               // Checker denied it, treat as policy rejection
               this.emitMessage({
                 type: MessageBusType.TOOL_POLICY_REJECTION,

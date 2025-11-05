@@ -12,6 +12,7 @@ import type {
   ExternalCheckerConfig,
 } from '../policy/types.js';
 import type { SafetyCheckInput, SafetyCheckResult } from './protocol.js';
+import { SafetyCheckDecision } from './protocol.js';
 import { CheckerRegistry } from './registry.js';
 import type { ContextBuilder } from './context-builder.js';
 
@@ -83,7 +84,7 @@ export class CheckerRunner {
       return await this.executeWithTimeout(checker.check(input));
     } catch (error) {
       return {
-        allowed: false,
+        decision: SafetyCheckDecision.DENY,
         reason: `Failed to run in-process checker "${checkerConfig.name}": ${
           error instanceof Error ? error.message : String(error)
         }`,
@@ -118,7 +119,7 @@ export class CheckerRunner {
     } catch (error) {
       // If anything goes wrong, deny the operation
       return {
-        allowed: false,
+        decision: SafetyCheckDecision.DENY,
         reason: `Failed to run safety checker "${checkerConfig.name}": ${
           error instanceof Error ? error.message : String(error)
         }`,
@@ -148,7 +149,7 @@ export class CheckerRunner {
         killed = true;
         child.kill('SIGTERM');
         resolve({
-          allowed: false,
+          decision: SafetyCheckDecision.DENY,
           reason: `Safety checker timed out after ${this.timeout}ms`,
         });
       }, this.timeout);
@@ -180,7 +181,7 @@ export class CheckerRunner {
         // Non-zero exit code is a failure
         if (code !== 0) {
           resolve({
-            allowed: false,
+            decision: SafetyCheckDecision.DENY,
             reason: `Safety checker exited with code ${code}${
               stderr ? `: ${stderr}` : ''
             }`,
@@ -193,16 +194,19 @@ export class CheckerRunner {
           const result: SafetyCheckResult = JSON.parse(stdout);
 
           // Validate the result structure
-          if (typeof result.allowed !== 'boolean') {
+          if (
+            !result.decision ||
+            !Object.values(SafetyCheckDecision).includes(result.decision)
+          ) {
             throw new Error(
-              'Invalid result: missing or invalid "allowed" field',
+              'Invalid result: missing or invalid "decision" field',
             );
           }
 
           resolve(result);
         } catch (parseError) {
           resolve({
-            allowed: false,
+            decision: SafetyCheckDecision.DENY,
             reason: `Failed to parse checker output: ${
               parseError instanceof Error
                 ? parseError.message
@@ -220,7 +224,7 @@ export class CheckerRunner {
 
         if (!killed) {
           resolve({
-            allowed: false,
+            decision: SafetyCheckDecision.DENY,
             reason: `Failed to spawn checker process: ${error.message}`,
           });
         }
@@ -241,7 +245,7 @@ export class CheckerRunner {
 
         child.kill();
         resolve({
-          allowed: false,
+          decision: SafetyCheckDecision.DENY,
           reason: `Failed to write to checker stdin: ${
             writeError instanceof Error
               ? writeError.message

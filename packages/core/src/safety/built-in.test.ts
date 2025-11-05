@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { AllowedPathChecker } from './built-in.js';
 import type { SafetyCheckInput } from './protocol.js';
+import { SafetyCheckDecision } from './protocol.js';
 import type { FunctionCall } from '@google/genai';
 
 describe('AllowedPathChecker', () => {
@@ -59,7 +60,7 @@ describe('AllowedPathChecker', () => {
       path: filePath,
     });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(true);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 
   it('should allow paths within workspace roots', async () => {
@@ -69,7 +70,7 @@ describe('AllowedPathChecker', () => {
       path: filePath,
     });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(true);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 
   it('should deny paths outside allowed areas', async () => {
@@ -78,7 +79,7 @@ describe('AllowedPathChecker', () => {
     await fs.writeFile(outsidePath, 'secret');
     const input = createInput({ path: outsidePath });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(false);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
     expect(result.reason).toContain('outside of the allowed workspace');
   });
 
@@ -89,7 +90,7 @@ describe('AllowedPathChecker', () => {
       path: path.join(mockCwd, '..', 'secret.txt'),
     });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(false);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
   });
 
   it('should allow additional paths from config', async () => {
@@ -102,7 +103,7 @@ describe('AllowedPathChecker', () => {
       { additional_allowed_paths: [safeDir] },
     );
     const result = await checker.check(input);
-    expect(result.allowed).toBe(true);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 
   it('should check multiple path arguments', async () => {
@@ -117,7 +118,7 @@ describe('AllowedPathChecker', () => {
       destination: passwdPath,
     });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(false);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
     expect(result.reason).toContain(passwdPath);
   });
 
@@ -126,7 +127,7 @@ describe('AllowedPathChecker', () => {
       path: path.join(mockCwd, 'new-file.txt'),
     });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(true);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 
   it('should deny access if path contains a symlink pointing outside allowed directories', async () => {
@@ -140,7 +141,7 @@ describe('AllowedPathChecker', () => {
 
     const input = createInput({ path: symlinkPath });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(false);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
     expect(result.reason).toContain(
       'outside of the allowed workspace directories',
     );
@@ -156,6 +157,6 @@ describe('AllowedPathChecker', () => {
 
     const input = createInput({ path: symlinkPath });
     const result = await checker.check(input);
-    expect(result.allowed).toBe(true);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 });

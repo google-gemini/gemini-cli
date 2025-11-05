@@ -7,6 +7,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { SafetyCheckInput, SafetyCheckResult } from './protocol.js';
+import { SafetyCheckDecision } from './protocol.js';
 import type { AllowedPathConfig } from '../policy/types.js';
 
 /**
@@ -58,7 +59,7 @@ export class AllowedPathChecker implements InProcessChecker {
       if (!resolvedPath) {
         // If path cannot be resolved, deny it
         return {
-          allowed: false,
+          decision: SafetyCheckDecision.DENY,
           reason: `Cannot resolve path "${p}"`,
         };
       }
@@ -75,13 +76,13 @@ export class AllowedPathChecker implements InProcessChecker {
 
       if (!isAllowed) {
         return {
-          allowed: false,
+          decision: SafetyCheckDecision.DENY,
           reason: `Path "${p}" is outside of the allowed workspace directories.`,
         };
       }
     }
 
-    return { allowed: true };
+    return { decision: SafetyCheckDecision.ALLOW };
   }
 
   private safelyResolvePath(inputPath: string, cwd: string): string | null {

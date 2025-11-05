@@ -68,13 +68,23 @@ export interface SafetyCheckInput {
 }
 
 /**
+ * The possible decisions a safety checker can make.
+ */
+export enum SafetyCheckDecision {
+  ALLOW = 'allow',
+  DENY = 'deny',
+  ASK_USER = 'ask_user',
+  CONTINUE_CHECKING = 'continue_checking',
+}
+
+/**
  * The data structure returned by a safety checker process via stdout.
  */
 export interface SafetyCheckResult {
   /**
-   * Whether the tool call is allowed to proceed.
+   * The decision made by the safety checker.
    */
-  allowed: boolean;
+  decision: SafetyCheckDecision;
   /**
    * If not allowed, a message explaining why the tool call was blocked.
    * This will be shown to the user.
