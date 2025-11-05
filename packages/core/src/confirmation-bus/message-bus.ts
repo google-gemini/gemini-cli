@@ -9,13 +9,10 @@ import type { PolicyEngine } from '../policy/policy-engine.js';
 import { PolicyDecision } from '../policy/types.js';
 import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import type { CheckerRunner } from '../safety/checker-runner.js';
-import { SafetyCheckDecision } from '../safety/protocol.js';
 
 export class MessageBus extends EventEmitter {
   constructor(
     private readonly policyEngine: PolicyEngine,
-    private readonly checkerRunner?: CheckerRunner,
     private readonly debug = false,
   ) {
     super();
@@ -53,52 +50,10 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const { decision, rule } = this.policyEngine.check(
+        const { decision } = await this.policyEngine.check(
           message.toolCall,
           message.serverName,
         );
-
-        if (
-          decision === PolicyDecision.ALLOW &&
-          rule?.safety_checker &&
-          this.checkerRunner
-        ) {
-          // If allowed by policy but has a safety checker, run it
-          try {
-            const result = await this.checkerRunner.runChecker(
-              message.toolCall,
-              rule.safety_checker,
-            );
-
-            if (result.decision !== SafetyCheckDecision.ALLOW) {
-              // Checker denied it, treat as policy rejection
-              this.emitMessage({
-                type: MessageBusType.TOOL_POLICY_REJECTION,
-                toolCall: message.toolCall,
-              });
-              this.emitMessage({
-                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-                correlationId: message.correlationId,
-                confirmed: false,
-              });
-              return;
-            }
-            // If allowed by checker, proceed to standard ALLOW handling below
-          } catch (error) {
-            // If checker fails to run, deny by default for safety
-            this.emit('error', error);
-            this.emitMessage({
-              type: MessageBusType.TOOL_POLICY_REJECTION,
-              toolCall: message.toolCall,
-            });
-            this.emitMessage({
-              type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-              correlationId: message.correlationId,
-              confirmed: false,
-            });
-            return;
-          }
-        }
 
         switch (decision) {
           case PolicyDecision.ALLOW:

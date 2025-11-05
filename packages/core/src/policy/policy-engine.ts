@@ -12,6 +12,8 @@ import {
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { CheckerRunner } from '../safety/checker-runner.js';
+import { SafetyCheckDecision } from '../safety/protocol.js';
 
 function ruleMatches(
   rule: PolicyRule,
@@ -62,26 +64,28 @@ export class PolicyEngine {
   private rules: PolicyRule[];
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
+  private readonly checkerRunner?: CheckerRunner;
 
-  constructor(config: PolicyEngineConfig = {}) {
+  constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
+    this.checkerRunner = checkerRunner;
   }
 
   /**
    * Check if a tool call is allowed based on the configured policies.
    * Returns the decision and the matching rule (if any).
    */
-  check(
+  async check(
     toolCall: FunctionCall,
     serverName: string | undefined,
-  ): {
+  ): Promise<{
     decision: PolicyDecision;
     rule?: PolicyRule;
-  } {
+  }> {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
     if (toolCall.args && this.rules.some((rule) => rule.argsPattern)) {
@@ -98,8 +102,38 @@ export class PolicyEngine {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
+
+        const decision = this.applyNonInteractiveMode(rule.decision);
+
+        if (
+          decision === PolicyDecision.ALLOW &&
+          rule.safety_checker &&
+          this.checkerRunner
+        ) {
+          try {
+            const result = await this.checkerRunner.runChecker(
+              toolCall,
+              rule.safety_checker,
+            );
+            if (result.decision !== SafetyCheckDecision.ALLOW) {
+              return {
+                decision: PolicyDecision.DENY,
+                rule,
+              };
+            }
+          } catch (error) {
+            debugLogger.debug(
+              `[PolicyEngine.check] Safety checker failed: ${error}`,
+            );
+            return {
+              decision: PolicyDecision.DENY,
+              rule,
+            };
+          }
+        }
+
         return {
-          decision: this.applyNonInteractiveMode(rule.decision),
+          decision,
           rule,
         };
       }
