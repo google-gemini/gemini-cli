@@ -108,6 +108,7 @@ export {
   // Custom metrics for token usage and API responses
   recordCustomTokenUsageMetrics,
   recordCustomApiResponseMetrics,
+  recordExitFail,
   // OpenTelemetry GenAI semantic convention for token usage and operation duration
   recordGenAiClientTokenUsage,
   recordGenAiClientOperationDuration,
@@ -125,6 +126,7 @@ export {
   recordBaselineComparison,
   isPerformanceMonitoringActive,
   recordFlickerFrame,
+  recordSlowRender,
   // Performance monitoring types
   PerformanceMetricType,
   MemoryMetricType,
@@ -136,3 +138,4 @@ export {
   GenAiProviderName,
   GenAiTokenType,
 } from './metrics.js';
+export { runInDevTraceSpan, type SpanMetadata } from './trace.js';

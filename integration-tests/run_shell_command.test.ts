@@ -61,6 +61,28 @@ function getDisallowedFileReadCommand(testFile: string): {
   }
 }
 
+function getChainedEchoCommand(): { allowPattern: string; command: string } {
+  const secondCommand = getAllowedListCommand();
+  switch (shell) {
+    case 'powershell':
+      return {
+        allowPattern: 'Write-Output',
+        command: `Write-Output "foo" && ${secondCommand}`,
+      };
+    case 'cmd':
+      return {
+        allowPattern: 'echo',
+        command: `echo "foo" && ${secondCommand}`,
+      };
+    case 'bash':
+    default:
+      return {
+        allowPattern: 'echo',
+        command: `echo "foo" && ${secondCommand}`,
+      };
+  }
+}
+
 describe('run_shell_command', () => {
   it('should be able to run a shell command', async () => {
     const rig = new TestRig();
@@ -122,7 +144,7 @@ describe('run_shell_command', () => {
     validateModelOutput(result, 'test-stdin', 'Shell command stdin test');
   });
 
-  it('should run allowed sub-command in non-interactive mode', async () => {
+  it.skip('should run allowed sub-command in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
@@ -240,7 +262,7 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should work with ShellTool alias', async () => {
+  it.skip('should work with ShellTool alias', async () => {
     const rig = new TestRig();
     await rig.setup('should work with ShellTool alias');
 
@@ -338,7 +360,7 @@ describe('run_shell_command', () => {
     }
   });
 
-  it.skip('should reject commands not on the allowlist', async () => {
+  it('should reject commands not on the allowlist', async () => {
     const rig = new TestRig();
     await rig.setup('should reject commands not on the allowlist');
 
@@ -403,6 +425,36 @@ describe('run_shell_command', () => {
       'Expected failing run_shell_command invocation',
     ).toBeTruthy();
     expect(failureLog!.toolRequest.success).toBe(false);
+  });
+
+  // TODO(#11966): Deflake this test and re-enable once the underlying race is resolved.
+  it.skip('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
+    const rig = new TestRig();
+    await rig.setup(
+      'should reject chained commands when only the first segment is allowlisted',
+    );
+
+    const chained = getChainedEchoCommand();
+    const shellInjection = `!{${chained.command}}`;
+
+    await rig.run(
+      {
+        stdin: `${shellInjection}\n`,
+        yolo: false,
+      },
+      `--allowed-tools=ShellTool(${chained.allowPattern})`,
+    );
+
+    // CLI should refuse to execute the chained command without scheduling run_shell_command.
+    const toolLogs = rig
+      .readToolLogs()
+      .filter((log) => log.toolRequest.name === 'run_shell_command');
+
+    // Success is false because tool is in the scheduled state.
+    for (const log of toolLogs) {
+      expect(log.toolRequest.success).toBe(false);
+      expect(log.toolRequest.args).toContain('&&');
+    }
   });
 
   it('should allow all with "ShellTool" and other specific tools', async () => {

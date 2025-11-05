@@ -28,7 +28,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
-const MAX_HISTORY_LENGTH = 1000;
+const MAX_HISTORY_LENGTH = 5000;
 
 /**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
@@ -123,7 +123,11 @@ export class LoopDetectionService {
    * @returns true if a loop is detected, false otherwise
    */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
-    if (this.loopDetected || this.disabledForSession) {
+    if (this.disabledForSession) {
+      return false;
+    }
+
+    if (this.loopDetected) {
       return this.loopDetected;
     }
 
@@ -324,7 +328,7 @@ export class LoopDetectionService {
    * 2. Verify actual content matches to prevent hash collisions
    * 3. Track all positions where this chunk appears
    * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
-   *    within a small average distance (≤ 1.5 * chunk size)
+   *    within a small average distance (≤ 5 * chunk size)
    */
   private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
     const existingIndices = this.contentStats.get(hash);
@@ -349,7 +353,7 @@ export class LoopDetectionService {
     const totalDistance =
       recentIndices[recentIndices.length - 1] - recentIndices[0];
     const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
-    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 1.5;
+    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 5;
 
     return averageDistance <= maxAllowedDistance;
   }
@@ -404,21 +408,30 @@ export class LoopDetectionService {
       ...trimmedHistory,
       { role: 'user', parts: [{ text: taskPrompt }] },
     ];
+    if (contents.length > 0 && isFunctionCall(contents[0])) {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Recent conversation history:' }],
+      });
+    }
     const schema: Record<string, unknown> = {
       type: 'object',
       properties: {
-        reasoning: {
+        unproductive_state_analysis: {
           type: 'string',
           description:
             'Your reasoning on if the conversation is looping without forward progress.',
         },
-        confidence: {
+        unproductive_state_confidence: {
           type: 'number',
           description:
             'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
         },
       },
-      required: ['reasoning', 'confidence'],
+      required: [
+        'unproductive_state_analysis',
+        'unproductive_state_confidence',
+      ],
     };
     let result;
     try {
@@ -432,14 +445,17 @@ export class LoopDetectionService {
       });
     } catch (e) {
       // Do nothing, treat it as a non-loop.
-      this.config.getDebugMode() ? console.error(e) : debugLogger.debug(e);
+      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
       return false;
     }
 
-    if (typeof result['confidence'] === 'number') {
-      if (result['confidence'] > 0.9) {
-        if (typeof result['reasoning'] === 'string' && result['reasoning']) {
-          debugLogger.warn(result['reasoning']);
+    if (typeof result['unproductive_state_confidence'] === 'number') {
+      if (result['unproductive_state_confidence'] > 0.9) {
+        if (
+          typeof result['unproductive_state_analysis'] === 'string' &&
+          result['unproductive_state_analysis']
+        ) {
+          debugLogger.warn(result['unproductive_state_analysis']);
         }
         logLoopDetected(
           this.config,
@@ -450,7 +466,7 @@ export class LoopDetectionService {
         this.llmCheckInterval = Math.round(
           MIN_LLM_CHECK_INTERVAL +
             (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result['confidence']),
+              (1 - result['unproductive_state_confidence']),
         );
       }
     }

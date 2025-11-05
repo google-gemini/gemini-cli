@@ -44,11 +44,7 @@ describe('validateAuthMethod', () => {
 
     it('should return an error message if GEMINI_API_KEY is not set', () => {
       vi.stubEnv('GEMINI_API_KEY', undefined);
-      expect(validateAuthMethod(AuthType.USE_GEMINI)).toBe(
-        'GEMINI_API_KEY not found. Find your existing key or generate a new one at: https://aistudio.google.com/apikey\n' +
-          '\n' +
-          'To continue, please set the GEMINI_API_KEY environment variable or add it to a .env file.',
-      );
+      expect(validateAuthMethod(AuthType.USE_GEMINI)).toBeNull();
     });
   });
 

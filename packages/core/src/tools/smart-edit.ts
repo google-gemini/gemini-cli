@@ -10,6 +10,7 @@ import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
+  BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
@@ -19,10 +20,13 @@ import {
   type ToolResult,
   type ToolResultDisplay,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import { type Config, ApprovalMode } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import {
   type ModifiableDeclarativeTool,
@@ -369,13 +373,21 @@ interface CalculatedEdit {
   originalLineEnding: '\r\n' | '\n';
 }
 
-class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
+class EditToolInvocation
+  extends BaseToolInvocation<EditToolParams, ToolResult>
+  implements ToolInvocation<EditToolParams, ToolResult>
+{
   constructor(
     private readonly config: Config,
-    public params: EditToolParams,
-  ) {}
+    params: EditToolParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
+  ) {
+    super(params, messageBus, toolName, displayName);
+  }
 
-  toolLocations(): ToolLocation[] {
+  override toolLocations(): ToolLocation[] {
     return [{ path: this.params.file_path }];
   }
 
@@ -413,6 +425,18 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       this.config.getBaseLlmClient(),
       abortSignal,
     );
+
+    // If the self-correction attempt timed out, return the original error.
+    if (fixedEdit === null) {
+      return {
+        currentContent: contentForLlmEditFixer,
+        newContent: currentContent,
+        occurrences: 0,
+        isNewFile: false,
+        error: initialError,
+        originalLineEnding,
+      };
+    }
 
     if (fixedEdit.noChangesRequired) {
       return {
@@ -602,7 +626,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
    * Handles the confirmation prompt for the Edit tool in the CLI.
    * It needs to calculate the diff to show the user.
    */
-  async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
@@ -753,12 +777,11 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
-        const originallyProposedContent =
-          this.params.ai_proposed_string || this.params.new_string;
+
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
-          originallyProposedContent,
+          editData.newContent,
           this.params.new_string,
         );
         displayResult = {
@@ -818,7 +841,10 @@ export class SmartEditTool
 {
   static readonly Name = EDIT_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       SmartEditTool.Name,
       'Edit',
@@ -875,6 +901,9 @@ A good instruction should concisely answer:
         required: ['file_path', 'instruction', 'old_string', 'new_string'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -914,7 +943,13 @@ A good instruction should concisely answer:
   protected createInvocation(
     params: EditToolParams,
   ): ToolInvocation<EditToolParams, ToolResult> {
-    return new EditToolInvocation(this.config, params);
+    return new EditToolInvocation(
+      this.config,
+      params,
+      this.messageBus,
+      this.name,
+      this.displayName,
+    );
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {

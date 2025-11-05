@@ -86,6 +86,8 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
   tool for reading content from multiple files or directories.
 - **[Memory Tool](./memory.md) (`save_memory`):** For saving and recalling
   information across sessions.
+- **[Todo Tool](./todos.md) (`write_todos`):** For managing subtasks of complex
+  requests.
 
 Additionally, these tools incorporate:
 

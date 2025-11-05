@@ -252,4 +252,30 @@ describe('CodeAssistServer', () => {
       currentTier: { id: UserTierId.STANDARD },
     });
   });
+
+  it('should call the listExperiments endpoint with metadata', async () => {
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    const mockResponse = {
+      experiments: [],
+    };
+    vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
+
+    const metadata = {
+      ideVersion: 'v0.1.0',
+    };
+    const response = await server.listExperiments(metadata);
+
+    expect(server.requestPost).toHaveBeenCalledWith('listExperiments', {
+      project: 'test-project',
+      metadata: { ideVersion: 'v0.1.0', duetProject: 'test-project' },
+    });
+    expect(response).toEqual(mockResponse);
+  });
 });

@@ -8,7 +8,9 @@
 import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ConfigParameters } from '../config/config.js';
-import { Config, ApprovalMode } from '../config/config.js';
+import { Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import type { FunctionDeclaration, CallableTool } from '@google/genai';
@@ -17,19 +19,9 @@ import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';
 import { MockTool } from '../test-utils/mock-tool.js';
-
-import { McpClientManager } from './mcp-client-manager.js';
 import { ToolErrorType } from './tool-error.js';
 
 vi.mock('node:fs');
-
-// Mock ./mcp-client.js to control its behavior within tool-registry tests
-vi.mock('./mcp-client.js', async () => {
-  const originalModule = await vi.importActual('./mcp-client.js');
-  return {
-    ...originalModule,
-  };
-});
 
 // Mock node:child_process
 vi.mock('node:child_process', async () => {
@@ -398,27 +390,6 @@ describe('ToolRegistry', () => {
       );
       expect(result.llmContent).toContain('Stderr: Something went wrong');
       expect(result.llmContent).toContain('Exit Code: 1');
-    });
-
-    it('should discover tools using MCP servers defined in getMcpServers', async () => {
-      const discoverSpy = vi.spyOn(
-        McpClientManager.prototype,
-        'discoverAllMcpTools',
-      );
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
-      const mcpServerConfigVal = {
-        'my-mcp-server': {
-          command: 'mcp-server-cmd',
-          args: ['--port', '1234'],
-          trust: true,
-        },
-      };
-      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
-
-      await toolRegistry.discoverAllTools();
-
-      expect(discoverSpy).toHaveBeenCalled();
     });
   });
 

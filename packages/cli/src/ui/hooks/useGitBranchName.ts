@@ -41,11 +41,13 @@ export function useGitBranchName(cwd: string): string | undefined {
 
     const gitLogsHeadPath = path.join(cwd, '.git', 'logs', 'HEAD');
     let watcher: fs.FSWatcher | undefined;
+    let cancelled = false;
 
     const setupWatcher = async () => {
       try {
         // Check if .git/logs/HEAD exists, as it might not in a new repo or orphaned head
         await fsPromises.access(gitLogsHeadPath, fs.constants.F_OK);
+        if (cancelled) return;
         watcher = fs.watch(gitLogsHeadPath, (eventType: string) => {
           // Changes to .git/logs/HEAD (appends) indicate HEAD has likely changed
           if (eventType === 'change' || eventType === 'rename') {
@@ -63,6 +65,7 @@ export function useGitBranchName(cwd: string): string | undefined {
     setupWatcher();
 
     return () => {
+      cancelled = true;
       watcher?.close();
     };
   }, [cwd, fetchBranchName]);

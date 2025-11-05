@@ -270,4 +270,42 @@ src/*.tmp
       expect(parser.isIgnored('bar ')).toBe(false);
     });
   });
+
+  describe('Extra Patterns', () => {
+    beforeEach(async () => {
+      await setupGitRepo();
+    });
+
+    it('should apply extraPatterns with higher precedence than .gitignore', async () => {
+      await createTestFile('.gitignore', '*.txt');
+
+      const extraPatterns = ['!important.txt', 'temp/'];
+      parser = new GitIgnoreParser(projectRoot, extraPatterns);
+
+      expect(parser.isIgnored('file.txt')).toBe(true);
+      expect(parser.isIgnored('important.txt')).toBe(false); // Un-ignored by extraPatterns
+      expect(parser.isIgnored('temp/file.js')).toBe(true); // Ignored by extraPatterns
+    });
+
+    it('should handle extraPatterns that unignore directories', async () => {
+      await createTestFile('.gitignore', '/foo/\n/a/*/c/');
+
+      const extraPatterns = ['!foo/', '!a/*/c/'];
+      parser = new GitIgnoreParser(projectRoot, extraPatterns);
+
+      expect(parser.isIgnored('foo/bar/file.txt')).toBe(false);
+      expect(parser.isIgnored('a/b/c/file.txt')).toBe(false);
+    });
+
+    it('should handle extraPatterns that unignore directories with nested gitignore', async () => {
+      await createTestFile('.gitignore', '/foo/');
+      await createTestFile('foo/bar/.gitignore', 'file.txt');
+
+      const extraPatterns = ['!foo/'];
+      parser = new GitIgnoreParser(projectRoot, extraPatterns);
+
+      expect(parser.isIgnored('foo/bar/file.txt')).toBe(true);
+      expect(parser.isIgnored('foo/bar/file2.txt')).toBe(false);
+    });
+  });
 });

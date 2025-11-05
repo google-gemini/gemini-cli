@@ -15,7 +15,7 @@ import type { Settings } from './settings.js';
 
 describe('Policy Engine Integration Tests', () => {
   describe('Policy configuration produces valid PolicyEngine config', () => {
-    it('should create a working PolicyEngine from basic settings', () => {
+    it('should create a working PolicyEngine from basic settings', async () => {
       const settings: Settings = {
         tools: {
           allowed: ['run_shell_command'],
@@ -23,7 +23,10 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
       // Allowed tool should be allowed
@@ -43,7 +46,7 @@ describe('Policy Engine Integration Tests', () => {
       );
     });
 
-    it('should handle MCP server wildcard patterns correctly', () => {
+    it('should handle MCP server wildcard patterns correctly', async () => {
       const settings: Settings = {
         mcp: {
           allowed: ['allowed-server'],
@@ -58,7 +61,10 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
       // Tools from allowed server should be allowed
@@ -91,7 +97,7 @@ describe('Policy Engine Integration Tests', () => {
       );
     });
 
-    it('should correctly prioritize specific tool rules over MCP server wildcards', () => {
+    it('should correctly prioritize specific tool excludes over MCP server wildcards', async () => {
       const settings: Settings = {
         mcp: {
           allowed: ['my-server'],
@@ -101,19 +107,23 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
-      // Server is allowed, but specific tool is excluded
+      // MCP server allowed (priority 2.1) provides general allow for server
       expect(engine.check({ name: 'my-server__safe-tool' })).toBe(
         PolicyDecision.ALLOW,
       );
+      // But specific tool exclude (priority 2.4) wins over server allow
       expect(engine.check({ name: 'my-server__dangerous-tool' })).toBe(
         PolicyDecision.DENY,
       );
     });
 
-    it('should handle complex mixed configurations', () => {
+    it('should handle complex mixed configurations', async () => {
       const settings: Settings = {
         tools: {
           autoAccept: true, // Allows read-only tools
@@ -133,7 +143,10 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
       // Read-only tools should be allowed (autoAccept)
@@ -171,14 +184,17 @@ describe('Policy Engine Integration Tests', () => {
       );
     });
 
-    it('should handle YOLO mode correctly', () => {
+    it('should handle YOLO mode correctly', async () => {
       const settings: Settings = {
         tools: {
           exclude: ['dangerous-tool'], // Even in YOLO, excludes should be respected
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.YOLO);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.YOLO,
+      );
       const engine = new PolicyEngine(config);
 
       // Most tools should be allowed in YOLO mode
@@ -194,25 +210,26 @@ describe('Policy Engine Integration Tests', () => {
       );
     });
 
-    it('should handle AUTO_EDIT mode correctly', () => {
+    it('should handle AUTO_EDIT mode correctly', async () => {
       const settings: Settings = {};
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.AUTO_EDIT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.AUTO_EDIT,
+      );
       const engine = new PolicyEngine(config);
 
-      // Edit tool should be allowed (EditTool.Name = 'replace')
+      // Edit tools should be allowed in AUTO_EDIT mode
       expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.ALLOW);
+      expect(engine.check({ name: 'write_file' })).toBe(PolicyDecision.ALLOW);
 
       // Other tools should follow normal rules
       expect(engine.check({ name: 'run_shell_command' })).toBe(
         PolicyDecision.ASK_USER,
       );
-      expect(engine.check({ name: 'write_file' })).toBe(
-        PolicyDecision.ASK_USER,
-      );
     });
 
-    it('should verify priority ordering works correctly in practice', () => {
+    it('should verify priority ordering works correctly in practice', async () => {
       const settings: Settings = {
         tools: {
           autoAccept: true, // Priority 50
@@ -232,7 +249,10 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
       // Test that priorities are applied correctly
@@ -240,28 +260,29 @@ describe('Policy Engine Integration Tests', () => {
 
       // Find rules and verify their priorities
       const blockedToolRule = rules.find((r) => r.toolName === 'blocked-tool');
-      expect(blockedToolRule?.priority).toBe(200);
+      expect(blockedToolRule?.priority).toBe(2.4); // Command line exclude
 
       const blockedServerRule = rules.find(
         (r) => r.toolName === 'blocked-server__*',
       );
-      expect(blockedServerRule?.priority).toBe(195);
+      expect(blockedServerRule?.priority).toBe(2.9); // MCP server exclude
 
       const specificToolRule = rules.find(
         (r) => r.toolName === 'specific-tool',
       );
-      expect(specificToolRule?.priority).toBe(100);
+      expect(specificToolRule?.priority).toBe(2.3); // Command line allow
 
       const trustedServerRule = rules.find(
         (r) => r.toolName === 'trusted-server__*',
       );
-      expect(trustedServerRule?.priority).toBe(90);
+      expect(trustedServerRule?.priority).toBe(2.2); // MCP trusted server
 
       const mcpServerRule = rules.find((r) => r.toolName === 'mcp-server__*');
-      expect(mcpServerRule?.priority).toBe(85);
+      expect(mcpServerRule?.priority).toBe(2.1); // MCP allowed server
 
       const readOnlyToolRule = rules.find((r) => r.toolName === 'glob');
-      expect(readOnlyToolRule?.priority).toBe(50);
+      // Priority 50 in default tier → 1.05
+      expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
 
       // Verify the engine applies these priorities correctly
       expect(engine.check({ name: 'blocked-tool' })).toBe(PolicyDecision.DENY);
@@ -280,7 +301,7 @@ describe('Policy Engine Integration Tests', () => {
       expect(engine.check({ name: 'glob' })).toBe(PolicyDecision.ALLOW);
     });
 
-    it('should handle edge case: MCP server with both trust and exclusion', () => {
+    it('should handle edge case: MCP server with both trust and exclusion', async () => {
       const settings: Settings = {
         mcpServers: {
           'conflicted-server': {
@@ -294,7 +315,10 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
       // Exclusion (195) should win over trust (90)
@@ -303,7 +327,7 @@ describe('Policy Engine Integration Tests', () => {
       );
     });
 
-    it('should handle edge case: specific tool allowed but server excluded', () => {
+    it('should handle edge case: specific tool allowed but server excluded', async () => {
       const settings: Settings = {
         mcp: {
           excluded: ['my-server'], // Priority 195 - DENY
@@ -313,7 +337,10 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
       // Server exclusion (195) wins over specific tool allow (100)
@@ -326,10 +353,13 @@ describe('Policy Engine Integration Tests', () => {
       );
     });
 
-    it('should verify non-interactive mode transformation', () => {
+    it('should verify non-interactive mode transformation', async () => {
       const settings: Settings = {};
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       // Enable non-interactive mode
       const engineConfig = { ...config, nonInteractive: true };
       const engine = new PolicyEngine(engineConfig);
@@ -341,10 +371,13 @@ describe('Policy Engine Integration Tests', () => {
       );
     });
 
-    it('should handle empty settings gracefully', () => {
+    it('should handle empty settings gracefully', async () => {
       const settings: Settings = {};
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const engine = new PolicyEngine(config);
 
       // Should have default rules for write tools
@@ -357,7 +390,7 @@ describe('Policy Engine Integration Tests', () => {
       expect(engine.check({ name: 'unknown' })).toBe(PolicyDecision.ASK_USER);
     });
 
-    it('should verify rules are created with correct priorities', () => {
+    it('should verify rules are created with correct priorities', async () => {
       const settings: Settings = {
         tools: {
           autoAccept: true,
@@ -370,24 +403,28 @@ describe('Policy Engine Integration Tests', () => {
         },
       };
 
-      const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
       const rules = config.rules || [];
 
       // Verify each rule has the expected priority
       const tool3Rule = rules.find((r) => r.toolName === 'tool3');
-      expect(tool3Rule?.priority).toBe(200); // Excluded tools
+      expect(tool3Rule?.priority).toBe(2.4); // Excluded tools (user tier)
 
       const server2Rule = rules.find((r) => r.toolName === 'server2__*');
-      expect(server2Rule?.priority).toBe(195); // Excluded servers
+      expect(server2Rule?.priority).toBe(2.9); // Excluded servers (user tier)
 
       const tool1Rule = rules.find((r) => r.toolName === 'tool1');
-      expect(tool1Rule?.priority).toBe(100); // Allowed tools
+      expect(tool1Rule?.priority).toBe(2.3); // Allowed tools (user tier)
 
       const server1Rule = rules.find((r) => r.toolName === 'server1__*');
-      expect(server1Rule?.priority).toBe(85); // Allowed servers
+      expect(server1Rule?.priority).toBe(2.1); // Allowed servers (user tier)
 
       const globRule = rules.find((r) => r.toolName === 'glob');
-      expect(globRule?.priority).toBe(50); // Auto-accept read-only
+      // Priority 50 in default tier → 1.05
+      expect(globRule?.priority).toBeCloseTo(1.05, 5); // Auto-accept read-only
 
       // The PolicyEngine will sort these by priority when it's created
       const engine = new PolicyEngine(config);

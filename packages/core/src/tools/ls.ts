@@ -14,6 +14,7 @@ import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Parameters for the LS tool
@@ -173,7 +174,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       );
 
       const fileDiscovery = this.config.getFileService();
-      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
+      const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
@@ -205,7 +206,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
           });
         } catch (error) {
           // Log error internally but don't fail the whole listing
-          console.error(`Error accessing ${fullPath}: ${error}`);
+          debugLogger.debug(`Error accessing ${fullPath}: ${error}`);
         }
       }
 
@@ -222,20 +223,13 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         .join('\n');
 
       let resultMessage = `Directory listing for ${this.params.path}:\n${directoryContent}`;
-      const ignoredMessages = [];
-      if (gitIgnoredCount > 0) {
-        ignoredMessages.push(`${gitIgnoredCount} git-ignored`);
-      }
-      if (geminiIgnoredCount > 0) {
-        ignoredMessages.push(`${geminiIgnoredCount} gemini-ignored`);
-      }
-      if (ignoredMessages.length > 0) {
-        resultMessage += `\n\n(${ignoredMessages.join(', ')})`;
+      if (ignoredCount > 0) {
+        resultMessage += `\n\n(${ignoredCount} ignored)`;
       }
 
       let displayMessage = `Listed ${entries.length} item(s).`;
-      if (ignoredMessages.length > 0) {
-        displayMessage += ` (${ignoredMessages.join(', ')})`;
+      if (ignoredCount > 0) {
+        displayMessage += ` (${ignoredCount} ignored)`;
       }
 
       return {

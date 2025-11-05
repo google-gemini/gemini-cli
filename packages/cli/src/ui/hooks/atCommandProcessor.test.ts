@@ -38,6 +38,10 @@ describe('handleAtCommand', () => {
     return path.resolve(testRootDir, fullPath);
   }
 
+  function getRelativePath(absolutePath: string): string {
+    return path.relative(testRootDir, absolutePath);
+  }
+
   beforeEach(async () => {
     vi.resetAllMocks();
 
@@ -80,6 +84,7 @@ describe('handleAtCommand', () => {
         getReadManyFilesExcludes: () => [],
       }),
       getUsageStatisticsEnabled: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
@@ -138,6 +143,7 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'path', 'to', 'file.txt'),
       fileContent,
     );
+    const relativePath = getRelativePath(filePath);
     const query = `@${filePath}`;
 
     const result = await handleAtCommand({
@@ -151,9 +157,9 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [
-        { text: `@${filePath}` },
+        { text: `@${relativePath}` },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${filePath}:\n` },
+        { text: `\nContent from @${relativePath}:\n` },
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
@@ -175,8 +181,10 @@ describe('handleAtCommand', () => {
       fileContent,
     );
     const dirPath = path.dirname(filePath);
+    const relativeDirPath = getRelativePath(dirPath);
+    const relativeFilePath = getRelativePath(filePath);
     const query = `@${dirPath}`;
-    const resolvedGlob = `${dirPath}/**`;
+    const resolvedGlob = path.join(relativeDirPath, '**');
 
     const result = await handleAtCommand({
       query,
@@ -191,7 +199,7 @@ describe('handleAtCommand', () => {
       processedQuery: [
         { text: `@${resolvedGlob}` },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${filePath}:\n` },
+        { text: `\nContent from @${relativeFilePath}:\n` },
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
@@ -208,6 +216,7 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'doc.md'),
       fileContent,
     );
+    const relativePath = getRelativePath(filePath);
     const textBefore = 'Explain this: ';
     const textAfter = ' in detail.';
     const query = `${textBefore}@${filePath}${textAfter}`;
@@ -223,9 +232,9 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [
-        { text: `${textBefore}@${filePath}${textAfter}` },
+        { text: `${textBefore}@${relativePath}${textAfter}` },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${filePath}:\n` },
+        { text: `\nContent from @${relativePath}:\n` },
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
@@ -253,9 +262,9 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [
-        { text: `@${filePath}` },
+        { text: `@${getRelativePath(filePath)}` },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${filePath}:\n` },
+        { text: `\nContent from @${getRelativePath(filePath)}:\n` },
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
@@ -294,11 +303,13 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [
-        { text: query },
+        {
+          text: `@${getRelativePath(file1Path)} @${getRelativePath(file2Path)}`,
+        },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${file1Path}:\n` },
+        { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
         { text: content1 },
-        { text: `\nContent from @${file2Path}:\n` },
+        { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
@@ -333,11 +344,13 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [
-        { text: query },
+        {
+          text: `${text1}@${getRelativePath(file1Path)}${text2}@${getRelativePath(file2Path)}${text3}`,
+        },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${file1Path}:\n` },
+        { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
         { text: content1 },
-        { text: `\nContent from @${file2Path}:\n` },
+        { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
@@ -371,12 +384,12 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [
         {
-          text: `Look at @${file1Path} then @${invalidFile} and also just @ symbol, then @${file2Path}`,
+          text: `Look at @${getRelativePath(file1Path)} then @${invalidFile} and also just @ symbol, then @${getRelativePath(file2Path)}`,
         },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${file2Path}:\n` },
+        { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
         { text: content2 },
-        { text: `\nContent from @${file1Path}:\n` },
+        { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
         { text: content1 },
         { text: '\n--- End of content ---' },
       ],
@@ -474,9 +487,9 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `@${validFile}` },
+          { text: `@${getRelativePath(validFile)}` },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${validFile}:\n` },
+          { text: `\nContent from @${getRelativePath(validFile)}:\n` },
           { text: 'console.log("Hello world");' },
           { text: '\n--- End of content ---' },
         ],
@@ -507,9 +520,9 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `@${validFile} @${gitIgnoredFile}` },
+          { text: `@${getRelativePath(validFile)} @${gitIgnoredFile}` },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${validFile}:\n` },
+          { text: `\nContent from @${getRelativePath(validFile)}:\n` },
           { text: '# Project README' },
           { text: '\n--- End of content ---' },
         ],
@@ -633,9 +646,9 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [
-        { text: `@${validFile}` },
+        { text: `@${getRelativePath(validFile)}` },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${validFile}:\n` },
+        { text: `\nContent from @${getRelativePath(validFile)}:\n` },
         { text: 'console.log("Hello world");' },
         { text: '\n--- End of content ---' },
       ],
@@ -669,9 +682,9 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [
-        { text: `@${validFile} @${geminiIgnoredFile}` },
+        { text: `@${getRelativePath(validFile)} @${geminiIgnoredFile}` },
         { text: '\n--- Content from referenced files ---' },
-        { text: `\nContent from @${validFile}:\n` },
+        { text: `\nContent from @${getRelativePath(validFile)}:\n` },
         { text: '// Main application entry' },
         { text: '\n--- End of content ---' },
       ],
@@ -692,7 +705,7 @@ describe('handleAtCommand', () => {
         fileName: 'test.txt',
         fileContent: 'File content here',
         queryTemplate: (filePath: string) =>
-          `Look at @${filePath}, then explain it.`,
+          `Look at @${getRelativePath(filePath)}, then explain it.`,
         messageId: 400,
       },
       {
@@ -700,7 +713,7 @@ describe('handleAtCommand', () => {
         fileName: 'readme.md',
         fileContent: 'File content here',
         queryTemplate: (filePath: string) =>
-          `Check @${filePath}. What does it say?`,
+          `Check @${getRelativePath(filePath)}. What does it say?`,
         messageId: 401,
       },
       {
@@ -708,7 +721,7 @@ describe('handleAtCommand', () => {
         fileName: 'example.js',
         fileContent: 'Code example',
         queryTemplate: (filePath: string) =>
-          `Review @${filePath}; check for bugs.`,
+          `Review @${getRelativePath(filePath)}; check for bugs.`,
         messageId: 402,
       },
       {
@@ -716,7 +729,7 @@ describe('handleAtCommand', () => {
         fileName: 'important.txt',
         fileContent: 'Important content',
         queryTemplate: (filePath: string) =>
-          `Look at @${filePath}! This is critical.`,
+          `Look at @${getRelativePath(filePath)}! This is critical.`,
         messageId: 403,
       },
       {
@@ -724,7 +737,7 @@ describe('handleAtCommand', () => {
         fileName: 'config.json',
         fileContent: 'Config settings',
         queryTemplate: (filePath: string) =>
-          `What is in @${filePath}? Please explain.`,
+          `What is in @${getRelativePath(filePath)}? Please explain.`,
         messageId: 404,
       },
       {
@@ -732,7 +745,7 @@ describe('handleAtCommand', () => {
         fileName: 'func.ts',
         fileContent: 'Function definition',
         queryTemplate: (filePath: string) =>
-          `Analyze @${filePath}(the main function).`,
+          `Analyze @${getRelativePath(filePath)}(the main function).`,
         messageId: 405,
       },
       {
@@ -740,7 +753,7 @@ describe('handleAtCommand', () => {
         fileName: 'data.json',
         fileContent: 'Test data',
         queryTemplate: (filePath: string) =>
-          `Use data from @${filePath}) for testing.`,
+          `Use data from @${getRelativePath(filePath)}) for testing.`,
         messageId: 406,
       },
       {
@@ -748,7 +761,7 @@ describe('handleAtCommand', () => {
         fileName: 'array.js',
         fileContent: 'Array data',
         queryTemplate: (filePath: string) =>
-          `Check @${filePath}[0] for the first element.`,
+          `Check @${getRelativePath(filePath)}[0] for the first element.`,
         messageId: 407,
       },
       {
@@ -756,7 +769,7 @@ describe('handleAtCommand', () => {
         fileName: 'list.md',
         fileContent: 'List content',
         queryTemplate: (filePath: string) =>
-          `Review item @${filePath}] from the list.`,
+          `Review item @${getRelativePath(filePath)}] from the list.`,
         messageId: 408,
       },
       {
@@ -764,7 +777,7 @@ describe('handleAtCommand', () => {
         fileName: 'object.ts',
         fileContent: 'Object definition',
         queryTemplate: (filePath: string) =>
-          `Parse @${filePath}{prop1: value1}.`,
+          `Parse @${getRelativePath(filePath)}{prop1: value1}.`,
         messageId: 409,
       },
       {
@@ -772,7 +785,7 @@ describe('handleAtCommand', () => {
         fileName: 'config.yaml',
         fileContent: 'Configuration',
         queryTemplate: (filePath: string) =>
-          `Use settings from @${filePath}} for deployment.`,
+          `Use settings from @${getRelativePath(filePath)}} for deployment.`,
         messageId: 410,
       },
     ];
@@ -799,7 +812,7 @@ describe('handleAtCommand', () => {
           processedQuery: [
             { text: query },
             { text: '\n--- Content from referenced files ---' },
-            { text: `\nContent from @${filePath}:\n` },
+            { text: `\nContent from @${getRelativePath(filePath)}:\n` },
             { text: fileContent },
             { text: '\n--- End of content ---' },
           ],
@@ -832,11 +845,13 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Compare @${file1Path}, @${file2Path}; what's different?` },
+          {
+            text: `Compare @${getRelativePath(file1Path)}, @${getRelativePath(file2Path)}; what's different?`,
+          },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${file1Path}:\n` },
+          { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
           { text: content1 },
-          { text: `\nContent from @${file2Path}:\n` },
+          { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
           { text: content2 },
           { text: '\n--- End of content ---' },
         ],
@@ -864,9 +879,9 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Check @${filePath}, it has spaces.` },
+          { text: `Check @${getRelativePath(filePath)}, it has spaces.` },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
@@ -880,7 +895,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'example.d.ts'),
         fileContent,
       );
-      const query = `Analyze @${filePath} for type definitions.`;
+      const query = `Analyze @${getRelativePath(filePath)} for type definitions.`;
 
       const result = await handleAtCommand({
         query,
@@ -893,9 +908,11 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Analyze @${filePath} for type definitions.` },
+          {
+            text: `Analyze @${getRelativePath(filePath)} for type definitions.`,
+          },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
@@ -909,7 +926,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'config.json'),
         fileContent,
       );
-      const query = `Check @${filePath}. This file contains settings.`;
+      const query = `Check @${getRelativePath(filePath)}. This file contains settings.`;
 
       const result = await handleAtCommand({
         query,
@@ -922,9 +939,11 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Check @${filePath}. This file contains settings.` },
+          {
+            text: `Check @${getRelativePath(filePath)}. This file contains settings.`,
+          },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
@@ -938,7 +957,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'package.json'),
         fileContent,
       );
-      const query = `Review @${filePath}, then check dependencies.`;
+      const query = `Review @${getRelativePath(filePath)}, then check dependencies.`;
 
       const result = await handleAtCommand({
         query,
@@ -951,9 +970,11 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Review @${filePath}, then check dependencies.` },
+          {
+            text: `Review @${getRelativePath(filePath)}, then check dependencies.`,
+          },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
@@ -967,7 +988,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'version.1.2.3.txt'),
         fileContent,
       );
-      const query = `Check @${filePath} contains version information.`;
+      const query = `Check @${getRelativePath(filePath)} contains version information.`;
 
       const result = await handleAtCommand({
         query,
@@ -980,9 +1001,11 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Check @${filePath} contains version information.` },
+          {
+            text: `Check @${getRelativePath(filePath)} contains version information.`,
+          },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
@@ -996,7 +1019,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'end.txt'),
         fileContent,
       );
-      const query = `Show me @${filePath}.`;
+      const query = `Show me @${getRelativePath(filePath)}.`;
 
       const result = await handleAtCommand({
         query,
@@ -1009,9 +1032,9 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Show me @${filePath}.` },
+          { text: `Show me @${getRelativePath(filePath)}.` },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
@@ -1025,7 +1048,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'file$with&special#chars.txt'),
         fileContent,
       );
-      const query = `Check @${filePath} for content.`;
+      const query = `Check @${getRelativePath(filePath)} for content.`;
 
       const result = await handleAtCommand({
         query,
@@ -1038,9 +1061,9 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Check @${filePath} for content.` },
+          { text: `Check @${getRelativePath(filePath)} for content.` },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
@@ -1054,7 +1077,7 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'basicfile.txt'),
         fileContent,
       );
-      const query = `Check @${filePath} please.`;
+      const query = `Check @${getRelativePath(filePath)} please.`;
 
       const result = await handleAtCommand({
         query,
@@ -1067,14 +1090,121 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [
-          { text: `Check @${filePath} please.` },
+          { text: `Check @${getRelativePath(filePath)} please.` },
           { text: '\n--- Content from referenced files ---' },
-          { text: `\nContent from @${filePath}:\n` },
+          { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
         shouldProceed: true,
       });
+    });
+  });
+
+  describe('absolute path handling', () => {
+    it('should handle absolute file paths correctly', async () => {
+      const fileContent = 'console.log("This is an absolute path test");';
+      const relativePath = path.join('src', 'absolute-test.ts');
+      const absolutePath = await createTestFile(
+        path.join(testRootDir, relativePath),
+        fileContent,
+      );
+      const query = `Check @${absolutePath} please.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 500,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [
+          { text: `Check @${relativePath} please.` },
+          { text: '\n--- Content from referenced files ---' },
+          { text: `\nContent from @${relativePath}:\n` },
+          { text: fileContent },
+          { text: '\n--- End of content ---' },
+        ],
+        shouldProceed: true,
+      });
+
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        expect.stringContaining(`using relative path: ${relativePath}`),
+      );
+    });
+
+    it('should handle absolute directory paths correctly', async () => {
+      const fileContent =
+        'export default function test() { return "absolute dir test"; }';
+      const subDirPath = path.join('src', 'utils');
+      const fileName = 'helper.ts';
+      await createTestFile(
+        path.join(testRootDir, subDirPath, fileName),
+        fileContent,
+      );
+      const absoluteDirPath = path.join(testRootDir, subDirPath);
+      const query = `Check @${absoluteDirPath} please.`;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 501,
+        signal: abortController.signal,
+      });
+
+      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).toEqual(
+        expect.arrayContaining([
+          { text: `Check @${path.join(subDirPath, '**')} please.` },
+          expect.objectContaining({
+            text: '\n--- Content from referenced files ---',
+          }),
+        ]),
+      );
+
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        expect.stringContaining(`using glob: ${path.join(subDirPath, '**')}`),
+      );
+    });
+
+    it('should skip absolute paths outside workspace', async () => {
+      const outsidePath = '/tmp/outside-workspace.txt';
+      const query = `Check @${outsidePath} please.`;
+
+      const mockWorkspaceContext = {
+        isPathWithinWorkspace: vi.fn((path: string) =>
+          path.startsWith(testRootDir),
+        ),
+        getDirectories: () => [testRootDir],
+        addDirectory: vi.fn(),
+        getInitialDirectories: () => [testRootDir],
+        setDirectories: vi.fn(),
+        onDirectoriesChanged: vi.fn(() => () => {}),
+      } as unknown as ReturnType<typeof mockConfig.getWorkspaceContext>;
+      mockConfig.getWorkspaceContext = () => mockWorkspaceContext;
+
+      const result = await handleAtCommand({
+        query,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 502,
+        signal: abortController.signal,
+      });
+
+      expect(result).toEqual({
+        processedQuery: [{ text: `Check @${outsidePath} please.` }],
+        shouldProceed: true,
+      });
+
+      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+        `Path ${outsidePath} is not in the workspace and will be skipped.`,
+      );
     });
   });
 
@@ -1085,7 +1215,7 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'path', 'to', 'another-file.txt'),
       fileContent,
     );
-    const query = `A query with @${filePath}`;
+    const query = `A query with @${getRelativePath(filePath)}`;
 
     // Act
     await handleAtCommand({
