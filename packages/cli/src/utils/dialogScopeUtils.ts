@@ -8,7 +8,7 @@ import type {
   LoadableSettingScope,
   LoadedSettings,
 } from '../config/settings.js';
-import { SettingScope } from '../config/settings.js';
+import { isLoadableSettingScope, SettingScope } from '../config/settings.js';
 import { settingExistsInScope } from './settingsUtils.js';
 
 /**
@@ -23,7 +23,10 @@ export const SCOPE_LABELS = {
 /**
  * Helper function to get scope items for radio button selects
  */
-export function getScopeItems() {
+export function getScopeItems(): Array<{
+  label: string;
+  value: LoadableSettingScope;
+}> {
   return [
     { label: SCOPE_LABELS[SettingScope.User], value: SettingScope.User },
     {
@@ -42,13 +45,14 @@ export function getScopeMessageForSetting(
   selectedScope: SettingScope,
   settings: LoadedSettings,
 ): string {
-  const otherScopes = Object.values(SettingScope).filter(
-    (scope) =>
-      scope !== selectedScope &&
-      // We don't allow configuring settings just for the current session at
-      // this time.
-      scope !== SettingScope.Session,
-  );
+  if (!isLoadableSettingScope(selectedScope)) {
+    throw new Error(
+      `Unsupported scope "${selectedScope}" for setting ${settingKey}`,
+    );
+  }
+  const otherScopes = Object.values(SettingScope)
+    .filter(isLoadableSettingScope)
+    .filter((scope) => scope !== selectedScope);
 
   const modifiedInOtherScopes = otherScopes.filter((scope) => {
     const scopeSettings = settings.forScope(scope).settings;
