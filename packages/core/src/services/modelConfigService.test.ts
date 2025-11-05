@@ -517,5 +517,37 @@ describe('ModelConfigService', () => {
         HARM_CATEGORY_SEXUALLY_EXPLICIT: 'BLOCK_MEDIUM_AND_ABOVE',
       });
     });
+
+    it('should not deeply merge merge arrays from aliases and overrides', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          base: {
+            modelConfig: {
+              model: 'gemini-pro',
+              generateContentConfig: {
+                stopSequences: ['foo'],
+              },
+            },
+          },
+        },
+        overrides: [
+          {
+            match: { model: 'base' },
+            modelConfig: {
+              generateContentConfig: {
+                stopSequences: ['overrideFoo'],
+              },
+            },
+          },
+        ],
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({ model: 'base' });
+
+      expect(resolved.model).toBe('gemini-pro');
+      expect(resolved.generateContentConfig.stopSequences).toEqual([
+        'overrideFoo',
+      ]);
+    });
   });
 });

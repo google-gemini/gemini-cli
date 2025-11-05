@@ -46,7 +46,7 @@ export interface _ResolvedModelConfig {
 }
 
 export class ModelConfigService {
-  // TODO(joshualitt): Process config to build a typed alias hierarchy.
+  // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
 
   private resolveAlias(
@@ -217,6 +217,11 @@ export class ModelConfigService {
         const accValue = acc[key];
         const objValue = obj[key];
 
+        // For now, we only deep merge objects, and not arrays. This is because
+        // If we deep merge arrays, there is no way for the user to completely
+        // override the base array.
+        // TODO(joshualitt): Consider knobs here, i.e. opt-in to deep merging
+        // arrays on a case-by-case basis.
         if (this.isObject(accValue) && this.isObject(objValue)) {
           acc[key] = this.deepMerge(
             accValue as Record<string, unknown>,

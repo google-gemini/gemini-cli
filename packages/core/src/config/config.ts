@@ -563,7 +563,7 @@ export class Config {
     // any `generation` settings (e.g., just `overrides`), the default `aliases`
     // are lost. This hack manually merges the default aliases back in if they
     // are missing from the user's config.
-    // TODO: Fix the settings loading logic to properly merge defaults and
+    // TODO(12593): Fix the settings loading logic to properly merge defaults and
     // remove this hack.
     let modelConfigs = params.modelConfigs;
     if (modelConfigs && !modelConfigs.aliases) {
