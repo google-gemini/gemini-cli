@@ -12,6 +12,12 @@ import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
 import { ConfigContext } from './contexts/ConfigContext.js';
+import { SettingsContext } from './contexts/SettingsContext.js';
+import {
+  type SettingScope,
+  LoadedSettings,
+  type SettingsFile,
+} from '../config/settings.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -63,10 +69,27 @@ describe('App', () => {
 
   const mockConfig = makeFakeConfig();
 
+  const mockSettingsFile: SettingsFile = {
+    settings: {},
+    originalSettings: {},
+    path: '/mock/path',
+  };
+
+  const mockLoadedSettings = new LoadedSettings(
+    mockSettingsFile,
+    mockSettingsFile,
+    mockSettingsFile,
+    mockSettingsFile,
+    true,
+    new Set<SettingScope>(),
+  );
+
   const renderWithProviders = (ui: React.ReactElement, state: UIState) =>
     render(
       <ConfigContext.Provider value={mockConfig}>
-        <UIStateContext.Provider value={state}>{ui}</UIStateContext.Provider>
+        <SettingsContext.Provider value={mockLoadedSettings}>
+          <UIStateContext.Provider value={state}>{ui}</UIStateContext.Provider>
+        </SettingsContext.Provider>
       </ConfigContext.Provider>,
     );
 

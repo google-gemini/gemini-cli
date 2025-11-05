@@ -72,6 +72,7 @@ import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
+import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -197,17 +198,19 @@ export async function startInteractiveUI(
               settings.merged.general?.debugKeystrokeLogging
             }
           >
-            <SessionStatsProvider>
-              <VimModeProvider settings={settings}>
-                <AppContainer
-                  config={config}
-                  settings={settings}
-                  startupWarnings={startupWarnings}
-                  version={version}
-                  initializationResult={initializationResult}
-                />
-              </VimModeProvider>
-            </SessionStatsProvider>
+            <ScrollProvider>
+              <SessionStatsProvider>
+                <VimModeProvider settings={settings}>
+                  <AppContainer
+                    config={config}
+                    settings={settings}
+                    startupWarnings={startupWarnings}
+                    version={version}
+                    initializationResult={initializationResult}
+                  />
+                </VimModeProvider>
+              </SessionStatsProvider>
+            </ScrollProvider>
           </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
