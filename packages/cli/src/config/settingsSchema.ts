@@ -500,6 +500,16 @@ const SETTINGS_SCHEMA = {
         description: 'Use the entire width of the terminal for output.',
         showInDialog: true,
       },
+      useAlternateBuffer: {
+        type: 'boolean',
+        label: 'Use Alternate Screen Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -1046,7 +1056,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use Write Todos',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
+    default: true,
     description: 'Enable the write_todos_list tool.',
     showInDialog: false,
   },
@@ -1233,7 +1243,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Codebase Investigator',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Enable the Codebase Investigator agent.',
             showInDialog: true,
           },
@@ -1242,7 +1252,7 @@ const SETTINGS_SCHEMA = {
             label: 'Codebase Investigator Max Num Turns',
             category: 'Experimental',
             requiresRestart: true,
-            default: 15,
+            default: 10,
             description:
               'Maximum number of turns for the Codebase Investigator agent.',
             showInDialog: true,
@@ -1252,7 +1262,7 @@ const SETTINGS_SCHEMA = {
             label: 'Max Time (Minutes)',
             category: 'Experimental',
             requiresRestart: true,
-            default: 5,
+            default: 3,
             description:
               'Maximum time for the Codebase Investigator agent (in minutes).',
             showInDialog: false,
@@ -1262,7 +1272,7 @@ const SETTINGS_SCHEMA = {
             label: 'Thinking Budget',
             category: 'Experimental',
             requiresRestart: true,
-            default: -1,
+            default: 8192,
             description:
               'The thinking budget for the Codebase Investigator agent.',
             showInDialog: false,

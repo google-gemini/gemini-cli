@@ -22,6 +22,7 @@ export enum AgentTerminateMode {
   GOAL = 'GOAL',
   MAX_TURNS = 'MAX_TURNS',
   ABORTED = 'ABORTED',
+  ERROR_NO_COMPLETE_TASK_CALL = 'ERROR_NO_COMPLETE_TASK_CALL',
 }
 
 /**

@@ -6,18 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type {
-  ConfigParameters,
-  SandboxConfig,
-  HookDefinition,
-} from './config.js';
-import {
-  Config,
-  ApprovalMode,
-  DEFAULT_FILE_FILTERING_OPTIONS,
-  HookType,
-  HookEventName,
-} from './config.js';
+import type { ConfigParameters, SandboxConfig } from './config.js';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { ApprovalMode } from '../policy/types.js';
+import type { HookDefinition } from '../hooks/types.js';
+import { HookType, HookEventName } from '../hooks/types.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
@@ -145,6 +138,21 @@ vi.mock('../agents/subagent-tool-wrapper.js', () => ({
   SubagentToolWrapper: vi.fn(),
 }));
 
+const mockCoreEvents = vi.hoisted(() => ({
+  emitFeedback: vi.fn(),
+  emitModelChanged: vi.fn(),
+}));
+
+const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
+
+vi.mock('../utils/events.js', () => ({
+  coreEvents: mockCoreEvents,
+}));
+
+vi.mock('../utils/fetch.js', () => ({
+  setGlobalProxy: mockSetGlobalProxy,
+}));
+
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { uiTelemetryService } from '../telemetry/index.js';
@@ -221,6 +229,49 @@ describe('Server Config (config.ts)', () => {
       await expect(config.initialize()).rejects.toThrow(
         'Config was already initialized',
       );
+    });
+
+    describe('getCompressionThreshold', () => {
+      it('should return the local compression threshold if it is set', async () => {
+        const config = new Config({
+          ...baseParams,
+          compressionThreshold: 0.5,
+        });
+        expect(await config.getCompressionThreshold()).toBe(0.5);
+      });
+
+      it('should return the remote experiment threshold if it is a positive number', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              GeminiCLIContextCompression__threshold_fraction: {
+                floatValue: 0.8,
+              },
+            },
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getCompressionThreshold()).toBe(0.8);
+      });
+
+      it('should return undefined if the remote experiment threshold is 0', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              GeminiCLIContextCompression__threshold_fraction: {
+                floatValue: 0.0,
+              },
+            },
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getCompressionThreshold()).toBeUndefined();
+      });
+
+      it('should return undefined if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getCompressionThreshold()).toBeUndefined();
+      });
     });
   });
 
@@ -912,6 +963,63 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTruncateToolOutputThreshold()).toBe(50000);
     });
   });
+
+  describe('Proxy Configuration Error Handling', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should call setGlobalProxy when proxy is configured', () => {
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'http://proxy.example.com:8080',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockSetGlobalProxy).toHaveBeenCalledWith(
+        'http://proxy.example.com:8080',
+      );
+    });
+
+    it('should not call setGlobalProxy when proxy is not configured', () => {
+      new Config(baseParams);
+
+      expect(mockSetGlobalProxy).not.toHaveBeenCalled();
+    });
+
+    it('should emit error feedback when setGlobalProxy throws an error', () => {
+      const proxyError = new Error('Invalid proxy URL');
+      mockSetGlobalProxy.mockImplementation(() => {
+        throw proxyError;
+      });
+
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'invalid-proxy',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
+        proxyError,
+      );
+    });
+
+    it('should not emit error feedback when setGlobalProxy succeeds', () => {
+      mockSetGlobalProxy.mockImplementation(() => {
+        // Success - no error thrown
+      });
+
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'http://proxy.example.com:8080',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('setApprovalMode with folder trust', () => {
@@ -1245,5 +1353,65 @@ describe('Config getHooks', () => {
     const retrievedHooks = config.getHooks();
     expect(retrievedHooks).toEqual(allEventHooks);
     expect(Object.keys(retrievedHooks!)).toHaveLength(11); // All hook event types
+  });
+
+  describe('setModel', () => {
+    it('should allow setting a pro (any) model and disable fallback mode', () => {
+      const config = new Config(baseParams);
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      const proModel = 'gemini-2.5-pro';
+      config.setModel(proModel);
+
+      expect(config.getModel()).toBe(proModel);
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
+    });
+  });
+});
+
+describe('Config getExperiments', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('should return undefined when no experiments are provided', () => {
+    const config = new Config(baseParams);
+    expect(config.getExperiments()).toBeUndefined();
+  });
+
+  it('should return empty object when empty experiments are provided', () => {
+    const configWithEmptyExps = new Config({
+      ...baseParams,
+      experiments: { flags: {}, experimentIds: [] },
+    });
+    expect(configWithEmptyExps.getExperiments()).toEqual({
+      flags: {},
+      experimentIds: [],
+    });
+  });
+
+  it('should return the experiments configuration when provided', () => {
+    const mockExps = {
+      flags: {
+        testFlag: { boolValue: true },
+      },
+      experimentIds: [],
+    };
+
+    const config = new Config({
+      ...baseParams,
+      experiments: mockExps,
+    });
+
+    const retrievedExps = config.getExperiments();
+    expect(retrievedExps).toEqual(mockExps);
+    expect(retrievedExps).toBe(mockExps); // Should return the same reference
   });
 });

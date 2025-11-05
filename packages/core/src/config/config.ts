@@ -32,6 +32,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
@@ -41,6 +42,7 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
+import { coreEvents } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -73,15 +75,15 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
+import { getCodeAssistServer } from '../code_assist/codeAssist.js';
+import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
+import { getExperiments } from '../code_assist/experiments/experiments.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
-export enum ApprovalMode {
-  DEFAULT = 'default',
-  AUTO_EDIT = 'autoEdit',
-  YOLO = 'yolo',
-}
+import { ApprovalMode } from '../policy/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -151,11 +153,12 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
-import { debugLogger } from '../utils/debugLogger.js';
+
 import {
   type ExtensionLoader,
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
+import { McpClientManager } from '../tools/mcp-client-manager.js';
 
 export type { FileFilteringOptions };
 export {
@@ -212,50 +215,6 @@ export interface SandboxConfig {
   image: string;
 }
 
-/**
- * Event names for the hook system
- */
-export enum HookEventName {
-  BeforeTool = 'BeforeTool',
-  AfterTool = 'AfterTool',
-  BeforeAgent = 'BeforeAgent',
-  Notification = 'Notification',
-  AfterAgent = 'AfterAgent',
-  SessionStart = 'SessionStart',
-  SessionEnd = 'SessionEnd',
-  PreCompress = 'PreCompress',
-  BeforeModel = 'BeforeModel',
-  AfterModel = 'AfterModel',
-  BeforeToolSelection = 'BeforeToolSelection',
-}
-
-/**
- * Hook configuration entry
- */
-export interface CommandHookConfig {
-  type: HookType.Command;
-  command: string;
-  timeout?: number;
-}
-
-export type HookConfig = CommandHookConfig;
-
-/**
- * Hook definition with matcher
- */
-export interface HookDefinition {
-  matcher?: string;
-  sequential?: boolean;
-  hooks: HookConfig[];
-}
-
-/**
- * Hook implementation types
- */
-export enum HookType {
-  Command = 'command',
-}
-
 export interface ConfigParameters {
   sessionId: string;
   embeddingModel?: string;
@@ -299,7 +258,8 @@ export interface ConfigParameters {
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
   enableExtensionReloading?: boolean;
-  blockedMcpServers?: Array<{ name: string; extensionName: string }>;
+  allowedMcpServers?: string[];
+  blockedMcpServers?: string[];
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
@@ -335,6 +295,7 @@ export interface ConfigParameters {
   ptyInfo?: string;
   disableYoloMode?: boolean;
   enableHooks?: boolean;
+  experiments?: Experiments;
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
@@ -342,6 +303,9 @@ export interface ConfigParameters {
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private mcpClientManager?: McpClientManager;
+  private allowedMcpServers: string[];
+  private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
   private agentRegistry!: AgentRegistry;
   private readonly sessionId: string;
@@ -396,10 +360,6 @@ export class Config {
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
-  private readonly _blockedMcpServers: Array<{
-    name: string;
-    extensionName: string;
-  }>;
   fallbackModelHandler?: FallbackModelHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
@@ -445,6 +405,8 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private experiments: Experiments | undefined;
+  private experimentsPromise: Promise<void> | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -467,6 +429,8 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.allowedMcpServers = params.allowedMcpServers ?? [];
+    this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
@@ -508,7 +472,6 @@ export class Config {
     this._extensionLoader =
       params.extensionLoader ?? new SimpleExtensionLoader([]);
     this._enabledExtensions = params.enabledExtensions ?? [];
-    this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
@@ -535,7 +498,7 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
@@ -550,9 +513,9 @@ export class Config {
       params.enableMessageBusIntegration ??
       (hooksNeedMessageBus ? true : false);
     this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? false,
-      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
-      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 5,
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
+      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
       thinkingBudget:
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
@@ -578,6 +541,7 @@ export class Config {
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
+    this.experiments = params.experiments;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -587,8 +551,17 @@ export class Config {
       initializeTelemetry(this);
     }
 
-    if (this.getProxy()) {
-      setGlobalProxy(this.getProxy() as string);
+    const proxy = this.getProxy();
+    if (proxy) {
+      try {
+        setGlobalProxy(proxy);
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
+          error,
+        );
+      }
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
@@ -614,6 +587,15 @@ export class Config {
     await this.agentRegistry.initialize();
 
     this.toolRegistry = await this.createToolRegistry();
+    this.mcpClientManager = new McpClientManager(
+      this.toolRegistry,
+      this,
+      this.eventEmitter,
+    );
+    await Promise.all([
+      await this.mcpClientManager.startConfiguredMcpServers(),
+      await this.getExtensionLoader().start(this),
+    ]);
 
     await this.geminiClient.initialize();
   }
@@ -655,6 +637,20 @@ export class Config {
 
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
+
+    const codeAssistServer = getCodeAssistServer(this);
+    if (codeAssistServer) {
+      this.experimentsPromise = getExperiments(codeAssistServer)
+        .then((experiments) => {
+          this.setExperiments(experiments);
+        })
+        .catch((e) => {
+          debugLogger.error('Failed to fetch experiments', e);
+        });
+    } else {
+      this.experiments = undefined;
+      this.experimentsPromise = undefined;
+    }
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
@@ -701,12 +697,12 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    // Do not allow Pro usage if the user is in fallback mode.
-    if (newModel.includes('pro') && this.isInFallbackMode()) {
-      return;
-    }
+    this.setFallbackMode(false);
 
-    this.model = newModel;
+    if (this.model !== newModel) {
+      this.model = newModel;
+      coreEvents.emitModelChanged(newModel);
+    }
   }
 
   isInFallbackMode(): boolean {
@@ -791,8 +787,23 @@ export class Config {
     return this.allowedTools;
   }
 
+  /**
+   * All the excluded tools from static configuration, loaded extensions, or
+   * other sources.
+   *
+   * May change over time.
+   */
   getExcludeTools(): string[] | undefined {
-    return this.excludeTools;
+    const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
+    for (const extension of this.getExtensionLoader().getExtensions()) {
+      if (!extension.isActive) {
+        continue;
+      }
+      for (const tool of extension.excludeTools || []) {
+        excludeToolsSet.add(tool);
+      }
+    }
+    return [...excludeToolsSet];
   }
 
   getToolDiscoveryCommand(): string | undefined {
@@ -807,8 +818,25 @@ export class Config {
     return this.mcpServerCommand;
   }
 
+  /**
+   * The user configured MCP servers (via gemini settings files).
+   *
+   * Does NOT include mcp servers configured by extensions.
+   */
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getMcpClientManager(): McpClientManager | undefined {
+    return this.mcpClientManager;
+  }
+
+  getAllowedMcpServers(): string[] | undefined {
+    return this.allowedMcpServers;
+  }
+
+  getBlockedMcpServers(): string[] | undefined {
+    return this.blockedMcpServers;
   }
 
   setMcpServers(mcpServers: Record<string, MCPServerConfig>): void {
@@ -994,10 +1022,6 @@ export class Config {
     return this.enableExtensionReloading;
   }
 
-  getBlockedMcpServers(): Array<{ name: string; extensionName: string }> {
-    return this._blockedMcpServers;
-  }
-
   getNoBrowser(): boolean {
     return this.noBrowser;
   }
@@ -1064,8 +1088,26 @@ export class Config {
     this.fileSystemService = fileSystemService;
   }
 
-  getCompressionThreshold(): number | undefined {
-    return this.compressionThreshold;
+  async getCompressionThreshold(): Promise<number | undefined> {
+    if (this.compressionThreshold) {
+      return this.compressionThreshold;
+    }
+
+    if (this.experimentsPromise) {
+      try {
+        await this.experimentsPromise;
+      } catch (e) {
+        debugLogger.debug('Failed to fetch experiments', e);
+      }
+    }
+
+    const remoteThreshold =
+      this.experiments?.flags['GeminiCLIContextCompression__threshold_fraction']
+        ?.floatValue;
+    if (remoteThreshold === 0) {
+      return undefined;
+    }
+    return remoteThreshold;
   }
 
   isInteractiveShellEnabled(): boolean {
@@ -1198,7 +1240,7 @@ export class Config {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.eventEmitter);
+    const registry = new ToolRegistry(this);
 
     // Set message bus on tool registry before discovery so MCP tools can access it
     if (this.getEnableMessageBusIntegration()) {
@@ -1239,19 +1281,11 @@ export class Config {
         // This first implementation is only focused on the general case of
         // the tool registry.
         const messageBusEnabled = this.getEnableMessageBusIntegration();
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
-          );
-        }
+
         const toolArgs = messageBusEnabled
           ? [...args, this.getMessageBus()]
           : args;
-        if (this.debugMode && messageBusEnabled) {
-          debugLogger.log(
-            `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
-          );
-        }
+
         registry.registerTool(new ToolClass(...toolArgs));
       }
     };
@@ -1322,6 +1356,20 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get experiments configuration
+   */
+  getExperiments(): Experiments | undefined {
+    return this.experiments;
+  }
+
+  /**
+   * Set experiments configuration
+   */
+  setExperiments(experiments: Experiments): void {
+    this.experiments = experiments;
   }
 }
 // Export model constants for use in CLI

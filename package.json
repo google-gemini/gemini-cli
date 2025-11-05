@@ -119,7 +119,8 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@google/adk": "0.1.0",
+    "@google/adk": "file:../adk-js/core",
+    "@google/genai": "1.14.0",
     "latest-version": "^9.0.0",
     "simple-git": "^3.28.0"
   },

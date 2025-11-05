@@ -11,12 +11,12 @@
  */
 
 import { BasePlugin, type BaseTool, type ToolContext } from '@google/adk';
-import { type AnyDeclarativeTool } from '../index.js';
+import { ApprovalMode, type AnyDeclarativeTool } from '../index.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from './message-bus.js';
 import { MessageBusType, type ToolConfirmationResponse } from './types.js';
 import { AdkToolAdapter, ToolConfirmationOutcome } from '../tools/tools.js';
-import { ApprovalMode, type Config } from '../config/config.js';
+import { type Config } from '../config/config.js';
 
 export class MessageBusPlugin extends BasePlugin {
   constructor(
