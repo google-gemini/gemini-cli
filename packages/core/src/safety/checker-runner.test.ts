@@ -174,5 +174,64 @@ describe('CheckerRunner', () => {
         expect.anything(),
       );
     });
+
+    it('should include checker name in timeout error message', async () => {
+      vi.useFakeTimers();
+      const mockCheckerPath = '/mock/dist/python-checker';
+      vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(), // Never calls 'close'
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      const runPromise = runner.runChecker(mockToolCall, mockExternalConfig);
+      vi.advanceTimersByTime(5001);
+
+      const result = await runPromise;
+      expect(result.decision).toBe(SafetyCheckDecision.DENY);
+      expect(result.reason).toContain(
+        'Safety checker "python-checker" timed out',
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('should include checker name in non-zero exit code error message', async () => {
+      const mockCheckerPath = '/mock/dist/python-checker';
+      vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn().mockImplementation((event, callback) => {
+          if (event === 'close') {
+            callback(1); // Exit code 1
+          }
+        }),
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      const result = await runner.runChecker(mockToolCall, mockExternalConfig);
+
+      expect(result.decision).toBe(SafetyCheckDecision.DENY);
+      expect(result.reason).toContain(
+        'Safety checker "python-checker" exited with code 1',
+      );
+    });
   });
 });

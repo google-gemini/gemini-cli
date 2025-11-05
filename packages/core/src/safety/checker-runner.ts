@@ -115,7 +115,11 @@ export class CheckerRunner {
       };
 
       // Run the checker process
-      return await this.executeCheckerProcess(checkerPath, input);
+      return await this.executeCheckerProcess(
+        checkerPath,
+        input,
+        checkerConfig.name,
+      );
     } catch (error) {
       // If anything goes wrong, deny the operation
       return {
@@ -133,6 +137,7 @@ export class CheckerRunner {
   private executeCheckerProcess(
     checkerPath: string,
     input: SafetyCheckInput,
+    checkerName: string,
   ): Promise<SafetyCheckResult> {
     return new Promise((resolve) => {
       const child = spawn(checkerPath, [], {
@@ -150,7 +155,7 @@ export class CheckerRunner {
         child.kill('SIGTERM');
         resolve({
           decision: SafetyCheckDecision.DENY,
-          reason: `Safety checker timed out after ${this.timeout}ms`,
+          reason: `Safety checker "${checkerName}" timed out after ${this.timeout}ms`,
         });
       }, this.timeout);
 
@@ -182,7 +187,7 @@ export class CheckerRunner {
         if (code !== 0) {
           resolve({
             decision: SafetyCheckDecision.DENY,
-            reason: `Safety checker exited with code ${code}${
+            reason: `Safety checker "${checkerName}" exited with code ${code}${
               stderr ? `: ${stderr}` : ''
             }`,
           });
@@ -207,7 +212,7 @@ export class CheckerRunner {
         } catch (parseError) {
           resolve({
             decision: SafetyCheckDecision.DENY,
-            reason: `Failed to parse checker output: ${
+            reason: `Failed to parse output from safety checker "${checkerName}": ${
               parseError instanceof Error
                 ? parseError.message
                 : String(parseError)
@@ -225,7 +230,7 @@ export class CheckerRunner {
         if (!killed) {
           resolve({
             decision: SafetyCheckDecision.DENY,
-            reason: `Failed to spawn checker process: ${error.message}`,
+            reason: `Failed to spawn safety checker "${checkerName}": ${error.message}`,
           });
         }
       });
@@ -246,7 +251,7 @@ export class CheckerRunner {
         child.kill();
         resolve({
           decision: SafetyCheckDecision.DENY,
-          reason: `Failed to write to checker stdin: ${
+          reason: `Failed to write to stdin of safety checker "${checkerName}": ${
             writeError instanceof Error
               ? writeError.message
               : String(writeError)
