@@ -50,7 +50,10 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const decision = this.policyEngine.check(message.toolCall);
+        const decision = this.policyEngine.check(
+          message.toolCall,
+          message.serverName,
+        );
 
         switch (decision) {
           case PolicyDecision.ALLOW:
