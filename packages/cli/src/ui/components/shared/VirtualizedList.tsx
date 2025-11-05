@@ -110,7 +110,7 @@ function VirtualizedList<T>(
       initialScrollIndex === SCROLL_TO_ITEM_END ||
       (typeof initialScrollIndex === 'number' &&
         initialScrollIndex >= data.length - 1 &&
-        initialScrollOffsetInIndex === Number.SCROLL_TO_ITEM_END);
+        initialScrollOffsetInIndex === SCROLL_TO_ITEM_END);
     return scrollToEnd;
   });
   const containerRef = useRef<DOMElement>(null);
