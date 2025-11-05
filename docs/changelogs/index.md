@@ -5,7 +5,7 @@ notable changes to Gemini CLI.
 
 ## v0.12.0 - Gemini CLI weekly update - 2025-10-27
 
-![Codebase investigator subagent](https://imgur.com/a/yJiggNO.jpg)
+![Codebase investigator subagent in Gemini CLI.](https://i.imgur.com/4J1njsx.png)
 
 - **🎉 New partner extensions:**
   - **🤗 Hugging Face extension:** Access the Hugging Face hub.
