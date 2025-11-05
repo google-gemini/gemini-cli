@@ -51,8 +51,7 @@ export class AgentRegistry {
       );
 
       for (const agent of userAgents) {
-        // Cast to AgentDefinition since we're using a generic type parameter
-        this.registerAgent(agent as AgentDefinition);
+        this.registerAgent(agent);
 
         if (this.config.getDebugMode()) {
           debugLogger.log(

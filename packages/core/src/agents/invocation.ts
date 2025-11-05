@@ -85,7 +85,8 @@ export class SubagentInvocation<
           }
         ).metadata || {};
       const agentIcon =
-        (typeof metadata.icon === 'string' ? metadata.icon : undefined) || '🤖';
+        (typeof metadata['icon'] === 'string' ? metadata['icon'] : undefined) ||
+        '🤖';
       const agentDisplayName =
         this.definition.displayName || this.definition.name;
 
