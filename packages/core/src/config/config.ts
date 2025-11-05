@@ -75,9 +75,13 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
+import { getCodeAssistServer } from '../code_assist/codeAssist.js';
+import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
+import { getExperiments } from '../code_assist/experiments/experiments.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 import { ApprovalMode } from '../policy/types.js';
 import { CheckerRunner } from '../safety/checker-runner.js';
@@ -290,6 +294,7 @@ export interface ConfigParameters {
   ptyInfo?: string;
   disableYoloMode?: boolean;
   enableHooks?: boolean;
+  experiments?: Experiments;
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
@@ -398,6 +403,8 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private experiments: Experiments | undefined;
+  private experimentsPromise: Promise<void> | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -504,9 +511,9 @@ export class Config {
       params.enableMessageBusIntegration ??
       (hooksNeedMessageBus ? true : false);
     this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? false,
-      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
-      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 5,
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
+      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
       thinkingBudget:
         params.codebaseInvestigatorSettings?.thinkingBudget ??
         DEFAULT_THINKING_MODE,
@@ -540,6 +547,7 @@ export class Config {
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
+    this.experiments = params.experiments;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -635,6 +643,20 @@ export class Config {
 
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
+
+    const codeAssistServer = getCodeAssistServer(this);
+    if (codeAssistServer) {
+      this.experimentsPromise = getExperiments(codeAssistServer)
+        .then((experiments) => {
+          this.setExperiments(experiments);
+        })
+        .catch((e) => {
+          debugLogger.error('Failed to fetch experiments', e);
+        });
+    } else {
+      this.experiments = undefined;
+      this.experimentsPromise = undefined;
+    }
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
@@ -1075,8 +1097,26 @@ export class Config {
     this.fileSystemService = fileSystemService;
   }
 
-  getCompressionThreshold(): number | undefined {
-    return this.compressionThreshold;
+  async getCompressionThreshold(): Promise<number | undefined> {
+    if (this.compressionThreshold) {
+      return this.compressionThreshold;
+    }
+
+    if (this.experimentsPromise) {
+      try {
+        await this.experimentsPromise;
+      } catch (e) {
+        debugLogger.debug('Failed to fetch experiments', e);
+      }
+    }
+
+    const remoteThreshold =
+      this.experiments?.flags['GeminiCLIContextCompression__threshold_fraction']
+        ?.floatValue;
+    if (remoteThreshold === 0) {
+      return undefined;
+    }
+    return remoteThreshold;
   }
 
   isInteractiveShellEnabled(): boolean {
@@ -1328,6 +1368,20 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get experiments configuration
+   */
+  getExperiments(): Experiments | undefined {
+    return this.experiments;
+  }
+
+  /**
+   * Set experiments configuration
+   */
+  setExperiments(experiments: Experiments): void {
+    this.experiments = experiments;
   }
 }
 // Export model constants for use in CLI

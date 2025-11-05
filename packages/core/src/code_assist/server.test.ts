@@ -268,13 +268,13 @@ describe('CodeAssistServer', () => {
     vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
 
     const metadata = {
-      ide_version: 'v0.1.0',
+      ideVersion: 'v0.1.0',
     };
     const response = await server.listExperiments(metadata);
 
     expect(server.requestPost).toHaveBeenCalledWith('listExperiments', {
       project: 'test-project',
-      metadata: { ide_version: 'v0.1.0', duet_project: 'test-project' },
+      metadata: { ideVersion: 'v0.1.0', duetProject: 'test-project' },
     });
     expect(response).toEqual(mockResponse);
   });
