@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { AgentExecutor, type ActivityCallback } from './executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -221,12 +229,12 @@ describe('AgentExecutor', () => {
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
-    (ChatCompressionService as vi.Mock).mockImplementation(() => ({
+    (ChatCompressionService as Mock).mockImplementation(() => ({
       compress: mockCompress,
     }));
     mockCompress.mockResolvedValue({
       newHistory: null,
-      info: { compressionStatus: CompressionStatus.NOT_COMPRESSED },
+      info: { compressionStatus: CompressionStatus.NOOP },
     });
 
     MockedGeminiChat.mockImplementation(
@@ -1510,7 +1518,7 @@ describe('AgentExecutor', () => {
       // Mock compression to do nothing
       mockCompress.mockResolvedValue({
         newHistory: null,
-        info: { compressionStatus: CompressionStatus.NOT_COMPRESSED },
+        info: { compressionStatus: CompressionStatus.NOOP },
       });
 
       // Turn 1
@@ -1587,7 +1595,7 @@ describe('AgentExecutor', () => {
       // Second call is neutral
       mockCompress.mockResolvedValueOnce({
         newHistory: null,
-        info: { compressionStatus: CompressionStatus.NOT_COMPRESSED },
+        info: { compressionStatus: CompressionStatus.NOOP },
       });
 
       // Turn 1
@@ -1640,7 +1648,7 @@ describe('AgentExecutor', () => {
       // Turn 3: Neutral
       mockCompress.mockResolvedValueOnce({
         newHistory: null,
-        info: { compressionStatus: CompressionStatus.NOT_COMPRESSED },
+        info: { compressionStatus: CompressionStatus.NOOP },
       });
 
       // Turn 1
