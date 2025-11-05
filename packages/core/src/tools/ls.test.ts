@@ -12,7 +12,7 @@ import { LSTool } from './ls.js';
 import type { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
-import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 describe('LSTool', () => {
   let lsTool: LSTool;
@@ -22,18 +22,16 @@ describe('LSTool', () => {
   const abortSignal = new AbortController().signal;
 
   beforeEach(async () => {
-    tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ls-tool-root-'));
+    const realTmp = await fs.realpath(os.tmpdir());
+    tempRootDir = await fs.mkdtemp(path.join(realTmp, 'ls-tool-root-'));
     tempSecondaryDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'ls-tool-secondary-'),
+      path.join(realTmp, 'ls-tool-secondary-'),
     );
-
-    const mockWorkspaceContext = createMockWorkspaceContext(tempRootDir, [
-      tempSecondaryDir,
-    ]);
 
     mockConfig = {
       getTargetDir: () => tempRootDir,
-      getWorkspaceContext: () => mockWorkspaceContext,
+      getWorkspaceContext: () =>
+        new WorkspaceContext(tempRootDir, [tempSecondaryDir]),
       getFileService: () => new FileDiscoveryService(tempRootDir),
       getFileFilteringOptions: () => ({
         respectGitIgnore: true,
@@ -59,10 +57,14 @@ describe('LSTool', () => {
       expect(invocation).toBeDefined();
     });
 
-    it('should reject relative paths', () => {
-      expect(() => lsTool.build({ dir_path: './src' })).toThrow(
-        'Path must be absolute: ./src',
-      );
+    it('should accept relative paths', async () => {
+      const testPath = path.join(tempRootDir, 'src');
+      await fs.mkdir(testPath);
+
+      const relativePath = path.relative(tempRootDir, testPath);
+      const invocation = lsTool.build({ dir_path: relativePath });
+
+      expect(invocation).toBeDefined();
     });
 
     it('should reject paths outside workspace with clear error message', () => {
@@ -224,12 +226,6 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('permission denied');
       expect(result.returnDisplay).toBe('Error: Failed to list directory.');
       expect(result.error?.type).toBe(ToolErrorType.LS_EXECUTION_ERROR);
-    });
-
-    it('should throw for invalid params at build time', () => {
-      expect(() => lsTool.build({ dir_path: '../outside' })).toThrow(
-        'Path must be absolute: ../outside',
-      );
     });
 
     it('should handle errors accessing individual files during listing', async () => {

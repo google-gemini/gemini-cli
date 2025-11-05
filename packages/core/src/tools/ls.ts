@@ -138,30 +138,34 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
    * @returns Result of the LS operation
    */
   async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const resolvedDirPath = path.resolve(
+      this.config.getTargetDir(),
+      this.params.dir_path,
+    );
     try {
-      const stats = await fs.stat(this.params.dir_path);
+      const stats = await fs.stat(resolvedDirPath);
       if (!stats) {
         // fs.statSync throws on non-existence, so this check might be redundant
         // but keeping for clarity. Error message adjusted.
         return this.errorResult(
-          `Error: Directory not found or inaccessible: ${this.params.dir_path}`,
+          `Error: Directory not found or inaccessible: ${resolvedDirPath}`,
           `Directory not found or inaccessible.`,
           ToolErrorType.FILE_NOT_FOUND,
         );
       }
       if (!stats.isDirectory()) {
         return this.errorResult(
-          `Error: Path is not a directory: ${this.params.dir_path}`,
+          `Error: Path is not a directory: ${resolvedDirPath}`,
           `Path is not a directory.`,
           ToolErrorType.PATH_IS_NOT_A_DIRECTORY,
         );
       }
 
-      const files = await fs.readdir(this.params.dir_path);
+      const files = await fs.readdir(resolvedDirPath);
       if (files.length === 0) {
         // Changed error message to be more neutral for LLM
         return {
-          llmContent: `Directory ${this.params.dir_path} is empty.`,
+          llmContent: `Directory ${resolvedDirPath} is empty.`,
           returnDisplay: `Directory is empty.`,
         };
       }
@@ -169,7 +173,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       const relativePaths = files.map((file) =>
         path.relative(
           this.config.getTargetDir(),
-          path.join(this.params.dir_path, file),
+          path.join(resolvedDirPath, file),
         ),
       );
 
@@ -222,7 +226,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         .map((entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`)
         .join('\n');
 
-      let resultMessage = `Directory listing for ${this.params.dir_path}:\n${directoryContent}`;
+      let resultMessage = `Directory listing for ${resolvedDirPath}:\n${directoryContent}`;
       if (ignoredCount > 0) {
         resultMessage += `\n\n(${ignoredCount} ignored)`;
       }
@@ -265,8 +269,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       {
         properties: {
           dir_path: {
-            description:
-              'The absolute path to the directory to list (must be absolute, not relative)',
+            description: 'The path to the directory to list',
             type: 'string',
           },
           ignore: {
@@ -311,12 +314,12 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   protected override validateToolParamValues(
     params: LSToolParams,
   ): string | null {
-    if (!path.isAbsolute(params.dir_path)) {
-      return `Path must be absolute: ${params.dir_path}`;
-    }
-
+    const resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      params.dir_path,
+    );
     const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(params.dir_path)) {
+    if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
       const directories = workspaceContext.getDirectories();
       return `Path must be within one of the workspace directories: ${directories.join(
         ', ',
