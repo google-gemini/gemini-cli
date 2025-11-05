@@ -20,6 +20,7 @@ import {
 } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
+import type { AgentDefinition } from '../agents/types.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import type { Config } from '../config/config.js';
 import { GEMINI_DIR } from '../utils/paths.js';
@@ -315,8 +316,9 @@ ${(function () {
         agent as AgentDefinition & { metadata?: Record<string, unknown> }
       ).metadata;
       const icon =
-        (typeof metadata?.icon === 'string' ? metadata.icon : undefined) ||
-        '🤖';
+        (typeof metadata?.['icon'] === 'string'
+          ? metadata['icon']
+          : undefined) || '🤖';
       return `- **${icon} ${displayName}** (\`${agent.name}\`): ${agent.description}`;
     })
     .join('\n');
