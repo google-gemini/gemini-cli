@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LoadedSettings } from '../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../config/settings.js';
 import { SettingScope } from '../config/settings.js';
 import { settingExistsInScope } from './settingsUtils.js';
 
@@ -40,7 +43,11 @@ export function getScopeMessageForSetting(
   settings: LoadedSettings,
 ): string {
   const otherScopes = Object.values(SettingScope).filter(
-    (scope) => scope !== selectedScope && scope !== SettingScope.Session,
+    (scope) =>
+      scope !== selectedScope &&
+      // We don't allow configuring settings just for the current session at
+      // this time.
+      scope !== SettingScope.Session,
   );
 
   const modifiedInOtherScopes = otherScopes.filter((scope) => {

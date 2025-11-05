@@ -163,7 +163,7 @@ async function exploreAction(context: CommandContext) {
 
 function getEnableDisableContext(
   context: CommandContext,
-  args: string,
+  argumentsString: string,
 ): {
   extensionManager: ExtensionManager;
   names: string[];
@@ -176,7 +176,7 @@ function getEnableDisableContext(
     );
     return null;
   }
-  const parts = args.split(' ');
+  const parts = argumentsString.split(' ');
   const name = parts[0];
   if (
     name === '' ||
@@ -200,7 +200,7 @@ function getEnableDisableContext(
     parts.push(...parts[1].split('='));
     parts.splice(1, 1);
   }
-  switch (parts[2]) {
+  switch (parts[2].toLowerCase()) {
     case 'workspace':
       scope = SettingScope.Workspace;
       break;
@@ -248,7 +248,7 @@ async function disableAction(context: CommandContext, args: string) {
 
   const { names, scope, extensionManager } = enableContext;
   for (const name of names) {
-    await extensionManager.disableExtension(name!, scope);
+    await extensionManager.disableExtension(name, scope);
     context.ui.addItem(
       {
         type: MessageType.INFO,
@@ -265,7 +265,7 @@ async function enableAction(context: CommandContext, args: string) {
 
   const { names, scope, extensionManager } = enableContext;
   for (const name of names) {
-    await extensionManager.enableExtension(name!, scope);
+    await extensionManager.enableExtension(name, scope);
     context.ui.addItem(
       {
         type: MessageType.INFO,
