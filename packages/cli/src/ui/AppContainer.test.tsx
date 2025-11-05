@@ -1711,7 +1711,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Shell Interaction', () => {
-    it('should not crash if resizing the pty fails', () => {
+    it('should not crash if resizing the pty fails', async () => {
       const resizePtySpy = vi
         .spyOn(ShellExecutionService, 'resizePty')
         .mockImplementation(() => {
@@ -1729,18 +1729,21 @@ describe('AppContainer State Management', () => {
       });
 
       // The main assertion is that the render does not throw.
-      expect(() => {
-        render(
-          <AppContainer
-            config={mockConfig}
-            settings={mockSettings}
-            version="1.0.0"
-            initializationResult={mockInitResult}
-          />,
-        );
-      }).not.toThrow();
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
 
       expect(resizePtySpy).toHaveBeenCalled();
+      unmount();
     });
   });
 });
