@@ -34,23 +34,30 @@
     "lucide-react": "^0.539.0",
     "monaco-editor": "^0.52.2",
     "node-pty": "^1.1.0-beta34",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",
-    "@testing-library/react": "^16.0.0",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/coverage-v8": "^3.1.1",
-    "electron": "^39.0.0",
+    "electron": "38.0.0",
     "electron-vite": "^4.0.0",
     "jsdom": "^24.0.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.11",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "esbuild": "0.25.9",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6"
   },
   "build": {
     "productName": "Gemini CLI",
