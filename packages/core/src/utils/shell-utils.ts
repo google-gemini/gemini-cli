@@ -256,6 +256,40 @@ function collectCommandDetails(
   return details;
 }
 
+function hasPromptCommandTransform(root: Node): boolean {
+  const stack: Node[] = [root];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+
+    if (current.type === 'expansion') {
+      for (let i = 0; i < current.childCount - 1; i += 1) {
+        const operatorNode = current.child(i);
+        const transformNode = current.child(i + 1);
+
+        if (
+          operatorNode?.type === '@' &&
+          transformNode?.text?.toLowerCase() === 'p'
+        ) {
+          return true;
+        }
+      }
+    }
+
+    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
+      const child = current.namedChild(i);
+      if (child) {
+        stack.push(child);
+      }
+    }
+  }
+
+  return false;
+}
+
 function parseBashCommandDetails(command: string): CommandParseResult | null {
   if (treeSitterInitializationError) {
     throw treeSitterInitializationError;
@@ -276,7 +310,10 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
   const details = collectCommandDetails(tree.rootNode, command);
   return {
     details,
-    hasError: tree.rootNode.hasError || details.length === 0,
+    hasError:
+      tree.rootNode.hasError ||
+      details.length === 0 ||
+      hasPromptCommandTransform(tree.rootNode),
   };
 }
 
