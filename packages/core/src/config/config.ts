@@ -692,10 +692,7 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    // Do not allow Pro usage if the user is in fallback mode.
-    if (newModel.includes('pro') && this.isInFallbackMode()) {
-      return;
-    }
+    this.setFallbackMode(false);
 
     if (this.model !== newModel) {
       this.model = newModel;
