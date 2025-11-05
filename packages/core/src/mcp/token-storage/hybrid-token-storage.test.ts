@@ -88,7 +88,22 @@ describe('HybridTokenStorage', () => {
   });
 
   describe('storage selection', () => {
-    it('should use keychain when available', async () => {
+    it('should default to file storage when keychain not enabled', async () => {
+      mockFileStorage.getCredentials.mockResolvedValue(null);
+
+      await storage.getCredentials('test-server');
+
+      expect(mockKeychainStorage.isAvailable).not.toHaveBeenCalled();
+      expect(mockFileStorage.getCredentials).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(await storage.getStorageType()).toBe(
+        TokenStorageType.ENCRYPTED_FILE,
+      );
+    });
+
+    it('should use keychain when explicitly enabled and available', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       mockKeychainStorage.isAvailable!.mockResolvedValue(true);
       mockKeychainStorage.getCredentials.mockResolvedValue(null);
 
@@ -103,6 +118,7 @@ describe('HybridTokenStorage', () => {
 
     it('should use file storage when GEMINI_FORCE_FILE_STORAGE is set', async () => {
       process.env['GEMINI_FORCE_FILE_STORAGE'] = 'true';
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       mockFileStorage.getCredentials.mockResolvedValue(null);
 
       await storage.getCredentials('test-server');
@@ -117,6 +133,7 @@ describe('HybridTokenStorage', () => {
     });
 
     it('should fall back to file storage when keychain is unavailable', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       mockKeychainStorage.isAvailable!.mockResolvedValue(false);
       mockFileStorage.getCredentials.mockResolvedValue(null);
 
@@ -132,6 +149,7 @@ describe('HybridTokenStorage', () => {
     });
 
     it('should fall back to file storage when keychain throws error', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       mockKeychainStorage.isAvailable!.mockRejectedValue(
         new Error('Keychain error'),
       );
@@ -149,6 +167,7 @@ describe('HybridTokenStorage', () => {
     });
 
     it('should cache storage selection', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       mockKeychainStorage.isAvailable!.mockResolvedValue(true);
       mockKeychainStorage.getCredentials.mockResolvedValue(null);
 
@@ -161,6 +180,7 @@ describe('HybridTokenStorage', () => {
 
   describe('getCredentials', () => {
     it('should delegate to selected storage', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       const credentials: OAuthCredentials = {
         serverName: 'test-server',
         token: {
@@ -184,6 +204,7 @@ describe('HybridTokenStorage', () => {
 
   describe('setCredentials', () => {
     it('should delegate to selected storage', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       const credentials: OAuthCredentials = {
         serverName: 'test-server',
         token: {
@@ -206,6 +227,7 @@ describe('HybridTokenStorage', () => {
 
   describe('deleteCredentials', () => {
     it('should delegate to selected storage', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       mockKeychainStorage.isAvailable!.mockResolvedValue(true);
       mockKeychainStorage.deleteCredentials.mockResolvedValue(undefined);
 
@@ -219,6 +241,7 @@ describe('HybridTokenStorage', () => {
 
   describe('listServers', () => {
     it('should delegate to selected storage', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       const servers = ['server1', 'server2'];
       mockKeychainStorage.isAvailable!.mockResolvedValue(true);
       mockKeychainStorage.listServers.mockResolvedValue(servers);
@@ -232,6 +255,7 @@ describe('HybridTokenStorage', () => {
 
   describe('getAllCredentials', () => {
     it('should delegate to selected storage', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       const credentialsMap = new Map([
         [
           'server1',
@@ -263,6 +287,7 @@ describe('HybridTokenStorage', () => {
 
   describe('clearAll', () => {
     it('should delegate to selected storage', async () => {
+      process.env['GEMINI_ENABLE_KEYCHAIN_STORAGE'] = 'true';
       mockKeychainStorage.isAvailable!.mockResolvedValue(true);
       mockKeychainStorage.clearAll.mockResolvedValue(undefined);
 

@@ -10,6 +10,14 @@ CLI, configure **one** of the following authentication methods:
 - Headless (non-interactive) mode
 - Google Cloud Shell
 
+## Where credentials are stored
+
+By default the CLI uses encrypted file-based storage for tokens and other
+secrets, which works consistently in headless shells and CI. Keychain
+integration via Keytar is currently experimental; opt in by setting
+`GEMINI_ENABLE_KEYCHAIN_STORAGE=true` before launching the CLI. Use
+`GEMINI_FORCE_FILE_STORAGE=true` if you need to disable the experiment.
+
 ## Quick Check: Running in Google Cloud Shell?
 
 If you are running the Gemini CLI within a Google Cloud Shell environment,
