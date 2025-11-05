@@ -19,13 +19,19 @@ export function useAnimatedScrollbar(
   const animationFrame = useRef<NodeJS.Timeout | null>(null);
   const timeout = useRef<NodeJS.Timeout | null>(null);
 
-  const flashScrollbar = useCallback(() => {
+  const cleanup = useCallback(() => {
     if (animationFrame.current) {
       clearInterval(animationFrame.current);
+      animationFrame.current = null;
     }
     if (timeout.current) {
       clearTimeout(timeout.current);
+      timeout.current = null;
     }
+  }, []);
+
+  const flashScrollbar = useCallback(() => {
+    cleanup();
 
     const fadeInDuration = 200;
     const visibleDuration = 1000;
@@ -46,6 +52,7 @@ export function useAnimatedScrollbar(
       if (progress === 1) {
         if (animationFrame.current) {
           clearInterval(animationFrame.current);
+          animationFrame.current = null;
         }
 
         // Phase 2: Wait
@@ -62,6 +69,7 @@ export function useAnimatedScrollbar(
             if (progress === 1) {
               if (animationFrame.current) {
                 clearInterval(animationFrame.current);
+                animationFrame.current = null;
               }
             }
           };
@@ -72,23 +80,19 @@ export function useAnimatedScrollbar(
     };
 
     animationFrame.current = setInterval(animateFadeIn, 33);
-  }, []);
+  }, [cleanup]);
 
   const wasFocused = useRef(isFocused);
   useEffect(() => {
     if (isFocused && !wasFocused.current) {
       flashScrollbar();
     } else if (!isFocused && wasFocused.current) {
-      if (animationFrame.current) {
-        clearInterval(animationFrame.current);
-      }
-      if (timeout.current) {
-        clearTimeout(timeout.current);
-      }
+      cleanup();
       setScrollbarColor(theme.ui.dark);
     }
     wasFocused.current = isFocused;
-  }, [isFocused, flashScrollbar]);
+    return cleanup;
+  }, [isFocused, flashScrollbar, cleanup]);
 
   const scrollByWithAnimation = useCallback(
     (delta: number) => {

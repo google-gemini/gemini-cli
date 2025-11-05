@@ -19,6 +19,8 @@ import { theme } from '../../semantic-colors.js';
 
 import { type DOMElement, measureElement, Box } from 'ink';
 
+export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
+
 type VirtualizedListProps<T> = {
   data: T[];
   renderItem: (info: { item: T; index: number }) => React.ReactElement;
@@ -82,15 +84,15 @@ function VirtualizedList<T>(
 
   const [scrollAnchor, setScrollAnchor] = useState(() => {
     const scrollToEnd =
-      initialScrollIndex === Number.MAX_SAFE_INTEGER ||
+      initialScrollIndex === SCROLL_TO_ITEM_END ||
       (typeof initialScrollIndex === 'number' &&
         initialScrollIndex >= data.length - 1 &&
-        initialScrollOffsetInIndex === Number.MAX_SAFE_INTEGER);
+        initialScrollOffsetInIndex === SCROLL_TO_ITEM_END);
 
     if (scrollToEnd) {
       return {
         index: data.length > 0 ? data.length - 1 : 0,
-        offset: Number.MAX_SAFE_INTEGER,
+        offset: SCROLL_TO_ITEM_END,
       };
     }
 
@@ -105,10 +107,10 @@ function VirtualizedList<T>(
   });
   const [isStickingToBottom, setIsStickingToBottom] = useState(() => {
     const scrollToEnd =
-      initialScrollIndex === Number.MAX_SAFE_INTEGER ||
+      initialScrollIndex === SCROLL_TO_ITEM_END ||
       (typeof initialScrollIndex === 'number' &&
         initialScrollIndex >= data.length - 1 &&
-        initialScrollOffsetInIndex === Number.MAX_SAFE_INTEGER);
+        initialScrollOffsetInIndex === Number.SCROLL_TO_ITEM_END);
     return scrollToEnd;
   });
   const containerRef = useRef<DOMElement>(null);
@@ -156,6 +158,23 @@ function VirtualizedList<T>(
         setContainerHeight(height);
       }
     }
+
+    let newHeights: number[] | null = null;
+    for (let i = startIndex; i <= endIndex; i++) {
+      const itemRef = itemRefs.current[i];
+      if (itemRef) {
+        const height = Math.round(measureElement(itemRef).height);
+        if (height !== heights[i]) {
+          if (!newHeights) {
+            newHeights = [...heights];
+          }
+          newHeights[i] = height;
+        }
+      }
+    }
+    if (newHeights) {
+      setHeights(newHeights);
+    }
   });
 
   const scrollableContainerHeight = containerRef.current
@@ -183,7 +202,7 @@ function VirtualizedList<T>(
       return 0;
     }
 
-    if (scrollAnchor.offset === Number.MAX_SAFE_INTEGER) {
+    if (scrollAnchor.offset === SCROLL_TO_ITEM_END) {
       const itemHeight = heights[scrollAnchor.index] ?? 0;
       return offset + itemHeight - scrollableContainerHeight;
     }
@@ -223,7 +242,7 @@ function VirtualizedList<T>(
     ) {
       setScrollAnchor({
         index: data.length > 0 ? data.length - 1 : 0,
-        offset: Number.MAX_SAFE_INTEGER,
+        offset: SCROLL_TO_ITEM_END,
       });
       // If we are scrolling to the bottom, we are by definition sticking.
       if (!isStickingToBottom) {
@@ -272,14 +291,14 @@ function VirtualizedList<T>(
 
     if (typeof initialScrollIndex === 'number') {
       const scrollToEnd =
-        initialScrollIndex === Number.MAX_SAFE_INTEGER ||
+        initialScrollIndex === SCROLL_TO_ITEM_END ||
         (initialScrollIndex >= data.length - 1 &&
-          initialScrollOffsetInIndex === Number.MAX_SAFE_INTEGER);
+          initialScrollOffsetInIndex === SCROLL_TO_ITEM_END);
 
       if (scrollToEnd) {
         setScrollAnchor({
           index: data.length - 1,
-          offset: Number.MAX_SAFE_INTEGER,
+          offset: SCROLL_TO_ITEM_END,
         });
         setIsStickingToBottom(true);
         isInitialScrollSet.current = true;
@@ -344,25 +363,6 @@ function VirtualizedList<T>(
     }
   }
 
-  useLayoutEffect(() => {
-    let newHeights: number[] | null = null;
-    for (let i = startIndex; i <= endIndex; i++) {
-      const itemRef = itemRefs.current[i];
-      if (itemRef) {
-        const height = Math.round(measureElement(itemRef).height);
-        if (height !== heights[i]) {
-          if (!newHeights) {
-            newHeights = [...heights];
-          }
-          newHeights[i] = height;
-        }
-      }
-    }
-    if (newHeights) {
-      setHeights(newHeights);
-    }
-  }, [startIndex, endIndex, heights]);
-
   useImperativeHandle(
     ref,
     () => ({
@@ -389,12 +389,11 @@ function VirtualizedList<T>(
         setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
       },
       scrollToEnd: () => {
-        const currentData = dataRef.current;
         setIsStickingToBottom(true);
-        if (currentData.length > 0) {
+        if (data.length > 0) {
           setScrollAnchor({
-            index: currentData.length - 1,
-            offset: Number.MAX_SAFE_INTEGER,
+            index: data.length - 1,
+            offset: SCROLL_TO_ITEM_END,
           });
         }
       },

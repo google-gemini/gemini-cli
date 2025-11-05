@@ -7,7 +7,14 @@
 import { render } from '../../../test-utils/render.js';
 import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
 import { Text, Box } from 'ink';
-import { createRef, act, useEffect } from 'react';
+import {
+  createRef,
+  act,
+  useEffect,
+  createContext,
+  useContext,
+  useState,
+} from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -192,5 +199,85 @@ describe('<VirtualizedList />', () => {
         expect(frame).toMatchSnapshot();
       },
     );
+  });
+
+  it('renders more items when a visible item shrinks via context update', async () => {
+    const SizeContext = createContext<{
+      firstItemHeight: number;
+      setFirstItemHeight: (h: number) => void;
+    }>({
+      firstItemHeight: 10,
+      setFirstItemHeight: () => {},
+    });
+
+    const items = Array.from({ length: 20 }, (_, i) => ({
+      id: `Item ${i}`,
+    }));
+
+    const ItemWithContext = ({
+      item,
+      index,
+    }: {
+      item: { id: string };
+      index: number;
+    }) => {
+      const { firstItemHeight } = useContext(SizeContext);
+      const height = index === 0 ? firstItemHeight : 1;
+      return (
+        <Box height={height}>
+          <Text>{item.id}</Text>
+        </Box>
+      );
+    };
+
+    const TestComponent = () => {
+      const [firstItemHeight, setFirstItemHeight] = useState(10);
+      return (
+        <SizeContext.Provider value={{ firstItemHeight, setFirstItemHeight }}>
+          <Box height={10} width={100}>
+            <VirtualizedList
+              data={items}
+              renderItem={({ item, index }) => (
+                <ItemWithContext item={item} index={index} />
+              )}
+              keyExtractor={(item) => item.id}
+              estimatedItemHeight={() => 1}
+            />
+          </Box>
+          {/* Expose setter for testing */}
+          <TestControl setFirstItemHeight={setFirstItemHeight} />
+        </SizeContext.Provider>
+      );
+    };
+
+    let setHeightFn: (h: number) => void = () => {};
+    const TestControl = ({
+      setFirstItemHeight,
+    }: {
+      setFirstItemHeight: (h: number) => void;
+    }) => {
+      setHeightFn = setFirstItemHeight;
+      return null;
+    };
+
+    const { lastFrame } = render(<TestComponent />);
+    await act(async () => {
+      await delay(0);
+    });
+
+    // Initially, only Item 0 (height 10) fills the 10px viewport
+    expect(lastFrame()).toContain('Item 0');
+    expect(lastFrame()).not.toContain('Item 1');
+
+    // Shrink Item 0 to 1px via context
+    await act(async () => {
+      setHeightFn(1);
+      await delay(0);
+    });
+
+    // Now Item 0 is 1px, so Items 1-9 should also be visible to fill 10px
+    expect(lastFrame()).toContain('Item 0');
+    expect(lastFrame()).toContain('Item 1');
+    expect(lastFrame()).toContain('Item 9');
   });
 });
