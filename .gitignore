@@ -17,7 +17,6 @@
 # Dependency directory
 node_modules
 bower_components
-package-lock.json
 
 # Editors
 .idea
@@ -47,9 +46,12 @@ packages/cli/src/generated/
 packages/core/src/generated/
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
+packages/cli/download-ripgrep*/
 
 # GHA credentials
 gha-creds-*.json
 
 # Log files
 patch_output.log
+
+.genkit

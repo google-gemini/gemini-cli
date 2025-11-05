@@ -51,7 +51,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
   const borderColor =
-    isShellCommand || isEmbeddedShellFocused
+    (isShellCommand && hasPending) || isEmbeddedShellFocused
       ? theme.ui.symbol
       : hasPending
         ? theme.status.warning
@@ -96,8 +96,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         Ink to render the border of the box incorrectly and span multiple lines and even
         cause tearing.
       */
-      width="100%"
-      marginLeft={1}
+      width={terminalWidth}
       borderDimColor={
         hasPending && (!isShellCommand || !isEmbeddedShellFocused)
       }

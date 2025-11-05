@@ -4,35 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { requestConsentInteractive } from '../../config/extension.js';
-import {
-  updateAllUpdatableExtensions,
-  type ExtensionUpdateInfo,
-  updateExtension,
-} from '../../config/extensions/update.js';
+import { listExtensions } from '@google/gemini-cli-core';
+import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
-import { ExtensionUpdateState } from '../state/extensions.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemExtensionsList } from '../types.js';
 import {
   type CommandContext,
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import open from 'open';
+import process from 'node:process';
 
 async function listAction(context: CommandContext) {
-  context.ui.addItem(
-    {
-      type: MessageType.EXTENSIONS_LIST,
-    },
-    Date.now(),
-  );
+  const historyItem: HistoryItemExtensionsList = {
+    type: MessageType.EXTENSIONS_LIST,
+    extensions: context.services.config
+      ? listExtensions(context.services.config)
+      : [],
+  };
+
+  context.ui.addItem(historyItem, Date.now());
 }
 
-async function updateAction(context: CommandContext, args: string) {
+function updateAction(context: CommandContext, args: string): Promise<void> {
   const updateArgs = args.split(' ').filter((value) => value.length > 0);
   const all = updateArgs.length === 1 && updateArgs[0] === '--all';
-  const names = all ? undefined : updateArgs;
-  let updateInfos: ExtensionUpdateInfo[] = [];
+  const names = all ? null : updateArgs;
 
   if (!all && names?.length === 0) {
     context.ui.addItem(
@@ -42,26 +40,51 @@ async function updateAction(context: CommandContext, args: string) {
       },
       Date.now(),
     );
-    return;
+    return Promise.resolve();
   }
 
-  try {
-    context.ui.setPendingItem({
-      type: MessageType.EXTENSIONS_LIST,
-    });
-    if (all) {
-      updateInfos = await updateAllUpdatableExtensions(
-        context.services.config!.getWorkingDir(),
-        // We don't have the ability to prompt for consent yet in this flow.
-        (description) =>
-          requestConsentInteractive(description, context.ui.addItem),
-        context.services.config!.getExtensions(),
-        context.ui.extensionsUpdateState,
-        context.ui.setExtensionsUpdateState,
+  let resolveUpdateComplete: (updateInfo: ExtensionUpdateInfo[]) => void;
+  const updateComplete = new Promise<ExtensionUpdateInfo[]>(
+    (resolve) => (resolveUpdateComplete = resolve),
+  );
+
+  const historyItem: HistoryItemExtensionsList = {
+    type: MessageType.EXTENSIONS_LIST,
+    extensions: context.services.config
+      ? listExtensions(context.services.config)
+      : [],
+  };
+
+  updateComplete.then((updateInfos) => {
+    if (updateInfos.length === 0) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions to update.',
+        },
+        Date.now(),
       );
-    } else if (names?.length) {
-      const workingDir = context.services.config!.getWorkingDir();
-      const extensions = context.services.config!.getExtensions();
+    }
+
+    context.ui.addItem(historyItem, Date.now());
+    context.ui.setPendingItem(null);
+  });
+
+  try {
+    context.ui.setPendingItem(historyItem);
+
+    context.ui.dispatchExtensionStateUpdate({
+      type: 'SCHEDULE_UPDATE',
+      payload: {
+        all,
+        names,
+        onComplete: (updateInfos) => {
+          resolveUpdateComplete(updateInfos);
+        },
+      },
+    });
+    if (names?.length) {
+      const extensions = listExtensions(context.services.config!);
       for (const name of names) {
         const extension = extensions.find(
           (extension) => extension.name === name,
@@ -76,36 +99,10 @@ async function updateAction(context: CommandContext, args: string) {
           );
           continue;
         }
-        const updateInfo = await updateExtension(
-          extension,
-          workingDir,
-          (description) =>
-            requestConsentInteractive(description, context.ui.addItem),
-          context.ui.extensionsUpdateState.get(extension.name) ??
-            ExtensionUpdateState.UNKNOWN,
-          (updateState) => {
-            context.ui.setExtensionsUpdateState((prev) => {
-              const newState = new Map(prev);
-              newState.set(name, updateState);
-              return newState;
-            });
-          },
-        );
-        if (updateInfo) updateInfos.push(updateInfo);
       }
     }
-
-    if (updateInfos.length === 0) {
-      context.ui.addItem(
-        {
-          type: MessageType.INFO,
-          text: 'No extensions to update.',
-        },
-        Date.now(),
-      );
-      return;
-    }
   } catch (error) {
+    resolveUpdateComplete!([]);
     context.ui.addItem(
       {
         type: MessageType.ERROR,
@@ -113,14 +110,52 @@ async function updateAction(context: CommandContext, args: string) {
       },
       Date.now(),
     );
-  } finally {
+  }
+  return updateComplete.then((_) => {});
+}
+
+async function exploreAction(context: CommandContext) {
+  const extensionsUrl = 'https://geminicli.com/extensions/';
+
+  // Only check for NODE_ENV for explicit test mode, not for unit test framework
+  if (process.env['NODE_ENV'] === 'test') {
     context.ui.addItem(
       {
-        type: MessageType.EXTENSIONS_LIST,
+        type: MessageType.INFO,
+        text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
       },
       Date.now(),
     );
-    context.ui.setPendingItem(null);
+  } else if (
+    process.env['SANDBOX'] &&
+    process.env['SANDBOX'] !== 'sandbox-exec'
+  ) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `View available extensions at ${extensionsUrl}`,
+      },
+      Date.now(),
+    );
+  } else {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Opening extensions page in your browser: ${extensionsUrl}`,
+      },
+      Date.now(),
+    );
+    try {
+      await open(extensionsUrl);
+    } catch (_error) {
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
+        },
+        Date.now(),
+      );
+    }
   }
 }
 
@@ -136,13 +171,39 @@ const updateExtensionsCommand: SlashCommand = {
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
   action: updateAction,
+  completion: async (context, partialArg) => {
+    const extensions = context.services.config
+      ? listExtensions(context.services.config)
+      : [];
+    const extensionNames = extensions.map((ext) => ext.name);
+    const suggestions = extensionNames.filter((name) =>
+      name.startsWith(partialArg),
+    );
+
+    if ('--all'.startsWith(partialArg) || 'all'.startsWith(partialArg)) {
+      suggestions.unshift('--all');
+    }
+
+    return suggestions;
+  },
+};
+
+const exploreExtensionsCommand: SlashCommand = {
+  name: 'explore',
+  description: 'Open extensions page in your browser',
+  kind: CommandKind.BUILT_IN,
+  action: exploreAction,
 };
 
 export const extensionsCommand: SlashCommand = {
   name: 'extensions',
   description: 'Manage extensions',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listExtensionsCommand, updateExtensionsCommand],
+  subCommands: [
+    listExtensionsCommand,
+    updateExtensionsCommand,
+    exploreExtensionsCommand,
+  ],
   action: (context, args) =>
     // Default to list if no subcommand is provided
     listExtensionsCommand.action!(context, args),

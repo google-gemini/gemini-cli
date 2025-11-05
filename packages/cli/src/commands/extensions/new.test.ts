@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { newCommand } from './new.js';
 import yargs from 'yargs';
 import * as fsPromises from 'node:fs/promises';
+import path from 'node:path';
 
 vi.mock('node:fs/promises');
 
@@ -29,15 +30,22 @@ describe('extensions new command', () => {
   it('should fail if no path is provided', async () => {
     const parser = yargs([]).command(newCommand).fail(false).locale('en');
     await expect(parser.parseAsync('new')).rejects.toThrow(
-      'Not enough non-option arguments: got 0, need at least 2',
+      'Not enough non-option arguments: got 0, need at least 1',
     );
   });
 
-  it('should fail if no template is provided', async () => {
-    const parser = yargs([]).command(newCommand).fail(false).locale('en');
-    await expect(parser.parseAsync('new /some/path')).rejects.toThrow(
-      'Not enough non-option arguments: got 1, need at least 2',
-    );
+  it('should create directory when no template is provided', async () => {
+    mockedFs.access.mockRejectedValue(new Error('ENOENT'));
+    mockedFs.mkdir.mockResolvedValue(undefined);
+
+    const parser = yargs([]).command(newCommand).fail(false);
+
+    await parser.parseAsync('new /some/path');
+
+    expect(mockedFs.mkdir).toHaveBeenCalledWith('/some/path', {
+      recursive: true,
+    });
+    expect(mockedFs.cp).not.toHaveBeenCalled();
   });
 
   it('should create directory and copy files when path does not exist', async () => {
@@ -53,18 +61,18 @@ describe('extensions new command', () => {
       recursive: true,
     });
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining('context/context'),
-      '/some/path/context',
+      expect.stringContaining(path.normalize('context/context')),
+      path.normalize('/some/path/context'),
       { recursive: true },
     );
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining('context/custom-commands'),
-      '/some/path/custom-commands',
+      expect.stringContaining(path.normalize('context/custom-commands')),
+      path.normalize('/some/path/custom-commands'),
       { recursive: true },
     );
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining('context/mcp-server'),
-      '/some/path/mcp-server',
+      expect.stringContaining(path.normalize('context/mcp-server')),
+      path.normalize('/some/path/mcp-server'),
       { recursive: true },
     );
   });

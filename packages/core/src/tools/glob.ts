@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { glob, escape } from 'glob';
@@ -13,6 +14,9 @@ import { shortenPath, makeRelative } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
+import { GLOB_TOOL_NAME } from './tool-names.js';
+import { getErrorMessage } from '../utils/errors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
 export interface GlobPath {
@@ -87,8 +91,11 @@ class GlobToolInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: GlobToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -164,7 +171,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         path.relative(this.config.getTargetDir(), p.fullpath()),
       );
 
-      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
+      const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
             this.params?.respect_git_ignore ??
@@ -191,11 +198,8 @@ class GlobToolInvocation extends BaseToolInvocation<
         } else {
           message += ` within ${searchDirectories.length} workspace directories`;
         }
-        if (gitIgnoredCount > 0) {
-          message += ` (${gitIgnoredCount} files were git-ignored)`;
-        }
-        if (geminiIgnoredCount > 0) {
-          message += ` (${geminiIgnoredCount} files were gemini-ignored)`;
+        if (ignoredCount > 0) {
+          message += ` (${ignoredCount} files were ignored)`;
         }
         return {
           llmContent: message,
@@ -226,11 +230,8 @@ class GlobToolInvocation extends BaseToolInvocation<
       } else {
         resultMessage += ` across ${searchDirectories.length} workspace directories`;
       }
-      if (gitIgnoredCount > 0) {
-        resultMessage += ` (${gitIgnoredCount} additional files were git-ignored)`;
-      }
-      if (geminiIgnoredCount > 0) {
-        resultMessage += ` (${geminiIgnoredCount} additional files were gemini-ignored)`;
+      if (ignoredCount > 0) {
+        resultMessage += ` (${ignoredCount} additional files were ignored)`;
       }
       resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
 
@@ -239,9 +240,8 @@ class GlobToolInvocation extends BaseToolInvocation<
         returnDisplay: `Found ${fileCount} matching file(s)`,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(`GlobLogic execute Error: ${errorMessage}`, error);
+      debugLogger.warn(`GlobLogic execute Error`, error);
+      const errorMessage = getErrorMessage(error);
       const rawError = `Error during glob search operation: ${errorMessage}`;
       return {
         llmContent: rawError,
@@ -259,9 +259,11 @@ class GlobToolInvocation extends BaseToolInvocation<
  * Implementation of the Glob tool logic
  */
 export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
-  static readonly Name = 'glob';
-
-  constructor(private config: Config) {
+  static readonly Name = GLOB_TOOL_NAME;
+  constructor(
+    private config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       GlobTool.Name,
       'FindFiles',
@@ -298,6 +300,9 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
         required: ['pattern'],
         type: 'object',
       },
+      true,
+      false,
+      messageBus,
     );
   }
 
@@ -343,7 +348,16 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
 
   protected createInvocation(
     params: GlobToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<GlobToolParams, ToolResult> {
-    return new GlobToolInvocation(this.config, params);
+    return new GlobToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

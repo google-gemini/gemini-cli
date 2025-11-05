@@ -24,10 +24,11 @@ import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
 import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
+  debug: (...args: any[]) => debugLogger.debug('[DEBUG] [IDEClient]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
 };
@@ -667,10 +668,10 @@ export class IdeClient {
   }
 
   private createProxyAwareFetch() {
-    // ignore proxy for 'localhost' by deafult to allow connecting to the ide mcp server
+    // ignore proxy for '127.0.0.1' by deafult to allow connecting to the ide mcp server
     const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
-      noProxy: [existingNoProxy, 'localhost'].filter(Boolean).join(','),
+      noProxy: [existingNoProxy, '127.0.0.1'].filter(Boolean).join(','),
     });
     const undiciPromise = import('undici');
     return async (url: string | URL, init?: RequestInit): Promise<Response> => {
@@ -841,5 +842,5 @@ export class IdeClient {
 function getIdeServerHost() {
   const isInContainer =
     fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
-  return isInContainer ? 'host.docker.internal' : 'localhost';
+  return isInContainer ? 'host.docker.internal' : '127.0.0.1';
 }

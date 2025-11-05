@@ -1,0 +1,137 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<HistoryItemDisplay /> > should render a full gemini item when using availableTerminalHeightGemini 1`] = `
+"✦ Example code block:
+    1 Line 1
+    2 Line 2
+    3 Line 3
+    4 Line 4
+    5 Line 5
+    6 Line 6
+    7 Line 7
+    8 Line 8
+    9 Line 9
+   10 Line 10
+   11 Line 11
+   12 Line 12
+   13 Line 13
+   14 Line 14
+   15 Line 15
+   16 Line 16
+   17 Line 17
+   18 Line 18
+   19 Line 19
+   20 Line 20
+   21 Line 21
+   22 Line 22
+   23 Line 23
+   24 Line 24
+   25 Line 25
+   26 Line 26
+   27 Line 27
+   28 Line 28
+   29 Line 29
+   30 Line 30
+   31 Line 31
+   32 Line 32
+   33 Line 33
+   34 Line 34
+   35 Line 35
+   36 Line 36
+   37 Line 37
+   38 Line 38
+   39 Line 39
+   40 Line 40
+   41 Line 41
+   42 Line 42
+   43 Line 43
+   44 Line 44
+   45 Line 45
+   46 Line 46
+   47 Line 47
+   48 Line 48
+   49 Line 49
+   50 Line 50"
+`;
+
+exports[`<HistoryItemDisplay /> > should render a full gemini_content item when using availableTerminalHeightGemini 1`] = `
+"  Example code block:
+    1 Line 1
+    2 Line 2
+    3 Line 3
+    4 Line 4
+    5 Line 5
+    6 Line 6
+    7 Line 7
+    8 Line 8
+    9 Line 9
+   10 Line 10
+   11 Line 11
+   12 Line 12
+   13 Line 13
+   14 Line 14
+   15 Line 15
+   16 Line 16
+   17 Line 17
+   18 Line 18
+   19 Line 19
+   20 Line 20
+   21 Line 21
+   22 Line 22
+   23 Line 23
+   24 Line 24
+   25 Line 25
+   26 Line 26
+   27 Line 27
+   28 Line 28
+   29 Line 29
+   30 Line 30
+   31 Line 31
+   32 Line 32
+   33 Line 33
+   34 Line 34
+   35 Line 35
+   36 Line 36
+   37 Line 37
+   38 Line 38
+   39 Line 39
+   40 Line 40
+   41 Line 41
+   42 Line 42
+   43 Line 43
+   44 Line 44
+   45 Line 45
+   46 Line 46
+   47 Line 47
+   48 Line 48
+   49 Line 49
+   50 Line 50"
+`;
+
+exports[`<HistoryItemDisplay /> > should render a truncated gemini item 1`] = `
+"✦ Example code block:
+   ... first 41 lines hidden ...
+   42 Line 42
+   43 Line 43
+   44 Line 44
+   45 Line 45
+   46 Line 46
+   47 Line 47
+   48 Line 48
+   49 Line 49
+   50 Line 50"
+`;
+
+exports[`<HistoryItemDisplay /> > should render a truncated gemini_content item 1`] = `
+"  Example code block:
+   ... first 41 lines hidden ...
+   42 Line 42
+   43 Line 43
+   44 Line 44
+   45 Line 45
+   46 Line 46
+   47 Line 47
+   48 Line 48
+   49 Line 49
+   50 Line 50"
+`;

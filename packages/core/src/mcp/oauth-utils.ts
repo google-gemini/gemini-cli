@@ -6,6 +6,7 @@
 
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * OAuth authorization server metadata as per RFC 8414.
@@ -36,6 +37,8 @@ export interface OAuthProtectedResourceMetadata {
   resource_encryption_alg_values_supported?: string[];
   resource_encryption_enc_values_supported?: string[];
 }
+
+export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
 
 /**
  * Utility class for common OAuth operations.
@@ -94,7 +97,7 @@ export class OAuthUtils {
       }
       return (await response.json()) as OAuthProtectedResourceMetadata;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to fetch protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
       );
       return null;
@@ -117,7 +120,7 @@ export class OAuthUtils {
       }
       return (await response.json()) as OAuthAuthorizationServerMetadata;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to fetch authorization server metadata from ${authServerMetadataUrl}: ${getErrorMessage(error)}`,
       );
       return null;
@@ -205,7 +208,7 @@ export class OAuthUtils {
       }
     }
 
-    console.debug(
+    debugLogger.debug(
       `Metadata discovery failed for authorization server ${authServerUrl}`,
     );
     return null;
@@ -249,7 +252,7 @@ export class OAuthUtils {
         if (authServerMetadata) {
           const config = this.metadataToOAuthConfig(authServerMetadata);
           if (authServerMetadata.registration_endpoint) {
-            console.log(
+            debugLogger.log(
               'Dynamic client registration is supported at:',
               authServerMetadata.registration_endpoint,
             );
@@ -259,14 +262,14 @@ export class OAuthUtils {
       }
 
       // Fallback: try well-known endpoints at the base URL
-      console.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
+      debugLogger.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
       const authServerMetadata =
         await this.discoverAuthorizationServerMetadata(serverUrl);
 
       if (authServerMetadata) {
         const config = this.metadataToOAuthConfig(authServerMetadata);
         if (authServerMetadata.registration_endpoint) {
-          console.log(
+          debugLogger.log(
             'Dynamic client registration is supported at:',
             authServerMetadata.registration_endpoint,
           );
@@ -276,7 +279,7 @@ export class OAuthUtils {
 
       return null;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to discover OAuth configuration: ${getErrorMessage(error)}`,
       );
       return null;
@@ -359,6 +362,28 @@ export class OAuthUtils {
    */
   static buildResourceParameter(endpointUrl: string): string {
     const url = new URL(endpointUrl);
-    return `${url.protocol}//${url.host}`;
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  }
+
+  /**
+   * Parses a JWT string to extract its expiry time.
+   * @param idToken The JWT ID token.
+   * @returns The expiry time in **milliseconds**, or undefined if parsing fails.
+   */
+  static parseTokenExpiry(idToken: string): number | undefined {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(idToken.split('.')[1], 'base64').toString(),
+      );
+
+      if (payload && typeof payload.exp === 'number') {
+        return payload.exp * 1000; // Convert seconds to milliseconds
+      }
+    } catch (e) {
+      console.error('Failed to parse ID token for expiry time with error:', e);
+    }
+
+    // Return undefined if try block fails or 'exp' is missing/invalid
+    return undefined;
   }
 }

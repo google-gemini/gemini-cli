@@ -7,11 +7,11 @@
 /* ACP defines a schema for a simple (experimental) JSON-RPC protocol that allows GUI applications to interact with agents. */
 
 import { z } from 'zod';
-import { EOL } from 'node:os';
 import * as schema from './schema.js';
 export * from './schema.js';
 
 import type { WritableStream, ReadableStream } from 'node:stream/web';
+import { coreEvents } from '@google/gemini-cli-core';
 
 export class AgentSideConnection implements Client {
   #connection: Connection;
@@ -173,7 +173,7 @@ class Connection {
     const decoder = new TextDecoder();
     for await (const chunk of output) {
       content += decoder.decode(chunk, { stream: true });
-      const lines = content.split(EOL);
+      const lines = content.split('\n');
       content = lines.pop() || '';
 
       for (const line of lines) {
@@ -282,7 +282,7 @@ class Connection {
       })
       .catch((error) => {
         // Continue processing writes on error
-        console.error('ACP write error:', error);
+        coreEvents.emitFeedback('error', 'ACP write error.', error);
       });
     return this.#writeQueue;
   }

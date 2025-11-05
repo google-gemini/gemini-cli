@@ -60,12 +60,15 @@ export const computeSessionStats = (
   const totalDecisions =
     tools.totalDecisions.accept +
     tools.totalDecisions.reject +
-    tools.totalDecisions.modify;
+    tools.totalDecisions.modify +
+    tools.totalDecisions.auto_accept;
   const successRate =
     tools.totalCalls > 0 ? (tools.totalSuccess / tools.totalCalls) * 100 : 0;
   const agreementRate =
     totalDecisions > 0
-      ? (tools.totalDecisions.accept / totalDecisions) * 100
+      ? ((tools.totalDecisions.accept + tools.totalDecisions.auto_accept) /
+          totalDecisions) *
+        100
       : 0;
 
   return {
