@@ -20,7 +20,7 @@ import type { FileDiff, ToolEditConfirmationDetails } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { type EditToolParams } from './edit.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -81,7 +81,7 @@ const mockConfigInternal = {
   getSandbox: () => false,
   getDebugMode: () => false,
   getQuestion: () => undefined,
-  getFullContext: () => false,
+
   getToolDiscoveryCommand: () => undefined,
   getToolCallCommand: () => undefined,
   getMcpServerCommand: () => undefined,

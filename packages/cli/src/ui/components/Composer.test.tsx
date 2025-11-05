@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
@@ -111,8 +111,9 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     showEscapePrompt: false,
     ideContextState: null,
     geminiMdFileCount: 0,
-    showToolDescriptions: false,
+    renderMarkdown: true,
     filteredConsoleMessages: [],
+    history: [],
     sessionStats: {
       lastPromptTokenCount: 0,
       sessionTokenCount: 0,
@@ -143,7 +144,10 @@ const createMockConfig = (overrides = {}) => ({
   getDebugMode: vi.fn(() => false),
   getAccessibility: vi.fn(() => ({})),
   getMcpServers: vi.fn(() => ({})),
-  getBlockedMcpServers: vi.fn(() => []),
+  getMcpClientManager: vi.fn().mockImplementation(() => ({
+    getBlockedMcpServers: vi.fn(),
+    getMcpServers: vi.fn(),
+  })),
   ...overrides,
 });
 
@@ -402,6 +406,26 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShellModeIndicator');
+    });
+
+    it('shows RawMarkdownIndicator when renderMarkdown is false', () => {
+      const uiState = createMockUIState({
+        renderMarkdown: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('raw markdown mode');
+    });
+
+    it('does not show RawMarkdownIndicator when renderMarkdown is true', () => {
+      const uiState = createMockUIState({
+        renderMarkdown: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('raw markdown mode');
     });
   });
 

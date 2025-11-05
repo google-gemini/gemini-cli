@@ -9,6 +9,7 @@ import type {
   GenerateContentConfig,
   Part,
   EmbedContentParameters,
+  GenerateContentResponse,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from './contentGenerator.js';
@@ -107,54 +108,44 @@ export class BaseLlmClient {
           promptId,
         );
 
+      const shouldRetryOnContent = (response: GenerateContentResponse) => {
+        const text = getResponseText(response)?.trim();
+        if (!text) {
+          return true; // Retry on empty response
+        }
+        try {
+          JSON.parse(this.cleanJsonResponse(text, model));
+          return false;
+        } catch (_e) {
+          return true;
+        }
+      };
+
       const result = await retryWithBackoff(apiCall, {
+        shouldRetryOnContent,
         maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       });
 
-      let text = getResponseText(result)?.trim();
-      if (!text) {
-        const error = new Error(
-          'API returned an empty response for generateJson.',
-        );
-        await reportError(
-          error,
-          'Error in generateJson: API returned an empty response.',
-          contents,
-          'generateJson-empty-response',
-        );
-        throw error;
-      }
-
-      text = this.cleanJsonResponse(text, model);
-
-      try {
-        return JSON.parse(text);
-      } catch (parseError) {
-        const error = new Error(
-          `Failed to parse API response as JSON: ${getErrorMessage(parseError)}`,
-        );
-        await reportError(
-          parseError,
-          'Failed to parse JSON response from generateJson.',
-          {
-            responseTextFailedToParse: text,
-            originalRequestContents: contents,
-          },
-          'generateJson-parse',
-        );
-        throw error;
-      }
+      // If we are here, the content is valid (not empty and parsable).
+      return JSON.parse(
+        this.cleanJsonResponse(getResponseText(result)!.trim(), model),
+      );
     } catch (error) {
       if (abortSignal.aborted) {
         throw error;
       }
 
+      // Check if the error is from exhausting retries, and report accordingly.
       if (
         error instanceof Error &&
-        (error.message === 'API returned an empty response for generateJson.' ||
-          error.message.startsWith('Failed to parse API response as JSON:'))
+        error.message.includes('Retry attempts exhausted')
       ) {
-        // We perform this check so that we don't report these again.
+        await reportError(
+          error,
+          'API returned invalid content (empty or unparsable JSON) after all retries.',
+          contents,
+          'generateJson-invalid-content',
+        );
       } else {
         await reportError(
           error,

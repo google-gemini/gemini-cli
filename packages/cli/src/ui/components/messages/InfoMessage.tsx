@@ -22,10 +22,12 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
       <Box width={prefixWidth}>
         <Text color={theme.status.warning}>{prefix}</Text>
       </Box>
-      <Box flexGrow={1}>
-        <Text wrap="wrap" color={theme.status.warning}>
-          <RenderInline text={text} />
-        </Text>
+      <Box flexGrow={1} flexDirection="column">
+        {text.split('\n').map((line, index) => (
+          <Text wrap="wrap" key={index}>
+            <RenderInline text={line} defaultColor={theme.status.warning} />
+          </Text>
+        ))}
       </Box>
     </Box>
   );

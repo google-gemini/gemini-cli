@@ -4,6 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+vi.mock('../ui/commands/profileCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    profileCommand: {
+      name: 'profile',
+      description: 'Profile command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
+
 vi.mock('../ui/commands/aboutCommand.js', async () => {
   const { CommandKind } = await import('../ui/commands/types.js');
   return {
@@ -55,7 +66,7 @@ vi.mock('../ui/commands/corgiCommand.js', () => ({ corgiCommand: {} }));
 vi.mock('../ui/commands/docsCommand.js', () => ({ docsCommand: {} }));
 vi.mock('../ui/commands/editorCommand.js', () => ({ editorCommand: {} }));
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
-  extensionsCommand: {},
+  extensionsCommand: () => ({}),
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
 vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
@@ -85,6 +96,8 @@ describe('BuiltinCommandLoader', () => {
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getUseModelRouter: () => false,
+      getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -175,5 +188,60 @@ describe('BuiltinCommandLoader', () => {
     const commands = await loader.loadCommands(new AbortController().signal);
     const modelCmd = commands.find((c) => c.name === 'model');
     expect(modelCmd).toBeUndefined();
+  });
+
+  it('should include policies command when message bus integration is enabled', async () => {
+    const mockConfigWithMessageBus = {
+      ...mockConfig,
+      getEnableMessageBusIntegration: () => true,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const policiesCmd = commands.find((c) => c.name === 'policies');
+    expect(policiesCmd).toBeDefined();
+  });
+
+  it('should exclude policies command when message bus integration is disabled', async () => {
+    const mockConfigWithoutMessageBus = {
+      ...mockConfig,
+      getEnableMessageBusIntegration: () => false,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const policiesCmd = commands.find((c) => c.name === 'policies');
+    expect(policiesCmd).toBeUndefined();
+  });
+});
+
+describe('BuiltinCommandLoader profile', () => {
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockConfig = {
+      getFolderTrust: vi.fn().mockReturnValue(false),
+      getUseModelRouter: () => false,
+      getCheckpointingEnabled: () => false,
+      getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
+    } as unknown as Config;
+  });
+
+  it('should not include profile command when isDevelopment is false', async () => {
+    process.env['NODE_ENV'] = 'production';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const profileCmd = commands.find((c) => c.name === 'profile');
+    expect(profileCmd).toBeUndefined();
+  });
+
+  it('should include profile command when isDevelopment is true', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const profileCmd = commands.find((c) => c.name === 'profile');
+    expect(profileCmd).toBeDefined();
   });
 });

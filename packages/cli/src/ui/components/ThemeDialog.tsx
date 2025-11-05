@@ -12,7 +12,10 @@ import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -20,7 +23,10 @@ import { ScopeSelector } from './shared/ScopeSelector.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string | undefined, scope: SettingScope) => void;
+  onSelect: (themeName: string, scope: LoadableSettingScope) => void;
+
+  /** Callback function when the dialog is cancelled */
+  onCancel: () => void;
 
   /** Callback function when a theme is highlighted */
   onHighlight: (themeName: string | undefined) => void;
@@ -32,19 +38,20 @@ interface ThemeDialogProps {
 
 export function ThemeDialog({
   onSelect,
+  onCancel,
   onHighlight,
   settings,
   availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+  const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
 
   // Track the currently highlighted theme name
-  const [highlightedThemeName, setHighlightedThemeName] = useState<
-    string | undefined
-  >(settings.merged.ui?.theme || DEFAULT_THEME.name);
+  const [highlightedThemeName, setHighlightedThemeName] = useState<string>(
+    settings.merged.ui?.theme || DEFAULT_THEME.name,
+  );
 
   // Generate theme items filtered by selected scope
   const customThemes =
@@ -63,12 +70,14 @@ export function ThemeDialog({
       value: theme.name,
       themeNameDisplay: theme.name,
       themeTypeDisplay: capitalize(theme.type),
+      key: theme.name,
     })),
     ...customThemeNames.map((name) => ({
       label: name,
       value: name,
       themeNameDisplay: name,
       themeTypeDisplay: 'Custom',
+      key: name,
     })),
   ];
 
@@ -91,12 +100,12 @@ export function ThemeDialog({
     onHighlight(themeName);
   };
 
-  const handleScopeHighlight = useCallback((scope: SettingScope) => {
+  const handleScopeHighlight = useCallback((scope: LoadableSettingScope) => {
     setSelectedScope(scope);
   }, []);
 
   const handleScopeSelect = useCallback(
-    (scope: SettingScope) => {
+    (scope: LoadableSettingScope) => {
       onSelect(highlightedThemeName, scope);
     },
     [onSelect, highlightedThemeName],
@@ -110,7 +119,7 @@ export function ThemeDialog({
         setMode((prev) => (prev === 'theme' ? 'scope' : 'theme'));
       }
       if (key.name === 'escape') {
-        onSelect(undefined, selectedScope);
+        onCancel();
       }
     },
     { isActive: true },
@@ -273,7 +282,7 @@ def fibonacci(n):
       <Box marginTop={1}>
         <Text color={theme.text.secondary} wrap="truncate">
           (Use Enter to {mode === 'theme' ? 'select' : 'apply scope'}, Tab to{' '}
-          {mode === 'theme' ? 'configure scope' : 'select theme'})
+          {mode === 'theme' ? 'configure scope' : 'select theme'}, Esc to close)
         </Text>
       </Box>
     </Box>

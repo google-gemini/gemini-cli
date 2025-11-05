@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 interface GeminiMessageContentProps {
   text: string;
@@ -27,6 +28,7 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const { renderMarkdown } = useUIState();
   const originalPrefix = '✦ ';
   const prefixWidth = originalPrefix.length;
 
@@ -37,6 +39,7 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
         isPending={isPending}
         availableTerminalHeight={availableTerminalHeight}
         terminalWidth={terminalWidth}
+        renderMarkdown={renderMarkdown}
       />
     </Box>
   );
