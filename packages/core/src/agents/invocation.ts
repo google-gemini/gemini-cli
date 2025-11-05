@@ -77,6 +77,18 @@ export class SubagentInvocation<
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
     try {
+      // Get agent metadata for icon and display
+      const metadata =
+        (
+          this.definition as AgentDefinition & {
+            metadata?: Record<string, unknown>;
+          }
+        ).metadata || {};
+      const agentIcon =
+        (typeof metadata.icon === 'string' ? metadata.icon : undefined) || '🤖';
+      const agentDisplayName =
+        this.definition.displayName || this.definition.name;
+
       if (updateOutput) {
         updateOutput('Subagent starting...\n');
       }
@@ -90,7 +102,7 @@ export class SubagentInvocation<
           activity.type === 'THOUGHT_CHUNK' &&
           typeof activity.data['text'] === 'string'
         ) {
-          updateOutput(`🤖💭 ${activity.data['text']}`);
+          updateOutput(`${agentIcon}💭 ${activity.data['text']}`);
         }
       };
 
@@ -107,10 +119,9 @@ Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      const displayContent = `
-Subagent ${this.definition.name} Finished
+      const displayContent = `${agentIcon} Subagent ${agentDisplayName} Finished
 
-Termination Reason:\n ${output.terminate_reason}
+Termination Reason: ${output.terminate_reason}
 
 Result:
 ${output.result}

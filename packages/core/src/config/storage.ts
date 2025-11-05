@@ -50,6 +50,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'commands');
   }
 
+  static getUserAgentsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'agents');
+  }
+
   static getGlobalMemoryFilePath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'memory.md');
   }
