@@ -274,6 +274,84 @@ priority = 100
       ).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
+
+    it('should handle a mix of valid and invalid policy files', async () => {
+      const actualFs =
+        await vi.importActual<typeof import('node:fs/promises')>(
+          'node:fs/promises',
+        );
+
+      const mockReaddir = vi.fn(
+        async (
+          path: string,
+          _options?: { withFileTypes: boolean },
+        ): Promise<Dirent[]> => {
+          if (nodePath.normalize(path) === nodePath.normalize('/policies')) {
+            return [
+              {
+                name: 'valid.toml',
+                isFile: () => true,
+                isDirectory: () => false,
+              } as Dirent,
+              {
+                name: 'invalid.toml',
+                isFile: () => true,
+                isDirectory: () => false,
+              } as Dirent,
+            ];
+          }
+          return [];
+        },
+      );
+
+      const mockReadFile = vi.fn(async (path: string): Promise<string> => {
+        if (
+          nodePath.normalize(path) ===
+          nodePath.normalize(nodePath.join('/policies', 'valid.toml'))
+        ) {
+          return `
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+`;
+        }
+        if (
+          nodePath.normalize(path) ===
+          nodePath.normalize(nodePath.join('/policies', 'invalid.toml'))
+        ) {
+          return `
+[[rule]]
+toolName = "grep"
+decision = "allow"
+priority = -1
+`;
+        }
+        throw new Error('File not found');
+      });
+
+      vi.doMock('node:fs/promises', () => ({
+        ...actualFs,
+        default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+      }));
+
+      const { loadPoliciesFromToml: load } = await import('./toml-loader.js');
+
+      const getPolicyTier = (_dir: string) => 1;
+      const result = await load(
+        ApprovalMode.DEFAULT,
+        ['/policies'],
+        getPolicyTier,
+      );
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('glob');
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].fileName).toBe('invalid.toml');
+      expect(result.errors[0].errorType).toBe('schema_validation');
+    });
   });
   describe('Negative Tests', () => {
     it('should return a schema_validation error if priority is missing', async () => {
