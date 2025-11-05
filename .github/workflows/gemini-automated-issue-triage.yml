@@ -153,9 +153,6 @@ jobs:
           settings: |-
             {
               "maxSessionTurns": 25,
-              "coreTools": [
-                "run_shell_command(echo)"
-              ],
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"
@@ -167,8 +164,8 @@ jobs:
             You are an issue triage assistant. Your role is to analyze a GitHub issue and determine the single most appropriate area/ label and the single most appropriate priority/ label based on the definitions provided.
 
             ## Steps
-            1. Review the issue title and body provided in the environment variables: ${ISSUE_TITLE} and ${ISSUE_BODY}.
-            2. Review the available labels provided in the environment variable: ${AVAILABLE_LABELS}.
+            1. Review the issue title and body: ${{ env.ISSUE_TITLE }} and ${{ env.ISSUE_BODY }}.
+            2. Review the available labels: ${{ env.AVAILABLE_LABELS }}.
             3. Select exactly one area/ label that best matches the issue based on Reference 1: Area Definitions.
             4. Select exactly one priority/ label that best matches the issue based on Reference 2: Priority Definitions.
             5. Fallback Logic:
@@ -180,7 +177,6 @@ jobs:
             ## Guidelines
             - Your output must contain exactly one area/ label and exactly one priority/ label.
             - Triage only the current issue based on its title and body.
-            - Reference all shell variables as "${VAR}" (with quotes and braces).
             - Output only valid JSON format.
             - Do not include any explanation or additional text, just the JSON.
 
