@@ -43,62 +43,57 @@ export const usePhraseCycler = (
   const hasShownFirstRequestTipRef = useRef(false);
 
   useEffect(() => {
+    // Always clear on re-run
+    if (phraseIntervalRef.current) {
+      clearInterval(phraseIntervalRef.current);
+      phraseIntervalRef.current = null;
+    }
+
     if (isInteractiveShellWaiting && showShellFocusHint) {
       setCurrentLoadingPhrase(
         'Interactive shell awaiting input... press Ctrl+f to focus shell',
       );
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-    } else if (isWaiting) {
-      setCurrentLoadingPhrase('Waiting for user confirmation...');
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-    } else if (isActive) {
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-      }
-
-      const setRandomPhrase = () => {
-        if (customPhrases && customPhrases.length > 0) {
-          const randomIndex = Math.floor(Math.random() * customPhrases.length);
-          setCurrentLoadingPhrase(customPhrases[randomIndex]);
-        } else {
-          let phraseList;
-          // Show a tip on the first request after startup, then continue with 1/6 chance
-          if (!hasShownFirstRequestTipRef.current) {
-            // Show a tip during the first request
-            phraseList = INFORMATIVE_TIPS;
-            hasShownFirstRequestTipRef.current = true;
-          } else {
-            // Roughly 1 in 6 chance to show a tip after the first request
-            const showTip = Math.random() < 1 / 6;
-            phraseList = showTip ? INFORMATIVE_TIPS : WITTY_LOADING_PHRASES;
-          }
-          const randomIndex = Math.floor(Math.random() * phraseList.length);
-          setCurrentLoadingPhrase(phraseList[randomIndex]);
-        }
-      };
-
-      // Select an initial random phrase
-      setRandomPhrase();
-
-      phraseIntervalRef.current = setInterval(() => {
-        // Select a new random phrase
-        setRandomPhrase();
-      }, PHRASE_CHANGE_INTERVAL_MS);
-    } else {
-      // Idle or other states, clear the phrase interval
-      // and reset to the first phrase for next active state.
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-      setCurrentLoadingPhrase(loadingPhrases[0]);
+      return;
     }
+
+    if (isWaiting) {
+      setCurrentLoadingPhrase('Waiting for user confirmation...');
+      return;
+    }
+
+    if (!isActive) {
+      setCurrentLoadingPhrase(loadingPhrases[0]);
+      return;
+    }
+
+    const setRandomPhrase = () => {
+      if (customPhrases && customPhrases.length > 0) {
+        const randomIndex = Math.floor(Math.random() * customPhrases.length);
+        setCurrentLoadingPhrase(customPhrases[randomIndex]);
+      } else {
+        let phraseList;
+        // Show a tip on the first request after startup, then continue with 1/6 chance
+        if (!hasShownFirstRequestTipRef.current) {
+          // Show a tip during the first request
+          phraseList = INFORMATIVE_TIPS;
+          hasShownFirstRequestTipRef.current = true;
+        } else {
+          // Roughly 1 in 6 chance to show a tip after the first request
+          const showTip = Math.random() < 1 / 6;
+          phraseList = showTip ? INFORMATIVE_TIPS : WITTY_LOADING_PHRASES;
+        }
+        const randomIndex = Math.floor(Math.random() * phraseList.length);
+        setCurrentLoadingPhrase(phraseList[randomIndex]);
+      }
+    };
+
+    // Select an initial random phrase
+    setRandomPhrase();
+
+    phraseIntervalRef.current = setInterval(() => {
+      // Select a new random phrase
+      setRandomPhrase();
+    }, PHRASE_CHANGE_INTERVAL_MS);
 
     return () => {
       if (phraseIntervalRef.current) {
