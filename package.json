@@ -58,8 +58,7 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "pre-commit": "node scripts/pre-commit.js",
-    "preinstall": "if [ \"$(uname)\" = \"OpenBSD\" ]; then npm pkg delete optionalDependencies; fi"
+    "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
     "ink": "npm:@jrichman/ink@6.4.0",
