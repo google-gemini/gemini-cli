@@ -670,10 +670,7 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    // Allow users to set any model, but if switching to a "pro" model, exit fallback mode
-    if (newModel.includes('pro')) {
-      this.setFallbackMode(false);
-    }
+    this.setFallbackMode(false);
 
     if (this.model !== newModel) {
       this.model = newModel;
