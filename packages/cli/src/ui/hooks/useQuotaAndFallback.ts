@@ -67,14 +67,14 @@ export function useQuotaAndFallback({
         // Pro Quota specific messages (Interactive)
         if (isPaidTier) {
           message = `⚡ You have reached your daily ${failedModel} quota limit.
-⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
-⚡ To continue accessing the ${failedModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+\n⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
+\n⚡ To continue accessing the ${failedModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
         } else {
           message = `⚡ You have reached your daily ${failedModel} quota limit.
-⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
+\n⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
+\n⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+\n⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+\n⚡ You can switch authentication methods by typing /auth`;
         }
       } else if (error instanceof RetryableQuotaError) {
         // Short term quota retries exhausted (Automatic fallback)
@@ -82,11 +82,11 @@ export function useQuotaAndFallback({
 
         if (isPaidTier) {
           message = `${actionMessage}
-⚡ To continue accessing the ${failedModel} model, retry your request after some time or consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+\n⚡ To continue accessing the ${failedModel} model, retry your request after some time or consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
         } else {
           message = `${actionMessage}
-⚡ Retry your requests after some time. Otherwise consider upgrading to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ You can switch authentication methods by typing /auth`;
+\n⚡ Retry your requests after some time. Otherwise consider upgrading to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+\n⚡ You can switch authentication methods by typing /auth`;
         }
       } else {
         // Other errors (Automatic fallback)
@@ -94,14 +94,14 @@ export function useQuotaAndFallback({
 
         if (isPaidTier) {
           message = `${actionMessage}
-⚡ Your requests are being throttled temporarily due to server being at capacity for ${failedModel} or there is a service outage.
-⚡ To continue accessing the ${failedModel} model, you can retry your request after some time or consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+\n⚡ Your requests are being throttled temporarily due to server being at capacity for ${failedModel} or there is a service outage.
+\n⚡ To continue accessing the ${failedModel} model, you can retry your request after some time or consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
         } else {
           message = `${actionMessage}
-⚡ Your requests are being throttled temporarily due to server being at capacity for ${failedModel} or there is a service outage.
-⚡ To avoid being throttled, you can retry your request after some time or upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
+\n⚡ Your requests are being throttled temporarily due to server being at capacity for ${failedModel} or there is a service outage.
+\n⚡ To avoid being throttled, you can retry your request after some time or upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+\n⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+\n⚡ You can switch authentication methods by typing /auth`;
         }
       }
 
