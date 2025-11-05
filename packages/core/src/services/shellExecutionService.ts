@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import stripAnsi from 'strip-ansi';
 import type { PtyImplementation } from '../utils/getPty.js';
 import { getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn } from 'node:child_process';
@@ -22,7 +21,6 @@ import {
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
-const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
@@ -168,36 +166,6 @@ export class ShellExecutionService {
     );
   }
 
-  private static appendAndTruncate(
-    currentBuffer: string,
-    chunk: string,
-    maxSize: number,
-  ): { newBuffer: string; truncated: boolean } {
-    const chunkLength = chunk.length;
-    const currentLength = currentBuffer.length;
-    const newTotalLength = currentLength + chunkLength;
-
-    if (newTotalLength <= maxSize) {
-      return { newBuffer: currentBuffer + chunk, truncated: false };
-    }
-
-    // Truncation is needed.
-    if (chunkLength >= maxSize) {
-      // The new chunk is larger than or equal to the max buffer size.
-      // The new buffer will be the tail of the new chunk.
-      return {
-        newBuffer: chunk.substring(chunkLength - maxSize),
-        truncated: true,
-      };
-    }
-
-    // The combined buffer exceeds the max size, but the new chunk is smaller than it.
-    // We need to truncate the current buffer from the beginning to make space.
-    const charsToTrim = newTotalLength - maxSize;
-    const truncatedBuffer = currentBuffer.substring(charsToTrim);
-    return { newBuffer: truncatedBuffer + chunk, truncated: true };
-  }
-
   private static childProcessFallback(
     commandToExecute: string,
     cwd: string,
@@ -212,10 +180,10 @@ export class ShellExecutionService {
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
-        stdio: ['inherit', 'pipe', 'pipe'],
+        stdio: 'inherit',
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
-        detached: !isWindows,
+        detached: false,
         env: {
           ...process.env,
           GEMINI_CLI: '1',
@@ -225,102 +193,22 @@ export class ShellExecutionService {
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
-        let stdoutDecoder: TextDecoder | null = null;
-        let stderrDecoder: TextDecoder | null = null;
-
-        let stdout = '';
-        let stderr = '';
-        let stdoutTruncated = false;
-        let stderrTruncated = false;
-        const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
-
-        let isStreamingRawContent = true;
-        const MAX_SNIFF_SIZE = 4096;
-        let sniffedBytes = 0;
-
-        const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
-          if (!stdoutDecoder || !stderrDecoder) {
-            const encoding = getCachedEncodingForBuffer(data);
-            try {
-              stdoutDecoder = new TextDecoder(encoding);
-              stderrDecoder = new TextDecoder(encoding);
-            } catch {
-              stdoutDecoder = new TextDecoder('utf-8');
-              stderrDecoder = new TextDecoder('utf-8');
-            }
-          }
-
-          outputChunks.push(data);
-
-          if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-            const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
-            sniffedBytes = sniffBuffer.length;
-
-            if (isBinary(sniffBuffer)) {
-              isStreamingRawContent = false;
-            }
-          }
-
-          if (isStreamingRawContent) {
-            const decoder = stream === 'stdout' ? stdoutDecoder : stderrDecoder;
-            const decodedChunk = decoder.decode(data, { stream: true });
-
-            if (stream === 'stdout') {
-              const { newBuffer, truncated } = this.appendAndTruncate(
-                stdout,
-                decodedChunk,
-                MAX_CHILD_PROCESS_BUFFER_SIZE,
-              );
-              stdout = newBuffer;
-              if (truncated) {
-                stdoutTruncated = true;
-              }
-            } else {
-              const { newBuffer, truncated } = this.appendAndTruncate(
-                stderr,
-                decodedChunk,
-                MAX_CHILD_PROCESS_BUFFER_SIZE,
-              );
-              stderr = newBuffer;
-              if (truncated) {
-                stderrTruncated = true;
-              }
-            }
-          }
-        };
 
         const handleExit = (
           code: number | null,
           signal: NodeJS.Signals | null,
         ) => {
-          const { finalBuffer } = cleanup();
-          // Ensure we don't add an extra newline if stdout already ends with one.
-          const separator = stdout.endsWith('\n') ? '' : '\n';
-          let combinedOutput =
-            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
+          exited = true;
+          abortSignal.removeEventListener('abort', abortHandler);
 
-          if (stdoutTruncated || stderrTruncated) {
-            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
-              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
-            }MB.]`;
-            combinedOutput += truncationMessage;
-          }
-
-          const finalStrippedOutput = stripAnsi(combinedOutput).trim();
-
-          if (isStreamingRawContent) {
-            if (finalStrippedOutput) {
-              onOutputEvent({ type: 'data', chunk: finalStrippedOutput });
-            }
-          } else {
-            onOutputEvent({ type: 'binary_detected' });
-          }
+          const output = '[Output not captured for interactive command]';
+          onOutputEvent({ type: 'data', chunk: output });
 
           resolve({
-            rawOutput: finalBuffer,
-            output: finalStrippedOutput,
+            rawOutput: Buffer.from(''),
+            output,
             exitCode: code,
             signal: signal ? os.constants.signals[signal] : null,
             error,
@@ -330,8 +218,6 @@ export class ShellExecutionService {
           });
         };
 
-        child.stdout.on('data', (data) => handleOutput(data, 'stdout'));
-        child.stderr.on('data', (data) => handleOutput(data, 'stderr'));
         child.on('error', (err) => {
           error = err;
           handleExit(1, null);
@@ -342,14 +228,10 @@ export class ShellExecutionService {
             if (isWindows) {
               cpSpawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
             } else {
-              try {
-                process.kill(-child.pid, 'SIGTERM');
-                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-                if (!exited) {
-                  process.kill(-child.pid, 'SIGKILL');
-                }
-              } catch (_e) {
-                if (!exited) child.kill('SIGKILL');
+              child.kill('SIGTERM');
+              await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
+              if (!exited) {
+                child.kill('SIGKILL');
               }
             }
           }
@@ -363,27 +245,6 @@ export class ShellExecutionService {
           }
           handleExit(code, signal);
         });
-
-        function cleanup() {
-          exited = true;
-          abortSignal.removeEventListener('abort', abortHandler);
-          if (stdoutDecoder) {
-            const remaining = stdoutDecoder.decode();
-            if (remaining) {
-              stdout += remaining;
-            }
-          }
-          if (stderrDecoder) {
-            const remaining = stderrDecoder.decode();
-            if (remaining) {
-              stderr += remaining;
-            }
-          }
-
-          const finalBuffer = Buffer.concat(outputChunks);
-
-          return { stdout, stderr, finalBuffer };
-        }
       });
 
       return { pid: undefined, result };
