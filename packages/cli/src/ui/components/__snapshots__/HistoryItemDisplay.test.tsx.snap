@@ -1,5 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`<HistoryItemDisplay /> > renders InfoMessage for "info" type with multi-line text 1`] = `
+"
+ℹ ⚡ Line 1
+  ⚡ Line 2
+  ⚡ Line 3"
+`;
+
 exports[`<HistoryItemDisplay /> > should render a full gemini item when using availableTerminalHeightGemini 1`] = `
 "✦ Example code block:
     1 Line 1

@@ -55,6 +55,18 @@ describe('<HistoryItemDisplay />', () => {
     expect(lastFrame()).toContain('/theme');
   });
 
+  it('renders InfoMessage for "info" type with multi-line text', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: MessageType.INFO,
+      text: '⚡ Line 1\n⚡ Line 2\n⚡ Line 3',
+    };
+    const { lastFrame } = renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('renders StatsDisplay for "stats" type', () => {
     const item: HistoryItem = {
       ...baseItem,
