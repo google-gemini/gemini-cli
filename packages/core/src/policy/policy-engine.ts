@@ -30,8 +30,9 @@ function ruleMatches(
         if (serverName !== prefix) {
           return false;
         }
-      } else if (!toolCall.name || !toolCall.name.startsWith(prefix + '__')) {
-        // Fallback to fragile string matching ONLY if serverName is not available (e.g. legacy internal tools)
+      }
+      // Always verify the prefix, even if serverName matched
+      if (!toolCall.name || !toolCall.name.startsWith(prefix + '__')) {
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {

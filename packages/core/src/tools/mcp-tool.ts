@@ -77,7 +77,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
     // while still allowing specific tool rules
-    // while still allowing specific tool rules
+
     super(
       params,
       messageBus,

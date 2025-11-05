@@ -325,6 +325,37 @@ describe('PolicyEngine', () => {
         PolicyDecision.ASK_USER,
       );
     });
+
+    it('should verify tool name prefix even if serverName matches', () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'safe_server__*',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      engine = new PolicyEngine({ rules });
+
+      // serverName matches, but tool name does not start with prefix
+      const invalidToolCall = { name: 'other_server__tool' };
+      expect(engine.check(invalidToolCall, 'safe_server')).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should allow when both serverName and tool name prefix match', () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'safe_server__*',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      engine = new PolicyEngine({ rules });
+
+      const validToolCall = { name: 'safe_server__tool' };
+      expect(engine.check(validToolCall, 'safe_server')).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
   });
 
   describe('complex scenarios', () => {
