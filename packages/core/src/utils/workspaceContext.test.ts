@@ -158,6 +158,43 @@ describe('WorkspaceContext with real filesystem', () => {
       );
     });
 
+    it('should handle unicode normalization differences', () => {
+      const unicodeDirName = '테스트';
+      const unicodeDirPath = path.join(tempDir, unicodeDirName);
+      const unicodeFilePath = path.join(unicodeDirPath, 'file.txt');
+      fs.mkdirSync(unicodeDirPath, { recursive: true });
+      fs.writeFileSync(unicodeFilePath, '');
+
+      const workspaceContext = new WorkspaceContext(unicodeDirPath);
+
+      const pathInsideNFC = unicodeFilePath.normalize('NFC');
+      const pathInsideNFD = unicodeFilePath.normalize('NFD');
+
+      expect(workspaceContext.isPathWithinWorkspace(pathInsideNFC)).toBe(true);
+      expect(workspaceContext.isPathWithinWorkspace(pathInsideNFD)).toBe(true);
+
+      const pathOutside = path.join(tempDir, '다른폴더', 'file.txt');
+      expect(workspaceContext.isPathWithinWorkspace(pathOutside)).toBe(false);
+    });
+
+    it('should not add duplicate directories with different unicode normalizations', () => {
+      const unicodeDirName = '테스트-중복방지';
+      const unicodeDirPath = path.join(tempDir, unicodeDirName);
+      fs.mkdirSync(unicodeDirPath, { recursive: true });
+
+      const workspaceContext = new WorkspaceContext(cwd);
+
+      // Add the same directory with two different normalization forms
+      workspaceContext.addDirectory(unicodeDirPath.normalize('NFC'));
+      workspaceContext.addDirectory(unicodeDirPath.normalize('NFD'));
+
+      const directories = workspaceContext.getDirectories();
+
+      // There should be only one entry for the unicode directory, plus the initial cwd.
+      expect(directories).toHaveLength(2);
+      expect(directories).toContain(unicodeDirPath.normalize('NFC'));
+    });
+
     describe('with symbolic link', () => {
       describe('in the workspace', () => {
         let realDir: string;
