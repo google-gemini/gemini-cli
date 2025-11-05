@@ -26,11 +26,6 @@ export interface AllowedPathConfig {
    * Additional directories to allow beyond the default CWD and workspaces.
    */
   additional_allowed_paths?: string[];
-
-  /**
-   * If true, follow symlinks when validating paths. Default: false for security.
-   */
-  follow_symlinks?: boolean;
 }
 
 /**
