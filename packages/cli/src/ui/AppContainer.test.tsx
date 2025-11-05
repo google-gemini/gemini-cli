@@ -1709,4 +1709,41 @@ describe('AppContainer State Management', () => {
       unmount();
     });
   });
+
+  describe('Shell Interaction', () => {
+    it('should not crash if resizing the pty fails', async () => {
+      const resizePtySpy = vi
+        .spyOn(ShellExecutionService, 'resizePty')
+        .mockImplementation(() => {
+          throw new Error('Cannot resize a pty that has already exited');
+        });
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+        activePtyId: 'some-pty-id', // Make sure activePtyId is set
+      });
+
+      // The main assertion is that the render does not throw.
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(resizePtySpy).toHaveBeenCalled();
+      unmount();
+    });
+  });
 });

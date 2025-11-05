@@ -52,7 +52,10 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const { decision, rule } = this.policyEngine.check(message.toolCall);
+        const { decision, rule } = this.policyEngine.check(
+          message.toolCall,
+          message.serverName,
+        );
 
         if (
           decision === PolicyDecision.ALLOW &&
