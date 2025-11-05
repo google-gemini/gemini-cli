@@ -115,7 +115,6 @@ describe('AllowedPathChecker', () => {
     // Let's assume for now we are checking existing paths or the implementation handles it.
     // Re-reading built-in.ts might be needed if this test fails in reality.
     // For now, trusting the mock.
-    // For now, trusting the mock.
     const input = createInput({
       path: path.resolve('/home/user/project/new-file.txt'),
     });
