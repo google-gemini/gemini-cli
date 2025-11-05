@@ -250,6 +250,51 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('sortTools', () => {
+    it('should sort tools by priority: built-in, discovered, then MCP (by server name)', () => {
+      const builtIn1 = new MockTool({ name: 'builtin-1' });
+      const builtIn2 = new MockTool({ name: 'builtin-2' });
+      const discovered1 = new DiscoveredTool(
+        config,
+        'discovered-1',
+        'desc',
+        {},
+      );
+      const mockCallable = {} as CallableTool;
+      const mcpZebra = new DiscoveredMCPTool(
+        mockCallable,
+        'zebra-server',
+        'mcp-zebra',
+        'desc',
+        {},
+      );
+      const mcpApple = new DiscoveredMCPTool(
+        mockCallable,
+        'apple-server',
+        'mcp-apple',
+        'desc',
+        {},
+      );
+
+      // Register in mixed order
+      toolRegistry.registerTool(mcpZebra);
+      toolRegistry.registerTool(discovered1);
+      toolRegistry.registerTool(builtIn1);
+      toolRegistry.registerTool(mcpApple);
+      toolRegistry.registerTool(builtIn2);
+
+      toolRegistry.sortTools();
+
+      expect(toolRegistry.getAllToolNames()).toEqual([
+        'builtin-1',
+        'builtin-2',
+        'discovered-1',
+        'mcp-apple',
+        'mcp-zebra',
+      ]);
+    });
+  });
+
   describe('discoverTools', () => {
     it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
