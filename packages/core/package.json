@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "preinstall": "if [ \"$(uname)\" = \"OpenBSD\" ]; then npm pkg delete optionalDependencies; fi"
   },
   "files": [
     "dist"
