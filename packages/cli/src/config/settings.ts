@@ -162,14 +162,18 @@ export enum SettingScope {
   Session = 'Session',
 }
 
-// A type representing the settings scopes that are supported for LoadedSettings.
+/**
+ * A type representing the settings scopes that are supported for LoadedSettings.
+ */
 export type LoadableSettingScope =
   | SettingScope.User
   | SettingScope.Workspace
   | SettingScope.System
   | SettingScope.SystemDefaults;
 
-// The actual values of the loadable settings scopes.
+/**
+ * The actual values of the loadable settings scopes.
+ */
 const _loadableSettingScopes = [
   SettingScope.User,
   SettingScope.Workspace,
@@ -177,8 +181,10 @@ const _loadableSettingScopes = [
   SettingScope.SystemDefaults,
 ];
 
-// A type guard function that checks if `scope` is a loadable settings scope,
-// and allows promotion to the `LoadableSettingsScope` type based on the result.
+/**
+ * A type guard function that checks if `scope` is a loadable settings scope,
+ * and allows promotion to the `LoadableSettingsScope` type based on the result.
+ */
 export function isLoadableSettingScope(
   scope: SettingScope,
 ): scope is LoadableSettingScope {

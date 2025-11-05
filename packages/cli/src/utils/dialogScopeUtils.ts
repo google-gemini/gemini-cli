@@ -42,7 +42,7 @@ export function getScopeItems(): Array<{
  */
 export function getScopeMessageForSetting(
   settingKey: string,
-  selectedScope: SettingScope,
+  selectedScope: LoadableSettingScope,
   settings: LoadedSettings,
 ): string {
   if (!isLoadableSettingScope(selectedScope)) {
