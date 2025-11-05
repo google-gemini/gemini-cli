@@ -263,14 +263,16 @@ class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
+        const model = resolveModel(
+          this.config.getModel(),
+          this.config.isInFallbackMode(),
+        );
+        const resolvedConfig =
+          this.config.generationConfigService.getResolvedConfig({ model });
+        resolvedConfig.sdkConfig.abortSignal = pendingSend.signal;
         const responseStream = await chat.sendMessageStream(
-          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
-          {
-            message: nextMessage?.parts ?? [],
-            config: {
-              abortSignal: pendingSend.signal,
-            },
-          },
+          resolvedConfig,
+          nextMessage?.parts ?? [],
           promptId,
         );
         nextMessage = null;

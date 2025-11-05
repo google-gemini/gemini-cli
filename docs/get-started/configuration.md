@@ -296,6 +296,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
+#### `generation`
+
+- **`generation.aliases`** (object):
+  - **Description:** Named presets for generation settings. Can be used in place
+    of a model name and can inherit from other aliases using an `extends`
+    property.
+  - **Default:**
+    `{"base":{"settings":{"config":{"temperature":0,"topP":1}}},"chat-base":{"extends":"base","settings":{"config":{"thinkingConfig":{"includeThoughts":true,"thinkingBudget":-1}}}},"gemini-2.5-pro":{"extends":"chat-base","settings":{"model":"gemini-2.5-pro"}},"gemini-2.5-flash":{"extends":"chat-base","settings":{"model":"gemini-2.5-flash"}},"gemini-2.5-flash-lite":{"extends":"chat-base","settings":{"model":"gemini-2.5-flash-lite"}},"classifier":{"extends":"base","settings":{"model":"gemini-2.5-flash-lite","config":{"maxOutputTokens":1024,"thinkingConfig":{"thinkingBudget":512}}}},"prompt-completion":{"extends":"base","settings":{"model":"gemini-2.5-flash-lite","config":{"temperature":0.3,"maxOutputTokens":16000,"thinkingConfig":{"thinkingBudget":0}}}},"edit-corrector":{"extends":"base","settings":{"model":"gemini-2.5-flash-lite","config":{"thinkingConfig":{"thinkingBudget":0}}}},"summarizer-default":{"extends":"base","settings":{"model":"gemini-2.5-flash-lite","config":{"maxOutputTokens":2000}}},"summarizer-shell":{"extends":"base","settings":{"model":"gemini-2.5-flash-lite","config":{"maxOutputTokens":2000}}},"web-search-tool":{"extends":"base","settings":{"model":"gemini-2.5-flash","config":{"tools":[{"googleSearch":{}}]}}},"web-fetch-tool":{"extends":"base","settings":{"model":"gemini-2.5-flash","config":{"tools":[{"urlContext":{}}]}}}}`
+
+- **`generation.overrides`** (array):
+  - **Description:** Apply specific generation settings based on the agent or
+    model being used. The most specific match will be used.
+  - **Default:** `[]`
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):

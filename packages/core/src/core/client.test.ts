@@ -15,11 +15,7 @@ import {
 } from 'vitest';
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
-import {
-  isThinkingDefault,
-  isThinkingSupported,
-  GeminiClient,
-} from './client.js';
+import { isThinkingDefault, GeminiClient } from './client.js';
 import {
   AuthType,
   type ContentGenerator,
@@ -42,6 +38,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import type { ResolvedModelConfig } from '../services/modelGenerationConfigService.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -120,6 +117,18 @@ vi.mock('../telemetry/uiTelemetry.js', () => ({
   },
 }));
 
+function expectedResolvedConfig(model: string): ResolvedModelConfig {
+  return {
+    model,
+    sdkConfig: {
+      temperature: 0,
+      topP: 1,
+      abortSignal: expect.any(AbortSignal),
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as ResolvedModelConfig as any;
+}
+
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
  *
@@ -132,21 +141,6 @@ async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
   }
   return results;
 }
-
-describe('isThinkingSupported', () => {
-  it('should return true for gemini-2.5', () => {
-    expect(isThinkingSupported('gemini-2.5')).toBe(true);
-  });
-
-  it('should return true for gemini-2.5-pro', () => {
-    expect(isThinkingSupported('gemini-2.5-pro')).toBe(true);
-  });
-
-  it('should return false for other models', () => {
-    expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
-    expect(isThinkingSupported('some-other-model')).toBe(false);
-  });
-});
 
 describe('isThinkingDefault', () => {
   it('should return false for gemini-2.5-flash-lite', () => {
@@ -260,6 +254,15 @@ describe('Gemini Client (client.ts)', () => {
           reasoning: 'test',
         }),
       }),
+      generationConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+          model,
+          sdkConfig: {
+            temperature: 0,
+            topP: 1,
+          },
+        })),
+      },
     } as unknown as Config;
 
     client = new GeminiClient(mockConfig);
@@ -737,14 +740,9 @@ ${JSON.stringify(
 
       // Assert
       expect(ideContextStore.get).toHaveBeenCalled();
-      // The `turn.run` method is now called with the model name as the first
-      // argument. We use `expect.any(String)` because this test is
-      // concerned with the IDE context logic, not the model routing,
-      // which is tested in its own dedicated suite.
       expect(mockTurnRunFn).toHaveBeenCalledWith(
-        expect.any(String),
+        expectedResolvedConfig('default-routed-model'),
         initialRequest,
-        expect.any(Object),
       );
     });
 
@@ -1273,9 +1271,8 @@ ${JSON.stringify(
         expect(mockConfig.getModelRouterService).toHaveBeenCalled();
         expect(mockRouterService.route).toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          'routed-model', // The model from the router
+          expectedResolvedConfig('routed-model'),
           [{ text: 'Hi' }],
-          expect.any(Object),
         );
       });
 
@@ -1290,9 +1287,8 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          'routed-model',
+          expectedResolvedConfig('routed-model'),
           [{ text: 'Hi' }],
-          expect.any(Object),
         );
 
         // Second turn
@@ -1307,9 +1303,8 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         // Should stick to the first model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          'routed-model',
+          expectedResolvedConfig('routed-model'),
           [{ text: 'Continue' }],
-          expect.any(Object),
         );
       });
 
@@ -1324,9 +1319,8 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          'routed-model',
+          expectedResolvedConfig('routed-model'),
           [{ text: 'Hi' }],
-          expect.any(Object),
         );
 
         // New prompt
@@ -1345,9 +1339,8 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(2);
         // Should use the newly routed model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          'new-routed-model',
+          expectedResolvedConfig('new-routed-model'),
           [{ text: 'A new topic' }],
-          expect.any(Object),
         );
       });
 
@@ -1366,9 +1359,8 @@ ${JSON.stringify(
         await fromAsync(stream);
 
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          DEFAULT_GEMINI_FLASH_MODEL,
+          expectedResolvedConfig(DEFAULT_GEMINI_FLASH_MODEL),
           [{ text: 'Hi' }],
-          expect.any(Object),
         );
       });
 
@@ -1388,9 +1380,8 @@ ${JSON.stringify(
 
         // First call should use fallback model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          DEFAULT_GEMINI_FLASH_MODEL,
+          expectedResolvedConfig(DEFAULT_GEMINI_FLASH_MODEL),
           [{ text: 'Hi' }],
-          expect.any(Object),
         );
 
         // End fallback mode
@@ -1407,9 +1398,8 @@ ${JSON.stringify(
         // Router should still not be called, and it should stick to the fallback model
         expect(mockTurnRunFn).toHaveBeenCalledTimes(2); // Ensure it was called again
         expect(mockTurnRunFn).toHaveBeenLastCalledWith(
-          DEFAULT_GEMINI_FLASH_MODEL, // Still the fallback model
+          expectedResolvedConfig(DEFAULT_GEMINI_FLASH_MODEL), // Still the fallback model
           [{ text: 'Continue' }],
-          expect.any(Object),
         );
       });
     });
@@ -1457,17 +1447,15 @@ ${JSON.stringify(
       // First call with original request
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         1,
-        expect.any(String),
+        expectedResolvedConfig('default-routed-model'),
         initialRequest,
-        expect.any(Object),
       );
 
       // Second call with "Please continue."
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         2,
-        expect.any(String),
+        expectedResolvedConfig('default-routed-model'),
         [{ text: 'System: Please continue.' }],
-        expect.any(Object),
       );
     });
 
@@ -2229,8 +2217,8 @@ ${JSON.stringify(
         .mockReturnValueOnce(true);
 
       let capturedSignal: AbortSignal;
-      mockTurnRunFn.mockImplementation((model, request, signal) => {
-        capturedSignal = signal;
+      mockTurnRunFn.mockImplementation((resolvedConfig, _request) => {
+        capturedSignal = resolvedConfig.sdkConfig.abortSignal;
         return (async function* () {
           yield { type: 'content', value: 'First event' };
           yield { type: 'content', value: 'Second event' };
@@ -2265,15 +2253,17 @@ ${JSON.stringify(
   describe('generateContent', () => {
     it('should call generateContent with the correct parameters', async () => {
       const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const generationConfig = { temperature: 0.5 };
       const abortSignal = new AbortController().signal;
 
-      await client.generateContent(
-        contents,
-        generationConfig,
-        abortSignal,
-        DEFAULT_GEMINI_FLASH_MODEL,
-      );
+      const resolvedConfig = {
+        model: DEFAULT_GEMINI_FLASH_MODEL,
+        sdkConfig: {
+          topP: 1,
+          temperature: 0.5,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any as ResolvedModelConfig;
+      await client.generateContent(contents, abortSignal, resolvedConfig);
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
@@ -2297,11 +2287,15 @@ ${JSON.stringify(
 
       vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
 
+      const resolvedConfig = {
+        model: DEFAULT_GEMINI_FLASH_MODEL,
+        sdkConfig: {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any as ResolvedModelConfig;
       await client.generateContent(
         contents,
-        {},
         new AbortController().signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        resolvedConfig,
       );
 
       expect(mockContentGenerator.generateContent).not.toHaveBeenCalledWith({
@@ -2321,19 +2315,18 @@ ${JSON.stringify(
 
     it('should use the Flash model when fallback mode is active', async () => {
       const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const generationConfig = { temperature: 0.5 };
       const abortSignal = new AbortController().signal;
       const requestedModel = 'gemini-2.5-pro'; // A non-flash model
 
       // Mock config to be in fallback mode
       vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
 
-      await client.generateContent(
-        contents,
-        generationConfig,
-        abortSignal,
-        requestedModel,
-      );
+      const resolvedConfig = {
+        model: requestedModel,
+        sdkConfig: {},
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any as ResolvedModelConfig;
+      await client.generateContent(contents, abortSignal, resolvedConfig);
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         expect.objectContaining({
