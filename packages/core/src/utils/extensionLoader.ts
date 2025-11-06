@@ -74,7 +74,8 @@ export abstract class ExtensionLoader {
     try {
       await this.config.getMcpClientManager()!.startExtension(extension);
       // Note: Context files are loaded only once all extensions are done
-      // loading/unloading to reduce churn.
+      // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
+      // below.
 
       // TODO: Update custom command updating away from the event based system
       // and call directly into a custom command manager here. See the
@@ -149,12 +150,15 @@ export abstract class ExtensionLoader {
 
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
+      // Note: Context files are loaded only once all extensions are done
+      // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
+      // below.
+
       // TODO: Update custom command updating away from the event based system
       // and call directly into a custom command manager here. See the
       // useSlashCommandProcessor hook which responds to events fired here today.
 
       // TODO: Remove all extension features here, including at least:
-      // - context files
       // - excluded tools
     } finally {
       this.stopCompletedCount++;
