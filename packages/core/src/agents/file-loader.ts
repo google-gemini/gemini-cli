@@ -119,7 +119,7 @@ export class AgentFileLoader {
         nodir: true,
         dot: false,
         signal,
-        follow: true,
+        follow: false,
       });
 
       const agentPromises = files.map((file) =>

@@ -36,7 +36,6 @@ import {
   getPty,
   EDIT_TOOL_NAME,
   debugLogger,
-  Storage,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -424,8 +423,7 @@ export async function loadCliConfig(
 
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
-    .concat((argv.includeDirectories || []).map(resolvePath))
-    .concat([Storage.getUserAgentsDir()]); // Allow writing to agents directory
+    .concat((argv.includeDirectories || []).map(resolvePath));
 
   const extensionManager = new ExtensionManager({
     settings,
