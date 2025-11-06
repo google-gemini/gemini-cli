@@ -33,12 +33,12 @@
     "electron-store": "^8.2.0",
     "lucide-react": "^0.539.0",
     "monaco-editor": "^0.52.2",
-    "node-pty": "^1.1.0-beta34",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.24.1"
   },
   "optionalDependencies": {
+    "node-pty": "^1.1.0-beta34",
     "@lydell/node-pty": "1.1.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",
