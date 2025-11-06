@@ -1,9 +1,3 @@
----
-title: Select the /model you use with Gemini CLI
-description: Configure the model used by Gemini CLI.
-date: 2025-11-06
----
-
 # Gemini CLI Model Selection (`/model` Command)
 
 Select your Gemini CLI model. The `/model` command opens a dialog where you can
