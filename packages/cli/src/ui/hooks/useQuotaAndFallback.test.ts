@@ -125,6 +125,52 @@ describe('useQuotaAndFallback', () => {
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
     });
 
+    describe('Flash Model Fallback', () => {
+      it('should show a terminal quota message and stop, without offering a fallback', async () => {
+        const handler = getRegisteredHandler();
+        // let result: FallbackIntent | null = null;
+        // await act(async () => {
+        //   result = await handler(
+        //     'gemini-2.5-flash',
+        //     'gemini-2.5-flash',
+        //     new TerminalQuotaError('flash quota', mockGoogleApiError),
+        //   );
+        // });
+        const result = await handler(
+          'gemini-2.5-flash',
+          'gemini-2.5-flash',
+          new TerminalQuotaError('flash quota', mockGoogleApiError),
+        );
+
+        expect(result).toBe('stop');
+        expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+        const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
+          .text;
+        expect(message).toContain(
+          'You have reached your daily gemini-2.5-flash',
+        );
+        expect(message).not.toContain('continue with the fallback model');
+      });
+
+      it('should show a capacity message and stop', async () => {
+        const handler = getRegisteredHandler();
+        // let result: FallbackIntent | null = null;
+        const result = await handler(
+          'gemini-2.5-flash',
+          'gemini-2.5-flash',
+          new Error('capacity'),
+        );
+
+        expect(result).toBe('stop');
+        expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+        const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
+          .text;
+        expect(message).toContain(
+          'Pardon Our Congestion! It looks like gemini-2.5-flash is very popular',
+        );
+      });
+    });
+
     describe('Interactive Fallback', () => {
       // Pro Quota Errors
       it('should set an interactive request and wait for user choice', async () => {
