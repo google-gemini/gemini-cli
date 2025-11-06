@@ -12,7 +12,6 @@ import type {
   Content,
   Part,
   FunctionCall,
-  GenerateContentConfig,
   FunctionDeclaration,
   Schema,
 } from '@google/genai';
@@ -20,6 +19,7 @@ import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import type { ModelConfigAlias } from '../services/modelConfigService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import {
   GLOB_TOOL_NAME,
@@ -595,18 +595,42 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
-    const messageParams = {
-      message: message.parts || [],
-      config: {
-        abortSignal: signal,
-        tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
+    const modelConfig = this.definition.modelConfig;
+
+    const runtimeAliasName = `${this.definition.name}-config`;
+    const runtimeAlias: ModelConfigAlias = {
+      modelConfig: {
+        model: modelConfig.model,
+        generateContentConfig: {
+          temperature: modelConfig.temp,
+          topP: modelConfig.top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: modelConfig.thinkingBudget ?? -1,
+          },
+        },
       },
     };
 
+    // TODO(12916): Migrate sub-agents to static runtime configs.
+    this.runtimeContext.modelConfigService.registerRuntimeModelConfig(
+      runtimeAliasName,
+      runtimeAlias,
+    );
+
+    if (tools.length > 0) {
+      // TODO(12622): Move tools back to config.
+      chat.setTools([{ functionDeclarations: tools }]);
+    }
+
     const responseStream = await chat.sendMessageStream(
-      this.definition.modelConfig.model,
-      messageParams,
+      {
+        model: runtimeAliasName,
+        overrideScope: this.definition.name,
+      },
+      message.parts || [],
       promptId,
+      signal,
     );
 
     const functionCalls: FunctionCall[] = [];
@@ -650,7 +674,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
   /** Initializes a `GeminiChat` instance for the agent run. */
   private async createChatObject(inputs: AgentInputs): Promise<GeminiChat> {
-    const { promptConfig, modelConfig } = this.definition;
+    const { promptConfig } = this.definition;
 
     if (!promptConfig.systemPrompt && !promptConfig.initialMessages) {
       throw new Error(
@@ -669,24 +693,16 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      const generationConfig: GenerateContentConfig = {
-        temperature: modelConfig.temp,
-        topP: modelConfig.top_p,
-        thinkingConfig: {
-          includeThoughts: true,
-          thinkingBudget: modelConfig.thinkingBudget ?? -1,
-        },
-      };
-
-      if (systemInstruction) {
-        generationConfig.systemInstruction = systemInstruction;
-      }
-
-      return new GeminiChat(
+      const chat = new GeminiChat(
         this.runtimeContext,
-        generationConfig,
+        systemInstruction,
+        [], // set in `callModel`,
         startHistory,
       );
+      if (systemInstruction) {
+        chat.setSystemInstruction(systemInstruction);
+      }
+      return chat;
     } catch (error) {
       await reportError(
         error,
