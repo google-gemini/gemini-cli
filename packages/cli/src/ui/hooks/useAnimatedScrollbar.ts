@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import { interpolateColor } from '../themes/color-utils.js';
+import { debugState } from '../debug.js';
 
 export function useAnimatedScrollbar(
   isFocused: boolean,
@@ -18,8 +19,13 @@ export function useAnimatedScrollbar(
 
   const animationFrame = useRef<NodeJS.Timeout | null>(null);
   const timeout = useRef<NodeJS.Timeout | null>(null);
+  const isAnimatingRef = useRef(false);
 
   const cleanup = useCallback(() => {
+    if (isAnimatingRef.current) {
+      debugState.debugNumAnimatedComponents--;
+      isAnimatingRef.current = false;
+    }
     if (animationFrame.current) {
       clearInterval(animationFrame.current);
       animationFrame.current = null;
@@ -32,6 +38,8 @@ export function useAnimatedScrollbar(
 
   const flashScrollbar = useCallback(() => {
     cleanup();
+    debugState.debugNumAnimatedComponents++;
+    isAnimatingRef.current = true;
 
     const fadeInDuration = 200;
     const visibleDuration = 1000;
@@ -67,10 +75,7 @@ export function useAnimatedScrollbar(
             );
 
             if (progress === 1) {
-              if (animationFrame.current) {
-                clearInterval(animationFrame.current);
-                animationFrame.current = null;
-              }
+              cleanup();
             }
           };
 
