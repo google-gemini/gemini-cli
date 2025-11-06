@@ -103,6 +103,7 @@ import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
+import { useEmbeddedShellExitConfirmation } from './hooks/useEmbeddedShellExitConfirmation.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -958,8 +959,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
   }, [handleNewMessage, config]);
 
+  const {
+    embeddedShellExitConfirmationRequest,
+    setTriggerEmbeddedShellExit,
+    isExitingEmbeddingShell,
+    setIsExitingEmbeddingShell,
+  } = useEmbeddedShellExitConfirmation(handleSlashCommand);
+
   useEffect(() => {
-    if (ctrlCTimerRef.current) {
+    if (ctrlCTimerRef.current && !isExitingEmbeddingShell) {
       clearTimeout(ctrlCTimerRef.current);
       ctrlCTimerRef.current = null;
     }
@@ -967,14 +975,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlCPressCount > 1) {
+      if (isExitingEmbeddingShell) {
+        setTriggerEmbeddedShellExit(true);
+        return;
+      }
       handleSlashCommand('/quit');
     } else {
       ctrlCTimerRef.current = setTimeout(() => {
         setCtrlCPressCount(0);
+        setIsExitingEmbeddingShell(false);
         ctrlCTimerRef.current = null;
       }, CTRL_EXIT_PROMPT_DURATION_MS);
     }
-  }, [ctrlCPressCount, config, setCtrlCPressCount, handleSlashCommand]);
+  }, [
+    ctrlCPressCount,
+    config,
+    setCtrlCPressCount,
+    isExitingEmbeddingShell,
+    setIsExitingEmbeddingShell,
+    setTriggerEmbeddedShellExit,
+    handleSlashCommand,
+  ]);
 
   useEffect(() => {
     if (ctrlDTimerRef.current) {
@@ -1052,6 +1073,11 @@ Logging in with Google... Please restart Gemini CLI to continue.
         // This should happen regardless of the count.
         cancelOngoingRequest?.();
 
+        // Capture embedding shell exit
+        if (embeddedShellFocused && ctrlCPressCount === 0) {
+          setIsExitingEmbeddingShell(true);
+        }
+
         setCtrlCPressCount((prev) => prev + 1);
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
@@ -1102,6 +1128,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setShowErrorDetails,
       config,
       ideContextState,
+      ctrlCPressCount,
+      setIsExitingEmbeddingShell,
       setCtrlCPressCount,
       buffer.text.length,
       setCtrlDPressCount,
@@ -1225,6 +1253,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
     !!confirmationRequest ||
+    !!embeddedShellExitConfirmationRequest ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
@@ -1271,6 +1300,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
+      embeddedShellExitConfirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
@@ -1353,6 +1383,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
+      embeddedShellExitConfirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
