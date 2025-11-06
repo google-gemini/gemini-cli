@@ -80,14 +80,27 @@ export enum SafetyCheckDecision {
 /**
  * The data structure returned by a safety checker process via stdout.
  */
-export interface SafetyCheckResult {
-  /**
-   * The decision made by the safety checker.
-   */
-  decision: SafetyCheckDecision;
-  /**
-   * If not allowed, a message explaining why the tool call was blocked.
-   * This will be shown to the user.
-   */
-  reason?: string;
-}
+export type SafetyCheckResult =
+  | {
+      /**
+       * The decision made by the safety checker.
+       */
+      decision: SafetyCheckDecision.ALLOW;
+      /**
+       * If not allowed, a message explaining why the tool call was blocked.
+       * This will be shown to the user.
+       */
+      reason?: string;
+    }
+  | {
+      decision: SafetyCheckDecision.DENY;
+      reason: string;
+    }
+  | {
+      decision: SafetyCheckDecision.ASK_USER;
+      reason: string;
+    }
+  | {
+      decision: SafetyCheckDecision.CONTINUE_CHECKING;
+      reason?: string;
+    };

@@ -912,6 +912,7 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
       vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
         decision: SafetyCheckDecision.DENY,
+        reason: 'test reason',
       });
 
       const result = await engine.check(
