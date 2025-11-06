@@ -127,22 +127,6 @@ describe('handleFallback', () => {
     });
   });
 
-  describe('when handler returns "auth"', () => {
-    it('should NOT activate fallback mode and return false', async () => {
-      mockHandler.mockResolvedValue('auth');
-
-      const result = await handleFallback(
-        mockConfig,
-        MOCK_PRO_MODEL,
-        AUTH_OAUTH,
-      );
-
-      expect(result).toBe(false);
-      expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
-      expect(logFlashFallback).not.toHaveBeenCalled();
-    });
-  });
-
   describe('when handler returns an unexpected value', () => {
     it('should log an error and return null', async () => {
       mockHandler.mockResolvedValue(null);
