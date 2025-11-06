@@ -160,7 +160,8 @@ describe('file-system', () => {
       `rewrite the file ${fileName} to replace all instances of "test line" with "new line"`,
     );
 
-    const foundToolCall = await rig.waitForToolCall('write_file');
+    const validTools = ['write_file', 'edit'];
+    const foundToolCall = await rig.waitForAnyToolCall(validTools);
     if (!foundToolCall) {
       printDebugInfo(rig, result, {
         'Tool call found': foundToolCall,
@@ -169,22 +170,23 @@ describe('file-system', () => {
     }
     expect(
       foundToolCall,
-      'Expected to find a write_file tool call',
+      `Expected to find one of ${validTools.join(', ')} tool calls`,
     ).toBeTruthy();
 
     const toolLogs = rig.readToolLogs();
     const successfulEdit = toolLogs.some(
-      (log) => log.toolRequest.name === 'write_file' && log.toolRequest.success,
+      (log) =>
+        validTools.includes(log.toolRequest.name) && log.toolRequest.success,
     );
     if (!successfulEdit) {
       console.error(
-        'Expected a successful write_file tool call, but none was found.',
+        `Expected a successful edit tool call (${validTools.join(', ')}), but none was found.`,
       );
       printDebugInfo(rig, result);
     }
     expect(
       successfulEdit,
-      'Expected a successful write_file tool call',
+      `Expected a successful edit tool call (${validTools.join(', ')})`,
     ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
