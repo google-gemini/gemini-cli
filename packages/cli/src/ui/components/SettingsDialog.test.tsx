@@ -571,7 +571,7 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        expect(lastFrame()).toContain('Hide Window Title');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Verify the dialog is rendered properly

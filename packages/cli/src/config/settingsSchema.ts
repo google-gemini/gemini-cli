@@ -236,6 +236,15 @@ const SETTINGS_SCHEMA = {
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
       },
+      previewFeatures: {
+        type: 'boolean',
+        label: 'Preview Features (e.g., models)',
+        category: 'General',
+        requiresRestart: true,
+        default: undefined as boolean | undefined,
+        description: 'Enable preview features (e.g., preview models).',
+        showInDialog: true,
+      },
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Debug Keystroke Logging',

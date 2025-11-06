@@ -130,6 +130,11 @@ their corresponding top-level category object in your `settings.json` file.
     request" errors.
   - **Default:** `false`
 
+- **`general.previewFeatures`** (boolean):
+  - **Description:** Enable preview features (e.g., preview models).
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
   - **Default:** `false`
