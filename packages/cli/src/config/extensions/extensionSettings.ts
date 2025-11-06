@@ -87,13 +87,18 @@ export async function maybePromptForSettings(
     }
   }
 
+  const envContent = formatEnvContent(nonSensitiveSettings);
+
+  await fs.writeFile(envFilePath, envContent);
+}
+
+function formatEnvContent(settings: Record<string, string>): string {
   let envContent = '';
-  for (const [key, value] of Object.entries(nonSensitiveSettings)) {
+  for (const [key, value] of Object.entries(settings)) {
     const formattedValue = value.includes(' ') ? `"${value}"` : value;
     envContent += `${key}=${formattedValue}\n`;
   }
-
-  await fs.writeFile(envFilePath, envContent);
+  return envContent;
 }
 
 export async function promptForSetting(
@@ -190,11 +195,7 @@ export async function updateSetting(
     }
   }
 
-  let envContent = '';
-  for (const [key, value] of Object.entries(nonSensitiveSettings)) {
-    const formattedValue = value.includes(' ') ? `"${value}"` : value;
-    envContent += `${key}=${formattedValue}\n`;
-  }
+  const envContent = formatEnvContent(nonSensitiveSettings);
 
   await fs.writeFile(envFilePath, envContent);
 }

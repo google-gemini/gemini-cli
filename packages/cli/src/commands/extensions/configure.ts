@@ -37,19 +37,8 @@ const setCommand: CommandModule<object, SetArgs> = {
       }),
   handler: async (args) => {
     const { name, setting } = args;
-    const workspaceDir = process.cwd();
-    const extensionManager = new ExtensionManager({
-      workspaceDir,
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: promptForSetting,
-      settings: loadSettings(workspaceDir).merged,
-    });
-    await extensionManager.loadExtensions();
-    const extension = extensionManager
-      .getExtensions()
-      .find((ext) => ext.name === name);
-    if (!extension) {
-      console.error(`Extension "${name}" is not installed.`);
+    const { extension, extensionManager } = await getExtensionAndManager(name);
+    if (!extension || !extensionManager) {
       return;
     }
     const extensionConfig = extensionManager.loadExtensionConfig(
@@ -68,6 +57,27 @@ const setCommand: CommandModule<object, SetArgs> = {
   },
 };
 
+async function getExtensionAndManager(name: string) {
+  const workspaceDir = process.cwd();
+  const extensionManager = new ExtensionManager({
+    workspaceDir,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    settings: loadSettings(workspaceDir).merged,
+  });
+  await extensionManager.loadExtensions();
+  const extension = extensionManager
+    .getExtensions()
+    .find((ext) => ext.name === name);
+
+  if (!extension) {
+    console.error(`Extension "${name}" is not installed.`);
+    return { extension: null, extensionManager: null };
+  }
+
+  return { extension, extensionManager };
+}
+
 // --- LIST COMMAND ---
 interface ListArgs {
   name: string;
@@ -84,19 +94,8 @@ const listCommand: CommandModule<object, ListArgs> = {
     }),
   handler: async (args) => {
     const { name } = args;
-    const workspaceDir = process.cwd();
-    const extensionManager = new ExtensionManager({
-      workspaceDir,
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: promptForSetting,
-      settings: loadSettings(workspaceDir).merged,
-    });
-    await extensionManager.loadExtensions();
-    const extension = extensionManager
-      .getExtensions()
-      .find((ext) => ext.name === name);
-    if (!extension) {
-      console.error(`Extension "${name}" is not installed.`);
+    const { extension, extensionManager } = await getExtensionAndManager(name);
+    if (!extension || !extensionManager) {
       return;
     }
     const extensionConfig = extensionManager.loadExtensionConfig(
