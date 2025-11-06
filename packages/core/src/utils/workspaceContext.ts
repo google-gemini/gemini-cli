@@ -7,7 +7,6 @@
 import { isNodeError } from '../utils/errors.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as process from 'node:process';
 import { debugLogger } from './debugLogger.js';
 
 export type Unsubscribe = () => void;
@@ -24,11 +23,14 @@ export class WorkspaceContext {
 
   /**
    * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
-   * @param directory The initial working directory (usually cwd)
+   * @param targetDir The initial working directory (usually cwd)
    * @param additionalDirectories Optional array of additional directories to include
    */
-  constructor(directory: string, additionalDirectories: string[] = []) {
-    this.addDirectory(directory);
+  constructor(
+    readonly targetDir: string,
+    additionalDirectories: string[] = [],
+  ) {
+    this.addDirectory(targetDir);
     for (const additionalDirectory of additionalDirectories) {
       this.addDirectory(additionalDirectory);
     }
@@ -66,9 +68,9 @@ export class WorkspaceContext {
    * @param directory The directory path to add (can be relative or absolute)
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
    */
-  addDirectory(directory: string, basePath: string = process.cwd()): void {
+  addDirectory(directory: string): void {
     try {
-      const resolved = this.resolveAndValidateDir(directory, basePath);
+      const resolved = this.resolveAndValidateDir(directory);
       if (this.directories.has(resolved)) {
         return;
       }
@@ -81,13 +83,8 @@ export class WorkspaceContext {
     }
   }
 
-  private resolveAndValidateDir(
-    directory: string,
-    basePath: string = process.cwd(),
-  ): string {
-    const absolutePath = path.isAbsolute(directory)
-      ? directory
-      : path.resolve(basePath, directory);
+  private resolveAndValidateDir(directory: string): string {
+    const absolutePath = path.resolve(this.targetDir, directory);
 
     if (!fs.existsSync(absolutePath)) {
       throw new Error(`Directory does not exist: ${absolutePath}`);
@@ -154,7 +151,7 @@ export class WorkspaceContext {
    */
   private fullyResolvedPath(pathToCheck: string): string {
     try {
-      return fs.realpathSync(pathToCheck);
+      return fs.realpathSync(path.resolve(this.targetDir, pathToCheck));
     } catch (e: unknown) {
       if (
         isNodeError(e) &&

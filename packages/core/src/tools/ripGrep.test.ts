@@ -307,21 +307,21 @@ describe('RipGrepTool', () => {
     });
 
     it('should return null for valid params (pattern and path)', () => {
-      const params: RipGrepToolParams = { pattern: 'hello', path: '.' };
+      const params: RipGrepToolParams = { pattern: 'hello', dir_path: '.' };
       expect(grepTool.validateToolParams(params)).toBeNull();
     });
 
     it('should return null for valid params (pattern, path, and include)', () => {
       const params: RipGrepToolParams = {
         pattern: 'hello',
-        path: '.',
+        dir_path: '.',
         include: '*.txt',
       };
       expect(grepTool.validateToolParams(params)).toBeNull();
     });
 
     it('should return error if pattern is missing', () => {
-      const params = { path: '.' } as unknown as RipGrepToolParams;
+      const params = { dir_path: '.' } as unknown as RipGrepToolParams;
       expect(grepTool.validateToolParams(params)).toBe(
         `params must have required property 'pattern'`,
       );
@@ -335,7 +335,7 @@ describe('RipGrepTool', () => {
     it('should return error if path does not exist', () => {
       const params: RipGrepToolParams = {
         pattern: 'hello',
-        path: 'nonexistent',
+        dir_path: 'nonexistent',
       };
       // Check for the core error message, as the full path might vary
       expect(grepTool.validateToolParams(params)).toContain(
@@ -346,7 +346,10 @@ describe('RipGrepTool', () => {
 
     it('should return error if path is a file, not a directory', async () => {
       const filePath = path.join(tempRootDir, 'fileA.txt');
-      const params: RipGrepToolParams = { pattern: 'hello', path: filePath };
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        dir_path: filePath,
+      };
       expect(grepTool.validateToolParams(params)).toContain(
         `Path is not a directory: ${filePath}`,
       );
@@ -387,7 +390,7 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: 'world', path: 'sub' };
+      const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -464,7 +467,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = {
         pattern: 'hello',
-        path: 'sub',
+        dir_path: 'sub',
         include: '*.js',
       };
       const invocation = grepTool.build(params);
@@ -613,7 +616,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should throw an error if params are invalid', async () => {
-      const params = { path: '.' } as unknown as RipGrepToolParams; // Invalid: pattern missing
+      const params = { dir_path: '.' } as unknown as RipGrepToolParams; // Invalid: pattern missing
       expect(() => grepTool.build(params)).toThrow(
         /params must have required property 'pattern'/,
       );
@@ -799,7 +802,7 @@ describe('RipGrepTool', () => {
       const multiDirGrepTool = new RipGrepTool(multiDirConfig);
 
       // Search only in the 'sub' directory of the first workspace
-      const params: RipGrepToolParams = { pattern: 'world', path: 'sub' };
+      const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = multiDirGrepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -881,7 +884,10 @@ describe('RipGrepTool', () => {
 
   describe('error handling and edge cases', () => {
     it('should handle workspace boundary violations', () => {
-      const params: RipGrepToolParams = { pattern: 'test', path: '../outside' };
+      const params: RipGrepToolParams = {
+        pattern: 'test',
+        dir_path: '../outside',
+      };
       expect(() => grepTool.build(params)).toThrow(/Path validation failed/);
     });
 
@@ -918,7 +924,7 @@ describe('RipGrepTool', () => {
         return mockProcess as unknown as ChildProcess;
       });
 
-      const params: RipGrepToolParams = { pattern: 'test', path: 'empty' };
+      const params: RipGrepToolParams = { pattern: 'test', dir_path: 'empty' };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -1374,7 +1380,7 @@ describe('RipGrepTool', () => {
       await fs.mkdir(dirPath, { recursive: true });
       const params: RipGrepToolParams = {
         pattern: 'testPattern',
-        path: path.join('src', 'app'),
+        dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);
       // The path will be relative to the tempRootDir, so we check for containment.
@@ -1405,7 +1411,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'testPattern',
         include: '*.ts',
-        path: path.join('src', 'app'),
+        dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toContain(
@@ -1415,7 +1421,10 @@ describe('RipGrepTool', () => {
     });
 
     it('should use ./ for root path in description', () => {
-      const params: RipGrepToolParams = { pattern: 'testPattern', path: '.' };
+      const params: RipGrepToolParams = {
+        pattern: 'testPattern',
+        dir_path: '.',
+      };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' within ./");
     });
