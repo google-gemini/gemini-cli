@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CheckerRegistry } from './registry.js';
+import { InProcessCheckerType } from '../policy/types.js';
 import { AllowedPathChecker } from './built-in.js';
 
 describe('CheckerRegistry', () => {
@@ -17,7 +18,9 @@ describe('CheckerRegistry', () => {
   });
 
   it('should resolve built-in in-process checkers', () => {
-    const checker = registry.resolveInProcess('allowed-path');
+    const checker = registry.resolveInProcess(
+      InProcessCheckerType.ALLOWED_PATH,
+    );
     expect(checker).toBeInstanceOf(AllowedPathChecker);
   });
 

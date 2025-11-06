@@ -9,7 +9,10 @@ import { spawn } from 'node:child_process';
 import { CheckerRunner } from './checker-runner.js';
 import { ContextBuilder } from './context-builder.js';
 import { CheckerRegistry } from './registry.js';
-import type { InProcessCheckerConfig } from '../policy/types.js';
+import {
+  type InProcessCheckerConfig,
+  InProcessCheckerType,
+} from '../policy/types.js';
 import type { SafetyCheckResult } from './protocol.js';
 import { SafetyCheckDecision } from './protocol.js';
 import type { Config } from '../config/config.js';
@@ -27,7 +30,7 @@ describe('CheckerRunner', () => {
   const mockToolCall = { name: 'test_tool', args: {} };
   const mockInProcessConfig: InProcessCheckerConfig = {
     type: 'in-process',
-    name: 'allowed-path',
+    name: InProcessCheckerType.ALLOWED_PATH,
   };
 
   beforeEach(() => {
@@ -62,7 +65,9 @@ describe('CheckerRunner', () => {
     const result = await runner.runChecker(mockToolCall, mockInProcessConfig);
 
     expect(result).toEqual(mockResult);
-    expect(mockRegistry.resolveInProcess).toHaveBeenCalledWith('allowed-path');
+    expect(mockRegistry.resolveInProcess).toHaveBeenCalledWith(
+      InProcessCheckerType.ALLOWED_PATH,
+    );
     expect(mockChecker.check).toHaveBeenCalled();
   });
 

@@ -30,37 +30,27 @@ export class AllowedPathChecker implements InProcessChecker {
     const allowedDirs = [
       context.environment.cwd,
       ...context.environment.workspaces,
-      ...(config?.additional_allowed_paths ?? []),
     ];
 
     // Find all arguments that look like paths
-    const pathsToCheck: string[] = [];
-    if (toolCall.args) {
-      for (const key in toolCall.args) {
-        if (
-          key.includes('path') ||
-          key.includes('directory') ||
-          key.includes('file') ||
-          key === 'source' ||
-          key === 'destination'
-        ) {
-          const value = toolCall.args[key];
-          if (typeof value === 'string') {
-            pathsToCheck.push(value);
-          }
-        }
-      }
-    }
+    const includedArgs = config?.included_args ?? [];
+    const excludedArgs = config?.excluded_args ?? [];
+
+    const pathsToCheck = this.collectPathsToCheck(
+      toolCall.args,
+      includedArgs,
+      excludedArgs,
+    );
 
     // Check each path
-    for (const p of pathsToCheck) {
+    for (const { path: p, argName } of pathsToCheck) {
       const resolvedPath = this.safelyResolvePath(p, context.environment.cwd);
 
       if (!resolvedPath) {
         // If path cannot be resolved, deny it
         return {
           decision: SafetyCheckDecision.DENY,
-          reason: `Cannot resolve path "${p}"`,
+          reason: `Cannot resolve path "${p}" in argument "${argName}"`,
         };
       }
 
@@ -77,7 +67,7 @@ export class AllowedPathChecker implements InProcessChecker {
       if (!isAllowed) {
         return {
           decision: SafetyCheckDecision.DENY,
-          reason: `Path "${p}" is outside of the allowed workspace directories.`,
+          reason: `Path "${p}" in argument "${argName}" is outside of the allowed workspace directories.`,
         };
       }
     }
@@ -116,5 +106,50 @@ export class AllowedPathChecker implements InProcessChecker {
       relative === '' ||
       (!relative.startsWith('..') && !path.isAbsolute(relative))
     );
+  }
+
+  private collectPathsToCheck(
+    args: unknown,
+    includedArgs: string[],
+    excludedArgs: string[],
+    prefix = '',
+  ): Array<{ path: string; argName: string }> {
+    const paths: Array<{ path: string; argName: string }> = [];
+
+    if (typeof args !== 'object' || args === null) {
+      return paths;
+    }
+
+    for (const [key, value] of Object.entries(args)) {
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+
+      if (excludedArgs.includes(fullKey)) {
+        continue;
+      }
+
+      if (typeof value === 'string') {
+        if (
+          includedArgs.includes(fullKey) ||
+          key.includes('path') ||
+          key.includes('directory') ||
+          key.includes('file') ||
+          key === 'source' ||
+          key === 'destination'
+        ) {
+          paths.push({ path: value, argName: fullKey });
+        }
+      } else if (typeof value === 'object') {
+        paths.push(
+          ...this.collectPathsToCheck(
+            value,
+            includedArgs,
+            excludedArgs,
+            fullKey,
+          ),
+        );
+      }
+    }
+
+    return paths;
   }
 }

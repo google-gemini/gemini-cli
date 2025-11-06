@@ -7,6 +7,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { type InProcessChecker, AllowedPathChecker } from './built-in.js';
+import { InProcessCheckerType } from '../policy/types.js';
 
 /**
  * Registry for managing safety checker resolution.
@@ -19,7 +20,7 @@ export class CheckerRegistry {
   private static readonly BUILT_IN_IN_PROCESS_CHECKERS = new Map<
     string,
     InProcessChecker
-  >([['allowed-path', new AllowedPathChecker()]]);
+  >([[InProcessCheckerType.ALLOWED_PATH, new AllowedPathChecker()]]);
 
   // Regex to validate checker names (alphanumeric and hyphens only)
   private static readonly VALID_NAME_PATTERN = /^[a-z0-9-]+$/;

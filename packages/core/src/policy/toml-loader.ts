@@ -10,6 +10,7 @@ import {
   type ApprovalMode,
   type SafetyCheckerConfig,
   type SafetyCheckerRule,
+  InProcessCheckerType,
 } from './types.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -59,7 +60,7 @@ const SafetyCheckerRuleSchema = z.object({
   checker: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('in-process'),
-      name: z.enum(['allowed-path']),
+      name: z.nativeEnum(InProcessCheckerType),
       required_context: z.array(z.string()).optional(),
       config: z.record(z.unknown()).optional(),
     }),

@@ -9,7 +9,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import nodePath from 'node:path';
 
 import type { PolicySettings } from './types.js';
-import { ApprovalMode, PolicyDecision } from './types.js';
+import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 
 import { Storage } from '../config/storage.js';
 
@@ -737,7 +737,7 @@ required_context = ["environment"]
     );
     expect(checker).toBeDefined();
     expect(checker?.checker.type).toBe('in-process');
-    expect(checker?.checker.name).toBe('allowed-path');
+    expect(checker?.checker.name).toBe(InProcessCheckerType.ALLOWED_PATH);
     expect(checker?.checker.required_context).toEqual(['environment']);
 
     vi.doUnmock('node:fs/promises');

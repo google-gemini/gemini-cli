@@ -11,6 +11,7 @@ import {
   type PolicyRule,
   type PolicyEngineConfig,
   type SafetyCheckerRule,
+  InProcessCheckerType,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -877,7 +878,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           checker: {
             type: 'in-process',
-            name: 'allowed-path',
+            name: InProcessCheckerType.ALLOWED_PATH,
           },
         },
       ];
@@ -964,7 +965,7 @@ describe('PolicyEngine', () => {
           toolName: 'test',
           checker: {
             type: 'in-process',
-            name: 'allowed-path',
+            name: InProcessCheckerType.ALLOWED_PATH,
           },
         },
       ];

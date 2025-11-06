@@ -93,19 +93,6 @@ describe('AllowedPathChecker', () => {
     expect(result.decision).toBe(SafetyCheckDecision.DENY);
   });
 
-  it('should allow additional paths from config', async () => {
-    const safeDir = path.join(testRootDir, 'tmp', 'safe');
-    await fs.mkdir(safeDir, { recursive: true });
-    const filePath = path.join(safeDir, 'file.txt');
-    await fs.writeFile(filePath, 'safe content');
-    const input = createInput(
-      { path: filePath },
-      { additional_allowed_paths: [safeDir] },
-    );
-    const result = await checker.check(input);
-    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
-  });
-
   it('should check multiple path arguments', async () => {
     const passwdPath = path.join(testRootDir, 'etc', 'passwd');
     await fs.mkdir(path.dirname(passwdPath), { recursive: true });
@@ -156,6 +143,101 @@ describe('AllowedPathChecker', () => {
     await fs.symlink(realFilePath, symlinkPath);
 
     const input = createInput({ path: symlinkPath });
+    const result = await checker.check(input);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+  });
+
+  it('should check explicitly included arguments', async () => {
+    const outsidePath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(outsidePath), { recursive: true });
+    await fs.writeFile(outsidePath, 'secret');
+    const input = createInput(
+      { custom_arg: outsidePath },
+      { included_args: ['custom_arg'] },
+    );
+    const result = await checker.check(input);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
+    expect(result.reason).toContain('outside of the allowed workspace');
+  });
+
+  it('should skip explicitly excluded arguments', async () => {
+    const outsidePath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(outsidePath), { recursive: true });
+    await fs.writeFile(outsidePath, 'secret');
+    // Normally 'path' would be checked, but we exclude it
+    const input = createInput(
+      { path: outsidePath },
+      { excluded_args: ['path'] },
+    );
+    const result = await checker.check(input);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+  });
+
+  it('should handle both included and excluded arguments', async () => {
+    const outsidePath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(outsidePath), { recursive: true });
+    await fs.writeFile(outsidePath, 'secret');
+    const input = createInput(
+      {
+        path: outsidePath, // Excluded
+        custom_arg: outsidePath, // Included
+      },
+      {
+        excluded_args: ['path'],
+        included_args: ['custom_arg'],
+      },
+    );
+    const result = await checker.check(input);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
+    // Should be denied because of custom_arg, not path
+    expect(result.reason).toContain(outsidePath);
+  });
+
+  it('should check nested path arguments', async () => {
+    const outsidePath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(outsidePath), { recursive: true });
+    await fs.writeFile(outsidePath, 'secret');
+    const input = createInput({
+      nested: {
+        path: outsidePath,
+      },
+    });
+    const result = await checker.check(input);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
+    expect(result.reason).toContain(outsidePath);
+    expect(result.reason).toContain('nested.path');
+  });
+
+  it('should support dot notation for included_args', async () => {
+    const outsidePath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(outsidePath), { recursive: true });
+    await fs.writeFile(outsidePath, 'secret');
+    const input = createInput(
+      {
+        nested: {
+          custom: outsidePath,
+        },
+      },
+      { included_args: ['nested.custom'] },
+    );
+    const result = await checker.check(input);
+    expect(result.decision).toBe(SafetyCheckDecision.DENY);
+    expect(result.reason).toContain(outsidePath);
+    expect(result.reason).toContain('nested.custom');
+  });
+
+  it('should support dot notation for excluded_args', async () => {
+    const outsidePath = path.join(testRootDir, 'etc', 'passwd');
+    await fs.mkdir(path.dirname(outsidePath), { recursive: true });
+    await fs.writeFile(outsidePath, 'secret');
+    const input = createInput(
+      {
+        nested: {
+          path: outsidePath,
+        },
+      },
+      { excluded_args: ['nested.path'] },
+    );
     const result = await checker.check(input);
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });

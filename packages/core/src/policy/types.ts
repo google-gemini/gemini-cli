@@ -23,9 +23,14 @@ export enum ApprovalMode {
  */
 export interface AllowedPathConfig {
   /**
-   * Additional directories to allow beyond the default CWD and workspaces.
+   * Explicitly include argument keys to be checked as paths.
    */
-  additional_allowed_paths?: string[];
+  included_args?: string[];
+
+  /**
+   * Explicitly exclude argument keys from being checked as paths.
+   */
+  excluded_args?: string[];
 }
 
 /**
@@ -38,12 +43,16 @@ export interface ExternalCheckerConfig {
   required_context?: Array<keyof SafetyCheckInput['context']>;
 }
 
+export enum InProcessCheckerType {
+  ALLOWED_PATH = 'allowed-path',
+}
+
 /**
  * Base interface for in-process checkers.
  */
 export interface InProcessCheckerConfig {
   type: 'in-process';
-  name: 'allowed-path'; // For now, only 'allowed-path' is in-process
+  name: InProcessCheckerType;
   config?: AllowedPathConfig;
   required_context?: Array<keyof SafetyCheckInput['context']>;
 }
