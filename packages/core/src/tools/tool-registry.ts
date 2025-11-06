@@ -32,8 +32,9 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     private readonly toolName: string,
     params: ToolParams,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus, toolName);
   }
 
   getDescription(): string {
@@ -129,6 +130,7 @@ export class DiscoveredTool extends BaseDeclarativeTool<
     name: string,
     override readonly description: string,
     override readonly parameterSchema: Record<string, unknown>,
+    messageBus?: MessageBus,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
@@ -156,6 +158,7 @@ Signal: Signal number or \`(none)\` if no signal was received.
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
+      messageBus,
     );
   }
 
@@ -165,7 +168,12 @@ Signal: Signal number or \`(none)\` if no signal was received.
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
-    return new DiscoveredToolInvocation(this.config, this.name, params);
+    return new DiscoveredToolInvocation(
+      this.config,
+      this.name,
+      params,
+      _messageBus,
+    );
   }
 }
 
@@ -387,6 +395,7 @@ export class ToolRegistry {
             func.name,
             func.description ?? '',
             parameters as Record<string, unknown>,
+            this.messageBus,
           ),
         );
       }

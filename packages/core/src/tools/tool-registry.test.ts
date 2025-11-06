@@ -20,6 +20,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { ToolErrorType } from './tool-error.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 vi.mock('node:fs');
 
@@ -435,6 +436,61 @@ describe('ToolRegistry', () => {
       );
       expect(result.llmContent).toContain('Stderr: Something went wrong');
       expect(result.llmContent).toContain('Exit Code: 1');
+    });
+
+    it('should pass MessageBus to DiscoveredTool and its invocations', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+
+      // Mock MessageBus
+      const mockMessageBus = {
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      } as unknown as MessageBus;
+      toolRegistry.setMessageBus(mockMessageBus);
+
+      const toolDeclaration: FunctionDeclaration = {
+        name: 'policy-test-tool',
+        description: 'tests policy',
+        parametersJsonSchema: { type: 'object', properties: {} },
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      const discoveryProcess = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        on: vi.fn(),
+        kill: vi.fn(),
+      };
+      mockSpawn.mockReturnValueOnce(discoveryProcess as any);
+
+      discoveryProcess.stdout.on.mockImplementation((event, callback) => {
+        if (event === 'data') {
+          callback(
+            Buffer.from(
+              JSON.stringify([{ functionDeclarations: [toolDeclaration] }]),
+            ),
+          );
+        }
+      });
+      discoveryProcess.on.mockImplementation((event, callback) => {
+        if (event === 'close') {
+          callback(0);
+        }
+      });
+
+      await toolRegistry.discoverAllTools();
+      const tool = toolRegistry.getTool('policy-test-tool');
+      expect(tool).toBeDefined();
+
+      // Verify DiscoveredTool has the message bus
+      expect((tool as any).messageBus).toBe(mockMessageBus);
+
+      const invocation = tool!.build({});
+
+      // Verify DiscoveredToolInvocation has the message bus
+      expect((invocation as any).messageBus).toBe(mockMessageBus);
     });
   });
 
