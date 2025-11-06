@@ -11,7 +11,6 @@ import {
   type FallbackIntent,
   TerminalQuotaError,
   UserTierId,
-  RetryableQuotaError,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -69,55 +68,24 @@ export function useQuotaAndFallback({
           message = [
             `⚡ You have reached your daily ${failedModel} quota limit.`,
             `⚡ You can choose to authenticate with a paid API key or continue with the fallback model.`,
-            `⚡ To continue accessing the ${failedModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey}`,
+            `⚡ Increase your limits by using a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key`,
+            `⚡ You can switch authentication methods by typing /auth`,
           ].join('\n');
         } else {
           message = [
             `⚡ You have reached your daily ${failedModel} quota limit.`,
             `⚡ You can choose to authenticate with a paid API key or continue with the fallback model.`,
-            `⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist`,
-            `⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key`,
-            `⚡ You can switch authentication methods by typing /auth`,
-          ].join('\n');
-        }
-      } else if (error instanceof RetryableQuotaError) {
-        // Short term quota retries exhausted (Automatic fallback)
-        const actionMessage = [
-          `⚡ Your requests are being throttled right now due to server being at capacity for ${failedModel}.`,
-          `⚡ Automatically switching from ${failedModel} to ${fallbackModel} for the remainder of this session.`,
-        ].join('\n');
-
-        if (isPaidTier) {
-          message = [
-            actionMessage,
-            `⚡ To continue accessing the ${failedModel} model, retry your request after some time or consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey}`,
-          ].join('\n');
-        } else {
-          message = [
-            actionMessage,
-            `⚡ Retry your requests after some time. Otherwise consider upgrading to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist`,
+            `⚡ Increase your limits by `,
+            `⚡ - signing up for a plan with higher limits at https://goo.gle/set-up-gemini-code-assist`,
+            `⚡ - or using a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key`,
             `⚡ You can switch authentication methods by typing /auth`,
           ].join('\n');
         }
       } else {
-        // Other errors (Automatic fallback)
-        const actionMessage = `⚡ Automatically switching from ${failedModel} to ${fallbackModel} for faster responses for the remainder of this session.`;
-
-        if (isPaidTier) {
-          message = [
-            actionMessage,
-            `⚡ Your requests are being throttled temporarily due to server being at capacity for ${failedModel} or there is a service outage.`,
-            `⚡ To continue accessing the ${failedModel} model, you can retry your request after some time or consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey}`,
-          ].join('\n');
-        } else {
-          message = [
-            actionMessage,
-            `⚡ Your requests are being throttled temporarily due to server being at capacity for ${failedModel} or there is a service outage.`,
-            `⚡ To avoid being throttled, you can retry your request after some time or upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist`,
-            `⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key`,
-            `⚡ You can switch authentication methods by typing /auth`,
-          ].join('\n');
-        }
+        message = [
+          `🚦Pardon Our Congestion! It looks like ${failedModel} is very popular at the moment.`,
+          `Please retry again later.`,
+        ].join('\n');
       }
 
       // Add message to UI history
@@ -132,44 +100,39 @@ export function useQuotaAndFallback({
       setModelSwitchedFromQuotaError(true);
       config.setQuotaErrorOccurred(true);
 
-      // Interactive Fallback for Pro quota
-      if (error instanceof TerminalQuotaError) {
-        if (isDialogPending.current) {
-          return 'stop'; // A dialog is already active, so just stop this request.
-        }
-        isDialogPending.current = true;
-
-        const intent: FallbackIntent = await new Promise<FallbackIntent>(
-          (resolve) => {
-            setProQuotaRequest({
-              failedModel,
-              fallbackModel,
-              resolve,
-            });
-          },
-        );
-
-        return intent;
+      if (isDialogPending.current) {
+        return 'stop'; // A dialog is already active, so just stop this request.
       }
+      isDialogPending.current = true;
 
-      return 'stop';
+      const intent: FallbackIntent = await new Promise<FallbackIntent>(
+        (resolve) => {
+          setProQuotaRequest({
+            failedModel,
+            fallbackModel,
+            resolve,
+          });
+        },
+      );
+
+      return intent;
     };
 
     config.setFallbackModelHandler(fallbackHandler);
   }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
 
   const handleProQuotaChoice = useCallback(
-    (choice: 'auth' | 'continue') => {
+    (choice: 'retry_later' | 'continue' | 'auth') => {
       if (!proQuotaRequest) return;
 
-      const intent: FallbackIntent = choice === 'auth' ? 'auth' : 'retry';
+      const intent: FallbackIntent = choice === 'continue' ? 'retry' : choice;
       proQuotaRequest.resolve(intent);
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
 
       if (choice === 'auth') {
         setAuthState(AuthState.Updating);
-      } else {
+      } else if (choice === 'continue') {
         historyManager.addItem(
           {
             type: MessageType.INFO,

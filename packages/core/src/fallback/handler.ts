@@ -49,6 +49,9 @@ export async function handleFallback(
       case 'auth':
         return false;
 
+      case 'retry_later':
+        return false;
+
       default:
         throw new Error(
           `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,
