@@ -4,38 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
-import chalk from 'chalk';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
-import * as path from 'node:path';
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import stringWidth from 'string-width';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import { useCallback, useEffect, useState, useRef } from 'react';
+import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
+import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
+import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
+import chalk from 'chalk';
+import stringWidth from 'string-width';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { Command, keyMatchers } from '../keyMatchers.js';
-import { theme } from '../semantic-colors.js';
-import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-import {
-  cleanupOldClipboardImages,
-  clipboardHasImage,
-  saveClipboardImage,
-} from '../utils/clipboardUtils.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   buildSegmentsForVisualSlice,
 } from '../utils/highlight.js';
-import { cpLen, cpSlice, toCodePoints } from '../utils/textUtils.js';
-import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
-import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import {
+  clipboardHasImage,
+  saveClipboardImage,
+  cleanupOldClipboardImages,
+} from '../utils/clipboardUtils.js';
+import * as path from 'node:path';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
@@ -82,7 +82,7 @@ export interface InputPromptProps {
 // The input content, input container, and input suggestions list may have different widths
 export const calculatePromptWidths = (mainContentWidth: number) => {
   const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
-  const PROMPT_PREFIX_WIDTH = 2; // "> " or "! "
+  const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
 
   const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
   const suggestionsWidth = Math.max(20, mainContentWidth);
@@ -405,16 +405,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               return;
             }
             // If no image was pasted, handle as a regular text paste.
+            // Record paste time to prevent accidental auto-submission
             if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
               setRecentUnsafePasteTime(Date.now());
+
+              // Clear any existing paste timeout
               if (pasteTimeoutRef.current) {
                 clearTimeout(pasteTimeoutRef.current);
               }
+
+              // Clear the paste protection after a very short delay to prevent
+              // false positives.
+              // Due to how we use a reducer for text buffer state updates, it is
+              // reasonable to expect that key events that are really part of the
+              // same paste will be processed in the same event loop tick. 40ms
+              // is chosen arbitrarily as it is faster than a typical human
+              // could go from pressing paste to pressing enter. The fastest typists
+              // can type at 200 words per minute which roughly translates to 50ms
+              // per letter.
               pasteTimeoutRef.current = setTimeout(() => {
                 setRecentUnsafePasteTime(null);
                 pasteTimeoutRef.current = null;
               }, 40);
             }
+            // Ensure we never accidentally interpret paste as regular input.
             buffer.handleInput(key);
           });
           return;
@@ -422,16 +436,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
         // On other platforms, we rely on the specific Ctrl+V keybinding for
         // images, so any generic paste event is treated as text.
+        // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
           setRecentUnsafePasteTime(Date.now());
+
+          // Clear any existing paste timeout
           if (pasteTimeoutRef.current) {
             clearTimeout(pasteTimeoutRef.current);
           }
+
+          // Clear the paste protection after a very short delay to prevent
+          // false positives.
+          // Due to how we use a reducer for text buffer state updates, it is
+          // reasonable to expect that key events that are really part of the
+          // same paste will be processed in the same event loop tick. 40ms
+          // is chosen arbitrarily as it is faster than a typical human
+          // could go from pressing paste to pressing enter. The fastest typists
+          // can type at 200 words per minute which roughly translates to 50ms
+          // per letter.
           pasteTimeoutRef.current = setTimeout(() => {
             setRecentUnsafePasteTime(null);
             pasteTimeoutRef.current = null;
           }, 40);
         }
+        // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
       }
@@ -1000,7 +1028,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 color={theme.text.link}
                 aria-label={SCREEN_READER_USER_PREFIX}
               >
-                (r:)
+                (r:){' '}
               </Text>
             ) : (
               '!'
@@ -1108,7 +1136,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   if (!currentLineGhost) {
                     renderedLine.push(
                       <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                        {' '}
                         {showCursor ? chalk.inverse(' ') : ' '}
                       </Text>,
                     );
