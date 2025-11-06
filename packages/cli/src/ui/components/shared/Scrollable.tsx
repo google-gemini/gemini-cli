@@ -81,15 +81,23 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     childrenCountRef.current = childCountCurrent;
   });
 
+  const pendingScrollTopRef = useRef<number | null>(null);
+  const scrollTopRef = useRef(scrollTop);
+  useEffect(() => {
+    scrollTopRef.current = scrollTop;
+    pendingScrollTopRef.current = null;
+  }, [scrollTop]);
+
   const scrollBy = useCallback(
     (delta: number) => {
       const { scrollHeight, innerHeight } = sizeRef.current;
-      setScrollTop((prev: number) =>
-        Math.min(
-          Math.max(0, prev + delta),
-          Math.max(0, scrollHeight - innerHeight),
-        ),
+      const current = pendingScrollTopRef.current ?? scrollTopRef.current;
+      const next = Math.min(
+        Math.max(0, current + delta),
+        Math.max(0, scrollHeight - innerHeight),
       );
+      pendingScrollTopRef.current = next;
+      setScrollTop(next);
     },
     [sizeRef],
   );
@@ -113,7 +121,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   const getScrollState = useCallback(
     () => ({
-      scrollTop,
+      scrollTop: pendingScrollTopRef.current ?? scrollTop,
       scrollHeight: size.scrollHeight,
       innerHeight: size.innerHeight,
     }),

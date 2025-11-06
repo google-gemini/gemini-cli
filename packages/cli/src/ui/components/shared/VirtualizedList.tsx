@@ -363,6 +363,11 @@ function VirtualizedList<T>(
     }
   }
 
+  const pendingScrollTopRef = useRef<number | null>(null);
+  useEffect(() => {
+    pendingScrollTopRef.current = null;
+  });
+
   useImperativeHandle(
     ref,
     () => ({
@@ -370,7 +375,7 @@ function VirtualizedList<T>(
         if (delta < 0) {
           setIsStickingToBottom(false);
         }
-        const currentScrollTop = scrollTop;
+        const currentScrollTop = pendingScrollTopRef.current ?? scrollTop;
         const newScrollTop = Math.max(
           0,
           Math.min(
@@ -378,6 +383,7 @@ function VirtualizedList<T>(
             currentScrollTop + delta,
           ),
         );
+        pendingScrollTopRef.current = newScrollTop;
         setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
       },
       scrollTo: (offset: number) => {
@@ -386,6 +392,7 @@ function VirtualizedList<T>(
           0,
           Math.min(totalHeight - scrollableContainerHeight, offset),
         );
+        pendingScrollTopRef.current = newScrollTop;
         setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
       },
       scrollToEnd: () => {
@@ -416,6 +423,7 @@ function VirtualizedList<T>(
               offset - viewPosition * scrollableContainerHeight + viewOffset,
             ),
           );
+          pendingScrollTopRef.current = newScrollTop;
           setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
         }
       },
@@ -440,13 +448,14 @@ function VirtualizedList<T>(
                 offset - viewPosition * scrollableContainerHeight + viewOffset,
               ),
             );
+            pendingScrollTopRef.current = newScrollTop;
             setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
           }
         }
       },
       getScrollIndex: () => scrollAnchor.index,
       getScrollState: () => ({
-        scrollTop,
+        scrollTop: pendingScrollTopRef.current ?? scrollTop,
         scrollHeight: totalHeight,
         innerHeight: containerHeight,
       }),
