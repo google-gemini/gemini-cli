@@ -17,12 +17,21 @@ function ruleMatches(
   rule: PolicyRule,
   toolCall: FunctionCall,
   stringifiedArgs: string | undefined,
+  serverName: string | undefined,
 ): boolean {
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
     if (rule.toolName.endsWith('__*')) {
       const prefix = rule.toolName.slice(0, -3); // Remove "__*"
+      if (serverName !== undefined) {
+        // Robust check: if serverName is provided, it MUST match the prefix exactly.
+        // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
+        if (serverName !== prefix) {
+          return false;
+        }
+      }
+      // Always verify the prefix, even if serverName matched
       if (!toolCall.name || !toolCall.name.startsWith(prefix + '__')) {
         return false;
       }
@@ -65,7 +74,10 @@ export class PolicyEngine {
   /**
    * Check if a tool call is allowed based on the configured policies.
    */
-  check(toolCall: FunctionCall): PolicyDecision {
+  check(
+    toolCall: FunctionCall,
+    serverName: string | undefined,
+  ): PolicyDecision {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
     if (toolCall.args && this.rules.some((rule) => rule.argsPattern)) {
@@ -78,7 +90,7 @@ export class PolicyEngine {
 
     // Find the first matching rule (already sorted by priority)
     for (const rule of this.rules) {
-      if (ruleMatches(rule, toolCall, stringifiedArgs)) {
+      if (ruleMatches(rule, toolCall, stringifiedArgs, serverName)) {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
