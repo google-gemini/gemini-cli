@@ -17,18 +17,11 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
-
-interface ReadFileParameterSchema {
-  properties: {
-    file_path: {
-      description: string;
-    };
-  };
-}
 
 describe('ReadFileTool', () => {
   let tempRootDir: string;
@@ -37,9 +30,8 @@ describe('ReadFileTool', () => {
 
   beforeEach(async () => {
     // Create a unique temporary root directory for each test run
-    tempRootDir = await fsp.mkdtemp(
-      path.join(os.tmpdir(), 'read-file-tool-root-'),
-    );
+    const realTmp = await fsp.realpath(os.tmpdir());
+    tempRootDir = await fsp.mkdtemp(path.join(realTmp, 'read-file-tool-root-'));
 
     const mockConfigInstance = {
       getFileService: () => new FileDiscoveryService(tempRootDir),
@@ -73,12 +65,18 @@ describe('ReadFileTool', () => {
       expect(typeof result).not.toBe('string');
     });
 
-    it('should throw error if file path is relative', () => {
+    it('should return an invocation for valid params (relative path within root)', () => {
       const params: ReadFileToolParams = {
-        file_path: 'relative/path.txt',
+        file_path: 'test.txt',
       };
-      expect(() => tool.build(params)).toThrow(
-        'File path must be absolute, but was relative: relative/path.txt. You must provide an absolute path.',
+      const result = tool.build(params);
+      expect(typeof result).not.toBe('string');
+      const invocation = result as ToolInvocation<
+        ReadFileToolParams,
+        ToolResult
+      >;
+      expect(invocation.toolLocations()[0].path).toBe(
+        path.join(tempRootDir, 'test.txt'),
       );
     });
 
@@ -204,39 +202,23 @@ describe('ReadFileTool', () => {
     });
   });
 
-  describe('constructor', () => {
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('should use windows-style path examples on windows', () => {
-      vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
-
-      const tool = new ReadFileTool({} as unknown as Config);
-      const schema = tool.schema;
-      expect(
-        (schema.parametersJsonSchema as ReadFileParameterSchema).properties
-          .file_path.description,
-      ).toBe(
-        "The absolute path to the file to read (e.g., 'C:\\Users\\project\\file.txt'). Relative paths are not supported. You must provide an absolute path.",
-      );
-    });
-
-    it('should use unix-style path examples on non-windows platforms', () => {
-      vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
-
-      const tool = new ReadFileTool({} as unknown as Config);
-      const schema = tool.schema;
-      expect(
-        (schema.parametersJsonSchema as ReadFileParameterSchema).properties
-          .file_path.description,
-      ).toBe(
-        "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
-      );
-    });
-  });
-
   describe('execute', () => {
+    it('should successfully read a file with a relative path', async () => {
+      const filePath = path.join(tempRootDir, 'textfile.txt');
+      const fileContent = 'This is a test file.';
+      await fsp.writeFile(filePath, fileContent, 'utf-8');
+      const params: ReadFileToolParams = { file_path: 'textfile.txt' };
+      const invocation = tool.build(params) as ToolInvocation<
+        ReadFileToolParams,
+        ToolResult
+      >;
+
+      expect(await invocation.execute(abortSignal)).toEqual({
+        llmContent: fileContent,
+        returnDisplay: '',
+      });
+    });
+
     it('should return error if file does not exist', async () => {
       const filePath = path.join(tempRootDir, 'nonexistent.txt');
       const params: ReadFileToolParams = { file_path: filePath };
@@ -502,7 +484,7 @@ describe('ReadFileTool', () => {
           getFileService: () => new FileDiscoveryService(tempRootDir),
           getFileSystemService: () => new StandardFileSystemService(),
           getTargetDir: () => tempRootDir,
-          getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+          getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
           getFileFilteringOptions: () => ({
             respectGitIgnore: true,
             respectGeminiIgnore: true,

@@ -456,7 +456,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
           },
           minItems: 1,
           description:
-            'An array of glob patterns or paths relative to the workspace directory. Examples: ["src/**/*.ts"], ["README.md", "docs/"]',
+            'An array of glob patterns or paths. Examples: ["src/**/*.ts"], ["README.md", "docs/"]',
         },
         exclude: {
           type: 'array',

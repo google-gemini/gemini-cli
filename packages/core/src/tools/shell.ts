@@ -161,7 +161,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = this.params.dir_path || this.config.getTargetDir();
+      const cwd = this.params.dir_path
+        ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
+        : this.config.getTargetDir();
 
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
@@ -406,7 +408,7 @@ export class ShellTool extends BaseDeclarativeTool<
           dir_path: {
             type: 'string',
             description:
-              '(OPTIONAL) The absolute path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
+              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
           },
         },
         required: ['command'],
@@ -438,16 +440,13 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Could not identify command root to obtain permission from user.';
     }
     if (params.dir_path) {
-      if (!path.isAbsolute(params.dir_path)) {
-        return 'Directory must be an absolute path.';
-      }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const isWithinWorkspace = workspaceDirs.some((wsDir) =>
-        params.dir_path!.startsWith(wsDir),
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.dir_path,
       );
-
-      if (!isWithinWorkspace) {
-        return `Directory '${params.dir_path}' is not within any of the registered workspace directories.`;
+      const workspaceContext = this.config.getWorkspaceContext();
+      if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
+        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
       }
     }
     return null;
