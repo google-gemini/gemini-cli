@@ -121,6 +121,9 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Restarts all MCP servers and re-discovers their
         available tools.
 
+- [**`/model`**](./model.md)
+  - **Description:** Opens a dialog to choose your Gemini model.
+
 - **`/memory`**
   - **Description:** Manage the AI's instructional context (hierarchical memory
     loaded from `GEMINI.md` files).
