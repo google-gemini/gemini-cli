@@ -1,0 +1,8 @@
+# Default policy for tools discovered via toolDiscoveryCommand.
+# These tools are potentially dangerous as they are arbitrary scripts.
+# We default them to ASK_USER for safety.
+
+[[rule]]
+toolName = "discovered_tool_*"
+decision = "ask_user"
+priority = 10
