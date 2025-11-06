@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useSessionResume } from './useSessionResume.js';
 import type {
   Config,
@@ -190,7 +192,7 @@ describe('useSessionResume', () => {
 
     it('should update callback when config changes', () => {
       const { result, rerender } = renderHook(
-        ({ config }) =>
+        ({ config }: { config: Config }) =>
           useSessionResume({
             ...getDefaultProps(),
             config,
@@ -352,7 +354,7 @@ describe('useSessionResume', () => {
       };
 
       const { rerender } = renderHook(
-        ({ refreshStatic }) =>
+        ({ refreshStatic }: { refreshStatic: () => void }) =>
           useSessionResume({
             ...getDefaultProps(),
             refreshStatic,
