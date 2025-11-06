@@ -42,10 +42,6 @@ export function useQuotaAndFallback({
       fallbackModel,
       error,
     ): Promise<FallbackIntent | null> => {
-      if (config.isInFallbackMode()) {
-        return null;
-      }
-
       // Fallbacks are currently only handled for OAuth users.
       const contentGeneratorConfig = config.getContentGeneratorConfig();
       if (
