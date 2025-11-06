@@ -22,7 +22,7 @@ export type EditorType =
   | 'GeminiEditor';
 
 function isValidEditorType(editor: string): editor is EditorType {
-  return [
+  const validEditors = [
     'vscode',
     'vscodium',
     'windsurf',
@@ -31,8 +31,11 @@ function isValidEditorType(editor: string): editor is EditorType {
     'neovim',
     'zed',
     'emacs',
-    'GeminiEditor',
-  ].includes(editor);
+  ];
+  if (process.env['GEMINI_CLI_CONTEXT'] === 'electron') {
+    validEditors.push('GeminiEditor');
+  }
+  return validEditors.includes(editor);
 }
 
 interface DiffCommand {

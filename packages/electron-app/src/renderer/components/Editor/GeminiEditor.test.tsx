@@ -158,7 +158,7 @@ describe('GeminiEditor', () => {
         expect.objectContaining({
           theme: 'vs-dark',
         }),
-        {},
+        undefined,
       );
     });
 
@@ -173,7 +173,7 @@ describe('GeminiEditor', () => {
         expect.objectContaining({
           theme: 'vs-dark',
         }),
-        {},
+        undefined,
       );
     });
   });
@@ -189,7 +189,7 @@ describe('GeminiEditor', () => {
         expect.objectContaining({
           theme: 'vs-light',
         }),
-        {},
+        undefined,
       );
     });
   });
@@ -208,7 +208,7 @@ describe('GeminiEditor', () => {
         expect.objectContaining({
           language: 'python',
         }),
-        {},
+        undefined,
       );
     });
   });

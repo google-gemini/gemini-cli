@@ -32,13 +32,12 @@ class EditorSettingsManager {
   availableEditors: EditorDisplay[];
 
   constructor() {
-    const editorTypes = Object.keys(
-      EDITOR_DISPLAY_NAMES,
-    ).sort() as EditorType[];
+    let editorTypes = Object.keys(EDITOR_DISPLAY_NAMES).sort() as EditorType[];
 
-    if (process.env['GEMINI_CLI_CONTEXT'] === 'electron') {
-      editorTypes.unshift('GeminiEditor');
+    if (process.env['GEMINI_CLI_CONTEXT'] !== 'electron') {
+      editorTypes = editorTypes.filter((type) => type !== 'GeminiEditor');
     }
+
     this.availableEditors = [
       {
         name: 'None',
@@ -46,8 +45,7 @@ class EditorSettingsManager {
         disabled: false,
       },
       ...editorTypes.map((type) => {
-        const hasEditor =
-          type === 'GeminiEditor' ? true : checkHasEditorType(type);
+        const hasEditor = checkHasEditorType(type);
         const isAllowedInSandbox = allowEditorTypeInSandbox(type);
 
         let labelSuffix = !isAllowedInSandbox
