@@ -111,9 +111,9 @@ export async function checkNextSpeaker(
 
   try {
     const parsedResponse = (await baseLlmClient.generateJson({
+      modelConfigKey: { model: DEFAULT_GEMINI_FLASH_MODEL },
       contents,
       schema: RESPONSE_SCHEMA,
-      model: DEFAULT_GEMINI_FLASH_MODEL,
       abortSignal,
       promptId,
     })) as unknown as NextSpeakerResponse;

@@ -176,10 +176,10 @@ export async function FixLLMEditWithInstruction(
   const result = await generateJsonWithTimeout<SearchReplaceEdit>(
     baseLlmClient,
     {
+      modelConfigKey: { model: DEFAULT_GEMINI_FLASH_MODEL },
       contents,
       schema: SearchReplaceEditSchema,
       abortSignal,
-      model: DEFAULT_GEMINI_FLASH_MODEL,
       systemInstruction: EDIT_SYS_PROMPT,
       promptId,
       maxAttempts: 1,
