@@ -716,12 +716,11 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    this.setFallbackMode(false);
-
-    if (this.model !== newModel) {
+    if (this.model !== newModel || this.inFallbackMode) {
       this.model = newModel;
       coreEvents.emitModelChanged(newModel);
     }
+    this.setFallbackMode(false);
   }
 
   isInFallbackMode(): boolean {
