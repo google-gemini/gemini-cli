@@ -17,6 +17,7 @@ import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { GEMINI_DIR } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
+import type { Config } from '../config/config.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -481,6 +482,15 @@ export async function loadServerHierarchicalMemory(
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
+  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
+  const realCwd = fsSync.realpathSync(path.resolve(currentWorkingDirectory));
+  const realHome = fsSync.realpathSync(path.resolve(homedir()));
+  const isHomeDirectory = realCwd === realHome;
+
+  // If it is the home directory, pass an empty string to the core memory
+  // function to signal that it should skip the workspace search.
+  currentWorkingDirectory = isHomeDirectory ? '' : currentWorkingDirectory;
+
   if (debugMode)
     logger.debug(
       `Loading server hierarchical memory for CWD: ${currentWorkingDirectory} (importFormat: ${importFormat})`,
@@ -536,6 +546,32 @@ export async function loadServerHierarchicalMemory(
     fileCount: contentsWithPaths.length,
     filePaths,
   };
+}
+
+/**
+ * Loads the hierarchical memory and resets the state of `config` as needed such
+ * that it reflects the new memory.
+ *
+ * Returns the result of the call to `loadHierarchicalGeminiMemory`.
+ */
+export async function refreshServerHierarchicalMemory(config: Config) {
+  const result = await loadServerHierarchicalMemory(
+    config.getWorkingDir(),
+    config.shouldLoadMemoryFromIncludeDirectories()
+      ? config.getWorkspaceContext().getDirectories()
+      : [],
+    config.getDebugMode(),
+    config.getFileService(),
+    config.getExtensionLoader(),
+    config.isTrustedFolder(),
+    config.getImportFormat(),
+    config.getFileFilteringOptions(),
+    config.getDiscoveryMaxDirs(),
+  );
+  config.setUserMemory(result.memoryContent);
+  config.setGeminiMdFileCount(result.fileCount);
+  config.setGeminiMdFilePaths(result.filePaths);
+  return result;
 }
 
 export async function loadJitSubdirectoryMemory(
