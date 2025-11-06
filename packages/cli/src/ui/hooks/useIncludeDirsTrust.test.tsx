@@ -4,13 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * @vitest-environment jsdom
- */
-
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useIncludeDirsTrust } from './useIncludeDirsTrust.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
 import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
