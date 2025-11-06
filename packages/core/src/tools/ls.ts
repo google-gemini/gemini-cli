@@ -16,6 +16,9 @@ import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
+/**
+ * Parameters for the LS tool
+ */
 export interface LSToolParams {
   /**
    * The absolute path to the directory to list
@@ -36,6 +39,9 @@ export interface LSToolParams {
   };
 }
 
+/**
+ * File entry returned by LS tool
+ */
 export interface FileEntry {
   /**
    * Name of the file or directory
@@ -74,6 +80,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
+  /**
+   * Checks if a filename matches any of the ignore patterns
+   * @param filename Filename to check
+   * @param patterns Array of glob patterns to check against
+   * @returns True if the filename should be ignored
+   */
   private shouldIgnore(filename: string, patterns?: string[]): boolean {
     if (!patterns || patterns.length === 0) {
       return false;
@@ -92,6 +104,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     return false;
   }
 
+  /**
+   * Gets a description of the file reading operation
+   * @returns A string describing the file being read
+   */
   getDescription(): string {
     const relativePath = makeRelative(
       this.params.dir_path,
@@ -117,6 +133,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     };
   }
 
+  /**
+   * Executes the LS operation with the given parameters
+   * @returns Result of the LS operation
+   */
   async execute(_signal: AbortSignal): Promise<ToolResult> {
     const resolvedDirPath = path.resolve(
       this.config.getTargetDir(),
@@ -231,6 +251,9 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   }
 }
 
+/**
+ * Implementation of the LS tool logic
+ */
 export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   static readonly Name = LS_TOOL_NAME;
 
@@ -283,6 +306,11 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     );
   }
 
+  /**
+   * Validates the parameters for the tool
+   * @param params Parameters to validate
+   * @returns An error message string if invalid, null otherwise
+   */
   protected override validateToolParamValues(
     params: LSToolParams,
   ): string | null {

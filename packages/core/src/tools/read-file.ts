@@ -22,6 +22,9 @@ import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME } from './tool-names.js';
 
+/**
+ * Parameters for the ReadFile tool
+ */
 export interface ReadFileToolParams {
   /**
    * The path to the file to read
@@ -135,6 +138,9 @@ ${result.llmContent}`;
   }
 }
 
+/**
+ * Implementation of the ReadFile tool logic
+ */
 export class ReadFileTool extends BaseDeclarativeTool<
   ReadFileToolParams,
   ToolResult
