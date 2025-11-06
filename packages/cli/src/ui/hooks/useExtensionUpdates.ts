@@ -194,7 +194,7 @@ export const useExtensionUpdates = (
       addItem(
         {
           type: MessageType.INFO,
-          text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available, run "/extensions list" for more information.`,
+          text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available. Run "gemini extensions update <extension-name>" to upgrade, or "/extensions list" for details.`,
         },
         Date.now(),
       );
