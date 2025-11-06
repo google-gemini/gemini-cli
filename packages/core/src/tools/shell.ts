@@ -73,6 +73,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // note description is needed even if validation fails due to absolute path
     if (this.params.directory) {
       description += ` [in ${this.params.directory}]`;
+    } else {
+      description += ` [current working directory ${process.cwd()}]`;
     }
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
