@@ -272,3 +272,70 @@ using `"cwd": "${extensionPath}${/}run.ts"`.
 | `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
 | `${workspacePath}`         | The fully-qualified path of the current workspace.                                                                                                              |
 | `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |
+
+### Extension-Contributed Settings
+
+Extensions can contribute settings to the Gemini CLI, allowing for user-specific
+configuration. These settings can either prompt the user for values (e.g., API
+keys) or override existing Gemini CLI settings (e.g.,
+`context.includeDirectories`).
+
+**Permissions and Precedence:**
+
+For security, users must grant permission for an extension to contribute
+settings. When an extension is installed, the user is prompted to review and
+approve the settings. Users can allow or deny individual contributions, or
+"always allow" an extension to skip future prompts.
+
+Settings are applied with the following order of precedence (from lowest to
+highest):
+
+1.  System Defaults
+2.  User Settings
+3.  Extension Settings
+4.  Workspace Settings
+5.  System Settings
+
+This means that a setting defined in a higher precedence source will override a
+setting from a lower precedence source.
+
+**Activation and Drift Detection:**
+
+Extension-contributed settings are only active when the extension is enabled. If
+an extension's `gemini-extension.json` file changes, the user will be
+re-prompted to grant permission for new or modified settings, ensuring user
+control.
+
+**Settings that CANNOT be overridden by extensions (for security and privacy
+reasons):**
+
+- Any setting under `security` (e.g., authentication, folder trust).
+- Any setting under `telemetry` or `privacy`.
+- `tools.sandbox`.
+- The `trust` field within `mcpServers` configurations.
+- `tools.autoAccept` cannot be set to `true`.
+
+**Example `gemini-extension.json` overriding `context.includeDirectories`:**
+
+```json
+{
+  "name": "my-context-extension",
+  "version": "1.0.0",
+  "context": {
+    "includeDirectories": ["src/my-feature", "docs/my-feature"]
+  }
+}
+```
+
+When this extension is installed and approved, it will create an
+`extension-settings.json` file in the extension's directory (e.g.,
+`<home>/.gemini/extensions/my-context-extension/extension-settings.json`) with
+the following content:
+
+```json
+{
+  "context": {
+    "includeDirectories": ["src/my-feature", "docs/my-feature"]
+  }
+}
+```
