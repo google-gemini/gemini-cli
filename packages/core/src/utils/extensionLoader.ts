@@ -64,9 +64,12 @@ export abstract class ExtensionLoader {
     });
     try {
       await this.config.getMcpClientManager()!.startExtension(extension);
-      // TODO: Move all extension features here, including at least:
+      // TODO: Update custom command updating away from the event based system
+      // and call directly into a custom command manager here. See the
+      // useSlashCommandProcessor hook which responds to events fired here today.
+
+      // TODO: Move all enablement of extension features here, including at least:
       // - context file loading
-      // - custom command loading
       // - excluded tool configuration
     } finally {
       this.startCompletedCount++;
@@ -116,9 +119,12 @@ export abstract class ExtensionLoader {
 
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
+      // TODO: Update custom command updating away from the event based system
+      // and call directly into a custom command manager here. See the
+      // useSlashCommandProcessor hook which responds to events fired here today.
+
       // TODO: Remove all extension features here, including at least:
       // - context files
-      // - custom commands
       // - excluded tools
     } finally {
       this.stopCompletedCount++;
