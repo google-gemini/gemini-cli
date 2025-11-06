@@ -11,7 +11,7 @@ import { theme } from '../semantic-colors.js';
 
 interface ProQuotaDialogProps {
   fallbackModel: string;
-  onChoice: (choice: 'retry_later' | 'continue') => void;
+  onChoice: (choice: 'retry_later' | 'retry') => void;
 }
 
 export function ProQuotaDialog({
@@ -26,12 +26,12 @@ export function ProQuotaDialog({
     },
     {
       label: `Switch to ${fallbackModel} for the rest of this session`,
-      value: 'continue' as const,
-      key: 'continue',
+      value: 'retry' as const,
+      key: 'retry',
     },
   ];
 
-  const handleSelect = (choice: 'retry_later' | 'continue') => {
+  const handleSelect = (choice: 'retry_later' | 'retry') => {
     onChoice(choice);
   };
 

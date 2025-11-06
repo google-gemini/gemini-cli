@@ -28,7 +28,7 @@ import {
 } from '@google/gemini-cli-core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { AuthState, MessageType } from '../types.js';
+import { MessageType } from '../types.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
@@ -36,7 +36,6 @@ type SpyInstance = ReturnType<typeof vi.spyOn>;
 describe('useQuotaAndFallback', () => {
   let mockConfig: Config;
   let mockHistoryManager: UseHistoryManagerReturn;
-  let mockSetAuthState: Mock;
   let mockSetModelSwitchedFromQuotaError: Mock;
   let setFallbackHandlerSpy: SpyInstance;
   let mockGoogleApiError: GoogleApiError;
@@ -62,7 +61,6 @@ describe('useQuotaAndFallback', () => {
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
     };
-    mockSetAuthState = vi.fn();
     mockSetModelSwitchedFromQuotaError = vi.fn();
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
@@ -79,7 +77,6 @@ describe('useQuotaAndFallback', () => {
         config: mockConfig,
         historyManager: mockHistoryManager,
         userTier: UserTierId.FREE,
-        setAuthState: mockSetAuthState,
         setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
       }),
     );
@@ -99,7 +96,6 @@ describe('useQuotaAndFallback', () => {
             config: mockConfig,
             historyManager: mockHistoryManager,
             userTier: props.userTier,
-            setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
         { initialProps: { userTier } },
@@ -137,7 +133,6 @@ describe('useQuotaAndFallback', () => {
             config: mockConfig,
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
-            setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
         );
@@ -161,7 +156,7 @@ describe('useQuotaAndFallback', () => {
 
         // Simulate the user choosing to continue with the fallback model
         await act(() => {
-          result.current.handleProQuotaChoice('continue');
+          result.current.handleProQuotaChoice('retry');
         });
 
         // The original promise from the handler should now resolve
@@ -178,7 +173,6 @@ describe('useQuotaAndFallback', () => {
             config: mockConfig,
             historyManager: mockHistoryManager,
             userTier: UserTierId.FREE,
-            setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
         );
@@ -212,7 +206,7 @@ describe('useQuotaAndFallback', () => {
         expect(result.current.proQuotaRequest).toBe(firstRequest);
 
         await act(() => {
-          result.current.handleProQuotaChoice('continue');
+          result.current.handleProQuotaChoice('retry');
         });
 
         const intent1 = await promise1!;
@@ -281,7 +275,6 @@ describe('useQuotaAndFallback', () => {
                 config: mockConfig,
                 historyManager: mockHistoryManager,
                 userTier: props.tier,
-                setAuthState: mockSetAuthState,
                 setModelSwitchedFromQuotaError:
                   mockSetModelSwitchedFromQuotaError,
               }),
@@ -314,7 +307,7 @@ describe('useQuotaAndFallback', () => {
 
           // Simulate the user choosing to continue with the fallback model
           await act(() => {
-            result.current.handleProQuotaChoice('continue');
+            result.current.handleProQuotaChoice('retry');
           });
 
           expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(true);
@@ -337,7 +330,6 @@ describe('useQuotaAndFallback', () => {
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
-          setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
       );
@@ -346,7 +338,6 @@ describe('useQuotaAndFallback', () => {
         result.current.handleProQuotaChoice('retry_later');
       });
 
-      expect(mockSetAuthState).not.toHaveBeenCalled();
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
     });
 
@@ -356,7 +347,6 @@ describe('useQuotaAndFallback', () => {
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
-          setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
       );
@@ -381,45 +371,12 @@ describe('useQuotaAndFallback', () => {
       expect(result.current.proQuotaRequest).toBeNull();
     });
 
-    it('should resolve intent to "auth" and trigger auth state update', async () => {
-      const { result } = renderHook(() =>
-        useQuotaAndFallback({
-          config: mockConfig,
-          historyManager: mockHistoryManager,
-          userTier: UserTierId.FREE,
-          setAuthState: mockSetAuthState,
-          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
-        }),
-      );
-
-      const handler = setFallbackHandlerSpy.mock
-        .calls[0][0] as FallbackModelHandler;
-      let promise: Promise<FallbackIntent | null>;
-      await act(() => {
-        promise = handler(
-          'gemini-pro',
-          'gemini-flash',
-          new TerminalQuotaError('pro quota', mockGoogleApiError),
-        );
-      });
-
-      await act(() => {
-        result.current.handleProQuotaChoice('auth');
-      });
-
-      const intent = await promise!;
-      expect(intent).toBe('auth');
-      expect(mockSetAuthState).toHaveBeenCalledWith(AuthState.Updating);
-      expect(result.current.proQuotaRequest).toBeNull();
-    });
-
     it('should resolve intent to "retry" and add info message on continue', async () => {
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
           userTier: UserTierId.FREE,
-          setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
       );
@@ -437,7 +394,7 @@ describe('useQuotaAndFallback', () => {
       });
 
       await act(() => {
-        result.current.handleProQuotaChoice('continue');
+        result.current.handleProQuotaChoice('retry');
       });
 
       const intent = await promise!;

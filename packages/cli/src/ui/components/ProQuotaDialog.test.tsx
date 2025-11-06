@@ -41,8 +41,8 @@ describe('ProQuotaDialog', () => {
           },
           {
             label: `Switch to gemini-2.5-flash for the rest of this session`,
-            value: 'continue' as const,
-            key: 'continue',
+            value: 'retry' as const,
+            key: 'retry',
           },
         ],
       }),
@@ -86,10 +86,10 @@ describe('ProQuotaDialog', () => {
 
     // Simulate the selection
     act(() => {
-      onSelect('continue');
+      onSelect('retry');
     });
 
-    expect(mockOnChoice).toHaveBeenCalledWith('continue');
+    expect(mockOnChoice).toHaveBeenCalledWith('retry');
     unmount();
   });
 });

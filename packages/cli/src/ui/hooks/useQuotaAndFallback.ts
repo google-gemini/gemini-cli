@@ -14,14 +14,13 @@ import {
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
-import { AuthState, MessageType } from '../types.js';
+import { MessageType } from '../types.js';
 import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
 
 interface UseQuotaAndFallbackArgs {
   config: Config;
   historyManager: UseHistoryManagerReturn;
   userTier: UserTierId | undefined;
-  setAuthState: (state: AuthState) => void;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
 }
 
@@ -29,7 +28,6 @@ export function useQuotaAndFallback({
   config,
   historyManager,
   userTier,
-  setAuthState,
   setModelSwitchedFromQuotaError,
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
@@ -122,17 +120,15 @@ export function useQuotaAndFallback({
   }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
 
   const handleProQuotaChoice = useCallback(
-    (choice: 'retry_later' | 'continue' | 'auth') => {
+    (choice: FallbackIntent) => {
       if (!proQuotaRequest) return;
 
-      const intent: FallbackIntent = choice === 'continue' ? 'retry' : choice;
+      const intent: FallbackIntent = choice;
       proQuotaRequest.resolve(intent);
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
 
-      if (choice === 'auth') {
-        setAuthState(AuthState.Updating);
-      } else if (choice === 'continue') {
+      if (choice === 'retry') {
         historyManager.addItem(
           {
             type: MessageType.INFO,
@@ -142,7 +138,7 @@ export function useQuotaAndFallback({
         );
       }
     },
-    [proQuotaRequest, setAuthState, historyManager],
+    [proQuotaRequest, historyManager],
   );
 
   return {
