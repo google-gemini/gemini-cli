@@ -124,8 +124,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [recentUnsafePasteTime,
-  setRecentUnsafePasteTime] = useState<number | null>(null);
+  const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
+    number | null
+  >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
 
@@ -142,11 +143,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [commandSearchActive, setCommandSearchActive] = useState(false);
   const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
   const [cursorPosition, setCursorPosition] = useState<[number, number]>([
-    0,
-    0,
+    0, 0,
   ]);
-  const [expandedSuggestionIndex,
-  setExpandedSuggestionIndex] = useState<number>(-1);
+  const [expandedSuggestionIndex, setExpandedSuggestionIndex] =
+    useState<number>(-1);
   const shellHistory = useShellHistory(config.getProjectRoot());
   const shellHistoryData = shellHistory.history;
 
@@ -725,7 +725,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
-          if (charBefore === '\') {
+          if (charBefore === '\\') {
             buffer.backspace();
             buffer.newline();
           } else {
@@ -1000,7 +1000,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 color={theme.text.link}
                 aria-label={SCREEN_READER_USER_PREFIX}
               >
-                (r:) 
+                (r:)
               </Text>
             ) : (
               '!'
@@ -1107,7 +1107,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 ) {
                   if (!currentLineGhost) {
                     renderedLine.push(
-                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}> {showCursor ? chalk.inverse(' ') : ' '}
+                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                        {' '}
+                        {showCursor ? chalk.inverse(' ') : ' '}
                       </Text>,
                     );
                   }
