@@ -390,7 +390,6 @@ export const AppContainer = (props: AppContainerProps) => {
     config,
     historyManager,
     userTier,
-    setAuthState,
     setModelSwitchedFromQuotaError,
   });
 
