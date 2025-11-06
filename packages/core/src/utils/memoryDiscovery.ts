@@ -18,6 +18,7 @@ import { GEMINI_DIR } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
+import { CoreEvent, coreEvents } from './events.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -483,8 +484,8 @@ export async function loadServerHierarchicalMemory(
   maxDirs: number = 200,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
   // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = fsSync.realpathSync(path.resolve(currentWorkingDirectory));
-  const realHome = fsSync.realpathSync(path.resolve(homedir()));
+  const realCwd = await fs.realpath(path.resolve(currentWorkingDirectory));
+  const realHome = await fs.realpath(path.resolve(homedir()));
   const isHomeDirectory = realCwd === realHome;
 
   // If it is the home directory, pass an empty string to the core memory
@@ -571,6 +572,7 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   config.setUserMemory(result.memoryContent);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
+  coreEvents.emit(CoreEvent.MemoryChanged, result);
   return result;
 }
 

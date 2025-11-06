@@ -24,6 +24,7 @@ import { GEMINI_DIR } from './paths.js';
 import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
+import { CoreEvent, coreEvents } from './events.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -917,6 +918,8 @@ included directory memory
       path: extensionPath,
     });
 
+    const mockEventListener = vi.fn();
+    coreEvents.on(CoreEvent.MemoryChanged, mockEventListener);
     const refreshResult = await refreshServerHierarchicalMemory(config);
     expect(refreshResult.fileCount).equals(1);
     expect(config.getGeminiMdFileCount()).equals(refreshResult.fileCount);
@@ -928,5 +931,6 @@ included directory memory
       path.join(extensionPath, 'CustomContext.md'),
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
+    expect(mockEventListener).toHaveBeenCalledExactlyOnceWith(refreshResult);
   });
 });

@@ -50,6 +50,7 @@ import {
   CoreEvent,
   refreshServerHierarchicalMemory,
   type ModelChangedPayload,
+  type MemoryChangedPayload,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -1226,7 +1227,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
-  const geminiMdFileCount = config.getGeminiMdFileCount();
+
+  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
+    config.getGeminiMdFileCount(),
+  );
+  useEffect(() => {
+    const handleMemoryChanged = (result: MemoryChangedPayload) => {
+      setGeminiMdFileCount(result.fileCount);
+    };
+    coreEvents.on(CoreEvent.MemoryChanged, handleMemoryChanged);
+    return () => {
+      coreEvents.off(CoreEvent.MemoryChanged, handleMemoryChanged);
+    };
+  });
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
