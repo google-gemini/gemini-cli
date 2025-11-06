@@ -192,11 +192,9 @@ describe('loggers', () => {
         getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringAllowBuildArtifacts: () => false,
         getDebugMode: () => true,
-        getMcpServers: () => ({
-          'test-server': {
-            command: 'test-command',
-          },
-        }),
+        getMcpServers: () => {
+          throw new Error('Should not call');
+        },
         getQuestion: () => 'test-question',
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
@@ -206,6 +204,13 @@ describe('loggers', () => {
             { name: 'ext-one', id: 'id-one' },
             { name: 'ext-two', id: 'id-two' },
           ] as GeminiCLIExtension[],
+        getMcpClientManager: () => ({
+          getMcpServers: () => ({
+            'test-server': {
+              command: 'test-command',
+            },
+          }),
+        }),
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -1244,6 +1249,7 @@ describe('loggers', () => {
         undefined,
         undefined,
         'test-extension',
+        'test-extension-id',
       );
 
       const call: CompletedToolCall = {
@@ -1278,7 +1284,8 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
-          extension_id: 'test-extension',
+          extension_name: 'test-extension',
+          extension_id: 'test-extension-id',
           function_name: 'mock_mcp_tool',
           function_args: JSON.stringify(
             {

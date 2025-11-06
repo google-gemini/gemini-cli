@@ -1016,7 +1016,7 @@ export class TestRig {
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
-    await run.expectText('Type your message', 30000);
+    await run.expectText('  Type your message or @path/to/file', 30000);
     return run;
   }
 }

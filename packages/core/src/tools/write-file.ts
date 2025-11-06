@@ -9,7 +9,8 @@ import path from 'node:path';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import type {
   FileDiff,
   ToolCallConfirmationDetails,

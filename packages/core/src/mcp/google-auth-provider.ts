@@ -14,6 +14,7 @@ import type {
 import { GoogleAuth } from 'google-auth-library';
 import type { MCPServerConfig } from '../config/config.js';
 import { FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
+import { coreEvents } from '../utils/events.js';
 
 const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
 
@@ -85,7 +86,10 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
     const accessTokenResponse = await client.getAccessToken();
 
     if (!accessTokenResponse.token) {
-      console.error('Failed to get access token from Google ADC');
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to get access token from Google ADC',
+      );
       return undefined;
     }
 
