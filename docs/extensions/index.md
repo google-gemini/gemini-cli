@@ -222,6 +222,18 @@ When a user installs this extension, they will be prompted to enter their API
 key. The value will be saved to a `.env` file in the extension's directory
 (e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
 
+You can view a list of an extension's settings by running:
+
+```
+gemini extensions configure list <extension name>
+```
+
+and you can update a given setting using:
+
+```
+gemini extensions configure set <extension name> <setting name>
+```
+
 ### Custom commands
 
 Extensions can provide [custom commands](../cli/custom-commands.md) by placing
