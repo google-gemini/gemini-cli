@@ -1176,9 +1176,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(baseSettings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-    });
+    expect(config.getAllowedMcpServers()).toEqual(['server1']);
   });
 
   it('should allow multiple specified MCP servers', async () => {
@@ -1192,10 +1190,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(baseSettings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-      server3: { url: 'http://localhost:8082' },
-    });
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server3']);
   });
 
   it('should handle server names that do not exist', async () => {
@@ -1209,16 +1204,14 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(baseSettings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-    });
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server4']);
   });
 
   it('should allow no MCP servers if the flag is provided but empty', async () => {
     process.argv = ['node', 'script.js', '--allowed-mcp-server-names', ''];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(baseSettings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({});
+    expect(config.getAllowedMcpServers()).toEqual(['']);
   });
 
   it('should read allowMCPServers from settings', async () => {
@@ -1229,10 +1222,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       mcp: { allowed: ['server1', 'server2'] },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-      server2: { url: 'http://localhost:8081' },
-    });
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server2']);
   });
 
   it('should read excludeMCPServers from settings', async () => {
@@ -1243,9 +1233,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       mcp: { excluded: ['server1', 'server2'] },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server3: { url: 'http://localhost:8082' },
-    });
+    expect(config.getBlockedMcpServers()).toEqual(['server1', 'server2']);
   });
 
   it('should override allowMCPServers with excludeMCPServers if overlapping', async () => {
@@ -1259,9 +1247,8 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server2: { url: 'http://localhost:8081' },
-    });
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server2']);
+    expect(config.getBlockedMcpServers()).toEqual(['server1']);
   });
 
   it('should prioritize mcp server flag if set', async () => {
@@ -1280,9 +1267,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-    });
+    expect(config.getAllowedMcpServers()).toEqual(['server1']);
   });
 
   it('should prioritize CLI flag over both allowed and excluded settings', async () => {
@@ -1303,10 +1288,8 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server2: { url: 'http://localhost:8081' },
-      server3: { url: 'http://localhost:8082' },
-    });
+    expect(config.getAllowedMcpServers()).toEqual(['server2', 'server3']);
+    expect(config.getBlockedMcpServers()).toEqual([]);
   });
 });
 
@@ -1597,7 +1580,7 @@ describe('loadCliConfig compressionThreshold', () => {
       },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getCompressionThreshold()).toBe(0.5);
+    expect(await config.getCompressionThreshold()).toBe(0.5);
   });
 
   it('should have undefined compressionThreshold if not in settings', async () => {
@@ -1605,7 +1588,7 @@ describe('loadCliConfig compressionThreshold', () => {
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getCompressionThreshold()).toBeUndefined();
+    expect(await config.getCompressionThreshold()).toBeUndefined();
   });
 });
 

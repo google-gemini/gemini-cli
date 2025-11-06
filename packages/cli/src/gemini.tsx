@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, type RenderOptions } from 'ink';
+import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
@@ -58,6 +58,7 @@ import { appEvents, AppEvent } from './utils/events.js';
 import { SessionSelector } from './utils/sessionUtils.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { MouseProvider } from './ui/contexts/MouseContext.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
@@ -72,6 +73,8 @@ import { deleteSession, listSessions } from './utils/sessions.js';
 import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
+import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
+import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -164,12 +167,20 @@ export async function startInteractiveUI(
   // do not yet have support for scrolling in that mode.
   if (!config.getScreenReader()) {
     process.stdout.write('\x1b[?7l');
-
-    registerCleanup(() => {
-      // Re-enable line wrapping on exit.
-      process.stdout.write('\x1b[?7h');
-    });
   }
+
+  const mouseEventsEnabled = settings.merged.ui?.useAlternateBuffer === true;
+  if (mouseEventsEnabled) {
+    enableMouseEvents();
+  }
+
+  registerCleanup(() => {
+    // Re-enable line wrapping on exit.
+    process.stdout.write('\x1b[?7h');
+    if (mouseEventsEnabled) {
+      disableMouseEvents();
+    }
+  });
 
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -184,18 +195,27 @@ export async function startInteractiveUI(
           config={config}
           debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
         >
-          <SessionStatsProvider>
-            <VimModeProvider settings={settings}>
-              <AppContainer
-                config={config}
-                settings={settings}
-                startupWarnings={startupWarnings}
-                version={version}
-                resumedSessionData={resumedSessionData}
-                initializationResult={initializationResult}
-              />
-            </VimModeProvider>
-          </SessionStatsProvider>
+          <MouseProvider
+            mouseEventsEnabled={mouseEventsEnabled}
+            debugKeystrokeLogging={
+              settings.merged.general?.debugKeystrokeLogging
+            }
+          >
+            <ScrollProvider>
+              <SessionStatsProvider>
+                <VimModeProvider settings={settings}>
+                  <AppContainer
+                    config={config}
+                    settings={settings}
+                    startupWarnings={startupWarnings}
+                    version={version}
+                    resumedSessionData={resumedSessionData}
+                    initializationResult={initializationResult}
+                  />
+                </VimModeProvider>
+              </SessionStatsProvider>
+            </ScrollProvider>
+          </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
     );
@@ -217,7 +237,8 @@ export async function startInteractiveUI(
           recordSlowRender(config, renderTime);
         }
       },
-    } as RenderOptions,
+      alternateBuffer: settings.merged.ui?.useAlternateBuffer,
+    },
   );
 
   checkForUpdates(settings)

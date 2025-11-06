@@ -58,6 +58,23 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
   }
 
+  static getSystemSettingsPath(): string {
+    if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
+      return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
+    }
+    if (os.platform() === 'darwin') {
+      return '/Library/Application Support/GeminiCli/settings.json';
+    } else if (os.platform() === 'win32') {
+      return 'C:\\ProgramData\\gemini-cli\\settings.json';
+    } else {
+      return '/etc/gemini-cli/settings.json';
+    }
+  }
+
+  static getSystemPoliciesDir(): string {
+    return path.join(path.dirname(Storage.getSystemSettingsPath()), 'policies');
+  }
+
   static getGlobalTempDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), TMP_DIR_NAME);
   }
