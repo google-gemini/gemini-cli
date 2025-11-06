@@ -10,45 +10,43 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 
 interface ProQuotaDialogProps {
-  failedModel: string;
   fallbackModel: string;
-  onChoice: (choice: 'auth' | 'continue') => void;
+  onChoice: (choice: 'retry_later' | 'retry') => void;
 }
 
 export function ProQuotaDialog({
-  failedModel,
   fallbackModel,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
   const items = [
     {
-      label: 'Change auth (executes the /auth command)',
-      value: 'auth' as const,
-      key: 'auth',
+      label: 'Try again later',
+      value: 'retry_later' as const,
+      key: 'retry_later',
     },
     {
-      label: `Continue with ${fallbackModel}`,
-      value: 'continue' as const,
-      key: 'continue',
+      label: `Switch to ${fallbackModel} for the rest of this session`,
+      value: 'retry' as const,
+      key: 'retry',
     },
   ];
 
-  const handleSelect = (choice: 'auth' | 'continue') => {
+  const handleSelect = (choice: 'retry_later' | 'retry') => {
     onChoice(choice);
   };
 
   return (
     <Box borderStyle="round" flexDirection="column" paddingX={1}>
-      <Text bold color={theme.status.warning}>
-        Pro quota limit reached for {failedModel}.
-      </Text>
-      <Box marginTop={1}>
+      <Box marginTop={1} marginBottom={1}>
         <RadioButtonSelect
           items={items}
           initialIndex={1}
           onSelect={handleSelect}
         />
       </Box>
+      <Text color={theme.text.primary}>
+        Note: You can always use /model to select a different option.
+      </Text>
     </Box>
   );
 }

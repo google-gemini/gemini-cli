@@ -73,14 +73,15 @@ describe('handleFallback', () => {
     expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
   });
 
-  it('should return null if the failed model is already the fallback model', async () => {
+  it('should still consult the handler if the failed model is the fallback model', async () => {
+    mockHandler.mockResolvedValue('stop');
     const result = await handleFallback(
       mockConfig,
       FALLBACK_MODEL, // Failed model is Flash
       AUTH_OAUTH,
     );
-    expect(result).toBeNull();
-    expect(mockHandler).not.toHaveBeenCalled();
+    expect(result).toBe(false);
+    expect(mockHandler).toHaveBeenCalled();
   });
 
   it('should return null if no fallbackHandler is injected in config', async () => {
@@ -124,22 +125,6 @@ describe('handleFallback', () => {
       expect(result).toBe(false);
       expect(mockConfig.setFallbackMode).toHaveBeenCalledWith(true);
       expect(logFlashFallback).toHaveBeenCalled();
-    });
-  });
-
-  describe('when handler returns "auth"', () => {
-    it('should NOT activate fallback mode and return false', async () => {
-      mockHandler.mockResolvedValue('auth');
-
-      const result = await handleFallback(
-        mockConfig,
-        MOCK_PRO_MODEL,
-        AUTH_OAUTH,
-      );
-
-      expect(result).toBe(false);
-      expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
-      expect(logFlashFallback).not.toHaveBeenCalled();
     });
   });
 

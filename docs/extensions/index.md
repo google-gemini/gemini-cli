@@ -187,6 +187,9 @@ precedence.
 
 ### Settings
 
+_Note: This is an experimental feature. We do not yet recommend extension
+authors introduce settings as part of their core flows._
+
 Extensions can define settings that the user will be prompted to provide upon
 installation. This is useful for things like API keys, URLs, or other
 configuration that the extension needs to function.
