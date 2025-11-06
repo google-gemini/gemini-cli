@@ -11,7 +11,11 @@ import type { ConfigParameters } from '../config/config.js';
 import { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
-import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
+import {
+  ToolRegistry,
+  DiscoveredTool,
+  DISCOVERED_TOOL_PREFIX,
+} from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import type { FunctionDeclaration, CallableTool } from '@google/genai';
 import { mcpToTool } from '@google/genai';
@@ -258,6 +262,7 @@ describe('ToolRegistry', () => {
       const discovered1 = new DiscoveredTool(
         config,
         'discovered-1',
+        DISCOVERED_TOOL_PREFIX + 'discovered-1',
         'desc',
         {},
       );
@@ -289,7 +294,7 @@ describe('ToolRegistry', () => {
       expect(toolRegistry.getAllToolNames()).toEqual([
         'builtin-1',
         'builtin-2',
-        'discovered-1',
+        DISCOVERED_TOOL_PREFIX + 'discovered-1',
         'mcp-apple',
         'mcp-zebra',
       ]);
@@ -347,7 +352,9 @@ describe('ToolRegistry', () => {
 
       await toolRegistry.discoverAllTools();
 
-      const discoveredTool = toolRegistry.getTool('tool-with-bad-format');
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'tool-with-bad-format',
+      );
       expect(discoveredTool).toBeDefined();
 
       const registeredParams = (discoveredTool as DiscoveredTool).schema
@@ -402,7 +409,9 @@ describe('ToolRegistry', () => {
       });
 
       await toolRegistry.discoverAllTools();
-      const discoveredTool = toolRegistry.getTool('failing-tool');
+      const discoveredTool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'failing-tool',
+      );
       expect(discoveredTool).toBeDefined();
 
       // --- Execution Mock ---
@@ -481,7 +490,9 @@ describe('ToolRegistry', () => {
       });
 
       await toolRegistry.discoverAllTools();
-      const tool = toolRegistry.getTool('policy-test-tool');
+      const tool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'policy-test-tool',
+      );
       expect(tool).toBeDefined();
 
       // Verify DiscoveredTool has the message bus
@@ -496,7 +507,13 @@ describe('ToolRegistry', () => {
 
   describe('DiscoveredToolInvocation', () => {
     it('should return the stringified params from getDescription', () => {
-      const tool = new DiscoveredTool(config, 'test-tool', 'A test tool', {});
+      const tool = new DiscoveredTool(
+        config,
+        'test-tool',
+        DISCOVERED_TOOL_PREFIX + 'test-tool',
+        'A test tool',
+        {},
+      );
       const params = { param: 'testValue' };
       const invocation = tool.build(params);
       const description = invocation.getDescription();
