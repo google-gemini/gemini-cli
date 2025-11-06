@@ -122,7 +122,7 @@ Slash commands provide meta-level control over the CLI itself.
         available tools.
 
 - [**`/model`**](./model.md)
-  - **Description:** Opens a dialog to configure the model.
+  - **Description:** Opens a dialog to choose your Gemini model.
 
 - **`/memory`**
   - **Description:** Manage the AI's instructional context (hierarchical memory
