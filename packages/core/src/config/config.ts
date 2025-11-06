@@ -290,7 +290,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
-  modelConfigs?: ModelConfigServiceConfig;
+  modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
@@ -308,7 +308,7 @@ export class Config {
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
-  readonly generationConfigService: ModelConfigService;
+  readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -565,16 +565,16 @@ export class Config {
     // are missing from the user's config.
     // TODO(12593): Fix the settings loading logic to properly merge defaults and
     // remove this hack.
-    let modelConfigs = params.modelConfigs;
-    if (modelConfigs && !modelConfigs.aliases) {
-      modelConfigs = {
-        ...modelConfigs,
+    let modelConfigServiceConfig = params.modelConfigServiceConfig;
+    if (modelConfigServiceConfig && !modelConfigServiceConfig.aliases) {
+      modelConfigServiceConfig = {
+        ...modelConfigServiceConfig,
         aliases: DEFAULT_MODEL_CONFIGS.aliases,
       };
     }
 
-    this.generationConfigService = new ModelConfigService(
-      modelConfigs ?? DEFAULT_MODEL_CONFIGS,
+    this.modelConfigService = new ModelConfigService(
+      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
   }
 

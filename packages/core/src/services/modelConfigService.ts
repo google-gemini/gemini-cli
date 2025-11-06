@@ -10,6 +10,16 @@ import type { GenerateContentConfig } from '@google/genai';
 // support a secondary key to limit the override scope, typically an agent name.
 export interface ModelConfigKey {
   model: string;
+
+  // In many cases the model (or model config alias) is sufficient to fully
+  // scope an override. However, in some cases, we want additional scoping of
+  // an override. Consider the case of developing a new subagent, perhaps we
+  // want to override the temperature for all model calls made by this subagent.
+  // However, we most certainly do not want to change the temperature for other
+  // subagents, nor do we want to introduce a whole new set of aliases just for
+  // the new subagent. Using the `overrideScope` we can limit our overrides to
+  // model calls made by this specific subagent, and no others, while still
+  // ensuring model configs are fully orthogonal to the agents who use them.
   overrideScope?: string;
 }
 

@@ -6,6 +6,9 @@
 
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 
+// The default model configs. We use `base` as the parent for all of our model
+// configs, while `chat-base`, a child of `base`, is the parent of the models
+// we use in the "chat" experience.
 export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
   aliases: {
     base: {
@@ -27,6 +30,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
+    // Because `gemini-2.5-pro` and related model configs are "user-facing"
+    // today, i.e. they could be passed via `--model`, we have to be careful to
+    // ensure these model configs can be used interactively.
+    // TODO(joshualitt): Introduce internal base configs for the various models,
+    // note: we will have to think carefully about names.
     'gemini-2.5-pro': {
       extends: 'chat-base',
       modelConfig: {

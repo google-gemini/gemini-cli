@@ -1243,14 +1243,14 @@ describe('Generation Config Merging (HACK)', () => {
 
     const params: ConfigParameters = {
       ...baseParams,
-      modelConfigs: {
+      modelConfigServiceConfig: {
         overrides: userOverrides,
       },
     };
 
     const config = new Config(params);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.generationConfigService as any).config;
+    const serviceConfig = (config.modelConfigService as any).config;
 
     // Assert that the default aliases are present
     expect(serviceConfig.aliases).toEqual(DEFAULT_MODEL_CONFIGS.aliases);
@@ -1267,14 +1267,14 @@ describe('Generation Config Merging (HACK)', () => {
 
     const params: ConfigParameters = {
       ...baseParams,
-      modelConfigs: {
+      modelConfigServiceConfig: {
         aliases: userAliases,
       },
     };
 
     const config = new Config(params);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.generationConfigService as any).config;
+    const serviceConfig = (config.modelConfigService as any).config;
 
     // Assert that the user's aliases are used, not the defaults
     expect(serviceConfig.aliases).toEqual(userAliases);
@@ -1285,7 +1285,7 @@ describe('Generation Config Merging (HACK)', () => {
 
     const config = new Config(params);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.generationConfigService as any).config;
+    const serviceConfig = (config.modelConfigService as any).config;
 
     // Assert that the full default config is used
     expect(serviceConfig).toEqual(DEFAULT_MODEL_CONFIGS);
