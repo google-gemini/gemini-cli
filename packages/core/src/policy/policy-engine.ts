@@ -93,7 +93,11 @@ export class PolicyEngine {
   }> {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
-    if (toolCall.args && this.rules.some((rule) => rule.argsPattern)) {
+    if (
+      toolCall.args &&
+      (this.rules.some((rule) => rule.argsPattern) ||
+        this.checkers.some((checker) => checker.argsPattern))
+    ) {
       stringifiedArgs = stableStringify(toolCall.args);
     }
 
@@ -101,7 +105,6 @@ export class PolicyEngine {
       `[PolicyEngine.check] toolCall.name: ${toolCall.name}, stringifiedArgs: ${stringifiedArgs}`,
     );
 
-    // Find the first matching rule (already sorted by priority)
     // Find the first matching rule (already sorted by priority)
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;

@@ -1060,4 +1060,90 @@ describe('PolicyEngine', () => {
       );
     });
   });
+
+  describe('addChecker', () => {
+    it('should add a new checker and maintain priority order', () => {
+      const checker1: SafetyCheckerRule = {
+        checker: { type: 'external', name: 'checker1' },
+        priority: 5,
+      };
+      const checker2: SafetyCheckerRule = {
+        checker: { type: 'external', name: 'checker2' },
+        priority: 10,
+      };
+
+      engine.addChecker(checker1);
+      engine.addChecker(checker2);
+
+      const checkers = engine.getCheckers();
+      expect(checkers).toHaveLength(2);
+      expect(checkers[0].priority).toBe(10);
+      expect(checkers[0].checker.name).toBe('checker2');
+      expect(checkers[1].priority).toBe(5);
+      expect(checkers[1].checker.name).toBe('checker1');
+    });
+  });
+
+  describe('checker matching logic', () => {
+    it('should match checkers using toolName and argsPattern', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'tool', decision: PolicyDecision.ALLOW },
+      ];
+      const matchingChecker: SafetyCheckerRule = {
+        checker: { type: 'external', name: 'matching' },
+        toolName: 'tool',
+        argsPattern: /"safe":true/,
+      };
+      const nonMatchingChecker: SafetyCheckerRule = {
+        checker: { type: 'external', name: 'non-matching' },
+        toolName: 'other',
+      };
+
+      engine = new PolicyEngine(
+        { rules, checkers: [matchingChecker, nonMatchingChecker] },
+        mockCheckerRunner,
+      );
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ALLOW,
+      });
+
+      await engine.check({ name: 'tool', args: { safe: true } }, undefined);
+
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'matching' }),
+      );
+      expect(mockCheckerRunner.runChecker).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'non-matching' }),
+      );
+    });
+
+    it('should support wildcard patterns for checkers', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'server__tool', decision: PolicyDecision.ALLOW },
+      ];
+      const wildcardChecker: SafetyCheckerRule = {
+        checker: { type: 'external', name: 'wildcard' },
+        toolName: 'server__*',
+      };
+
+      engine = new PolicyEngine(
+        { rules, checkers: [wildcardChecker] },
+        mockCheckerRunner,
+      );
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ALLOW,
+      });
+
+      await engine.check({ name: 'server__tool' }, 'server');
+
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'wildcard' }),
+      );
+    });
+  });
 });
