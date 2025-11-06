@@ -10,7 +10,7 @@
 export type FallbackIntent =
   | 'retry' // Immediately retry the current request with the fallback model.
   | 'stop' // Switch to fallback for future requests, but stop the current request.
-  | 'auth'; // Stop the current request; user intends to change authentication.
+  | 'retry_later'; // Stop the current request and do not fallback. Intend to try again later with the same model.
 
 /**
  * The interface for the handler provided by the UI layer (e.g., the CLI)

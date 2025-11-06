@@ -671,9 +671,9 @@ describe('AppContainer State Management', () => {
 
       // You can even verify that the plumbed function is callable
       act(() => {
-        capturedUIActions.handleProQuotaChoice('auth');
+        capturedUIActions.handleProQuotaChoice('retry_later');
       });
-      expect(mockHandler).toHaveBeenCalledWith('auth');
+      expect(mockHandler).toHaveBeenCalledWith('retry_later');
       unmount();
     });
   });

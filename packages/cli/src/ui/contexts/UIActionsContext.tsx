@@ -40,7 +40,7 @@ export interface UIActions {
   refreshStatic: () => void;
   handleFinalSubmit: (value: string) => void;
   handleClearScreen: () => void;
-  handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
+  handleProQuotaChoice: (choice: 'retry_later' | 'retry') => void;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: (onPop: (messages: string | undefined) => void) => void;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;

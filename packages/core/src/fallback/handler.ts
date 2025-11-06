@@ -46,7 +46,7 @@ export async function handleFallback(
         activateFallbackMode(config, authType);
         return false;
 
-      case 'auth':
+      case 'retry_later':
         return false;
 
       default:
