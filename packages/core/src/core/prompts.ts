@@ -83,7 +83,8 @@ export function getCoreSystemPrompt(
   if (config.getAdkMode()) {
     return `Please use the adk_main_loop tool to handle all queries.
     Do not plan or execute any actions other than to call the adk_main_loop
-    tool, which will handle all planning and execution.`;
+    tool and pass it the query you received verbatim. The adk_main_loop
+    tool will handle all planning and execution.`;
   }
   return resolveSystemPrompt(config, userMemory);
 }
