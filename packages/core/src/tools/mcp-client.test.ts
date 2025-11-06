@@ -89,6 +89,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -153,6 +154,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -237,6 +239,7 @@ describe('mcp-client', () => {
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -286,6 +289,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -340,6 +344,7 @@ describe('mcp-client', () => {
         unregisterTool: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
         removeMcpToolsByServer: vi.fn(),
+        sortTools: vi.fn(),
       } as unknown as ToolRegistry;
       const mockedPromptRegistry = {
         registerPrompt: vi.fn(),

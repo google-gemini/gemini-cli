@@ -205,6 +205,43 @@ export class ToolRegistry {
     this.tools.set(tool.name, tool);
   }
 
+  /**
+   * Sorts tools as:
+   * 1. Built in tools.
+   * 2. Discovered tools.
+   * 3. MCP tools ordered by server name.
+   *
+   * This is a stable sort in that ties preseve existing order.
+   */
+  sortTools(): void {
+    const getPriority = (tool: AnyDeclarativeTool): number => {
+      if (tool instanceof DiscoveredMCPTool) return 2;
+      if (tool instanceof DiscoveredTool) return 1;
+      return 0; // Built-in
+    };
+
+    this.tools = new Map(
+      Array.from(this.tools.entries()).sort((a, b) => {
+        const toolA = a[1];
+        const toolB = b[1];
+        const priorityA = getPriority(toolA);
+        const priorityB = getPriority(toolB);
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+
+        if (priorityA === 2) {
+          const serverA = (toolA as DiscoveredMCPTool).serverName;
+          const serverB = (toolB as DiscoveredMCPTool).serverName;
+          return serverA.localeCompare(serverB);
+        }
+
+        return 0;
+      }),
+    );
+  }
+
   private removeDiscoveredTools(): void {
     for (const tool of this.tools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
