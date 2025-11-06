@@ -32,11 +32,9 @@ export class WorkspaceContext {
   ) {
     this.addDirectory(targetDir);
     for (const additionalDirectory of additionalDirectories) {
-      console.log('In constructor additionalDirectory');
       this.addDirectory(additionalDirectory);
     }
     this.initialDirectories = new Set(this.directories);
-    console.log('end In constructor');
   }
 
   /**
@@ -77,7 +75,6 @@ export class WorkspaceContext {
         return;
       }
       this.directories.add(resolved);
-      console.log('Added dir:', resolved);
       this.notifyDirectoriesChanged();
     } catch (err) {
       debugLogger.warn(

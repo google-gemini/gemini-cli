@@ -420,7 +420,6 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
 
   constructor(params: ConfigParameters) {
-    console.log('In Config constructor');
     this.sessionId = params.sessionId;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
