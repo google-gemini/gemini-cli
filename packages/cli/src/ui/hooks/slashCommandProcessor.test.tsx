@@ -201,7 +201,7 @@ describe('useSlashCommandProcessor', () => {
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized
-        vi.fn(), // setCustomDialog
+          vi.fn(), // setCustomDialog
         ),
       );
       result = hook.result;

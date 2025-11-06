@@ -9,11 +9,54 @@ import type { Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
 import {
   expandHomeDir,
-  finishAddingDirectories,
-} from '../commands/directoryUtils.js';
+  loadMemoryFromDirectories,
+} from '../utils/directoryUtils.js';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { MessageType, type HistoryItem } from '../types.js';
+
+async function finishAddingDirectories(
+  config: Config,
+  settings: LoadedSettings,
+  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
+  setGeminiMdFileCount: (count: number) => void,
+  added: string[],
+  errors: string[],
+) {
+  if (!config) {
+    addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Configuration is not available.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  try {
+    if (added.length > 0) {
+      const result = await loadMemoryFromDirectories(config, settings);
+      if (result) {
+        setGeminiMdFileCount(result.fileCount);
+      }
+    }
+  } catch (error) {
+    errors.push(`Error refreshing memory: ${(error as Error).message}`);
+  }
+
+  if (added.length > 0) {
+    const gemini = config.getGeminiClient();
+    if (gemini) {
+      await gemini.addDirectoryContext();
+    }
+  }
+
+  if (errors.length > 0) {
+    addItem({ type: MessageType.ERROR, text: errors.join('\n') }, Date.now());
+  }
+}
 
 export function useIncludeDirsTrust(
   config: Config,
@@ -64,7 +107,6 @@ export function useIncludeDirsTrust(
           setGeminiMdFileCount,
           added,
           errors,
-          true, // silentOnSuccess
         );
       }
       config.clearPendingIncludeDirectories();
@@ -110,6 +152,10 @@ export function useIncludeDirsTrust(
     }
 
     if (undefinedTrustDirs.length > 0) {
+      console.log(
+        'Creating custom dialog with undecidedDirs:',
+        undefinedTrustDirs,
+      );
       setCustomDialog(
         <MultiFolderTrustDialog
           folders={undefinedTrustDirs}
@@ -124,7 +170,6 @@ export function useIncludeDirsTrust(
           settings={settings}
           addItem={addItem}
           setGeminiMdFileCount={setGeminiMdFileCount}
-          silentOnSuccess={true}
         />,
       );
     } else if (added.length > 0 || errors.length > 0) {
@@ -135,7 +180,6 @@ export function useIncludeDirsTrust(
         setGeminiMdFileCount,
         added,
         errors,
-        true,
       );
       config.clearPendingIncludeDirectories();
     }

@@ -12,9 +12,71 @@ import {
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
 import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
-import { MessageType } from '../types.js';
-import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
-import { expandHomeDir } from '../utils/directoryUtils.js';
+import { MessageType, type HistoryItem } from '../types.js';
+import {
+  expandHomeDir,
+  loadMemoryFromDirectories,
+} from '../utils/directoryUtils.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../../config/settings.js';
+
+async function finishAddingDirectories(
+  config: Config,
+  settings: LoadedSettings,
+  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
+  setGeminiMdFileCount: (count: number) => void,
+  added: string[],
+  errors: string[],
+) {
+  if (!config) {
+    addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Configuration is not available.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  try {
+    if (added.length > 0) {
+      const result = await loadMemoryFromDirectories(config, settings);
+      if (result) {
+        setGeminiMdFileCount(result.fileCount);
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join(
+              '\n- ',
+            )}`,
+          },
+          Date.now(),
+        );
+      }
+    }
+  } catch (error) {
+    errors.push(`Error refreshing memory: ${(error as Error).message}`);
+  }
+
+  if (added.length > 0) {
+    const gemini = config.getGeminiClient();
+    if (gemini) {
+      await gemini.addDirectoryContext();
+    }
+    addItem(
+      {
+        type: MessageType.INFO,
+        text: `Successfully added directories:\n- ${added.join('\n- ')}`,
+      },
+      Date.now(),
+    );
+  }
+
+  if (errors.length > 0) {
+    addItem({ type: MessageType.ERROR, text: errors.join('\n') }, Date.now());
+  }
+}
 
 export const directoryCommand: SlashCommand = {
   name: 'directory',
@@ -45,7 +107,14 @@ export const directoryCommand: SlashCommand = {
           return;
         }
 
-        const workspaceContext = config.getWorkspaceContext();
+        if (config.isRestrictiveSandbox()) {
+          return {
+            type: 'message' as const,
+            messageType: 'error' as const,
+            content:
+              'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
+          };
+        }
 
         const pathsToAdd = rest
           .join(' ')
@@ -62,17 +131,38 @@ export const directoryCommand: SlashCommand = {
           return;
         }
 
-        if (config.isRestrictiveSandbox()) {
-          return {
-            type: 'message' as const,
-            messageType: 'error' as const,
-            content:
-              'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
-          };
-        }
-
         const added: string[] = [];
         const errors: string[] = [];
+        const alreadyAdded: string[] = [];
+
+        const workspaceContext = config.getWorkspaceContext();
+        const currentWorkspaceDirs = workspaceContext.getDirectories();
+        const pathsToProcess: string[] = [];
+
+        for (const pathToAdd of pathsToAdd) {
+          const expandedPath = expandHomeDir(pathToAdd.trim());
+          if (currentWorkspaceDirs.includes(expandedPath)) {
+            alreadyAdded.push(pathToAdd.trim());
+          } else {
+            pathsToProcess.push(pathToAdd.trim());
+          }
+        }
+
+        if (alreadyAdded.length > 0) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: `The following directories are already in the workspace:\n- ${alreadyAdded.join(
+                '\n- ',
+              )}`,
+            },
+            Date.now(),
+          );
+        }
+
+        if (pathsToProcess.length === 0) {
+          return;
+        }
 
         if (
           isFolderTrustEnabled(settings.merged) &&
@@ -83,7 +173,7 @@ export const directoryCommand: SlashCommand = {
           const undefinedTrustDirs: string[] = [];
           const trustedDirs: string[] = [];
 
-          for (const pathToAdd of pathsToAdd) {
+          for (const pathToAdd of pathsToProcess) {
             const expandedPath = expandHomeDir(pathToAdd.trim());
             const isTrusted = trustedFolders.isPathTrusted(expandedPath);
             if (isTrusted === false) {
@@ -127,13 +217,12 @@ export const directoryCommand: SlashCommand = {
                   settings={settings}
                   addItem={addItem}
                   setGeminiMdFileCount={context.ui.setGeminiMdFileCount}
-                  silentOnSuccess={false}
                 />
               ),
             };
           }
         } else {
-          for (const pathToAdd of pathsToAdd) {
+          for (const pathToAdd of pathsToProcess) {
             try {
               workspaceContext.addDirectory(expandHomeDir(pathToAdd.trim()));
               added.push(pathToAdd.trim());
@@ -153,7 +242,6 @@ export const directoryCommand: SlashCommand = {
           context.ui.setGeminiMdFileCount,
           added,
           errors,
-          false,
         );
         return;
       },

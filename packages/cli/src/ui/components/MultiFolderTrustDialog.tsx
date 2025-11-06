@@ -12,7 +12,7 @@ import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
-import { expandHomeDir } from '../commands/directoryUtils.js';
+import { expandHomeDir } from '../utils/directoryUtils.js';
 import { MessageType, type HistoryItem } from '../types.js';
 import type { Config } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -23,7 +23,7 @@ export enum MultiFolderTrustChoice {
   NO,
 }
 
-interface MultiFolderTrustDialogProps {
+export interface MultiFolderTrustDialogProps {
   folders: string[];
   onComplete: () => void;
   trustedDirs: string[];
