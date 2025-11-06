@@ -432,7 +432,7 @@ describe('InputPrompt', () => {
       );
     });
 
-    const simulatePaste = (stdin: NodeJS.WriteStream) => {
+    const simulatePaste = (stdin: { write: (input: string) => void }) => {
       if (isMac) {
         // On macOS, Cmd+V is a generic paste event.
         stdin.write('\x1b[200~');
