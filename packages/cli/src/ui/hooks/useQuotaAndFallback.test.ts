@@ -103,15 +103,6 @@ describe('useQuotaAndFallback', () => {
       return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
     };
 
-    it('should return null and take no action if already in fallback mode', async () => {
-      vi.spyOn(mockConfig, 'isInFallbackMode').mockReturnValue(true);
-      const handler = getRegisteredHandler();
-      const result = await handler('gemini-pro', 'gemini-flash', new Error());
-
-      expect(result).toBeNull();
-      expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
-    });
-
     it('should return null and take no action if authType is not LOGIN_WITH_GOOGLE', async () => {
       // Override the default mock from beforeEach for this specific test
       vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
@@ -123,6 +114,62 @@ describe('useQuotaAndFallback', () => {
 
       expect(result).toBeNull();
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
+    });
+
+    describe('Flash Model Fallback', () => {
+      it('should show a terminal quota message and stop, without offering a fallback', async () => {
+        const handler = getRegisteredHandler();
+        const result = await handler(
+          'gemini-2.5-flash',
+          'gemini-2.5-flash',
+          new TerminalQuotaError('flash quota', mockGoogleApiError),
+        );
+
+        expect(result).toBe('stop');
+        expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+        const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
+          .text;
+        expect(message).toContain(
+          'You have reached your daily gemini-2.5-flash',
+        );
+        expect(message).not.toContain('continue with the fallback model');
+      });
+
+      it('should show a capacity message and stop', async () => {
+        const handler = getRegisteredHandler();
+        // let result: FallbackIntent | null = null;
+        const result = await handler(
+          'gemini-2.5-flash',
+          'gemini-2.5-flash',
+          new Error('capacity'),
+        );
+
+        expect(result).toBe('stop');
+        expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+        const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
+          .text;
+        expect(message).toContain(
+          'Pardon Our Congestion! It looks like gemini-2.5-flash is very popular',
+        );
+      });
+
+      it('should show a capacity message and stop, even when already in fallback mode', async () => {
+        vi.spyOn(mockConfig, 'isInFallbackMode').mockReturnValue(true);
+        const handler = getRegisteredHandler();
+        const result = await handler(
+          'gemini-2.5-flash',
+          'gemini-2.5-flash',
+          new Error('capacity'),
+        );
+
+        expect(result).toBe('stop');
+        expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+        const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
+          .text;
+        expect(message).toContain(
+          'Pardon Our Congestion! It looks like gemini-2.5-flash is very popular',
+        );
+      });
     });
 
     describe('Interactive Fallback', () => {

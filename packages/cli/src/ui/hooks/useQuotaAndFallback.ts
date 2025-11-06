@@ -11,6 +11,7 @@ import {
   type FallbackIntent,
   TerminalQuotaError,
   UserTierId,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -41,10 +42,6 @@ export function useQuotaAndFallback({
       fallbackModel,
       error,
     ): Promise<FallbackIntent | null> => {
-      if (config.isInFallbackMode()) {
-        return null;
-      }
-
       // Fallbacks are currently only handled for OAuth users.
       const contentGeneratorConfig = config.getContentGeneratorConfig();
       if (
@@ -58,28 +55,35 @@ export function useQuotaAndFallback({
       const isPaidTier =
         userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
 
+      const isFallbackModel = failedModel === DEFAULT_GEMINI_FLASH_MODEL;
       let message: string;
 
       if (error instanceof TerminalQuotaError) {
-        // Pro Quota specific messages (Interactive)
+        // Common part of the message for both tiers
+        const messageLines = [
+          `⚡ You have reached your daily ${failedModel} quota limit.`,
+          `⚡ You can choose to authenticate with a paid API key${
+            isFallbackModel ? '.' : ' or continue with the fallback model.'
+          }`,
+        ];
+
+        // Tier-specific part
         if (isPaidTier) {
-          message = [
-            `⚡ You have reached your daily ${failedModel} quota limit.`,
-            `⚡ You can choose to authenticate with a paid API key or continue with the fallback model.`,
+          messageLines.push(
             `⚡ Increase your limits by using a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key`,
             `⚡ You can switch authentication methods by typing /auth`,
-          ].join('\n');
+          );
         } else {
-          message = [
-            `⚡ You have reached your daily ${failedModel} quota limit.`,
-            `⚡ You can choose to authenticate with a paid API key or continue with the fallback model.`,
+          messageLines.push(
             `⚡ Increase your limits by `,
             `⚡ - signing up for a plan with higher limits at https://goo.gle/set-up-gemini-code-assist`,
             `⚡ - or using a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key`,
             `⚡ You can switch authentication methods by typing /auth`,
-          ].join('\n');
+          );
         }
+        message = messageLines.join('\n');
       } else {
+        // Capacity error
         message = [
           `🚦Pardon Our Congestion! It looks like ${failedModel} is very popular at the moment.`,
           `Please retry again later.`,
@@ -94,6 +98,10 @@ export function useQuotaAndFallback({
         },
         Date.now(),
       );
+
+      if (isFallbackModel) {
+        return 'stop';
+      }
 
       setModelSwitchedFromQuotaError(true);
       config.setQuotaErrorOccurred(true);
