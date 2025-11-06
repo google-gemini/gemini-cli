@@ -6,9 +6,10 @@
 
 import type { Content } from '@google/genai';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
-import type { GeminiClient } from '../core/client.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { isFunctionResponse } from './messageInspectors.js';
+import { debugLogger } from './debugLogger.js';
 
 const CHECK_PROMPT = `Analyze *only* the content and structure of your immediately preceding response (your last turn in the conversation history). Based *strictly* on that response, determine who should logically speak next: the 'user' or the 'model' (you).
 **Decision Rules (apply in order):**
@@ -41,8 +42,9 @@ export interface NextSpeakerResponse {
 
 export async function checkNextSpeaker(
   chat: GeminiChat,
-  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
+  promptId: string,
 ): Promise<NextSpeakerResponse | null> {
   // We need to capture the curated history because there are many moments when the model will return invalid turns
   // that when passed back up to the endpoint will break subsequent calls. An example of this is when the model decides
@@ -108,12 +110,13 @@ export async function checkNextSpeaker(
   ];
 
   try {
-    const parsedResponse = (await geminiClient.generateJson(
+    const parsedResponse = (await baseLlmClient.generateJson({
       contents,
-      RESPONSE_SCHEMA,
+      schema: RESPONSE_SCHEMA,
+      model: DEFAULT_GEMINI_FLASH_MODEL,
       abortSignal,
-      DEFAULT_GEMINI_FLASH_MODEL,
-    )) as unknown as NextSpeakerResponse;
+      promptId,
+    })) as unknown as NextSpeakerResponse;
 
     if (
       parsedResponse &&
@@ -124,7 +127,7 @@ export async function checkNextSpeaker(
     }
     return null;
   } catch (error) {
-    console.warn(
+    debugLogger.warn(
       'Failed to talk to Gemini endpoint when seeing if conversation should continue.',
       error,
     );

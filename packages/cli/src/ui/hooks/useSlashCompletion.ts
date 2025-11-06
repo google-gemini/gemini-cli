@@ -7,7 +7,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AsyncFzf } from 'fzf';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from '../commands/types.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Type alias for improved type safety based on actual fzf result structure
 type FzfCommandResult = {
@@ -28,9 +33,9 @@ interface FzfCommandCacheEntry {
 function logErrorSafely(error: unknown, context: string): void {
   if (error instanceof Error) {
     // Log full error details securely for debugging
-    console.error(`[${context}]`, error);
+    debugLogger.warn(`[${context}]`, error);
   } else {
-    console.error(`[${context}] Non-error thrown:`, error);
+    debugLogger.warn(`[${context}] Non-error thrown:`, error);
   }
 }
 
@@ -93,9 +98,13 @@ function useCommandParser(
       const found: SlashCommand | undefined = currentLevel.find((cmd) =>
         matchesCommand(cmd, part),
       );
+
       if (found) {
         leafCommand = found;
         currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
+        if (found.kind === CommandKind.MCP_PROMPT) {
+          break;
+        }
       } else {
         leafCommand = null;
         currentLevel = [];
@@ -150,6 +159,7 @@ interface PerfectMatchResult {
 }
 
 function useCommandSuggestions(
+  query: string | null,
   parserResult: CommandParserResult,
   commandContext: CommandContext,
   getFzfForCommands: (
@@ -181,7 +191,7 @@ function useCommandSuggestions(
 
         // Safety check: ensure leafCommand and completion exist
         if (!leafCommand?.completion) {
-          console.warn(
+          debugLogger.warn(
             'Attempted argument completion without completion function',
           );
           return;
@@ -194,7 +204,17 @@ function useCommandSuggestions(
           const depth = commandPathParts.length;
           const argString = rawParts.slice(depth).join(' ');
           const results =
-            (await leafCommand.completion(commandContext, argString)) || [];
+            (await leafCommand.completion(
+              {
+                ...commandContext,
+                invocation: {
+                  raw: query || `/${rawParts.join(' ')}`,
+                  name: leafCommand.name,
+                  args: argString,
+                },
+              },
+              argString,
+            )) || [];
 
           if (!signal.aborted) {
             const finalSuggestions = results.map((s) => ({
@@ -287,7 +307,13 @@ function useCommandSuggestions(
 
     setSuggestions([]);
     return () => abortController.abort();
-  }, [parserResult, commandContext, getFzfForCommands, getPrefixSuggestions]);
+  }, [
+    query,
+    parserResult,
+    commandContext,
+    getFzfForCommands,
+    getPrefixSuggestions,
+  ]);
 
   return { suggestions, isLoading };
 }
@@ -456,6 +482,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   // Use extracted hooks for better separation of concerns
   const parserResult = useCommandParser(query, slashCommands);
   const { suggestions: hookSuggestions, isLoading } = useCommandSuggestions(
+    query,
     parserResult,
     commandContext,
     getFzfForCommands,
@@ -467,18 +494,28 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   );
   const { isPerfectMatch } = usePerfectMatch(parserResult);
 
-  // Update external state - this is now much simpler and focused
+  // Clear internal state when disabled
   useEffect(() => {
-    if (!enabled || query === null) {
+    if (!enabled) {
       setSuggestions([]);
       setIsLoadingSuggestions(false);
       setIsPerfectMatch(false);
       setCompletionStart(-1);
       setCompletionEnd(-1);
+    }
+  }, [enabled, setSuggestions, setIsLoadingSuggestions, setIsPerfectMatch]);
+
+  // Update external state only when enabled
+  useEffect(() => {
+    if (!enabled || query === null) {
       return;
     }
 
-    setSuggestions(hookSuggestions);
+    if (isPerfectMatch) {
+      setSuggestions([]);
+    } else {
+      setSuggestions(hookSuggestions);
+    }
     setIsLoadingSuggestions(isLoading);
     setIsPerfectMatch(isPerfectMatch);
     setCompletionStart(calculatedStart);

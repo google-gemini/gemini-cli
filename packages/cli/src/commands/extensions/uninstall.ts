@@ -5,19 +5,31 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { uninstallExtension } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { debugLogger } from '@google/gemini-cli-core';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface UninstallArgs {
-  name: string;
+  name: string; // can be extension name or source URL.
 }
 
 export async function handleUninstall(args: UninstallArgs) {
   try {
-    await uninstallExtension(args.name);
-    console.log(`Extension "${args.name}" successfully uninstalled.`);
+    const workspaceDir = process.cwd();
+    const extensionManager = new ExtensionManager({
+      workspaceDir,
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: promptForSetting,
+      settings: loadSettings(workspaceDir).merged,
+    });
+    await extensionManager.loadExtensions();
+    await extensionManager.uninstallExtension(args.name, false);
+    debugLogger.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }
@@ -28,7 +40,7 @@ export const uninstallCommand: CommandModule = {
   builder: (yargs) =>
     yargs
       .positional('name', {
-        describe: 'The name of the extension to uninstall.',
+        describe: 'The name or source path of the extension to uninstall.',
         type: 'string',
       })
       .check((argv) => {

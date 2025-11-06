@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import type { CompressionProps } from '../../types.js';
-import Spinner from 'ink-spinner';
+import { CliSpinner } from '../CliSpinner.js';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
@@ -47,7 +47,7 @@ export function CompressionMessage({
       case CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR:
         return 'Could not compress chat history due to a token counting error.';
       case CompressionStatus.NOOP:
-        return 'Chat history is already compressed.';
+        return 'Nothing to compress.';
       default:
         return '';
     }
@@ -59,7 +59,7 @@ export function CompressionMessage({
     <Box flexDirection="row">
       <Box marginRight={1}>
         {isPending ? (
-          <Spinner type="dots" />
+          <CliSpinner type="dots" />
         ) : (
           <Text color={theme.text.accent}>✦</Text>
         )}

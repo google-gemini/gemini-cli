@@ -61,9 +61,16 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
               }
             />
           </Box>
-          {primaryText && <Text color={theme.text.accent}>{primaryText}</Text>}
+          {primaryText && (
+            <Text color={theme.text.accent} wrap="truncate-end">
+              {primaryText}
+            </Text>
+          )}
           {!isNarrow && cancelAndTimerContent && (
-            <Text color={theme.text.secondary}> {cancelAndTimerContent}</Text>
+            <>
+              <Box flexShrink={0} width={1} />
+              <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
+            </>
           )}
         </Box>
         {!isNarrow && <Box flexGrow={1}>{/* Spacer */}</Box>}

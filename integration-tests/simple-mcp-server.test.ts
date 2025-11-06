@@ -11,7 +11,7 @@
  */
 
 import { describe, it, beforeAll, expect } from 'vitest';
-import { TestRig, validateModelOutput } from './test-helper.js';
+import { TestRig, poll, validateModelOutput } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -189,12 +189,33 @@ describe('simple-mcp-server', () => {
       const { chmodSync } = await import('node:fs');
       chmodSync(testServerPath, 0o755);
     }
+
+    // Poll for script for up to 5s
+    const { accessSync, constants } = await import('node:fs');
+    const isReady = await poll(
+      () => {
+        try {
+          accessSync(testServerPath, constants.F_OK);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      5000, // Max wait 5 seconds
+      100, // Poll every 100ms
+    );
+
+    if (!isReady) {
+      throw new Error('MCP server script was not ready in time.');
+    }
   });
 
   it('should add two numbers', async () => {
     // Test directory is already set up in before hook
     // Just run the command - MCP server config is in settings.json
-    const output = await rig.run('add 5 and 10');
+    const output = await rig.run(
+      'Use the `add` tool to calculate 5+10 and output only the resulting number.',
+    );
 
     const foundToolCall = await rig.waitForToolCall('add');
 

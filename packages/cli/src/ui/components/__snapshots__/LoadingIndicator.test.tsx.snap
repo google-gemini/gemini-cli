@@ -1,0 +1,6 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<LoadingIndicator /> > should truncate long primary text instead of wrapping 1`] = `
+"MockRespondin This is an extremely long loading phrase that shoul… (esc to
+gSpinner                                                           cancel, 5s)"
+`;

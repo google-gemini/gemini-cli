@@ -15,9 +15,11 @@ import {
 } from 'vitest';
 
 import * as actualNodeFs from 'node:fs'; // For setup/teardown
+import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 // eslint-disable-next-line import/no-internal-modules
 import mime from 'mime/lite';
 
@@ -29,6 +31,7 @@ import {
   detectBOM,
   readFileWithEncoding,
   fileExists,
+  readWasmBinaryFromDisk,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -74,6 +77,23 @@ describe('fileUtils', () => {
     }
     process.cwd = originalProcessCwd;
     vi.restoreAllMocks(); // Restore any spies
+  });
+
+  describe('readWasmBinaryFromDisk', () => {
+    it('loads a WASM binary from disk as a Uint8Array', async () => {
+      const wasmFixtureUrl = new URL(
+        './__fixtures__/dummy.wasm',
+        import.meta.url,
+      );
+      const wasmFixturePath = fileURLToPath(wasmFixtureUrl);
+      const result = await readWasmBinaryFromDisk(wasmFixturePath);
+      const expectedBytes = new Uint8Array(
+        await fsPromises.readFile(wasmFixturePath),
+      );
+
+      expect(result).toBeInstanceOf(Uint8Array);
+      expect(result).toStrictEqual(expectedBytes);
+    });
   });
 
   describe('isWithinRoot', () => {
@@ -954,22 +974,30 @@ describe('fileUtils', () => {
     });
 
     it('should return an error if the file size exceeds 20MB', async () => {
-      // Create a file just over 20MB
-      const twentyOneMB = 21 * 1024 * 1024;
-      const buffer = Buffer.alloc(twentyOneMB, 0x61); // Fill with 'a'
-      actualNodeFs.writeFileSync(testTextFilePath, buffer);
+      // Create a small test file
+      actualNodeFs.writeFileSync(testTextFilePath, 'test content');
 
-      const result = await processSingleFileContent(
-        testTextFilePath,
-        tempRootDir,
-        new StandardFileSystemService(),
-      );
+      // Spy on fs.promises.stat to return a large file size
+      const statSpy = vi.spyOn(fs.promises, 'stat').mockResolvedValueOnce({
+        size: 21 * 1024 * 1024,
+        isDirectory: () => false,
+      } as fs.Stats);
 
-      expect(result.error).toContain('File size exceeds the 20MB limit');
-      expect(result.returnDisplay).toContain(
-        'File size exceeds the 20MB limit',
-      );
-      expect(result.llmContent).toContain('File size exceeds the 20MB limit');
+      try {
+        const result = await processSingleFileContent(
+          testTextFilePath,
+          tempRootDir,
+          new StandardFileSystemService(),
+        );
+
+        expect(result.error).toContain('File size exceeds the 20MB limit');
+        expect(result.returnDisplay).toContain(
+          'File size exceeds the 20MB limit',
+        );
+        expect(result.llmContent).toContain('File size exceeds the 20MB limit');
+      } finally {
+        statSpy.mockRestore();
+      }
     });
   });
 });

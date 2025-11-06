@@ -5,30 +5,26 @@
  */
 
 import type {
-  EmbedContentParameters,
   GenerateContentConfig,
   PartListUnion,
   Content,
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
-import { createUserContent } from '@google/genai';
 import {
   getDirectoryContextString,
-  getEnvironmentContext,
+  getInitialChatHistory,
 } from '../utils/environmentContext.js';
 import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
 import { CompressionStatus } from './turn.js';
 import { Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
-import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
-import { getResponseText } from '../utils/partUtils.js';
+import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
@@ -40,20 +36,21 @@ import {
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
-  logChatCompression,
+  logContentRetryFailure,
   logNextSpeakerCheck,
-  logMalformedJsonResponse,
 } from '../telemetry/loggers.js';
 import {
-  makeChatCompressionEvent,
-  MalformedJsonResponseEvent,
+  ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -66,52 +63,7 @@ export function isThinkingDefault(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
 }
 
-/**
- * Returns the index of the content after the fraction of the total characters in the history.
- *
- * Exported for testing purposes.
- */
-export function findIndexAfterFraction(
-  history: Content[],
-  fraction: number,
-): number {
-  if (fraction <= 0 || fraction >= 1) {
-    throw new Error('Fraction must be between 0 and 1');
-  }
-
-  const contentLengths = history.map(
-    (content) => JSON.stringify(content).length,
-  );
-
-  const totalCharacters = contentLengths.reduce(
-    (sum, length) => sum + length,
-    0,
-  );
-  const targetCharacters = totalCharacters * fraction;
-
-  let charactersSoFar = 0;
-  for (let i = 0; i < contentLengths.length; i++) {
-    if (charactersSoFar >= targetCharacters) {
-      return i;
-    }
-    charactersSoFar += contentLengths[i];
-  }
-  return contentLengths.length;
-}
-
 const MAX_TURNS = 100;
-
-/**
- * Threshold for compression token count as a fraction of the model's token limit.
- * If the chat history exceeds this threshold, it will be compressed.
- */
-const COMPRESSION_TOKEN_THRESHOLD = 0.7;
-
-/**
- * The fraction of the latest chat history to keep. A value of 0.3
- * means that only the last 30% of the chat history will be kept after compression.
- */
-const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -122,6 +74,7 @@ export class GeminiClient {
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
+  private readonly compressionService: ChatCompressionService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -135,11 +88,21 @@ export class GeminiClient {
 
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
+    this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
+  }
+
+  private updateTelemetryTokenCount() {
+    if (this.chat) {
+      uiTelemetryService.setLastPromptTokenCount(
+        this.chat.getLastPromptTokenCount(),
+      );
+    }
   }
 
   async initialize() {
     this.chat = await this.startChat();
+    this.updateTelemetryTokenCount();
   }
 
   private getContentGeneratorOrFail(): ContentGenerator {
@@ -186,6 +149,7 @@ export class GeminiClient {
 
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
+    this.updateTelemetryTokenCount();
   }
 
   getChatRecordingService(): ChatRecordingService | undefined {
@@ -194,6 +158,10 @@ export class GeminiClient {
 
   getLoopDetectionService(): LoopDetectionService {
     return this.loopDetector;
+  }
+
+  getCurrentSequenceModel(): string | null {
+    return this.currentSequenceModel;
   }
 
   async addDirectoryContext(): Promise<void> {
@@ -210,26 +178,16 @@ export class GeminiClient {
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
-    const envParts = await getEnvironmentContext(this.config);
 
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
-    const history: Content[] = [
-      {
-        role: 'user',
-        parts: envParts,
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the context!' }],
-      },
-      ...(extraHistory ?? []),
-    ];
+    const history = await getInitialChatHistory(this.config, extraHistory);
+
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
       const model = this.config.getModel();
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
@@ -310,7 +268,7 @@ export class GeminiClient {
       ];
 
       if (this.config.getDebugMode()) {
-        console.log(contextParts.join('\n'));
+        debugLogger.log(contextParts.join('\n'));
       }
       return {
         contextParts,
@@ -420,7 +378,7 @@ export class GeminiClient {
       ];
 
       if (this.config.getDebugMode()) {
-        console.log(contextParts.join('\n'));
+        debugLogger.log(contextParts.join('\n'));
       }
       return {
         contextParts,
@@ -429,11 +387,25 @@ export class GeminiClient {
     }
   }
 
+  private _getEffectiveModelForCurrentTurn(): string {
+    if (this.currentSequenceModel) {
+      return this.currentSequenceModel;
+    }
+
+    const configModel = this.config.getModel();
+    const model: string =
+      configModel === DEFAULT_GEMINI_MODEL_AUTO
+        ? DEFAULT_GEMINI_MODEL
+        : configModel;
+    return getEffectiveModel(this.config.isInFallbackMode(), model);
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
+    isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
@@ -454,7 +426,25 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat(prompt_id, false, request);
+    // Check for context window overflow
+    const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
+
+    const estimatedRequestTokenCount = Math.floor(
+      JSON.stringify(request).length / 4,
+    );
+
+    const remainingTokenCount =
+      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
+
+    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+      yield {
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: { estimatedRequestTokenCount, remainingTokenCount },
+      };
+      return new Turn(this.getChat(), prompt_id);
+    }
+
+    const compressed = await this.tryCompressChat(prompt_id, false);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -525,6 +515,34 @@ export class GeminiClient {
         return turn;
       }
       yield event;
+
+      this.updateTelemetryTokenCount();
+
+      if (event.type === GeminiEventType.InvalidStream) {
+        if (this.config.getContinueOnFailedApiCall()) {
+          if (isInvalidStreamRetry) {
+            // We already retried once, so stop here.
+            logContentRetryFailure(
+              this.config,
+              new ContentRetryFailureEvent(
+                4, // 2 initial + 2 after injections
+                'FAILED_AFTER_PROMPT_INJECTION',
+                modelToUse,
+              ),
+            );
+            return turn;
+          }
+          const nextRequest = [{ text: 'System: Please continue.' }];
+          yield* this.sendMessageStream(
+            nextRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+            true, // Set isInvalidStreamRetry to true
+          );
+          return turn;
+        }
+      }
       if (event.type === GeminiEventType.Error) {
         return turn;
       }
@@ -541,8 +559,9 @@ export class GeminiClient {
 
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
-        this,
+        this.config.getBaseLlmClient(),
         signal,
+        prompt_id,
       );
       logNextSpeakerCheck(
         this.config,
@@ -561,130 +580,11 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
+          // isInvalidStreamRetry is false here, as this is a next speaker check
         );
       }
     }
     return turn;
-  }
-
-  async generateJson(
-    contents: Content[],
-    schema: Record<string, unknown>,
-    abortSignal: AbortSignal,
-    model: string,
-    config: GenerateContentConfig = {},
-  ): Promise<Record<string, unknown>> {
-    let currentAttemptModel: string = model;
-
-    try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
-      const requestConfig = {
-        abortSignal,
-        ...this.generateContentConfig,
-        ...config,
-      };
-
-      const apiCall = () => {
-        const modelToUse = this.config.isInFallbackMode()
-          ? DEFAULT_GEMINI_FLASH_MODEL
-          : model;
-        currentAttemptModel = modelToUse;
-
-        return this.getContentGeneratorOrFail().generateContent(
-          {
-            model: modelToUse,
-            config: {
-              ...requestConfig,
-              systemInstruction,
-              responseJsonSchema: schema,
-              responseMimeType: 'application/json',
-            },
-            contents,
-          },
-          this.lastPromptId,
-        );
-      };
-
-      const onPersistent429Callback = async (
-        authType?: string,
-        error?: unknown,
-      ) =>
-        // Pass the captured model to the centralized handler.
-        await handleFallback(this.config, currentAttemptModel, authType, error);
-
-      const result = await retryWithBackoff(apiCall, {
-        onPersistent429: onPersistent429Callback,
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
-
-      let text = getResponseText(result);
-      if (!text) {
-        const error = new Error(
-          'API returned an empty response for generateJson.',
-        );
-        await reportError(
-          error,
-          'Error in generateJson: API returned an empty response.',
-          contents,
-          'generateJson-empty-response',
-        );
-        throw error;
-      }
-
-      const prefix = '```json';
-      const suffix = '```';
-      if (text.startsWith(prefix) && text.endsWith(suffix)) {
-        logMalformedJsonResponse(
-          this.config,
-          new MalformedJsonResponseEvent(currentAttemptModel),
-        );
-        text = text
-          .substring(prefix.length, text.length - suffix.length)
-          .trim();
-      }
-
-      try {
-        return JSON.parse(text);
-      } catch (parseError) {
-        await reportError(
-          parseError,
-          'Failed to parse JSON response from generateJson.',
-          {
-            responseTextFailedToParse: text,
-            originalRequestContents: contents,
-          },
-          'generateJson-parse',
-        );
-        throw new Error(
-          `Failed to parse API response as JSON: ${getErrorMessage(
-            parseError,
-          )}`,
-        );
-      }
-    } catch (error) {
-      if (abortSignal.aborted) {
-        throw error;
-      }
-
-      // Avoid double reporting for the empty response case handled above
-      if (
-        error instanceof Error &&
-        error.message === 'API returned an empty response for generateJson.'
-      ) {
-        throw error;
-      }
-
-      await reportError(
-        error,
-        'Error generating JSON content via API.',
-        contents,
-        'generateJson-api',
-      );
-      throw new Error(
-        `Failed to generate JSON content: ${getErrorMessage(error)}`,
-      );
-    }
   }
 
   async generateContent(
@@ -702,7 +602,7 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
 
       const requestConfig: GenerateContentConfig = {
         abortSignal,
@@ -757,208 +657,37 @@ export class GeminiClient {
     }
   }
 
-  async generateEmbedding(texts: string[]): Promise<number[][]> {
-    if (!texts || texts.length === 0) {
-      return [];
-    }
-    const embedModelParams: EmbedContentParameters = {
-      model: this.config.getEmbeddingModel(),
-      contents: texts,
-    };
-
-    const embedContentResponse =
-      await this.getContentGeneratorOrFail().embedContent(embedModelParams);
-    if (
-      !embedContentResponse.embeddings ||
-      embedContentResponse.embeddings.length === 0
-    ) {
-      throw new Error('No embeddings found in API response.');
-    }
-
-    if (embedContentResponse.embeddings.length !== texts.length) {
-      throw new Error(
-        `API returned a mismatched number of embeddings. Expected ${texts.length}, got ${embedContentResponse.embeddings.length}.`,
-      );
-    }
-
-    return embedContentResponse.embeddings.map((embedding, index) => {
-      const values = embedding.values;
-      if (!values || values.length === 0) {
-        throw new Error(
-          `API returned an empty embedding for input text at index ${index}: "${texts[index]}"`,
-        );
-      }
-      return values;
-    });
-  }
-
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
-    request?: PartListUnion,
   ): Promise<ChatCompressionInfo> {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
     // before the model is chosen would result in an error.
-    const configModel = this.config.getModel();
-    let model: string =
-      configModel === DEFAULT_GEMINI_MODEL_AUTO
-        ? DEFAULT_GEMINI_MODEL
-        : configModel;
+    const model = this._getEffectiveModelForCurrentTurn();
 
-    // Check if the model needs to be a fallback
-    model = getEffectiveModel(this.config.isInFallbackMode(), model);
+    const { newHistory, info } = await this.compressionService.compress(
+      this.getChat(),
+      prompt_id,
+      force,
+      model,
+      this.config,
+      this.hasFailedCompressionAttempt,
+    );
 
-    const curatedHistory = this.getChat().getHistory(true);
-
-    if (request) {
-      curatedHistory.push(createUserContent(request));
-    }
-
-    // Regardless of `force`, don't do anything if the history is empty.
     if (
-      curatedHistory.length === 0 ||
-      (this.hasFailedCompressionAttempt && !force)
+      info.compressionStatus ===
+      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
     ) {
-      return {
-        originalTokenCount: 0,
-        newTokenCount: 0,
-        compressionStatus: CompressionStatus.NOOP,
-      };
-    }
-
-    const { totalTokens: originalTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        model,
-        contents: curatedHistory,
-      });
-    if (originalTokenCount === undefined) {
-      console.warn(`Could not determine token count for model ${model}.`);
       this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount: 0,
-        newTokenCount: 0,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
-
-    const contextPercentageThreshold =
-      this.config.getChatCompression()?.contextPercentageThreshold;
-
-    // Don't compress if not forced and we are under the limit.
-    if (!force) {
-      const threshold =
-        contextPercentageThreshold ?? COMPRESSION_TOKEN_THRESHOLD;
-      if (originalTokenCount < threshold * tokenLimit(model)) {
-        return {
-          originalTokenCount,
-          newTokenCount: originalTokenCount,
-          compressionStatus: CompressionStatus.NOOP,
-        };
+    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+      if (newHistory) {
+        this.chat = await this.startChat(newHistory);
+        this.updateTelemetryTokenCount();
+        this.forceFullIdeContext = true;
       }
     }
 
-    let compressBeforeIndex = findIndexAfterFraction(
-      curatedHistory,
-      1 - COMPRESSION_PRESERVE_THRESHOLD,
-    );
-    // Find the first user message after the index. This is the start of the next turn.
-    while (
-      compressBeforeIndex < curatedHistory.length &&
-      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
-        isFunctionResponse(curatedHistory[compressBeforeIndex]))
-    ) {
-      compressBeforeIndex++;
-    }
-
-    const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
-    const historyToKeep = curatedHistory.slice(compressBeforeIndex);
-
-    const summaryResponse = await this.config
-      .getContentGenerator()
-      .generateContent(
-        {
-          model,
-          contents: [
-            ...historyToCompress,
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
-                },
-              ],
-            },
-          ],
-          config: {
-            systemInstruction: { text: getCompressionPrompt() },
-          },
-        },
-        prompt_id,
-      );
-    const summary = getResponseText(summaryResponse) ?? '';
-
-    const chat = await this.startChat([
-      {
-        role: 'user',
-        parts: [{ text: summary }],
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the additional context!' }],
-      },
-      ...historyToKeep,
-    ]);
-    this.forceFullIdeContext = true;
-
-    const { totalTokens: newTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        // model might change after calling `sendMessage`, so we get the newest value from config
-        model: this.config.getModel(),
-        contents: chat.getHistory(),
-      });
-    if (newTokenCount === undefined) {
-      console.warn('Could not determine compressed history token count.');
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount,
-        newTokenCount: originalTokenCount,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
-
-    logChatCompression(
-      this.config,
-      makeChatCompressionEvent({
-        tokens_before: originalTokenCount,
-        tokens_after: newTokenCount,
-      }),
-    );
-
-    if (newTokenCount > originalTokenCount) {
-      this.getChat().setHistory(curatedHistory);
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount,
-        newTokenCount,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
-      };
-    } else {
-      this.chat = chat; // Chat compression successful, set new state.
-    }
-
-    return {
-      originalTokenCount,
-      newTokenCount,
-      compressionStatus: CompressionStatus.COMPRESSED,
-    };
+    return info;
   }
 }
-
-export const TEST_ONLY = {
-  COMPRESSION_PRESERVE_THRESHOLD,
-  COMPRESSION_TOKEN_THRESHOLD,
-};

@@ -36,6 +36,14 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
+interface EditFileParameterSchema {
+  properties: {
+    file_path: {
+      description: string;
+    };
+  };
+}
+
 import type { Mock } from 'vitest';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { EditToolParams } from './edit.js';
@@ -47,7 +55,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { Content, Part, SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
@@ -58,6 +66,7 @@ describe('EditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let baseLlmClient: any;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -69,8 +78,13 @@ describe('EditTool', () => {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
+    baseLlmClient = {
+      generateJson: vi.fn(),
+    };
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
@@ -85,7 +99,7 @@ describe('EditTool', () => {
       getSandbox: () => false,
       getDebugMode: () => false,
       getQuestion: () => undefined,
-      getFullContext: () => false,
+
       getToolDiscoveryCommand: () => undefined,
       getToolCallCommand: () => undefined,
       getMcpServerCommand: () => undefined,
@@ -424,11 +438,12 @@ describe('EditTool', () => {
       // Set a specific mock for this test case
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
-        async (_, content, p, client) => {
+        async (_, content, p, client, baseClient) => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
           expect(client).toBe(geminiClient);
+          expect(baseClient).toBe(baseLlmClient);
           return {
             params: {
               file_path: filePath,
@@ -463,6 +478,34 @@ describe('EditTool', () => {
         correctedNewString, // This was the string identified by ensureCorrectEdit as the replacement
       );
       expect(patchedContent).toBe(expectedFinalContent);
+    });
+
+    it('should rethrow calculateEdit errors when the abort signal is triggered', async () => {
+      const filePath = path.join(rootDir, 'abort-confirmation.txt');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const abortController = new AbortController();
+      const abortError = new Error('Abort requested');
+
+      const calculateSpy = vi
+        .spyOn(invocation as any, 'calculateEdit')
+        .mockImplementation(async () => {
+          if (!abortController.signal.aborted) {
+            abortController.abort();
+          }
+          throw abortError;
+        });
+
+      await expect(
+        invocation.shouldConfirmExecute(abortController.signal),
+      ).rejects.toBe(abortError);
+
+      calculateSpy.mockRestore();
     });
   });
 
@@ -506,6 +549,33 @@ describe('EditTool', () => {
       expect(() => tool.build(params)).toThrow(
         /The 'file_path' parameter must be non-empty./,
       );
+    });
+
+    it('should reject when calculateEdit fails after an abort signal', async () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'abort-execute.txt'),
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const abortController = new AbortController();
+      const abortError = new Error('Abort requested during execute');
+
+      const calculateSpy = vi
+        .spyOn(invocation as any, 'calculateEdit')
+        .mockImplementation(async () => {
+          if (!abortController.signal.aborted) {
+            abortController.abort();
+          }
+          throw abortError;
+        });
+
+      await expect(invocation.execute(abortController.signal)).rejects.toBe(
+        abortError,
+      );
+
+      calculateSpy.mockRestore();
     });
 
     it('should edit an existing file and return diff with fileName', async () => {
@@ -963,6 +1033,38 @@ describe('EditTool', () => {
     });
   });
 
+  describe('constructor', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should use windows-style path examples on windows', () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+
+      const tool = new EditTool({} as unknown as Config);
+      const schema = tool.schema;
+      expect(
+        (schema.parametersJsonSchema as EditFileParameterSchema).properties
+          .file_path.description,
+      ).toBe(
+        "The absolute path to the file to modify (e.g., 'C:\\Users\\project\\file.txt'). Must be an absolute path.",
+      );
+    });
+
+    it('should use unix-style path examples on non-windows platforms', () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+
+      const tool = new EditTool({} as unknown as Config);
+      const schema = tool.schema;
+      expect(
+        (schema.parametersJsonSchema as EditFileParameterSchema).properties
+          .file_path.description,
+      ).toBe(
+        "The absolute path to the file to modify (e.g., '/home/user/project/file.txt'). Must start with '/'.",
+      );
+    });
+  });
+
   describe('IDE mode', () => {
     const testFile = 'edit_me.txt';
     let filePath: string;
@@ -1010,6 +1112,91 @@ describe('EditTool', () => {
 
       expect(params.old_string).toBe(initialContent);
       expect(params.new_string).toBe(modifiedContent);
+    });
+  });
+
+  describe('multiple file edits', () => {
+    it('should perform multiple removals and report correct diff stats', async () => {
+      const numFiles = 10;
+      const files: Array<{
+        path: string;
+        initialContent: string;
+        toRemove: string;
+      }> = [];
+      const expectedLinesRemoved: number[] = [];
+      const actualLinesRemoved: number[] = [];
+
+      // 1. Create 10 files with 5-10 lines each
+      for (let i = 0; i < numFiles; i++) {
+        const fileName = `test-file-${i}.txt`;
+        const filePath = path.join(rootDir, fileName);
+        const numLines = Math.floor(Math.random() * 6) + 5; // 5 to 10 lines
+        const lines = Array.from(
+          { length: numLines },
+          (_, j) => `File ${i}, Line ${j + 1}`,
+        );
+        const content = lines.join('\n') + '\n';
+
+        // Determine which lines to remove (2 or 3 lines)
+        const numLinesToRemove = Math.floor(Math.random() * 2) + 2; // 2 or 3
+        expectedLinesRemoved.push(numLinesToRemove);
+        const startLineToRemove = 1; // Start removing from the second line
+        const linesToRemove = lines.slice(
+          startLineToRemove,
+          startLineToRemove + numLinesToRemove,
+        );
+        const toRemove = linesToRemove.join('\n') + '\n';
+
+        fs.writeFileSync(filePath, content, 'utf8');
+        files.push({
+          path: filePath,
+          initialContent: content,
+          toRemove,
+        });
+      }
+
+      // 2. Create and execute 10 tool calls for removal
+      for (const file of files) {
+        const params: EditToolParams = {
+          file_path: file.path,
+          old_string: file.toRemove,
+          new_string: '', // Removing the content
+        };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
+
+        if (
+          result.returnDisplay &&
+          typeof result.returnDisplay === 'object' &&
+          'diffStat' in result.returnDisplay &&
+          result.returnDisplay.diffStat
+        ) {
+          actualLinesRemoved.push(
+            result.returnDisplay.diffStat?.model_removed_lines,
+          );
+        } else if (result.error) {
+          console.error(`Edit failed for ${file.path}:`, result.error);
+        }
+      }
+
+      // 3. Assert that the content was removed from each file
+      for (const file of files) {
+        const finalContent = fs.readFileSync(file.path, 'utf8');
+        const expectedContent = file.initialContent.replace(file.toRemove, '');
+        expect(finalContent).toBe(expectedContent);
+        expect(finalContent).not.toContain(file.toRemove);
+      }
+
+      // 4. Assert that the total number of removed lines matches the diffStat total
+      const totalExpectedRemoved = expectedLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      const totalActualRemoved = actualLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      expect(totalActualRemoved).toBe(totalExpectedRemoved);
     });
   });
 });

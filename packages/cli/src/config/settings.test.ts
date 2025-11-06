@@ -30,7 +30,9 @@ vi.mock('./settings.js', async (importActual) => {
 
 // Mock trustedFolders
 vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi.fn(),
+  isWorkspaceTrusted: vi
+    .fn()
+    .mockReturnValue({ isTrusted: true, source: 'file' }),
 }));
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
@@ -44,7 +46,6 @@ import {
   afterEach,
   type Mocked,
   type Mock,
-  fail,
 } from 'vitest';
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
@@ -56,19 +57,24 @@ import {
   USER_SETTINGS_PATH, // This IS the mocked path.
   getSystemSettingsPath,
   getSystemDefaultsPath,
-  SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   migrateSettingsToV1,
   needsMigration,
   type Settings,
   loadEnvironment,
+  migrateDeprecatedSettings,
+  SettingScope,
+  saveSettings,
+  type SettingsFile,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import { ExtensionManager } from './extension-manager.js';
+import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
-// Use the (mocked) SETTINGS_DIRECTORY_NAME for consistency
+// Use the (mocked) GEMINI_DIR for consistency
 const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
   MOCK_WORKSPACE_DIR,
-  SETTINGS_DIRECTORY_NAME,
+  GEMINI_DIR,
   'settings.json',
 );
 
@@ -89,6 +95,25 @@ vi.mock('fs', async (importOriginal) => {
     realpathSync: (p: string) => p,
   };
 });
+
+vi.mock('./extension.js');
+
+const mockCoreEvents = vi.hoisted(() => ({
+  emitFeedback: vi.fn(),
+}));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    coreEvents: mockCoreEvents,
+  };
+});
+
+vi.mock('../utils/commentJson.js', () => ({
+  updateSettingsFilePreservingFormat: vi.fn(),
+}));
 
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
@@ -113,7 +138,10 @@ describe('Settings Loading and Merging', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     (fs.readFileSync as Mock).mockReturnValue('{}'); // Return valid empty JSON
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 
   afterEach(() => {
@@ -600,6 +628,40 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
     });
 
+    it('should not allow user or workspace to override system disableYoloMode', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        security: {
+          disableYoloMode: false,
+        },
+      };
+      const workspaceSettingsContent = {
+        security: {
+          disableYoloMode: false, // This should be ignored
+        },
+      };
+      const systemSettingsContent = {
+        security: {
+          disableYoloMode: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
+    });
+
     it('should handle contextFileName correctly when only in user settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
@@ -1042,15 +1104,15 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
-    it('should merge chatCompression settings, with workspace taking precedence', () => {
+    it('should merge compressionThreshold settings, with workspace taking precedence', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.5 } },
+        model: { compressionThreshold: 0.5 },
       };
       const workspaceSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.8 } },
+        model: { compressionThreshold: 0.8 },
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -1064,18 +1126,12 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      const e = settings.user.settings.model?.chatCompression;
-      console.log(e);
 
-      expect(settings.user.settings.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.5,
-      });
-      expect(settings.workspace.settings.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.8,
-      });
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.8,
-      });
+      expect(settings.user.settings.model?.compressionThreshold).toEqual(0.5);
+      expect(settings.workspace.settings.model?.compressionThreshold).toEqual(
+        0.8,
+      );
+      expect(settings.merged.model?.compressionThreshold).toEqual(0.8);
     });
 
     it('should merge output format settings, with workspace taking precedence', () => {
@@ -1102,13 +1158,13 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.output?.format).toBe('json');
     });
 
-    it('should handle chatCompression when only in user settings', () => {
+    it('should handle compressionThreshold when only in user settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
       const userSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.5 } },
+        model: { compressionThreshold: 0.5 },
       };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
@@ -1119,9 +1175,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.5,
-      });
+      expect(settings.merged.model?.compressionThreshold).toEqual(0.5);
     });
 
     it('should have model as undefined if not in any settings file', () => {
@@ -1131,39 +1185,15 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.model).toBeUndefined();
     });
 
-    it('should ignore chatCompression if contextPercentageThreshold is invalid', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
-      );
-      const userSettingsContent = {
-        general: {},
-        model: { chatCompression: { contextPercentageThreshold: 1.5 } },
-      };
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 1.5,
-      });
-      warnSpy.mockRestore();
-    });
-
-    it('should deep merge chatCompression settings', () => {
+    it('should use user compressionThreshold if workspace does not define it', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         general: {},
-        model: { chatCompression: { contextPercentageThreshold: 0.5 } },
+        model: { compressionThreshold: 0.5 },
       };
       const workspaceSettingsContent = {
         general: {},
-        model: { chatCompression: {} },
+        model: {},
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -1178,9 +1208,7 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.merged.model?.chatCompression).toEqual({
-        contextPercentageThreshold: 0.5,
-      });
+      expect(settings.merged.model?.compressionThreshold).toEqual(0.5);
     });
 
     it('should merge includeDirectories from all scopes', () => {
@@ -1255,7 +1283,7 @@ describe('Settings Loading and Merging', () => {
 
       try {
         loadSettings(MOCK_WORKSPACE_DIR);
-        fail('loadSettings should have thrown a FatalConfigError');
+        throw new Error('loadSettings should have thrown a FatalConfigError');
       } catch (e) {
         expect(e).toBeInstanceOf(FatalConfigError);
         const error = e as FatalConfigError;
@@ -1325,9 +1353,10 @@ describe('Settings Loading and Merging', () => {
       expect((settings.workspace.settings as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
-      expect(
-        (settings.workspace.settings as TestSettings)['nested']['value'],
-      ).toBe('workspace_endpoint_from_env');
+      const nested = (settings.workspace.settings as TestSettings)[
+        'nested'
+      ] as Record<string, unknown>;
+      expect(nested['value']).toBe('workspace_endpoint_from_env');
       expect((settings.merged as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
@@ -1575,21 +1604,14 @@ describe('Settings Loading and Merging', () => {
         (settings.user.settings as TestSettings)['undefinedVal'],
       ).toBeUndefined();
 
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNull'],
-      ).toBeNull();
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedBool'],
-      ).toBe(true);
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNum'],
-      ).toBe(0);
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedString'],
-      ).toBe('literal');
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['anotherEnv'],
-      ).toBe('env_string_nested_value');
+      const nestedObj = (settings.user.settings as TestSettings)[
+        'nestedObj'
+      ] as Record<string, unknown>;
+      expect(nestedObj['nestedNull']).toBeNull();
+      expect(nestedObj['nestedBool']).toBe(true);
+      expect(nestedObj['nestedNum']).toBe(0);
+      expect(nestedObj['nestedString']).toBe('literal');
+      expect(nestedObj['anotherEnv']).toBe('env_string_nested_value');
 
       delete process.env['MY_ENV_STRING'];
       delete process.env['MY_ENV_STRING_NESTED'];
@@ -1836,7 +1858,10 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should NOT merge workspace settings when workspace is not trusted', () => {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         ui: { theme: 'dark' },
@@ -1968,9 +1993,6 @@ describe('Settings Loading and Merging', () => {
         },
         model: {
           name: 'gemini-pro',
-          chatCompression: {
-            contextPercentageThreshold: 0.5,
-          },
         },
         mcpServers: {
           'server-1': {
@@ -1989,9 +2011,6 @@ describe('Settings Loading and Merging', () => {
           myTheme: {},
         },
         model: 'gemini-pro',
-        chatCompression: {
-          contextPercentageThreshold: 0.5,
-        },
         mcpServers: {
           'server-1': {
             command: 'node server.js',
@@ -2031,9 +2050,6 @@ describe('Settings Loading and Merging', () => {
         },
         model: {
           name: 'gemini-pro',
-          chatCompression: {
-            contextPercentageThreshold: 0.8,
-          },
         },
         context: {
           fileName: 'CONTEXT.md',
@@ -2073,9 +2089,6 @@ describe('Settings Loading and Merging', () => {
         theme: 'dark',
         usageStatisticsEnabled: false,
         model: 'gemini-pro',
-        chatCompression: {
-          contextPercentageThreshold: 0.8,
-        },
         contextFileName: 'CONTEXT.md',
         includeDirectories: ['/src'],
         sandbox: true,
@@ -2102,7 +2115,7 @@ describe('Settings Loading and Merging', () => {
         },
         ui: {},
         model: {
-          name: 'gemini-1.5-pro',
+          name: 'gemini-2.5-pro',
         },
         unrecognized: 'value',
       };
@@ -2111,7 +2124,7 @@ describe('Settings Loading and Merging', () => {
 
       expect(v1Settings).toEqual({
         vimMode: false,
-        model: 'gemini-1.5-pro',
+        model: 'gemini-2.5-pro',
         unrecognized: 'value',
       });
     });
@@ -2122,14 +2135,14 @@ describe('Settings Loading and Merging', () => {
           vimMode: false,
         },
         model: {
-          maxSessionTurns: 0,
+          maxSessionTurns: -1,
         },
         context: {
           includeDirectories: [],
         },
         security: {
           folderTrust: {
-            enabled: null,
+            enabled: undefined,
           },
         },
       };
@@ -2138,9 +2151,13 @@ describe('Settings Loading and Merging', () => {
 
       expect(v1Settings).toEqual({
         vimMode: false,
-        maxSessionTurns: 0,
+        maxSessionTurns: -1,
         includeDirectories: [],
-        folderTrust: null,
+        security: {
+          folderTrust: {
+            enabled: undefined,
+          },
+        },
       });
     });
 
@@ -2193,6 +2210,18 @@ describe('Settings Loading and Merging', () => {
         allowMCPServers: ['serverA'],
       });
     });
+
+    it('should correctly migrate customWittyPhrases', () => {
+      const v2Settings: Partial<Settings> = {
+        ui: {
+          customWittyPhrases: ['test phrase'],
+        },
+      };
+      const v1Settings = migrateSettingsToV1(v2Settings as Settings);
+      expect(v1Settings).toEqual({
+        customWittyPhrases: ['test phrase'],
+      });
+    });
   });
 
   describe('loadEnvironment', () => {
@@ -2203,7 +2232,10 @@ describe('Settings Loading and Merging', () => {
       delete process.env['TESTTEST']; // reset
       const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
 
-      vi.mocked(isWorkspaceTrusted).mockReturnValue(isWorkspaceTrustedValue);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: isWorkspaceTrustedValue,
+        source: 'file',
+      });
       (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
         [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
       );
@@ -2251,7 +2283,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should return false for settings that are already in V2 format', () => {
-      const v2Settings = {
+      const v2Settings: Partial<Settings> = {
         ui: {
           theme: 'dark',
         },
@@ -2309,6 +2341,200 @@ describe('Settings Loading and Merging', () => {
         someUnrecognizedKey: 'value',
       };
       expect(needsMigration(settings)).toBe(false);
+    });
+  });
+
+  describe('migrateDeprecatedSettings', () => {
+    let mockFsExistsSync: Mock;
+    let mockFsReadFileSync: Mock;
+
+    beforeEach(() => {
+      vi.resetAllMocks();
+      mockFsExistsSync = vi.mocked(fs.existsSync);
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      mockFsReadFileSync = vi.mocked(fs.readFileSync);
+      mockFsReadFileSync.mockReturnValue('{}');
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: undefined,
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should migrate disabled extensions from user and workspace settings', () => {
+      const userSettingsContent = {
+        extensions: {
+          disabled: ['user-ext-1', 'shared-ext'],
+        },
+      };
+      const workspaceSettingsContent = {
+        extensions: {
+          disabled: ['workspace-ext-1', 'shared-ext'],
+        },
+      };
+
+      (mockFsReadFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        settings: loadedSettings.merged,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+      const mockDisableExtension = vi.spyOn(
+        extensionManager,
+        'disableExtension',
+      );
+      mockDisableExtension.mockImplementation(async () => {});
+
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
+
+      // Check user settings migration
+      expect(mockDisableExtension).toHaveBeenCalledWith(
+        'user-ext-1',
+        SettingScope.User,
+      );
+      expect(mockDisableExtension).toHaveBeenCalledWith(
+        'shared-ext',
+        SettingScope.User,
+      );
+
+      // Check workspace settings migration
+      expect(mockDisableExtension).toHaveBeenCalledWith(
+        'workspace-ext-1',
+        SettingScope.Workspace,
+      );
+      expect(mockDisableExtension).toHaveBeenCalledWith(
+        'shared-ext',
+        SettingScope.Workspace,
+      );
+
+      // Check that setValue was called to remove the deprecated setting
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'extensions',
+        {
+          disabled: undefined,
+        },
+      );
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'extensions',
+        {
+          disabled: undefined,
+        },
+      );
+    });
+
+    it('should not do anything if there are no deprecated settings', () => {
+      const userSettingsContent = {
+        extensions: {
+          enabled: ['user-ext-1'],
+        },
+      };
+      const workspaceSettingsContent = {
+        someOtherSetting: 'value',
+      };
+
+      (mockFsReadFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+      const extensionManager = new ExtensionManager({
+        settings: loadedSettings.merged,
+        workspaceDir: MOCK_WORKSPACE_DIR,
+        requestConsent: vi.fn(),
+        requestSetting: vi.fn(),
+      });
+      const mockDisableExtension = vi.spyOn(
+        extensionManager,
+        'disableExtension',
+      );
+      mockDisableExtension.mockImplementation(async () => {});
+
+      migrateDeprecatedSettings(loadedSettings, extensionManager);
+
+      expect(mockDisableExtension).not.toHaveBeenCalled();
+      expect(setValueSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveSettings', () => {
+    it('should save settings using updateSettingsFilePreservingFormat', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const settingsFile = {
+        path: '/mock/settings.json',
+        settings: { ui: { theme: 'dark' } },
+        originalSettings: { ui: { theme: 'dark' } },
+      } as unknown as SettingsFile;
+
+      saveSettings(settingsFile);
+
+      expect(mockUpdateSettings).toHaveBeenCalledWith('/mock/settings.json', {
+        ui: { theme: 'dark' },
+      });
+    });
+
+    it('should create directory if it does not exist', () => {
+      const mockFsExistsSync = vi.mocked(fs.existsSync);
+      const mockFsMkdirSync = vi.mocked(fs.mkdirSync);
+      mockFsExistsSync.mockReturnValue(false);
+
+      const settingsFile = {
+        path: '/mock/new/dir/settings.json',
+        settings: {},
+        originalSettings: {},
+      } as unknown as SettingsFile;
+
+      saveSettings(settingsFile);
+
+      expect(mockFsExistsSync).toHaveBeenCalledWith('/mock/new/dir');
+      expect(mockFsMkdirSync).toHaveBeenCalledWith('/mock/new/dir', {
+        recursive: true,
+      });
+    });
+
+    it('should emit error feedback if saving fails', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const error = new Error('Write failed');
+      mockUpdateSettings.mockImplementation(() => {
+        throw error;
+      });
+
+      const settingsFile = {
+        path: '/mock/settings.json',
+        settings: {},
+        originalSettings: {},
+      } as unknown as SettingsFile;
+
+      saveSettings(settingsFile);
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'There was an error saving your latest settings changes.',
+        error,
+      );
     });
   });
 });

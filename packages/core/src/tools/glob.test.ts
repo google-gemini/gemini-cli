@@ -242,101 +242,70 @@ describe('GlobTool', () => {
   });
 
   describe('validateToolParams', () => {
-    it('should return null for valid parameters (pattern only)', () => {
-      const params: GlobToolParams = { pattern: '*.js' };
-      expect(globTool.validateToolParams(params)).toBeNull();
-    });
-
-    it('should return null for valid parameters (pattern and path)', () => {
-      const params: GlobToolParams = { pattern: '*.js', path: 'sub' };
-      expect(globTool.validateToolParams(params)).toBeNull();
-    });
-
-    it('should return null for valid parameters (pattern, path, and case_sensitive)', () => {
-      const params: GlobToolParams = {
-        pattern: '*.js',
-        path: 'sub',
-        case_sensitive: true,
-      };
-      expect(globTool.validateToolParams(params)).toBeNull();
-    });
-
-    it('should return error if pattern is missing (schema validation)', () => {
-      // Need to correctly define this as an object without pattern
-      const params = { path: '.' };
+    it.each([
+      {
+        name: 'should return null for valid parameters (pattern only)',
+        params: { pattern: '*.js' },
+        expected: null,
+      },
+      {
+        name: 'should return null for valid parameters (pattern and path)',
+        params: { pattern: '*.js', path: 'sub' },
+        expected: null,
+      },
+      {
+        name: 'should return null for valid parameters (pattern, path, and case_sensitive)',
+        params: { pattern: '*.js', path: 'sub', case_sensitive: true },
+        expected: null,
+      },
+      {
+        name: 'should return error if pattern is missing (schema validation)',
+        params: { path: '.' },
+        expected: `params must have required property 'pattern'`,
+      },
+      {
+        name: 'should return error if pattern is an empty string',
+        params: { pattern: '' },
+        expected: "The 'pattern' parameter cannot be empty.",
+      },
+      {
+        name: 'should return error if pattern is only whitespace',
+        params: { pattern: '   ' },
+        expected: "The 'pattern' parameter cannot be empty.",
+      },
+      {
+        name: 'should return error if path is not a string (schema validation)',
+        params: { pattern: '*.ts', path: 123 },
+        expected: 'params/path must be string',
+      },
+      {
+        name: 'should return error if case_sensitive is not a boolean (schema validation)',
+        params: { pattern: '*.ts', case_sensitive: 'true' },
+        expected: 'params/case_sensitive must be boolean',
+      },
+      {
+        name: "should return error if search path resolves outside the tool's root directory",
+        params: { pattern: '*.txt', path: '../../../../../../../../../../tmp' },
+        expected: 'resolves outside the allowed workspace directories',
+      },
+      {
+        name: 'should return error if specified search path does not exist',
+        params: { pattern: '*.txt', path: 'nonexistent_subdir' },
+        expected: 'Search path does not exist',
+      },
+      {
+        name: 'should return error if specified search path is a file, not a directory',
+        params: { pattern: '*.txt', path: 'fileA.txt' },
+        expected: 'Search path is not a directory',
+      },
+    ])('$name', ({ params, expected }) => {
       // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toBe(
-        `params must have required property 'pattern'`,
-      );
-    });
-
-    it('should return error if pattern is an empty string', () => {
-      const params: GlobToolParams = { pattern: '' };
-      expect(globTool.validateToolParams(params)).toContain(
-        "The 'pattern' parameter cannot be empty.",
-      );
-    });
-
-    it('should return error if pattern is only whitespace', () => {
-      const params: GlobToolParams = { pattern: '   ' };
-      expect(globTool.validateToolParams(params)).toContain(
-        "The 'pattern' parameter cannot be empty.",
-      );
-    });
-
-    it('should return error if path is provided but is not a string (schema validation)', () => {
-      const params = {
-        pattern: '*.ts',
-        path: 123,
-      };
-      // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toBe(
-        'params/path must be string',
-      );
-    });
-
-    it('should return error if case_sensitive is provided but is not a boolean (schema validation)', () => {
-      const params = {
-        pattern: '*.ts',
-        case_sensitive: 'true',
-      };
-      // @ts-expect-error - We're intentionally creating invalid params for testing
-      expect(globTool.validateToolParams(params)).toBe(
-        'params/case_sensitive must be boolean',
-      );
-    });
-
-    it("should return error if search path resolves outside the tool's root directory", () => {
-      // Create a globTool instance specifically for this test, with a deeper root
-      tempRootDir = path.join(tempRootDir, 'sub');
-      const specificGlobTool = new GlobTool(mockConfig);
-      // const params: GlobToolParams = { pattern: '*.txt', path: '..' }; // This line is unused and will be removed.
-      // This should be fine as tempRootDir is still within the original tempRootDir (the parent of deeperRootDir)
-      // Let's try to go further up.
-      const paramsOutside: GlobToolParams = {
-        pattern: '*.txt',
-        path: '../../../../../../../../../../tmp', // Definitely outside
-      };
-      expect(specificGlobTool.validateToolParams(paramsOutside)).toContain(
-        'resolves outside the allowed workspace directories',
-      );
-    });
-
-    it('should return error if specified search path does not exist', async () => {
-      const params: GlobToolParams = {
-        pattern: '*.txt',
-        path: 'nonexistent_subdir',
-      };
-      expect(globTool.validateToolParams(params)).toContain(
-        'Search path does not exist',
-      );
-    });
-
-    it('should return error if specified search path is a file, not a directory', async () => {
-      const params: GlobToolParams = { pattern: '*.txt', path: 'fileA.txt' };
-      expect(globTool.validateToolParams(params)).toContain(
-        'Search path is not a directory',
-      );
+      const result = globTool.validateToolParams(params);
+      if (expected === null) {
+        expect(result).toBeNull();
+      } else {
+        expect(result).toContain(expected);
+      }
     });
   });
 
@@ -373,85 +342,84 @@ describe('GlobTool', () => {
   });
 
   describe('ignore file handling', () => {
-    it('should respect .gitignore files by default', async () => {
-      await fs.writeFile(path.join(tempRootDir, '.gitignore'), '*.ignored.txt');
-      await fs.writeFile(
-        path.join(tempRootDir, 'a.ignored.txt'),
-        'ignored content',
-      );
-      await fs.writeFile(
-        path.join(tempRootDir, 'b.notignored.txt'),
-        'not ignored content',
-      );
+    interface IgnoreFileTestCase {
+      name: string;
+      ignoreFile: { name: string; content: string };
+      filesToCreate: string[];
+      globToolParams: GlobToolParams;
+      expectedCountMessage: string;
+      expectedToContain?: string[];
+      notExpectedToContain?: string[];
+    }
 
-      const params: GlobToolParams = { pattern: '*.txt' };
-      const invocation = globTool.build(params);
-      const result = await invocation.execute(abortSignal);
+    it.each<IgnoreFileTestCase>([
+      {
+        name: 'should respect .gitignore files by default',
+        ignoreFile: { name: '.gitignore', content: '*.ignored.txt' },
+        filesToCreate: ['a.ignored.txt', 'b.notignored.txt'],
+        globToolParams: { pattern: '*.txt' },
+        expectedCountMessage: 'Found 3 file(s)',
+        notExpectedToContain: ['a.ignored.txt'],
+      },
+      {
+        name: 'should respect .geminiignore files by default',
+        ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
+        filesToCreate: ['a.geminiignored.txt', 'b.notignored.txt'],
+        globToolParams: { pattern: '*.txt' },
+        expectedCountMessage: 'Found 3 file(s)',
+        notExpectedToContain: ['a.geminiignored.txt'],
+      },
+      {
+        name: 'should not respect .gitignore when respect_git_ignore is false',
+        ignoreFile: { name: '.gitignore', content: '*.ignored.txt' },
+        filesToCreate: ['a.ignored.txt'],
+        globToolParams: { pattern: '*.txt', respect_git_ignore: false },
+        expectedCountMessage: 'Found 3 file(s)',
+        expectedToContain: ['a.ignored.txt'],
+      },
+      {
+        name: 'should not respect .geminiignore when respect_gemini_ignore is false',
+        ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
+        filesToCreate: ['a.geminiignored.txt'],
+        globToolParams: { pattern: '*.txt', respect_gemini_ignore: false },
+        expectedCountMessage: 'Found 3 file(s)',
+        expectedToContain: ['a.geminiignored.txt'],
+      },
+    ])(
+      '$name',
+      async ({
+        ignoreFile,
+        filesToCreate,
+        globToolParams,
+        expectedCountMessage,
+        expectedToContain,
+        notExpectedToContain,
+      }) => {
+        await fs.writeFile(
+          path.join(tempRootDir, ignoreFile.name),
+          ignoreFile.content,
+        );
+        for (const file of filesToCreate) {
+          await fs.writeFile(path.join(tempRootDir, file), 'content');
+        }
 
-      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, b.notignored.txt
-      expect(result.llmContent).not.toContain('a.ignored.txt');
-    });
+        const invocation = globTool.build(globToolParams);
+        const result = await invocation.execute(abortSignal);
 
-    it('should respect .geminiignore files by default', async () => {
-      await fs.writeFile(
-        path.join(tempRootDir, '.geminiignore'),
-        '*.geminiignored.txt',
-      );
-      await fs.writeFile(
-        path.join(tempRootDir, 'a.geminiignored.txt'),
-        'ignored content',
-      );
-      await fs.writeFile(
-        path.join(tempRootDir, 'b.notignored.txt'),
-        'not ignored content',
-      );
+        expect(result.llmContent).toContain(expectedCountMessage);
 
-      const params: GlobToolParams = { pattern: '*.txt' };
-      const invocation = globTool.build(params);
-      const result = await invocation.execute(abortSignal);
-
-      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, b.notignored.txt
-      expect(result.llmContent).not.toContain('a.geminiignored.txt');
-    });
-
-    it('should not respect .gitignore when respect_git_ignore is false', async () => {
-      await fs.writeFile(path.join(tempRootDir, '.gitignore'), '*.ignored.txt');
-      await fs.writeFile(
-        path.join(tempRootDir, 'a.ignored.txt'),
-        'ignored content',
-      );
-
-      const params: GlobToolParams = {
-        pattern: '*.txt',
-        respect_git_ignore: false,
-      };
-      const invocation = globTool.build(params);
-      const result = await invocation.execute(abortSignal);
-
-      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, a.ignored.txt
-      expect(result.llmContent).toContain('a.ignored.txt');
-    });
-
-    it('should not respect .geminiignore when respect_gemini_ignore is false', async () => {
-      await fs.writeFile(
-        path.join(tempRootDir, '.geminiignore'),
-        '*.geminiignored.txt',
-      );
-      await fs.writeFile(
-        path.join(tempRootDir, 'a.geminiignored.txt'),
-        'ignored content',
-      );
-
-      const params: GlobToolParams = {
-        pattern: '*.txt',
-        respect_gemini_ignore: false,
-      };
-      const invocation = globTool.build(params);
-      const result = await invocation.execute(abortSignal);
-
-      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, a.geminiignored.txt
-      expect(result.llmContent).toContain('a.geminiignored.txt');
-    });
+        if (expectedToContain) {
+          for (const file of expectedToContain) {
+            expect(result.llmContent).toContain(file);
+          }
+        }
+        if (notExpectedToContain) {
+          for (const file of notExpectedToContain) {
+            expect(result.llmContent).not.toContain(file);
+          }
+        }
+      },
+    );
   });
 });
 
@@ -464,110 +432,102 @@ describe('sortFileEntries', () => {
     mtimeMs: mtimeDate.getTime(),
   });
 
-  it('should sort a mix of recent and older files correctly', () => {
-    const recentTime1 = new Date(nowTimestamp - 1 * 60 * 60 * 1000); // 1 hour ago
-    const recentTime2 = new Date(nowTimestamp - 2 * 60 * 60 * 1000); // 2 hours ago
-    const olderTime1 = new Date(
-      nowTimestamp - (oneDayInMs + 1 * 60 * 60 * 1000),
-    ); // 25 hours ago
-    const olderTime2 = new Date(
-      nowTimestamp - (oneDayInMs + 2 * 60 * 60 * 1000),
-    ); // 26 hours ago
+  const testCases = [
+    {
+      name: 'should sort a mix of recent and older files correctly',
+      entries: [
+        {
+          name: 'older_zebra.txt',
+          mtime: new Date(nowTimestamp - (oneDayInMs + 2 * 60 * 60 * 1000)),
+        },
+        {
+          name: 'recent_alpha.txt',
+          mtime: new Date(nowTimestamp - 1 * 60 * 60 * 1000),
+        },
+        {
+          name: 'older_apple.txt',
+          mtime: new Date(nowTimestamp - (oneDayInMs + 1 * 60 * 60 * 1000)),
+        },
+        {
+          name: 'recent_beta.txt',
+          mtime: new Date(nowTimestamp - 2 * 60 * 60 * 1000),
+        },
+        {
+          name: 'older_banana.txt',
+          mtime: new Date(nowTimestamp - (oneDayInMs + 1 * 60 * 60 * 1000)),
+        },
+      ],
+      expected: [
+        'recent_alpha.txt',
+        'recent_beta.txt',
+        'older_apple.txt',
+        'older_banana.txt',
+        'older_zebra.txt',
+      ],
+    },
+    {
+      name: 'should sort only recent files by mtime descending',
+      entries: [
+        { name: 'c.txt', mtime: new Date(nowTimestamp - 2000) },
+        { name: 'a.txt', mtime: new Date(nowTimestamp - 3000) },
+        { name: 'b.txt', mtime: new Date(nowTimestamp - 1000) },
+      ],
+      expected: ['b.txt', 'c.txt', 'a.txt'],
+    },
+    {
+      name: 'should sort only older files alphabetically by path',
+      entries: [
+        { name: 'zebra.txt', mtime: new Date(nowTimestamp - 2 * oneDayInMs) },
+        { name: 'apple.txt', mtime: new Date(nowTimestamp - 2 * oneDayInMs) },
+        { name: 'banana.txt', mtime: new Date(nowTimestamp - 2 * oneDayInMs) },
+      ],
+      expected: ['apple.txt', 'banana.txt', 'zebra.txt'],
+    },
+    {
+      name: 'should handle an empty array',
+      entries: [],
+      expected: [],
+    },
+    {
+      name: 'should correctly sort files when mtimes are identical for recent files',
+      entries: [
+        { name: 'b.txt', mtime: new Date(nowTimestamp - 1000) },
+        { name: 'a.txt', mtime: new Date(nowTimestamp - 1000) },
+      ],
+      expectedUnordered: ['a.txt', 'b.txt'],
+    },
+    {
+      name: 'should use recencyThresholdMs parameter correctly',
+      recencyThresholdMs: 1000,
+      entries: [
+        { name: 'older_file.txt', mtime: new Date(nowTimestamp - 1001) },
+        { name: 'recent_file.txt', mtime: new Date(nowTimestamp - 999) },
+      ],
+      expected: ['recent_file.txt', 'older_file.txt'],
+    },
+  ];
 
-    const entries: GlobPath[] = [
-      createFileEntry('older_zebra.txt', olderTime2),
-      createFileEntry('recent_alpha.txt', recentTime1),
-      createFileEntry('older_apple.txt', olderTime1),
-      createFileEntry('recent_beta.txt', recentTime2),
-      createFileEntry('older_banana.txt', olderTime1), // Same mtime as apple
-    ];
+  it.each(testCases)(
+    '$name',
+    ({ entries, expected, expectedUnordered, recencyThresholdMs }) => {
+      const globPaths = entries.map((e) => createFileEntry(e.name, e.mtime));
+      const sorted = sortFileEntries(
+        globPaths,
+        nowTimestamp,
+        recencyThresholdMs ?? oneDayInMs,
+      );
+      const sortedPaths = sorted.map((e) => e.fullpath());
 
-    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
-    const sortedPaths = sorted.map((e) => e.fullpath());
-
-    expect(sortedPaths).toEqual([
-      'recent_alpha.txt', // Recent, newest
-      'recent_beta.txt', // Recent, older
-      'older_apple.txt', // Older, alphabetical
-      'older_banana.txt', // Older, alphabetical
-      'older_zebra.txt', // Older, alphabetical
-    ]);
-  });
-
-  it('should sort only recent files by mtime descending', () => {
-    const recentTime1 = new Date(nowTimestamp - 1000); // Newest
-    const recentTime2 = new Date(nowTimestamp - 2000);
-    const recentTime3 = new Date(nowTimestamp - 3000); // Oldest recent
-
-    const entries: GlobPath[] = [
-      createFileEntry('c.txt', recentTime2),
-      createFileEntry('a.txt', recentTime3),
-      createFileEntry('b.txt', recentTime1),
-    ];
-    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
-    expect(sorted.map((e) => e.fullpath())).toEqual([
-      'b.txt',
-      'c.txt',
-      'a.txt',
-    ]);
-  });
-
-  it('should sort only older files alphabetically by path', () => {
-    const olderTime = new Date(nowTimestamp - 2 * oneDayInMs); // All equally old
-    const entries: GlobPath[] = [
-      createFileEntry('zebra.txt', olderTime),
-      createFileEntry('apple.txt', olderTime),
-      createFileEntry('banana.txt', olderTime),
-    ];
-    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
-    expect(sorted.map((e) => e.fullpath())).toEqual([
-      'apple.txt',
-      'banana.txt',
-      'zebra.txt',
-    ]);
-  });
-
-  it('should handle an empty array', () => {
-    const entries: GlobPath[] = [];
-    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
-    expect(sorted).toEqual([]);
-  });
-
-  it('should correctly sort files when mtimes are identical for older files', () => {
-    const olderTime = new Date(nowTimestamp - 2 * oneDayInMs);
-    const entries: GlobPath[] = [
-      createFileEntry('b.txt', olderTime),
-      createFileEntry('a.txt', olderTime),
-    ];
-    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
-    expect(sorted.map((e) => e.fullpath())).toEqual(['a.txt', 'b.txt']);
-  });
-
-  it('should correctly sort files when mtimes are identical for recent files (maintaining mtime sort)', () => {
-    const recentTime = new Date(nowTimestamp - 1000);
-    const entries: GlobPath[] = [
-      createFileEntry('b.txt', recentTime),
-      createFileEntry('a.txt', recentTime),
-    ];
-    const sorted = sortFileEntries(entries, nowTimestamp, oneDayInMs);
-    expect(sorted.map((e) => e.fullpath())).toContain('a.txt');
-    expect(sorted.map((e) => e.fullpath())).toContain('b.txt');
-    expect(sorted.length).toBe(2);
-  });
-
-  it('should use recencyThresholdMs parameter correctly', () => {
-    const justOverThreshold = new Date(nowTimestamp - (1000 + 1)); // Barely older
-    const justUnderThreshold = new Date(nowTimestamp - (1000 - 1)); // Barely recent
-    const customThresholdMs = 1000; // 1 second
-
-    const entries: GlobPath[] = [
-      createFileEntry('older_file.txt', justOverThreshold),
-      createFileEntry('recent_file.txt', justUnderThreshold),
-    ];
-    const sorted = sortFileEntries(entries, nowTimestamp, customThresholdMs);
-    expect(sorted.map((e) => e.fullpath())).toEqual([
-      'recent_file.txt',
-      'older_file.txt',
-    ]);
-  });
+      if (expected) {
+        expect(sortedPaths).toEqual(expected);
+      } else if (expectedUnordered) {
+        expect(sortedPaths).toHaveLength(expectedUnordered.length);
+        for (const path of expectedUnordered) {
+          expect(sortedPaths).toContain(path);
+        }
+      } else {
+        throw new Error('Test case must have expected or expectedUnordered');
+      }
+    },
+  );
 });

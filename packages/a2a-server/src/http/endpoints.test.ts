@@ -16,7 +16,7 @@ import type { AddressInfo } from 'node:net';
 import { createApp, updateCoderAgentCardUrl } from './app.js';
 import type { TaskMetadata } from '../types.js';
 import { createMockConfig } from '../utils/testing_utils.js';
-import type { Config } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@google/gemini-cli-core';
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug
@@ -115,7 +115,7 @@ describe('Agent Server Endpoints', () => {
       try {
         fs.rmSync(testWorkspace, { recursive: true, force: true });
       } catch (e) {
-        console.warn(`Could not remove temp dir '${testWorkspace}':`, e);
+        debugLogger.warn(`Could not remove temp dir '${testWorkspace}':`, e);
       }
     }
   });
