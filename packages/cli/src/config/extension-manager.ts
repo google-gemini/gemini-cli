@@ -46,6 +46,7 @@ import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { ExtensionStorage } from './extensions/storage.js';
 import {
+  EXTENSION_CONFIG_SETTINGS_FILENAME,
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
   recursivelyHydrateStrings,
@@ -57,6 +58,8 @@ import {
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { ExtensionSettingsValidator } from './extension-settings-validator.js';
+import type { ExtensionSettings } from './extension-settings.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -281,6 +284,19 @@ export class ExtensionManager extends ExtensionLoader {
           }
         }
 
+        const settingContributions =
+          await maybeValidateAndPromptForSettingContributions(
+            newExtensionConfig,
+            this.requestConsent,
+            previousExtensionConfig,
+          );
+        if (settingContributions) {
+          await fs.promises.writeFile(
+            path.join(destinationPath, EXTENSION_CONFIG_SETTINGS_FILENAME),
+            JSON.stringify(settingContributions, null, 2),
+          );
+        }
+
         if (
           installMetadata.type === 'local' ||
           installMetadata.type === 'git' ||
@@ -392,6 +408,7 @@ export class ExtensionManager extends ExtensionLoader {
     await this.unloadExtension(extension);
     const storage = new ExtensionStorage(extension.name);
 
+    // Delete the entire extension directory (including extension-settings.json)
     await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
       force: true,
@@ -667,6 +684,80 @@ export class ExtensionManager extends ExtensionLoader {
     }
     await this.maybeStartExtension(extension);
   }
+}
+
+const extensionSettingKeys: Array<keyof ExtensionSettings> = [
+  'general',
+  'output',
+  'ui',
+  'ide',
+  'context',
+  'tools',
+  'model',
+  'modelConfigs',
+  'mcp',
+  'useSmartEdit',
+  'useWriteTodos',
+  'advanced',
+  'experimental',
+  'hooks',
+];
+
+function extractExtensionSettings(config: ExtensionConfig): ExtensionSettings {
+  const settings: ExtensionSettings = {};
+  for (const key of extensionSettingKeys) {
+    if (
+      key in config &&
+      (config as unknown as Record<string, unknown>)[key] !== undefined
+    ) {
+      (settings as unknown as Record<string, unknown>)[key] = (
+        config as unknown as Record<string, unknown>
+      )[key];
+    }
+  }
+  return settings;
+}
+
+async function maybeValidateAndPromptForSettingContributions(
+  config: ExtensionConfig,
+  requestConsent: (consent: string) => Promise<boolean>,
+  previousExtensionConfig?: ExtensionConfig,
+): Promise<ExtensionSettings | null> {
+  const validator = new ExtensionSettingsValidator();
+  const settingsToValidate = extractExtensionSettings(config);
+
+  const validationResult = validator.validate(settingsToValidate);
+  if (!validationResult.valid) {
+    debugLogger.error(
+      `Invalid setting contributions in extension "${config.name}":`,
+    );
+    for (const error of validationResult.errors) {
+      debugLogger.error(`- ${error}`);
+    }
+    return null;
+  }
+
+  const previousSettings = previousExtensionConfig
+    ? extractExtensionSettings(previousExtensionConfig)
+    : {};
+
+  if (
+    Object.keys(settingsToValidate).length > 0 &&
+    JSON.stringify(settingsToValidate) !== JSON.stringify(previousSettings)
+  ) {
+    let consentString =
+      'This extension would like to modify the following settings:';
+    for (const [key, value] of Object.entries(settingsToValidate)) {
+      consentString += `\n- ${key}: ${JSON.stringify(value)}`;
+    }
+    consentString +=
+      '\nDo you want to allow this extension to modify these settings?';
+
+    if (await requestConsent(consentString)) {
+      return settingsToValidate;
+    }
+  }
+  return null;
 }
 
 function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {

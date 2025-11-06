@@ -45,9 +45,6 @@ import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
-/**
- * Parameters for the WriteFile tool
- */
 export interface WriteFileToolParams {
   /**
    * The absolute path to the file to write to
@@ -388,9 +385,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   }
 }
 
-/**
- * Implementation of the WriteFile tool logic
- */
 export class WriteFileTool
   extends BaseDeclarativeTool<WriteFileToolParams, ToolResult>
   implements ModifiableDeclarativeTool<WriteFileToolParams>

@@ -12,6 +12,20 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { INSTALL_METADATA_FILENAME } from './extensions/variables.js';
 import type { ExtensionSetting } from './extensions/extensionSettings.js';
+import type {
+  AdvancedSettings,
+  ContextSettings,
+  ExperimentalSettings,
+  GeneralSettings,
+  HooksSettings,
+  IDESettings,
+  MCPSettings,
+  ModelConfigsSettings,
+  ModelSettings,
+  OutputSettings,
+  ToolSettings,
+  UISettings,
+} from './extension-settings.js';
 
 /**
  * Extension definition as written to disk in gemini-extension.json files.
@@ -27,6 +41,21 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
   excludeTools?: string[];
   settings?: ExtensionSetting[];
+  // Extension-contributed settings
+  general?: GeneralSettings;
+  output?: OutputSettings;
+  ui?: UISettings;
+  ide?: IDESettings;
+  context?: ContextSettings;
+  tools?: ToolSettings;
+  model?: ModelSettings;
+  modelConfigs?: ModelConfigsSettings;
+  mcp?: MCPSettings;
+  useSmartEdit?: boolean;
+  useWriteTodos?: boolean;
+  advanced?: AdvancedSettings;
+  experimental?: ExperimentalSettings;
+  hooks?: HooksSettings;
 }
 
 export interface ExtensionUpdateInfo {
