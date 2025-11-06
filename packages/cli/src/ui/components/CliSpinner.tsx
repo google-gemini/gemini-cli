@@ -6,17 +6,15 @@
 
 import Spinner from 'ink-spinner';
 import { type ComponentProps, useEffect } from 'react';
-
-// A top-level field to track the total number of active spinners.
-export let debugNumSpinners = 0;
+import { debugState } from '../debug.js';
 
 export type SpinnerProps = ComponentProps<typeof Spinner>;
 
 export const CliSpinner = (props: SpinnerProps) => {
   useEffect(() => {
-    debugNumSpinners++;
+    debugState.debugNumAnimatedComponents++;
     return () => {
-      debugNumSpinners--;
+      debugState.debugNumAnimatedComponents--;
     };
   }, []);
 

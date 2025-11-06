@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { FixedDeque } from 'mnemonist';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { debugNumSpinners } from './CliSpinner.js';
+import { debugState } from '../debug.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 
 // Frames that render at least this far before or after an action are considered
@@ -52,7 +52,7 @@ export const profiler = {
     if (now - this.lastFrameStartTime > 16) {
       this.lastFrameStartTime = now;
       this.numFrames++;
-      if (debugNumSpinners === 0) {
+      if (debugState.debugNumAnimatedComponents === 0) {
         if (this.possiblyIdleFrameTimestamps.size >= FRAME_TIMESTAMP_CAPACITY) {
           this.possiblyIdleFrameTimestamps.shift();
         }
