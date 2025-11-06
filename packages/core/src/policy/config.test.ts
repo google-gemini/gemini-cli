@@ -691,12 +691,19 @@ toolName = "write_file"
 decision = "allow"
 priority = 10
 
-[rule.safety_checker]
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 10
+
+[[safety_checker]]
+toolName = "write_file"
+priority = 10
+[safety_checker.checker]
 type = "in-process"
 name = "allowed-path"
 required_context = ["environment"]
-[rule.safety_checker.config]
-follow_symlinks = true
+[safety_checker.checker.config]
 `;
         }
         return actualFs.readFile(path, options);
@@ -724,12 +731,14 @@ follow_symlinks = true
       (r) => r.toolName === 'write_file' && r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    expect(rule?.safety_checker).toBeDefined();
-    expect(rule?.safety_checker?.type).toBe('in-process');
-    expect(rule?.safety_checker?.name).toBe('allowed-path');
-    expect(rule?.safety_checker?.required_context).toEqual(['environment']);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((rule?.safety_checker as any)?.config?.follow_symlinks).toBe(true);
+
+    const checker = config.checkers?.find(
+      (c) => c.toolName === 'write_file' && c.checker.type === 'in-process',
+    );
+    expect(checker).toBeDefined();
+    expect(checker?.checker.type).toBe('in-process');
+    expect(checker?.checker.name).toBe('allowed-path');
+    expect(checker?.checker.required_context).toEqual(['environment']);
 
     vi.doUnmock('node:fs/promises');
   });
@@ -785,7 +794,10 @@ toolName = "write_file"
 decision = "allow"
 priority = 10
 
-[rule.safety_checker]
+[[safety_checker]]
+toolName = "write_file"
+priority = 10
+[safety_checker.checker]
 type = "in-process"
 name = "invalid-name"
 `;

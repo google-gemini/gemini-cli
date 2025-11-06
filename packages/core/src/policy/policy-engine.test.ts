@@ -10,6 +10,7 @@ import {
   PolicyDecision,
   type PolicyRule,
   type PolicyEngineConfig,
+  type SafetyCheckerRule,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -831,14 +832,19 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test-tool',
           decision: PolicyDecision.ALLOW,
-          safety_checker: {
+        },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          toolName: 'test-tool',
+          checker: {
             type: 'external',
             name: 'test-checker',
             config: { content: 'test-content' },
           },
         },
       ];
-      engine = new PolicyEngine({ rules }, mockCheckerRunner);
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
       vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
         decision: SafetyCheckDecision.ALLOW,
       });
@@ -859,48 +865,54 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should handle checker errors as DENY', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'test',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          toolName: 'test',
+          checker: {
+            type: 'in-process',
+            name: 'allowed-path',
+          },
+        },
+      ];
+
+      mockCheckerRunner.runChecker = vi
+        .fn()
+        .mockRejectedValue(new Error('Checker failed'));
+
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
+      const { decision } = await engine.check({ name: 'test' }, undefined);
+
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
     it('should return DENY when checker denies', async () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'test-tool',
           decision: PolicyDecision.ALLOW,
-          safety_checker: {
+        },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          toolName: 'test-tool',
+          checker: {
             type: 'external',
             name: 'test-checker',
             config: { content: 'test-content' },
           },
         },
       ];
-      engine = new PolicyEngine({ rules }, mockCheckerRunner);
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
       vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
         decision: SafetyCheckDecision.DENY,
       });
-
-      const result = await engine.check(
-        { name: 'test-tool', args: { foo: 'bar' } },
-        undefined,
-      );
-
-      expect(result.decision).toBe(PolicyDecision.DENY);
-      expect(mockCheckerRunner.runChecker).toHaveBeenCalled();
-    });
-
-    it('should return DENY when checker throws', async () => {
-      const rules: PolicyRule[] = [
-        {
-          toolName: 'test-tool',
-          decision: PolicyDecision.ALLOW,
-          safety_checker: {
-            type: 'external',
-            name: 'test-checker',
-            config: { content: 'test-content' },
-          },
-        },
-      ];
-      engine = new PolicyEngine({ rules }, mockCheckerRunner);
-      vi.mocked(mockCheckerRunner.runChecker).mockRejectedValue(
-        new Error('Checker failed'),
-      );
 
       const result = await engine.check(
         { name: 'test-tool', args: { foo: 'bar' } },
@@ -916,14 +928,19 @@ describe('PolicyEngine', () => {
         {
           toolName: 'test-tool',
           decision: PolicyDecision.ASK_USER,
-          safety_checker: {
+        },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          toolName: 'test-tool',
+          checker: {
             type: 'external',
             name: 'test-checker',
             config: { content: 'test-content' },
           },
         },
       ];
-      engine = new PolicyEngine({ rules }, mockCheckerRunner);
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
 
       const result = await engine.check(
         { name: 'test-tool', args: { foo: 'bar' } },
@@ -932,6 +949,34 @@ describe('PolicyEngine', () => {
 
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
       expect(mockCheckerRunner.runChecker).not.toHaveBeenCalled();
+    });
+
+    it('should run checkers when rule allows', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'test',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          toolName: 'test',
+          checker: {
+            type: 'in-process',
+            name: 'allowed-path',
+          },
+        },
+      ];
+
+      mockCheckerRunner.runChecker = vi.fn().mockResolvedValue({
+        decision: SafetyCheckDecision.ALLOW,
+      });
+
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
+      const { decision } = await engine.check({ name: 'test' }, undefined);
+
+      expect(decision).toBe(PolicyDecision.ALLOW);
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledTimes(1);
     });
 
     it('should not call checker if rule has no safety_checker', async () => {
@@ -966,6 +1011,52 @@ describe('PolicyEngine', () => {
       expect(
         (await engine.check({ name: 'test' }, 'some-server')).decision,
       ).toBe(PolicyDecision.ASK_USER);
+    });
+    it('should run multiple checkers in priority order and stop at first denial', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'test',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          toolName: 'test',
+          priority: 10,
+          checker: { type: 'external', name: 'checker1' },
+        },
+        {
+          toolName: 'test',
+          priority: 20, // Should run first
+          checker: { type: 'external', name: 'checker2' },
+        },
+      ];
+
+      mockCheckerRunner.runChecker = vi
+        .fn()
+        .mockImplementation(async (_toolCall, config) => {
+          if (config.name === 'checker2') {
+            return {
+              decision: SafetyCheckDecision.DENY,
+              reason: 'checker2 denied',
+            };
+          }
+          return { decision: SafetyCheckDecision.ALLOW };
+        });
+
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
+      const { decision, rule } = await engine.check(
+        { name: 'test' },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.DENY);
+      expect(rule).toBeDefined();
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledTimes(1);
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'checker2' }),
+      );
     });
   });
 });

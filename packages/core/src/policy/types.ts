@@ -78,12 +78,32 @@ export interface PolicyRule {
    * Default is 0.
    */
   priority?: number;
+}
+
+export interface SafetyCheckerRule {
+  /**
+   * The name of the tool this rule applies to.
+   * If undefined, the rule applies to all tools.
+   */
+  toolName?: string;
+
+  /**
+   * Pattern to match against tool arguments.
+   * Can be used for more fine-grained control.
+   */
+  argsPattern?: RegExp;
+
+  /**
+   * Priority of this checker. Higher numbers run first.
+   * Default is 0.
+   */
+  priority?: number;
 
   /**
    * Specifies an external or built-in safety checker to execute for
    * additional validation of a tool call.
    */
-  safety_checker?: SafetyCheckerConfig;
+  checker: SafetyCheckerConfig;
 }
 
 export interface PolicyEngineConfig {
@@ -91,6 +111,11 @@ export interface PolicyEngineConfig {
    * List of policy rules to apply.
    */
   rules?: PolicyRule[];
+
+  /**
+   * List of safety checkers to apply.
+   */
+  checkers?: SafetyCheckerRule[];
 
   /**
    * Default decision when no rules match.

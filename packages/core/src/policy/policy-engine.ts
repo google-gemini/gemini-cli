@@ -9,6 +9,7 @@ import {
   PolicyDecision,
   type PolicyEngineConfig,
   type PolicyRule,
+  type SafetyCheckerRule,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -16,7 +17,7 @@ import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
 
 function ruleMatches(
-  rule: PolicyRule,
+  rule: PolicyRule | SafetyCheckerRule,
   toolCall: FunctionCall,
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
@@ -62,12 +63,16 @@ function ruleMatches(
 
 export class PolicyEngine {
   private rules: PolicyRule[];
+  private checkers: SafetyCheckerRule[];
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
+      (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+    );
+    this.checkers = (config.checkers ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
@@ -97,28 +102,48 @@ export class PolicyEngine {
     );
 
     // Find the first matching rule (already sorted by priority)
+    // Find the first matching rule (already sorted by priority)
+    let matchedRule: PolicyRule | undefined;
+    let decision: PolicyDecision | undefined;
+
     for (const rule of this.rules) {
       if (ruleMatches(rule, toolCall, stringifiedArgs, serverName)) {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
+        matchedRule = rule;
+        decision = this.applyNonInteractiveMode(rule.decision);
+        break;
+      }
+    }
 
-        const decision = this.applyNonInteractiveMode(rule.decision);
+    if (!decision) {
+      // No matching rule found, use default decision
+      debugLogger.debug(
+        `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
+      );
+      decision = this.applyNonInteractiveMode(this.defaultDecision);
+    }
 
-        if (
-          decision === PolicyDecision.ALLOW &&
-          rule.safety_checker &&
-          this.checkerRunner
-        ) {
+    // If decision is ALLOW, run safety checkers
+    if (decision === PolicyDecision.ALLOW && this.checkerRunner) {
+      for (const checkerRule of this.checkers) {
+        if (ruleMatches(checkerRule, toolCall, stringifiedArgs, serverName)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Running safety checker: ${checkerRule.checker.name}`,
+          );
           try {
             const result = await this.checkerRunner.runChecker(
               toolCall,
-              rule.safety_checker,
+              checkerRule.checker,
             );
             if (result.decision !== SafetyCheckDecision.ALLOW) {
+              debugLogger.debug(
+                `[PolicyEngine.check] Safety checker denied: ${result.reason}`,
+              );
               return {
                 decision: PolicyDecision.DENY,
-                rule,
+                rule: matchedRule,
               };
             }
           } catch (error) {
@@ -127,24 +152,16 @@ export class PolicyEngine {
             );
             return {
               decision: PolicyDecision.DENY,
-              rule,
+              rule: matchedRule,
             };
           }
         }
-
-        return {
-          decision,
-          rule,
-        };
       }
     }
 
-    // No matching rule found, use default decision
-    debugLogger.debug(
-      `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
-    );
     return {
-      decision: this.applyNonInteractiveMode(this.defaultDecision),
+      decision,
+      rule: matchedRule,
     };
   }
 
@@ -155,6 +172,11 @@ export class PolicyEngine {
     this.rules.push(rule);
     // Re-sort rules by priority
     this.rules.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  }
+
+  addChecker(checker: SafetyCheckerRule): void {
+    this.checkers.push(checker);
+    this.checkers.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }
 
   /**
@@ -169,6 +191,10 @@ export class PolicyEngine {
    */
   getRules(): readonly PolicyRule[] {
     return this.rules;
+  }
+
+  getCheckers(): readonly SafetyCheckerRule[] {
+    return this.checkers;
   }
 
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
