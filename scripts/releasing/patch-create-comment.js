@@ -46,6 +46,11 @@ async function main() {
       description: 'The GitHub workflow run ID',
       type: 'string',
     })
+    .option('environment', {
+      choices: ['prod', 'dev'],
+      type: 'string',
+      default: process.env.ENVIRONMENT || 'prod',
+    })
     .option('test', {
       description: 'Test mode - validate logic without GitHub API calls',
       type: 'boolean',
@@ -75,6 +80,7 @@ async function main() {
       : parseInt(process.env.EXIT_CODE || '1');
   const commit = argv.commit || process.env.COMMIT;
   const channel = argv.channel || process.env.CHANNEL;
+  const environment = argv.environment;
   const repository =
     argv.repository || process.env.REPOSITORY || 'google-gemini/gemini-cli';
   const runId = argv.runId || process.env.GITHUB_RUN_ID || '0';
@@ -210,6 +216,7 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
         commentBody = `🚀 **Patch PR Created!**
 
 **📋 Patch Details:**
+- **Environment**: \`${environment}\`
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
@@ -265,6 +272,7 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
             commentBody = `🚀 **Patch PR Created!**
 
 **📋 Patch Details:**
+- **Environment**: \`${environment}\`
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
