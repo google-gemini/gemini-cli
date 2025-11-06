@@ -87,6 +87,15 @@ export const DialogManager = ({
       />
     );
   }
+  if (uiState.embeddedShellExitConfirmationRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.embeddedShellExitConfirmationRequest.prompt}
+        onConfirm={uiState.embeddedShellExitConfirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
   if (uiState.confirmationRequest) {
     return (
       <ConsentPrompt
