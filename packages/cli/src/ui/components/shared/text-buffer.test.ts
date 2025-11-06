@@ -223,44 +223,49 @@ describe('textBufferReducer', () => {
   });
 
   describe('delete_word_left action', () => {
-    it('should delete a simple word', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['hello world'],
-        cursorRow: 0,
+    const createSingleLineState = (
+      text: string,
+      col: number,
+    ): TextBufferState => ({
+      ...initialState,
+      lines: [text],
+      cursorRow: 0,
+      cursorCol: col,
+    });
+
+    it.each([
+      {
+        input: 'hello world',
         cursorCol: 11,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['hello ']);
-      expect(state.cursorCol).toBe(6);
-    });
-
-    it('should delete a path segment', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['path/to/file'],
-        cursorRow: 0,
+        expectedLines: ['hello '],
+        expectedCol: 6,
+        desc: 'simple word',
+      },
+      {
+        input: 'path/to/file',
         cursorCol: 12,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['path/to/']);
-      expect(state.cursorCol).toBe(8);
-    });
-
-    it('should delete variable_name parts', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['variable_name'],
-        cursorRow: 0,
+        expectedLines: ['path/to/'],
+        expectedCol: 8,
+        desc: 'path segment',
+      },
+      {
+        input: 'variable_name',
         cursorCol: 13,
-      };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['variable_']);
-      expect(state.cursorCol).toBe(9);
-    });
+        expectedLines: ['variable_'],
+        expectedCol: 9,
+        desc: 'variable_name parts',
+      },
+    ])(
+      'should delete $desc',
+      ({ input, cursorCol, expectedLines, expectedCol }) => {
+        const state = textBufferReducer(
+          createSingleLineState(input, cursorCol),
+          { type: 'delete_word_left' },
+        );
+        expect(state.lines).toEqual(expectedLines);
+        expect(state.cursorCol).toBe(expectedCol);
+      },
+    );
 
     it('should act like backspace at the beginning of a line', () => {
       const stateWithText: TextBufferState = {
@@ -269,8 +274,9 @@ describe('textBufferReducer', () => {
         cursorRow: 1,
         cursorCol: 0,
       };
-      const action: TextBufferAction = { type: 'delete_word_left' };
-      const state = textBufferReducer(stateWithText, action);
+      const state = textBufferReducer(stateWithText, {
+        type: 'delete_word_left',
+      });
       expect(state.lines).toEqual(['helloworld']);
       expect(state.cursorRow).toBe(0);
       expect(state.cursorCol).toBe(5);
@@ -278,44 +284,56 @@ describe('textBufferReducer', () => {
   });
 
   describe('delete_word_right action', () => {
-    it('should delete a simple word', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['hello world'],
-        cursorRow: 0,
-        cursorCol: 0,
-      };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['world']);
-      expect(state.cursorCol).toBe(0);
+    const createSingleLineState = (
+      text: string,
+      col: number,
+    ): TextBufferState => ({
+      ...initialState,
+      lines: [text],
+      cursorRow: 0,
+      cursorCol: col,
     });
 
-    it('should delete a path segment', () => {
+    it.each([
+      {
+        input: 'hello world',
+        cursorCol: 0,
+        expectedLines: ['world'],
+        expectedCol: 0,
+        desc: 'simple word',
+      },
+      {
+        input: 'variable_name',
+        cursorCol: 0,
+        expectedLines: ['_name'],
+        expectedCol: 0,
+        desc: 'variable_name parts',
+      },
+    ])(
+      'should delete $desc',
+      ({ input, cursorCol, expectedLines, expectedCol }) => {
+        const state = textBufferReducer(
+          createSingleLineState(input, cursorCol),
+          { type: 'delete_word_right' },
+        );
+        expect(state.lines).toEqual(expectedLines);
+        expect(state.cursorCol).toBe(expectedCol);
+      },
+    );
+
+    it('should delete path segments progressively', () => {
       const stateWithText: TextBufferState = {
         ...initialState,
         lines: ['path/to/file'],
         cursorRow: 0,
         cursorCol: 0,
       };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      let state = textBufferReducer(stateWithText, action);
+      let state = textBufferReducer(stateWithText, {
+        type: 'delete_word_right',
+      });
       expect(state.lines).toEqual(['/to/file']);
-      state = textBufferReducer(state, action);
+      state = textBufferReducer(state, { type: 'delete_word_right' });
       expect(state.lines).toEqual(['to/file']);
-    });
-
-    it('should delete variable_name parts', () => {
-      const stateWithText: TextBufferState = {
-        ...initialState,
-        lines: ['variable_name'],
-        cursorRow: 0,
-        cursorCol: 0,
-      };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      const state = textBufferReducer(stateWithText, action);
-      expect(state.lines).toEqual(['_name']);
-      expect(state.cursorCol).toBe(0);
     });
 
     it('should act like delete at the end of a line', () => {
@@ -325,8 +343,9 @@ describe('textBufferReducer', () => {
         cursorRow: 0,
         cursorCol: 5,
       };
-      const action: TextBufferAction = { type: 'delete_word_right' };
-      const state = textBufferReducer(stateWithText, action);
+      const state = textBufferReducer(stateWithText, {
+        type: 'delete_word_right',
+      });
       expect(state.lines).toEqual(['helloworld']);
       expect(state.cursorRow).toBe(0);
       expect(state.cursorCol).toBe(5);
@@ -334,7 +353,6 @@ describe('textBufferReducer', () => {
   });
 });
 
-// Helper to get the state from the hook
 const getBufferState = (result: { current: TextBuffer }) => {
   expect(result.current).toHaveOnlyValidCharacters();
   return {
@@ -1386,58 +1404,42 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   });
 
   describe('Input Sanitization', () => {
-    it('should strip ANSI escape codes from input', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
-      const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: textWithAnsi,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Hello World');
+    const createInput = (sequence: string) => ({
+      name: '',
+      ctrl: false,
+      meta: false,
+      shift: false,
+      paste: false,
+      sequence,
     });
 
-    it('should strip control characters from input', () => {
+    it.each([
+      {
+        input: '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m',
+        expected: 'Hello World',
+        desc: 'ANSI escape codes',
+      },
+      {
+        input: 'H\x07e\x08l\x0Bl\x0Co',
+        expected: 'Hello',
+        desc: 'control characters',
+      },
+      {
+        input: '\u001B[4mH\u001B[0mello',
+        expected: 'Hello',
+        desc: 'mixed ANSI and control characters',
+      },
+      {
+        input: '\u001B[4mPasted\u001B[4m Text',
+        expected: 'Pasted Text',
+        desc: 'pasted text with ANSI',
+      },
+    ])('should strip $desc from input', ({ input, expected }) => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      const textWithControlChars = 'H\x07e\x08l\x0Bl\x0Co'; // BELL, BACKSPACE, VT, FF
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: textWithControlChars,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Hello');
-    });
-
-    it('should strip mixed ANSI and control characters from input', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
-      const textWithMixed = '\u001B[4mH\u001B[0mello';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: textWithMixed,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Hello');
+      act(() => result.current.handleInput(createInput(input)));
+      expect(getBufferState(result).text).toBe(expected);
     });
 
     it('should not strip standard characters or newlines', () => {
@@ -1445,35 +1447,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const validText = 'Hello World\nThis is a test.';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: validText,
-        }),
-      );
+      act(() => result.current.handleInput(createInput(validText)));
       expect(getBufferState(result).text).toBe(validText);
-    });
-
-    it('should sanitize pasted text via handleInput', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({ viewport, isValidPath: () => false }),
-      );
-      const pastedText = '\u001B[4mPasted\u001B[4m Text';
-      act(() =>
-        result.current.handleInput({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: pastedText,
-        }),
-      );
-      expect(getBufferState(result).text).toBe('Pasted Text');
     });
 
     it('should sanitize large text (>5000 chars) and strip unsafe characters', () => {
@@ -1765,98 +1740,161 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 });
 
 describe('offsetToLogicalPos', () => {
-  it('should return [0,0] for offset 0', () => {
-    expect(offsetToLogicalPos('any text', 0)).toEqual([0, 0]);
+  it.each([
+    { text: 'any text', offset: 0, expected: [0, 0], desc: 'offset 0' },
+    { text: 'hello', offset: 0, expected: [0, 0], desc: 'single line start' },
+    { text: 'hello', offset: 2, expected: [0, 2], desc: 'single line middle' },
+    { text: 'hello', offset: 5, expected: [0, 5], desc: 'single line end' },
+    { text: 'hello', offset: 10, expected: [0, 5], desc: 'beyond end clamps' },
+    {
+      text: 'a\n\nc',
+      offset: 0,
+      expected: [0, 0],
+      desc: 'empty lines - first char',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 1,
+      expected: [0, 1],
+      desc: 'empty lines - end of first',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 2,
+      expected: [1, 0],
+      desc: 'empty lines - empty line',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 3,
+      expected: [2, 0],
+      desc: 'empty lines - last line start',
+    },
+    {
+      text: 'a\n\nc',
+      offset: 4,
+      expected: [2, 1],
+      desc: 'empty lines - last line end',
+    },
+    {
+      text: 'hello\n',
+      offset: 5,
+      expected: [0, 5],
+      desc: 'newline end - before newline',
+    },
+    {
+      text: 'hello\n',
+      offset: 6,
+      expected: [1, 0],
+      desc: 'newline end - after newline',
+    },
+    {
+      text: 'hello\n',
+      offset: 7,
+      expected: [1, 0],
+      desc: 'newline end - beyond',
+    },
+    {
+      text: '\nhello',
+      offset: 0,
+      expected: [0, 0],
+      desc: 'newline start - first line',
+    },
+    {
+      text: '\nhello',
+      offset: 1,
+      expected: [1, 0],
+      desc: 'newline start - second line',
+    },
+    {
+      text: '\nhello',
+      offset: 3,
+      expected: [1, 2],
+      desc: 'newline start - middle of second',
+    },
+    { text: '', offset: 0, expected: [0, 0], desc: 'empty string at 0' },
+    { text: '', offset: 5, expected: [0, 0], desc: 'empty string beyond' },
+    {
+      text: '你好\n世界',
+      offset: 0,
+      expected: [0, 0],
+      desc: 'unicode - start',
+    },
+    {
+      text: '你好\n世界',
+      offset: 1,
+      expected: [0, 1],
+      desc: 'unicode - after first char',
+    },
+    {
+      text: '你好\n世界',
+      offset: 2,
+      expected: [0, 2],
+      desc: 'unicode - end first line',
+    },
+    {
+      text: '你好\n世界',
+      offset: 3,
+      expected: [1, 0],
+      desc: 'unicode - second line start',
+    },
+    {
+      text: '你好\n世界',
+      offset: 4,
+      expected: [1, 1],
+      desc: 'unicode - second line middle',
+    },
+    {
+      text: '你好\n世界',
+      offset: 5,
+      expected: [1, 2],
+      desc: 'unicode - second line end',
+    },
+    {
+      text: '你好\n世界',
+      offset: 6,
+      expected: [1, 2],
+      desc: 'unicode - beyond',
+    },
+    {
+      text: 'abc\ndef',
+      offset: 3,
+      expected: [0, 3],
+      desc: 'at newline - end of line',
+    },
+    {
+      text: 'abc\ndef',
+      offset: 4,
+      expected: [1, 0],
+      desc: 'at newline - after newline',
+    },
+    { text: '🐶🐱', offset: 0, expected: [0, 0], desc: 'emoji - start' },
+    { text: '🐶🐱', offset: 1, expected: [0, 1], desc: 'emoji - middle' },
+    { text: '🐶🐱', offset: 2, expected: [0, 2], desc: 'emoji - end' },
+  ])('should handle $desc', ({ text, offset, expected }) => {
+    expect(offsetToLogicalPos(text, offset)).toEqual(expected);
   });
 
-  it('should handle single line text', () => {
-    const text = 'hello';
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start
-    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // Middle 'l'
-    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End
-    expect(offsetToLogicalPos(text, 10)).toEqual([0, 5]); // Beyond end
-  });
-
-  it('should handle multi-line text', () => {
+  describe('multi-line text', () => {
     const text = 'hello\nworld\n123';
-    // "hello" (5) + \n (1) + "world" (5) + \n (1) + "123" (3)
-    // h e l l o \n w o r l d \n 1 2 3
-    // 0 1 2 3 4  5  6 7 8 9 0  1  2 3 4
-    // Line 0: "hello" (length 5)
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of 'hello'
-    expect(offsetToLogicalPos(text, 3)).toEqual([0, 3]); // 'l' in 'hello'
-    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End of 'hello' (before \n)
 
-    // Line 1: "world" (length 5)
-    expect(offsetToLogicalPos(text, 6)).toEqual([1, 0]); // Start of 'world' (after \n)
-    expect(offsetToLogicalPos(text, 8)).toEqual([1, 2]); // 'r' in 'world'
-    expect(offsetToLogicalPos(text, 11)).toEqual([1, 5]); // End of 'world' (before \n)
-
-    // Line 2: "123" (length 3)
-    expect(offsetToLogicalPos(text, 12)).toEqual([2, 0]); // Start of '123' (after \n)
-    expect(offsetToLogicalPos(text, 13)).toEqual([2, 1]); // '2' in '123'
-    expect(offsetToLogicalPos(text, 15)).toEqual([2, 3]); // End of '123'
-    expect(offsetToLogicalPos(text, 20)).toEqual([2, 3]); // Beyond end of text
-  });
-
-  it('should handle empty lines', () => {
-    const text = 'a\n\nc'; // "a" (1) + \n (1) + "" (0) + \n (1) + "c" (1)
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // 'a'
-    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // End of 'a'
-    expect(offsetToLogicalPos(text, 2)).toEqual([1, 0]); // Start of empty line
-    expect(offsetToLogicalPos(text, 3)).toEqual([2, 0]); // Start of 'c'
-    expect(offsetToLogicalPos(text, 4)).toEqual([2, 1]); // End of 'c'
-  });
-
-  it('should handle text ending with a newline', () => {
-    const text = 'hello\n'; // "hello" (5) + \n (1)
-    expect(offsetToLogicalPos(text, 5)).toEqual([0, 5]); // End of 'hello'
-    expect(offsetToLogicalPos(text, 6)).toEqual([1, 0]); // Position on the new empty line after
-
-    expect(offsetToLogicalPos(text, 7)).toEqual([1, 0]); // Still on the new empty line
-  });
-
-  it('should handle text starting with a newline', () => {
-    const text = '\nhello'; // "" (0) + \n (1) + "hello" (5)
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of first empty line
-    expect(offsetToLogicalPos(text, 1)).toEqual([1, 0]); // Start of 'hello'
-    expect(offsetToLogicalPos(text, 3)).toEqual([1, 2]); // 'l' in 'hello'
-  });
-
-  it('should handle empty string input', () => {
-    expect(offsetToLogicalPos('', 0)).toEqual([0, 0]);
-    expect(offsetToLogicalPos('', 5)).toEqual([0, 0]);
-  });
-
-  it('should handle multi-byte unicode characters correctly', () => {
-    const text = '你好\n世界'; // "你好" (2 chars) + \n (1) + "世界" (2 chars)
-    // Total "code points" for offset calculation: 2 + 1 + 2 = 5
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]); // Start of '你好'
-    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After '你', before '好'
-    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // End of '你好'
-    expect(offsetToLogicalPos(text, 3)).toEqual([1, 0]); // Start of '世界'
-    expect(offsetToLogicalPos(text, 4)).toEqual([1, 1]); // After '世', before '界'
-    expect(offsetToLogicalPos(text, 5)).toEqual([1, 2]); // End of '世界'
-    expect(offsetToLogicalPos(text, 6)).toEqual([1, 2]); // Beyond end
-  });
-
-  it('should handle offset exactly at newline character', () => {
-    const text = 'abc\ndef';
-    // a b c \n d e f
-    // 0 1 2  3  4 5 6
-    expect(offsetToLogicalPos(text, 3)).toEqual([0, 3]); // End of 'abc'
-    // The next character is the newline, so an offset of 4 means the start of the next line.
-    expect(offsetToLogicalPos(text, 4)).toEqual([1, 0]); // Start of 'def'
-  });
-
-  it('should handle offset in the middle of a multi-byte character (should place at start of that char)', () => {
-    // This scenario is tricky as "offset" is usually character-based.
-    // Assuming cpLen and related logic handles this by treating multi-byte as one unit.
-    // The current implementation of offsetToLogicalPos uses cpLen, so it should be code-point aware.
-    const text = '🐶🐱'; // 2 code points
-    expect(offsetToLogicalPos(text, 0)).toEqual([0, 0]);
-    expect(offsetToLogicalPos(text, 1)).toEqual([0, 1]); // After 🐶
-    expect(offsetToLogicalPos(text, 2)).toEqual([0, 2]); // After 🐱
+    it.each([
+      { offset: 0, expected: [0, 0], desc: 'start of first line' },
+      { offset: 3, expected: [0, 3], desc: 'middle of first line' },
+      { offset: 5, expected: [0, 5], desc: 'end of first line' },
+      { offset: 6, expected: [1, 0], desc: 'start of second line' },
+      { offset: 8, expected: [1, 2], desc: 'middle of second line' },
+      { offset: 11, expected: [1, 5], desc: 'end of second line' },
+      { offset: 12, expected: [2, 0], desc: 'start of third line' },
+      { offset: 13, expected: [2, 1], desc: 'middle of third line' },
+      { offset: 15, expected: [2, 3], desc: 'end of third line' },
+      { offset: 20, expected: [2, 3], desc: 'beyond end' },
+    ])(
+      'should return $expected for $desc (offset $offset)',
+      ({ offset, expected }) => {
+        expect(offsetToLogicalPos(text, offset)).toEqual(expected);
+      },
+    );
   });
 });
 
@@ -1920,7 +1958,6 @@ describe('logicalPosToOffset', () => {
   });
 });
 
-// Helper to create state for reducer tests
 const createTestState = (
   lines: string[],
   cursorRow: number,

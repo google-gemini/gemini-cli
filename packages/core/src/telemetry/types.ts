@@ -11,7 +11,8 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
-import type { ApprovalMode } from '../config/config.js';
+import type { ApprovalMode } from '../policy/types.js';
+
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { FileDiff } from '../tools/tools.js';
@@ -73,7 +74,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
-    const mcpServers = config.getMcpServers();
+    const mcpServers =
+      config.getMcpClientManager()?.getMcpServers() ?? config.getMcpServers();
 
     let useGemini = false;
     let useVertex = false;
@@ -1459,6 +1461,7 @@ export type TelemetryEvent =
   | ModelSlashCommandEvent
   | AgentStartEvent
   | AgentFinishEvent
+  | RecoveryAttemptEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
@@ -1548,15 +1551,16 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_AGENT_START = 'gemini_cli.agent.start';
-export class AgentStartEvent implements BaseTelemetryEvent {
-  'event.name': 'agent_start';
+abstract class BaseAgentEvent implements BaseTelemetryEvent {
+  abstract 'event.name':
+    | 'agent_start'
+    | 'agent_finish'
+    | 'agent_recovery_attempt';
   'event.timestamp': string;
   agent_id: string;
   agent_name: string;
 
   constructor(agent_id: string, agent_name: string) {
-    this['event.name'] = 'agent_start';
     this['event.timestamp'] = new Date().toISOString();
     this.agent_id = agent_id;
     this.agent_name = agent_name;
@@ -1565,10 +1569,27 @@ export class AgentStartEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_AGENT_START,
       'event.timestamp': this['event.timestamp'],
       agent_id: this.agent_id,
       agent_name: this.agent_name,
+    };
+  }
+
+  abstract toLogBody(): string;
+}
+
+export const EVENT_AGENT_START = 'gemini_cli.agent.start';
+export class AgentStartEvent extends BaseAgentEvent {
+  'event.name' = 'agent_start' as const;
+
+  constructor(agent_id: string, agent_name: string) {
+    super(agent_id, agent_name);
+  }
+
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...super.toOpenTelemetryAttributes(config),
+      'event.name': EVENT_AGENT_START,
     };
   }
 
@@ -1578,11 +1599,8 @@ export class AgentStartEvent implements BaseTelemetryEvent {
 }
 
 export const EVENT_AGENT_FINISH = 'gemini_cli.agent.finish';
-export class AgentFinishEvent implements BaseTelemetryEvent {
-  'event.name': 'agent_finish';
-  'event.timestamp': string;
-  agent_id: string;
-  agent_name: string;
+export class AgentFinishEvent extends BaseAgentEvent {
+  'event.name' = 'agent_finish' as const;
   duration_ms: number;
   turn_count: number;
   terminate_reason: AgentTerminateMode;
@@ -1594,22 +1612,16 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
     turn_count: number,
     terminate_reason: AgentTerminateMode,
   ) {
-    this['event.name'] = 'agent_finish';
-    this['event.timestamp'] = new Date().toISOString();
-    this.agent_id = agent_id;
-    this.agent_name = agent_name;
+    super(agent_id, agent_name);
     this.duration_ms = duration_ms;
     this.turn_count = turn_count;
     this.terminate_reason = terminate_reason;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
-      ...getCommonAttributes(config),
+      ...super.toOpenTelemetryAttributes(config),
       'event.name': EVENT_AGENT_FINISH,
-      'event.timestamp': this['event.timestamp'],
-      agent_id: this.agent_id,
-      agent_name: this.agent_name,
       duration_ms: this.duration_ms,
       turn_count: this.turn_count,
       terminate_reason: this.terminate_reason,
@@ -1618,6 +1630,45 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Agent ${this.agent_name} finished. Reason: ${this.terminate_reason}. Duration: ${this.duration_ms}ms. Turns: ${this.turn_count}.`;
+  }
+}
+
+export const EVENT_AGENT_RECOVERY_ATTEMPT = 'gemini_cli.agent.recovery_attempt';
+export class RecoveryAttemptEvent extends BaseAgentEvent {
+  'event.name' = 'agent_recovery_attempt' as const;
+  reason: AgentTerminateMode;
+  duration_ms: number;
+  success: boolean;
+  turn_count: number;
+
+  constructor(
+    agent_id: string,
+    agent_name: string,
+    reason: AgentTerminateMode,
+    duration_ms: number,
+    success: boolean,
+    turn_count: number,
+  ) {
+    super(agent_id, agent_name);
+    this.reason = reason;
+    this.duration_ms = duration_ms;
+    this.success = success;
+    this.turn_count = turn_count;
+  }
+
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...super.toOpenTelemetryAttributes(config),
+      'event.name': EVENT_AGENT_RECOVERY_ATTEMPT,
+      reason: this.reason,
+      duration_ms: this.duration_ms,
+      success: this.success,
+      turn_count: this.turn_count,
+    };
+  }
+
+  toLogBody(): string {
+    return `Agent ${this.agent_name} recovery attempt. Reason: ${this.reason}. Success: ${this.success}. Duration: ${this.duration_ms}ms.`;
   }
 }
 

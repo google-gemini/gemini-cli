@@ -8,7 +8,9 @@
 import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ConfigParameters } from '../config/config.js';
-import { Config, ApprovalMode } from '../config/config.js';
+import { Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import type { FunctionDeclaration, CallableTool } from '@google/genai';
@@ -17,19 +19,9 @@ import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';
 import { MockTool } from '../test-utils/mock-tool.js';
-
-import { McpClientManager } from './mcp-client-manager.js';
 import { ToolErrorType } from './tool-error.js';
 
 vi.mock('node:fs');
-
-// Mock ./mcp-client.js to control its behavior within tool-registry tests
-vi.mock('./mcp-client.js', async () => {
-  const originalModule = await vi.importActual('./mcp-client.js');
-  return {
-    ...originalModule,
-  };
-});
 
 // Mock node:child_process
 vi.mock('node:child_process', async () => {
@@ -258,6 +250,51 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('sortTools', () => {
+    it('should sort tools by priority: built-in, discovered, then MCP (by server name)', () => {
+      const builtIn1 = new MockTool({ name: 'builtin-1' });
+      const builtIn2 = new MockTool({ name: 'builtin-2' });
+      const discovered1 = new DiscoveredTool(
+        config,
+        'discovered-1',
+        'desc',
+        {},
+      );
+      const mockCallable = {} as CallableTool;
+      const mcpZebra = new DiscoveredMCPTool(
+        mockCallable,
+        'zebra-server',
+        'mcp-zebra',
+        'desc',
+        {},
+      );
+      const mcpApple = new DiscoveredMCPTool(
+        mockCallable,
+        'apple-server',
+        'mcp-apple',
+        'desc',
+        {},
+      );
+
+      // Register in mixed order
+      toolRegistry.registerTool(mcpZebra);
+      toolRegistry.registerTool(discovered1);
+      toolRegistry.registerTool(builtIn1);
+      toolRegistry.registerTool(mcpApple);
+      toolRegistry.registerTool(builtIn2);
+
+      toolRegistry.sortTools();
+
+      expect(toolRegistry.getAllToolNames()).toEqual([
+        'builtin-1',
+        'builtin-2',
+        'discovered-1',
+        'mcp-apple',
+        'mcp-zebra',
+      ]);
+    });
+  });
+
   describe('discoverTools', () => {
     it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
@@ -398,27 +435,6 @@ describe('ToolRegistry', () => {
       );
       expect(result.llmContent).toContain('Stderr: Something went wrong');
       expect(result.llmContent).toContain('Exit Code: 1');
-    });
-
-    it('should discover tools using MCP servers defined in getMcpServers', async () => {
-      const discoverSpy = vi.spyOn(
-        McpClientManager.prototype,
-        'discoverAllMcpTools',
-      );
-      mockConfigGetToolDiscoveryCommand.mockReturnValue(undefined);
-      vi.spyOn(config, 'getMcpServerCommand').mockReturnValue(undefined);
-      const mcpServerConfigVal = {
-        'my-mcp-server': {
-          command: 'mcp-server-cmd',
-          args: ['--port', '1234'],
-          trust: true,
-        },
-      };
-      vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
-
-      await toolRegistry.discoverAllTools();
-
-      expect(discoverSpy).toHaveBeenCalled();
     });
   });
 
