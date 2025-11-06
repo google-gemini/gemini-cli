@@ -211,7 +211,7 @@ export interface SlashCommand {
   completion?: (
     context: CommandContext,
     partialArg: string,
-  ) => Promise<string[]>;
+  ) => Promise<string[]> | string[];
 
   subCommands?: SlashCommand[];
 }
