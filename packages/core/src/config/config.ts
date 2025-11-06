@@ -62,6 +62,9 @@ import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
+import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -291,6 +294,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   experiments?: Experiments;
   hooks?: {
@@ -309,6 +313,7 @@ export class Config {
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
+  readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -560,6 +565,25 @@ export class Config {
     }
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
+
+    // HACK: The settings loading logic doesn't currently merge the default
+    // generation config with the user's settings. This means if a user provides
+    // any `generation` settings (e.g., just `overrides`), the default `aliases`
+    // are lost. This hack manually merges the default aliases back in if they
+    // are missing from the user's config.
+    // TODO(12593): Fix the settings loading logic to properly merge defaults and
+    // remove this hack.
+    let modelConfigServiceConfig = params.modelConfigServiceConfig;
+    if (modelConfigServiceConfig && !modelConfigServiceConfig.aliases) {
+      modelConfigServiceConfig = {
+        ...modelConfigServiceConfig,
+        aliases: DEFAULT_MODEL_CONFIGS.aliases,
+      };
+    }
+
+    this.modelConfigService = new ModelConfigService(
+      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
+    );
   }
 
   /**
