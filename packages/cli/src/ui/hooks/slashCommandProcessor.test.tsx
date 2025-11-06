@@ -26,6 +26,7 @@ import {
   ToolConfirmationOutcome,
   makeFakeConfig,
 } from '@google/gemini-cli-core';
+import { appEvents } from '../../utils/events.js';
 
 const { logSlashCommand } = vi.hoisted(() => ({
   logSlashCommand: vi.fn(),
@@ -1075,5 +1076,27 @@ describe('useSlashCommandProcessor', () => {
 
       expect(logSlashCommand).not.toHaveBeenCalled();
     });
+  });
+
+  it('should reload commands on extension events', async () => {
+    const result = await setupProcessorHook();
+    await waitFor(() => expect(result.current.slashCommands).toEqual([]));
+
+    // Create a new command and make that the result of the fileLoadCommands
+    // (which is where extension commands come from)
+    const newCommand = createTestCommand({
+      name: 'someNewCommand',
+      action: vi.fn(),
+    });
+    mockFileLoadCommands.mockResolvedValue([newCommand]);
+
+    // We should not see a change until we fire an event.
+    await waitFor(() => expect(result.current.slashCommands).toEqual([]));
+    await act(() => {
+      appEvents.emit('extensionsStarting');
+    });
+    await waitFor(() =>
+      expect(result.current.slashCommands).toEqual([newCommand]),
+    );
   });
 });

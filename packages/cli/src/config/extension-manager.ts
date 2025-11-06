@@ -616,15 +616,21 @@ export class ExtensionManager extends ExtensionLoader {
       throw new Error(`Extension with name ${name} does not exist.`);
     }
 
-    const scopePath =
-      scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
-    this.extensionEnablementManager.disable(name, true, scopePath);
-    extension.isActive = false;
-    await this.maybeStopExtension(extension);
+    if (scope !== SettingScope.Session) {
+      const scopePath =
+        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+      this.extensionEnablementManager.disable(name, true, scopePath);
+    }
     logExtensionDisable(
       this.telemetryConfig,
       new ExtensionDisableEvent(hashValue(name), extension.id, scope),
     );
+    if (!this.config || this.config.getEnableExtensionReloading()) {
+      // Only toggle the isActive state if we are actually going to disable it
+      // in the current session, or we haven't been initialized yet.
+      extension.isActive = false;
+    }
+    await this.maybeStopExtension(extension);
   }
 
   /**
@@ -644,14 +650,21 @@ export class ExtensionManager extends ExtensionLoader {
     if (!extension) {
       throw new Error(`Extension with name ${name} does not exist.`);
     }
-    const scopePath =
-      scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
-    this.extensionEnablementManager.enable(name, true, scopePath);
+
+    if (scope !== SettingScope.Session) {
+      const scopePath =
+        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+      this.extensionEnablementManager.enable(name, true, scopePath);
+    }
     logExtensionEnable(
       this.telemetryConfig,
       new ExtensionEnableEvent(hashValue(name), extension.id, scope),
     );
-    extension.isActive = true;
+    if (!this.config || this.config.getEnableExtensionReloading()) {
+      // Only toggle the isActive state if we are actually going to disable it
+      // in the current session, or we haven't been initialized yet.
+      extension.isActive = true;
+    }
     await this.maybeStartExtension(extension);
   }
 }
