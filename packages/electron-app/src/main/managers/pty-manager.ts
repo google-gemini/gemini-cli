@@ -6,7 +6,8 @@
 
 import type { BrowserWindow } from 'electron';
 import { dialog } from 'electron';
-import * as pty from 'node-pty';
+import type { IPty, IDisposable } from 'node-pty';
+import { getPty } from '@google/gemini-cli-core';
 import os from 'node:os';
 import fs from 'node:fs';
 import { join, extname, basename, dirname } from 'node:path';
@@ -58,8 +59,8 @@ async function waitForFileStability(
 }
 
 export class PtyManager {
-  private ptyProcess: pty.IPty | null = null;
-  private onDataDisposable: pty.IDisposable | null = null;
+  private ptyProcess: IPty | null = null;
+  private onDataDisposable: IDisposable | null = null;
   private fileWatcher: FSWatcher | null = null;
 
   constructor(private mainWindow: BrowserWindow) {}
@@ -91,7 +92,12 @@ export class PtyManager {
     const env = await this.getEnv();
 
     try {
-      const ptyProcess = pty.spawn(CLI_PATH, [], {
+      const ptyInfo = await getPty();
+      if (!ptyInfo) {
+        throw new Error('Failed to load PTY implementation');
+      }
+
+      const ptyProcess = ptyInfo.module.spawn(CLI_PATH, [], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
@@ -105,7 +111,7 @@ export class PtyManager {
           NODE_NO_WARNINGS: '1',
           DEV: 'false',
         },
-      });
+      }) as IPty;
       this.ptyProcess = ptyProcess;
 
       let outputBuffer = '';

@@ -10,7 +10,7 @@ import type {
   IpcMain,
   BrowserWindow as ElectronBrowserWindow,
 } from 'electron';
-import type * as PTY from 'node-pty';
+import { getPty } from '@google/gemini-cli-core';
 import type { Mock } from 'vitest';
 
 // --- Mocks ---
@@ -22,8 +22,10 @@ const mockPtyProcess = {
   resize: vi.fn(),
   kill: vi.fn(),
 };
-vi.mock('node-pty', () => ({
-  spawn: vi.fn(() => mockPtyProcess),
+const mockSpawn = vi.fn(() => mockPtyProcess);
+
+vi.mock('@google/gemini-cli-core', () => ({
+  getPty: vi.fn(),
 }));
 
 const mockWebContents = {
@@ -115,7 +117,6 @@ describe('main process (index.ts)', () => {
   let app: App;
   let BrowserWindow: typeof ElectronBrowserWindow;
   let ipcMain: IpcMain;
-  let pty: typeof PTY;
 
   beforeEach(async () => {
     vi.resetModules(); // Ensure the main script runs fresh for each test
@@ -124,7 +125,11 @@ describe('main process (index.ts)', () => {
     app = electron.app;
     BrowserWindow = electron.BrowserWindow;
     ipcMain = electron.ipcMain;
-    pty = await import('node-pty');
+
+    vi.mocked(getPty).mockResolvedValue({
+      module: { spawn: mockSpawn },
+      name: 'node-pty',
+    });
   });
 
   afterEach(() => {
@@ -139,7 +144,7 @@ describe('main process (index.ts)', () => {
 
     expect(BrowserWindow).toHaveBeenCalled();
     expect(mockMainWindow.loadFile).toHaveBeenCalled();
-    expect(pty.spawn).toHaveBeenCalled();
+    expect(mockSpawn).toHaveBeenCalled();
   });
 
   it('handles terminal keystrokes', async () => {

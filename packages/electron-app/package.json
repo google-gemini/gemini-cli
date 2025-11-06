@@ -38,6 +38,14 @@
     "react-dom": "^19.1.0",
     "zod": "^3.24.1"
   },
+  "optionalDependencies": {
+    "@lydell/node-pty": "1.1.0",
+    "@lydell/node-pty-darwin-arm64": "1.1.0",
+    "@lydell/node-pty-darwin-x64": "1.1.0",
+    "@lydell/node-pty-linux-x64": "1.1.0",
+    "@lydell/node-pty-win32-arm64": "1.1.0",
+    "@lydell/node-pty-win32-x64": "1.1.0"
+  },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^16.3.0",
@@ -67,6 +75,7 @@
     },
     "asarUnpack": [
       "**/node_modules/node-pty/**",
+      "**/node_modules/@lydell/**",
       "**/node_modules/ajv/**/*"
     ],
     "files": [

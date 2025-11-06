@@ -15,7 +15,7 @@ import {
 } from 'vitest';
 import { PtyManager } from './pty-manager.js';
 import type { BrowserWindow } from 'electron';
-import * as pty from 'node-pty';
+import { getPty } from '@google/gemini-cli-core';
 import { watch, type FSWatcher } from 'chokidar';
 import fs from 'node:fs';
 
@@ -26,8 +26,8 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('node-pty', () => ({
-  spawn: vi.fn(),
+vi.mock('@google/gemini-cli-core', () => ({
+  getPty: vi.fn(),
 }));
 
 vi.mock('chokidar', () => ({
@@ -89,6 +89,7 @@ describe('PtyManager', () => {
     on: Mock;
     close: Mock;
   };
+  let mockSpawn: Mock;
 
   beforeEach(() => {
     mockMainWindow = {
@@ -105,7 +106,12 @@ describe('PtyManager', () => {
       resize: vi.fn(),
       write: vi.fn(),
     };
-    vi.mocked(pty.spawn).mockReturnValue(mockPtyProcess as unknown as pty.IPty);
+
+    mockSpawn = vi.fn().mockReturnValue(mockPtyProcess);
+    vi.mocked(getPty).mockResolvedValue({
+      module: { spawn: mockSpawn },
+      name: 'node-pty',
+    });
 
     mockFileWatcher = {
       on: vi.fn(),
@@ -124,7 +130,7 @@ describe('PtyManager', () => {
 
   it('should start pty process', async () => {
     await ptyManager.start();
-    expect(pty.spawn).toHaveBeenCalledWith(
+    expect(mockSpawn).toHaveBeenCalledWith(
       '/mock/cli/path',
       [],
       expect.objectContaining({
