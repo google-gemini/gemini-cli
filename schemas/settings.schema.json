@@ -81,6 +81,12 @@
           "default": false,
           "type": "boolean"
         },
+        "previewFeatures": {
+          "title": "Preview Features (e.g., models)",
+          "description": "Enable preview features (e.g., preview models).",
+          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `yes`",
+          "type": "boolean"
+        },
         "debugKeystrokeLogging": {
           "title": "Debug Keystroke Logging",
           "description": "Enable debug logging of keystrokes to the console.",

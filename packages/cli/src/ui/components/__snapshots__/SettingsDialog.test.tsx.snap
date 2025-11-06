@@ -12,6 +12,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -19,8 +21,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -47,6 +47,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -54,8 +56,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -82,6 +82,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │   Enable Prompt Completion                             false*                                    │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false*                                    │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -89,8 +91,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -117,6 +117,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -124,8 +126,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -152,6 +152,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -159,8 +161,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -187,6 +187,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -194,8 +196,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -222,6 +222,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -229,8 +231,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -257,6 +257,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -264,8 +266,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -292,6 +292,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │   Enable Prompt Completion                             true*                                     │
 │                                                                                                  │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Debug Keystroke Logging                              true*                                     │
 │                                                                                                  │
 │   Session Retention                                    undefined                                 │
@@ -299,8 +301,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    true*                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
