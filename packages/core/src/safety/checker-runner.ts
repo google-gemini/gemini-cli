@@ -73,9 +73,14 @@ export class CheckerRunner {
           )
         : this.contextBuilder.buildFullContext();
 
+      const toolCallWithConfig = {
+        ...toolCall,
+        config: checkerConfig.config,
+      };
+
       const input: SafetyCheckInput = {
         protocolVersion: '1.0.0',
-        toolCall,
+        toolCall: toolCallWithConfig as FunctionCall,
         context,
       };
 

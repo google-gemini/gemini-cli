@@ -131,6 +131,34 @@ describe('CheckerRunner', () => {
     expect(mockContextBuilder.buildFullContext).not.toHaveBeenCalled();
   });
 
+  it('should pass config to in-process checker via toolCall', async () => {
+    const mockConfig = { included_args: ['foo'] };
+    const configWithConfig: InProcessCheckerConfig = {
+      ...mockInProcessConfig,
+      config: mockConfig,
+    };
+    const mockResult: SafetyCheckResult = {
+      decision: SafetyCheckDecision.ALLOW,
+    };
+    const mockChecker = {
+      check: vi.fn().mockResolvedValue(mockResult),
+    };
+    vi.mocked(mockRegistry.resolveInProcess).mockReturnValue(mockChecker);
+    vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+      environment: { cwd: '/tmp', workspaces: [] },
+    });
+
+    await runner.runChecker(mockToolCall, configWithConfig);
+
+    expect(mockChecker.check).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          config: mockConfig,
+        }),
+      }),
+    );
+  });
+
   describe('External Checkers', () => {
     const mockExternalConfig = {
       type: 'external' as const,
