@@ -200,6 +200,11 @@ export abstract class ExtensionLoader {
     }
     return;
   }
+
+  async restartExtension(extension: GeminiCLIExtension): Promise<void> {
+    await this.stopExtension(extension);
+    await this.startExtension(extension);
+  }
 }
 
 export interface ExtensionEvents {

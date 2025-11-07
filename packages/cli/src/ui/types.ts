@@ -103,6 +103,8 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  icon?: string;
+  color?: string;
 };
 
 export type HistoryItemError = HistoryItemBase & {

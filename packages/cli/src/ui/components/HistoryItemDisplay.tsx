@@ -86,7 +86,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         />
       )}
       {itemForDisplay.type === 'info' && (
-        <InfoMessage text={itemForDisplay.text} />
+        <InfoMessage
+          text={itemForDisplay.text}
+          icon={itemForDisplay.icon}
+          color={itemForDisplay.color}
+        />
       )}
       {itemForDisplay.type === 'warning' && (
         <WarningMessage text={itemForDisplay.text} />
