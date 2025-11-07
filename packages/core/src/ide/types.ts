@@ -105,7 +105,7 @@ export const IdeDiffRejectedNotificationSchema = z.object({
 });
 
 /**
- * This is defineded for backwards compatability only. Newer extension versions
+ * This is defined for backwards compatibility only. Newer extension versions
  * will only send IdeDiffRejectedNotificationSchema.
  *
  * A notification that a diff has been closed in the IDE.
