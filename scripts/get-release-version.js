@@ -47,6 +47,10 @@ function getArgs() {
       description: 'Override the calculated preview version.',
       string: true,
     })
+    .option('stable-base-version', {
+      description: 'Base version to use for calculating next preview/nightly.',
+      string: true,
+    })
     .help(false)
     .version(false)
     .parse();
@@ -256,21 +260,31 @@ function getAndVerifyTags({ npmDistTag, args } = {}) {
 }
 
 function promoteNightlyVersion({ args } = {}) {
-  const { latestVersion, latestTag } = getAndVerifyTags({
+  let latestStableVersion = args['stable-base-version'];
+  if (!latestStableVersion) {
+    const { latestVersion } = getAndVerifyTags({
+      npmDistTag: TAG_LATEST,
+      args,
+    });
+    latestStableVersion = latestVersion;
+  }
+
+  const { latestTag: previousNightlyTag } = getAndVerifyTags({
     npmDistTag: TAG_NIGHTLY,
     args,
   });
-  const baseVersion = latestVersion.split('-')[0];
+
+  const baseVersion = latestStableVersion.split('-')[0];
   const versionParts = baseVersion.split('.');
   const major = versionParts[0];
   const minor = versionParts[1] ? parseInt(versionParts[1]) : 0;
-  const nextMinor = minor + 1;
+  const nextMinor = minor + 2;
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
   return {
     releaseVersion: `${major}.${nextMinor}.0-nightly.${date}.${gitShortHash}`,
     npmTag: TAG_NIGHTLY,
-    previousReleaseTag: latestTag,
+    previousReleaseTag: previousNightlyTag,
   };
 }
 
@@ -329,10 +343,15 @@ function getStableVersion(args) {
 }
 
 function getPreviewVersion(args) {
-  const { latestVersion: latestNightlyVersion } = getAndVerifyTags({
-    npmDistTag: TAG_NIGHTLY,
-    args,
-  });
+  let latestStableVersion = args['stable-base-version'];
+  if (!latestStableVersion) {
+    const { latestVersion } = getAndVerifyTags({
+      npmDistTag: TAG_LATEST,
+      args,
+    });
+    latestStableVersion = latestVersion;
+  }
+
   let releaseVersion;
   if (args['preview_version_override']) {
     const overrideVersion = args['preview_version_override'].replace(/^v/, '');
@@ -343,8 +362,12 @@ function getPreviewVersion(args) {
     );
     releaseVersion = overrideVersion;
   } else {
-    releaseVersion =
-      latestNightlyVersion.replace(/-nightly.*/, '') + '-preview.0';
+    const baseVersion = latestStableVersion.split('-')[0];
+    const versionParts = baseVersion.split('.');
+    const major = versionParts[0];
+    const minor = versionParts[1] ? parseInt(versionParts[1]) : 0;
+    const nextMinor = minor + 1;
+    releaseVersion = `${major}.${nextMinor}.0-preview.0`;
   }
 
   const { latestTag: previousPreviewTag } = getAndVerifyTags({
