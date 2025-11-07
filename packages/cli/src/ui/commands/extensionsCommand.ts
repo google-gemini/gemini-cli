@@ -116,6 +116,85 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
   return updateComplete.then((_) => {});
 }
 
+async function restartAction(
+  context: CommandContext,
+  args: string,
+): Promise<void> {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!extensionLoader) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: "Extensions are not yet loaded, can't restart yet",
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  const restartArgs = args.split(' ').filter((value) => value.length > 0);
+  const all = restartArgs.length === 1 && restartArgs[0] === '--all';
+  const names = all ? null : restartArgs;
+  if (!all && names?.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions restart <extension-names>|--all',
+      },
+      Date.now(),
+    );
+    return Promise.resolve();
+  }
+
+  let extensionsToRestart = extensionLoader
+    .getExtensions()
+    .filter((extension) => extension.isActive);
+  if (names) {
+    extensionsToRestart = extensionsToRestart.filter((extension) =>
+      names.includes(extension.name),
+    );
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Restarting ${extensionsToRestart.length} extension${extensionsToRestart.length > 1 ? 's' : ''}...`,
+    },
+    Date.now(),
+  );
+
+  try {
+    await Promise.all(
+      extensionsToRestart.map(async (extension) => {
+        if (extension.isActive) {
+          await extensionLoader.restartExtension(extension);
+          context.ui.dispatchExtensionStateUpdate({
+            type: 'RESTARTED',
+            payload: {
+              name: extension.name,
+            },
+          });
+        }
+      }),
+    );
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'All extensions restarted successfully.',
+      },
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to restart some extensions: ${getErrorMessage(error)}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
 async function exploreAction(context: CommandContext) {
   const extensionsUrl = 'https://geminicli.com/extensions/';
 
@@ -284,10 +363,14 @@ export function completeExtensions(
   partialArg: string,
 ) {
   let extensions = context.services.config?.getExtensions() ?? [];
+
   if (context.invocation?.name === 'enable') {
     extensions = extensions.filter((ext) => !ext.isActive);
   }
-  if (context.invocation?.name === 'disable') {
+  if (
+    context.invocation?.name === 'disable' ||
+    context.invocation?.name === 'restart'
+  ) {
     extensions = extensions.filter((ext) => ext.isActive);
   }
   const extensionNames = extensions.map((ext) => ext.name);
@@ -351,6 +434,14 @@ const exploreExtensionsCommand: SlashCommand = {
   action: exploreAction,
 };
 
+const restartCommand: SlashCommand = {
+  name: 'restart',
+  description: 'Restart all extensions',
+  kind: CommandKind.BUILT_IN,
+  action: restartAction,
+  completion: completeExtensions,
+};
+
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
@@ -365,6 +456,7 @@ export function extensionsCommand(
       listExtensionsCommand,
       updateExtensionsCommand,
       exploreExtensionsCommand,
+      restartCommand,
       ...conditionalCommands,
     ],
     action: (context, args) =>
