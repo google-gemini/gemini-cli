@@ -98,7 +98,9 @@ describe('file-system', () => {
     await rig.setup('should correctly handle file paths with spaces');
     const fileName = 'my test file.txt';
 
-    const result = await rig.run(`write "hello" to "${fileName}"`);
+    const result = await rig.run(
+      `write "hello" to "${fileName}" and then stop. Do not perform any other actions.`,
+    );
 
     const foundToolCall = await rig.waitForToolCall('write_file');
     if (!foundToolCall) {
