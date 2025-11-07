@@ -8,7 +8,6 @@ import type { Message, Task as SDKTask } from '@a2a-js/sdk';
 import type {
   TaskStore,
   AgentExecutor,
-  AgentExecutionEvent,
   RequestContext,
   ExecutionEventBus,
 } from '@a2a-js/sdk/server';
@@ -299,9 +298,6 @@ export class CoderAgentExecutor implements AgentExecutor {
     );
     logger.info(
       `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
-    );
-    eventBus.on('event', (event: AgentExecutionEvent) =>
-      logger.info('[EventBus event]: ', event),
     );
 
     const store = requestStorage.getStore();

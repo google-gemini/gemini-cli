@@ -864,11 +864,8 @@ export class Task {
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
     // TODO: Determine what it mean to have, then add a prompt ID.
-    yield* this.geminiClient.sendMessageStream(
-      llmParts,
-      aborted,
-      /*prompt_id*/ '',
-    );
+    const promptId = completedToolCalls[0]?.request.prompt_id || uuidv4();
+    yield* this.geminiClient.sendMessageStream(llmParts, aborted, promptId);
   }
 
   async *acceptUserMessage(
@@ -907,7 +904,7 @@ export class Task {
       yield* this.geminiClient.sendMessageStream(
         llmParts,
         aborted,
-        /*prompt_id*/ '',
+        userMessage.messageId,
       );
     } else if (anyConfirmationHandled) {
       logger.info(
