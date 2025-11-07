@@ -2,7 +2,7 @@ name: 'Feature Request'
 description: 'Suggest an idea for this project'
 labels:
   - 'status/need-triage'
-type: Feature
+type: 'Feature'
 body:
   - type: 'markdown'
     attributes:
