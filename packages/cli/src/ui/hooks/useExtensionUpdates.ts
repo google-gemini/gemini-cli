@@ -190,11 +190,20 @@ export const useExtensionUpdates = (
       }
     }
     if (shouldNotifyOfUpdates) {
-      const s = extensionsWithUpdatesCount > 1 ? 's' : '';
+      const updatableExtensions = extensions.filter(
+        (ext) => extensionsUpdateState.extensionStatuses.get(ext.name)?.status === ExtensionUpdateState.UPDATE_AVAILABLE
+      );
+
+      const commandHint =
+        updatableExtensions.length > 1
+          ? '--all'
+          : updatableExtensions[0]?.name || '<extension-name>';
       addItem(
         {
           type: MessageType.INFO,
-          text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available. Run "gemini extensions update <extension-name>" to upgrade, or "/extensions list" for details.`,
+          text: `You have ${updatableExtensions.length} extension${
+            updatableExtensions.length > 1 ? 's' : ''
+          } with an update available.\nRun "gemini extensions update ${commandHint}" to upgrade, or "/extensions list" for details.`,
         },
         Date.now(),
       );

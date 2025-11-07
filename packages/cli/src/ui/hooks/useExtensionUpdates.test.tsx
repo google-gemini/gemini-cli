@@ -107,7 +107,7 @@ describe('useExtensionUpdates', () => {
       expect(addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'You have 1 extension with an update available, run "/extensions list" for more information.',
+          text: 'You have 1 extension with an update available.\nRun "gemini extensions update test-extension" to upgrade, or "/extensions list" for details.',
         },
         expect.any(Number),
       );
