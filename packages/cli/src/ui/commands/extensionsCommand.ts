@@ -8,6 +8,7 @@ import { debugLogger, listExtensions } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
+  emptyIcon,
   MessageType,
   type HistoryItemExtensionsList,
   type HistoryItemInfo,
@@ -226,7 +227,7 @@ async function restartAction(
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
       text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
-      icon: '  ',
+      icon: emptyIcon,
       color: theme.text.primary,
     };
     context.ui.addItem(infoItem, Date.now());
