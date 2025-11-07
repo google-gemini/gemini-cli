@@ -226,7 +226,7 @@ async function restartAction(
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
       text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
-      icon: '  ',
+      prefix: '  ',
       color: theme.text.primary,
     };
     context.ui.addItem(infoItem, Date.now());
