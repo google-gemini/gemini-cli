@@ -8,7 +8,6 @@ import { createHash } from 'node:crypto';
 import { type Content, Type } from '@google/genai';
 import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 
@@ -176,7 +175,7 @@ export async function FixLLMEditWithInstruction(
   const result = await generateJsonWithTimeout<SearchReplaceEdit>(
     baseLlmClient,
     {
-      modelConfigKey: { model: DEFAULT_GEMINI_FLASH_MODEL },
+      modelConfigKey: { model: 'llm-edit-fixer' },
       contents,
       schema: SearchReplaceEditSchema,
       abortSignal,

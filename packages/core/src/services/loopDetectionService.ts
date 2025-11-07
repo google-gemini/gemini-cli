@@ -18,7 +18,6 @@ import {
   LoopType,
 } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,
@@ -436,7 +435,7 @@ export class LoopDetectionService {
     let result;
     try {
       result = await this.config.getBaseLlmClient().generateJson({
-        modelConfigKey: { model: DEFAULT_GEMINI_FLASH_MODEL },
+        modelConfigKey: { model: 'loop-detection' },
         contents,
         schema,
         systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,

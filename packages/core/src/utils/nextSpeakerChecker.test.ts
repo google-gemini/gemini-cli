@@ -272,7 +272,7 @@ describe('checkNextSpeaker', () => {
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
     const generateJsonCall = (mockBaseLlmClient.generateJson as Mock).mock
       .calls[0][0];
-    expect(generateJsonCall.modelConfigKey.model).toBe('gemini-2.5-flash');
+    expect(generateJsonCall.modelConfigKey.model).toBe('next-speaker-checker');
     expect(generateJsonCall.promptId).toBe(promptId);
   });
 });
