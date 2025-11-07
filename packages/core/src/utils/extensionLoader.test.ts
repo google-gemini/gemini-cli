@@ -169,4 +169,27 @@ describe('SimpleExtensionLoader', () => {
       },
     );
   });
+
+  describe('restartExtension', () => {
+    it('should stop and then start the extension', async () => {
+      const loader = new TestingSimpleExtensionLoader([activeExtension]);
+      vi.spyOn(loader, 'stopExtension');
+      vi.spyOn(loader, 'startExtension');
+      await loader.start(mockConfig);
+      await loader.restartExtension(activeExtension);
+      expect(loader.stopExtension).toHaveBeenCalledWith(activeExtension);
+      expect(loader.startExtension).toHaveBeenCalledWith(activeExtension);
+    });
+  });
 });
+
+// Adding these overrides allows us to access the protected members.
+class TestingSimpleExtensionLoader extends SimpleExtensionLoader {
+  override async startExtension(extension: GeminiCLIExtension): Promise<void> {
+    await super.startExtension(extension);
+  }
+
+  override async stopExtension(extension: GeminiCLIExtension): Promise<void> {
+    await super.stopExtension(extension);
+  }
+}
