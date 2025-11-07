@@ -1519,7 +1519,7 @@ describe('loggers', () => {
       vi.resetAllMocks();
     });
 
-    it('should log extension install event', () => {
+    it('should log extension install event', async () => {
       const event = new ExtensionInstallEvent(
         'testing',
         'testing-id',
@@ -1528,7 +1528,7 @@ describe('loggers', () => {
         'success',
       );
 
-      logExtensionInstallEvent(mockConfig, event);
+      await logExtensionInstallEvent(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionInstallEvent,
@@ -1551,7 +1551,7 @@ describe('loggers', () => {
     });
   });
 
-  describe('logExtensionUpdate', () => {
+  describe('logExtensionUpdate', async () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
@@ -1578,7 +1578,7 @@ describe('loggers', () => {
         'success',
       );
 
-      logExtensionUpdateEvent(mockConfig, event);
+      await logExtensionUpdateEvent(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionUpdateEvent,
@@ -1602,7 +1602,7 @@ describe('loggers', () => {
     });
   });
 
-  describe('logExtensionUninstall', () => {
+  describe('logExtensionUninstall', async () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
@@ -1626,7 +1626,7 @@ describe('loggers', () => {
         'success',
       );
 
-      logExtensionUninstall(mockConfig, event);
+      await logExtensionUninstall(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionUninstallEvent,
@@ -1647,7 +1647,7 @@ describe('loggers', () => {
     });
   });
 
-  describe('logExtensionEnable', () => {
+  describe('logExtensionEnable', async () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
@@ -1664,7 +1664,7 @@ describe('loggers', () => {
     it('should log extension enable event', () => {
       const event = new ExtensionEnableEvent('testing', 'testing-id', 'user');
 
-      logExtensionEnable(mockConfig, event);
+      await logExtensionEnable(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionEnableEvent,
@@ -1699,10 +1699,10 @@ describe('loggers', () => {
       vi.resetAllMocks();
     });
 
-    it('should log extension disable event', () => {
+    it('should log extension disable event', async () => {
       const event = new ExtensionDisableEvent('testing', 'testing-id', 'user');
 
-      logExtensionDisable(mockConfig, event);
+      await logExtensionDisable(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionDisableEvent,
