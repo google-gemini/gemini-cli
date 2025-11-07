@@ -788,7 +788,7 @@ export class Config {
    *
    * May change over time.
    */
-  getExcludeTools(): string[] | undefined {
+  getExcludeTools(): Set<string> | undefined {
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
       if (!extension.isActive) {
@@ -798,7 +798,7 @@ export class Config {
         excludeToolsSet.add(tool);
       }
     }
-    return [...excludeToolsSet];
+    return excludeToolsSet;
   }
 
   getToolDiscoveryCommand(): string | undefined {
@@ -1244,7 +1244,6 @@ export class Config {
       const className = ToolClass.name;
       const toolName = ToolClass.Name || className;
       const coreTools = this.getCoreTools();
-      const excludeTools = this.getExcludeTools() || [];
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
 
@@ -1257,14 +1256,6 @@ export class Config {
             tool.startsWith(`${toolName}(`) ||
             tool.startsWith(`${normalizedClassName}(`),
         );
-      }
-
-      const isExcluded = excludeTools.some(
-        (tool) => tool === toolName || tool === normalizedClassName,
-      );
-
-      if (isExcluded) {
-        isEnabled = false;
       }
 
       if (isEnabled) {
@@ -1325,15 +1316,12 @@ export class Config {
       );
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
-        const excludeTools = this.getExcludeTools() || [];
-
         const allowedTools = this.getAllowedTools();
 
-        const isExcluded = excludeTools.includes(definition.name);
         const isAllowed =
           !allowedTools || allowedTools.includes(definition.name);
 
-        if (isAllowed && !isExcluded) {
+        if (isAllowed) {
           const messageBusEnabled = this.getEnableMessageBusIntegration();
           const wrapper = new SubagentToolWrapper(
             definition,

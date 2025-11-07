@@ -62,7 +62,7 @@ describe('ShellTool', () => {
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
-      getExcludeTools: vi.fn().mockReturnValue([]),
+      getExcludeTools: vi.fn().mockReturnValue(new Set([])),
       getDebugMode: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
