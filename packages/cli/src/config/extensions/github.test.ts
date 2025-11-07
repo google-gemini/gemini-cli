@@ -310,11 +310,11 @@ describe('git extension helpers', () => {
 
   describe('findReleaseAsset', () => {
     const assets = [
-      { name: 'darwin.arm64.extension.tar.gz', browser_download_url: 'url1' },
-      { name: 'darwin.x64.extension.tar.gz', browser_download_url: 'url2' },
-      { name: 'linux.x64.extension.tar.gz', browser_download_url: 'url3' },
-      { name: 'win32.x64.extension.tar.gz', browser_download_url: 'url4' },
-      { name: 'extension-generic.tar.gz', browser_download_url: 'url5' },
+      { name: 'darwin.arm64.extension.tar.gz', url: 'url1' },
+      { name: 'darwin.x64.extension.tar.gz', url: 'url2' },
+      { name: 'linux.x64.extension.tar.gz', url: 'url3' },
+      { name: 'win32.x64.extension.tar.gz', url: 'url4' },
+      { name: 'extension-generic.tar.gz', url: 'url5' },
     ];
 
     it.each([
@@ -334,9 +334,7 @@ describe('git extension helpers', () => {
     );
 
     it('should find generic asset if it is the only one', () => {
-      const singleAsset = [
-        { name: 'extension.tar.gz', browser_download_url: 'url' },
-      ];
+      const singleAsset = [{ name: 'extension.tar.gz', url: 'aurl5' }];
 
       mockPlatform.mockReturnValue('darwin');
       mockArch.mockReturnValue('arm64');
@@ -346,8 +344,8 @@ describe('git extension helpers', () => {
 
     it('should return undefined if multiple generic assets exist', () => {
       const multipleGenericAssets = [
-        { name: 'extension-1.tar.gz', browser_download_url: 'url1' },
-        { name: 'extension-2.tar.gz', browser_download_url: 'url2' },
+        { name: 'extension-1.tar.gz', url: 'aurl1' },
+        { name: 'extension-2.tar.gz', url: 'aurl2' },
       ];
 
       mockPlatform.mockReturnValue('darwin');
