@@ -43,8 +43,7 @@ describe('ClassifierStrategy', () => {
     mockResolvedConfig = {
       model: 'classifier',
       generateContentConfig: {},
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any as ResolvedModelConfig;
+    } as unknown as ResolvedModelConfig;
     mockConfig = {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
