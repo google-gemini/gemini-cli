@@ -73,6 +73,8 @@ export abstract class ExtensionLoader {
     });
     try {
       await this.config.getMcpClientManager()!.startExtension(extension);
+      await this.maybeRefreshGeminiTools(extension);
+
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
       // below.
@@ -80,9 +82,6 @@ export abstract class ExtensionLoader {
       // TODO: Update custom command updating away from the event based system
       // and call directly into a custom command manager here. See the
       // useSlashCommandProcessor hook which responds to events fired here today.
-
-      // TODO: Move all enablement of extension features here, including at least:
-      // - excluded tool configuration
     } finally {
       this.startCompletedCount++;
       this.eventEmitter?.emit('extensionsStarting', {
@@ -112,6 +111,21 @@ export abstract class ExtensionLoader {
       // reload memory, this is somewhat expensive and also busts the context
       // cache, we want to only do it once.
       await refreshServerHierarchicalMemory(this.config);
+    }
+  }
+
+  /**
+   * Refreshes the gemini tools list if it is initialized and the extension has
+   * any excludeTools settings.
+   */
+  private async maybeRefreshGeminiTools(
+    extension: GeminiCLIExtension,
+  ): Promise<void> {
+    if (extension.excludeTools && extension.excludeTools.length > 0) {
+      const geminiClient = this.config?.getGeminiClient();
+      if (geminiClient?.isInitialized()) {
+        await geminiClient.setTools();
+      }
     }
   }
 
@@ -150,6 +164,8 @@ export abstract class ExtensionLoader {
 
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
+      await this.maybeRefreshGeminiTools(extension);
+
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
       // below.
@@ -157,9 +173,6 @@ export abstract class ExtensionLoader {
       // TODO: Update custom command updating away from the event based system
       // and call directly into a custom command manager here. See the
       // useSlashCommandProcessor hook which responds to events fired here today.
-
-      // TODO: Remove all extension features here, including at least:
-      // - excluded tools
     } finally {
       this.stopCompletedCount++;
       this.eventEmitter?.emit('extensionsStopping', {

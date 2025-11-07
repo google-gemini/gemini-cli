@@ -5,7 +5,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mocked } from 'vitest';
+import type { Mocked, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ConfigParameters } from '../config/config.js';
 import { Config } from '../config/config.js';
@@ -109,6 +109,9 @@ describe('ToolRegistry', () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
+  let mockConfigGetExcludedTools: MockInstance<
+    typeof Config.prototype.getExcludeTools
+  >;
 
   beforeEach(() => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -132,6 +135,7 @@ describe('ToolRegistry', () => {
       config,
       'getToolDiscoveryCommand',
     );
+    mockConfigGetExcludedTools = vi.spyOn(config, 'getExcludeTools');
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
     vi.spyOn(config, 'getPromptRegistry').mockReturnValue({
@@ -149,6 +153,75 @@ describe('ToolRegistry', () => {
       const tool = new MockTool({ name: 'mock-tool' });
       toolRegistry.registerTool(tool);
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
+    });
+  });
+
+  describe('excluded tools', () => {
+    const simpleTool = new MockTool({
+      name: 'tool-a',
+      displayName: 'Tool a',
+    });
+    const excludedTool = new ExcludedMockTool({
+      name: 'excluded-tool-class',
+      displayName: 'Excluded Tool Class',
+    });
+    const mockCallable = {} as CallableTool;
+    const mcpTool = new DiscoveredMCPTool(
+      mockCallable,
+      'mcp-server',
+      'excluded-mcp-tool',
+      'description',
+      {},
+    );
+    const allowedTool = new MockTool({
+      name: 'allowed-tool',
+      displayName: 'Allowed Tool',
+    });
+
+    it.each([
+      {
+        name: 'should match simple names',
+        tools: [simpleTool],
+        excludedTools: ['tool-a'],
+      },
+      {
+        name: 'should match simple MCP tool names, when qualified or unqualified',
+        tools: [mcpTool, mcpTool.asFullyQualifiedTool()],
+        excludedTools: [mcpTool.name],
+      },
+      {
+        name: 'should match qualified MCP tool names when qualified or unqualified',
+        tools: [mcpTool, mcpTool.asFullyQualifiedTool()],
+        excludedTools: [`${mcpTool.getFullyQualifiedPrefix()}${mcpTool.name}`],
+      },
+      {
+        name: 'should match class names',
+        tools: [excludedTool],
+        excludedTools: ['ExcludedMockTool'],
+      },
+    ])('$name', ({ tools, excludedTools }) => {
+      toolRegistry.registerTool(allowedTool);
+      for (const tool of tools) {
+        toolRegistry.registerTool(tool);
+      }
+      mockConfigGetExcludedTools.mockReturnValue(new Set(excludedTools));
+
+      expect(toolRegistry.getAllTools()).toEqual([allowedTool]);
+      expect(toolRegistry.getAllToolNames()).toEqual([allowedTool.name]);
+      expect(toolRegistry.getFunctionDeclarations()).toEqual(
+        toolRegistry.getFunctionDeclarationsFiltered([allowedTool.name]),
+      );
+      for (const tool of tools) {
+        expect(toolRegistry.getTool(tool.name)).toBeUndefined();
+        expect(
+          toolRegistry.getFunctionDeclarationsFiltered([tool.name]),
+        ).toHaveLength(0);
+        if (tool instanceof DiscoveredMCPTool) {
+          expect(toolRegistry.getToolsByServer(tool.serverName)).toHaveLength(
+            0,
+          );
+        }
+      }
     });
   });
 
@@ -521,3 +594,12 @@ describe('ToolRegistry', () => {
     });
   });
 });
+
+/**
+ * Used for tests that exclude by class name.
+ */
+class ExcludedMockTool extends MockTool {
+  constructor(options: ConstructorParameters<typeof MockTool>[0]) {
+    super(options);
+  }
+}
