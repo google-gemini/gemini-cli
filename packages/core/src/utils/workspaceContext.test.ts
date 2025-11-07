@@ -68,7 +68,7 @@ describe('WorkspaceContext with real filesystem', () => {
     it('should resolve relative paths to absolute', () => {
       const workspaceContext = new WorkspaceContext(cwd);
       const relativePath = path.relative(cwd, otherDir);
-      workspaceContext.addDirectory(relativePath, cwd);
+      workspaceContext.addDirectory(relativePath);
       const directories = workspaceContext.getDirectories();
 
       expect(directories).toEqual([cwd, otherDir]);
