@@ -186,14 +186,21 @@ export class McpClientManager {
             this.eventEmitter?.emit('mcp-client-update', this.clients);
           } catch (error) {
             this.eventEmitter?.emit('mcp-client-update', this.clients);
-            // Log the error but don't let a single failed server stop the others
-            coreEvents.emitFeedback(
-              'error',
-              `Error during discovery for MCP server '${name}': ${getErrorMessage(
+            // Check if this is a 401/auth error - if so, don't show as red error
+            // (the info message was already shown in mcp-client.ts)
+            const errorMessage = getErrorMessage(error);
+            const is401AuthError =
+              errorMessage.includes('401 error received') ||
+              errorMessage.includes('requires authentication');
+
+            if (!is401AuthError) {
+              // Log the error but don't let a single failed server stop the others
+              coreEvents.emitFeedback(
+                'error',
+                `Error during discovery for MCP server '${name}': ${errorMessage}`,
                 error,
-              )}`,
-              error,
-            );
+              );
+            }
           }
         } finally {
           // This is required to update the content generator configuration with the
