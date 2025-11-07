@@ -36,7 +36,7 @@ vi.mock('./sandboxConfig.js', () => ({
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
-  const mockHome = '/mock/home/user';
+  const mockHome = pathMod.resolve(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -69,7 +69,7 @@ vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
   return {
     ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
+    homedir: vi.fn(() => path.resolve(path.sep, 'mock', 'home', 'user')),
   };
 });
 
@@ -1480,7 +1480,9 @@ describe('loadCliConfig folderTrust', () => {
 describe('loadCliConfig with includeDirectories', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(
+      path.resolve(path.sep, 'mock', 'home', 'user'),
+    );
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(process, 'cwd').mockReturnValue(
       path.resolve(path.sep, 'home', 'user', 'project'),
