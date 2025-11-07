@@ -839,6 +839,8 @@ export async function connectToMcpServer(
     unlistenDirectories = undefined;
   };
 
+  let firstAttemptError: Error | null = null;
+
   try {
     const transport = await createTransport(
       mcpServerName,
@@ -852,9 +854,85 @@ export async function connectToMcpServer(
       return mcpClient;
     } catch (error) {
       await transport.close();
+      firstAttemptError = error as Error;
       throw error;
     }
   } catch (error) {
+    // If HTTP failed and no explicit type was specified, try SSE fallback
+    if (
+      firstAttemptError &&
+      mcpServerConfig.url &&
+      !mcpServerConfig.type &&
+      !mcpServerConfig.httpUrl
+    ) {
+      debugLogger.log(
+        `MCP server '${mcpServerName}': HTTP connection failed, attempting SSE fallback...`,
+      );
+
+      try {
+        // Check if we have OAuth tokens to use with SSE
+        let accessToken: string | null = null;
+        let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
+
+        if (hasOAuthConfig && mcpServerConfig.oauth) {
+          const tokenStorage = new MCPOAuthTokenStorage();
+          const authProvider = new MCPOAuthProvider(tokenStorage);
+          accessToken = await authProvider.getValidToken(
+            mcpServerName,
+            mcpServerConfig.oauth,
+          );
+        } else {
+          // Check if we have stored OAuth tokens for this server
+          const tokenStorage = new MCPOAuthTokenStorage();
+          const credentials = await tokenStorage.getCredentials(mcpServerName);
+          if (credentials) {
+            const authProvider = new MCPOAuthProvider(tokenStorage);
+            accessToken = await authProvider.getValidToken(mcpServerName, {
+              clientId: credentials.clientId,
+            });
+            if (accessToken) {
+              hasOAuthConfig = true;
+            }
+          }
+        }
+
+        // Build transport options for SSE
+        const transportOptions: SSEClientTransportOptions = {};
+        if (hasOAuthConfig && accessToken) {
+          transportOptions.requestInit = {
+            headers: {
+              ...mcpServerConfig.headers,
+              Authorization: `Bearer ${accessToken}`,
+            },
+          };
+        } else if (mcpServerConfig.headers) {
+          transportOptions.requestInit = {
+            headers: mcpServerConfig.headers,
+          };
+        }
+
+        const sseTransport = new SSEClientTransport(
+          new URL(mcpServerConfig.url),
+          transportOptions,
+        );
+
+        await mcpClient.connect(sseTransport, {
+          timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+        });
+
+        debugLogger.log(
+          `MCP server '${mcpServerName}': Successfully connected using SSE transport.`,
+        );
+        return mcpClient;
+      } catch (_sseError) {
+        debugLogger.log(
+          `MCP server '${mcpServerName}': SSE fallback also failed.`,
+        );
+        // Both failed, throw the original HTTP error
+        // Fall through to existing error handling below
+      }
+    }
+
     // Check if this is a 401 error that might indicate OAuth is required
     const errorString = String(error);
     if (errorString.includes('401') && hasNetworkTransport(mcpServerConfig)) {
@@ -1162,65 +1240,24 @@ export async function createTransport(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
 ): Promise<Transport> {
+  // Handle auth provider types (SERVICE_ACCOUNT_IMPERSONATION and GOOGLE_CREDENTIALS)
   if (
     mcpServerConfig.authProviderType ===
-    AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
-  ) {
-    const provider = new ServiceAccountImpersonationProvider(mcpServerConfig);
-    const transportOptions:
-      | StreamableHTTPClientTransportOptions
-      | SSEClientTransportOptions = {
-      authProvider: provider,
-    };
-
-    // Priority 1: httpUrl (deprecated)
-    if (mcpServerConfig.httpUrl) {
-      if (mcpServerConfig.url) {
-        debugLogger.warn(
-          `MCP server '${mcpServerName}': Both 'httpUrl' and 'url' are configured. ` +
-            `Using deprecated 'httpUrl'. Please migrate to 'url' with 'type: "http"'.`,
-        );
-      }
-      return new StreamableHTTPClientTransport(
-        new URL(mcpServerConfig.httpUrl),
-        transportOptions,
-      );
-    }
-    // Priority 2 & 3: url with explicit type
-    if (mcpServerConfig.url && mcpServerConfig.type) {
-      if (mcpServerConfig.type === 'http') {
-        return new StreamableHTTPClientTransport(
-          new URL(mcpServerConfig.url),
-          transportOptions,
-        );
-      } else if (mcpServerConfig.type === 'sse') {
-        return new SSEClientTransport(
-          new URL(mcpServerConfig.url),
-          transportOptions,
-        );
-      }
-    }
-    // Priority 4: url without type (default to SSE for backward compatibility)
-    if (mcpServerConfig.url) {
-      return new SSEClientTransport(
-        new URL(mcpServerConfig.url),
-        transportOptions,
-      );
-    }
-    throw new Error(
-      'No URL configured for ServiceAccountImpersonation MCP Server',
-    );
-  }
-
-  if (
+      AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION ||
     mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
   ) {
-    const provider = new GoogleCredentialProvider(mcpServerConfig);
+    const provider =
+      mcpServerConfig.authProviderType ===
+      AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
+        ? new ServiceAccountImpersonationProvider(mcpServerConfig)
+        : new GoogleCredentialProvider(mcpServerConfig);
+
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
       authProvider: provider,
     };
+
     // Priority 1: httpUrl (deprecated)
     if (mcpServerConfig.httpUrl) {
       if (mcpServerConfig.url) {
@@ -1248,14 +1285,20 @@ export async function createTransport(
         );
       }
     }
-    // Priority 4: url without type (default to SSE for backward compatibility)
+    // Priority 4: url without type (default to HTTP)
     if (mcpServerConfig.url) {
-      return new SSEClientTransport(
+      return new StreamableHTTPClientTransport(
         new URL(mcpServerConfig.url),
         transportOptions,
       );
     }
-    throw new Error('No URL configured for Google Credentials MCP server');
+
+    const authTypeName =
+      mcpServerConfig.authProviderType ===
+      AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
+        ? 'ServiceAccountImpersonation'
+        : 'Google Credentials';
+    throw new Error(`No URL configured for ${authTypeName} MCP Server`);
   }
 
   // Check if we have OAuth configuration or stored tokens

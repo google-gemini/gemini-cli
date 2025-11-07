@@ -442,7 +442,7 @@ describe('mcp-client', () => {
           false,
         );
         expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {}),
+          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
         );
       });
 
@@ -457,7 +457,7 @@ describe('mcp-client', () => {
         );
 
         expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
+          new StreamableHTTPClientTransport(new URL('http://test-server'), {
             requestInit: {
               headers: { Authorization: 'derp' },
             },
@@ -516,6 +516,7 @@ describe('mcp-client', () => {
           'test-server',
           {
             url: 'http://test.googleapis.com',
+            type: 'sse',
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
             oauth: {
               scopes: ['scope1'],
