@@ -572,4 +572,116 @@ describe('extensionsCommand', () => {
       );
     });
   });
+
+  describe('uninstall', () => {
+    const uninstallAction = extensionsCommand(true).subCommands?.find(
+      (cmd) => cmd.name === 'uninstall',
+    )?.action;
+
+    if (!uninstallAction) {
+      throw new Error('Uninstall action not found');
+    }
+
+    it('should show info message if no extensions are installed', async () => {
+      mockGetExtensions.mockReturnValue([]);
+      await uninstallAction(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions installed.',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if specified extension is not found', async () => {
+      mockGetExtensions.mockReturnValue([
+        {
+          name: 'ext-one',
+          id: 'ext-one-id',
+          version: '1.0.0',
+          isActive: true,
+          path: '/test/dir/ext-one',
+          contextFiles: [],
+        },
+      ]);
+      await uninstallAction(mockContext, 'nonexistent');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: 'Extension "nonexistent" not found.',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should return confirmation prompt when extension name is provided', async () => {
+      mockGetExtensions.mockReturnValue([
+        {
+          name: 'ext-one',
+          id: 'ext-one-id',
+          version: '1.0.0',
+          isActive: true,
+          path: '/test/dir/ext-one',
+          contextFiles: [],
+        },
+      ]);
+      const result = await uninstallAction(mockContext, 'ext-one');
+      expect(result).toEqual({
+        type: 'confirm_action',
+        prompt: expect.anything(),
+        originalInvocation: {
+          raw: '/extensions uninstall ext-one',
+        },
+      });
+    });
+
+    describe('completion', () => {
+      const uninstallCompletion = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'uninstall',
+      )?.completion;
+
+      if (!uninstallCompletion) {
+        throw new Error('Uninstall completion not found');
+      }
+
+      it('should return matching extension names', async () => {
+        mockGetExtensions.mockReturnValue([
+          {
+            name: 'ext-one',
+            id: 'ext-one-id',
+            version: '1.0.0',
+            isActive: true,
+            path: '/test/dir/ext-one',
+            contextFiles: [],
+          },
+          {
+            name: 'another-ext',
+            id: 'another-ext-id',
+            version: '1.0.0',
+            isActive: true,
+            path: '/test/dir/another-ext',
+            contextFiles: [],
+          },
+        ]);
+        const suggestions = await uninstallCompletion(mockContext, 'ext');
+        expect(suggestions).toEqual(['ext-one']);
+      });
+
+      it('should return empty array if no matches', async () => {
+        mockGetExtensions.mockReturnValue([
+          {
+            name: 'ext-one',
+            id: 'ext-one-id',
+            version: '1.0.0',
+            isActive: true,
+            path: '/test/dir/ext-one',
+            contextFiles: [],
+          },
+        ]);
+        const suggestions = await uninstallCompletion(mockContext, 'nomatch');
+        expect(suggestions).toEqual([]);
+      });
+    });
+  });
 });

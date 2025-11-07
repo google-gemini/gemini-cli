@@ -11,12 +11,16 @@ import { MessageType, type HistoryItemExtensionsList } from '../types.js';
 import {
   type CommandContext,
   type SlashCommand,
+  type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
 import open from 'open';
 import process from 'node:process';
+import { Text } from 'ink';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 async function listAction(context: CommandContext) {
   const historyItem: HistoryItemExtensionsList = {
@@ -351,6 +355,139 @@ const exploreExtensionsCommand: SlashCommand = {
   action: exploreAction,
 };
 
+async function uninstallAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | SlashCommandActionReturn> {
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (extensions.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'No extensions installed.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  // If an extension name is provided as argument, skip the selection and go to confirmation
+  const trimmedArgs = args.trim();
+  if (trimmedArgs) {
+    const extension = extensions.find((ext) => ext.name === trimmedArgs);
+    if (!extension) {
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Extension "${trimmedArgs}" not found.`,
+        },
+        Date.now(),
+      );
+      return;
+    }
+
+    // Show confirmation for the specified extension
+    if (!context.overwriteConfirmed) {
+      return {
+        type: 'confirm_action',
+        prompt: (
+          <Text>
+            Do you want to remove the extension{' '}
+            <Text bold>{extension.name}</Text>?
+          </Text>
+        ),
+        originalInvocation: {
+          raw: `/extensions uninstall ${trimmedArgs}`,
+        },
+      } as const;
+    }
+
+    // Proceed with uninstallation
+    try {
+      const extensionManager = new ExtensionManager({
+        workspaceDir: process.cwd(),
+        requestConsent: requestConsentNonInteractive,
+        requestSetting: promptForSetting,
+        settings: context.services.settings.merged,
+      });
+      await extensionManager.loadExtensions();
+      await extensionManager.uninstallExtension(extension.name, false);
+
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: `Extension "${extension.name}" successfully uninstalled.`,
+        },
+        Date.now(),
+      );
+
+      // Manually update the list of extensions in the UI.
+      const updatedExtensions = extensions.filter(
+        (e) => e.name !== extension.name,
+      );
+      const historyItem: HistoryItemExtensionsList = {
+        type: MessageType.EXTENSIONS_LIST,
+        extensions: updatedExtensions,
+      };
+      context.ui.addItem(historyItem, Date.now());
+
+      // Reload commands to reflect the changes
+      context.ui.reloadCommands();
+    } catch (error) {
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to uninstall extension: ${getErrorMessage(error)}`,
+        },
+        Date.now(),
+      );
+    }
+    return;
+  }
+
+  // Show selection list of extensions
+  const extensionItems = extensions.map((ext) => ({
+    label: ext.name,
+    value: ext.name,
+    key: ext.name,
+  }));
+
+  return {
+    type: 'confirm_action',
+    prompt: (
+      <Text>
+        Select an extension to uninstall (this will show a selection menu in the
+        future):
+        {extensionItems.map((item) => (
+          <Text key={item.key}>
+            {'\n'} - {item.label}
+          </Text>
+        ))}
+      </Text>
+    ),
+    originalInvocation: {
+      raw: '/extensions uninstall',
+    },
+  } as const;
+}
+
+const uninstallExtensionsCommand: SlashCommand = {
+  name: 'uninstall',
+  description: 'Uninstall an extension',
+  kind: CommandKind.BUILT_IN,
+  action: uninstallAction,
+  completion: async (context, partialArg) => {
+    const extensions = context.services.config
+      ? listExtensions(context.services.config)
+      : [];
+    const extensionNames = extensions.map((ext) => ext.name);
+    return extensionNames.filter((name) => name.startsWith(partialArg));
+  },
+};
+
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
@@ -365,6 +502,7 @@ export function extensionsCommand(
       listExtensionsCommand,
       updateExtensionsCommand,
       exploreExtensionsCommand,
+      uninstallExtensionsCommand,
       ...conditionalCommands,
     ],
     action: (context, args) =>
