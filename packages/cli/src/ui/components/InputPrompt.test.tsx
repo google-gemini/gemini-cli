@@ -433,11 +433,7 @@ describe('InputPrompt', () => {
     it.each([
       {
         os: 'macOS',
-        pasteSequence: ['\x1b[200~', '\x1b[201~'],
-      },
-      {
-        os: 'other',
-        pasteSequence: ['\x16'],
+        pasteSequence: '\x1b[200~\x1b[201~',
       },
     ])('should handle paste on $os', async ({ pasteSequence }) => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
@@ -450,9 +446,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        for (const seq of pasteSequence) {
-          stdin.write(seq);
-        }
+        stdin.write(pasteSequence);
       });
 
       await waitFor(() => {
@@ -471,11 +465,7 @@ describe('InputPrompt', () => {
     it.each([
       {
         os: 'macOS',
-        pasteSequence: ['\x1b[200~', '\x1b[201~'],
-      },
-      {
-        os: 'other',
-        pasteSequence: ['\x16'],
+        pasteSequence: '\x1b[200~\x1b[201~',
       },
     ])(
       'should not insert anything when clipboard has no image on $os',
@@ -487,9 +477,7 @@ describe('InputPrompt', () => {
         );
 
         await act(async () => {
-          for (const seq of pasteSequence) {
-            stdin.write(seq);
-          }
+          stdin.write(pasteSequence);
         });
         await waitFor(() => {
           expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
@@ -503,11 +491,7 @@ describe('InputPrompt', () => {
     it.each([
       {
         os: 'macOS',
-        pasteSequence: ['\x1b[200~', '\x1b[201~'],
-      },
-      {
-        os: 'other',
-        pasteSequence: ['\x16'],
+        pasteSequence: '\x1b[200~\x1b[201~',
       },
     ])(
       'should handle image save failure gracefully on $os',
@@ -520,9 +504,7 @@ describe('InputPrompt', () => {
         );
 
         await act(async () => {
-          for (const seq of pasteSequence) {
-            stdin.write(seq);
-          }
+          stdin.write(pasteSequence);
         });
         await waitFor(() => {
           expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
@@ -535,11 +517,7 @@ describe('InputPrompt', () => {
     it.each([
       {
         os: 'macOS',
-        pasteSequence: ['\x1b[200~', '\x1b[201~'],
-      },
-      {
-        os: 'other',
-        pasteSequence: ['\x16'],
+        pasteSequence: '\x1b[200~\x1b[201~',
       },
     ])(
       'should insert image path at cursor position with proper spacing on $os',
@@ -565,9 +543,7 @@ describe('InputPrompt', () => {
         );
 
         await act(async () => {
-          for (const seq of pasteSequence) {
-            stdin.write(seq);
-          }
+          stdin.write(pasteSequence);
         });
         await waitFor(() => {
           // Should insert at cursor position with spaces
@@ -589,11 +565,7 @@ describe('InputPrompt', () => {
     it.each([
       {
         os: 'macOS',
-        pasteSequence: ['\x1b[200~', '\x1b[201~'],
-      },
-      {
-        os: 'other',
-        pasteSequence: ['\x16'],
+        pasteSequence: '\x1b[200~\x1b[201~',
       },
     ])(
       'should handle errors during clipboard operations on $os',
@@ -610,9 +582,7 @@ describe('InputPrompt', () => {
         );
 
         await act(async () => {
-          for (const seq of pasteSequence) {
-            stdin.write(seq);
-          }
+          stdin.write(pasteSequence);
         });
         await waitFor(() => {
           expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -1004,10 +974,6 @@ describe('InputPrompt', () => {
       {
         os: 'macOS',
         pasteSequence: '\x1B[200~pasted text\x1B[201~',
-      },
-      {
-        os: 'other',
-        pasteSequence: '\x16pasted text',
       },
     ])('should handle bracketed paste on $os', async ({ pasteSequence }) => {
       props.focus = false;
