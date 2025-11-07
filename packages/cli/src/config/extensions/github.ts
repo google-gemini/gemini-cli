@@ -306,8 +306,11 @@ export async function downloadFromGitHubRelease(
     let archiveUrl: string | undefined;
     let isTar = false;
     let isZip = false;
+    let fileName: string | undefined;
+
     if (asset) {
-      archiveUrl = asset.browser_download_url;
+      archiveUrl = asset.url;
+      fileName = asset.name;
     } else {
       if (releaseData.tarball_url) {
         archiveUrl = releaseData.tarball_url;
@@ -326,10 +329,10 @@ export async function downloadFromGitHubRelease(
         errorMessage: `No assets found for release with tag ${releaseData.tag_name}`,
       };
     }
-    let downloadedAssetPath = path.join(
-      destination,
-      path.basename(new URL(archiveUrl).pathname),
-    );
+    if (!fileName) {
+      fileName = path.basename(new URL(archiveUrl).pathname);
+    }
+    let downloadedAssetPath = path.join(destination, fileName);
     if (isTar && !downloadedAssetPath.endsWith('.tar.gz')) {
       downloadedAssetPath += '.tar.gz';
     } else if (isZip && !downloadedAssetPath.endsWith('.zip')) {
@@ -414,7 +417,7 @@ interface GithubReleaseData {
 
 interface Asset {
   name: string;
-  browser_download_url: string;
+  url: string;
 }
 
 export function findReleaseAsset(assets: Asset[]): Asset | undefined {
@@ -455,8 +458,13 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
-  const headers: { 'User-agent': string; Authorization?: string } = {
+  const headers: {
+    'User-agent': string;
+    Accept: string;
+    Authorization?: string;
+  } = {
     'User-agent': 'gemini-cli',
+    Accept: 'application/octet-stream',
   };
   const token = getGitHubToken();
   if (token) {
