@@ -503,15 +503,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         continue;
       }
 
+      const normalizedToolName = functionCall.name.replaceAll('_', '-');
+
       // Handle standard tools
-      if (!allowedToolNames.has(functionCall.name as string)) {
+      if (!allowedToolNames.has(normalizedToolName)) {
         const error = `Unauthorized tool call: '${functionCall.name}' is not available to this agent.`;
 
         debugLogger.warn(`[AgentExecutor] Blocked call: ${error}`);
 
         syncResponseParts.push({
           functionResponse: {
-            name: functionCall.name as string,
+            name: functionCall.name,
             id: callId,
             response: { error },
           },
@@ -529,7 +531,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
       const requestInfo: ToolCallRequestInfo = {
         callId,
-        name: functionCall.name as string,
+        name: normalizedToolName,
         args,
         isClientInitiated: true,
         prompt_id: promptId,
