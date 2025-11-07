@@ -259,7 +259,7 @@ function getAndVerifyTags({ npmDistTag, args } = {}) {
   };
 }
 
-function promoteNightlyVersion({ args } = {}) {
+function getStableBaseVersion(args) {
   let latestStableVersion = args['stable-base-version'];
   if (!latestStableVersion) {
     const { latestVersion } = getAndVerifyTags({
@@ -268,16 +268,19 @@ function promoteNightlyVersion({ args } = {}) {
     });
     latestStableVersion = latestVersion;
   }
+  return latestStableVersion;
+}
+
+function promoteNightlyVersion({ args } = {}) {
+  const latestStableVersion = getStableBaseVersion(args);
 
   const { latestTag: previousNightlyTag } = getAndVerifyTags({
     npmDistTag: TAG_NIGHTLY,
     args,
   });
 
-  const baseVersion = latestStableVersion.split('-')[0];
-  const versionParts = baseVersion.split('.');
-  const major = versionParts[0];
-  const minor = versionParts[1] ? parseInt(versionParts[1]) : 0;
+  const major = semver.major(latestStableVersion);
+  const minor = semver.minor(latestStableVersion);
   const nextMinor = minor + 2;
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
@@ -343,14 +346,7 @@ function getStableVersion(args) {
 }
 
 function getPreviewVersion(args) {
-  let latestStableVersion = args['stable-base-version'];
-  if (!latestStableVersion) {
-    const { latestVersion } = getAndVerifyTags({
-      npmDistTag: TAG_LATEST,
-      args,
-    });
-    latestStableVersion = latestVersion;
-  }
+  const latestStableVersion = getStableBaseVersion(args);
 
   let releaseVersion;
   if (args['preview_version_override']) {
@@ -362,10 +358,8 @@ function getPreviewVersion(args) {
     );
     releaseVersion = overrideVersion;
   } else {
-    const baseVersion = latestStableVersion.split('-')[0];
-    const versionParts = baseVersion.split('.');
-    const major = versionParts[0];
-    const minor = versionParts[1] ? parseInt(versionParts[1]) : 0;
+    const major = semver.major(latestStableVersion);
+    const minor = semver.minor(latestStableVersion);
     const nextMinor = minor + 1;
     releaseVersion = `${major}.${nextMinor}.0-preview.0`;
   }
