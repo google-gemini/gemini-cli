@@ -66,6 +66,8 @@ export const Composer = () => {
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
 
+      <TodoTray />
+
       <Box
         marginTop={1}
         justifyContent={
@@ -99,8 +101,10 @@ export const Composer = () => {
                 ideContext={uiState.ideContextState}
                 geminiMdFileCount={uiState.geminiMdFileCount}
                 contextFileNames={contextFileNames}
-                mcpServers={config.getMcpServers()}
-                blockedMcpServers={config.getBlockedMcpServers()}
+                mcpServers={config.getMcpClientManager()?.getMcpServers() ?? {}}
+                blockedMcpServers={
+                  config.getMcpClientManager()?.getBlockedMcpServers() ?? []
+                }
               />
             )
           )}
@@ -124,13 +128,12 @@ export const Composer = () => {
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
               width={uiState.mainAreaWidth}
+              hasFocus={true}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>
         </OverflowProvider>
       )}
-
-      <TodoTray />
 
       {uiState.isInputActive && (
         <InputPrompt

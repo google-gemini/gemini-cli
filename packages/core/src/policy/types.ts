@@ -10,6 +10,12 @@ export enum PolicyDecision {
   ASK_USER = 'ask_user',
 }
 
+export enum ApprovalMode {
+  DEFAULT = 'default',
+  AUTO_EDIT = 'autoEdit',
+  YOLO = 'yolo',
+}
+
 export interface PolicyRule {
   /**
    * The name of the tool this rule applies to.
@@ -52,4 +58,16 @@ export interface PolicyEngineConfig {
    * When true, ASK_USER decisions become DENY.
    */
   nonInteractive?: boolean;
+}
+
+export interface PolicySettings {
+  mcp?: {
+    excluded?: string[];
+    allowed?: string[];
+  };
+  tools?: {
+    exclude?: string[];
+    allowed?: string[];
+  };
+  mcpServers?: Record<string, { trust?: boolean }>;
 }

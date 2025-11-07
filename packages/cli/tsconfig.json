@@ -13,14 +13,6 @@
     "src/**/*.json",
     "./package.json"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    // TODO(5691): Fix type errors and remove excludes.
-    "src/utils/cleanup.test.ts",
-    "src/utils/handleAutoUpdate.test.ts",
-    "src/utils/startupWarnings.test.ts",
-    "src/ui/utils/computeStats.test.ts"
-  ],
+  "exclude": ["node_modules", "dist"],
   "references": [{ "path": "../core" }]
 }

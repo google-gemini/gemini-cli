@@ -107,10 +107,6 @@ describe('summarizers', () => {
 
       expect(mockGeminiClient.generateContent).toHaveBeenCalledTimes(1);
       expect(result).toBe(longText);
-      expect(console.error).toHaveBeenCalledWith(
-        'Failed to summarize tool output.',
-        error,
-      );
     });
 
     it('should construct the correct prompt for summarization', async () => {

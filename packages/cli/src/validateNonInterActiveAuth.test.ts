@@ -53,10 +53,7 @@ describe('validateNonInterActiveAuth', () => {
         throw new Error(`process.exit(${code}) called`);
       });
     vi.spyOn(auth, 'validateAuthMethod').mockReturnValue(null);
-    refreshAuthMock = vi.fn().mockImplementation(async () => {
-      console.log('DEBUG: refreshAuthMock called');
-      return 'refreshed';
-    });
+    refreshAuthMock = vi.fn().mockImplementation(async () => 'refreshed');
     mockSettings = {
       system: { path: '', settings: {} },
       systemDefaults: { path: '', settings: {} },
@@ -72,7 +69,7 @@ describe('validateNonInterActiveAuth', () => {
         },
       },
       isTrusted: true,
-      migratedInMemorScopes: new Set(),
+      migratedInMemoryScopes: new Set(),
       forScope: vi.fn(),
       computeMergedSettings: vi.fn(),
     } as unknown as LoadedSettings;

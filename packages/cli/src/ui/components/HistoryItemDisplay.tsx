@@ -130,7 +130,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'compression' && (
         <CompressionMessage compression={itemForDisplay.compression} />
       )}
-      {itemForDisplay.type === 'extensions_list' && <ExtensionsList />}
+      {itemForDisplay.type === 'extensions_list' && (
+        <ExtensionsList extensions={itemForDisplay.extensions} />
+      )}
       {itemForDisplay.type === 'tools_list' && (
         <ToolsList
           terminalWidth={terminalWidth}

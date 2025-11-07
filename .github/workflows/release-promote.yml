@@ -39,7 +39,7 @@ jobs:
   calculate-versions:
     name: 'Calculate Versions and Plan'
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
 
     outputs:
       STABLE_VERSION: '${{ steps.versions.outputs.STABLE_VERSION }}'
@@ -77,10 +77,19 @@ jobs:
         id: 'versions'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          STABLE_OVERRIDE: '${{ github.event.inputs.stable_version_override }}'
+          PREVIEW_OVERRIDE: '${{ github.event.inputs.preview_version_override }}'
+          REF_INPUT: '${{ github.event.inputs.ref }}'
         run: |
           set -e
-          STABLE_COMMAND="node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
-          PREVIEW_COMMAND="node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
+          STABLE_COMMAND="node scripts/get-release-version.js --type=stable"
+          if [[ -n "${STABLE_OVERRIDE}" ]]; then
+            STABLE_COMMAND+=" --stable_version_override=${STABLE_OVERRIDE}"
+          fi
+          PREVIEW_COMMAND="node scripts/get-release-version.js --type=preview"
+          if [[ -n "${PREVIEW_OVERRIDE}" ]]; then
+            PREVIEW_COMMAND+=" --preview_version_override=${PREVIEW_OVERRIDE}"
+          fi
           NIGHTLY_COMMAND="node scripts/get-release-version.js --type=promote-nightly"
           STABLE_JSON=$(${STABLE_COMMAND})
           PREVIEW_JSON=$(${PREVIEW_COMMAND})
@@ -97,7 +106,7 @@ jobs:
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          REF="${{ github.event.inputs.ref }}"
+          REF="${REF_INPUT}"
           SHA=$(git ls-remote origin "$REF" | awk '{print $1}')
           if [ -z "$SHA" ]; then
             if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
@@ -116,20 +125,30 @@ jobs:
           echo "NEXT_SHA=$SHA" >> "${GITHUB_OUTPUT}"
 
       - name: 'Display Pending Updates'
+        env:
+          STABLE_VERSION: '${{ steps.versions.outputs.STABLE_VERSION }}'
+          STABLE_SHA: '${{ steps.versions.outputs.STABLE_SHA }}'
+          PREVIOUS_STABLE_TAG: '${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}'
+          PREVIEW_VERSION: '${{ steps.versions.outputs.PREVIEW_VERSION }}'
+          PREVIEW_SHA: '${{ steps.versions.outputs.PREVIEW_SHA }}'
+          PREVIOUS_PREVIEW_TAG: '${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}'
+          NEXT_NIGHTLY_VERSION: '${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}'
+          PREVIOUS_NIGHTLY_TAG: '${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}'
+          INPUT_REF: '${{ github.event.inputs.ref }}'
         run: |
           echo "Release Plan:"
           echo "-----------"
-          echo "Stable Release: ${{ steps.versions.outputs.STABLE_VERSION }}"
-          echo "  - Commit: ${{ steps.versions.outputs.STABLE_SHA }}"
-          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
+          echo "Stable Release: ${STABLE_VERSION}"
+          echo "  - Commit: ${STABLE_SHA}"
+          echo "  - Previous Tag: ${PREVIOUS_STABLE_TAG}"
           echo ""
-          echo "Preview Release: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
-          echo "  - Commit: ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})"
-          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}"
+          echo "Preview Release: ${PREVIEW_VERSION}"
+          echo "  - Commit: ${PREVIEW_SHA} (${INPUT_REF})"
+          echo "  - Previous Tag: ${PREVIOUS_PREVIEW_TAG}"
           echo ""
-          echo "Preparing Next Nightly Release: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  - Merging Version Update PR to Branch: ${{ github.event.inputs.ref }}"
-          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
+          echo "Preparing Next Nightly Release: ${NEXT_NIGHTLY_VERSION}"
+          echo "  - Merging Version Update PR to Branch: ${INPUT_REF}"
+          echo "  - Previous Tag: ${PREVIOUS_NIGHTLY_TAG}"
 
   test:
     name: 'Test ${{ matrix.channel }}'
@@ -179,7 +198,7 @@ jobs:
     name: 'Publish preview'
     needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       packages: 'write'
@@ -245,7 +264,7 @@ jobs:
     name: 'Publish stable'
     needs: ['calculate-versions', 'test', 'publish-preview']
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       packages: 'write'

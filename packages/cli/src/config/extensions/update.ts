@@ -9,18 +9,13 @@ import {
   ExtensionUpdateState,
   type ExtensionUpdateStatus,
 } from '../../ui/state/extensions.js';
-import {
-  copyExtension,
-  installOrUpdateExtension,
-  loadExtension,
-  loadInstallMetadata,
-  ExtensionStorage,
-  loadExtensionConfig,
-} from '../extension.js';
+import { loadInstallMetadata } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import { getErrorMessage } from '../../utils/errors.js';
+import { copyExtension, type ExtensionManager } from '../extension-manager.js';
+import { ExtensionStorage } from './storage.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -30,10 +25,10 @@ export interface ExtensionUpdateInfo {
 
 export async function updateExtension(
   extension: GeminiCLIExtension,
-  cwd: string = process.cwd(),
-  requestConsent: (consent: string) => Promise<boolean>,
+  extensionManager: ExtensionManager,
   currentState: ExtensionUpdateState,
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void,
+  enableExtensionReloading?: boolean,
 ): Promise<ExtensionUpdateInfo | undefined> {
   if (currentState === ExtensionUpdateState.UPDATING) {
     return undefined;
@@ -64,35 +59,32 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    const previousExtensionConfig = await loadExtensionConfig({
-      extensionDir: extension.path,
-      workspaceDir: cwd,
-    });
-    await installOrUpdateExtension(
-      installMetadata,
-      requestConsent,
-      cwd,
-      previousExtensionConfig,
+    const previousExtensionConfig = extensionManager.loadExtensionConfig(
+      extension.path,
     );
-
-    const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = loadExtension({
-      extensionDir: updatedExtensionStorage.getExtensionDir(),
-      workspaceDir: cwd,
-    });
-    if (!updatedExtension) {
+    let updatedExtension: GeminiCLIExtension;
+    try {
+      updatedExtension = await extensionManager.installOrUpdateExtension(
+        installMetadata,
+        previousExtensionConfig,
+      );
+    } catch (e) {
       dispatchExtensionStateUpdate({
         type: 'SET_STATE',
         payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
       });
-      throw new Error('Updated extension not found after installation.');
+      throw new Error(
+        `Updated extension not found after installation, got error:\n${e}`,
+      );
     }
     const updatedVersion = updatedExtension.version;
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: {
         name: extension.name,
-        state: ExtensionUpdateState.UPDATED_NEEDS_RESTART,
+        state: enableExtensionReloading
+          ? ExtensionUpdateState.UPDATED
+          : ExtensionUpdateState.UPDATED_NEEDS_RESTART,
       },
     });
     return {
@@ -101,7 +93,7 @@ export async function updateExtension(
       updatedVersion,
     };
   } catch (e) {
-    console.error(
+    debugLogger.error(
       `Error updating extension, rolling back. ${getErrorMessage(e)}`,
     );
     dispatchExtensionStateUpdate({
@@ -116,11 +108,11 @@ export async function updateExtension(
 }
 
 export async function updateAllUpdatableExtensions(
-  cwd: string = process.cwd(),
-  requestConsent: (consent: string) => Promise<boolean>,
   extensions: GeminiCLIExtension[],
   extensionsState: Map<string, ExtensionUpdateStatus>,
+  extensionManager: ExtensionManager,
   dispatch: (action: ExtensionUpdateAction) => void,
+  enableExtensionReloading?: boolean,
 ): Promise<ExtensionUpdateInfo[]> {
   return (
     await Promise.all(
@@ -133,10 +125,10 @@ export async function updateAllUpdatableExtensions(
         .map((extension) =>
           updateExtension(
             extension,
-            cwd,
-            requestConsent,
+            extensionManager,
             extensionsState.get(extension.name)!.status,
             dispatch,
+            enableExtensionReloading,
           ),
         ),
     )
@@ -150,38 +142,41 @@ export interface ExtensionUpdateCheckResult {
 
 export async function checkForAllExtensionUpdates(
   extensions: GeminiCLIExtension[],
+  extensionManager: ExtensionManager,
   dispatch: (action: ExtensionUpdateAction) => void,
-  cwd: string = process.cwd(),
 ): Promise<void> {
   dispatch({ type: 'BATCH_CHECK_START' });
-  const promises: Array<Promise<void>> = [];
-  for (const extension of extensions) {
-    if (!extension.installMetadata) {
+  try {
+    const promises: Array<Promise<void>> = [];
+    for (const extension of extensions) {
+      if (!extension.installMetadata) {
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: extension.name,
+            state: ExtensionUpdateState.NOT_UPDATABLE,
+          },
+        });
+        continue;
+      }
       dispatch({
         type: 'SET_STATE',
         payload: {
           name: extension.name,
-          state: ExtensionUpdateState.NOT_UPDATABLE,
+          state: ExtensionUpdateState.CHECKING_FOR_UPDATES,
         },
       });
-      continue;
+      promises.push(
+        checkForExtensionUpdate(extension, extensionManager).then((state) =>
+          dispatch({
+            type: 'SET_STATE',
+            payload: { name: extension.name, state },
+          }),
+        ),
+      );
     }
-    dispatch({
-      type: 'SET_STATE',
-      payload: {
-        name: extension.name,
-        state: ExtensionUpdateState.CHECKING_FOR_UPDATES,
-      },
-    });
-    promises.push(
-      checkForExtensionUpdate(extension, cwd).then((state) =>
-        dispatch({
-          type: 'SET_STATE',
-          payload: { name: extension.name, state },
-        }),
-      ),
-    );
+    await Promise.all(promises);
+  } finally {
+    dispatch({ type: 'BATCH_CHECK_END' });
   }
-  await Promise.all(promises);
-  dispatch({ type: 'BATCH_CHECK_END' });
 }

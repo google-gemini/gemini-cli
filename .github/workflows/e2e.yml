@@ -30,6 +30,7 @@ jobs:
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    permissions: 'read-all'
     outputs:
       skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
     steps:
@@ -37,12 +38,13 @@ jobs:
         uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
         with:
           secret: '${{ secrets.GITHUB_TOKEN }}'
+    continue-on-error: true
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
@@ -104,7 +106,7 @@ jobs:
     name: 'E2E Test (macOS)'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
@@ -153,7 +155,7 @@ jobs:
     name: 'Slow E2E - Win'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||

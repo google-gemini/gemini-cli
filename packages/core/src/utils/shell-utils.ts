@@ -256,6 +256,40 @@ function collectCommandDetails(
   return details;
 }
 
+function hasPromptCommandTransform(root: Node): boolean {
+  const stack: Node[] = [root];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+
+    if (current.type === 'expansion') {
+      for (let i = 0; i < current.childCount - 1; i += 1) {
+        const operatorNode = current.child(i);
+        const transformNode = current.child(i + 1);
+
+        if (
+          operatorNode?.type === '@' &&
+          transformNode?.text?.toLowerCase() === 'p'
+        ) {
+          return true;
+        }
+      }
+    }
+
+    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
+      const child = current.namedChild(i);
+      if (child) {
+        stack.push(child);
+      }
+    }
+  }
+
+  return false;
+}
+
 function parseBashCommandDetails(command: string): CommandParseResult | null {
   if (treeSitterInitializationError) {
     throw treeSitterInitializationError;
@@ -276,7 +310,10 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
   const details = collectCommandDetails(tree.rootNode, command);
   return {
     details,
-    hasError: tree.rootNode.hasError || details.length === 0,
+    hasError:
+      tree.rootNode.hasError ||
+      details.length === 0 ||
+      hasPromptCommandTransform(tree.rootNode),
   };
 }
 
@@ -737,4 +774,76 @@ export function isCommandAllowed(
     return { allowed: true };
   }
   return { allowed: false, reason: blockReason };
+}
+
+/**
+ * Determines whether a shell invocation should be auto-approved based on an allowlist.
+ *
+ * This reuses the same parsing logic as command-permission enforcement so that
+ * chained commands must be individually covered by the allowlist.
+ *
+ * @param invocation The shell tool invocation being evaluated.
+ * @param allowedPatterns The configured allowlist patterns (e.g. `run_shell_command(git)`).
+ * @returns True if every parsed command segment is allowed by the patterns; false otherwise.
+ */
+export function isShellInvocationAllowlisted(
+  invocation: AnyToolInvocation,
+  allowedPatterns: string[],
+): boolean {
+  if (!allowedPatterns.length) {
+    return false;
+  }
+
+  const hasShellWildcard = allowedPatterns.some((pattern) =>
+    SHELL_TOOL_NAMES.includes(pattern),
+  );
+  const hasShellSpecificPattern = allowedPatterns.some((pattern) =>
+    SHELL_TOOL_NAMES.some((name) => pattern.startsWith(`${name}(`)),
+  );
+
+  if (!hasShellWildcard && !hasShellSpecificPattern) {
+    return false;
+  }
+
+  if (hasShellWildcard) {
+    return true;
+  }
+
+  if (
+    !('params' in invocation) ||
+    typeof invocation.params !== 'object' ||
+    invocation.params === null ||
+    !('command' in invocation.params)
+  ) {
+    return false;
+  }
+
+  const commandValue = (invocation.params as { command?: unknown }).command;
+  if (typeof commandValue !== 'string' || !commandValue.trim()) {
+    return false;
+  }
+
+  const command = commandValue.trim();
+
+  const parseResult = parseCommandDetails(command);
+  if (!parseResult || parseResult.hasError) {
+    return false;
+  }
+
+  const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
+  const commandsToValidate = parseResult.details
+    .map((detail) => normalize(detail.text))
+    .filter(Boolean);
+
+  if (commandsToValidate.length === 0) {
+    return false;
+  }
+
+  return commandsToValidate.every((commandSegment) =>
+    doesToolInvocationMatch(
+      SHELL_TOOL_NAMES[0],
+      { params: { command: commandSegment } } as AnyToolInvocation,
+      allowedPatterns,
+    ),
+  );
 }

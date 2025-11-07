@@ -31,7 +31,7 @@ on:
 
 jobs:
   release:
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'

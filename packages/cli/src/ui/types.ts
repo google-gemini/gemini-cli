@@ -6,6 +6,7 @@
 
 import type {
   CompressionStatus,
+  GeminiCLIExtension,
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
@@ -22,6 +23,8 @@ export enum AuthState {
   Unauthenticated = 'unauthenticated',
   // Auth dialog is open for user to select auth method
   Updating = 'updating',
+  // Waiting for user to input API key
+  AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
 }
@@ -163,6 +166,7 @@ export type HistoryItemCompression = HistoryItemBase & {
 
 export type HistoryItemExtensionsList = HistoryItemBase & {
   type: 'extensions_list';
+  extensions: GeminiCLIExtension[];
 };
 
 export interface ChatDetail {
