@@ -4,10 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  expect,
+  it,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import { SimpleExtensionLoader } from './extensionLoader.js';
-import type { Config } from '../config/config.js';
+import type { Config, GeminiCLIExtension } from '../config/config.js';
 import { type McpClientManager } from '../tools/mcp-client-manager.js';
+import type { GeminiClient } from '../core/client.js';
 
 const mockRefreshServerHierarchicalMemory = vi.hoisted(() => vi.fn());
 
@@ -23,15 +32,20 @@ describe('SimpleExtensionLoader', () => {
   let mockConfig: Config;
   let extensionReloadingEnabled: boolean;
   let mockMcpClientManager: McpClientManager;
-  const activeExtension = {
+  let mockGeminiClientSetTools: MockInstance<
+    typeof GeminiClient.prototype.setTools
+  >;
+
+  const activeExtension: GeminiCLIExtension = {
     name: 'test-extension',
     isActive: true,
     version: '1.0.0',
     path: '/path/to/extension',
     contextFiles: [],
+    excludeTools: ['some-tool'],
     id: '123',
   };
-  const inactiveExtension = {
+  const inactiveExtension: GeminiCLIExtension = {
     name: 'test-extension',
     isActive: false,
     version: '1.0.0',
@@ -46,9 +60,14 @@ describe('SimpleExtensionLoader', () => {
       stopExtension: vi.fn(),
     } as unknown as McpClientManager;
     extensionReloadingEnabled = false;
+    mockGeminiClientSetTools = vi.fn();
     mockConfig = {
       getMcpClientManager: () => mockMcpClientManager,
       getEnableExtensionReloading: () => extensionReloadingEnabled,
+      getGeminiClient: vi.fn(() => ({
+        isInitialized: () => true,
+        setTools: mockGeminiClientSetTools,
+      })),
     } as unknown as Config;
   });
 
@@ -106,11 +125,14 @@ describe('SimpleExtensionLoader', () => {
               mockMcpClientManager.startExtension,
             ).toHaveBeenCalledExactlyOnceWith(activeExtension);
             expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
+            expect(mockGeminiClientSetTools).toHaveBeenCalledOnce();
           } else {
             expect(mockMcpClientManager.startExtension).not.toHaveBeenCalled();
             expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
+            expect(mockGeminiClientSetTools).not.toHaveBeenCalledOnce();
           }
           mockRefreshServerHierarchicalMemory.mockClear();
+          mockGeminiClientSetTools.mockClear();
 
           await loader.unloadExtension(activeExtension);
           if (reloadingEnabled) {
@@ -118,9 +140,11 @@ describe('SimpleExtensionLoader', () => {
               mockMcpClientManager.stopExtension,
             ).toHaveBeenCalledExactlyOnceWith(activeExtension);
             expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
+            expect(mockGeminiClientSetTools).toHaveBeenCalledOnce();
           } else {
             expect(mockMcpClientManager.stopExtension).not.toHaveBeenCalled();
             expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
+            expect(mockGeminiClientSetTools).not.toHaveBeenCalledOnce();
           }
         });
 
