@@ -8,6 +8,7 @@ import { isDevelopment } from '../utils/installationInfo.js';
 import type { ICommandLoader } from './types.js';
 import type { SlashCommand } from '../ui/commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../config/settings.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
@@ -16,6 +17,7 @@ import { clearCommand } from '../ui/commands/clearCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
+import { dinoCommand } from '../ui/commands/dinoCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
 import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
@@ -45,7 +47,10 @@ import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
  * of the Gemini CLI application.
  */
 export class BuiltinCommandLoader implements ICommandLoader {
-  constructor(private config: Config | null) {}
+  constructor(
+    private config: Config | null,
+    private settings: LoadedSettings,
+  ) {}
 
   /**
    * Gathers all raw built-in command definitions, injects dependencies where
@@ -64,6 +69,9 @@ export class BuiltinCommandLoader implements ICommandLoader {
       compressCommand,
       copyCommand,
       corgiCommand,
+      ...(this.settings.merged.ui?.enableDinoGame !== false
+        ? [dinoCommand]
+        : []),
       docsCommand,
       directoryCommand,
       editorCommand,

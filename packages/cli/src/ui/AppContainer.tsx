@@ -205,6 +205,10 @@ export const AppContainer = (props: AppContainerProps) => {
     [],
   );
 
+  const [isDinoDialogOpen, setDinoDialogOpen] = useState(false);
+  const openDinoDialog = useCallback(() => setDinoDialogOpen(true), []);
+  const closeDinoDialog = useCallback(() => setDinoDialogOpen(false), []);
+
   const toggleDebugProfiler = useCallback(
     () => setShowDebugProfiler((prev) => !prev),
     [],
@@ -522,6 +526,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openPrivacyNotice: () => setShowPrivacyNotice(true),
       openSettingsDialog,
       openModelDialog,
+      openDinoDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
@@ -548,6 +553,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setCorgiMode,
       dispatchExtensionStateUpdate,
       openPermissionsDialog,
+      openDinoDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
     ],
@@ -1233,6 +1239,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
+    isDinoDialogOpen ||
     isPermissionsDialogOpen ||
     isAuthenticating ||
     isAuthDialogOpen ||
@@ -1268,6 +1275,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       quittingMessages,
       isSettingsDialogOpen,
       isModelDialogOpen,
+      isDinoDialogOpen,
       isPermissionsDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
@@ -1350,6 +1358,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       quittingMessages,
       isSettingsDialogOpen,
       isModelDialogOpen,
+      isDinoDialogOpen,
       isPermissionsDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
@@ -1440,6 +1449,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      closeDinoDialog,
       closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,
@@ -1468,6 +1478,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      closeDinoDialog,
       closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,

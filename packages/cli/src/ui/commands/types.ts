@@ -123,6 +123,7 @@ export interface OpenDialogActionReturn {
     | 'privacy'
     | 'settings'
     | 'model'
+    | 'dino'
     | 'permissions';
 }
 

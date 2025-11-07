@@ -52,6 +52,7 @@ interface SlashCommandProcessorActions {
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
   openModelDialog: () => void;
+  openDinoDialog: () => void;
   openPermissionsDialog: () => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
@@ -285,7 +286,7 @@ export const useSlashCommandProcessor = (
       const commandService = await CommandService.create(
         [
           new McpPromptLoader(config),
-          new BuiltinCommandLoader(config),
+          new BuiltinCommandLoader(config, settings),
           new FileCommandLoader(config),
         ],
         controller.signal,
@@ -296,7 +297,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger, isConfigInitialized]);
+  }, [config, reloadTrigger, isConfigInitialized, settings]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -401,6 +402,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'model':
                       actions.openModelDialog();
+                      return { type: 'handled' };
+                    case 'dino':
+                      actions.openDinoDialog();
                       return { type: 'handled' };
                     case 'permissions':
                       actions.openPermissionsDialog();

@@ -150,7 +150,7 @@ export const Composer = () => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showAutoAcceptIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={true}
+          focus={!uiState.isDinoDialogOpen}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
