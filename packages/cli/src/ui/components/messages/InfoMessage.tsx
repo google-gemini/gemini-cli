@@ -15,7 +15,7 @@ interface InfoMessageProps {
 
 export const InfoMessage: React.FC<InfoMessageProps> = ({ text }) => {
   const prefix = 'ℹ ';
-  const prefixWidth = prefix.length;
+  const prefixWidth = 3;
 
   return (
     <Box flexDirection="row" marginTop={1}>
