@@ -16,13 +16,17 @@ import {
 import {
   type CommandContext,
   type SlashCommand,
+  type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
 import open from 'open';
 import process from 'node:process';
+import { Text } from 'ink';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { theme } from '../semantic-colors.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 async function listAction(context: CommandContext) {
   const historyItem: HistoryItemExtensionsList = {
@@ -481,6 +485,127 @@ const restartCommand: SlashCommand = {
   completion: completeExtensions,
 };
 
+async function uninstallAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | SlashCommandActionReturn> {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Extension management is not available in this context.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+  const extensionManager = extensionLoader;
+
+  const extensions = extensionManager.getExtensions();
+
+  if (extensions.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'No extensions installed.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  // If no extension name is provided, list available extensions and show usage.
+  const trimmedArgs = args.trim();
+  if (!trimmedArgs) {
+    const extensionNames = extensions
+      .map((ext) => `  - ${ext.name}`)
+      .join('\n');
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Please specify an extension to uninstall.\nUsage: /extensions uninstall <extension-name>\n\nInstalled extensions:\n${extensionNames}`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  const extension = extensions.find((ext) => ext.name === trimmedArgs);
+  if (!extension) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Extension "${trimmedArgs}" not found.`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  // Show confirmation for the specified extension
+  if (!context.overwriteConfirmed) {
+    return {
+      type: 'confirm_action',
+      prompt: (
+        <Text>
+          Do you want to remove the extension <Text bold>{extension.name}</Text>
+          ?
+        </Text>
+      ),
+      originalInvocation: {
+        raw: `/extensions uninstall ${trimmedArgs}`,
+      },
+    } as const;
+  }
+
+  // Proceed with uninstallation
+  try {
+    await extensionManager.uninstallExtension(extension.name, false);
+
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${extension.name}" successfully uninstalled.`,
+      },
+      Date.now(),
+    );
+
+    // Manually update the list of extensions in the UI with the fresh list.
+    const historyItem: HistoryItemExtensionsList = {
+      type: MessageType.EXTENSIONS_LIST,
+      extensions: extensionManager.getExtensions(),
+    };
+    context.ui.addItem(historyItem, Date.now());
+
+    // Reload commands to reflect the changes
+    context.ui.reloadCommands();
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to uninstall extension: ${getErrorMessage(error)}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
+const uninstallExtensionsCommand: SlashCommand = {
+  name: 'uninstall',
+  description: 'Uninstall an extension',
+  kind: CommandKind.BUILT_IN,
+  action: uninstallAction,
+  completion: async (context, partialArg) => {
+    const extensions = context.services.config
+      ? listExtensions(context.services.config)
+      : [];
+    const extensionNames = extensions.map((ext) => ext.name);
+    return extensionNames.filter((name) => name.startsWith(partialArg));
+  },
+};
+};
+
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
@@ -496,6 +621,7 @@ export function extensionsCommand(
       updateExtensionsCommand,
       exploreExtensionsCommand,
       restartCommand,
+      uninstallExtensionsCommand,
       ...conditionalCommands,
     ],
     action: (context, args) =>
