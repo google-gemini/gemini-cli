@@ -53,6 +53,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-flash-lite',
       },
     },
+    // Bases for the internal model configs.
+    'gemini-2.5-flash-base': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-flash',
+      },
+    },
     classifier: {
       extends: 'base',
       modelConfig: {
@@ -108,22 +115,32 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-search-tool': {
-      extends: 'base',
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {
-        model: 'gemini-2.5-flash',
         generateContentConfig: {
           tools: [{ googleSearch: {} }],
         },
       },
     },
     'web-fetch-tool': {
-      extends: 'base',
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {
-        model: 'gemini-2.5-flash',
         generateContentConfig: {
           tools: [{ urlContext: {} }],
         },
       },
+    },
+    'loop-detection': {
+      extends: 'gemini-2.5-flash-base',
+      modelConfig: {},
+    },
+    'llm-edit-fixer': {
+      extends: 'gemini-2.5-flash-base',
+      modelConfig: {},
+    },
+    'next-speaker-checker': {
+      extends: 'gemini-2.5-flash-base',
+      modelConfig: {},
     },
   },
 };

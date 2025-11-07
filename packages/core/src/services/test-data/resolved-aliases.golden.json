@@ -48,6 +48,13 @@
       }
     }
   },
+  "gemini-2.5-flash-base": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
   "classifier": {
     "model": "gemini-2.5-flash-lite",
     "generateContentConfig": {
@@ -118,6 +125,27 @@
           "urlContext": {}
         }
       ]
+    }
+  },
+  "loop-detection": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "llm-edit-fixer": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "next-speaker-checker": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
     }
   }
 }

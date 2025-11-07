@@ -735,6 +735,12 @@ describe('LoopDetectionService LLM Checks', () => {
       getBaseLlmClient: () => mockBaseLlmClient,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockReturnValue({
+          model: 'cognitive-loop-v1',
+          generateContentConfig: {},
+        }),
+      },
     } as unknown as Config;
 
     service = new LoopDetectionService(mockConfig);
@@ -765,9 +771,9 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
+        modelConfigKey: expect.any(Object),
         systemInstruction: expect.any(String),
         contents: expect.any(Array),
-        model: expect.any(String),
         schema: expect.any(Object),
         promptId: expect.any(String),
       }),
