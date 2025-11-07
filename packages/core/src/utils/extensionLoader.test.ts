@@ -9,6 +9,16 @@ import { SimpleExtensionLoader } from './extensionLoader.js';
 import type { Config } from '../config/config.js';
 import { type McpClientManager } from '../tools/mcp-client-manager.js';
 
+const mockRefreshServerHierarchicalMemory = vi.hoisted(() => vi.fn());
+
+vi.mock('./memoryDiscovery.js', async (importActual) => {
+  const actual = await importActual<typeof import('./memoryDiscovery.js')>();
+  return {
+    ...actual,
+    refreshServerHierarchicalMemory: mockRefreshServerHierarchicalMemory,
+  };
+});
+
 describe('SimpleExtensionLoader', () => {
   let mockConfig: Config;
   let extensionReloadingEnabled: boolean;
@@ -79,29 +89,59 @@ describe('SimpleExtensionLoader', () => {
       ).toHaveBeenCalledExactlyOnceWith(activeExtension);
     });
 
-    it.each([true, false])(
-      'should only call `start` and `stop` if extension reloading is enabled ($i)',
-      async (reloadingEnabled) => {
-        extensionReloadingEnabled = reloadingEnabled;
-        const loader = new SimpleExtensionLoader([]);
-        await loader.start(mockConfig);
-        expect(mockMcpClientManager.startExtension).not.toHaveBeenCalled();
-        await loader.loadExtension(activeExtension);
-        if (reloadingEnabled) {
-          expect(
-            mockMcpClientManager.startExtension,
-          ).toHaveBeenCalledExactlyOnceWith(activeExtension);
-        } else {
+    describe.each([true, false])(
+      'when enableExtensionReloading === $i',
+      (reloadingEnabled) => {
+        beforeEach(() => {
+          extensionReloadingEnabled = reloadingEnabled;
+        });
+
+        it(`should ${reloadingEnabled ? '' : 'not '}reload extension features`, async () => {
+          const loader = new SimpleExtensionLoader([]);
+          await loader.start(mockConfig);
           expect(mockMcpClientManager.startExtension).not.toHaveBeenCalled();
-        }
-        await loader.unloadExtension(activeExtension);
-        if (reloadingEnabled) {
-          expect(
-            mockMcpClientManager.stopExtension,
-          ).toHaveBeenCalledExactlyOnceWith(activeExtension);
-        } else {
-          expect(mockMcpClientManager.stopExtension).not.toHaveBeenCalled();
-        }
+          await loader.loadExtension(activeExtension);
+          if (reloadingEnabled) {
+            expect(
+              mockMcpClientManager.startExtension,
+            ).toHaveBeenCalledExactlyOnceWith(activeExtension);
+            expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
+          } else {
+            expect(mockMcpClientManager.startExtension).not.toHaveBeenCalled();
+            expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
+          }
+          mockRefreshServerHierarchicalMemory.mockClear();
+
+          await loader.unloadExtension(activeExtension);
+          if (reloadingEnabled) {
+            expect(
+              mockMcpClientManager.stopExtension,
+            ).toHaveBeenCalledExactlyOnceWith(activeExtension);
+            expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
+          } else {
+            expect(mockMcpClientManager.stopExtension).not.toHaveBeenCalled();
+            expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
+          }
+        });
+
+        it.runIf(reloadingEnabled)(
+          'Should only reload memory once all extensions are done',
+          async () => {
+            const anotherExtension = {
+              ...activeExtension,
+              name: 'another-extension',
+            };
+            const loader = new SimpleExtensionLoader([]);
+            await loader.loadExtension(activeExtension);
+            await loader.start(mockConfig);
+            expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
+            await Promise.all([
+              loader.unloadExtension(activeExtension),
+              loader.loadExtension(anotherExtension),
+            ]);
+            expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
+          },
+        );
       },
     );
   });
