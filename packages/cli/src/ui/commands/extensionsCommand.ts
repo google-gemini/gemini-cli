@@ -7,7 +7,11 @@
 import { debugLogger, listExtensions } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
-import { MessageType, type HistoryItemExtensionsList } from '../types.js';
+import {
+  MessageType,
+  type HistoryItemExtensionsList,
+  type HistoryItemInfo,
+} from '../types.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -17,6 +21,7 @@ import open from 'open';
 import process from 'node:process';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { theme } from '../semantic-colors.js';
 
 async function listAction(context: CommandContext) {
   const historyItem: HistoryItemExtensionsList = {
@@ -178,13 +183,12 @@ async function restartAction(
 
   const s = extensionsToRestart.length > 1 ? 's' : '';
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: `Restarting ${extensionsToRestart.length} extension${s}...`,
-    },
-    Date.now(),
-  );
+  const restartingMessage = {
+    type: MessageType.INFO,
+    text: `Restarting ${extensionsToRestart.length} extension${s}...`,
+    color: theme.text.primary,
+  };
+  context.ui.addItem(restartingMessage, Date.now());
 
   const results = await Promise.allSettled(
     extensionsToRestart.map(async (extension) => {
@@ -219,13 +223,13 @@ async function restartAction(
       Date.now(),
     );
   } else {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
-      },
-      Date.now(),
-    );
+    const infoItem: HistoryItemInfo = {
+      type: MessageType.INFO,
+      text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
+      icon: '  ',
+      color: theme.text.primary,
+    };
+    context.ui.addItem(infoItem, Date.now());
   }
 }
 
