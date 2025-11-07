@@ -235,7 +235,7 @@ export class ToolRegistry {
    * 2. Discovered tools.
    * 3. MCP tools ordered by server name.
    *
-   * This is a stable sort in that ties preseve existing order.
+   * This is a stable sort in that tries preserve existing order.
    */
   sortTools(): void {
     const getPriority = (tool: AnyDeclarativeTool): number => {
@@ -244,8 +244,8 @@ export class ToolRegistry {
       return 0; // Built-in
     };
 
-    this.tools = new Map(
-      Array.from(this.tools.entries()).sort((a, b) => {
+    this.allKnownTools = new Map(
+      Array.from(this.allKnownTools.entries()).sort((a, b) => {
         const toolA = a[1];
         const toolB = b[1];
         const priorityA = getPriority(toolA);
