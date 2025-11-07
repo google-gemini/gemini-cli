@@ -4,43 +4,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
-import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
-import { theme } from '../semantic-colors.js';
-import { useInputHistory } from '../hooks/useInputHistory.js';
-import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
-import chalk from 'chalk';
-import stringWidth from 'string-width';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
-import type { Key } from '../hooks/useKeypress.js';
-import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import {
-  parseInputForHighlighting,
-  buildSegmentsForVisualSlice,
-} from '../utils/highlight.js';
-import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
-import {
-  clipboardHasImage,
-  saveClipboardImage,
-  cleanupOldClipboardImages,
-} from '../utils/clipboardUtils.js';
+import chalk from 'chalk';
+import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
 import * as path from 'node:path';
-import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import stringWidth from 'string-width';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { Command, keyMatchers } from '../keyMatchers.js';
+import { theme } from '../semantic-colors.js';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { StreamingState } from '../types.js';
+import {
+  cleanupOldClipboardImages,
+  clipboardHasImage,
+  saveClipboardImage,
+} from '../utils/clipboardUtils.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
-import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
+import {
+  buildSegmentsForVisualSlice,
+  parseInputForHighlighting,
+} from '../utils/highlight.js';
+import { cpLen, cpSlice, toCodePoints } from '../utils/textUtils.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { MAX_WIDTH, SuggestionsDisplay } from './SuggestionsDisplay.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -782,12 +782,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         buffer.openInExternalEditor();
-        return;
-      }
-
-      // Ctrl+V for clipboard image paste
-      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
-        handleClipboardImage();
         return;
       }
 

@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as process from 'node:process';
-
 /**
  * Command enum for all available keyboard shortcuts
  */
@@ -48,7 +46,6 @@ export enum Command {
 
   // External tools
   OPEN_EXTERNAL_EDITOR = 'openExternalEditor',
-  PASTE_CLIPBOARD_IMAGE = 'pasteClipboardImage',
 
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
@@ -95,8 +92,6 @@ export interface KeyBinding {
 export type KeyBindingConfig = {
   readonly [C in Command]: readonly KeyBinding[];
 };
-
-const isMac = process.platform === 'darwin';
 
 /**
  * Default key binding configuration
@@ -180,10 +175,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'x', ctrl: true },
     { sequence: '\x18', ctrl: true },
   ],
-  // On macOS, Cmd+V is the standard for pasting. On other platforms, it's Ctrl+V.
-  [Command.PASTE_CLIPBOARD_IMAGE]: isMac
-    ? [{ key: 'v', command: true, ctrl: false }]
-    : [{ key: 'v', ctrl: true }],
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],

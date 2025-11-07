@@ -53,7 +53,6 @@ describe('keyMatchers', () => {
       key.name === 'return' && (key.ctrl || key.meta || key.paste),
     [Command.OPEN_EXTERNAL_EDITOR]: (key: Key) =>
       key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
-    [Command.PASTE_CLIPBOARD_IMAGE]: (key: Key) => key.ctrl && key.name === 'v',
     [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.name === 'f12',
     [Command.SHOW_FULL_TODOS]: (key: Key) => key.ctrl && key.name === 't',
     [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
@@ -228,21 +227,6 @@ describe('keyMatchers', () => {
       ],
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
-    {
-      command: Command.PASTE_CLIPBOARD_IMAGE,
-      positive: [
-        process.platform === 'darwin'
-          ? createKey('v', { meta: true })
-          : createKey('v', { ctrl: true }),
-      ],
-      negative: [
-        createKey('v'),
-        createKey('c', { ctrl: true }),
-        process.platform === 'darwin'
-          ? createKey('v', { ctrl: true })
-          : createKey('v', { meta: true }),
-      ],
-    },
 
     // App level bindings
     {
@@ -317,12 +301,10 @@ describe('keyMatchers', () => {
             keyMatchers[command](key),
             `Expected ${command} to match ${JSON.stringify(key)}`,
           ).toBe(true);
-          if (command !== Command.PASTE_CLIPBOARD_IMAGE) {
-            expect(
-              originalMatchers[command](key),
-              `Original matcher should also match ${JSON.stringify(key)}`,
-            ).toBe(true);
-          }
+          expect(
+            originalMatchers[command](key),
+            `Original matcher should also match ${JSON.stringify(key)}`,
+          ).toBe(true);
         });
 
         negative.forEach((key) => {
@@ -330,12 +312,10 @@ describe('keyMatchers', () => {
             keyMatchers[command](key),
             `Expected ${command} to NOT match ${JSON.stringify(key)}`,
           ).toBe(false);
-          if (command !== Command.PASTE_CLIPBOARD_IMAGE) {
-            expect(
-              originalMatchers[command](key),
-              `Original matcher should also NOT match ${JSON.stringify(key)}`,
-            ).toBe(false);
-          }
+          expect(
+            originalMatchers[command](key),
+            `Original matcher should also NOT match ${JSON.stringify(key)}`,
+          ).toBe(false);
         });
       });
     });
