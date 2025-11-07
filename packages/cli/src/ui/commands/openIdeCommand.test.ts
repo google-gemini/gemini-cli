@@ -99,7 +99,7 @@ describe('openIdeCommand', () => {
       unref: vi.fn(),
       on: vi.fn((event, callback) => {
         if (event === 'spawn') {
-          setTimeout(callback, 0);
+          callback();
         }
       }),
     };
@@ -124,7 +124,7 @@ describe('openIdeCommand', () => {
       unref: vi.fn(),
       on: vi.fn((event, callback) => {
         if (event === 'spawn') {
-          setTimeout(callback, 0);
+          callback();
         }
       }),
     };
@@ -144,11 +144,12 @@ describe('openIdeCommand', () => {
 
   it('should handle spawn errors gracefully', async () => {
     const mockContext = createMockContext('invalid-command');
+    const errorMessage = 'spawn ENOENT';
     const mockChild = {
       unref: vi.fn(),
       on: vi.fn((event, callback) => {
         if (event === 'error') {
-          setTimeout(() => callback(new Error('Spawn failed')), 0);
+          callback(new Error(errorMessage));
         }
       }),
     };
@@ -159,8 +160,7 @@ describe('openIdeCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content:
-        'Failed to open IDE with command "invalid-command". Please check that the IDE path is correct in your settings.',
+      content: `Failed to open IDE with command "invalid-command". Please check your configuration. Error: ${errorMessage}`,
     });
   });
 
@@ -179,7 +179,7 @@ describe('openIdeCommand', () => {
       unref: vi.fn(),
       on: vi.fn((event, callback) => {
         if (event === 'spawn') {
-          setTimeout(callback, 0);
+          callback();
         }
       }),
     };

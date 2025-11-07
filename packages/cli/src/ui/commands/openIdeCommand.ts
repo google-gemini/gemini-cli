@@ -19,8 +19,8 @@ import type {
 function openConfiguredIde(
   idePath: string,
   workingDirectory: string,
-): Promise<boolean> {
-  return new Promise((resolve) => {
+): Promise<void> {
+  return new Promise((resolve, reject) => {
     // Parse the IDE path - it might include arguments
     const parts = idePath.trim().split(/\s+/);
     const command = parts[0];
@@ -33,18 +33,13 @@ function openConfiguredIde(
 
     child.unref();
 
-    child.on('error', () => {
-      resolve(false);
+    child.on('error', (err) => {
+      reject(err);
     });
 
     child.on('spawn', () => {
-      resolve(true);
+      resolve();
     });
-
-    // Fallback timeout
-    setTimeout(() => {
-      resolve(true);
-    }, 1000);
   });
 }
 
@@ -85,26 +80,17 @@ export const openIdeCommand: SlashCommand = {
     }
 
     try {
-      const success = await openConfiguredIde(idePath, workingDirectory);
-
-      if (success) {
-        return {
-          type: 'message',
-          messageType: 'info',
-          content: `Opening "${workingDirectory}" in ${idePath}...`,
-        } as const;
-      } else {
-        return {
-          type: 'message',
-          messageType: 'error',
-          content: `Failed to open IDE with command "${idePath}". Please check that the IDE path is correct in your settings.`,
-        } as const;
-      }
+      await openConfiguredIde(idePath, workingDirectory);
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Opening "${workingDirectory}" in ${idePath}...`,
+      } as const;
     } catch (error) {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error opening IDE: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `Failed to open IDE with command "${idePath}". Please check your configuration. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
       } as const;
     }
   },
