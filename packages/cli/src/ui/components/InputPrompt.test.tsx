@@ -995,6 +995,34 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('should handle non-bracketed paste as plain text', async () => {
+      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
+
+      await act(async () => {
+        // Directly simulate the paste event
+        props.buffer.handleInput({
+          paste: true,
+          sequence: 'pasted text',
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
+      });
+
+      await waitFor(() => {
+        expect(props.buffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({
+            paste: true,
+            sequence: 'pasted text',
+          }),
+        );
+      });
+
+      expect(clipboardUtils.clipboardHasImage).not.toHaveBeenCalled();
+      unmount();
+    });
+
     it.each([
       {
         os: 'macOS',
