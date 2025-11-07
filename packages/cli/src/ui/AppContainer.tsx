@@ -1239,7 +1239,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     return () => {
       coreEvents.off(CoreEvent.MemoryChanged, handleMemoryChanged);
     };
-  });
+  }, []);
 
   const uiState: UIState = useMemo(
     () => ({
