@@ -638,13 +638,7 @@ describe('Context file configuration', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(argv.extensions),
-      'test-session',
-      argv,
-    );
+    await loadCliConfig(settings, 'test-session', argv);
     expect(ServerConfig.getCurrentGeminiMdFilename).toHaveBeenCalled();
     expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith('DEFAULT.md');
   });
@@ -653,13 +647,7 @@ describe('Context file configuration', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { context: { fileName: 'settings.md' } };
-    await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(argv.extensions),
-      'test-session',
-      argv,
-    );
+    await loadCliConfig(settings, 'test-session', argv);
     expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
       'settings.md',
     );
@@ -672,13 +660,7 @@ describe('Context file configuration', () => {
     process.argv = ['node', 'script.js', '--context-file', 'cli.md'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { context: { fileName: 'settings.md' } };
-    await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(argv.extensions),
-      'test-session',
-      argv,
-    );
+    await loadCliConfig(settings, 'test-session', argv);
     expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
       expect.stringContaining('cli.md'),
     );
@@ -692,13 +674,7 @@ describe('Context file configuration', () => {
     process.argv = ['node', 'script.js', '-f', 'cli.md'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { context: { fileName: 'settings.md' } };
-    await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(argv.extensions),
-      'test-session',
-      argv,
-    );
+    await loadCliConfig(settings, 'test-session', argv);
     expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
       expect.stringContaining('cli.md'),
     );
@@ -714,15 +690,7 @@ describe('Context file configuration', () => {
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
 
-    await expect(
-      loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(argv.extensions),
-        'test-session',
-        argv,
-      ),
-    ).rejects.toThrow(
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'Path specified by --context-file is a directory: a-directory',
     );
     statSpy.mockRestore();
@@ -739,15 +707,7 @@ describe('Context file configuration', () => {
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
 
-    await expect(
-      loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(argv.extensions),
-        'test-session',
-        argv,
-      ),
-    ).rejects.toThrow(
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'File specified by --context-file does not exist: new-file.md',
     );
     statSpy.mockRestore();
@@ -764,15 +724,7 @@ describe('Context file configuration', () => {
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
 
-    await expect(
-      loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(argv.extensions),
-        'test-session',
-        argv,
-      ),
-    ).rejects.toThrow(
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       `Permission denied for file specified by --context-file: inaccessible.md`,
     );
     statSpy.mockRestore();
