@@ -561,6 +561,12 @@ async function uninstallAction(
 
   // Proceed with uninstallation
   try {
+    const extensionLoader = context.services.config?.getExtensionLoader();
+    if (!(extensionLoader instanceof ExtensionManager)) {
+      throw new Error('Extension management is not available in this context.');
+    }
+    const extensionManager = extensionLoader;
+
     await extensionManager.uninstallExtension(extension.name, false);
 
     context.ui.addItem(
