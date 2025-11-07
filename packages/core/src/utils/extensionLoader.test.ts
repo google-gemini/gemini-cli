@@ -132,6 +132,7 @@ describe('SimpleExtensionLoader', () => {
             expect(mockGeminiClientSetTools).not.toHaveBeenCalledOnce();
           }
           mockRefreshServerHierarchicalMemory.mockClear();
+          mockGeminiClientSetTools.mockClear();
 
           await loader.unloadExtension(activeExtension);
           if (reloadingEnabled) {
