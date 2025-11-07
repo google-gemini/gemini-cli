@@ -396,71 +396,48 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.paste) {
+        const handleTextPaste = () => {
+          // Record paste time to prevent accidental auto-submission
+          if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
+            setRecentUnsafePasteTime(Date.now());
+
+            // Clear any existing paste timeout
+            if (pasteTimeoutRef.current) {
+              clearTimeout(pasteTimeoutRef.current);
+            }
+
+            // Clear the paste protection after a very short delay to prevent
+            // false positives.
+            // Due to how we use a reducer for text buffer state updates, it is
+            // reasonable to expect that key events that are really part of the
+            // same paste will be processed in the same event loop tick. 40ms
+            // is chosen arbitrarily as it is faster than a typical human
+            // could go from pressing paste to pressing enter. The fastest typists
+            // can type at 200 words per minute which roughly translates to 50ms
+            // per letter.
+            pasteTimeoutRef.current = setTimeout(() => {
+              setRecentUnsafePasteTime(null);
+              pasteTimeoutRef.current = null;
+            }, 40);
+          }
+          // Ensure we never accidentally interpret paste as regular input.
+          buffer.handleInput(key);
+        };
+
         const isMac = process.platform === 'darwin';
         if (isMac) {
           // On macOS, Cmd+V arrives as a generic paste event. We check for an
           // image and handle it, otherwise we fall through to regular text paste.
           handleClipboardImage().then((imageWasPasted) => {
-            if (imageWasPasted) {
-              return;
+            if (!imageWasPasted) {
+              handleTextPaste();
             }
-            // If no image was pasted, handle as a regular text paste.
-            // Record paste time to prevent accidental auto-submission
-            if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
-              setRecentUnsafePasteTime(Date.now());
-
-              // Clear any existing paste timeout
-              if (pasteTimeoutRef.current) {
-                clearTimeout(pasteTimeoutRef.current);
-              }
-
-              // Clear the paste protection after a very short delay to prevent
-              // false positives.
-              // Due to how we use a reducer for text buffer state updates, it is
-              // reasonable to expect that key events that are really part of the
-              // same paste will be processed in the same event loop tick. 40ms
-              // is chosen arbitrarily as it is faster than a typical human
-              // could go from pressing paste to pressing enter. The fastest typists
-              // can type at 200 words per minute which roughly translates to 50ms
-              // per letter.
-              pasteTimeoutRef.current = setTimeout(() => {
-                setRecentUnsafePasteTime(null);
-                pasteTimeoutRef.current = null;
-              }, 40);
-            }
-            // Ensure we never accidentally interpret paste as regular input.
-            buffer.handleInput(key);
           });
-          return;
+        } else {
+          // On other platforms, we rely on the specific Ctrl+V keybinding for
+          // images, so any generic paste event is treated as text.
+          handleTextPaste();
         }
-
-        // On other platforms, we rely on the specific Ctrl+V keybinding for
-        // images, so any generic paste event is treated as text.
-        // Record paste time to prevent accidental auto-submission
-        if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
-          setRecentUnsafePasteTime(Date.now());
-
-          // Clear any existing paste timeout
-          if (pasteTimeoutRef.current) {
-            clearTimeout(pasteTimeoutRef.current);
-          }
-
-          // Clear the paste protection after a very short delay to prevent
-          // false positives.
-          // Due to how we use a reducer for text buffer state updates, it is
-          // reasonable to expect that key events that are really part of the
-          // same paste will be processed in the same event loop tick. 40ms
-          // is chosen arbitrarily as it is faster than a typical human
-          // could go from pressing paste to pressing enter. The fastest typists
-          // can type at 200 words per minute which roughly translates to 50ms
-          // per letter.
-          pasteTimeoutRef.current = setTimeout(() => {
-            setRecentUnsafePasteTime(null);
-            pasteTimeoutRef.current = null;
-          }, 40);
-        }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
         return;
       }
 
