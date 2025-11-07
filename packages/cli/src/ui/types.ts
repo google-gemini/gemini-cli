@@ -19,7 +19,7 @@ import { type ReactNode } from 'react';
 export type { ThoughtSummary };
 
 export enum AuthState {
-  // Attempting to authenticate or re-authenticate
+  // Attemtping to authenticate or re-authenticate
   Unauthenticated = 'unauthenticated',
   // Auth dialog is open for user to select auth method
   Updating = 'updating',
@@ -103,7 +103,7 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
-  prefix?: string;
+  icon?: string;
   color?: string;
 };
 

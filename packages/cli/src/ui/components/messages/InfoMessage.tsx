@@ -11,17 +11,17 @@ import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 
 interface InfoMessageProps {
   text: string;
-  prefix?: string;
+  icon?: string;
   color?: string;
 }
 
 export const InfoMessage: React.FC<InfoMessageProps> = ({
   text,
-  prefix,
+  icon,
   color,
 }) => {
   color ??= theme.status.warning;
-  prefix ??= 'ℹ ';
+  const prefix = icon ?? 'ℹ ';
   const prefixWidth = prefix.length;
 
   return (

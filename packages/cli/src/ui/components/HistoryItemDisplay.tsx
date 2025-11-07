@@ -88,7 +88,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'info' && (
         <InfoMessage
           text={itemForDisplay.text}
-          prefix={itemForDisplay.prefix}
+          icon={itemForDisplay.icon}
           color={itemForDisplay.color}
         />
       )}
