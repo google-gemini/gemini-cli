@@ -4,29 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ListExtensionsCommand } from './list-extensions.js';
-import type { Config } from '@google/gemini-cli-core';
-
-export interface Command {
-  readonly names: string[];
-  execute(config: Config, args: string[]): Promise<unknown>;
-}
+import { ExtensionsCommand } from './extensions.js';
+import type { Command } from './types.js';
 
 class CommandRegistry {
   private readonly commands = new Map<string, Command>();
 
   constructor() {
-    this.register(new ListExtensionsCommand());
+    this.register(new ExtensionsCommand());
   }
 
   register(command: Command) {
-    for (const name of command.names) {
-      this.commands.set(name, command);
+    if (this.commands.has(command.name)) {
+      console.warn(`Command ${command.name} already registered. Skipping.`);
+      return;
+    }
+
+    this.commands.set(command.name, command);
+
+    for (const subCommand of command.subCommands ?? []) {
+      this.register(subCommand);
     }
   }
 
   get(commandName: string): Command | undefined {
     return this.commands.get(commandName);
+  }
+
+  getAllCommands(): Command[] {
+    return [...this.commands.values()];
   }
 }
 
