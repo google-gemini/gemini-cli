@@ -128,11 +128,17 @@ Each server configuration supports the following properties:
 #### Required (one of the following)
 
 - **`command`** (string): Path to the executable for Stdio transport
-- **`url`** (string): SSE endpoint URL (e.g., `"http://localhost:8080/sse"`)
-- **`httpUrl`** (string): HTTP streaming endpoint URL
+- **`url`** (string): URL for HTTP or SSE transport (e.g.,
+  `"https://api.example.com/mcp"`). When used with the `type` field, supports
+  both HTTP and SSE transports. When used alone, defaults to HTTP transport.
 
 #### Optional
 
+- **`type`** (string): Explicitly specifies the transport type when using `url`.
+  Can be `"http"` or `"sse"`. When omitted, defaults to HTTP transport. This
+  field is recommended for clarity and to avoid auto-detection behavior.
+  - `"http"`: Use Streamable HTTP transport
+  - `"sse"`: Use Server-Sent Events transport
 - **`args`** (string[]): Command-line arguments for Stdio transport
 - **`headers`** (object): Custom HTTP headers when using `url` or `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can
@@ -172,7 +178,8 @@ and let the CLI discover it automatically:
 {
   "mcpServers": {
     "discoveredServer": {
-      "url": "https://api.example.com/sse"
+      "url": "https://api.example.com/sse",
+      "type": "sse"
     }
   }
 }
@@ -271,7 +278,8 @@ property:
 {
   "mcpServers": {
     "googleCloudServer": {
-      "httpUrl": "https://my-gcp-service.run.app/mcp",
+      "url": "https://my-gcp-service.run.app/mcp",
+      "type": "http",
       "authProviderType": "google_credentials",
       "oauth": {
         "scopes": ["https://www.googleapis.com/auth/userinfo.email"]
@@ -385,7 +393,23 @@ then be used to authenticate with the MCP server.
 {
   "mcpServers": {
     "httpServer": {
-      "httpUrl": "http://localhost:3000/mcp",
+      "url": "http://localhost:3000/mcp",
+      "type": "http",
+      "timeout": 5000
+    }
+  }
+}
+```
+
+#### HTTP-based MCP Server with Auto-detection
+
+When `type` is omitted, the CLI defaults to HTTP transport:
+
+```json
+{
+  "mcpServers": {
+    "sentry": {
+      "url": "https://mcp.sentry.dev/mcp",
       "timeout": 5000
     }
   }
@@ -398,12 +422,27 @@ then be used to authenticate with the MCP server.
 {
   "mcpServers": {
     "httpServerWithAuth": {
-      "httpUrl": "http://localhost:3000/mcp",
+      "url": "http://localhost:3000/mcp",
+      "type": "http",
       "headers": {
         "Authorization": "Bearer your-api-token",
         "X-Custom-Header": "custom-value",
         "Content-Type": "application/json"
       },
+      "timeout": 5000
+    }
+  }
+}
+```
+
+#### SSE-based MCP Server
+
+```json
+{
+  "mcpServers": {
+    "sseServer": {
+      "url": "http://localhost:8080/sse",
+      "type": "sse",
       "timeout": 5000
     }
   }
@@ -433,6 +472,7 @@ then be used to authenticate with the MCP server.
   "mcpServers": {
     "myIapProtectedServer": {
       "url": "https://my-iap-service.run.app/sse",
+      "type": "sse",
       "authProviderType": "service_account_impersonation",
       "targetAudience": "YOUR_IAP_CLIENT_ID.apps.googleusercontent.com",
       "targetServiceAccount": "your-sa@your-project.iam.gserviceaccount.com"
@@ -452,8 +492,9 @@ For each configured server in `mcpServers`:
 
 1. **Status tracking begins:** Server status is set to `CONNECTING`
 2. **Transport selection:** Based on configuration properties:
-   - `httpUrl` → `StreamableHTTPClientTransport`
-   - `url` → `SSEClientTransport`
+   - `url` + `type: "http"` → `StreamableHTTPClientTransport`
+   - `url` + `type: "sse"` → `SSEClientTransport`
+   - `url` (without type) → `StreamableHTTPClientTransport` (defaults to HTTP)
    - `command` → `StdioClientTransport`
 3. **Connection establishment:** The MCP client attempts to connect with the
    configured timeout
@@ -938,7 +979,8 @@ gemini mcp add python-server python server.py -- --server-arg my-value
 
 #### Adding an HTTP server
 
-This transport is for servers that use the streamable HTTP transport.
+This transport is for servers that use the streamable HTTP transport. When you
+use `--transport http`, the configuration will use `url` with `type: "http"`.
 
 ```bash
 # Basic syntax
@@ -953,7 +995,8 @@ gemini mcp add --transport http --header "Authorization: Bearer abc123" secure-h
 
 #### Adding an SSE server
 
-This transport is for servers that use Server-Sent Events (SSE).
+This transport is for servers that use Server-Sent Events (SSE). When you use
+`--transport sse`, the configuration will use `url` with `type: "sse"`.
 
 ```bash
 # Basic syntax

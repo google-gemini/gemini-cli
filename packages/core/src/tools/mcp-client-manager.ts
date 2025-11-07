@@ -189,7 +189,7 @@ export class McpClientManager {
             // Log the error but don't let a single failed server stop the others
             coreEvents.emitFeedback(
               'error',
-              `Error during discovery for server '${name}': ${getErrorMessage(
+              `Error during discovery for MCP server '${name}': ${getErrorMessage(
                 error,
               )}`,
               error,

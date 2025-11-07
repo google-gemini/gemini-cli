@@ -880,19 +880,19 @@ export async function connectToMcpServer(
           if (hasStoredTokens) {
             coreEvents.emitFeedback(
               'error',
-              `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
+              `Stored OAuth token for MCP server '${mcpServerName}' was rejected. ` +
                 `Please re-authenticate using: /mcp auth ${mcpServerName}`,
             );
           } else {
             coreEvents.emitFeedback(
               'error',
-              `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
+              `401 error received without OAuth configuration.\n` +
                 `Please authenticate using: /mcp auth ${mcpServerName}`,
             );
           }
         }
         throw new Error(
-          `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
+          `401 error received without OAuth configuration.\n` +
             `Please authenticate using: /mcp auth ${mcpServerName}`,
         );
       }
@@ -1020,19 +1020,19 @@ export async function connectToMcpServer(
             if (hasStoredTokens) {
               coreEvents.emitFeedback(
                 'error',
-                `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
+                `Stored OAuth token for MCP server '${mcpServerName}' was rejected. ` +
                   `Please re-authenticate using: /mcp auth ${mcpServerName}`,
               );
             } else {
               coreEvents.emitFeedback(
                 'error',
-                `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
+                `401 error received without OAuth configuration.\n` +
                   `Please authenticate using: /mcp auth ${mcpServerName}`,
               );
             }
           }
           throw new Error(
-            `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
+            `401 error received without OAuth configuration.\n` +
               `Please authenticate using: /mcp auth ${mcpServerName}`,
           );
         }
@@ -1173,13 +1173,35 @@ export async function createTransport(
       authProvider: provider,
     };
 
+    // Priority 1: httpUrl (deprecated)
     if (mcpServerConfig.httpUrl) {
+      if (mcpServerConfig.url) {
+        debugLogger.warn(
+          `MCP server '${mcpServerName}': Both 'httpUrl' and 'url' are configured. ` +
+            `Using deprecated 'httpUrl'. Please migrate to 'url' with 'type: "http"'.`,
+        );
+      }
       return new StreamableHTTPClientTransport(
         new URL(mcpServerConfig.httpUrl),
         transportOptions,
       );
-    } else if (mcpServerConfig.url) {
-      // Default to SSE if only url is provided
+    }
+    // Priority 2 & 3: url with explicit type
+    if (mcpServerConfig.url && mcpServerConfig.type) {
+      if (mcpServerConfig.type === 'http') {
+        return new StreamableHTTPClientTransport(
+          new URL(mcpServerConfig.url),
+          transportOptions,
+        );
+      } else if (mcpServerConfig.type === 'sse') {
+        return new SSEClientTransport(
+          new URL(mcpServerConfig.url),
+          transportOptions,
+        );
+      }
+    }
+    // Priority 4: url without type (default to SSE for backward compatibility)
+    if (mcpServerConfig.url) {
       return new SSEClientTransport(
         new URL(mcpServerConfig.url),
         transportOptions,
@@ -1199,12 +1221,35 @@ export async function createTransport(
       | SSEClientTransportOptions = {
       authProvider: provider,
     };
+    // Priority 1: httpUrl (deprecated)
     if (mcpServerConfig.httpUrl) {
+      if (mcpServerConfig.url) {
+        debugLogger.warn(
+          `MCP server '${mcpServerName}': Both 'httpUrl' and 'url' are configured. ` +
+            `Using deprecated 'httpUrl'. Please migrate to 'url' with 'type: "http"'.`,
+        );
+      }
       return new StreamableHTTPClientTransport(
         new URL(mcpServerConfig.httpUrl),
         transportOptions,
       );
-    } else if (mcpServerConfig.url) {
+    }
+    // Priority 2 & 3: url with explicit type
+    if (mcpServerConfig.url && mcpServerConfig.type) {
+      if (mcpServerConfig.type === 'http') {
+        return new StreamableHTTPClientTransport(
+          new URL(mcpServerConfig.url),
+          transportOptions,
+        );
+      } else if (mcpServerConfig.type === 'sse') {
+        return new SSEClientTransport(
+          new URL(mcpServerConfig.url),
+          transportOptions,
+        );
+      }
+    }
+    // Priority 4: url without type (default to SSE for backward compatibility)
+    if (mcpServerConfig.url) {
       return new SSEClientTransport(
         new URL(mcpServerConfig.url),
         transportOptions,
@@ -1251,7 +1296,16 @@ export async function createTransport(
     }
   }
 
+  // Priority 1: httpUrl (deprecated, but takes precedence for backward compatibility)
   if (mcpServerConfig.httpUrl) {
+    // Log warning if both httpUrl and url are present
+    if (mcpServerConfig.url) {
+      debugLogger.warn(
+        `MCP server '${mcpServerName}': Both 'httpUrl' and 'url' are configured. ` +
+          `Using deprecated 'httpUrl'. Please migrate to 'url' with 'type: "http"'.`,
+      );
+    }
+
     const transportOptions: StreamableHTTPClientTransportOptions = {};
 
     // Set up headers with OAuth token if available
@@ -1274,8 +1328,11 @@ export async function createTransport(
     );
   }
 
-  if (mcpServerConfig.url) {
-    const transportOptions: SSEClientTransportOptions = {};
+  // Priority 2 & 3: url with explicit type
+  if (mcpServerConfig.url && mcpServerConfig.type) {
+    const transportOptions:
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {};
 
     // Set up headers with OAuth token if available
     if (hasOAuthConfig && accessToken) {
@@ -1291,7 +1348,48 @@ export async function createTransport(
       };
     }
 
-    return new SSEClientTransport(
+    if (mcpServerConfig.type === 'http') {
+      return new StreamableHTTPClientTransport(
+        new URL(mcpServerConfig.url),
+        transportOptions,
+      );
+    } else if (mcpServerConfig.type === 'sse') {
+      return new SSEClientTransport(
+        new URL(mcpServerConfig.url),
+        transportOptions,
+      );
+    }
+  }
+
+  // Priority 4: url without type (default to HTTP with note)
+  // Note: Auto-detection with probing would add startup latency. Instead, we default to HTTP
+  // (the modern standard) and let connection errors guide the user to specify explicit type if needed.
+  if (mcpServerConfig.url) {
+    const transportOptions:
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {};
+
+    // Set up headers with OAuth token if available
+    if (hasOAuthConfig && accessToken) {
+      transportOptions.requestInit = {
+        headers: {
+          ...mcpServerConfig.headers,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      };
+    } else if (mcpServerConfig.headers) {
+      transportOptions.requestInit = {
+        headers: mcpServerConfig.headers,
+      };
+    }
+
+    debugLogger.log(
+      `MCP server '${mcpServerName}': No explicit 'type' specified. Defaulting to HTTP transport. ` +
+        `If connection fails, try adding 'type: "sse"' to your configuration.`,
+    );
+
+    // Default to HTTP (SSE is deprecated, HTTP is the modern standard)
+    return new StreamableHTTPClientTransport(
       new URL(mcpServerConfig.url),
       transportOptions,
     );
