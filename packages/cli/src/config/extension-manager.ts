@@ -386,28 +386,39 @@ export class ExtensionManager extends ExtensionLoader {
         installed.installMetadata?.source.toLowerCase() ===
           extensionIdentifier.toLowerCase(),
     );
-    if (!extension) {
+
+    const extensionName = extension ? extension.name : extensionIdentifier;
+    const storage = new ExtensionStorage(extensionName);
+    const extensionDir = storage.getExtensionDir();
+    const directoryExists = fs.existsSync(extensionDir);
+
+    if (!extension && !directoryExists) {
       throw new Error(`Extension not found.`);
     }
-    await this.unloadExtension(extension);
-    const storage = new ExtensionStorage(extension.name);
 
-    await fs.promises.rm(storage.getExtensionDir(), {
-      recursive: true,
-      force: true,
-    });
+    if (extension) {
+      await this.unloadExtension(extension);
+    }
+
+    if (directoryExists) {
+      await fs.promises.rm(extensionDir, {
+        recursive: true,
+        force: true,
+      });
+    }
 
     // The rest of the cleanup below here is only for true uninstalls, not
     // uninstalls related to updates.
     if (isUpdate) return;
 
-    this.extensionEnablementManager.remove(extension.name);
+    const nameToRemove = extension ? extension.name : extensionIdentifier;
+    this.extensionEnablementManager.remove(nameToRemove);
 
     logExtensionUninstall(
       this.telemetryConfig,
       new ExtensionUninstallEvent(
-        hashValue(extension.name),
-        extension.id,
+        hashValue(nameToRemove),
+        extension ? extension.id : '',
         'success',
       ),
     );
