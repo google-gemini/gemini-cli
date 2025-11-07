@@ -630,7 +630,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'All extensions restarted successfully.',
+          text: '2 extensions restarted successfully.',
         }),
         expect.any(Number),
       );
@@ -703,7 +703,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Failed to restart some extensions: Failed to restart',
+          text: 'Failed to restart some extensions:\n  ext1: Failed to restart',
         }),
         expect.any(Number),
       );

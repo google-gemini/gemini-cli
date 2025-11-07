@@ -155,40 +155,53 @@ async function restartAction(
     );
   }
 
+  const s = extensionsToRestart.length > 1 ? 's' : '';
+
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Restarting ${extensionsToRestart.length} extension${extensionsToRestart.length > 1 ? 's' : ''}...`,
+      text: `Restarting ${extensionsToRestart.length} extension${s}...`,
     },
     Date.now(),
   );
 
-  try {
-    await Promise.all(
-      extensionsToRestart.map(async (extension) => {
-        if (extension.isActive) {
-          await extensionLoader.restartExtension(extension);
-          context.ui.dispatchExtensionStateUpdate({
-            type: 'RESTARTED',
-            payload: {
-              name: extension.name,
-            },
-          });
-        }
-      }),
-    );
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: 'All extensions restarted successfully.',
-      },
-      Date.now(),
-    );
-  } catch (error) {
+  const results = await Promise.allSettled(
+    extensionsToRestart.map(async (extension) => {
+      if (extension.isActive) {
+        await extensionLoader.restartExtension(extension);
+        context.ui.dispatchExtensionStateUpdate({
+          type: 'RESTARTED',
+          payload: {
+            name: extension.name,
+          },
+        });
+      }
+    }),
+  );
+
+  const failures = results.filter(
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
+  );
+
+  if (failures.length > 0) {
+    const errorMessages = failures
+      .map((failure, index) => {
+        const extensionName = extensionsToRestart[index].name;
+        return `${extensionName}: ${getErrorMessage(failure.reason)}`;
+      })
+      .join('\n  ');
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: `Failed to restart some extensions: ${getErrorMessage(error)}`,
+        text: `Failed to restart some extensions:\n  ${errorMessages}`,
+      },
+      Date.now(),
+    );
+  } else {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
       },
       Date.now(),
     );
