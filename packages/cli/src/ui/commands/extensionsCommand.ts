@@ -153,6 +153,27 @@ async function restartAction(
     extensionsToRestart = extensionsToRestart.filter((extension) =>
       names.includes(extension.name),
     );
+    if (names.length !== extensionsToRestart.length) {
+      const notFound = names.filter(
+        (name) =>
+          !extensionsToRestart.some((extension) => extension.name === name),
+      );
+      if (notFound.length > 0) {
+        context.ui.addItem(
+          {
+            type: MessageType.WARNING,
+            text: `Extension(s) not found or not active: ${notFound.join(
+              ', ',
+            )}`,
+          },
+          Date.now(),
+        );
+      }
+    }
+  }
+  if (extensionsToRestart.length === 0) {
+    // We will have logged a different message above already.
+    return;
   }
 
   const s = extensionsToRestart.length > 1 ? 's' : '';
