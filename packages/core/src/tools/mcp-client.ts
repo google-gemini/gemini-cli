@@ -402,12 +402,12 @@ async function handleAutomaticOAuth(
  */
 function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
-  headers: Record<string, string>,
+  defaultHeaders: Record<string, string>,
 ): RequestInit {
   return {
     headers: {
+      ...defaultHeaders,
       ...mcpServerConfig.headers,
-      ...headers,
     },
   };
 }
@@ -1207,10 +1207,11 @@ export async function createTransport(
     mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
   ) {
     const provider = new GoogleCredentialProvider(mcpServerConfig);
+    const customHeaders = await provider.getRequestHeaders();
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
-      requestInit: createTransportRequestInit(mcpServerConfig, {}),
+      requestInit: createTransportRequestInit(mcpServerConfig, customHeaders),
       authProvider: provider,
     };
     if (mcpServerConfig.httpUrl) {
