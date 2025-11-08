@@ -33,7 +33,6 @@ export const MainContent = () => {
   } = uiState;
 
   const historyItems = [
-    <AppHeader key="app-header" version={version} />,
     ...uiState.history.map((h) => (
       <HistoryItemDisplay
         terminalWidth={mainAreaWidth}
@@ -90,6 +89,7 @@ export const MainContent = () => {
 
   return (
     <>
+      <AppHeader key="app-header" version={version} />
       <Static key={uiState.historyRemountKey} items={historyItems}>
         {(item) => item}
       </Static>
