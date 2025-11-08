@@ -390,14 +390,9 @@ export class ExtensionManager extends ExtensionLoader {
       throw new Error(`Extension not found.`);
     }
     await this.unloadExtension(extension);
-    let pathToDelete: string;
-    if (extension.installMetadata?.type === 'link') {
-      const storage = new ExtensionStorage(extension.name);
-      pathToDelete = storage.getExtensionDir();
-    } else {
-      pathToDelete = extension.path;
-    }
-    await fs.promises.rm(pathToDelete, {
+    const storage = new ExtensionStorage(extension.name);
+
+    await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
       force: true,
     });
