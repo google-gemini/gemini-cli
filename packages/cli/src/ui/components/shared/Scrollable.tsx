@@ -16,6 +16,7 @@ import { Box, getInnerHeight, getScrollHeight, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
+import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -81,25 +82,20 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     childrenCountRef.current = childCountCurrent;
   });
 
-  const pendingScrollTopRef = useRef<number | null>(null);
-  const scrollTopRef = useRef(scrollTop);
-  useEffect(() => {
-    scrollTopRef.current = scrollTop;
-    pendingScrollTopRef.current = null;
-  }, [scrollTop]);
+  const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
 
   const scrollBy = useCallback(
     (delta: number) => {
       const { scrollHeight, innerHeight } = sizeRef.current;
-      const current = pendingScrollTopRef.current ?? scrollTopRef.current;
+      const current = getScrollTop();
       const next = Math.min(
         Math.max(0, current + delta),
         Math.max(0, scrollHeight - innerHeight),
       );
-      pendingScrollTopRef.current = next;
+      setPendingScrollTop(next);
       setScrollTop(next);
     },
-    [sizeRef],
+    [sizeRef, getScrollTop, setPendingScrollTop],
   );
 
   const { scrollbarColor, flashScrollbar, scrollByWithAnimation } =
@@ -121,11 +117,11 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   const getScrollState = useCallback(
     () => ({
-      scrollTop: pendingScrollTopRef.current ?? scrollTop,
+      scrollTop: getScrollTop(),
       scrollHeight: size.scrollHeight,
       innerHeight: size.innerHeight,
     }),
-    [scrollTop, size.scrollHeight, size.innerHeight],
+    [getScrollTop, size.scrollHeight, size.innerHeight],
   );
 
   const hasFocusCallback = useCallback(() => hasFocus, [hasFocus]);

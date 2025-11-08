@@ -16,6 +16,7 @@ import {
 } from 'react';
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
+import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 
 import { type DOMElement, measureElement, Box } from 'ink';
 
@@ -363,10 +364,7 @@ function VirtualizedList<T>(
     }
   }
 
-  const pendingScrollTopRef = useRef<number | null>(null);
-  useEffect(() => {
-    pendingScrollTopRef.current = null;
-  });
+  const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
 
   useImperativeHandle(
     ref,
@@ -375,7 +373,7 @@ function VirtualizedList<T>(
         if (delta < 0) {
           setIsStickingToBottom(false);
         }
-        const currentScrollTop = pendingScrollTopRef.current ?? scrollTop;
+        const currentScrollTop = getScrollTop();
         const newScrollTop = Math.max(
           0,
           Math.min(
@@ -383,7 +381,7 @@ function VirtualizedList<T>(
             currentScrollTop + delta,
           ),
         );
-        pendingScrollTopRef.current = newScrollTop;
+        setPendingScrollTop(newScrollTop);
         setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
       },
       scrollTo: (offset: number) => {
@@ -392,7 +390,7 @@ function VirtualizedList<T>(
           0,
           Math.min(totalHeight - scrollableContainerHeight, offset),
         );
-        pendingScrollTopRef.current = newScrollTop;
+        setPendingScrollTop(newScrollTop);
         setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
       },
       scrollToEnd: () => {
@@ -423,7 +421,7 @@ function VirtualizedList<T>(
               offset - viewPosition * scrollableContainerHeight + viewOffset,
             ),
           );
-          pendingScrollTopRef.current = newScrollTop;
+          setPendingScrollTop(newScrollTop);
           setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
         }
       },
@@ -448,14 +446,14 @@ function VirtualizedList<T>(
                 offset - viewPosition * scrollableContainerHeight + viewOffset,
               ),
             );
-            pendingScrollTopRef.current = newScrollTop;
+            setPendingScrollTop(newScrollTop);
             setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
           }
         }
       },
       getScrollIndex: () => scrollAnchor.index,
       getScrollState: () => ({
-        scrollTop: pendingScrollTopRef.current ?? scrollTop,
+        scrollTop: getScrollTop(),
         scrollHeight: totalHeight,
         innerHeight: containerHeight,
       }),
@@ -467,7 +465,8 @@ function VirtualizedList<T>(
       getAnchorForScrollTop,
       data,
       scrollableContainerHeight,
-      scrollTop,
+      getScrollTop,
+      setPendingScrollTop,
       containerHeight,
     ],
   );
