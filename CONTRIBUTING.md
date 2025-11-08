@@ -35,6 +35,16 @@ sign a new one.
 This project follows
 [Google's Open Source Community Guidelines](https://opensource.google/conduct/).
 
+### Review our Code of Conduct
+
+This project has a [Code of Conduct](./.github/CODE_OF_CONDUCT.md) that all
+contributors are expected to follow. Please review it before contributing.
+
+> [!NOTE] **For project maintainers:** Please update the
+> `[INSERT CONTACT METHOD]` placeholder in the
+> [Code of Conduct](./.github/CODE_OF_CONDUCT.md) with a private contact method
+> for reporting violations.
+
 ## Code contribution process
 
 ### Get started
