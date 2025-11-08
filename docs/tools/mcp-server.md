@@ -422,20 +422,6 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-#### SSE-based MCP Server
-
-```json
-{
-  "mcpServers": {
-    "sseServer": {
-      "url": "http://localhost:8080/sse",
-      "type": "sse",
-      "timeout": 5000
-    }
-  }
-}
-```
-
 #### MCP Server with Tool Filtering
 
 ```json
@@ -967,8 +953,7 @@ gemini mcp add python-server python server.py -- --server-arg my-value
 
 #### Adding an HTTP server
 
-This transport is for servers that use the streamable HTTP transport. When you
-use `--transport http`, the configuration will use `url` with `type: "http"`.
+This transport is for servers that use the streamable HTTP transport.
 
 ```bash
 # Basic syntax
@@ -983,8 +968,7 @@ gemini mcp add --transport http --header "Authorization: Bearer abc123" secure-h
 
 #### Adding an SSE server
 
-This transport is for servers that use Server-Sent Events (SSE). When you use
-`--transport sse`, the configuration will use `url` with `type: "sse"`.
+This transport is for servers that use Server-Sent Events (SSE).
 
 ```bash
 # Basic syntax
