@@ -171,6 +171,7 @@ describe('AppContainer State Management', () => {
   const mockedUseKeypress = useKeypress as Mock;
 
   beforeEach(() => {
+    vi.resetAllMocks();
     vi.clearAllMocks();
 
     // Initialize mock stdout for terminal title tests
@@ -326,6 +327,7 @@ describe('AppContainer State Management', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     cleanup();
   });
 
