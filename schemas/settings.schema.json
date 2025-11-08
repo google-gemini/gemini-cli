@@ -6,6 +6,9 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string"
+    },
     "mcpServers": {
       "title": "MCP Servers",
       "description": "Configuration for MCP servers.",
