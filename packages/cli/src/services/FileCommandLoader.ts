@@ -37,6 +37,7 @@ import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 interface CommandDirectory {
   path: string;
   extensionName?: string;
+  extensionId?: string;
 }
 
 /**
@@ -110,6 +111,7 @@ export class FileCommandLoader implements ICommandLoader {
             path.join(dirInfo.path, file),
             dirInfo.path,
             dirInfo.extensionName,
+            dirInfo.extensionId,
           ),
         );
 
@@ -158,6 +160,7 @@ export class FileCommandLoader implements ICommandLoader {
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
         extensionName: ext.name,
+        extensionId: ext.id,
       }));
 
       dirs.push(...extensionCommandDirs);
@@ -177,6 +180,7 @@ export class FileCommandLoader implements ICommandLoader {
     filePath: string,
     baseDir: string,
     extensionName?: string,
+    extensionId?: string,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -265,6 +269,7 @@ export class FileCommandLoader implements ICommandLoader {
       description,
       kind: CommandKind.FILE,
       extensionName,
+      extensionId,
       action: async (
         context: CommandContext,
         _args: string,
