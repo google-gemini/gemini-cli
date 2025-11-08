@@ -19,7 +19,6 @@ import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 
-export const DRAG_TIMEOUT = 100;
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 50;
@@ -41,7 +40,9 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00B5': 'm', // "µ" toggle markup view
 };
 
-function mouseEventFilterer(keypressHandler: KeypressHandler): KeypressHandler {
+function nonKeyboardEventFilter(
+  keypressHandler: KeypressHandler,
+): KeypressHandler {
   return (key: Key) => {
     if (
       !parseMouseEvent(key.sequence) &&
@@ -61,98 +62,42 @@ function mouseEventFilterer(keypressHandler: KeypressHandler): KeypressHandler {
 function bufferBackslashEnter(
   keypressHandler: KeypressHandler,
 ): (key: Key | null) => void {
-  let timeoutId: NodeJS.Timeout;
-
   const bufferer = (function* (): Generator<void, void, Key | null> {
-    let buffer: Key | null = null;
     while (true) {
       const key = yield;
+
       if (key == null) {
-        // timeout occurred
-        if (buffer !== null) {
-          keypressHandler(buffer);
-          buffer = null;
-        }
-      } else if (buffer !== null) {
-        if (key.name === 'return') {
-          keypressHandler({
-            ...key,
-            shift: true,
-            sequence: '\r', // Corrected escaping for newline
-          });
-          buffer = null;
-        } else {
-          keypressHandler(buffer);
-          buffer = null;
-          keypressHandler(key);
-        }
-      } else if (key.sequence === '\\') {
-        buffer = key; // start buffering
-        timeoutId = setTimeout(
-          () => bufferer.next(null),
-          BACKSLASH_ENTER_TIMEOUT,
-        );
+        continue;
+      } else if (key.name !== '\\') {
+        keypressHandler(key);
+        continue;
+      }
+
+      const timeoutId = setTimeout(
+        () => bufferer.next(null),
+        BACKSLASH_ENTER_TIMEOUT,
+      );
+      const nextKey = yield;
+      clearTimeout(timeoutId);
+
+      if (nextKey === null) {
+        keypressHandler(key);
+      } else if (nextKey.name === 'return') {
+        keypressHandler({
+          ...key,
+          shift: true,
+          sequence: '\r', // Corrected escaping for newline
+        });
       } else {
         keypressHandler(key);
+        keypressHandler(nextKey);
       }
     }
   })();
 
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key | null) => {
-    clearTimeout(timeoutId);
-    bufferer.next(key);
-  };
-}
-
-/**
- * Buffers keys sent between single or double quotes.
- * Will flush the buffer if no data is received for DRAG_COMPLETION_TIMEOUT_MS
- * or when a null key is received.
- */
-function bufferDrag(
-  keypressHandler: KeypressHandler,
-): (key: Key | null) => void {
-  let timeoutId: NodeJS.Timeout;
-
-  const bufferer = (function* (): Generator<void, void, Key | null> {
-    let buffer: string | null = null; // This is null when not in drag mode
-    while (true) {
-      const key = yield;
-      if (
-        key == null ||
-        key.sequence === DOUBLE_QUOTE ||
-        key.sequence === SINGLE_QUOTE
-      ) {
-        if (buffer !== null) {
-          keypressHandler({
-            name: '',
-            ctrl: false,
-            meta: false,
-            shift: false,
-            paste: true,
-            sequence: buffer,
-          });
-          buffer = null;
-        } else if (key != null) {
-          buffer = key.sequence;
-          timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
-        }
-      } else if (buffer !== null) {
-        buffer += key.sequence;
-        timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
-      } else {
-        keypressHandler(key);
-      }
-    }
-  })();
-  bufferer.next(); // prime the generator so it starts listening.
-
-  return (key: Key | null) => {
-    clearTimeout(timeoutId);
-    bufferer.next(key);
-  };
+  return (key: Key | null) => bufferer.next(key);
 }
 
 /**
@@ -163,41 +108,44 @@ function bufferDrag(
 function bufferPaste(
   keypressHandler: KeypressHandler,
 ): (key: Key | null) => void {
-  let timeoutId: NodeJS.Timeout;
   const bufferer = (function* (): Generator<void, void, Key | null> {
-    // This is null when not in paste mode
-    let buffer: string | null = null;
     while (true) {
-      const key = yield;
-      if (key == null || key.name === 'paste-end') {
-        if (buffer !== null) {
-          keypressHandler({
-            name: '',
-            ctrl: false,
-            meta: false,
-            shift: false,
-            paste: true,
-            sequence: buffer,
-          });
-        }
-        buffer = null;
-      } else if (key.name === 'paste-start') {
-        buffer = '';
-        timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
-      } else if (buffer !== null) {
-        buffer += key.sequence;
-        timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
-      } else {
+      let key = yield;
+
+      if (key === null) {
+        continue;
+      } else if (key.name !== 'paste-start') {
         keypressHandler(key);
+        continue;
+      }
+
+      let buffer = '';
+      while (true) {
+        const timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
+        key = yield;
+        clearTimeout(timeoutId);
+
+        if (key === null || key.name === 'paste-end') {
+          break;
+        }
+        buffer += key.sequence;
+      }
+
+      if (buffer.length > 0) {
+        keypressHandler({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: buffer,
+        });
       }
     }
   })();
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key | null) => {
-    clearTimeout(timeoutId);
-    bufferer.next(key);
-  };
+  return (key: Key | null) => bufferer.next(key);
 }
 
 /**
@@ -206,7 +154,7 @@ function bufferPaste(
  * until a timeout occurs.
  */
 function createDataListener(keypressHandler: KeypressHandler) {
-  const parser = emitKeys((key) => keypressHandler(key));
+  const parser = emitKeys(keypressHandler);
   parser.next(); // prime the generator so it starts listening.
 
   let timeoutId: NodeJS.Timeout;
@@ -215,7 +163,9 @@ function createDataListener(keypressHandler: KeypressHandler) {
     for (const char of data) {
       parser.next(char);
     }
-    timeoutId = setTimeout(() => parser.next(''), ESC_TIMEOUT);
+    if (data.length !== 0) {
+      timeoutId = setTimeout(() => parser.next(''), ESC_TIMEOUT);
+    }
   };
 }
 
@@ -240,10 +190,12 @@ function* emitKeys(
 
     if (ch === ESC) {
       escaped = true;
-      sequence += ch = yield;
+      ch = yield;
+      sequence += ch;
 
       if (ch === ESC) {
-        sequence += ch = yield;
+        ch = yield;
+        sequence += ch;
       }
     }
 
@@ -255,11 +207,13 @@ function* emitKeys(
       if (ch === 'O') {
         // ESC O letter
         // ESC O modifier letter
-        sequence += ch = yield;
+        ch = yield;
+        sequence += ch;
 
         if (ch >= '0' && ch <= '9') {
           modifier = parseInt(ch, 10) - 1;
-          sequence += ch = yield;
+          ch = yield;
+          sequence += ch;
         }
 
         code += ch;
@@ -268,13 +222,15 @@ function* emitKeys(
         // ESC [ modifier letter
         // ESC [ [ modifier letter
         // ESC [ [ num char
-        sequence += ch = yield;
+        ch = yield;
+        sequence += ch;
 
         if (ch === '[') {
           // \x1b[[A
           //      ^--- escape codes might have a second bracket
           code += ch;
-          sequence += ch = yield;
+          ch = yield;
+          sequence += ch;
         }
 
         /*
@@ -310,30 +266,38 @@ function* emitKeys(
 
         // collect as many digits as possible
         while (ch >= '0' && ch <= '9') {
-          sequence += ch = yield;
+          ch = yield;
+          sequence += ch;
         }
 
         // skip modifier
         if (ch === ';') {
-          sequence += ch = yield;
+          ch = yield;
+          sequence += ch;
 
           // collect as many digits as possible
           while (ch >= '0' && ch <= '9') {
-            sequence += ch = yield;
+            ch = yield;
+            sequence += ch;
           }
         } else if (ch === '<') {
           // SGR mouse mode
-          sequence += ch = yield;
+          ch = yield;
+          sequence += ch;
           // Don't skip on empty string here to avoid timeouts on slow events.
           while (ch === '' || ch === ';' || (ch >= '0' && ch <= '9')) {
-            sequence += ch = yield;
+            ch = yield;
+            sequence += ch;
           }
         } else if (ch === 'M') {
           // X11 mouse mode
           // three characters after 'M'
-          sequence += ch = yield;
-          sequence += ch = yield;
-          sequence += ch = yield;
+          ch = yield;
+          sequence += ch;
+          ch = yield;
+          sequence += ch;
+          ch = yield;
+          sequence += ch;
         }
 
         /*
@@ -370,7 +334,7 @@ function* emitKeys(
           name = 'paste-end';
           break;
 
-        /* from Cygwin and used in libuv */
+        // from Cygwin and used in libuv
         case '[[A':
           name = 'f1';
           break;
@@ -449,7 +413,7 @@ function* emitKeys(
           name = 'f12';
           break;
 
-        /* xterm ESC [ letter */
+        // xterm ESC [ letter
         case '[A':
           name = 'up';
           break;
@@ -484,7 +448,7 @@ function* emitKeys(
           name = 'f4';
           break;
 
-        /* xterm/gnome ESC O letter */
+        // xterm/gnome ESC O letter
         case 'OA':
           name = 'up';
           break;
@@ -519,9 +483,7 @@ function* emitKeys(
           name = 'f4';
           break;
 
-        /* xterm/rxvt ESC [ number ~ */
-
-        /* putty */
+        // putty
         case '[[5~':
           name = 'pageup';
           break;
@@ -529,7 +491,7 @@ function* emitKeys(
           name = 'pagedown';
           break;
 
-        /* rxvt keys with modifiers */
+        // rxvt keys with modifiers
         case '[a':
           name = 'up';
           shift = true;
@@ -639,7 +601,7 @@ function* emitKeys(
           name = 'return';
           break;
 
-        /* misc. */
+        // misc.
         case '[Z':
           name = 'tab';
           shift = true;
@@ -717,7 +679,6 @@ function* emitKeys(
       (sequence.length !== 0 && (name !== undefined || escaped)) ||
       charLengthAt(sequence, 0) === sequence.length
     ) {
-      /* Named character or sequence */
       keypressHandler({
         name: name || '',
         ctrl,
@@ -727,12 +688,9 @@ function* emitKeys(
         sequence,
       });
     }
-    /* Unrecognized or broken escape sequence, don't emit anything */
+    // Unrecognized or broken escape sequence, don't emit anything
   }
 }
-
-export const SINGLE_QUOTE = "'";
-export const DOUBLE_QUOTE = '"';
 
 export interface Key {
   name: string;
@@ -799,16 +757,17 @@ export function KeypressProvider({
 
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
-    const mouseFilterer = mouseEventFilterer(broadcast);
+    const mouseFilterer = nonKeyboardEventFilter(broadcast);
     const backslashBufferer = bufferBackslashEnter(mouseFilterer);
-    const dragBufferer = bufferDrag(backslashBufferer);
-    const pasteBufferer = bufferPaste(dragBufferer);
+    const pasteBufferer = bufferPaste(backslashBufferer);
     let dataListener = createDataListener(pasteBufferer);
 
     if (debugKeystrokeLogging) {
       const old = dataListener;
       dataListener = (data: string) => {
-        debugLogger.log(`[DEBUG] Raw StdIn: ${JSON.stringify(data)}`);
+        if (data.length > 0) {
+          debugLogger.log(`[DEBUG] Raw StdIn: ${JSON.stringify(data)}`);
+        }
         old(data);
       };
     }
@@ -818,7 +777,6 @@ export function KeypressProvider({
     return () => {
       // flush buffers by sending null key
       backslashBufferer(null);
-      dragBufferer(null);
       pasteBufferer(null);
       // flush by sending empty string to the data listener
       dataListener('');
