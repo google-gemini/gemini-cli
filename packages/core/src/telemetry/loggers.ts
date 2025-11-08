@@ -507,11 +507,11 @@ export function logModelSlashCommand(
   recordModelSlashCommand(config, event);
 }
 
-export function logExtensionInstallEvent(
+export async function logExtensionInstallEvent(
   config: Config,
   event: ExtensionInstallEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -522,11 +522,11 @@ export function logExtensionInstallEvent(
   logger.emit(logRecord);
 }
 
-export function logExtensionUninstall(
+export async function logExtensionUninstall(
   config: Config,
   event: ExtensionUninstallEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -537,11 +537,11 @@ export function logExtensionUninstall(
   logger.emit(logRecord);
 }
 
-export function logExtensionUpdateEvent(
+export async function logExtensionUpdateEvent(
   config: Config,
   event: ExtensionUpdateEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionUpdateEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionUpdateEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -552,11 +552,11 @@ export function logExtensionUpdateEvent(
   logger.emit(logRecord);
 }
 
-export function logExtensionEnable(
+export async function logExtensionEnable(
   config: Config,
   event: ExtensionEnableEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -567,11 +567,11 @@ export function logExtensionEnable(
   logger.emit(logRecord);
 }
 
-export function logExtensionDisable(
+export async function logExtensionDisable(
   config: Config,
   event: ExtensionDisableEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
