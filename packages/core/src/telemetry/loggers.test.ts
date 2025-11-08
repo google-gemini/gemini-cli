@@ -1516,7 +1516,7 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should log extension install event', async () => {
@@ -1565,10 +1565,10 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
-    it('should log extension update event', () => {
+    it('should log extension update event', async () => {
       const event = new ExtensionUpdateEvent(
         'testing',
         'testing-id',
@@ -1616,10 +1616,9 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
-
-    it('should log extension uninstall event', () => {
+    it('should log extension uninstall event', async () => {
       const event = new ExtensionUninstallEvent(
         'testing',
         'testing-id',
@@ -1658,10 +1657,10 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
-    it('should log extension enable event', () => {
+    it('should log extension enable event', async () => {
       const event = new ExtensionEnableEvent('testing', 'testing-id', 'user');
 
       await logExtensionEnable(mockConfig, event);
@@ -1696,7 +1695,7 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should log extension disable event', async () => {
