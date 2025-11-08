@@ -71,7 +71,6 @@ export class GcpLogExporter implements LogRecordExporter {
             },
           },
           {
-            session_id: log.attributes?.['session.id'],
             ...log.attributes,
             ...log.resource?.attributes,
             message: log.body,

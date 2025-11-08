@@ -5,6 +5,7 @@
  */
 
 import { render as inkRender } from 'ink-testing-library';
+import { Box } from 'ink';
 import type React from 'react';
 import { act } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
@@ -22,12 +23,26 @@ import { type Config } from '@google/gemini-cli-core';
 // Wrapper around ink-testing-library's render that ensures act() is called
 export const render = (
   tree: React.ReactElement,
+  terminalWidth?: number,
 ): ReturnType<typeof inkRender> => {
   let renderResult: ReturnType<typeof inkRender> =
     undefined as unknown as ReturnType<typeof inkRender>;
   act(() => {
     renderResult = inkRender(tree);
   });
+
+  if (terminalWidth !== undefined && renderResult?.stdout) {
+    // Override the columns getter on the stdout instance provided by ink-testing-library
+    Object.defineProperty(renderResult.stdout, 'columns', {
+      get: () => terminalWidth,
+      configurable: true,
+    });
+
+    // Trigger a rerender so Ink can pick up the new terminal width
+    act(() => {
+      renderResult.rerender(tree);
+    });
+  }
 
   const originalUnmount = renderResult.unmount;
   const originalRerender = renderResult.rerender;
@@ -148,13 +163,21 @@ export const renderWithProviders = (
           <VimModeProvider settings={settings}>
             <ShellFocusContext.Provider value={shellFocus}>
               <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-                {component}
+                <Box
+                  width={terminalWidth}
+                  flexShrink={0}
+                  flexGrow={0}
+                  flexDirection="column"
+                >
+                  {component}
+                </Box>
               </KeypressProvider>
             </ShellFocusContext.Provider>
           </VimModeProvider>
         </UIStateContext.Provider>
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
+    terminalWidth,
   );
 };
 

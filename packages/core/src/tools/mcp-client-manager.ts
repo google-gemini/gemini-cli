@@ -220,8 +220,10 @@ export class McpClientManager {
         try {
           await client.disconnect();
         } catch (error) {
-          console.error(
-            `Error stopping client '${name}': ${getErrorMessage(error)}`,
+          coreEvents.emitFeedback(
+            'error',
+            `Error stopping client '${name}':`,
+            error,
           );
         }
       },

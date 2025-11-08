@@ -927,13 +927,13 @@ This is the default transport for running local servers.
 
 ```bash
 # Basic syntax
-gemini mcp add <name> <command> [args...]
+gemini mcp add [options] <name> <command> [args...]
 
 # Example: Adding a local server
-gemini mcp add -e API_KEY=123 my-stdio-server /path/to/server arg1 arg2 arg3
+gemini mcp add -e API_KEY=123 -e DEBUG=true my-stdio-server /path/to/server arg1 arg2 arg3
 
 # Example: Adding a local python server
-gemini mcp add python-server python server.py --port 8080
+gemini mcp add python-server python server.py -- --server-arg my-value
 ```
 
 #### Adding an HTTP server

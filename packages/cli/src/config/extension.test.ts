@@ -16,7 +16,10 @@ import {
   KeychainTokenStorage,
 } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from './settings.js';
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import {
+  isWorkspaceTrusted,
+  resetTrustedFoldersForTesting,
+} from './trustedFolders.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { join } from 'node:path';
@@ -182,6 +185,7 @@ describe('extension tests', () => {
       requestSetting: mockPromptForSettings,
       settings: loadSettings(tempWorkspaceDir).merged,
     });
+    resetTrustedFoldersForTesting();
   });
 
   afterEach(() => {
@@ -870,6 +874,87 @@ describe('extension tests', () => {
         type: 'link',
       });
       fs.rmSync(targetExtDir, { recursive: true, force: true });
+    });
+
+    it('should prompt for trust if workspace is not trusted', async () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: undefined,
+      });
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+
+      expect(mockRequestConsent).toHaveBeenCalledWith(
+        `The current workspace at "${tempWorkspaceDir}" is not trusted. Do you want to trust this workspace to install extensions?`,
+      );
+    });
+
+    it('should not install if user denies trust', async () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: undefined,
+      });
+      mockRequestConsent.mockImplementation(async (message) => {
+        if (
+          message.includes(
+            'is not trusted. Do you want to trust this workspace to install extensions?',
+          )
+        ) {
+          return false;
+        }
+        return true;
+      });
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: sourceExtDir,
+          type: 'local',
+        }),
+      ).rejects.toThrow(
+        `Could not install extension because the current workspace at ${tempWorkspaceDir} is not trusted.`,
+      );
+    });
+
+    it('should add the workspace to trusted folders if user consents', async () => {
+      const trustedFoldersPath = path.join(
+        tempHomeDir,
+        '.gemini',
+        'trustedFolders.json',
+      );
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: undefined,
+      });
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+      });
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+      expect(fs.existsSync(trustedFoldersPath)).toBe(true);
+      const trustedFolders = JSON.parse(
+        fs.readFileSync(trustedFoldersPath, 'utf-8'),
+      );
+      expect(trustedFolders[tempWorkspaceDir]).toBe('TRUST_FOLDER');
     });
 
     describe.each([true, false])(

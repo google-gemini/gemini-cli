@@ -634,6 +634,19 @@ describe('Server Config (config.ts)', () => {
       expect(config.getUseModelRouter()).toBe(true);
       expect(config.getModel()).toBe(chosenModel);
     });
+
+    it('should NOT switch to auto model if cli provides specific model, even if router is enabled', async () => {
+      const config = new Config({
+        ...baseParams,
+        useModelRouter: true,
+        model: 'gemini-flash-latest',
+      });
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getUseModelRouter()).toBe(true);
+      expect(config.getModel()).toBe('gemini-flash-latest');
+    });
   });
 
   describe('ContinueOnFailedApiCall Configuration', () => {

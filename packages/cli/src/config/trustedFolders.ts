@@ -18,13 +18,16 @@ import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
-export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
+
+export function getUserSettingsDir(): string {
+  return path.join(homedir(), GEMINI_DIR);
+}
 
 export function getTrustedFoldersPath(): string {
   if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
     return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
   }
-  return path.join(USER_SETTINGS_DIR, TRUSTED_FOLDERS_FILENAME);
+  return path.join(getUserSettingsDir(), TRUSTED_FOLDERS_FILENAME);
 }
 
 export enum TrustLevel {

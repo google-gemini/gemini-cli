@@ -47,6 +47,7 @@ const renderWithContext = (
     <StreamingContext.Provider value={contextValue}>
       {ui}
     </StreamingContext.Provider>,
+    width,
   );
 };
 

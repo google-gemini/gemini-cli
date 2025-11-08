@@ -12,7 +12,11 @@ import { ExtensionEnablementManager } from './extensions/extensionEnablement.js'
 import { type Settings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import {
+  isWorkspaceTrusted,
+  loadTrustedFolders,
+  TrustLevel,
+} from './trustedFolders.js';
 import {
   cloneFromGit,
   downloadFromGitHubRelease,
@@ -136,11 +140,19 @@ export class ExtensionManager implements ExtensionLoader {
     let extension: GeminiCLIExtension | null;
     try {
       if (!isWorkspaceTrusted(this.settings).isTrusted) {
-        throw new Error(
-          `Could not install extension from untrusted folder at ${installMetadata.source}`,
-        );
+        if (
+          await this.requestConsent(
+            `The current workspace at "${this.workspaceDir}" is not trusted. Do you want to trust this workspace to install extensions?`,
+          )
+        ) {
+          const trustedFolders = loadTrustedFolders();
+          trustedFolders.setValue(this.workspaceDir, TrustLevel.TRUST_FOLDER);
+        } else {
+          throw new Error(
+            `Could not install extension because the current workspace at ${this.workspaceDir} is not trusted.`,
+          );
+        }
       }
-
       const extensionsDir = ExtensionStorage.getUserExtensionsDir();
       await fs.promises.mkdir(extensionsDir, { recursive: true });
 

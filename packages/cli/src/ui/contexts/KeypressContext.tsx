@@ -57,6 +57,48 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
 };
 
 /**
+ * Maps symbols from parameterized functional keys `\x1b[1;1<letter>`
+ * to their corresponding key names (e.g., 'up', 'f1').
+ */
+const LEGACY_FUNC_TO_NAME: { [k: string]: string } = {
+  A: 'up',
+  B: 'down',
+  C: 'right',
+  D: 'left',
+  H: 'home',
+  F: 'end',
+  P: 'f1',
+  Q: 'f2',
+  R: 'f3',
+  S: 'f4',
+};
+
+/**
+ * Maps key codes from tilde-coded functional keys `\x1b[<code>~`
+ * to their corresponding key names.
+ */
+const TILDE_KEYCODE_TO_NAME: Record<number, string> = {
+  1: 'home',
+  2: 'insert',
+  3: 'delete',
+  4: 'end',
+  5: 'pageup',
+  6: 'pagedown',
+  11: 'f1',
+  12: 'f2',
+  13: 'f3',
+  14: 'f4',
+  15: 'f5',
+  17: 'f6', // skipping 16 is intentional
+  18: 'f7',
+  19: 'f8',
+  20: 'f9',
+  21: 'f10',
+  23: 'f11', // skipping 22 is intentional
+  24: 'f12',
+};
+
+/**
  * Check if a buffer could potentially be a valid kitty sequence or its prefix.
  */
 function couldBeKittySequence(buffer: string): boolean {
@@ -169,19 +211,7 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
     const alt = (bits & MODIFIER_ALT_BIT) === MODIFIER_ALT_BIT;
     const ctrl = (bits & MODIFIER_CTRL_BIT) === MODIFIER_CTRL_BIT;
     const sym = m[2];
-    const symbolToName: { [k: string]: string } = {
-      A: 'up',
-      B: 'down',
-      C: 'right',
-      D: 'left',
-      H: 'home',
-      F: 'end',
-      P: 'f1',
-      Q: 'f2',
-      R: 'f3',
-      S: 'f4',
-    };
-    const name = symbolToName[sym] || '';
+    const name = LEGACY_FUNC_TO_NAME[sym] || '';
     if (!name) return null;
     return {
       key: {
@@ -216,29 +246,7 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
 
     // Tilde-coded functional keys (Delete, Insert, PageUp/Down, Home/End)
     if (terminator === '~') {
-      let name: string | null = null;
-      switch (keyCode) {
-        case 1:
-          name = 'home';
-          break;
-        case 2:
-          name = 'insert';
-          break;
-        case 3:
-          name = 'delete';
-          break;
-        case 4:
-          name = 'end';
-          break;
-        case 5:
-          name = 'pageup';
-          break;
-        case 6:
-          name = 'pagedown';
-          break;
-        default:
-          break;
-      }
+      const name = TILDE_KEYCODE_TO_NAME[keyCode];
       if (name) {
         return {
           key: {
@@ -307,15 +315,7 @@ function parseKittyPrefix(buffer: string): { key: Key; length: number } | null {
   m = buffer.match(legacyFuncKey);
   if (m) {
     const sym = m[1];
-    const nameMap: { [key: string]: string } = {
-      A: 'up',
-      B: 'down',
-      C: 'right',
-      D: 'left',
-      H: 'home',
-      F: 'end',
-    };
-    const name = nameMap[sym]!;
+    const name = LEGACY_FUNC_TO_NAME[sym]!;
     return {
       key: {
         name,
