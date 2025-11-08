@@ -102,6 +102,7 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
+  gws_experiment: number[];
 }
 
 export interface EventValue {
@@ -237,6 +238,7 @@ export class ClearcutLogger {
         {
           event_time_ms: Date.now(),
           source_extension_json: safeJsonStringify(event),
+          gws_experiment: this.config?.getExperiments()?.experimentIds ?? [],
         },
       ]);
 
