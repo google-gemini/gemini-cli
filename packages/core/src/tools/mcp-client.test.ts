@@ -697,7 +697,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     const client = await connectToMcpServer(
       'test-server',
-      { httpUrl: serverUrl },
+      { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
     );
@@ -741,7 +741,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     const client = await connectToMcpServer(
       'test-server',
-      { httpUrl: serverUrl },
+      { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
     );
