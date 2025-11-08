@@ -403,22 +403,6 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-#### HTTP-based MCP Server with Auto-detection
-
-When `type` is omitted, the CLI attempts HTTP transport first and automatically
-falls back to SSE if HTTP fails:
-
-```json
-{
-  "mcpServers": {
-    "sentry": {
-      "url": "https://mcp.sentry.dev/mcp",
-      "timeout": 5000
-    }
-  }
-}
-```
-
 #### HTTP-based MCP Server with Custom Headers
 
 ```json
