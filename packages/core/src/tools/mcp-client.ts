@@ -1442,6 +1442,11 @@ export async function createTransport(
     );
 
     if (!accessToken) {
+      // Emit info message (not error) since this is expected behavior
+      coreEvents.emitFeedback(
+        'info',
+        `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
+      );
       throw new Error(
         `MCP server '${mcpServerName}' requires OAuth authentication. ` +
           `Please authenticate using the /mcp auth command.`,

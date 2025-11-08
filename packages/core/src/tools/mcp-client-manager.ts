@@ -191,7 +191,8 @@ export class McpClientManager {
             const errorMessage = getErrorMessage(error);
             const is401AuthError =
               errorMessage.includes('401 error received') ||
-              errorMessage.includes('requires authentication');
+              errorMessage.includes('requires authentication') ||
+              errorMessage.includes('requires OAuth authentication');
 
             if (!is401AuthError) {
               // Log the error but don't let a single failed server stop the others
