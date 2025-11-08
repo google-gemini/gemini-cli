@@ -130,13 +130,15 @@ Each server configuration supports the following properties:
 - **`command`** (string): Path to the executable for Stdio transport
 - **`url`** (string): URL for HTTP or SSE transport (e.g.,
   `"https://api.example.com/mcp"`). When used with the `type` field, supports
-  both HTTP and SSE transports. When used alone, defaults to HTTP transport.
+  both HTTP and SSE transports. When used alone, attempts HTTP transport first,
+  then automatically falls back to SSE if HTTP fails.
 
 #### Optional
 
 - **`type`** (string): Explicitly specifies the transport type when using `url`.
-  Can be `"http"` or `"sse"`. When omitted, defaults to HTTP transport. This
-  field is recommended for clarity and to avoid auto-detection behavior.
+  Can be `"http"` or `"sse"`. When omitted, the CLI attempts HTTP transport
+  first, then automatically falls back to SSE if HTTP fails. This field is
+  recommended for clarity and to avoid auto-detection behavior.
   - `"http"`: Use Streamable HTTP transport
   - `"sse"`: Use Server-Sent Events transport
 - **`args`** (string[]): Command-line arguments for Stdio transport
@@ -403,7 +405,8 @@ then be used to authenticate with the MCP server.
 
 #### HTTP-based MCP Server with Auto-detection
 
-When `type` is omitted, the CLI defaults to HTTP transport:
+When `type` is omitted, the CLI attempts HTTP transport first and automatically
+falls back to SSE if HTTP fails:
 
 ```json
 {
@@ -494,7 +497,8 @@ For each configured server in `mcpServers`:
 2. **Transport selection:** Based on configuration properties:
    - `url` + `type: "http"` → `StreamableHTTPClientTransport`
    - `url` + `type: "sse"` → `SSEClientTransport`
-   - `url` (without type) → `StreamableHTTPClientTransport` (defaults to HTTP)
+   - `url` (without type) → `StreamableHTTPClientTransport` first, with
+     automatic fallback to `SSEClientTransport` if HTTP fails
    - `command` → `StdioClientTransport`
 3. **Connection establishment:** The MCP client attempts to connect with the
    configured timeout
