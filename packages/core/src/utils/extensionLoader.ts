@@ -6,6 +6,7 @@
 
 import type { EventEmitter } from 'node:events';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
+import { refreshServerHierarchicalMemory } from './memoryDiscovery.js';
 
 export abstract class ExtensionLoader {
   // Assigned in `start`.
@@ -17,6 +18,9 @@ export abstract class ExtensionLoader {
   protected startCompletedCount: number = 0;
   protected stoppingCount: number = 0;
   protected stopCompletedCount: number = 0;
+
+  // Whether or not we are currently executing `start`
+  private isStarting: boolean = false;
 
   constructor(private readonly eventEmitter?: EventEmitter<ExtensionEvents>) {}
 
@@ -32,16 +36,21 @@ export abstract class ExtensionLoader {
    * McpClientManager, PromptRegistry, and GeminiChat set up.
    */
   async start(config: Config): Promise<void> {
-    if (!this.config) {
-      this.config = config;
-    } else {
-      throw new Error('Already started, you may only call `start` once.');
+    this.isStarting = true;
+    try {
+      if (!this.config) {
+        this.config = config;
+      } else {
+        throw new Error('Already started, you may only call `start` once.');
+      }
+      await Promise.all(
+        this.getExtensions()
+          .filter((e) => e.isActive)
+          .map(this.startExtension.bind(this)),
+      );
+    } finally {
+      this.isStarting = false;
     }
-    await Promise.all(
-      this.getExtensions()
-        .filter((e) => e.isActive)
-        .map(this.startExtension.bind(this)),
-    );
   }
 
   /**
@@ -64,13 +73,15 @@ export abstract class ExtensionLoader {
     });
     try {
       await this.config.getMcpClientManager()!.startExtension(extension);
+      await this.maybeRefreshGeminiTools(extension);
+
+      // Note: Context files are loaded only once all extensions are done
+      // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
+      // below.
+
       // TODO: Update custom command updating away from the event based system
       // and call directly into a custom command manager here. See the
       // useSlashCommandProcessor hook which responds to events fired here today.
-
-      // TODO: Move all enablement of extension features here, including at least:
-      // - context file loading
-      // - excluded tool configuration
     } finally {
       this.startCompletedCount++;
       this.eventEmitter?.emit('extensionsStarting', {
@@ -80,6 +91,40 @@ export abstract class ExtensionLoader {
       if (this.startingCount === this.startCompletedCount) {
         this.startingCount = 0;
         this.startCompletedCount = 0;
+      }
+      await this.maybeRefreshMemories();
+    }
+  }
+
+  private async maybeRefreshMemories(): Promise<void> {
+    if (!this.config) {
+      throw new Error(
+        'Cannot refresh gemini memories prior to calling `start`.',
+      );
+    }
+    if (
+      !this.isStarting && // Don't refresh memories on the first call to `start`.
+      this.startingCount === this.startCompletedCount &&
+      this.stoppingCount === this.stopCompletedCount
+    ) {
+      // Wait until all extensions are done starting and stopping before we
+      // reload memory, this is somewhat expensive and also busts the context
+      // cache, we want to only do it once.
+      await refreshServerHierarchicalMemory(this.config);
+    }
+  }
+
+  /**
+   * Refreshes the gemini tools list if it is initialized and the extension has
+   * any excludeTools settings.
+   */
+  private async maybeRefreshGeminiTools(
+    extension: GeminiCLIExtension,
+  ): Promise<void> {
+    if (extension.excludeTools && extension.excludeTools.length > 0) {
+      const geminiClient = this.config?.getGeminiClient();
+      if (geminiClient?.isInitialized()) {
+        await geminiClient.setTools();
       }
     }
   }
@@ -119,13 +164,15 @@ export abstract class ExtensionLoader {
 
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
+      await this.maybeRefreshGeminiTools(extension);
+
+      // Note: Context files are loaded only once all extensions are done
+      // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
+      // below.
+
       // TODO: Update custom command updating away from the event based system
       // and call directly into a custom command manager here. See the
       // useSlashCommandProcessor hook which responds to events fired here today.
-
-      // TODO: Remove all extension features here, including at least:
-      // - context files
-      // - excluded tools
     } finally {
       this.stopCompletedCount++;
       this.eventEmitter?.emit('extensionsStopping', {
@@ -136,6 +183,7 @@ export abstract class ExtensionLoader {
         this.stoppingCount = 0;
         this.stopCompletedCount = 0;
       }
+      await this.maybeRefreshMemories();
     }
   }
 
@@ -151,6 +199,11 @@ export abstract class ExtensionLoader {
       return this.stopExtension(extension);
     }
     return;
+  }
+
+  async restartExtension(extension: GeminiCLIExtension): Promise<void> {
+    await this.stopExtension(extension);
+    await this.startExtension(extension);
   }
 }
 
