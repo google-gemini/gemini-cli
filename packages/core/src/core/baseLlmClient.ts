@@ -19,6 +19,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -26,28 +27,17 @@ const DEFAULT_MAX_ATTEMPTS = 5;
  * Options for the generateJson utility function.
  */
 export interface GenerateJsonOptions {
+  /** The desired model config. */
+  modelConfigKey: ModelConfigKey;
   /** The input prompt or history. */
   contents: Content[];
   /** The required JSON schema for the output. */
   schema: Record<string, unknown>;
-  /** The specific model to use for this task. */
-  model: string;
   /**
    * Task-specific system instructions.
    * If omitted, no system instruction is sent.
    */
   systemInstruction?: string | Part | Part[] | Content;
-  /**
-   * Overrides for generation configuration (e.g., temperature).
-   */
-  config?: Omit<
-    GenerateContentConfig,
-    | 'systemInstruction'
-    | 'responseJsonSchema'
-    | 'responseMimeType'
-    | 'tools'
-    | 'abortSignal'
-  >;
   /** Signal for cancellation. */
   abortSignal: AbortSignal;
   /**
@@ -64,12 +54,6 @@ export interface GenerateJsonOptions {
  * A client dedicated to stateless, utility-focused LLM calls.
  */
 export class BaseLlmClient {
-  // Default configuration for utility tasks
-  private readonly defaultUtilityConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
-
   constructor(
     private readonly contentGenerator: ContentGenerator,
     private readonly config: Config,
@@ -79,19 +63,20 @@ export class BaseLlmClient {
     options: GenerateJsonOptions,
   ): Promise<Record<string, unknown>> {
     const {
+      modelConfigKey,
       contents,
       schema,
-      model,
       abortSignal,
       systemInstruction,
       promptId,
       maxAttempts,
     } = options;
 
+    const { model, generateContentConfig } =
+      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
     const requestConfig: GenerateContentConfig = {
       abortSignal,
-      ...this.defaultUtilityConfig,
-      ...options.config,
+      ...generateContentConfig,
       ...(systemInstruction && { systemInstruction }),
       responseJsonSchema: schema,
       responseMimeType: 'application/json',
