@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { platform } from 'node:os';
 import { URL } from 'node:url';
+import { ensureConstrainedLanguageEnv } from './shell-utils.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -93,13 +94,17 @@ export async function openBrowserSecurely(url: string): Promise<void> {
       throw new Error(`Unsupported platform: ${platformName}`);
   }
 
+  let env: NodeJS.ProcessEnv = {
+    ...process.env,
+    SHELL: undefined,
+  };
+
+  if (platformName === 'win32') {
+    env = ensureConstrainedLanguageEnv(env);
+  }
+
   const options: Record<string, unknown> = {
-    // Don't inherit parent's environment to avoid potential issues
-    env: {
-      ...process.env,
-      // Ensure we're not in a shell that might interpret special characters
-      SHELL: undefined,
-    },
+    env,
     // Detach the browser process so it doesn't block
     detached: true,
     stdio: 'ignore',

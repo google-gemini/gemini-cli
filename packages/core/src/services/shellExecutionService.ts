@@ -12,7 +12,11 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
-import { getShellConfiguration, type ShellType } from '../utils/shell-utils.js';
+import {
+  ensureConstrainedLanguageEnv,
+  getShellConfiguration,
+  type ShellType,
+} from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
@@ -26,6 +30,19 @@ const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
+
+function createShellEnv(shell: ShellType, pager?: string): NodeJS.ProcessEnv {
+  const baseEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    GEMINI_CLI: '1',
+    TERM: 'xterm-256color',
+    PAGER: pager ?? 'cat',
+  };
+
+  return shell === 'powershell'
+    ? ensureConstrainedLanguageEnv(baseEnv)
+    : baseEnv;
+}
 
 function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   if (shell !== 'bash') {
@@ -209,6 +226,7 @@ export class ShellExecutionService {
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const spawnArgs = [...argsPrefix, guardedCommand];
+      const env = createShellEnv(shell);
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
@@ -216,12 +234,7 @@ export class ShellExecutionService {
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: 'cat',
-        },
+        env,
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
@@ -423,18 +436,14 @@ export class ShellExecutionService {
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
+      const env = createShellEnv(shell, shellExecutionConfig.pager);
 
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
         name: 'xterm',
         cols,
         rows,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: shellExecutionConfig.pager ?? 'cat',
-        },
+        env,
         handleFlowControl: true,
       });
 

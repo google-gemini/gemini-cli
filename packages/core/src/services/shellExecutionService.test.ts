@@ -11,6 +11,7 @@ import { type ChildProcess } from 'node:child_process';
 import type { ShellOutputEvent } from './shellExecutionService.js';
 import { ShellExecutionService } from './shellExecutionService.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import { POWERSHELL_CONSTRAINED_LANGUAGE_ENV } from '../utils/shell-utils.js';
 
 // Hoisted Mocks
 const mockPtySpawn = vi.hoisted(() => vi.fn());
@@ -114,6 +115,7 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env[POWERSHELL_CONSTRAINED_LANGUAGE_ENV];
 
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
@@ -547,7 +549,11 @@ describe('ShellExecutionService', () => {
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'powershell.exe',
         ['-NoProfile', '-Command', 'dir "foo bar"'],
-        expect.any(Object),
+        expect.objectContaining({
+          env: expect.objectContaining({
+            __PSLockdownPolicy: '4',
+          }),
+        }),
       );
     });
 
@@ -997,6 +1003,9 @@ describe('ShellExecutionService child_process fallback', () => {
           shell: false,
           detached: false,
           windowsVerbatimArguments: false,
+          env: expect.objectContaining({
+            __PSLockdownPolicy: '4',
+          }),
         }),
       );
     });
@@ -1016,6 +1025,10 @@ describe('ShellExecutionService child_process fallback', () => {
           detached: true,
         }),
       );
+
+      const env = (mockCpSpawn.mock.calls[0][2] as { env?: NodeJS.ProcessEnv })
+        .env;
+      expect(env?.[POWERSHELL_CONSTRAINED_LANGUAGE_ENV]).toBeUndefined();
     });
   });
 });
