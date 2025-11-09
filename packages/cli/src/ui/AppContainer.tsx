@@ -44,12 +44,15 @@ import {
   clearCachedCredentialFile,
   recordExitFail,
   ShellExecutionService,
+  saveApiKey,
   debugLogger,
   coreEvents,
   CoreEvent,
+  refreshServerHierarchicalMemory,
+  type ModelChangedPayload,
+  type MemoryChangedPayload,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
-import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
@@ -74,7 +77,11 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useVim } from './hooks/vim.js';
-import { type LoadedSettings, SettingScope } from '../config/settings.js';
+import {
+  type LoadableSettingScope,
+  type LoadedSettings,
+  SettingScope,
+} from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
@@ -98,8 +105,9 @@ import {
   useExtensionUpdates,
 } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
-import { ExtensionManager } from '../config/extension-manager.js';
+import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
+import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -151,10 +159,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
   const [showDebugProfiler, setShowDebugProfiler] = useState(false);
+  const [copyModeEnabled, setCopyModeEnabled] = useState(false);
 
-  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
-    initializationResult.geminiMdFileCount,
-  );
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
@@ -168,21 +174,12 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
-  const extensions = config.getExtensions();
-  const [extensionManager] = useState<ExtensionManager>(
-    new ExtensionManager({
-      enabledExtensionOverrides: config.getEnabledExtensions(),
-      workspaceDir: config.getWorkingDir(),
-      requestConsent: (description) =>
-        requestConsentInteractive(
-          description,
-          addConfirmUpdateExtensionRequest,
-        ),
-      // TODO: Support requesting settings in the interactive CLI
-      requestSetting: null,
-      loadedSettings: settings,
-    }),
+  const extensionManager = config.getExtensionLoader() as ExtensionManager;
+  // We are in the interactive CLI, update how we request consent and settings.
+  extensionManager.setRequestConsent((description) =>
+    requestConsentInteractive(description, addConfirmUpdateExtensionRequest),
   );
+  extensionManager.setRequestSetting();
 
   const { addConfirmUpdateExtensionRequest, confirmUpdateExtensionRequests } =
     useConfirmUpdateRequests();
@@ -190,7 +187,11 @@ export const AppContainer = (props: AppContainerProps) => {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
-  } = useExtensionUpdates(extensions, extensionManager, historyManager.addItem);
+  } = useExtensionUpdates(
+    extensionManager,
+    historyManager.addItem,
+    config.getEnableExtensionReloading(),
+  );
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const openPermissionsDialog = useCallback(
@@ -251,6 +252,8 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
     })();
     registerCleanup(async () => {
+      // Turn off mouse scroll.
+      disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
     });
@@ -261,20 +264,24 @@ export const AppContainer = (props: AppContainerProps) => {
     [historyManager.addItem],
   );
 
-  // Watch for model changes (e.g., from Flash fallback)
+  // Subscribe to fallback mode and model changes from core
   useEffect(() => {
-    const checkModelChange = () => {
+    const handleFallbackModeChanged = () => {
       const effectiveModel = getEffectiveModel();
-      if (effectiveModel !== currentModel) {
-        setCurrentModel(effectiveModel);
-      }
+      setCurrentModel(effectiveModel);
     };
 
-    checkModelChange();
-    const interval = setInterval(checkModelChange, 1000); // Check every second
+    const handleModelChanged = (payload: ModelChangedPayload) => {
+      setCurrentModel(payload.model);
+    };
 
-    return () => clearInterval(interval);
-  }, [config, currentModel, getEffectiveModel]);
+    coreEvents.on(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+    coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
+    return () => {
+      coreEvents.off(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
+      coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
+    };
+  }, [getEffectiveModel]);
 
   const {
     consoleMessages,
@@ -349,9 +356,11 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [historyManager.history, logger]);
 
   const refreshStatic = useCallback(() => {
-    stdout.write(ansiEscapes.clearTerminal);
+    if (settings.merged.ui?.useAlternateBuffer === false) {
+      stdout.write(ansiEscapes.clearTerminal);
+    }
     setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, stdout]);
+  }, [setHistoryRemountKey, stdout, settings]);
 
   const {
     isThemeDialogOpen,
@@ -366,16 +375,19 @@ export const AppContainer = (props: AppContainerProps) => {
     initializationResult.themeError,
   );
 
-  const { authState, setAuthState, authError, onAuthError } = useAuthCommand(
-    settings,
-    config,
-  );
+  const {
+    authState,
+    setAuthState,
+    authError,
+    onAuthError,
+    apiKeyDefaultValue,
+    reloadApiKey,
+  } = useAuthCommand(settings, config);
 
   const { proQuotaRequest, handleProQuotaChoice } = useQuotaAndFallback({
     config,
     historyManager,
     userTier,
-    setAuthState,
     setModelSwitchedFromQuotaError,
   });
 
@@ -385,7 +397,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Create handleAuthSelect wrapper for backward compatibility
   const handleAuthSelect = useCallback(
-    async (authType: AuthType | undefined, scope: SettingScope) => {
+    async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
       if (authType) {
         await clearCachedCredentialFile();
         settings.setValue(scope, 'security.auth.selectedType', authType);
@@ -417,6 +429,35 @@ Logging in with Google... Please restart Gemini CLI to continue.
     },
     [settings, config, setAuthState, onAuthError],
   );
+
+  const handleApiKeySubmit = useCallback(
+    async (apiKey: string) => {
+      try {
+        onAuthError(null);
+        if (!apiKey.trim() && apiKey.length > 1) {
+          onAuthError(
+            'API key cannot be empty string with length greater than 1.',
+          );
+          return;
+        }
+
+        await saveApiKey(apiKey);
+        await reloadApiKey();
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        setAuthState(AuthState.Authenticated);
+      } catch (e) {
+        onAuthError(
+          `Failed to save API key: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    },
+    [setAuthState, onAuthError, reloadApiKey, config],
+  );
+
+  const handleApiKeyCancel = useCallback(() => {
+    // Go back to auth method selection
+    setAuthState(AuthState.Updating);
+  }, [setAuthState]);
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
@@ -526,7 +567,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
     refreshStatic,
     toggleVimEnabled,
     setIsProcessing,
-    setGeminiMdFileCount,
     slashCommandActions,
     extensionsUpdateStateInternal,
     isConfigInitialized,
@@ -541,26 +581,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       Date.now(),
     );
     try {
-      const { memoryContent, fileCount, filePaths } =
-        await loadHierarchicalGeminiMemory(
-          process.cwd(),
-          settings.merged.context?.loadMemoryFromIncludeDirectories
-            ? config.getWorkspaceContext().getDirectories()
-            : [],
-          config.getDebugMode(),
-          config.getFileService(),
-          settings.merged,
-          config.getExtensions(),
-          config.isTrustedFolder(),
-          settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
-          config.getFileFilteringOptions(),
-        );
-
-      config.setUserMemory(memoryContent);
-      config.setGeminiMdFileCount(fileCount);
-      config.setGeminiMdFilePaths(filePaths);
-
-      setGeminiMdFileCount(fileCount);
+      const { memoryContent, fileCount } =
+        await refreshServerHierarchicalMemory(config);
 
       historyManager.addItem(
         {
@@ -590,9 +612,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
         },
         Date.now(),
       );
-      console.error('Error refreshing memory:', error);
+      debugLogger.warn('Error refreshing memory:', error);
     }
-  }, [config, historyManager, settings.merged]);
+  }, [config, historyManager]);
 
   const cancelHandlerRef = useRef<() => void>(() => {});
 
@@ -765,11 +787,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   useEffect(() => {
     if (activePtyId) {
-      ShellExecutionService.resizePty(
-        activePtyId,
-        Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-        Math.max(Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING), 1),
-      );
+      try {
+        ShellExecutionService.resizePty(
+          activePtyId,
+          Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
+          Math.max(
+            Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+            1,
+          ),
+        );
+      } catch (e) {
+        // This can happen in a race condition where the pty exits
+        // right before we try to resize it.
+        if (
+          !(
+            e instanceof Error &&
+            e.message.includes('Cannot resize a pty that has already exited')
+          )
+        ) {
+          throw e;
+        }
+      }
     }
   }, [terminalWidth, availableTerminalHeight, activePtyId]);
 
@@ -900,7 +938,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
       appEvents.off(AppEvent.LogError, logErrorHandler);
     };
-  }, [handleNewMessage]);
+  }, [handleNewMessage, config]);
 
   useEffect(() => {
     if (ctrlCTimerRef.current) {
@@ -970,9 +1008,25 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
+      if (copyModeEnabled) {
+        setCopyModeEnabled(false);
+        enableMouseEvents();
+        // We don't want to process any other keys if we're in copy mode.
+        return;
+      }
+
       // Debug log keystrokes if enabled
       if (settings.merged.general?.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
+      if (
+        settings.merged.ui?.useAlternateBuffer &&
+        keyMatchers[Command.TOGGLE_COPY_MODE](key)
+      ) {
+        setCopyModeEnabled(true);
+        disableMouseEvents();
+        return;
       }
 
       if (keyMatchers[Command.QUIT](key)) {
@@ -1039,6 +1093,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
       refreshStatic,
+      setCopyModeEnabled,
+      copyModeEnabled,
+      settings.merged.ui?.useAlternateBuffer,
     ],
   );
 
@@ -1161,12 +1218,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isEditorDialogOpen ||
     showPrivacyNotice ||
     showIdeRestartPrompt ||
-    !!proQuotaRequest;
+    !!proQuotaRequest ||
+    isAuthDialogOpen ||
+    authState === AuthState.AwaitingApiKeyInput;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
+
+  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
+    config.getGeminiMdFileCount(),
+  );
+  useEffect(() => {
+    const handleMemoryChanged = (result: MemoryChangedPayload) => {
+      setGeminiMdFileCount(result.fileCount);
+    };
+    coreEvents.on(CoreEvent.MemoryChanged, handleMemoryChanged);
+    return () => {
+      coreEvents.off(CoreEvent.MemoryChanged, handleMemoryChanged);
+    };
+  }, []);
 
   const uiState: UIState = useMemo(
     () => ({
@@ -1178,6 +1250,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isConfigInitialized,
       authError,
       isAuthDialogOpen,
+      isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
+      apiKeyDefaultValue,
       editorError,
       isEditorDialogOpen,
       showPrivacyNotice,
@@ -1251,6 +1325,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       showDebugProfiler,
+      copyModeEnabled,
     }),
     [
       isThemeDialogOpen,
@@ -1333,6 +1408,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       historyManager,
       embeddedShellFocused,
       showDebugProfiler,
+      apiKeyDefaultValue,
+      authState,
+      copyModeEnabled,
     ],
   );
 
@@ -1367,6 +1445,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
       setQueueErrorMessage,
       popAllMessages,
+      handleApiKeySubmit,
+      handleApiKeyCancel,
     }),
     [
       handleThemeSelect,
@@ -1393,6 +1473,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
       setQueueErrorMessage,
       popAllMessages,
+      handleApiKeySubmit,
+      handleApiKeyCancel,
     ],
   );
 

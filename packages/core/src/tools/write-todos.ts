@@ -99,6 +99,15 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
   WriteTodosToolParams,
   ToolResult
 > {
+  constructor(
+    params: WriteTodosToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
   getDescription(): string {
     const count = this.params.todos?.length ?? 0;
     if (count === 0) {
@@ -209,6 +218,11 @@ export class WriteTodosTool extends BaseDeclarativeTool<
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
-    return new WriteTodosToolInvocation(params);
+    return new WriteTodosToolInvocation(
+      params,
+      _messageBus,
+      _toolName,
+      _displayName,
+    );
   }
 }

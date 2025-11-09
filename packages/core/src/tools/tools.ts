@@ -78,6 +78,7 @@ export abstract class BaseToolInvocation<
     protected readonly messageBus?: MessageBus,
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
+    readonly _serverName?: string,
   ) {}
 
   abstract getDescription(): string;
@@ -114,13 +115,31 @@ export abstract class BaseToolInvocation<
   /**
    * Subclasses should override this method to provide custom confirmation UI
    * when the policy engine's decision is 'ASK_USER'.
-   * The base implementation returns false (no confirmation needed).
-   * Only tools that need confirmation (e.g., write, execute tools) should override this.
+   * The base implementation provides a generic confirmation prompt.
    */
   protected async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    return false;
+    if (!this.messageBus) {
+      return false;
+    }
+
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'info',
+      title: `Confirm: ${this._toolDisplayName || this._toolName}`,
+      prompt: this.getDescription(),
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          if (this.messageBus && this._toolName) {
+            this.messageBus.publish({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: this._toolName,
+            });
+          }
+        }
+      },
+    };
+    return confirmationDetails;
   }
 
   protected getMessageBusDecision(
@@ -197,6 +216,7 @@ export abstract class BaseToolInvocation<
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall,
         correlationId,
+        serverName: this._serverName,
       };
 
       try {
@@ -288,6 +308,7 @@ export abstract class DeclarativeTool<
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
     readonly messageBus?: MessageBus,
+    readonly extensionName?: string,
     readonly extensionId?: string,
   ) {}
 

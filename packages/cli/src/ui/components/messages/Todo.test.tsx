@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Box } from 'ink';
 import { TodoTray } from './Todo.js';
@@ -30,36 +30,30 @@ const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
     ],
   }) as unknown as HistoryItem;
 
-describe('<TodoTray />', () => {
-  const renderWithUiState = (uiState: Partial<UIState>) =>
-    render(
-      <UIStateContext.Provider value={uiState as UIState}>
-        <TodoTray />
-      </UIStateContext.Provider>,
-    );
+describe.each([true, false])(
+  '<TodoTray /> (showFullTodos: %s)',
+  (showFullTodos: boolean) => {
+    const renderWithUiState = (uiState: Partial<UIState>) =>
+      render(
+        <UIStateContext.Provider value={uiState as UIState}>
+          <TodoTray />
+        </UIStateContext.Provider>,
+      );
 
-  it.each([true, false])(
-    'renders null when no todos are in the history',
-    (showFullTodos) => {
+    it('renders null when no todos are in the history', () => {
       const { lastFrame } = renderWithUiState({ history: [], showFullTodos });
       expect(lastFrame()).toMatchSnapshot();
-    },
-  );
+    });
 
-  it.each([true, false])(
-    'renders null when todo list is empty',
-    (showFullTodos) => {
+    it('renders null when todo list is empty', () => {
       const { lastFrame } = renderWithUiState({
         history: [createTodoHistoryItem([])],
         showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
-    },
-  );
+    });
 
-  it.each([true, false])(
-    'renders when todos exist but none are in progress',
-    (showFullTodos) => {
+    it('renders when todos exist but none are in progress', () => {
       const { lastFrame } = renderWithUiState({
         history: [
           createTodoHistoryItem([
@@ -71,12 +65,9 @@ describe('<TodoTray />', () => {
         showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
-    },
-  );
+    });
 
-  it.each([true, false])(
-    'renders when todos exist and one is in progress',
-    (showFullTodos) => {
+    it('renders when todos exist and one is in progress', () => {
       const { lastFrame } = renderWithUiState({
         history: [
           createTodoHistoryItem([
@@ -89,12 +80,9 @@ describe('<TodoTray />', () => {
         showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
-    },
-  );
+    });
 
-  it.each([true, false])(
-    'renders a todo list with long descriptions that wrap when full view is on',
-    (showFullTodos) => {
+    it('renders a todo list with long descriptions that wrap when full view is on', () => {
       const { lastFrame } = render(
         <Box width="50">
           <UIStateContext.Provider
@@ -123,23 +111,36 @@ describe('<TodoTray />', () => {
         </Box>,
       );
       expect(lastFrame()).toMatchSnapshot();
-    },
-  );
-
-  it('renders the most recent todo list when multiple write_todos calls are in history', () => {
-    const { lastFrame } = renderWithUiState({
-      history: [
-        createTodoHistoryItem([
-          { description: 'Older Task 1', status: 'completed' },
-          { description: 'Older Task 2', status: 'pending' },
-        ]),
-        createTodoHistoryItem([
-          { description: 'Newer Task 1', status: 'pending' },
-          { description: 'Newer Task 2', status: 'in_progress' },
-        ]),
-      ],
-      showFullTodos: true,
     });
-    expect(lastFrame()).toMatchSnapshot();
-  });
-});
+
+    it('renders the most recent todo list when multiple write_todos calls are in history', () => {
+      const { lastFrame } = renderWithUiState({
+        history: [
+          createTodoHistoryItem([
+            { description: 'Older Task 1', status: 'completed' },
+            { description: 'Older Task 2', status: 'pending' },
+          ]),
+          createTodoHistoryItem([
+            { description: 'Newer Task 1', status: 'pending' },
+            { description: 'Newer Task 2', status: 'in_progress' },
+          ]),
+        ],
+        showFullTodos,
+      });
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('renders full list when all todos are inactive', () => {
+      const { lastFrame } = renderWithUiState({
+        history: [
+          createTodoHistoryItem([
+            { description: 'Task 1', status: 'completed' },
+            { description: 'Task 2', status: 'cancelled' },
+          ]),
+        ],
+        showFullTodos,
+      });
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  },
+);

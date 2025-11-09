@@ -150,44 +150,53 @@ describe('file-system', () => {
 
   it.skip('should replace multiple instances of a string', async () => {
     const rig = new TestRig();
-    await rig.setup('should replace multiple instances of a string');
+    rig.setup('should replace multiple instances of a string');
     const fileName = 'ambiguous.txt';
     const fileContent = 'Hey there, \ntest line\ntest line';
     const expectedContent = 'Hey there, \nnew line\nnew line';
     rig.createFile(fileName, fileContent);
 
     const result = await rig.run(
-      `replace "test line" with "new line" in ${fileName}`,
+      `rewrite the file ${fileName} to replace all instances of "test line" with "new line"`,
     );
 
-    const foundToolCall = await rig.waitForAnyToolCall([
-      'replace',
-      'write_file',
-    ]);
+    const validTools = ['write_file', 'edit'];
+    const foundToolCall = await rig.waitForAnyToolCall(validTools);
     if (!foundToolCall) {
-      printDebugInfo(rig, result);
+      printDebugInfo(rig, result, {
+        'Tool call found': foundToolCall,
+        'Tool logs': rig.readToolLogs(),
+      });
     }
     expect(
       foundToolCall,
-      'Expected to find a replace or write_file tool call',
+      `Expected to find one of ${validTools.join(', ')} tool calls`,
     ).toBeTruthy();
 
     const toolLogs = rig.readToolLogs();
     const successfulEdit = toolLogs.some(
       (log) =>
-        (log.toolRequest.name === 'replace' ||
-          log.toolRequest.name === 'write_file') &&
-        log.toolRequest.success,
+        validTools.includes(log.toolRequest.name) && log.toolRequest.success,
     );
     if (!successfulEdit) {
       console.error(
-        'Expected a successful edit tool call, but none was found.',
+        `Expected a successful edit tool call (${validTools.join(', ')}), but none was found.`,
       );
       printDebugInfo(rig, result);
     }
-    expect(successfulEdit, 'Expected a successful edit tool call').toBeTruthy();
+    expect(
+      successfulEdit,
+      `Expected a successful edit tool call (${validTools.join(', ')})`,
+    ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
+    if (newFileContent !== expectedContent) {
+      printDebugInfo(rig, result, {
+        'Final file content': newFileContent,
+        'Expected file content': expectedContent,
+        'Tool logs': rig.readToolLogs(),
+      });
+    }
     expect(newFileContent).toBe(expectedContent);
   });
 

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
@@ -144,7 +144,10 @@ const createMockConfig = (overrides = {}) => ({
   getDebugMode: vi.fn(() => false),
   getAccessibility: vi.fn(() => ({})),
   getMcpServers: vi.fn(() => ({})),
-  getBlockedMcpServers: vi.fn(() => []),
+  getMcpClientManager: vi.fn().mockImplementation(() => ({
+    getBlockedMcpServers: vi.fn(),
+    getMcpServers: vi.fn(),
+  })),
   ...overrides,
 });
 

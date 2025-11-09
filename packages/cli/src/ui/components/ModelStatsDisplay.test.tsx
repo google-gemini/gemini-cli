@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
