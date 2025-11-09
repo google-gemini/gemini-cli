@@ -92,6 +92,9 @@ jobs:
           fi
           NIGHTLY_COMMAND="node scripts/get-release-version.js --type=promote-nightly"
           STABLE_JSON=$(${STABLE_COMMAND})
+          STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)
+          PREVIEW_COMMAND+=" --stable-base-version=${STABLE_VERSION}"
+          NIGHTLY_COMMAND+=" --stable-base-version=${STABLE_VERSION}"
           PREVIEW_JSON=$(${PREVIEW_COMMAND})
           NIGHTLY_JSON=$(${NIGHTLY_COMMAND})
           echo "STABLE_JSON_COMMAND=${STABLE_COMMAND}"
@@ -100,14 +103,14 @@ jobs:
           echo "STABLE_JSON: ${STABLE_JSON}"
           echo "PREVIEW_JSON: ${PREVIEW_JSON}"
           echo "NIGHTLY_JSON: ${NIGHTLY_JSON}"
-          echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          echo "STABLE_VERSION=${STABLE_VERSION}" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
           echo "STABLE_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
           REF="${REF_INPUT}"
-          SHA=$(git ls-remote origin "$REF" | awk '{print $1}')
+          SHA=$(git ls-remote origin "$REF" | awk -v ref="$REF" '$2 == "refs/heads/"ref || $2 == "refs/tags/"ref || $2 == ref {print $1}' | head -n 1)
           if [ -z "$SHA" ]; then
             if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
               SHA="$REF"
