@@ -22,6 +22,7 @@ import {
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -66,25 +67,17 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
 
   const [lastUpdateTime, setLastUpdateTime] = React.useState<Date | null>(null);
   const [userHasFocused, setUserHasFocused] = React.useState(false);
-  const [showFocusHint, setShowFocusHint] = React.useState(false);
+  const showFocusHint = useInactivityTimer(
+    !!lastUpdateTime,
+    lastUpdateTime,
+    5000,
+  );
 
   React.useEffect(() => {
     if (resultDisplay) {
       setLastUpdateTime(new Date());
     }
   }, [resultDisplay]);
-
-  React.useEffect(() => {
-    if (!lastUpdateTime) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setShowFocusHint(true);
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, [lastUpdateTime]);
 
   React.useEffect(() => {
     if (isThisShellFocused) {

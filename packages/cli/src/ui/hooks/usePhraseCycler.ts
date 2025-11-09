@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { useInactivityTimer } from './useInactivityTimer.js';
 
 export const WITTY_LOADING_PHRASES = [
   "I'm Feeling Lucky",
@@ -104,7 +105,6 @@ export const WITTY_LOADING_PHRASES = [
   'Searching for the correct USB orientation...',
   'Ensuring the magic smoke stays inside the wires...',
   'Rewriting in Rust for no particular reason...',
-  'Trying to exit Vim...',
   'Spinning up the hamster wheel...',
   "That's not a bug, it's an undocumented feature...",
   'Engage.',
@@ -286,11 +286,15 @@ export const PHRASE_CHANGE_INTERVAL_MS = 15000;
  * Custom hook to manage cycling through loading phrases.
  * @param isActive Whether the phrase cycling should be active.
  * @param isWaiting Whether to show a specific waiting phrase.
+ * @param isInteractiveShellWaiting Whether an interactive shell is waiting for input but not focused.
+ * @param customPhrases Optional list of custom phrases to use.
  * @returns The current loading phrase.
  */
 export const usePhraseCycler = (
   isActive: boolean,
   isWaiting: boolean,
+  isInteractiveShellWaiting: boolean,
+  lastOutputTime: number = 0,
   customPhrases?: string[],
 ) => {
   const loadingPhrases =
@@ -301,49 +305,57 @@ export const usePhraseCycler = (
   const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
     loadingPhrases[0],
   );
+  const showShellFocusHint = useInactivityTimer(
+    isInteractiveShellWaiting,
+    lastOutputTime,
+    5000,
+  );
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Always clear on re-run
+    if (phraseIntervalRef.current) {
+      clearInterval(phraseIntervalRef.current);
+      phraseIntervalRef.current = null;
+    }
+
+    if (isInteractiveShellWaiting && showShellFocusHint) {
+      setCurrentLoadingPhrase(
+        'Interactive shell awaiting input... press Ctrl+f to focus shell',
+      );
+      return;
+    }
+
     if (isWaiting) {
       setCurrentLoadingPhrase('Waiting for user confirmation...');
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-    } else if (isActive) {
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-      }
-
-      const setRandomPhrase = () => {
-        if (customPhrases && customPhrases.length > 0) {
-          const randomIndex = Math.floor(Math.random() * customPhrases.length);
-          setCurrentLoadingPhrase(customPhrases[randomIndex]);
-        } else {
-          // Roughly 1 in 6 chance to show a tip.
-          const showTip = Math.random() < 1 / 6;
-          const phraseList = showTip ? INFORMATIVE_TIPS : WITTY_LOADING_PHRASES;
-          const randomIndex = Math.floor(Math.random() * phraseList.length);
-          setCurrentLoadingPhrase(phraseList[randomIndex]);
-        }
-      };
-
-      // Select an initial random phrase
-      setRandomPhrase();
-
-      phraseIntervalRef.current = setInterval(() => {
-        // Select a new random phrase
-        setRandomPhrase();
-      }, PHRASE_CHANGE_INTERVAL_MS);
-    } else {
-      // Idle or other states, clear the phrase interval
-      // and reset to the first phrase for next active state.
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-      setCurrentLoadingPhrase(loadingPhrases[0]);
+      return;
     }
+
+    if (!isActive) {
+      setCurrentLoadingPhrase(loadingPhrases[0]);
+      return;
+    }
+
+    const setRandomPhrase = () => {
+      if (customPhrases && customPhrases.length > 0) {
+        const randomIndex = Math.floor(Math.random() * customPhrases.length);
+        setCurrentLoadingPhrase(customPhrases[randomIndex]);
+      } else {
+        // Roughly 1 in 6 chance to show a tip.
+        const showTip = Math.random() < 1 / 6;
+        const phraseList = showTip ? INFORMATIVE_TIPS : WITTY_LOADING_PHRASES;
+        const randomIndex = Math.floor(Math.random() * phraseList.length);
+        setCurrentLoadingPhrase(phraseList[randomIndex]);
+      }
+    };
+
+    // Select an initial random phrase
+    setRandomPhrase();
+
+    phraseIntervalRef.current = setInterval(() => {
+      // Select a new random phrase
+      setRandomPhrase();
+    }, PHRASE_CHANGE_INTERVAL_MS);
 
     return () => {
       if (phraseIntervalRef.current) {
@@ -351,7 +363,14 @@ export const usePhraseCycler = (
         phraseIntervalRef.current = null;
       }
     };
-  }, [isActive, isWaiting, customPhrases, loadingPhrases]);
+  }, [
+    isActive,
+    isWaiting,
+    isInteractiveShellWaiting,
+    customPhrases,
+    loadingPhrases,
+    showShellFocusHint,
+  ]);
 
   return currentLoadingPhrase;
 };

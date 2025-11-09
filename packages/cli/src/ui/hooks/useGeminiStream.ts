@@ -135,6 +135,7 @@ export const useGeminiStream = (
     markToolsAsSubmitted,
     setToolCallsForDisplay,
     cancelAllToolCalls,
+    lastToolOutputTime,
   ] = useReactToolScheduler(
     async (completedToolCallsFromScheduler) => {
       // This onComplete is called when ALL scheduled tools for a given batch are done.
@@ -211,17 +212,18 @@ export const useGeminiStream = (
     await done;
     setIsResponding(false);
   }, []);
-  const { handleShellCommand, activeShellPtyId } = useShellCommandProcessor(
-    addItem,
-    setPendingHistoryItem,
-    onExec,
-    onDebugMessage,
-    config,
-    geminiClient,
-    setShellInputFocused,
-    terminalWidth,
-    terminalHeight,
-  );
+  const { handleShellCommand, activeShellPtyId, lastShellOutputTime } =
+    useShellCommandProcessor(
+      addItem,
+      setPendingHistoryItem,
+      onExec,
+      onDebugMessage,
+      config,
+      geminiClient,
+      setShellInputFocused,
+      terminalWidth,
+      terminalHeight,
+    );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
 
@@ -1275,6 +1277,8 @@ export const useGeminiStream = (
     storage,
   ]);
 
+  const lastOutputTime = Math.max(lastToolOutputTime, lastShellOutputTime);
+
   return {
     streamingState,
     submitQuery,
@@ -1286,5 +1290,6 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    lastOutputTime,
   };
 };

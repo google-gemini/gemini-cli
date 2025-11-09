@@ -27,18 +27,33 @@ describe('useLoadingIndicator', () => {
 
   const renderLoadingIndicatorHook = (
     initialStreamingState: StreamingState,
+    initialIsInteractiveShellWaiting: boolean = false,
+    initialLastOutputTime: number = 0,
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
       streamingState,
+      isInteractiveShellWaiting,
+      lastOutputTime,
     }: {
       streamingState: StreamingState;
+      isInteractiveShellWaiting?: boolean;
+      lastOutputTime?: number;
     }) {
-      hookResult = useLoadingIndicator(streamingState);
+      hookResult = useLoadingIndicator(
+        streamingState,
+        undefined,
+        isInteractiveShellWaiting,
+        lastOutputTime,
+      );
       return null;
     }
     const { rerender } = render(
-      <TestComponent streamingState={initialStreamingState} />,
+      <TestComponent
+        streamingState={initialStreamingState}
+        isInteractiveShellWaiting={initialIsInteractiveShellWaiting}
+        lastOutputTime={initialLastOutputTime}
+      />,
     );
     return {
       result: {
@@ -46,8 +61,11 @@ describe('useLoadingIndicator', () => {
           return hookResult;
         },
       },
-      rerender: (newProps: { streamingState: StreamingState }) =>
-        rerender(<TestComponent {...newProps} />),
+      rerender: (newProps: {
+        streamingState: StreamingState;
+        isInteractiveShellWaiting?: boolean;
+        lastOutputTime?: number;
+      }) => rerender(<TestComponent {...newProps} />),
     };
   };
 
@@ -57,6 +75,27 @@ describe('useLoadingIndicator', () => {
     expect(result.current.elapsedTime).toBe(0);
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
+    );
+  });
+
+  it('should show interactive shell waiting phrase when isInteractiveShellWaiting is true after 5s', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      true,
+    );
+
+    // Initially should be witty phrase
+    expect(WITTY_LOADING_PHRASES).toContain(
+      result.current.currentLoadingPhrase,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Interactive shell awaiting input... press Ctrl+f to focus shell',
     );
   });
 
