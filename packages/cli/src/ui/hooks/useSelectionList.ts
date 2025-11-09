@@ -6,6 +6,7 @@
 
 import { useReducer, useRef, useEffect, useCallback } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 export interface SelectionListItem<T> {
   key: string;
@@ -318,7 +319,7 @@ export function useSelectionList<T>({
   const itemsLength = items.length;
   const handleKeypress = useCallback(
     (key: Key) => {
-      const { sequence, name } = key;
+      const { sequence } = key;
       const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
       // Clear number input buffer on non-numeric key press
@@ -327,17 +328,17 @@ export function useSelectionList<T>({
         numberInputRef.current = '';
       }
 
-      if (name === 'k' || name === 'up') {
+      if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
         dispatch({ type: 'MOVE_UP' });
         return;
       }
 
-      if (name === 'j' || name === 'down') {
+      if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
         dispatch({ type: 'MOVE_DOWN' });
         return;
       }
 
-      if (name === 'return') {
+      if (keyMatchers[Command.RETURN](key)) {
         dispatch({ type: 'SELECT_CURRENT' });
         return;
       }

@@ -12,7 +12,7 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
-import { getShellConfiguration } from '../utils/shell-utils.js';
+import { getShellConfiguration, type ShellType } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
@@ -23,6 +23,22 @@ const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
+
+const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
+const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
+
+function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
+  if (shell !== 'bash') {
+    return command;
+  }
+
+  const trimmed = command.trimStart();
+  if (trimmed.startsWith(BASH_SHOPT_GUARD)) {
+    return command;
+  }
+
+  return `${BASH_SHOPT_GUARD} ${command}`;
+}
 
 /** A structured result from a shell command execution. */
 export interface ShellExecutionResult {
@@ -190,8 +206,9 @@ export class ShellExecutionService {
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix } = getShellConfiguration();
-      const spawnArgs = [...argsPrefix, commandToExecute];
+      const { executable, argsPrefix, shell } = getShellConfiguration();
+      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      const spawnArgs = [...argsPrefix, guardedCommand];
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
@@ -403,8 +420,9 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix } = getShellConfiguration();
-      const args = [...argsPrefix, commandToExecute];
+      const { executable, argsPrefix, shell } = getShellConfiguration();
+      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      const args = [...argsPrefix, guardedCommand];
 
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
@@ -753,9 +771,11 @@ export class ShellExecutionService {
         if (
           e instanceof Error &&
           (('code' in e && e.code === 'ESRCH') ||
-            e.message === 'Cannot resize a pty that has already exited')
+            e.message.includes('Cannot resize a pty that has already exited'))
         ) {
-          // ignore
+          // On Unix, we get an ESRCH error.
+          // On Windows, we get a message-based error.
+          // In both cases, it's safe to ignore.
         } else {
           throw e;
         }

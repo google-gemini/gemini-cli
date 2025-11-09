@@ -5,7 +5,6 @@
  */
 
 import type { Content } from '@google/genai';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { isFunctionResponse } from './messageInspectors.js';
@@ -111,9 +110,9 @@ export async function checkNextSpeaker(
 
   try {
     const parsedResponse = (await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'next-speaker-checker' },
       contents,
       schema: RESPONSE_SCHEMA,
-      model: DEFAULT_GEMINI_FLASH_MODEL,
       abortSignal,
       promptId,
     })) as unknown as NextSpeakerResponse;

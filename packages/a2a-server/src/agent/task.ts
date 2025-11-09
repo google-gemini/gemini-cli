@@ -40,7 +40,6 @@ import type {
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import * as fs from 'node:fs';
-
 import { CoderAgentEvent } from '../types.js';
 import type {
   CoderAgentMessage,
@@ -50,6 +49,7 @@ import type {
   TaskMetadata,
   Thought,
   ThoughtSummary,
+  Citation,
 } from '../types.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
 
@@ -113,7 +113,7 @@ export class Task {
   // state managed within the @gemini-cli/core module.
   async getMetadata(): Promise<TaskMetadata> {
     const toolRegistry = await this.config.getToolRegistry();
-    const mcpServers = this.config.getMcpServers() || {};
+    const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
     const servers = Object.keys(mcpServers).map((serverName) => ({
       name: serverName,
@@ -373,11 +373,11 @@ export class Task {
 
       // Only send an update if the status has actually changed.
       if (hasChanged) {
-        const message = this.toolStatusMessage(tc, this.id, this.contextId);
         const coderAgentMessage: CoderAgentMessage =
           tc.status === 'awaiting_approval'
             ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
             : { kind: CoderAgentEvent.ToolCallUpdateEvent };
+        const message = this.toolStatusMessage(tc, this.id, this.contextId);
 
         const event = this._createStatusUpdateEvent(
           this.taskState,
@@ -404,20 +404,16 @@ export class Task {
     const isAwaitingApproval = allPendingStatuses.some(
       (status) => status === 'awaiting_approval',
     );
-    const allPendingAreStable = allPendingStatuses.every(
-      (status) =>
-        status === 'awaiting_approval' ||
-        status === 'success' ||
-        status === 'error' ||
-        status === 'cancelled',
+    const isExecuting = allPendingStatuses.some(
+      (status) => status === 'executing',
     );
 
-    // 1. Are any pending tool calls awaiting_approval
-    // 2. Are all pending tool calls in a stable state (i.e. not in validing or executing)
-    // 3. After an inline edit, the edited tool call will send awaiting_approval THEN scheduled. We wait for the next update in this case.
+    // The turn is complete and requires user input if at least one tool
+    // is waiting for the user's decision, and no other tool is actively
+    // running in the background.
     if (
       isAwaitingApproval &&
-      allPendingAreStable &&
+      !isExecuting &&
       !this.skipFinalTrueAfterInlineEdit
     ) {
       this.skipFinalTrueAfterInlineEdit = false;
@@ -642,6 +638,10 @@ export class Task {
       case GeminiEventType.Thought:
         logger.info('[Task] Sending agent thought...');
         this._sendThought(event.value, traceId);
+        break;
+      case GeminiEventType.Citation:
+        logger.info('[Task] Received citation from LLM stream.');
+        this._sendCitation(event.value);
         break;
       case GeminiEventType.ChatCompressed:
         break;
@@ -982,6 +982,20 @@ export class Task {
         undefined,
         traceId,
       ),
+    );
+  }
+
+  _sendCitation(citation: string) {
+    if (!citation || citation.trim() === '') {
+      return;
+    }
+    logger.info('[Task] Sending citation to event bus.');
+    const message = this._createTextMessage(citation);
+    const citationEvent: Citation = {
+      kind: CoderAgentEvent.CitationEvent,
+    };
+    this.eventBus?.publish(
+      this._createStatusUpdateEvent(this.taskState, citationEvent, message),
     );
   }
 }

@@ -68,7 +68,7 @@ describe('WorkspaceContext with real filesystem', () => {
     it('should resolve relative paths to absolute', () => {
       const workspaceContext = new WorkspaceContext(cwd);
       const relativePath = path.relative(cwd, otherDir);
-      workspaceContext.addDirectory(relativePath, cwd);
+      workspaceContext.addDirectory(relativePath);
       const directories = workspaceContext.getDirectories();
 
       expect(directories).toEqual([cwd, otherDir]);
@@ -83,18 +83,21 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(directories).toHaveLength(2);
     });
 
-    it('should handle symbolic links correctly', () => {
-      const realDir = path.join(tempDir, 'real');
-      fs.mkdirSync(realDir, { recursive: true });
-      const symlinkDir = path.join(tempDir, 'symlink-to-real');
-      fs.symlinkSync(realDir, symlinkDir, 'dir');
-      const workspaceContext = new WorkspaceContext(cwd);
-      workspaceContext.addDirectory(symlinkDir);
+    it.skipIf(os.platform() === 'win32')(
+      'should handle symbolic links correctly',
+      () => {
+        const realDir = path.join(tempDir, 'real');
+        fs.mkdirSync(realDir, { recursive: true });
+        const symlinkDir = path.join(tempDir, 'symlink-to-real');
+        fs.symlinkSync(realDir, symlinkDir, 'dir');
+        const workspaceContext = new WorkspaceContext(cwd);
+        workspaceContext.addDirectory(symlinkDir);
 
-      const directories = workspaceContext.getDirectories();
+        const directories = workspaceContext.getDirectories();
 
-      expect(directories).toEqual([cwd, realDir]);
-    });
+        expect(directories).toEqual([cwd, realDir]);
+      },
+    );
   });
 
   describe('path validation', () => {
@@ -158,7 +161,7 @@ describe('WorkspaceContext with real filesystem', () => {
       );
     });
 
-    describe('with symbolic link', () => {
+    describe.skipIf(os.platform() === 'win32')('with symbolic link', () => {
       describe('in the workspace', () => {
         let realDir: string;
         let symlinkDir: string;

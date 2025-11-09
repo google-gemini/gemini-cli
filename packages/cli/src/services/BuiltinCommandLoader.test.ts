@@ -66,7 +66,7 @@ vi.mock('../ui/commands/corgiCommand.js', () => ({ corgiCommand: {} }));
 vi.mock('../ui/commands/docsCommand.js', () => ({ docsCommand: {} }));
 vi.mock('../ui/commands/editorCommand.js', () => ({ editorCommand: {} }));
 vi.mock('../ui/commands/extensionsCommand.js', () => ({
-  extensionsCommand: {},
+  extensionsCommand: () => ({}),
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
 vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
@@ -96,6 +96,8 @@ describe('BuiltinCommandLoader', () => {
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getUseModelRouter: () => false,
+      getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -187,6 +189,28 @@ describe('BuiltinCommandLoader', () => {
     const modelCmd = commands.find((c) => c.name === 'model');
     expect(modelCmd).toBeUndefined();
   });
+
+  it('should include policies command when message bus integration is enabled', async () => {
+    const mockConfigWithMessageBus = {
+      ...mockConfig,
+      getEnableMessageBusIntegration: () => true,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const policiesCmd = commands.find((c) => c.name === 'policies');
+    expect(policiesCmd).toBeDefined();
+  });
+
+  it('should exclude policies command when message bus integration is disabled', async () => {
+    const mockConfigWithoutMessageBus = {
+      ...mockConfig,
+      getEnableMessageBusIntegration: () => false,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const policiesCmd = commands.find((c) => c.name === 'policies');
+    expect(policiesCmd).toBeUndefined();
+  });
 });
 
 describe('BuiltinCommandLoader profile', () => {
@@ -198,6 +222,8 @@ describe('BuiltinCommandLoader profile', () => {
       getFolderTrust: vi.fn().mockReturnValue(false),
       getUseModelRouter: () => false,
       getCheckpointingEnabled: () => false,
+      getEnableMessageBusIntegration: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
   });
 

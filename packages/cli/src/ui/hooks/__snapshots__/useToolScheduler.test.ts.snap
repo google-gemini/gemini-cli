@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`useReactToolScheduler > should handle live output updates 1`] = `
+{
+  "callId": "liveCall",
+  "contentLength": 12,
+  "error": undefined,
+  "errorType": undefined,
+  "outputFile": undefined,
+  "responseParts": [
+    {
+      "functionResponse": {
+        "id": "liveCall",
+        "name": "mockToolWithLiveOutput",
+        "response": {
+          "output": "Final output",
+        },
+      },
+    },
+  ],
+  "resultDisplay": "Final display",
+}
+`;
+
+exports[`useReactToolScheduler > should handle tool requiring confirmation - approved 1`] = `
+{
+  "callId": "callConfirm",
+  "contentLength": 16,
+  "error": undefined,
+  "errorType": undefined,
+  "outputFile": undefined,
+  "responseParts": [
+    {
+      "functionResponse": {
+        "id": "callConfirm",
+        "name": "mockToolRequiresConfirmation",
+        "response": {
+          "output": "Confirmed output",
+        },
+      },
+    },
+  ],
+  "resultDisplay": "Confirmed display",
+}
+`;
+
+exports[`useReactToolScheduler > should handle tool requiring confirmation - cancelled by user 1`] = `
+{
+  "callId": "callConfirmCancel",
+  "contentLength": 59,
+  "error": undefined,
+  "errorType": undefined,
+  "responseParts": [
+    {
+      "functionResponse": {
+        "id": "callConfirmCancel",
+        "name": "mockToolRequiresConfirmation",
+        "response": {
+          "error": "[Operation Cancelled] Reason: User cancelled the operation.",
+        },
+      },
+    },
+  ],
+  "resultDisplay": {
+    "fileDiff": "Mock tool requires confirmation",
+    "fileName": "mockToolRequiresConfirmation.ts",
+    "newContent": undefined,
+    "originalContent": undefined,
+  },
+}
+`;
+
+exports[`useReactToolScheduler > should schedule and execute a tool call successfully 1`] = `
+{
+  "callId": "call1",
+  "contentLength": 11,
+  "error": undefined,
+  "errorType": undefined,
+  "outputFile": undefined,
+  "responseParts": [
+    {
+      "functionResponse": {
+        "id": "call1",
+        "name": "mockTool",
+        "response": {
+          "output": "Tool output",
+        },
+      },
+    },
+  ],
+  "resultDisplay": "Formatted tool output",
+}
+`;

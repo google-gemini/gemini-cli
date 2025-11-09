@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { spawnAsync } from '@google/gemini-cli-core';
+import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
@@ -105,7 +105,7 @@ export async function saveClipboardImage(
     // No format worked
     return null;
   } catch (error) {
-    console.error('Error saving clipboard image:', error);
+    debugLogger.warn('Error saving clipboard image:', error);
     return null;
   }
 }

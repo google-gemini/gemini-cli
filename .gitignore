@@ -17,7 +17,6 @@
 # Dependency directory
 node_modules
 bower_components
-package-lock.json
 
 # Editors
 .idea
@@ -54,3 +53,5 @@ gha-creds-*.json
 
 # Log files
 patch_output.log
+
+.genkit

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../../test-utils/render.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionUpdateState } from '../../state/extensions.js';
@@ -57,27 +57,30 @@ describe('<ExtensionsList />', () => {
 
   it('should render "No extensions installed." if there are no extensions', () => {
     mockUIState(new Map());
-    const { lastFrame } = render(<ExtensionsList extensions={[]} />);
+    const { lastFrame, unmount } = render(<ExtensionsList extensions={[]} />);
     expect(lastFrame()).toContain('No extensions installed.');
+    unmount();
   });
 
   it('should render a list of extensions with their version and status', () => {
     mockUIState(new Map());
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <ExtensionsList extensions={mockExtensions} />,
     );
     const output = lastFrame();
     expect(output).toContain('ext-one (v1.0.0) - active');
     expect(output).toContain('ext-two (v2.1.0) - active');
     expect(output).toContain('ext-disabled (v3.0.0) - disabled');
+    unmount();
   });
 
   it('should display "unknown state" if an extension has no update state', () => {
     mockUIState(new Map());
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <ExtensionsList extensions={[mockExtensions[0]]} />,
     );
     expect(lastFrame()).toContain('(unknown state)');
+    unmount();
   });
 
   const stateTestCases = [
@@ -98,6 +101,10 @@ describe('<ExtensionsList />', () => {
       expectedText: '(updated, needs restart)',
     },
     {
+      state: ExtensionUpdateState.UPDATED,
+      expectedText: '(updated)',
+    },
+    {
       state: ExtensionUpdateState.ERROR,
       expectedText: '(error)',
     },
@@ -111,10 +118,11 @@ describe('<ExtensionsList />', () => {
     it(`should correctly display the state: ${state}`, () => {
       const updateState = new Map([[mockExtensions[0].name, state]]);
       mockUIState(updateState);
-      const { lastFrame } = render(
+      const { lastFrame, unmount } = render(
         <ExtensionsList extensions={[mockExtensions[0]]} />,
       );
       expect(lastFrame()).toContain(expectedText);
+      unmount();
     });
   }
 });

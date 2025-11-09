@@ -249,9 +249,7 @@ export const ToolConfirmationMessage: React.FC<
 
     bodyContent = (
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
-        <Text color={theme.text.link}>
-          <RenderInline text={infoProps.prompt} />
-        </Text>
+        <RenderInline text={infoProps.prompt} defaultColor={theme.text.link} />
         {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
           <Box flexDirection="column" marginTop={1}>
             <Text color={theme.text.primary}>URLs to fetch:</Text>

@@ -6,7 +6,7 @@
 
 import { CoreToolScheduler } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { renderHook } from '@testing-library/react';
+import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useReactToolScheduler } from './useReactToolScheduler.js';
 

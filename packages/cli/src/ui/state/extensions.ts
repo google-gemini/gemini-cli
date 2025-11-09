@@ -10,6 +10,7 @@ import { checkExhaustive } from '../../utils/checks.js';
 export enum ExtensionUpdateState {
   CHECKING_FOR_UPDATES = 'checking for updates',
   UPDATED_NEEDS_RESTART = 'updated, needs restart',
+  UPDATED = 'updated',
   UPDATING = 'updating',
   UPDATE_AVAILABLE = 'update available',
   UP_TO_DATE = 'up to date',
@@ -62,7 +63,8 @@ export type ExtensionUpdateAction =
   | { type: 'BATCH_CHECK_START' }
   | { type: 'BATCH_CHECK_END' }
   | { type: 'SCHEDULE_UPDATE'; payload: ScheduleUpdateArgs }
-  | { type: 'CLEAR_SCHEDULED_UPDATE' };
+  | { type: 'CLEAR_SCHEDULED_UPDATE' }
+  | { type: 'RESTARTED'; payload: { name: string } };
 
 export function extensionUpdatesReducer(
   state: ExtensionUpdatesState,
@@ -124,6 +126,20 @@ export function extensionUpdatesReducer(
         ...state,
         scheduledUpdate: null,
       };
+    case 'RESTARTED': {
+      const existing = state.extensionStatuses.get(action.payload.name);
+      if (existing?.status !== ExtensionUpdateState.UPDATED_NEEDS_RESTART) {
+        return state;
+      }
+
+      const newStatuses = new Map(state.extensionStatuses);
+      newStatuses.set(action.payload.name, {
+        ...existing,
+        status: ExtensionUpdateState.UPDATED,
+      });
+
+      return { ...state, extensionStatuses: newStatuses };
+    }
     default:
       checkExhaustive(action);
   }

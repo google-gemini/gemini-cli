@@ -174,7 +174,7 @@ async function main() {
             `📝 Creating commit with conflict markers for manual resolution...`,
           );
           execSync('git add .');
-          execSync(`git commit --no-edit`);
+          execSync(`git commit --no-edit --no-verify`);
           console.log(`✅ Committed cherry-pick with conflict markers`);
         } else {
           // Re-throw if it's not a conflict error

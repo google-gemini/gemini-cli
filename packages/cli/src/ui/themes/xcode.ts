@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const xcodeColors: ColorsTheme = {
   type: 'light',
@@ -21,6 +22,7 @@ const xcodeColors: ColorsTheme = {
   DiffRemoved: '#FEDEDE',
   Comment: '#007400',
   Gray: '#c0c0c0',
+  DarkGray: interpolateColor('#c0c0c0', '#fff', 0.5),
   GradientColors: ['#1c00cf', '#007400'],
 };
 

@@ -15,11 +15,11 @@ import {
 } from '../../utils/messageInspectors.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
+import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 
 vi.mock('../../core/baseLlmClient.js');
 vi.mock('../../utils/promptIdContext.js');
@@ -29,6 +29,7 @@ describe('ClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let mockResolvedConfig: ResolvedModelConfig;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,7 +40,15 @@ describe('ClassifierStrategy', () => {
       request: [{ text: 'simple task' }],
       signal: new AbortController().signal,
     };
-    mockConfig = {} as Config;
+    mockResolvedConfig = {
+      model: 'classifier',
+      generateContentConfig: {},
+    } as unknown as ResolvedModelConfig;
+    mockConfig = {
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
+      },
+    } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
@@ -60,14 +69,7 @@ describe('ClassifierStrategy', () => {
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        config: expect.objectContaining({
-          temperature: 0,
-          maxOutputTokens: 1024,
-          thinkingConfig: {
-            thinkingBudget: 512,
-          },
-        }),
+        modelConfigKey: { model: mockResolvedConfig.model },
         promptId: 'test-prompt-id',
       }),
     );

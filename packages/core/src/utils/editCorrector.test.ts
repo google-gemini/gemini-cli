@@ -236,6 +236,14 @@ describe('editCorrector', () => {
       mockGeminiClientInstance.getHistory = vi.fn().mockResolvedValue([]);
       mockBaseLlmClientInstance = {
         generateJson: mockGenerateJson,
+        config: {
+          generationConfigService: {
+            getResolvedConfig: vi.fn().mockReturnValue({
+              model: 'edit-corrector',
+              generateContentConfig: {},
+            }),
+          },
+        },
       } as unknown as Mocked<BaseLlmClient>;
       resetEditCorrectorCaches_TEST_ONLY();
     });
@@ -634,6 +642,14 @@ describe('editCorrector', () => {
 
       mockBaseLlmClientInstance = {
         generateJson: mockGenerateJson,
+        config: {
+          generationConfigService: {
+            getResolvedConfig: vi.fn().mockReturnValue({
+              model: 'edit-corrector',
+              generateContentConfig: {},
+            }),
+          },
+        },
       } as unknown as Mocked<BaseLlmClient>;
       resetEditCorrectorCaches_TEST_ONLY();
     });

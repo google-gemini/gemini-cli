@@ -8,6 +8,7 @@ import type { Config } from '../config/config.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { logFlashFallback, FlashFallbackEvent } from '../telemetry/index.js';
+import { coreEvents } from '../utils/events.js';
 
 export async function handleFallback(
   config: Config,
@@ -19,8 +20,6 @@ export async function handleFallback(
   if (authType !== AuthType.LOGIN_WITH_GOOGLE) return null;
 
   const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-
-  if (failedModel === fallbackModel) return null;
 
   // Consult UI Handler for Intent
   const fallbackModelHandler = config.fallbackModelHandler;
@@ -45,7 +44,7 @@ export async function handleFallback(
         activateFallbackMode(config, authType);
         return false;
 
-      case 'auth':
+      case 'retry_later':
         return false;
 
       default:
@@ -62,6 +61,7 @@ export async function handleFallback(
 function activateFallbackMode(config: Config, authType: string | undefined) {
   if (!config.isInFallbackMode()) {
     config.setFallbackMode(true);
+    coreEvents.emitFallbackModeChanged(true);
     if (authType) {
       logFlashFallback(config, new FlashFallbackEvent(authType));
     }

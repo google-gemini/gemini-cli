@@ -20,8 +20,7 @@ import {
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
-  type GeminiCLIExtension,
-  debugLogger,
+  type ExtensionLoader,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -30,10 +29,9 @@ import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export async function loadConfig(
   settings: Settings,
-  extensions: GeminiCLIExtension[],
+  extensionLoader: ExtensionLoader,
   taskId: string,
 ): Promise<Config> {
-  const mcpServers = mergeMcpServers(settings, extensions);
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
@@ -53,7 +51,7 @@ export async function loadConfig(
       process.env['GEMINI_YOLO_MODE'] === 'true'
         ? ApprovalMode.YOLO
         : ApprovalMode.DEFAULT,
-    mcpServers,
+    mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
@@ -71,7 +69,7 @@ export async function loadConfig(
     },
     ideMode: false,
     folderTrust: settings.folderTrust === true,
-    extensions,
+    extensionLoader,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
@@ -80,7 +78,7 @@ export async function loadConfig(
     [workspaceDir],
     false,
     fileService,
-    extensions,
+    extensionLoader,
     settings.folderTrust === true,
   );
   configParams.userMemory = memoryContent;
@@ -117,25 +115,6 @@ export async function loadConfig(
   }
 
   return config;
-}
-
-export function mergeMcpServers(
-  settings: Settings,
-  extensions: GeminiCLIExtension[],
-) {
-  const mcpServers = { ...(settings.mcpServers || {}) };
-  for (const extension of extensions) {
-    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
-        debugLogger.warn(
-          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-        );
-        return;
-      }
-      mcpServers[key] = server;
-    });
-  }
-  return mcpServers;
 }
 
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {

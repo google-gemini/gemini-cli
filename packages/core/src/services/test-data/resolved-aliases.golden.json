@@ -1,0 +1,151 @@
+{
+  "base": {
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "chat-base": {
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "gemini-2.5-pro": {
+    "model": "gemini-2.5-pro",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "gemini-2.5-flash": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "gemini-2.5-flash-lite": {
+    "model": "gemini-2.5-flash-lite",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  },
+  "gemini-2.5-flash-base": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "classifier": {
+    "model": "gemini-2.5-flash-lite",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "maxOutputTokens": 1024,
+      "thinkingConfig": {
+        "thinkingBudget": 512
+      }
+    }
+  },
+  "prompt-completion": {
+    "model": "gemini-2.5-flash-lite",
+    "generateContentConfig": {
+      "temperature": 0.3,
+      "topP": 1,
+      "maxOutputTokens": 16000,
+      "thinkingConfig": {
+        "thinkingBudget": 0
+      }
+    }
+  },
+  "edit-corrector": {
+    "model": "gemini-2.5-flash-lite",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "thinkingConfig": {
+        "thinkingBudget": 0
+      }
+    }
+  },
+  "summarizer-default": {
+    "model": "gemini-2.5-flash-lite",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "maxOutputTokens": 2000
+    }
+  },
+  "summarizer-shell": {
+    "model": "gemini-2.5-flash-lite",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "maxOutputTokens": 2000
+    }
+  },
+  "web-search-tool": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "tools": [
+        {
+          "googleSearch": {}
+        }
+      ]
+    }
+  },
+  "web-fetch-tool": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1,
+      "tools": [
+        {
+          "urlContext": {}
+        }
+      ]
+    }
+  },
+  "loop-detection": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "llm-edit-fixer": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "next-speaker-checker": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  }
+}

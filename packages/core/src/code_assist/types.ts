@@ -21,7 +21,8 @@ export type ClientMetadataIdeType =
   | 'INTELLIJ'
   | 'VSCODE_CLOUD_WORKSTATION'
   | 'INTELLIJ_CLOUD_WORKSTATION'
-  | 'CLOUD_SHELL';
+  | 'CLOUD_SHELL'
+  | 'GEMINI_CLI';
 export type ClientMetadataPlatform =
   | 'PLATFORM_UNSPECIFIED'
   | 'DARWIN_AMD64'

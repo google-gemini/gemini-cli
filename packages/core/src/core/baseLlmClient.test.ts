@@ -75,6 +75,15 @@ const mockConfig = {
     .fn()
     .mockReturnValue({ authType: AuthType.USE_GEMINI }),
   getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+  modelConfigService: {
+    getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+      model,
+      generateContentConfig: {
+        temperature: 0,
+        topP: 1,
+      },
+    })),
+  },
 } as unknown as Mocked<Config>;
 
 // Helper to create a mock GenerateContentResponse
@@ -97,9 +106,9 @@ describe('BaseLlmClient', () => {
     client = new BaseLlmClient(mockContentGenerator, mockConfig);
     abortController = new AbortController();
     defaultOptions = {
+      modelConfigKey: { model: 'test-model' },
       contents: [{ role: 'user', parts: [{ text: 'Give me a color.' }] }],
       schema: { type: 'object', properties: { color: { type: 'string' } } },
-      model: 'test-model',
       abortSignal: abortController.signal,
       promptId: 'test-prompt-id',
     };
@@ -135,37 +144,14 @@ describe('BaseLlmClient', () => {
           contents: defaultOptions.contents,
           config: {
             abortSignal: defaultOptions.abortSignal,
-            temperature: 0,
-            topP: 1,
             responseJsonSchema: defaultOptions.schema,
             responseMimeType: 'application/json',
+            temperature: 0,
+            topP: 1,
             // Crucial: systemInstruction should NOT be in the config object if not provided
           },
         },
         'test-prompt-id',
-      );
-    });
-
-    it('should respect configuration overrides', async () => {
-      const mockResponse = createMockResponse('{"color": "red"}');
-      mockGenerateContent.mockResolvedValue(mockResponse);
-
-      const options: GenerateJsonOptions = {
-        ...defaultOptions,
-        config: { temperature: 0.8, topK: 10 },
-      };
-
-      await client.generateJson(options);
-
-      expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            temperature: 0.8,
-            topP: 1, // Default should remain if not overridden
-            topK: 10,
-          }),
-        }),
-        expect.any(String),
       );
     });
 
@@ -296,7 +282,7 @@ describe('BaseLlmClient', () => {
       const calls = vi.mocked(logMalformedJsonResponse).mock.calls;
       const lastCall = calls[calls.length - 1];
       const event = lastCall[1] as MalformedJsonResponseEvent;
-      expect(event.model).toBe('test-model');
+      expect(event.model).toBe(defaultOptions.modelConfigKey.model);
     });
 
     it('should handle extra whitespace correctly without logging malformed telemetry', async () => {

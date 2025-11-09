@@ -60,7 +60,10 @@ function verifyVSCode(
   if (ide.name !== IDE_DEFINITIONS.vscode.name) {
     return ide;
   }
-  if (ideProcessInfo.command.toLowerCase().includes('code')) {
+  if (
+    !ideProcessInfo.command ||
+    ideProcessInfo.command.toLowerCase().includes('code')
+  ) {
     return IDE_DEFINITIONS.vscode;
   }
   return IDE_DEFINITIONS.vscodefork;

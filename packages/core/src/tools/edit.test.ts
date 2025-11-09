@@ -36,6 +36,14 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
+interface EditFileParameterSchema {
+  properties: {
+    file_path: {
+      description: string;
+    };
+  };
+}
+
 import type { Mock } from 'vitest';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { EditToolParams } from './edit.js';
@@ -47,10 +55,10 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { Content, Part, SchemaUnion } from '@google/genai';
-import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -80,7 +88,7 @@ describe('EditTool', () => {
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
-      getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
+      getWorkspaceContext: () => new WorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
       getIdeMode: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
@@ -292,17 +300,6 @@ describe('EditTool', () => {
       expect(tool.validateToolParams(params)).toBeNull();
     });
 
-    it('should return error for relative path', () => {
-      const params: EditToolParams = {
-        file_path: 'test.txt',
-        old_string: 'old',
-        new_string: 'new',
-      };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be absolute/,
-      );
-    });
-
     it('should return error for path outside root', () => {
       const params: EditToolParams = {
         file_path: path.join(tempDir, 'outside-root.txt'),
@@ -324,13 +321,29 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
     });
 
-    it('should throw an error if params are invalid', async () => {
+    it('should resolve relative path and request confirmation', async () => {
+      fs.writeFileSync(filePath, 'some old content here');
       const params: EditToolParams = {
-        file_path: 'relative.txt',
+        file_path: testFile, // relative path
         old_string: 'old',
         new_string: 'new',
       };
-      expect(() => tool.build(params)).toThrow();
+      // ensureCorrectEdit will be called by shouldConfirmExecute
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, file_path: filePath },
+        occurrences: 1,
+      });
+      const invocation = tool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).toEqual(
+        expect.objectContaining({
+          title: `Confirm Edit: ${testFile}`,
+          fileName: testFile,
+          fileDiff: expect.any(String),
+        }),
+      );
     });
 
     it('should request confirmation for valid edit', async () => {
@@ -523,13 +536,21 @@ describe('EditTool', () => {
       });
     });
 
-    it('should throw error if file path is not absolute', async () => {
+    it('should resolve relative path and execute successfully', async () => {
+      const initialContent = 'This is some old text.';
+      const newContent = 'This is some new text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
       const params: EditToolParams = {
-        file_path: 'relative.txt',
+        file_path: testFile, // relative path
         old_string: 'old',
         new_string: 'new',
       };
-      expect(() => tool.build(params)).toThrow(/File path must be absolute/);
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
     });
 
     it('should throw error if file path is empty', async () => {
@@ -919,13 +940,13 @@ describe('EditTool', () => {
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_CHANGE);
     });
 
-    it('should throw INVALID_PARAMETERS error for relative path', async () => {
+    it('should not throw error for relative path', async () => {
       const params: EditToolParams = {
         file_path: 'relative/path.txt',
         old_string: 'a',
         new_string: 'b',
       };
-      expect(() => tool.build(params)).toThrow();
+      expect(() => tool.build(params)).not.toThrow();
     });
 
     it('should return FILE_WRITE_FAILURE on write error', async () => {
@@ -1025,6 +1046,34 @@ describe('EditTool', () => {
     });
   });
 
+  describe('constructor', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should use windows-style path examples on windows', () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+
+      const tool = new EditTool({} as unknown as Config);
+      const schema = tool.schema;
+      expect(
+        (schema.parametersJsonSchema as EditFileParameterSchema).properties
+          .file_path.description,
+      ).toBe('The path to the file to modify.');
+    });
+
+    it('should use unix-style path examples on non-windows platforms', () => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+
+      const tool = new EditTool({} as unknown as Config);
+      const schema = tool.schema;
+      expect(
+        (schema.parametersJsonSchema as EditFileParameterSchema).properties
+          .file_path.description,
+      ).toBe('The path to the file to modify.');
+    });
+  });
+
   describe('IDE mode', () => {
     const testFile = 'edit_me.txt';
     let filePath: string;
@@ -1072,6 +1121,91 @@ describe('EditTool', () => {
 
       expect(params.old_string).toBe(initialContent);
       expect(params.new_string).toBe(modifiedContent);
+    });
+  });
+
+  describe('multiple file edits', () => {
+    it('should perform multiple removals and report correct diff stats', async () => {
+      const numFiles = 10;
+      const files: Array<{
+        path: string;
+        initialContent: string;
+        toRemove: string;
+      }> = [];
+      const expectedLinesRemoved: number[] = [];
+      const actualLinesRemoved: number[] = [];
+
+      // 1. Create 10 files with 5-10 lines each
+      for (let i = 0; i < numFiles; i++) {
+        const fileName = `test-file-${i}.txt`;
+        const filePath = path.join(rootDir, fileName);
+        const numLines = Math.floor(Math.random() * 6) + 5; // 5 to 10 lines
+        const lines = Array.from(
+          { length: numLines },
+          (_, j) => `File ${i}, Line ${j + 1}`,
+        );
+        const content = lines.join('\n') + '\n';
+
+        // Determine which lines to remove (2 or 3 lines)
+        const numLinesToRemove = Math.floor(Math.random() * 2) + 2; // 2 or 3
+        expectedLinesRemoved.push(numLinesToRemove);
+        const startLineToRemove = 1; // Start removing from the second line
+        const linesToRemove = lines.slice(
+          startLineToRemove,
+          startLineToRemove + numLinesToRemove,
+        );
+        const toRemove = linesToRemove.join('\n') + '\n';
+
+        fs.writeFileSync(filePath, content, 'utf8');
+        files.push({
+          path: filePath,
+          initialContent: content,
+          toRemove,
+        });
+      }
+
+      // 2. Create and execute 10 tool calls for removal
+      for (const file of files) {
+        const params: EditToolParams = {
+          file_path: file.path,
+          old_string: file.toRemove,
+          new_string: '', // Removing the content
+        };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
+
+        if (
+          result.returnDisplay &&
+          typeof result.returnDisplay === 'object' &&
+          'diffStat' in result.returnDisplay &&
+          result.returnDisplay.diffStat
+        ) {
+          actualLinesRemoved.push(
+            result.returnDisplay.diffStat?.model_removed_lines,
+          );
+        } else if (result.error) {
+          console.error(`Edit failed for ${file.path}:`, result.error);
+        }
+      }
+
+      // 3. Assert that the content was removed from each file
+      for (const file of files) {
+        const finalContent = fs.readFileSync(file.path, 'utf8');
+        const expectedContent = file.initialContent.replace(file.toRemove, '');
+        expect(finalContent).toBe(expectedContent);
+        expect(finalContent).not.toContain(file.toRemove);
+      }
+
+      // 4. Assert that the total number of removed lines matches the diffStat total
+      const totalExpectedRemoved = expectedLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      const totalActualRemoved = actualLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      expect(totalActualRemoved).toBe(totalExpectedRemoved);
     });
   });
 });

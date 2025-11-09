@@ -1,0 +1,1532 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+  "title": "Gemini CLI Settings",
+  "description": "Configuration file schema for Gemini CLI settings. This schema enables IDE completion for `settings.json`.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "mcpServers": {
+      "title": "MCP Servers",
+      "description": "Configuration for MCP servers.",
+      "markdownDescription": "Configuration for MCP servers.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/MCPServerConfig"
+      }
+    },
+    "general": {
+      "title": "General",
+      "description": "General application settings.",
+      "markdownDescription": "General application settings.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "preferredEditor": {
+          "title": "Preferred Editor",
+          "description": "The preferred editor to open files in.",
+          "markdownDescription": "The preferred editor to open files in.\n\n- Category: `General`\n- Requires restart: `no`",
+          "type": "string"
+        },
+        "vimMode": {
+          "title": "Vim Mode",
+          "description": "Enable Vim keybindings",
+          "markdownDescription": "Enable Vim keybindings\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "disableAutoUpdate": {
+          "title": "Disable Auto Update",
+          "description": "Disable automatic updates",
+          "markdownDescription": "Disable automatic updates\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "disableUpdateNag": {
+          "title": "Disable Update Nag",
+          "description": "Disable update notification prompts.",
+          "markdownDescription": "Disable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "checkpointing": {
+          "title": "Checkpointing",
+          "description": "Session checkpointing settings.",
+          "markdownDescription": "Session checkpointing settings.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Checkpointing",
+              "description": "Enable session checkpointing for recovery",
+              "markdownDescription": "Enable session checkpointing for recovery\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "enablePromptCompletion": {
+          "title": "Enable Prompt Completion",
+          "description": "Enable AI-powered prompt completion suggestions while typing.",
+          "markdownDescription": "Enable AI-powered prompt completion suggestions while typing.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "retryFetchErrors": {
+          "title": "Retry Fetch Errors",
+          "description": "Retry on \"exception TypeError: fetch failed sending request\" errors.",
+          "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "debugKeystrokeLogging": {
+          "title": "Debug Keystroke Logging",
+          "description": "Enable debug logging of keystrokes to the console.",
+          "markdownDescription": "Enable debug logging of keystrokes to the console.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "sessionRetention": {
+          "title": "Session Retention",
+          "description": "Settings for automatic session cleanup.",
+          "markdownDescription": "Settings for automatic session cleanup.\n\n- Category: `General`\n- Requires restart: `no`",
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Session Cleanup",
+              "description": "Enable automatic session cleanup",
+              "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "maxAge": {
+              "title": "Max Session Age",
+              "description": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
+              "markdownDescription": "Maximum age of sessions to keep (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
+              "type": "string"
+            },
+            "maxCount": {
+              "title": "Max Session Count",
+              "description": "Alternative: Maximum number of sessions to keep (most recent)",
+              "markdownDescription": "Alternative: Maximum number of sessions to keep (most recent)\n\n- Category: `General`\n- Requires restart: `no`",
+              "type": "number"
+            },
+            "minRetention": {
+              "title": "Min Retention Period",
+              "description": "Minimum retention period (safety limit, defaults to \"1d\")",
+              "markdownDescription": "Minimum retention period (safety limit, defaults to \"1d\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `1d`",
+              "default": "1d",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "title": "Output",
+      "description": "Settings for the CLI output.",
+      "markdownDescription": "Settings for the CLI output.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "format": {
+          "title": "Output Format",
+          "description": "The format of the CLI output.",
+          "markdownDescription": "The format of the CLI output.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `text`",
+          "default": "text",
+          "type": "string",
+          "enum": ["text", "json"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ui": {
+      "title": "UI",
+      "description": "User interface settings.",
+      "markdownDescription": "User interface settings.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "theme": {
+          "title": "Theme",
+          "description": "The color theme for the UI. See the CLI themes guide for available options.",
+          "markdownDescription": "The color theme for the UI. See the CLI themes guide for available options.\n\n- Category: `UI`\n- Requires restart: `no`",
+          "type": "string"
+        },
+        "customThemes": {
+          "title": "Custom Themes",
+          "description": "Custom theme definitions.",
+          "markdownDescription": "Custom theme definitions.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/CustomTheme"
+          }
+        },
+        "hideWindowTitle": {
+          "title": "Hide Window Title",
+          "description": "Hide the window title bar",
+          "markdownDescription": "Hide the window title bar\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showStatusInTitle": {
+          "title": "Show Status in Title",
+          "description": "Show Gemini CLI status and thoughts in the terminal window title",
+          "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "hideTips": {
+          "title": "Hide Tips",
+          "description": "Hide helpful tips in the UI",
+          "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "hideBanner": {
+          "title": "Hide Banner",
+          "description": "Hide the application banner",
+          "markdownDescription": "Hide the application banner\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "hideContextSummary": {
+          "title": "Hide Context Summary",
+          "description": "Hide the context summary (GEMINI.md, MCP servers) above the input.",
+          "markdownDescription": "Hide the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "footer": {
+          "title": "Footer",
+          "description": "Settings for the footer.",
+          "markdownDescription": "Settings for the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "hideCWD": {
+              "title": "Hide CWD",
+              "description": "Hide the current working directory path in the footer.",
+              "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "hideSandboxStatus": {
+              "title": "Hide Sandbox Status",
+              "description": "Hide the sandbox status indicator in the footer.",
+              "markdownDescription": "Hide the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "hideModelInfo": {
+              "title": "Hide Model Info",
+              "description": "Hide the model name and context usage in the footer.",
+              "markdownDescription": "Hide the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "hideContextPercentage": {
+              "title": "Hide Context Window Percentage",
+              "description": "Hides the context window remaining percentage.",
+              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "hideFooter": {
+          "title": "Hide Footer",
+          "description": "Hide the footer from the UI",
+          "markdownDescription": "Hide the footer from the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showMemoryUsage": {
+          "title": "Show Memory Usage",
+          "description": "Display memory usage information in the UI",
+          "markdownDescription": "Display memory usage information in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showLineNumbers": {
+          "title": "Show Line Numbers",
+          "description": "Show line numbers in the chat.",
+          "markdownDescription": "Show line numbers in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showCitations": {
+          "title": "Show Citations",
+          "description": "Show citations for generated text in the chat.",
+          "markdownDescription": "Show citations for generated text in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useFullWidth": {
+          "title": "Use Full Width",
+          "description": "Use the entire width of the terminal for output.",
+          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useAlternateBuffer": {
+          "title": "Use Alternate Screen Buffer",
+          "description": "Use an alternate screen buffer for the UI, preserving shell history.",
+          "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "customWittyPhrases": {
+          "title": "Custom Witty Phrases",
+          "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
+          "markdownDescription": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "accessibility": {
+          "title": "Accessibility",
+          "description": "Accessibility settings.",
+          "markdownDescription": "Accessibility settings.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "disableLoadingPhrases": {
+              "title": "Disable Loading Phrases",
+              "description": "Disable loading phrases for accessibility",
+              "markdownDescription": "Disable loading phrases for accessibility\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "screenReader": {
+              "title": "Screen Reader Mode",
+              "description": "Render output in plain-text to be more screen reader accessible",
+              "markdownDescription": "Render output in plain-text to be more screen reader accessible\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ide": {
+      "title": "IDE",
+      "description": "IDE integration settings.",
+      "markdownDescription": "IDE integration settings.\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "title": "IDE Mode",
+          "description": "Enable IDE integration mode",
+          "markdownDescription": "Enable IDE integration mode\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "hasSeenNudge": {
+          "title": "Has Seen IDE Integration Nudge",
+          "description": "Whether the user has seen the IDE integration nudge.",
+          "markdownDescription": "Whether the user has seen the IDE integration nudge.\n\n- Category: `IDE`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "title": "Privacy",
+      "description": "Privacy-related settings.",
+      "markdownDescription": "Privacy-related settings.\n\n- Category: `Privacy`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "usageStatisticsEnabled": {
+          "title": "Enable Usage Statistics",
+          "description": "Enable collection of usage statistics",
+          "markdownDescription": "Enable collection of usage statistics\n\n- Category: `Privacy`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "telemetry": {
+      "title": "Telemetry",
+      "description": "Telemetry configuration.",
+      "markdownDescription": "Telemetry configuration.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+      "$ref": "#/$defs/TelemetrySettings"
+    },
+    "model": {
+      "title": "Model",
+      "description": "Settings related to the generative model.",
+      "markdownDescription": "Settings related to the generative model.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Model",
+          "description": "The Gemini model to use for conversations.",
+          "markdownDescription": "The Gemini model to use for conversations.\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "string"
+        },
+        "maxSessionTurns": {
+          "title": "Max Session Turns",
+          "description": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.",
+          "markdownDescription": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `-1`",
+          "default": -1,
+          "type": "number"
+        },
+        "summarizeToolOutput": {
+          "title": "Summarize Tool Output",
+          "description": "Enables or disables summarization of tool output. Configure per-tool token budgets (for example {\"run_shell_command\": {\"tokenBudget\": 2000}}). Currently only the run_shell_command tool supports summarization.",
+          "markdownDescription": "Enables or disables summarization of tool output. Configure per-tool token budgets (for example {\"run_shell_command\": {\"tokenBudget\": 2000}}). Currently only the run_shell_command tool supports summarization.\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/SummarizeToolOutputSettings"
+          }
+        },
+        "compressionThreshold": {
+          "title": "Compression Threshold",
+          "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
+          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.2`",
+          "default": 0.2,
+          "type": "number"
+        },
+        "skipNextSpeakerCheck": {
+          "title": "Skip Next Speaker Check",
+          "description": "Skip the next speaker check.",
+          "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "modelConfigs": {
+      "title": "Model Configs",
+      "description": "Model configurations.",
+      "markdownDescription": "Model configurations.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\"aliases\":{\"base\":{\"modelConfig\":{\"generateContentConfig\":{\"temperature\":0,\"topP\":1}}},\"chat-base\":{\"extends\":\"base\",\"modelConfig\":{\"generateContentConfig\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingBudget\":-1}}}},\"gemini-2.5-pro\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-pro\"}},\"gemini-2.5-flash\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\"}},\"gemini-2.5-flash-lite\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\"}},\"gemini-2.5-flash-base\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\"}},\"classifier\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":1024,\"thinkingConfig\":{\"thinkingBudget\":512}}}},\"prompt-completion\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"temperature\":0.3,\"maxOutputTokens\":16000,\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"edit-corrector\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"summarizer-default\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"summarizer-shell\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"web-search-tool\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{\"generateContentConfig\":{\"tools\":[{\"googleSearch\":{}}]}}},\"web-fetch-tool\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{\"generateContentConfig\":{\"tools\":[{\"urlContext\":{}}]}}},\"loop-detection\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{}},\"llm-edit-fixer\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{}},\"next-speaker-checker\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{}}}}`",
+      "default": {
+        "aliases": {
+          "base": {
+            "modelConfig": {
+              "generateContentConfig": {
+                "temperature": 0,
+                "topP": 1
+              }
+            }
+          },
+          "chat-base": {
+            "extends": "base",
+            "modelConfig": {
+              "generateContentConfig": {
+                "thinkingConfig": {
+                  "includeThoughts": true,
+                  "thinkingBudget": -1
+                }
+              }
+            }
+          },
+          "gemini-2.5-pro": {
+            "extends": "chat-base",
+            "modelConfig": {
+              "model": "gemini-2.5-pro"
+            }
+          },
+          "gemini-2.5-flash": {
+            "extends": "chat-base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash"
+            }
+          },
+          "gemini-2.5-flash-lite": {
+            "extends": "chat-base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite"
+            }
+          },
+          "gemini-2.5-flash-base": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash"
+            }
+          },
+          "classifier": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite",
+              "generateContentConfig": {
+                "maxOutputTokens": 1024,
+                "thinkingConfig": {
+                  "thinkingBudget": 512
+                }
+              }
+            }
+          },
+          "prompt-completion": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite",
+              "generateContentConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 16000,
+                "thinkingConfig": {
+                  "thinkingBudget": 0
+                }
+              }
+            }
+          },
+          "edit-corrector": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite",
+              "generateContentConfig": {
+                "thinkingConfig": {
+                  "thinkingBudget": 0
+                }
+              }
+            }
+          },
+          "summarizer-default": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite",
+              "generateContentConfig": {
+                "maxOutputTokens": 2000
+              }
+            }
+          },
+          "summarizer-shell": {
+            "extends": "base",
+            "modelConfig": {
+              "model": "gemini-2.5-flash-lite",
+              "generateContentConfig": {
+                "maxOutputTokens": 2000
+              }
+            }
+          },
+          "web-search-tool": {
+            "extends": "gemini-2.5-flash-base",
+            "modelConfig": {
+              "generateContentConfig": {
+                "tools": [
+                  {
+                    "googleSearch": {}
+                  }
+                ]
+              }
+            }
+          },
+          "web-fetch-tool": {
+            "extends": "gemini-2.5-flash-base",
+            "modelConfig": {
+              "generateContentConfig": {
+                "tools": [
+                  {
+                    "urlContext": {}
+                  }
+                ]
+              }
+            }
+          },
+          "loop-detection": {
+            "extends": "gemini-2.5-flash-base",
+            "modelConfig": {}
+          },
+          "llm-edit-fixer": {
+            "extends": "gemini-2.5-flash-base",
+            "modelConfig": {}
+          },
+          "next-speaker-checker": {
+            "extends": "gemini-2.5-flash-base",
+            "modelConfig": {}
+          }
+        }
+      },
+      "type": "object",
+      "properties": {
+        "aliases": {
+          "title": "Model Config Aliases",
+          "description": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.",
+          "markdownDescription": "Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{\"base\":{\"modelConfig\":{\"generateContentConfig\":{\"temperature\":0,\"topP\":1}}},\"chat-base\":{\"extends\":\"base\",\"modelConfig\":{\"generateContentConfig\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingBudget\":-1}}}},\"gemini-2.5-pro\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-pro\"}},\"gemini-2.5-flash\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\"}},\"gemini-2.5-flash-lite\":{\"extends\":\"chat-base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\"}},\"gemini-2.5-flash-base\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash\"}},\"classifier\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":1024,\"thinkingConfig\":{\"thinkingBudget\":512}}}},\"prompt-completion\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"temperature\":0.3,\"maxOutputTokens\":16000,\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"edit-corrector\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"thinkingConfig\":{\"thinkingBudget\":0}}}},\"summarizer-default\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"summarizer-shell\":{\"extends\":\"base\",\"modelConfig\":{\"model\":\"gemini-2.5-flash-lite\",\"generateContentConfig\":{\"maxOutputTokens\":2000}}},\"web-search-tool\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{\"generateContentConfig\":{\"tools\":[{\"googleSearch\":{}}]}}},\"web-fetch-tool\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{\"generateContentConfig\":{\"tools\":[{\"urlContext\":{}}]}}},\"loop-detection\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{}},\"llm-edit-fixer\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{}},\"next-speaker-checker\":{\"extends\":\"gemini-2.5-flash-base\",\"modelConfig\":{}}}`",
+          "default": {
+            "base": {
+              "modelConfig": {
+                "generateContentConfig": {
+                  "temperature": 0,
+                  "topP": 1
+                }
+              }
+            },
+            "chat-base": {
+              "extends": "base",
+              "modelConfig": {
+                "generateContentConfig": {
+                  "thinkingConfig": {
+                    "includeThoughts": true,
+                    "thinkingBudget": -1
+                  }
+                }
+              }
+            },
+            "gemini-2.5-pro": {
+              "extends": "chat-base",
+              "modelConfig": {
+                "model": "gemini-2.5-pro"
+              }
+            },
+            "gemini-2.5-flash": {
+              "extends": "chat-base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash"
+              }
+            },
+            "gemini-2.5-flash-lite": {
+              "extends": "chat-base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite"
+              }
+            },
+            "gemini-2.5-flash-base": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash"
+              }
+            },
+            "classifier": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite",
+                "generateContentConfig": {
+                  "maxOutputTokens": 1024,
+                  "thinkingConfig": {
+                    "thinkingBudget": 512
+                  }
+                }
+              }
+            },
+            "prompt-completion": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite",
+                "generateContentConfig": {
+                  "temperature": 0.3,
+                  "maxOutputTokens": 16000,
+                  "thinkingConfig": {
+                    "thinkingBudget": 0
+                  }
+                }
+              }
+            },
+            "edit-corrector": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite",
+                "generateContentConfig": {
+                  "thinkingConfig": {
+                    "thinkingBudget": 0
+                  }
+                }
+              }
+            },
+            "summarizer-default": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite",
+                "generateContentConfig": {
+                  "maxOutputTokens": 2000
+                }
+              }
+            },
+            "summarizer-shell": {
+              "extends": "base",
+              "modelConfig": {
+                "model": "gemini-2.5-flash-lite",
+                "generateContentConfig": {
+                  "maxOutputTokens": 2000
+                }
+              }
+            },
+            "web-search-tool": {
+              "extends": "gemini-2.5-flash-base",
+              "modelConfig": {
+                "generateContentConfig": {
+                  "tools": [
+                    {
+                      "googleSearch": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "web-fetch-tool": {
+              "extends": "gemini-2.5-flash-base",
+              "modelConfig": {
+                "generateContentConfig": {
+                  "tools": [
+                    {
+                      "urlContext": {}
+                    }
+                  ]
+                }
+              }
+            },
+            "loop-detection": {
+              "extends": "gemini-2.5-flash-base",
+              "modelConfig": {}
+            },
+            "llm-edit-fixer": {
+              "extends": "gemini-2.5-flash-base",
+              "modelConfig": {}
+            },
+            "next-speaker-checker": {
+              "extends": "gemini-2.5-flash-base",
+              "modelConfig": {}
+            }
+          },
+          "type": "object",
+          "additionalProperties": true
+        },
+        "overrides": {
+          "title": "Model Config Overrides",
+          "description": "Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.",
+          "markdownDescription": "Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "context": {
+      "title": "Context",
+      "description": "Settings for managing context provided to the model.",
+      "markdownDescription": "Settings for managing context provided to the model.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "fileName": {
+          "title": "Context File Name",
+          "description": "The name of the context file or files to load into memory. Accepts either a single string or an array of strings.",
+          "markdownDescription": "The name of the context file or files to load into memory. Accepts either a single string or an array of strings.\n\n- Category: `Context`\n- Requires restart: `no`",
+          "$ref": "#/$defs/StringOrStringArray"
+        },
+        "importFormat": {
+          "title": "Memory Import Format",
+          "description": "The format to use when importing memory.",
+          "markdownDescription": "The format to use when importing memory.\n\n- Category: `Context`\n- Requires restart: `no`",
+          "type": "string"
+        },
+        "discoveryMaxDirs": {
+          "title": "Memory Discovery Max Dirs",
+          "description": "Maximum number of directories to search for memory.",
+          "markdownDescription": "Maximum number of directories to search for memory.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `200`",
+          "default": 200,
+          "type": "number"
+        },
+        "includeDirectories": {
+          "title": "Include Directories",
+          "description": "Additional directories to include in the workspace context. Missing directories will be skipped with a warning.",
+          "markdownDescription": "Additional directories to include in the workspace context. Missing directories will be skipped with a warning.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "loadMemoryFromIncludeDirectories": {
+          "title": "Load Memory From Include Directories",
+          "description": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
+          "markdownDescription": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "fileFiltering": {
+          "title": "File Filtering",
+          "description": "Settings for git-aware file filtering.",
+          "markdownDescription": "Settings for git-aware file filtering.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "respectGitIgnore": {
+              "title": "Respect .gitignore",
+              "description": "Respect .gitignore files when searching",
+              "markdownDescription": "Respect .gitignore files when searching\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "respectGeminiIgnore": {
+              "title": "Respect .geminiignore",
+              "description": "Respect .geminiignore files when searching",
+              "markdownDescription": "Respect .geminiignore files when searching\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "enableRecursiveFileSearch": {
+              "title": "Enable Recursive File Search",
+              "description": "Enable recursive file search functionality when completing @ references in the prompt.",
+              "markdownDescription": "Enable recursive file search functionality when completing @ references in the prompt.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "disableFuzzySearch": {
+              "title": "Disable Fuzzy Search",
+              "description": "Disable fuzzy search when searching for files.",
+              "markdownDescription": "Disable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "tools": {
+      "title": "Tools",
+      "description": "Settings for built-in and custom tools.",
+      "markdownDescription": "Settings for built-in and custom tools.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "sandbox": {
+          "title": "Sandbox",
+          "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.",
+          "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "$ref": "#/$defs/BooleanOrString"
+        },
+        "shell": {
+          "title": "Shell",
+          "description": "Settings for shell execution.",
+          "markdownDescription": "Settings for shell execution.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enableInteractiveShell": {
+              "title": "Enable Interactive Shell",
+              "description": "Use node-pty for an interactive shell experience. Fallback to child_process still applies.",
+              "markdownDescription": "Use node-pty for an interactive shell experience. Fallback to child_process still applies.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "pager": {
+              "title": "Pager",
+              "description": "The pager command to use for shell output. Defaults to `cat`.",
+              "markdownDescription": "The pager command to use for shell output. Defaults to `cat`.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `cat`",
+              "default": "cat",
+              "type": "string"
+            },
+            "showColor": {
+              "title": "Show Color",
+              "description": "Show color in shell output.",
+              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "autoAccept": {
+          "title": "Auto Accept",
+          "description": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).",
+          "markdownDescription": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "core": {
+          "title": "Core Tools",
+          "description": "Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.",
+          "markdownDescription": "Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowed": {
+          "title": "Allowed Tools",
+          "description": "Tool names that bypass the confirmation dialog. Useful for trusted commands (for example [\"run_shell_command(git)\", \"run_shell_command(npm test)\"]). See shell tool command restrictions for matching details.",
+          "markdownDescription": "Tool names that bypass the confirmation dialog. Useful for trusted commands (for example [\"run_shell_command(git)\", \"run_shell_command(npm test)\"]). See shell tool command restrictions for matching details.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude": {
+          "title": "Exclude Tools",
+          "description": "Tool names to exclude from discovery.",
+          "markdownDescription": "Tool names to exclude from discovery.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "discoveryCommand": {
+          "title": "Tool Discovery Command",
+          "description": "Command to run for tool discovery.",
+          "markdownDescription": "Command to run for tool discovery.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "type": "string"
+        },
+        "callCommand": {
+          "title": "Tool Call Command",
+          "description": "Defines a custom shell command for invoking discovered tools. The command must take the tool name as the first argument, read JSON arguments from stdin, and emit JSON results on stdout.",
+          "markdownDescription": "Defines a custom shell command for invoking discovered tools. The command must take the tool name as the first argument, read JSON arguments from stdin, and emit JSON results on stdout.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "type": "string"
+        },
+        "useRipgrep": {
+          "title": "Use Ripgrep",
+          "description": "Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.",
+          "markdownDescription": "Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "enableToolOutputTruncation": {
+          "title": "Enable Tool Output Truncation",
+          "description": "Enable truncation of large tool outputs.",
+          "markdownDescription": "Enable truncation of large tool outputs.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "truncateToolOutputThreshold": {
+          "title": "Tool Output Truncation Threshold",
+          "description": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.",
+          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `4000000`",
+          "default": 4000000,
+          "type": "number"
+        },
+        "truncateToolOutputLines": {
+          "title": "Tool Output Truncation Lines",
+          "description": "The number of lines to keep when truncating tool output.",
+          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `1000`",
+          "default": 1000,
+          "type": "number"
+        },
+        "enableMessageBusIntegration": {
+          "title": "Enable Message Bus Integration",
+          "description": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.",
+          "markdownDescription": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "enableHooks": {
+          "title": "Enable Hooks System",
+          "description": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.",
+          "markdownDescription": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mcp": {
+      "title": "MCP",
+      "description": "Settings for Model Context Protocol (MCP) servers.",
+      "markdownDescription": "Settings for Model Context Protocol (MCP) servers.\n\n- Category: `MCP`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "serverCommand": {
+          "title": "MCP Server Command",
+          "description": "Command to start an MCP server.",
+          "markdownDescription": "Command to start an MCP server.\n\n- Category: `MCP`\n- Requires restart: `yes`",
+          "type": "string"
+        },
+        "allowed": {
+          "title": "Allow MCP Servers",
+          "description": "A list of MCP servers to allow.",
+          "markdownDescription": "A list of MCP servers to allow.\n\n- Category: `MCP`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded": {
+          "title": "Exclude MCP Servers",
+          "description": "A list of MCP servers to exclude.",
+          "markdownDescription": "A list of MCP servers to exclude.\n\n- Category: `MCP`\n- Requires restart: `yes`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "useSmartEdit": {
+      "title": "Use Smart Edit",
+      "description": "Enable the smart-edit tool instead of the replace tool.",
+      "markdownDescription": "Enable the smart-edit tool instead of the replace tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+      "default": true,
+      "type": "boolean"
+    },
+    "useWriteTodos": {
+      "title": "Use Write Todos",
+      "description": "Enable the write_todos_list tool.",
+      "markdownDescription": "Enable the write_todos_list tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
+      "default": false,
+      "type": "boolean"
+    },
+    "security": {
+      "title": "Security",
+      "description": "Security-related settings.",
+      "markdownDescription": "Security-related settings.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "disableYoloMode": {
+          "title": "Disable YOLO Mode",
+          "description": "Disable YOLO mode, even if enabled by a flag.",
+          "markdownDescription": "Disable YOLO mode, even if enabled by a flag.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "folderTrust": {
+          "title": "Folder Trust",
+          "description": "Settings for folder trust.",
+          "markdownDescription": "Settings for folder trust.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Folder Trust",
+              "description": "Setting to track whether Folder trust is enabled.",
+              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "auth": {
+          "title": "Authentication",
+          "description": "Authentication settings.",
+          "markdownDescription": "Authentication settings.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "selectedType": {
+              "title": "Selected Auth Type",
+              "description": "The currently selected authentication type.",
+              "markdownDescription": "The currently selected authentication type.\n\n- Category: `Security`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "enforcedType": {
+              "title": "Enforced Auth Type",
+              "description": "The required auth type. If this does not match the selected auth type, the user will be prompted to re-authenticate.",
+              "markdownDescription": "The required auth type. If this does not match the selected auth type, the user will be prompted to re-authenticate.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "useExternal": {
+              "title": "Use External Auth",
+              "description": "Whether to use an external authentication flow.",
+              "markdownDescription": "Whether to use an external authentication flow.\n\n- Category: `Security`\n- Requires restart: `yes`",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "advanced": {
+      "title": "Advanced",
+      "description": "Advanced settings for power users.",
+      "markdownDescription": "Advanced settings for power users.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "autoConfigureMemory": {
+          "title": "Auto Configure Max Old Space Size",
+          "description": "Automatically configure Node.js memory limits",
+          "markdownDescription": "Automatically configure Node.js memory limits\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "dnsResolutionOrder": {
+          "title": "DNS Resolution Order",
+          "description": "The DNS resolution order.",
+          "markdownDescription": "The DNS resolution order.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+          "type": "string"
+        },
+        "excludedEnvVars": {
+          "title": "Excluded Project Environment Variables",
+          "description": "Environment variables to exclude from project context.",
+          "markdownDescription": "Environment variables to exclude from project context.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `[\"DEBUG\",\"DEBUG_MODE\"]`",
+          "default": ["DEBUG", "DEBUG_MODE"],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "bugCommand": {
+          "title": "Bug Command",
+          "description": "Configuration for the bug report command.",
+          "markdownDescription": "Configuration for the bug report command.\n\n- Category: `Advanced`\n- Requires restart: `no`",
+          "$ref": "#/$defs/BugCommandSettings"
+        }
+      },
+      "additionalProperties": false
+    },
+    "experimental": {
+      "title": "Experimental",
+      "description": "Setting to enable experimental features",
+      "markdownDescription": "Setting to enable experimental features\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "extensionManagement": {
+          "title": "Extension Management",
+          "description": "Enable extension management features.",
+          "markdownDescription": "Enable extension management features.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "extensionReloading": {
+          "title": "Extension Reloading",
+          "description": "Enables extension loading/unloading within the CLI session.",
+          "markdownDescription": "Enables extension loading/unloading within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "useModelRouter": {
+          "title": "Use Model Router",
+          "description": "Enable model routing to route requests to the best model based on complexity.",
+          "markdownDescription": "Enable model routing to route requests to the best model based on complexity.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "codebaseInvestigatorSettings": {
+          "title": "Codebase Investigator Settings",
+          "description": "Configuration for Codebase Investigator.",
+          "markdownDescription": "Configuration for Codebase Investigator.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Codebase Investigator",
+              "description": "Enable the Codebase Investigator agent.",
+              "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "maxNumTurns": {
+              "title": "Codebase Investigator Max Num Turns",
+              "description": "Maximum number of turns for the Codebase Investigator agent.",
+              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `10`",
+              "default": 10,
+              "type": "number"
+            },
+            "maxTimeMinutes": {
+              "title": "Max Time (Minutes)",
+              "description": "Maximum time for the Codebase Investigator agent (in minutes).",
+              "markdownDescription": "Maximum time for the Codebase Investigator agent (in minutes).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `3`",
+              "default": 3,
+              "type": "number"
+            },
+            "thinkingBudget": {
+              "title": "Thinking Budget",
+              "description": "The thinking budget for the Codebase Investigator agent.",
+              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `8192`",
+              "default": 8192,
+              "type": "number"
+            },
+            "model": {
+              "title": "Model",
+              "description": "The model to use for the Codebase Investigator agent.",
+              "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemini-2.5-pro`",
+              "default": "gemini-2.5-pro",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "extensions": {
+      "title": "Extensions",
+      "description": "Settings for extensions.",
+      "markdownDescription": "Settings for extensions.\n\n- Category: `Extensions`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "disabled": {
+          "title": "Disabled Extensions",
+          "description": "List of disabled extensions.",
+          "markdownDescription": "List of disabled extensions.\n\n- Category: `Extensions`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "workspacesWithMigrationNudge": {
+          "title": "Workspaces with Migration Nudge",
+          "description": "List of workspaces for which the migration nudge has been shown.",
+          "markdownDescription": "List of workspaces for which the migration nudge has been shown.\n\n- Category: `Extensions`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "hooks": {
+      "title": "Hooks",
+      "description": "Hook configurations for intercepting and customizing agent behavior.",
+      "markdownDescription": "Hook configurations for intercepting and customizing agent behavior.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "MCPServerConfig": {
+      "type": "object",
+      "description": "Definition of a Model Context Protocol (MCP) server configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Executable invoked for stdio transport."
+        },
+        "args": {
+          "type": "array",
+          "description": "Command-line arguments for the stdio transport command.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables to set for the server process.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory for the server process."
+        },
+        "url": {
+          "type": "string",
+          "description": "SSE transport URL."
+        },
+        "httpUrl": {
+          "type": "string",
+          "description": "Streaming HTTP transport URL."
+        },
+        "headers": {
+          "type": "object",
+          "description": "Additional HTTP headers sent to the server.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tcp": {
+          "type": "string",
+          "description": "TCP address for websocket transport."
+        },
+        "timeout": {
+          "type": "number",
+          "description": "Timeout in milliseconds for MCP requests."
+        },
+        "trust": {
+          "type": "boolean",
+          "description": "Marks the server as trusted. Trusted servers may gain additional capabilities."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the server."
+        },
+        "includeTools": {
+          "type": "array",
+          "description": "Subset of tools that should be enabled for this server. When omitted all tools are enabled.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeTools": {
+          "type": "array",
+          "description": "Tools that should be disabled for this server even if exposed.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "extension": {
+          "type": "object",
+          "description": "Metadata describing the Gemini CLI extension that owns this MCP server.",
+          "additionalProperties": {
+            "type": ["string", "boolean", "number"]
+          }
+        },
+        "oauth": {
+          "type": "object",
+          "description": "OAuth configuration for authenticating with the server.",
+          "additionalProperties": true
+        },
+        "authProviderType": {
+          "type": "string",
+          "description": "Authentication provider used for acquiring credentials (for example `dynamic_discovery`).",
+          "enum": [
+            "dynamic_discovery",
+            "google_credentials",
+            "service_account_impersonation"
+          ]
+        },
+        "targetAudience": {
+          "type": "string",
+          "description": "OAuth target audience (CLIENT_ID.apps.googleusercontent.com)."
+        },
+        "targetServiceAccount": {
+          "type": "string",
+          "description": "Service account email to impersonate (name@project.iam.gserviceaccount.com)."
+        }
+      }
+    },
+    "TelemetrySettings": {
+      "type": "object",
+      "description": "Telemetry configuration for Gemini CLI.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enables telemetry emission."
+        },
+        "target": {
+          "type": "string",
+          "description": "Telemetry destination (for example `stderr`, `stdout`, or `otlp`)."
+        },
+        "otlpEndpoint": {
+          "type": "string",
+          "description": "Endpoint for OTLP exporters."
+        },
+        "otlpProtocol": {
+          "type": "string",
+          "description": "Protocol for OTLP exporters.",
+          "enum": ["grpc", "http"]
+        },
+        "logPrompts": {
+          "type": "boolean",
+          "description": "Whether prompts are logged in telemetry payloads."
+        },
+        "outfile": {
+          "type": "string",
+          "description": "File path for writing telemetry output."
+        },
+        "useCollector": {
+          "type": "boolean",
+          "description": "Whether to forward telemetry to an OTLP collector."
+        }
+      }
+    },
+    "BugCommandSettings": {
+      "type": "object",
+      "description": "Configuration for the bug report helper command.",
+      "additionalProperties": false,
+      "properties": {
+        "urlTemplate": {
+          "type": "string",
+          "description": "Template used to open a bug report URL. Variables in the template are populated at runtime."
+        }
+      },
+      "required": ["urlTemplate"]
+    },
+    "SummarizeToolOutputSettings": {
+      "type": "object",
+      "description": "Controls summarization behavior for individual tools. All properties are optional.",
+      "additionalProperties": false,
+      "properties": {
+        "tokenBudget": {
+          "type": "number",
+          "description": "Maximum number of tokens used when summarizing tool output."
+        }
+      }
+    },
+    "CustomTheme": {
+      "type": "object",
+      "description": "Custom theme definition used for styling Gemini CLI output. Colors are provided as hex strings or named ANSI colors.",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["custom"],
+          "default": "custom"
+        },
+        "name": {
+          "type": "string",
+          "description": "Theme display name."
+        },
+        "text": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "primary": {
+              "type": "string"
+            },
+            "secondary": {
+              "type": "string"
+            },
+            "link": {
+              "type": "string"
+            },
+            "accent": {
+              "type": "string"
+            }
+          }
+        },
+        "background": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "primary": {
+              "type": "string"
+            },
+            "diff": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "added": {
+                  "type": "string"
+                },
+                "removed": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "border": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "string"
+            },
+            "focused": {
+              "type": "string"
+            }
+          }
+        },
+        "ui": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "comment": {
+              "type": "string"
+            },
+            "symbol": {
+              "type": "string"
+            },
+            "gradient": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "status": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "error": {
+              "type": "string"
+            },
+            "success": {
+              "type": "string"
+            },
+            "warning": {
+              "type": "string"
+            }
+          }
+        },
+        "Background": {
+          "type": "string"
+        },
+        "Foreground": {
+          "type": "string"
+        },
+        "LightBlue": {
+          "type": "string"
+        },
+        "AccentBlue": {
+          "type": "string"
+        },
+        "AccentPurple": {
+          "type": "string"
+        },
+        "AccentCyan": {
+          "type": "string"
+        },
+        "AccentGreen": {
+          "type": "string"
+        },
+        "AccentYellow": {
+          "type": "string"
+        },
+        "AccentRed": {
+          "type": "string"
+        },
+        "DiffAdded": {
+          "type": "string"
+        },
+        "DiffRemoved": {
+          "type": "string"
+        },
+        "Comment": {
+          "type": "string"
+        },
+        "Gray": {
+          "type": "string"
+        },
+        "DarkGray": {
+          "type": "string"
+        },
+        "GradientColors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["type", "name"]
+    },
+    "StringOrStringArray": {
+      "description": "Accepts either a single string or an array of strings.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "BooleanOrString": {
+      "description": "Accepts either a boolean flag or a string command name.",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

@@ -17,6 +17,14 @@ import type { BaseLlmClient } from '../core/baseLlmClient.js';
 const mockGenerateJson = vi.fn();
 const mockBaseLlmClient = {
   generateJson: mockGenerateJson,
+  config: {
+    generationConfigService: {
+      getResolvedConfig: vi.fn().mockReturnValue({
+        model: 'edit-corrector',
+        generateContentConfig: {},
+      }),
+    },
+  },
 } as unknown as BaseLlmClient;
 
 describe('FixLLMEditWithInstruction', () => {
@@ -29,6 +37,7 @@ describe('FixLLMEditWithInstruction', () => {
   const abortSignal = abortController.signal;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     resetLlmEditFixerCaches_TEST_ONLY(); // Ensure cache is cleared before each test
   });
@@ -319,4 +328,46 @@ describe('FixLLMEditWithInstruction', () => {
       });
     });
   });
+
+  it(
+    'should return null if the LLM call times out',
+    { timeout: 60000 },
+    async () => {
+      mockGenerateJson.mockImplementation(
+        async ({ abortSignal }) =>
+          // Simulate a long-running operation that never resolves on its own.
+          // It will only reject when the abort signal is triggered by the timeout.
+          new Promise((_resolve, reject) => {
+            if (abortSignal?.aborted) {
+              return reject(new DOMException('Aborted', 'AbortError'));
+            }
+            abortSignal?.addEventListener('abort', () => {
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          }),
+      );
+
+      const testPromptId = 'test-prompt-id-timeout';
+
+      const fixPromise = promptIdContext.run(testPromptId, () =>
+        FixLLMEditWithInstruction(
+          instruction,
+          old_string,
+          new_string,
+          error,
+          current_content,
+          mockBaseLlmClient,
+          abortSignal,
+        ),
+      );
+
+      // Let the timers advance just past the 40000ms default timeout.
+      await vi.advanceTimersByTimeAsync(40001);
+
+      const result = await fixPromise;
+
+      expect(result).toBeNull();
+      expect(mockGenerateJson).toHaveBeenCalledOnce();
+    },
+  );
 });

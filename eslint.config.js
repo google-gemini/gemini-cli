@@ -162,6 +162,31 @@ export default tseslint.config(
     },
   },
   {
+    // Prevent self-imports in packages
+    files: ['packages/core/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          name: '@google/gemini-cli-core',
+          message: 'Please use relative imports within the @google/gemini-cli-core package.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/cli/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          name: '@google/gemini-cli',
+          message: 'Please use relative imports within the @google/gemini-cli package.',
+        },
+      ],
+    },
+  },
+  {
     files: ['packages/*/src/**/*.test.{ts,tsx}'],
     plugins: {
       vitest,

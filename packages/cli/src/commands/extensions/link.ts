@@ -31,12 +31,13 @@ export async function handleLink(args: InstallArgs) {
       workspaceDir,
       requestConsent: requestConsentNonInteractive,
       requestSetting: promptForSetting,
-      loadedSettings: loadSettings(workspaceDir),
+      settings: loadSettings(workspaceDir).merged,
     });
-    const extensionName =
+    await extensionManager.loadExtensions();
+    const extension =
       await extensionManager.installOrUpdateExtension(installMetadata);
     debugLogger.log(
-      `Extension "${extensionName}" linked successfully and enabled.`,
+      `Extension "${extension.name}" linked successfully and enabled.`,
     );
   } catch (error) {
     debugLogger.error(getErrorMessage(error));

@@ -233,7 +233,7 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
 
 /**
  * Calculates the relative path from a root directory to a target path.
- * Ensures both paths are resolved before calculating.
+ * If targetPath is relative, it is returned as-is.
  * Returns '.' if the target path is the same as the root directory.
  *
  * @param targetPath The absolute or relative path to make relative.
@@ -244,10 +244,11 @@ export function makeRelative(
   targetPath: string,
   rootDirectory: string,
 ): string {
-  const resolvedTargetPath = path.resolve(targetPath);
+  if (!path.isAbsolute(targetPath)) {
+    return targetPath;
+  }
   const resolvedRootDirectory = path.resolve(rootDirectory);
-
-  const relativePath = path.relative(resolvedRootDirectory, resolvedTargetPath);
+  const relativePath = path.relative(resolvedRootDirectory, targetPath);
 
   // If the paths are the same, path.relative returns '', return '.' instead
   return relativePath || '.';
