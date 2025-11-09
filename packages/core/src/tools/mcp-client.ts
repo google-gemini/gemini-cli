@@ -751,6 +751,157 @@ export function hasNetworkTransport(config: MCPServerConfig): boolean {
 }
 
 /**
+ * Helper function to retrieve a stored OAuth token for an MCP server.
+ * Handles token validation and refresh automatically.
+ *
+ * @param serverName The name of the MCP server
+ * @returns The valid access token, or null if no token is stored
+ */
+async function getStoredOAuthToken(serverName: string): Promise<string | null> {
+  const tokenStorage = new MCPOAuthTokenStorage();
+  const credentials = await tokenStorage.getCredentials(serverName);
+  if (!credentials) return null;
+
+  const authProvider = new MCPOAuthProvider(tokenStorage);
+  return await authProvider.getValidToken(serverName, {
+    clientId: credentials.clientId,
+  });
+}
+
+/**
+ * Helper function to create an SSE transport with optional OAuth authentication.
+ *
+ * @param config The MCP server configuration
+ * @param accessToken Optional OAuth access token for authentication
+ * @returns A configured SSE transport ready for connection
+ */
+function createSSETransportWithAuth(
+  config: MCPServerConfig,
+  accessToken?: string | null,
+): SSEClientTransport {
+  const headers = {
+    ...config.headers,
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  };
+
+  const options: SSEClientTransportOptions = {};
+  if (Object.keys(headers).length > 0) {
+    options.requestInit = { headers };
+  }
+
+  return new SSEClientTransport(new URL(config.url!), options);
+}
+
+/**
+ * Helper function to connect a client using SSE transport with optional OAuth.
+ *
+ * @param client The MCP client to connect
+ * @param config The MCP server configuration
+ * @param accessToken Optional OAuth access token for authentication
+ */
+async function connectWithSSETransport(
+  client: Client,
+  config: MCPServerConfig,
+  accessToken?: string | null,
+): Promise<void> {
+  const transport = createSSETransportWithAuth(config, accessToken);
+  await client.connect(transport, {
+    timeout: config.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+  });
+}
+
+/**
+ * Helper function to show authentication required message and throw error.
+ * Checks if there's a stored token that was rejected (requires re-auth).
+ *
+ * @param serverName The name of the MCP server
+ * @throws Always throws an error with authentication instructions
+ */
+async function showAuthRequiredMessage(serverName: string): Promise<never> {
+  const hasRejectedToken = !!(await getStoredOAuthToken(serverName));
+
+  const message = hasRejectedToken
+    ? `MCP server '${serverName}' rejected stored OAuth token. Please re-authenticate using: /mcp auth ${serverName}`
+    : `MCP server '${serverName}' requires authentication using: /mcp auth ${serverName}`;
+
+  coreEvents.emitFeedback('info', message);
+  throw new Error(
+    `401 error received without OAuth configuration.\nPlease authenticate using: /mcp auth ${serverName}`,
+  );
+}
+
+/**
+ * Helper function to retry connection with OAuth token after authentication.
+ * Handles both HTTP and SSE transports based on what previously failed.
+ *
+ * @param client The MCP client to connect
+ * @param serverName The name of the MCP server
+ * @param config The MCP server configuration
+ * @param accessToken The OAuth access token to use
+ * @param httpReturned404 Whether the HTTP transport returned 404 (indicating SSE-only server)
+ */
+async function retryWithOAuth(
+  client: Client,
+  serverName: string,
+  config: MCPServerConfig,
+  accessToken: string,
+  httpReturned404: boolean,
+): Promise<void> {
+  if (httpReturned404) {
+    // HTTP returned 404, only try SSE
+    debugLogger.log(
+      `Retrying SSE connection to '${serverName}' with OAuth token...`,
+    );
+    await connectWithSSETransport(client, config, accessToken);
+    debugLogger.log(
+      `Successfully connected to '${serverName}' using SSE with OAuth.`,
+    );
+    return;
+  }
+
+  // HTTP returned 401, try HTTP with OAuth first
+  debugLogger.log(`Retrying connection to '${serverName}' with OAuth token...`);
+
+  const httpTransport = await createTransportWithOAuth(
+    serverName,
+    config,
+    accessToken,
+  );
+  if (!httpTransport) {
+    throw new Error(
+      `Failed to create OAuth transport for server '${serverName}'`,
+    );
+  }
+
+  try {
+    await client.connect(httpTransport, {
+      timeout: config.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+    });
+    debugLogger.log(
+      `Successfully connected to '${serverName}' using HTTP with OAuth.`,
+    );
+  } catch (httpError) {
+    await httpTransport.close();
+
+    // If HTTP+OAuth returns 404 and auto-detection enabled, try SSE+OAuth
+    if (
+      String(httpError).includes('404') &&
+      config.url &&
+      !config.type &&
+      !config.httpUrl
+    ) {
+      debugLogger.log(`HTTP with OAuth returned 404, trying SSE with OAuth...`);
+      await connectWithSSETransport(client, config, accessToken);
+      debugLogger.log(
+        `Successfully connected to '${serverName}' using SSE with OAuth.`,
+      );
+    } else {
+      throw httpError;
+    }
+  }
+}
+
+/**
  * Creates and connects an MCP client to a server based on the provided configuration.
  * It determines the appropriate transport (Stdio, SSE, or Streamable HTTP) and
  * establishes a connection. It also applies a patch to handle request timeouts.
@@ -820,6 +971,10 @@ export async function connectToMcpServer(
   let httpReturned404 = false; // Track if HTTP returned 404 to skip it in OAuth retry
   let sseError: Error | null = null; // Track SSE fallback error
 
+  // Pre-fetch stored OAuth token so it's available for fallback attempts
+  // This ensures SSE fallback can use the token if HTTP fails
+  const storedToken = await getStoredOAuthToken(mcpServerName);
+
   try {
     const transport = await createTransport(
       mcpServerName,
@@ -852,35 +1007,17 @@ export async function connectToMcpServer(
       !mcpServerConfig.httpUrl
     ) {
       // Check if HTTP returned 404 - if so, we know it's not an HTTP server
-      if (errorString.includes('404')) {
-        httpReturned404 = true;
-        debugLogger.log(
-          `MCP server '${mcpServerName}': HTTP returned 404, trying SSE transport...`,
-        );
-      } else {
-        debugLogger.log(
-          `MCP server '${mcpServerName}': HTTP connection failed, attempting SSE fallback...`,
-        );
-      }
+      httpReturned404 = errorString.includes('404');
+
+      const logMessage = httpReturned404
+        ? `HTTP returned 404, trying SSE transport...`
+        : `HTTP connection failed, attempting SSE fallback...`;
+      debugLogger.log(`MCP server '${mcpServerName}': ${logMessage}`);
 
       try {
-        // Try SSE without OAuth token first
-        // If SSE also needs OAuth, we'll handle it in the 401 check below
-        const transportOptions: SSEClientTransportOptions = {};
-        if (mcpServerConfig.headers) {
-          transportOptions.requestInit = {
-            headers: mcpServerConfig.headers,
-          };
-        }
-
-        const sseTransport = new SSEClientTransport(
-          new URL(mcpServerConfig.url),
-          transportOptions,
-        );
-
-        await mcpClient.connect(sseTransport, {
-          timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-        });
+        // Try SSE with stored OAuth token if available
+        // This ensures that SSE fallback works for authenticated servers
+        await connectWithSSETransport(mcpClient, mcpServerConfig, storedToken);
 
         debugLogger.log(
           `MCP server '${mcpServerName}': Successfully connected using SSE transport.`,
@@ -921,36 +1058,7 @@ export async function connectToMcpServer(
       const shouldTriggerOAuth = mcpServerConfig.oauth?.enabled;
 
       if (!shouldTriggerOAuth) {
-        // Check if there's a stored token that was rejected, or if no token exists
-        const tokenStorage = new MCPOAuthTokenStorage();
-        const credentials = await tokenStorage.getCredentials(mcpServerName);
-        let hasStoredTokens = false;
-
-        if (credentials) {
-          const authProvider = new MCPOAuthProvider(tokenStorage);
-          hasStoredTokens = !!(await authProvider.getValidToken(mcpServerName, {
-            // Pass client ID if available
-            clientId: credentials.clientId,
-          }));
-        }
-
-        if (hasStoredTokens) {
-          coreEvents.emitFeedback(
-            'info',
-            `MCP server '${mcpServerName}' rejected stored OAuth token. ` +
-              `Please re-authenticate using: /mcp auth ${mcpServerName}`,
-          );
-        } else {
-          coreEvents.emitFeedback(
-            'info',
-            `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
-          );
-        }
-
-        throw new Error(
-          `401 error received without OAuth configuration.\n` +
-            `Please authenticate using: /mcp auth ${mcpServerName}`,
-        );
+        await showAuthRequiredMessage(mcpServerName);
       }
 
       // Try to extract www-authenticate header from the error
@@ -1018,146 +1126,21 @@ export async function connectToMcpServer(
         );
         if (oauthSuccess) {
           // Retry connection with OAuth token
-          // Get the valid token - we need to create a proper OAuth config
-          // The token should already be available from the authentication process
-          const tokenStorage = new MCPOAuthTokenStorage();
-          const credentials = await tokenStorage.getCredentials(mcpServerName);
-          if (credentials) {
-            const authProvider = new MCPOAuthProvider(tokenStorage);
-            const accessToken = await authProvider.getValidToken(
-              mcpServerName,
-              {
-                // Pass client ID if available
-                clientId: credentials.clientId,
-              },
-            );
-
-            if (accessToken) {
-              // Determine retry strategy based on what failed
-              if (httpReturned404) {
-                // HTTP returned 404, only retry SSE with token
-                debugLogger.log(
-                  `Retrying SSE connection to '${mcpServerName}' with OAuth token...`,
-                );
-
-                try {
-                  const transportOptions: SSEClientTransportOptions = {
-                    requestInit: {
-                      headers: {
-                        ...mcpServerConfig.headers,
-                        Authorization: `Bearer ${accessToken}`,
-                      },
-                    },
-                  };
-
-                  const sseTransport = new SSEClientTransport(
-                    new URL(mcpServerConfig.url!),
-                    transportOptions,
-                  );
-
-                  await mcpClient.connect(sseTransport, {
-                    timeout:
-                      mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-                  });
-
-                  debugLogger.log(
-                    `Successfully connected to '${mcpServerName}' using SSE with OAuth.`,
-                  );
-                  return mcpClient;
-                } catch (sseOAuthError) {
-                  throw new Error(
-                    `Failed to connect via SSE with OAuth: ${getErrorMessage(sseOAuthError)}`,
-                  );
-                }
-              } else {
-                // HTTP returned 401 (not 404), try HTTP first, then SSE if HTTP fails
-                debugLogger.log(
-                  `Retrying connection to '${mcpServerName}' with OAuth token...`,
-                );
-
-                try {
-                  // Try HTTP with OAuth token first
-                  const oauthTransport = await createTransportWithOAuth(
-                    mcpServerName,
-                    mcpServerConfig,
-                    accessToken,
-                  );
-
-                  if (oauthTransport) {
-                    try {
-                      await mcpClient.connect(oauthTransport, {
-                        timeout:
-                          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-                      });
-                      // Connection successful with OAuth on HTTP
-                      debugLogger.log(
-                        `Successfully connected to '${mcpServerName}' using HTTP with OAuth.`,
-                      );
-                      return mcpClient;
-                    } catch (httpOAuthError) {
-                      await oauthTransport.close();
-                      const httpOAuthErrorString = String(httpOAuthError);
-
-                      // If HTTP with OAuth returned 404, try SSE with OAuth
-                      if (
-                        httpOAuthErrorString.includes('404') &&
-                        mcpServerConfig.url &&
-                        !mcpServerConfig.type &&
-                        !mcpServerConfig.httpUrl
-                      ) {
-                        debugLogger.log(
-                          `HTTP with OAuth returned 404, trying SSE with OAuth...`,
-                        );
-
-                        const transportOptions: SSEClientTransportOptions = {
-                          requestInit: {
-                            headers: {
-                              ...mcpServerConfig.headers,
-                              Authorization: `Bearer ${accessToken}`,
-                            },
-                          },
-                        };
-
-                        const sseTransport = new SSEClientTransport(
-                          new URL(mcpServerConfig.url),
-                          transportOptions,
-                        );
-
-                        await mcpClient.connect(sseTransport, {
-                          timeout:
-                            mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-                        });
-
-                        debugLogger.log(
-                          `Successfully connected to '${mcpServerName}' using SSE with OAuth.`,
-                        );
-                        return mcpClient;
-                      } else {
-                        // HTTP failed with non-404 error, don't try SSE
-                        throw httpOAuthError;
-                      }
-                    }
-                  } else {
-                    throw new Error(
-                      `Failed to create OAuth transport for server '${mcpServerName}'`,
-                    );
-                  }
-                } catch (retryError) {
-                  throw new Error(
-                    `Failed to connect with OAuth: ${getErrorMessage(retryError)}`,
-                  );
-                }
-              }
-            } else {
-              throw new Error(
-                `Failed to get OAuth token for server '${mcpServerName}'`,
-              );
-            }
-          } else {
+          const accessToken = await getStoredOAuthToken(mcpServerName);
+          if (!accessToken) {
             throw new Error(
-              `Failed to get credentials for server '${mcpServerName}' after successful OAuth authentication`,
+              `Failed to get OAuth token for server '${mcpServerName}'`,
             );
           }
+
+          await retryWithOAuth(
+            mcpClient,
+            mcpServerName,
+            mcpServerConfig,
+            accessToken,
+            httpReturned404,
+          );
+          return mcpClient;
         } else {
           throw new Error(
             `Failed to handle automatic OAuth for server '${mcpServerName}'`,
@@ -1169,39 +1152,7 @@ export async function connectToMcpServer(
         const shouldTryDiscovery = mcpServerConfig.oauth?.enabled;
 
         if (!shouldTryDiscovery) {
-          // Check if there's a stored token that was rejected, or if no token exists
-          const tokenStorage = new MCPOAuthTokenStorage();
-          const credentials = await tokenStorage.getCredentials(mcpServerName);
-          let hasStoredTokens = false;
-
-          if (credentials) {
-            const authProvider = new MCPOAuthProvider(tokenStorage);
-            hasStoredTokens = !!(await authProvider.getValidToken(
-              mcpServerName,
-              {
-                // Pass client ID if available
-                clientId: credentials.clientId,
-              },
-            ));
-          }
-
-          if (hasStoredTokens) {
-            coreEvents.emitFeedback(
-              'info',
-              `MCP server '${mcpServerName}' rejected stored OAuth token. ` +
-                `Please re-authenticate using: /mcp auth ${mcpServerName}`,
-            );
-          } else {
-            coreEvents.emitFeedback(
-              'info',
-              `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
-            );
-          }
-
-          throw new Error(
-            `401 error received without OAuth configuration.\n` +
-              `Please authenticate using: /mcp auth ${mcpServerName}`,
-          );
+          await showAuthRequiredMessage(mcpServerName);
         }
 
         // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
@@ -1247,47 +1198,30 @@ export async function connectToMcpServer(
             );
 
             // Retry connection with OAuth token
-            const tokenStorage = new MCPOAuthTokenStorage();
-            const credentials =
-              await tokenStorage.getCredentials(mcpServerName);
-            if (credentials) {
-              const authProvider = new MCPOAuthProvider(tokenStorage);
-              const accessToken = await authProvider.getValidToken(
-                mcpServerName,
-                {
-                  // Pass client ID if available
-                  clientId: credentials.clientId,
-                },
-              );
-              if (accessToken) {
-                // Create transport with OAuth token
-                const oauthTransport = await createTransportWithOAuth(
-                  mcpServerName,
-                  mcpServerConfig,
-                  accessToken,
-                );
-                if (oauthTransport) {
-                  await mcpClient.connect(oauthTransport, {
-                    timeout:
-                      mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-                  });
-                  // Connection successful with OAuth
-                  return mcpClient;
-                } else {
-                  throw new Error(
-                    `Failed to create OAuth transport for server '${mcpServerName}'`,
-                  );
-                }
-              } else {
-                throw new Error(
-                  `Failed to get OAuth token for server '${mcpServerName}'`,
-                );
-              }
-            } else {
+            const accessToken = await getStoredOAuthToken(mcpServerName);
+            if (!accessToken) {
               throw new Error(
-                `Failed to get stored credentials for server '${mcpServerName}'`,
+                `Failed to get OAuth token for server '${mcpServerName}'`,
               );
             }
+
+            // Create transport with OAuth token
+            const oauthTransport = await createTransportWithOAuth(
+              mcpServerName,
+              mcpServerConfig,
+              accessToken,
+            );
+            if (!oauthTransport) {
+              throw new Error(
+                `Failed to create OAuth transport for server '${mcpServerName}'`,
+              );
+            }
+
+            await mcpClient.connect(oauthTransport, {
+              timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+            });
+            // Connection successful with OAuth
+            return mcpClient;
           } else {
             throw new Error(
               `OAuth configuration failed for '${mcpServerName}'. Please authenticate manually with /mcp auth ${mcpServerName}`,
@@ -1454,20 +1388,9 @@ export async function createTransport(
     }
   } else {
     // Check if we have stored OAuth tokens for this server (from previous authentication)
-    const tokenStorage = new MCPOAuthTokenStorage();
-    const credentials = await tokenStorage.getCredentials(mcpServerName);
-    if (credentials) {
-      const authProvider = new MCPOAuthProvider(tokenStorage);
-      accessToken = await authProvider.getValidToken(mcpServerName, {
-        // Pass client ID if available
-        clientId: credentials.clientId,
-      });
-
-      if (accessToken) {
-        debugLogger.log(
-          `Found stored OAuth token for server '${mcpServerName}'`,
-        );
-      }
+    accessToken = await getStoredOAuthToken(mcpServerName);
+    if (accessToken) {
+      debugLogger.log(`Found stored OAuth token for server '${mcpServerName}'`);
     }
   }
 
