@@ -78,7 +78,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -91,7 +91,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame, stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -113,7 +113,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog
             {...baseProps}
             onCancel={mockOnCancel}
