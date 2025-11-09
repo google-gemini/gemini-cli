@@ -135,7 +135,7 @@ describe('ClearcutLogger', () => {
   function setup({
     config = {} as Partial<ConfigParameters>,
     lifetimeGoogleAccounts = 1,
-    cachedGoogleAccount = 'test@google.com',
+    cachedGoogleAccount = { email: 'test@google.com', name: 'Test User' },
   } = {}) {
     server.resetHandlers(
       http.post(CLEARCUT_URL, () => HttpResponse.text(EXAMPLE_RESPONSE)),

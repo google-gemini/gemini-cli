@@ -11,6 +11,7 @@ import { debugLogger } from './debugLogger.js';
 
 interface UserAccounts {
   active: string | null;
+  activeName: string | null;
   old: string[];
 }
 
@@ -25,7 +26,7 @@ export class UserAccountManager {
    * @returns A valid UserAccounts object.
    */
   private parseAndValidateAccounts(content: string): UserAccounts {
-    const defaultState = { active: null, old: [] };
+    const defaultState = { active: null, activeName: null, old: [] };
     if (!content.trim()) {
       return defaultState;
     }
@@ -37,9 +38,12 @@ export class UserAccountManager {
       debugLogger.log('Invalid accounts file schema, starting fresh.');
       return defaultState;
     }
-    const { active, old } = parsed as Partial<UserAccounts>;
+    const { active, activeName, old } = parsed as Partial<UserAccounts>;
     const isValid =
       (active === undefined || active === null || typeof active === 'string') &&
+      (activeName === undefined ||
+        activeName === null ||
+        typeof activeName === 'string') &&
       (old === undefined ||
         (Array.isArray(old) && old.every((i) => typeof i === 'string')));
 
@@ -50,12 +54,13 @@ export class UserAccountManager {
 
     return {
       active: parsed.active ?? null,
+      activeName: parsed.activeName ?? null,
       old: parsed.old ?? [],
     };
   }
 
   private readAccountsSync(filePath: string): UserAccounts {
-    const defaultState = { active: null, old: [] };
+    const defaultState = { active: null, activeName: null, old: [] };
     try {
       const content = readFileSync(filePath, 'utf-8');
       return this.parseAndValidateAccounts(content);
@@ -76,7 +81,7 @@ export class UserAccountManager {
   }
 
   private async readAccounts(filePath: string): Promise<UserAccounts> {
-    const defaultState = { active: null, old: [] };
+    const defaultState = { active: null, activeName: null, old: [] };
     try {
       const content = await fsp.readFile(filePath, 'utf-8');
       return this.parseAndValidateAccounts(content);
@@ -93,7 +98,7 @@ export class UserAccountManager {
     }
   }
 
-  async cacheGoogleAccount(email: string): Promise<void> {
+  async cacheGoogleAccount(email: string, name: string): Promise<void> {
     const filePath = this.getGoogleAccountsCachePath();
     await fsp.mkdir(path.dirname(filePath), { recursive: true });
 
@@ -109,13 +114,20 @@ export class UserAccountManager {
     accounts.old = accounts.old.filter((oldEmail) => oldEmail !== email);
 
     accounts.active = email;
+    accounts.activeName = name;
     await fsp.writeFile(filePath, JSON.stringify(accounts, null, 2), 'utf-8');
   }
 
-  getCachedGoogleAccount(): string | null {
+  getCachedGoogleAccount(): { email: string; name: string } | null {
     const filePath = this.getGoogleAccountsCachePath();
     const accounts = this.readAccountsSync(filePath);
-    return accounts.active;
+    if (!accounts.active || !accounts.activeName) {
+      return null;
+    }
+    return {
+      email: accounts.active,
+      name: accounts.activeName,
+    };
   }
 
   getLifetimeGoogleAccounts(): number {
@@ -137,6 +149,7 @@ export class UserAccountManager {
         accounts.old.push(accounts.active);
       }
       accounts.active = null;
+      accounts.activeName = null;
     }
 
     await fsp.writeFile(filePath, JSON.stringify(accounts, null, 2), 'utf-8');

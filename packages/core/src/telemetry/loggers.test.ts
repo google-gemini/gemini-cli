@@ -124,7 +124,10 @@ describe('loggers', () => {
     vi.spyOn(
       UserAccountManager.prototype,
       'getCachedGoogleAccount',
-    ).mockReturnValue('test-user@example.com');
+    ).mockReturnValue({
+      email: 'test-user@example.com',
+      name: 'Test User',
+    });
     vi.spyOn(
       InstallationManager.prototype,
       'getInstallationId',

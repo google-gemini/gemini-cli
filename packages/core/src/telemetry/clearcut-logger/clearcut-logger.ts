@@ -286,7 +286,7 @@ export class ClearcutLogger {
   }
 
   createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
-    const email = this.userAccountManager.getCachedGoogleAccount();
+    const cachedAccount = this.userAccountManager.getCachedGoogleAccount();
 
     if (eventName !== EventNames.START_SESSION) {
       data.push(...this.sessionData);
@@ -298,8 +298,8 @@ export class ClearcutLogger {
     const logEvent = this.createBasicLogEvent(eventName, data);
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
-    if (email) {
-      logEvent.client_email = email;
+    if (cachedAccount) {
+      logEvent.client_email = cachedAccount.email;
     } else {
       logEvent.client_install_id = this.installationManager.getInstallationId();
     }

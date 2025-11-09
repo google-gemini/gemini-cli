@@ -25,6 +25,7 @@ export async function createCodeAssistContentGenerator(
   ) {
     const authClient = await getOauthClient(authType, config);
     const userData = await setupUser(authClient);
+    config.setUserTierInfo(userData.tierName, userData.tierDescription);
     return new CodeAssistServer(
       authClient,
       userData.projectId,

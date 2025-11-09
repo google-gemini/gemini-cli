@@ -42,12 +42,19 @@ describe('UserAccountManager', () => {
 
   describe('cacheGoogleAccount', () => {
     it('should create directory and write initial account file', async () => {
-      await userAccountManager.cacheGoogleAccount('test1@google.com');
+      await userAccountManager.cacheGoogleAccount(
+        'test1@google.com',
+        'Test User 1',
+      );
 
       // Verify Google Account ID was cached
       expect(fs.existsSync(accountsFile())).toBe(true);
       expect(fs.readFileSync(accountsFile(), 'utf-8')).toBe(
-        JSON.stringify({ active: 'test1@google.com', old: [] }, null, 2),
+        JSON.stringify(
+          { active: 'test1@google.com', activeName: 'Test User 1', old: [] },
+          null,
+          2,
+        ),
       );
     });
 
@@ -56,18 +63,26 @@ describe('UserAccountManager', () => {
       fs.writeFileSync(
         accountsFile(),
         JSON.stringify(
-          { active: 'test2@google.com', old: ['test1@google.com'] },
+          {
+            active: 'test2@google.com',
+            activeName: 'Test User 2',
+            old: ['test1@google.com'],
+          },
           null,
           2,
         ),
       );
 
-      await userAccountManager.cacheGoogleAccount('test3@google.com');
+      await userAccountManager.cacheGoogleAccount(
+        'test3@google.com',
+        'Test User 3',
+      );
 
       expect(fs.readFileSync(accountsFile(), 'utf-8')).toBe(
         JSON.stringify(
           {
             active: 'test3@google.com',
+            activeName: 'Test User 3',
             old: ['test1@google.com', 'test2@google.com'],
           },
           null,
@@ -81,17 +96,31 @@ describe('UserAccountManager', () => {
       fs.writeFileSync(
         accountsFile(),
         JSON.stringify(
-          { active: 'test1@google.com', old: ['test2@google.com'] },
+          {
+            active: 'test1@google.com',
+            activeName: 'Test User 1',
+            old: ['test2@google.com'],
+          },
           null,
           2,
         ),
       );
-      await userAccountManager.cacheGoogleAccount('test2@google.com');
-      await userAccountManager.cacheGoogleAccount('test1@google.com');
+      await userAccountManager.cacheGoogleAccount(
+        'test2@google.com',
+        'Test User 2',
+      );
+      await userAccountManager.cacheGoogleAccount(
+        'test1@google.com',
+        'Test User 1',
+      );
 
       expect(fs.readFileSync(accountsFile(), 'utf-8')).toBe(
         JSON.stringify(
-          { active: 'test1@google.com', old: ['test2@google.com'] },
+          {
+            active: 'test1@google.com',
+            activeName: 'Test User 1',
+            old: ['test2@google.com'],
+          },
           null,
           2,
         ),
@@ -105,11 +134,15 @@ describe('UserAccountManager', () => {
         .spyOn(console, 'log')
         .mockImplementation(() => {});
 
-      await userAccountManager.cacheGoogleAccount('test1@google.com');
+      await userAccountManager.cacheGoogleAccount(
+        'test1@google.com',
+        'Test User 1',
+      );
 
       expect(consoleLogSpy).toHaveBeenCalled();
       expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
         active: 'test1@google.com',
+        activeName: 'Test User 1',
         old: [],
       });
     });
@@ -124,11 +157,15 @@ describe('UserAccountManager', () => {
         .spyOn(console, 'log')
         .mockImplementation(() => {});
 
-      await userAccountManager.cacheGoogleAccount('test2@google.com');
+      await userAccountManager.cacheGoogleAccount(
+        'test2@google.com',
+        'Test User 2',
+      );
 
       expect(consoleLogSpy).toHaveBeenCalled();
       expect(JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'))).toEqual({
         active: 'test2@google.com',
+        activeName: 'Test User 2',
         old: [],
       });
     });
@@ -139,10 +176,21 @@ describe('UserAccountManager', () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(
         accountsFile(),
-        JSON.stringify({ active: 'active@google.com', old: [] }, null, 2),
+        JSON.stringify(
+          {
+            active: 'active@google.com',
+            activeName: 'Active User',
+            old: [],
+          },
+          null,
+          2,
+        ),
       );
       const account = userAccountManager.getCachedGoogleAccount();
-      expect(account).toBe('active@google.com');
+      expect(account).toEqual({
+        email: 'active@google.com',
+        name: 'Active User',
+      });
     });
 
     it('should return null if file does not exist', () => {
@@ -184,7 +232,11 @@ describe('UserAccountManager', () => {
       fs.writeFileSync(
         accountsFile(),
         JSON.stringify(
-          { active: 'active@google.com', old: ['old1@google.com'] },
+          {
+            active: 'active@google.com',
+            activeName: 'Active User',
+            old: ['old1@google.com'],
+          },
           null,
           2,
         ),
@@ -194,6 +246,7 @@ describe('UserAccountManager', () => {
 
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
+      expect(stored.activeName).toBeNull();
       expect(stored.old).toEqual(['old1@google.com', 'active@google.com']);
     });
 
@@ -203,6 +256,7 @@ describe('UserAccountManager', () => {
       await userAccountManager.clearCachedGoogleAccount();
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
+      expect(stored.activeName).toBeNull();
       expect(stored.old).toEqual([]);
     });
 
@@ -218,6 +272,7 @@ describe('UserAccountManager', () => {
       expect(consoleLogSpy).toHaveBeenCalled();
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
+      expect(stored.activeName).toBeNull();
       expect(stored.old).toEqual([]);
     });
 
@@ -225,13 +280,18 @@ describe('UserAccountManager', () => {
       fs.mkdirSync(path.dirname(accountsFile()), { recursive: true });
       fs.writeFileSync(
         accountsFile(),
-        JSON.stringify({ active: null, old: ['old1@google.com'] }, null, 2),
+        JSON.stringify(
+          { active: null, activeName: null, old: ['old1@google.com'] },
+          null,
+          2,
+        ),
       );
 
       await userAccountManager.clearCachedGoogleAccount();
 
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
+      expect(stored.activeName).toBeNull();
       expect(stored.old).toEqual(['old1@google.com']);
     });
 
@@ -242,6 +302,7 @@ describe('UserAccountManager', () => {
         JSON.stringify(
           {
             active: 'active@google.com',
+            activeName: 'Active User',
             old: ['active@google.com'],
           },
           null,
@@ -253,6 +314,7 @@ describe('UserAccountManager', () => {
 
       const stored = JSON.parse(fs.readFileSync(accountsFile(), 'utf-8'));
       expect(stored.active).toBeNull();
+      expect(stored.activeName).toBeNull();
       expect(stored.old).toEqual(['active@google.com']);
     });
   });

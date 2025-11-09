@@ -412,6 +412,8 @@ export class Config {
     | undefined;
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
+  private userTierName?: string;
+  private userTierDescription?: string;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1395,6 +1397,19 @@ export class Config {
    */
   setExperiments(experiments: Experiments): void {
     this.experiments = experiments;
+  }
+
+  setUserTierInfo(name?: string, description?: string): void {
+    this.userTierName = name;
+    this.userTierDescription = description;
+  }
+
+  getUserTierName(): string | undefined {
+    return this.userTierName;
+  }
+
+  getUserTierDescription(): string | undefined {
+    return this.userTierDescription;
   }
 }
 // Export model constants for use in CLI

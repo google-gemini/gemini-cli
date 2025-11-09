@@ -13,10 +13,10 @@ const userAccountManager = new UserAccountManager();
 const installationManager = new InstallationManager();
 
 export function getCommonAttributes(config: Config): Attributes {
-  const email = userAccountManager.getCachedGoogleAccount();
+  const cachedAccount = userAccountManager.getCachedGoogleAccount();
   return {
     'session.id': config.getSessionId(),
     'installation.id': installationManager.getInstallationId(),
-    ...(email && { 'user.email': email }),
+    ...(cachedAccount && { 'user.email': cachedAccount.email }),
   };
 }
