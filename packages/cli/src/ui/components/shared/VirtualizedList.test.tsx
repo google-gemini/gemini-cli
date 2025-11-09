@@ -280,4 +280,48 @@ describe('<VirtualizedList />', () => {
     expect(lastFrame()).toContain('Item 1');
     expect(lastFrame()).toContain('Item 9');
   });
+
+  it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {
+    const ref = createRef<VirtualizedListRef<string>>();
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    const itemHeight = 1;
+    const renderItem1px = ({ item }: { item: string }) => (
+      <Box height={itemHeight}>
+        <Text>{item}</Text>
+      </Box>
+    );
+    const keyExtractor = (item: string) => item;
+
+    render(
+      <Box height={10} width={100} borderStyle="round">
+        <VirtualizedList
+          ref={ref}
+          data={longData}
+          renderItem={renderItem1px}
+          keyExtractor={keyExtractor}
+          estimatedItemHeight={() => itemHeight}
+        />
+      </Box>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    expect(ref.current?.getScrollState().scrollTop).toBe(0);
+
+    await act(async () => {
+      ref.current?.scrollBy(1);
+      ref.current?.scrollBy(1);
+      await delay(0);
+    });
+
+    expect(ref.current?.getScrollState().scrollTop).toBe(2);
+
+    await act(async () => {
+      ref.current?.scrollBy(2);
+      await delay(0);
+    });
+
+    expect(ref.current?.getScrollState().scrollTop).toBe(4);
+  });
 });
