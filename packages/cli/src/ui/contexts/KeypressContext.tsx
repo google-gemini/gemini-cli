@@ -724,12 +724,10 @@ export function useKeypressContext() {
 
 export function KeypressProvider({
   children,
-  kittyProtocolEnabled,
   config,
   debugKeystrokeLogging,
 }: {
   children: React.ReactNode;
-  kittyProtocolEnabled: boolean;
   config?: Config;
   debugKeystrokeLogging?: boolean;
 }) {
@@ -787,14 +785,7 @@ export function KeypressProvider({
         setRawMode(false);
       }
     };
-  }, [
-    stdin,
-    setRawMode,
-    kittyProtocolEnabled,
-    config,
-    debugKeystrokeLogging,
-    broadcast,
-  ]);
+  }, [stdin, setRawMode, config, debugKeystrokeLogging, broadcast]);
 
   return (
     <KeypressContext.Provider value={{ subscribe, unsubscribe }}>

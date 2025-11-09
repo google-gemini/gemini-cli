@@ -48,12 +48,10 @@ class MockStdin extends EventEmitter {
 }
 
 // Helper function to setup keypress test with standard configuration
-const setupKeypressTest = (kittyProtocolEnabled = true) => {
+const setupKeypressTest = () => {
   const keyHandler = vi.fn();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-      {children}
-    </KeypressProvider>
+    <KeypressProvider>{children}</KeypressProvider>
   );
 
   const { result } = renderHook(() => useKeypressContext(), { wrapper });
@@ -66,16 +64,8 @@ describe('KeypressContext', () => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
 
-  const wrapper = ({
-    children,
-    kittyProtocolEnabled = true,
-  }: {
-    children: React.ReactNode;
-    kittyProtocolEnabled?: boolean;
-  }) => (
-    <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled ?? false}>
-      {children}
-    </KeypressProvider>
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider>{children}</KeypressProvider>
   );
 
   beforeAll(() => vi.useFakeTimers());
@@ -101,7 +91,7 @@ describe('KeypressContext', () => {
         sequence: '\x1b[57414u',
       },
     ])('should recognize $name in kitty protocol', async ({ sequence }) => {
-      const { keyHandler } = setupKeypressTest(true);
+      const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write(sequence));
 
@@ -134,7 +124,7 @@ describe('KeypressContext', () => {
     ])(
       'should handle numpad enter with $modifier modifier',
       async ({ sequence, expected }) => {
-        const { keyHandler } = setupKeypressTest(true);
+        const { keyHandler } = setupKeypressTest();
 
         act(() => stdin.write(sequence));
 
@@ -150,7 +140,7 @@ describe('KeypressContext', () => {
 
   describe('Escape key handling', () => {
     it('should recognize escape key (keycode 27) in kitty protocol', async () => {
-      const { keyHandler } = setupKeypressTest(true);
+      const { keyHandler } = setupKeypressTest();
 
       // Send kitty protocol sequence for escape: ESC[27u
       act(() => {
@@ -167,9 +157,7 @@ describe('KeypressContext', () => {
     it('should handle double Escape', async () => {
       const keyHandler = vi.fn();
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider kittyProtocolEnabled={true}>
-          {children}
-        </KeypressProvider>
+        <KeypressProvider>{children}</KeypressProvider>
       );
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
       act(() => result.current.subscribe(keyHandler));
@@ -196,9 +184,7 @@ describe('KeypressContext', () => {
       // Use real timers for this test to avoid issues with stream/buffer timing
       const keyHandler = vi.fn();
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider kittyProtocolEnabled={true}>
-          {children}
-        </KeypressProvider>
+        <KeypressProvider>{children}</KeypressProvider>
       );
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
       act(() => result.current.subscribe(keyHandler));
@@ -252,7 +238,7 @@ describe('KeypressContext', () => {
     ])(
       'should recognize $name in kitty protocol',
       async ({ sequence, expected }) => {
-        const { keyHandler } = setupKeypressTest(true);
+        const { keyHandler } = setupKeypressTest();
 
         act(() => {
           stdin.write(sequence);
@@ -338,10 +324,7 @@ describe('KeypressContext', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={false}
-        >
+        <KeypressProvider debugKeystrokeLogging={false}>
           {children}
         </KeypressProvider>
       );
@@ -365,10 +348,7 @@ describe('KeypressContext', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={true}
-        >
+        <KeypressProvider debugKeystrokeLogging={true}>
           {children}
         </KeypressProvider>
       );
@@ -389,10 +369,7 @@ describe('KeypressContext', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider
-          kittyProtocolEnabled={true}
-          debugKeystrokeLogging={true}
-        >
+        <KeypressProvider debugKeystrokeLogging={true}>
           {children}
         </KeypressProvider>
       );
@@ -475,7 +452,7 @@ describe('KeypressContext', () => {
 
   describe('Double-tap and batching', () => {
     it('should emit two delete events for double-tap CSI[3~', async () => {
-      const { keyHandler } = setupKeypressTest(true);
+      const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write(`\x1b[3~`));
       act(() => stdin.write(`\x1b[3~`));
@@ -491,7 +468,7 @@ describe('KeypressContext', () => {
     });
 
     it('should parse two concatenated tilde-coded sequences in one chunk', async () => {
-      const { keyHandler } = setupKeypressTest(true);
+      const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write(`\x1b[3~\x1b[5~`));
 
@@ -501,35 +478,6 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'pageup' }),
       );
-    });
-  });
-});
-
-describe('Kitty Sequence Parsing', () => {
-  let stdin: MockStdin;
-  const mockSetRawMode = vi.fn();
-
-  const wrapper = ({
-    children,
-    kittyProtocolEnabled = true,
-  }: {
-    children: React.ReactNode;
-    kittyProtocolEnabled?: boolean;
-  }) => (
-    <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-      {children}
-    </KeypressProvider>
-  );
-
-  beforeAll(() => vi.useFakeTimers());
-  afterAll(() => vi.useRealTimers());
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    stdin = new MockStdin();
-    (useStdin as Mock).mockReturnValue({
-      stdin,
-      setRawMode: mockSetRawMode,
     });
   });
 
@@ -616,20 +564,10 @@ describe('Kitty Sequence Parsing', () => {
       ),
     )(
       'should handle Alt+$key in $terminal',
-      ({
-        chunk,
-        expected,
-        kitty = true,
-      }: {
-        chunk: string;
-        expected: Partial<Key>;
-        kitty?: boolean;
-      }) => {
+      ({ chunk, expected }: { chunk: string; expected: Partial<Key> }) => {
         const keyHandler = vi.fn();
         const testWrapper = ({ children }: { children: React.ReactNode }) => (
-          <KeypressProvider kittyProtocolEnabled={kitty}>
-            {children}
-          </KeypressProvider>
+          <KeypressProvider>{children}</KeypressProvider>
         );
         const { result } = renderHook(() => useKeypressContext(), {
           wrapper: testWrapper,
@@ -647,7 +585,7 @@ describe('Kitty Sequence Parsing', () => {
 
   describe('Backslash key handling', () => {
     it('should treat backslash as a regular keystroke', () => {
-      const { keyHandler } = setupKeypressTest(true);
+      const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write('\\'));
 
@@ -944,53 +882,44 @@ describe('Kitty Sequence Parsing', () => {
   });
 
   describe('Ignored Sequences', () => {
-    describe.each([true, false])(
-      'with kittyProtocolEnabled = %s',
-      (kittyEnabled) => {
-        it.each([
-          { name: 'Focus In', sequence: '\x1b[I' },
-          { name: 'Focus Out', sequence: '\x1b[O' },
-          { name: 'SGR Mouse Release', sequence: '\u001b[<0;44;18m' },
-          { name: 'something mouse', sequence: '\u001b[<0;53;19M' },
-          { name: 'another mouse', sequence: '\u001b[<0;29;19m' },
-        ])('should ignore $name sequence', async ({ sequence }) => {
-          const keyHandler = vi.fn();
-          const wrapper = ({ children }: { children: React.ReactNode }) => (
-            <KeypressProvider kittyProtocolEnabled={kittyEnabled}>
-              {children}
-            </KeypressProvider>
-          );
-          const { result } = renderHook(() => useKeypressContext(), {
-            wrapper,
-          });
-          act(() => result.current.subscribe(keyHandler));
-
-          for (const char of sequence) {
-            act(() => stdin.write(char));
-            act(() => vi.advanceTimersByTime(0));
-          }
-
-          act(() => stdin.write('HI'));
-
-          expect(keyHandler).toHaveBeenCalledTimes(2);
-          expect(keyHandler).toHaveBeenNthCalledWith(
-            1,
-            expect.objectContaining({ name: 'h', sequence: 'H', shift: true }),
-          );
-          expect(keyHandler).toHaveBeenNthCalledWith(
-            2,
-            expect.objectContaining({ name: 'i', sequence: 'I', shift: true }),
-          );
-        });
-      },
-    );
-
-    it('should handle F12 when kittyProtocolEnabled is false', async () => {
+    it.each([
+      { name: 'Focus In', sequence: '\x1b[I' },
+      { name: 'Focus Out', sequence: '\x1b[O' },
+      { name: 'SGR Mouse Release', sequence: '\u001b[<0;44;18m' },
+      { name: 'something mouse', sequence: '\u001b[<0;53;19M' },
+      { name: 'another mouse', sequence: '\u001b[<0;29;19m' },
+    ])('should ignore $name sequence', async ({ sequence }) => {
       const keyHandler = vi.fn();
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider kittyProtocolEnabled={false}>
-          {children}
-        </KeypressProvider>
+        <KeypressProvider>{children}</KeypressProvider>
+      );
+      const { result } = renderHook(() => useKeypressContext(), {
+        wrapper,
+      });
+      act(() => result.current.subscribe(keyHandler));
+
+      for (const char of sequence) {
+        act(() => stdin.write(char));
+        act(() => vi.advanceTimersByTime(0));
+      }
+
+      act(() => stdin.write('HI'));
+
+      expect(keyHandler).toHaveBeenCalledTimes(2);
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ name: 'h', sequence: 'H', shift: true }),
+      );
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ name: 'i', sequence: 'I', shift: true }),
+      );
+    });
+
+    it('should handle F12', async () => {
+      const keyHandler = vi.fn();
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider>{children}</KeypressProvider>
       );
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
       act(() => result.current.subscribe(keyHandler));

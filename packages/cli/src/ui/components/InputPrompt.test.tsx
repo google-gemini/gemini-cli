@@ -1297,7 +1297,6 @@ describe('InputPrompt', () => {
 
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
-          { kittyProtocolEnabled: true },
         );
         await act(async () => {
           await vi.runAllTimersAsync();
@@ -1362,7 +1361,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1389,7 +1387,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1409,7 +1406,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1433,7 +1429,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1454,7 +1449,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1472,7 +1466,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
       await act(async () => {
         await vi.runAllTimersAsync();
@@ -1491,7 +1484,6 @@ describe('InputPrompt', () => {
     it('should not interfere with existing keyboard shortcuts', async () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1556,18 +1548,13 @@ describe('InputPrompt', () => {
     });
 
     it.each([
-      { name: 'standard', kittyProtocolEnabled: false, escapeSequence: '\x1B' },
-      {
-        name: 'kitty',
-        kittyProtocolEnabled: true,
-        escapeSequence: '\u001b[27u',
-      },
+      { name: 'standard', escapeSequence: '\x1B' },
+      { name: 'kitty', escapeSequence: '\u001b[27u' },
     ])(
       'resets reverse search state on Escape ($name)',
-      async ({ kittyProtocolEnabled, escapeSequence }) => {
+      async ({ escapeSequence }) => {
         const { stdin, stdout, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
-          { kittyProtocolEnabled },
         );
 
         await act(async () => {

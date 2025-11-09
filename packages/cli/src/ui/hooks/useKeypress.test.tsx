@@ -38,7 +38,7 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
+describe(`useKeypress with useKitty=%s`, () => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
@@ -50,7 +50,7 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
       return null;
     }
     return render(
-      <KeypressProvider kittyProtocolEnabled={useKitty}>
+      <KeypressProvider>
         <TestComponent />
       </KeypressProvider>,
     );

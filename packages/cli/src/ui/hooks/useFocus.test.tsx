@@ -55,7 +55,7 @@ describe('useFocus', () => {
       return null;
     }
     const { unmount } = render(
-      <KeypressProvider kittyProtocolEnabled={false}>
+      <KeypressProvider>
         <TestComponent />
       </KeypressProvider>,
     );
