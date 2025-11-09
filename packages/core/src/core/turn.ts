@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import crypto from 'node:crypto';
 import type {
   Part,
   PartListUnion,
@@ -303,7 +304,7 @@ export class Turn {
   ): ServerGeminiStreamEvent | null {
     const callId =
       fnCall.id ??
-      `${fnCall.name}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      `${fnCall.name}-${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
     const name = fnCall.name || 'undefined_tool_name';
     const args = (fnCall.args || {}) as Record<string, unknown>;
 
