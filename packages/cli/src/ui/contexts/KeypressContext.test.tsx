@@ -105,6 +105,21 @@ describe('KeypressContext', () => {
       );
     });
 
+    it('should handle backslash return', async () => {
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => stdin.write('\\\r'));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'return',
+          ctrl: false,
+          meta: false,
+          shift: true,
+        }),
+      );
+    });
+
     it.each([
       {
         modifier: 'Shift',
