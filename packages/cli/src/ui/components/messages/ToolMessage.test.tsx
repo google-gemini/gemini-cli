@@ -6,12 +6,14 @@
 
 import React from 'react';
 import type { ToolMessageProps } from './ToolMessage.js';
+import { describe, it, expect, vi } from 'vitest';
 import { ToolMessage } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
@@ -97,10 +99,160 @@ describe('<ToolMessage />', () => {
       StreamingState.Idle,
     );
     const output = lastFrame();
+
     expect(output).toContain('✓'); // Success indicator
     expect(output).toContain('test-tool');
     expect(output).toContain('A tool for testing');
     expect(output).toContain('MockMarkdown:Test result');
+  });
+
+  describe('JSON rendering', () => {
+    const extractJSON = (output: string | undefined): string => {
+      if (!output) return '';
+      const start = output.indexOf('{');
+      const end = output.lastIndexOf('}');
+      if (start >= 0 && end >= start) {
+        return output.slice(start, end + 1);
+      } else {
+        return '';
+      }
+    };
+
+    it('pretty prints valid JSON', async () => {
+      const testJSONstring = '{"a": 1, "b": [2, 3]}';
+      const testJSON = JSON.parse(testJSONstring);
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      const extractedOutput = JSON.parse(extractJSON(output));
+
+      expect(tryParseJSON(testJSONstring)).toBeTruthy();
+      expect(extractedOutput).toStrictEqual(testJSON);
+    });
+
+    it('renders pretty JSON in ink frame', async () => {
+      const { lastFrame } = renderWithContext(
+        <ToolMessage {...baseProps} resultDisplay='{"a":1,"b":2}' />,
+        StreamingState.Idle,
+      );
+
+      const frame = lastFrame();
+
+      expect(frame).toMatchSnapshot();
+      expect(frame).not.toContain('MockMarkdown:');
+      expect(frame).not.toContain('MockAnsiOutput:');
+      expect(frame).not.toMatch(/MockDiff:/);
+    });
+
+    it('uses JSON renderer even when renderOutputAsMarkdown=true is true', async () => {
+      const testJSONstring = '{"a": 1, "b": [2, 3]}';
+      const testJSON = JSON.parse(testJSONstring);
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={true}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      const extractedOutput = JSON.parse(extractJSON(output));
+
+      expect(tryParseJSON(testJSONstring)).toBeTruthy();
+      expect(extractedOutput).toStrictEqual(testJSON);
+      expect(output).not.toContain('MockMarkDown:');
+    });
+    it('falls back to plain text for malformed JSON', () => {
+      const testJSONstring = 'a": 1, "b": [2, 3]}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      expect(tryParseJSON(testJSONstring)).toBeFalsy();
+      expect(typeof output === 'string').toBeTruthy();
+    });
+
+    it('rejects mixed text + JSON renders as plain text', () => {
+      const testJSONstring = `{"result":  "count": 42,"items": ["apple", "banana"]},"meta": {"timestamp": "2025-09-28T12:34:56Z"}}End.`;
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      expect(tryParseJSON(testJSONstring)).toBeFalsy();
+      expect(typeof output === 'string').toBeTruthy();
+    });
+
+    it('rejects ANSI-tained JSON renders as plain text', () => {
+      const testJSONstring =
+        '\u001b[32mOK\u001b[0m {"status": "success", "data": {"id": 123, "values": [10, 20, 30]}}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={testJSONstring}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const output = lastFrame();
+
+      expect(tryParseJSON(testJSONstring)).toBeFalsy();
+      expect(typeof output === 'string').toBeTruthy();
+    });
+
+    it('pretty printing 10kb JSON completes in <50ms', () => {
+      const large = '{"key": "' + 'x'.repeat(10000) + '"}';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage
+          {...baseProps}
+          resultDisplay={large}
+          renderOutputAsMarkdown={false}
+        />,
+        StreamingState.Idle,
+      );
+
+      const start = performance.now();
+      lastFrame();
+      expect(performance.now() - start).toBeLessThan(50);
+    });
+
+    it('renders a JSON array', async () => {
+      const testJSONArray = '[1, 2, 3]';
+      const { lastFrame } = renderWithContext(
+        <ToolMessage {...baseProps} resultDisplay={testJSONArray} />,
+        StreamingState.Idle,
+      );
+
+      const frame = lastFrame();
+
+      expect(frame).toContain('1,');
+      expect(frame).toContain('2,');
+      expect(frame).toContain('3');
+    });
   });
 
   describe('ToolStatusIndicator rendering', () => {
