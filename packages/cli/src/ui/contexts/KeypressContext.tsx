@@ -23,6 +23,92 @@ export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 50;
 
+// Parse the key itself
+const KEY_INFO_MAP: Record<
+  string,
+  { name: string; shift?: boolean; ctrl?: boolean }
+> = {
+  '[200~': { name: 'paste-start' },
+  '[201~': { name: 'paste-end' },
+  '[[A': { name: 'f1' },
+  '[[B': { name: 'f2' },
+  '[[C': { name: 'f3' },
+  '[[D': { name: 'f4' },
+  '[[E': { name: 'f5' },
+  '[1~': { name: 'home' },
+  '[2~': { name: 'insert' },
+  '[3~': { name: 'delete' },
+  '[4~': { name: 'end' },
+  '[5~': { name: 'pageup' },
+  '[6~': { name: 'pagedown' },
+  '[7~': { name: 'home' },
+  '[8~': { name: 'end' },
+  '[11~': { name: 'f1' },
+  '[12~': { name: 'f2' },
+  '[13~': { name: 'f3' },
+  '[14~': { name: 'f4' },
+  '[15~': { name: 'f5' },
+  '[17~': { name: 'f6' },
+  '[18~': { name: 'f7' },
+  '[19~': { name: 'f8' },
+  '[20~': { name: 'f9' },
+  '[21~': { name: 'f10' },
+  '[23~': { name: 'f11' },
+  '[24~': { name: 'f12' },
+  '[A': { name: 'up' },
+  '[B': { name: 'down' },
+  '[C': { name: 'right' },
+  '[D': { name: 'left' },
+  '[E': { name: 'clear' },
+  '[F': { name: 'end' },
+  '[H': { name: 'home' },
+  '[P': { name: 'f1' },
+  '[Q': { name: 'f2' },
+  '[R': { name: 'f3' },
+  '[S': { name: 'f4' },
+  OA: { name: 'up' },
+  OB: { name: 'down' },
+  OC: { name: 'right' },
+  OD: { name: 'left' },
+  OE: { name: 'clear' },
+  OF: { name: 'end' },
+  OH: { name: 'home' },
+  OP: { name: 'f1' },
+  OQ: { name: 'f2' },
+  OR: { name: 'f3' },
+  OS: { name: 'f4' },
+  '[[5~': { name: 'pageup' },
+  '[[6~': { name: 'pagedown' },
+  '[9u': { name: 'tab' },
+  '[13u': { name: 'return' },
+  '[27u': { name: 'escape' },
+  '[127u': { name: 'backspace' },
+  '[57414u': { name: 'return' }, // Numpad Enter
+  '[a': { name: 'up', shift: true },
+  '[b': { name: 'down', shift: true },
+  '[c': { name: 'right', shift: true },
+  '[d': { name: 'left', shift: true },
+  '[e': { name: 'clear', shift: true },
+  '[2$': { name: 'insert', shift: true },
+  '[3$': { name: 'delete', shift: true },
+  '[5$': { name: 'pageup', shift: true },
+  '[6$': { name: 'pagedown', shift: true },
+  '[7$': { name: 'home', shift: true },
+  '[8$': { name: 'end', shift: true },
+  '[Z': { name: 'tab', shift: true },
+  Oa: { name: 'up', ctrl: true },
+  Ob: { name: 'down', ctrl: true },
+  Oc: { name: 'right', ctrl: true },
+  Od: { name: 'left', ctrl: true },
+  Oe: { name: 'clear', ctrl: true },
+  '[2^': { name: 'insert', ctrl: true },
+  '[3^': { name: 'delete', ctrl: true },
+  '[5^': { name: 'pageup', ctrl: true },
+  '[6^': { name: 'pagedown', ctrl: true },
+  '[7^': { name: 'home', ctrl: true },
+  '[8^': { name: 'end', ctrl: true },
+};
+
 const kUTF16SurrogateThreshold = 0x10000; // 2 ** 16
 function charLengthAt(str: string, i: number): number {
   if (str.length <= i) {
@@ -324,301 +410,27 @@ function* emitKeys(
       meta = !!(modifier & 10); // use 10 to catch both alt (2) and meta (8).
       shift = !!(modifier & 1);
 
-      // Parse the key itself
-      switch (code) {
-        /* paste bracket mode */
-        case '[200~':
-          name = 'paste-start';
-          break;
-        case '[201~':
-          name = 'paste-end';
-          break;
-
-        // from Cygwin and used in libuv
-        case '[[A':
-          name = 'f1';
-          break;
-        case '[[B':
-          name = 'f2';
-          break;
-        case '[[C':
-          name = 'f3';
-          break;
-        case '[[D':
-          name = 'f4';
-          break;
-        case '[[E':
-          name = 'f5';
-          break;
-
-        case '[1~':
-          name = 'home';
-          break;
-        case '[2~':
-          name = 'insert';
-          break;
-        case '[3~':
-          name = 'delete';
-          break;
-        case '[4~':
-          name = 'end';
-          break;
-        case '[5~':
-          name = 'pageup';
-          break;
-        case '[6~':
-          name = 'pagedown';
-          break;
-        case '[7~':
-          name = 'home';
-          break;
-        case '[8~':
-          name = 'end';
-          break;
-
-        case '[11~':
-          name = 'f1';
-          break;
-        case '[12~':
-          name = 'f2';
-          break;
-        case '[13~':
-          name = 'f3';
-          break;
-        case '[14~':
-          name = 'f4';
-          break;
-        case '[15~':
-          name = 'f5';
-          break;
-        case '[17~':
-          name = 'f6';
-          break;
-        case '[18~':
-          name = 'f7';
-          break;
-        case '[19~':
-          name = 'f8';
-          break;
-        case '[20~':
-          name = 'f9';
-          break;
-        case '[21~':
-          name = 'f10';
-          break;
-        case '[23~':
-          name = 'f11';
-          break;
-        case '[24~':
-          name = 'f12';
-          break;
-
-        // xterm ESC [ letter
-        case '[A':
-          name = 'up';
-          break;
-        case '[B':
-          name = 'down';
-          break;
-        case '[C':
-          name = 'right';
-          break;
-        case '[D':
-          name = 'left';
-          break;
-        case '[E':
-          name = 'clear';
-          break;
-        case '[F':
-          name = 'end';
-          break;
-        case '[H':
-          name = 'home';
-          break;
-        case '[P':
-          name = 'f1';
-          break;
-        case '[Q':
-          name = 'f2';
-          break;
-        case '[R':
-          name = 'f3';
-          break;
-        case '[S':
-          name = 'f4';
-          break;
-
-        // xterm/gnome ESC O letter
-        case 'OA':
-          name = 'up';
-          break;
-        case 'OB':
-          name = 'down';
-          break;
-        case 'OC':
-          name = 'right';
-          break;
-        case 'OD':
-          name = 'left';
-          break;
-        case 'OE':
-          name = 'clear';
-          break;
-        case 'OF':
-          name = 'end';
-          break;
-        case 'OH':
-          name = 'home';
-          break;
-        case 'OP':
-          name = 'f1';
-          break;
-        case 'OQ':
-          name = 'f2';
-          break;
-        case 'OR':
-          name = 'f3';
-          break;
-        case 'OS':
-          name = 'f4';
-          break;
-
-        // putty
-        case '[[5~':
-          name = 'pageup';
-          break;
-        case '[[6~':
-          name = 'pagedown';
-          break;
-
-        // rxvt keys with modifiers
-        case '[a':
-          name = 'up';
+      const keyInfo = KEY_INFO_MAP[code];
+      if (keyInfo) {
+        name = keyInfo.name;
+        if (keyInfo.shift) {
           shift = true;
-          break;
-        case '[b':
-          name = 'down';
-          shift = true;
-          break;
-        case '[c':
-          name = 'right';
-          shift = true;
-          break;
-        case '[d':
-          name = 'left';
-          shift = true;
-          break;
-        case '[e':
-          name = 'clear';
-          shift = true;
-          break;
-
-        case '[2$':
-          name = 'insert';
-          shift = true;
-          break;
-        case '[3$':
-          name = 'delete';
-          shift = true;
-          break;
-        case '[5$':
-          name = 'pageup';
-          shift = true;
-          break;
-        case '[6$':
-          name = 'pagedown';
-          shift = true;
-          break;
-        case '[7$':
-          name = 'home';
-          shift = true;
-          break;
-        case '[8$':
-          name = 'end';
-          shift = true;
-          break;
-
-        case 'Oa':
-          name = 'up';
+        }
+        if (keyInfo.ctrl) {
           ctrl = true;
-          break;
-        case 'Ob':
-          name = 'down';
-          ctrl = true;
-          break;
-        case 'Oc':
-          name = 'right';
-          ctrl = true;
-          break;
-        case 'Od':
-          name = 'left';
-          ctrl = true;
-          break;
-        case 'Oe':
-          name = 'clear';
-          ctrl = true;
-          break;
-
-        case '[2^':
-          name = 'insert';
-          ctrl = true;
-          break;
-        case '[3^':
-          name = 'delete';
-          ctrl = true;
-          break;
-        case '[5^':
-          name = 'pageup';
-          ctrl = true;
-          break;
-        case '[6^':
-          name = 'pagedown';
-          ctrl = true;
-          break;
-        case '[7^':
-          name = 'home';
-          ctrl = true;
-          break;
-        case '[8^':
-          name = 'end';
-          ctrl = true;
-          break;
-
-        // kitty protocol sequences
-        case '[9u':
-          name = 'tab';
-          break;
-        case '[13u':
-          name = 'return';
-          break;
-        case '[27u':
-          name = 'escape';
-          break;
-        case '[127u':
-          name = 'backspace';
-          break;
-        case '[57414u': // Numpad Enter
-          name = 'return';
-          break;
-
-        // misc.
-        case '[Z':
-          name = 'tab';
-          shift = true;
-          break;
-        default:
-          name = 'undefined';
-          if ((ctrl || meta) && (code.endsWith('u') || code.endsWith('~'))) {
-            // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
-            const codeNumber = parseInt(code.slice(1, -1), 10);
-            if (
-              codeNumber >= 'a'.charCodeAt(0) &&
-              codeNumber <= 'z'.charCodeAt(0)
-            ) {
-              name = String.fromCharCode(codeNumber);
-            }
+        }
+      } else {
+        name = 'undefined';
+        if ((ctrl || meta) && (code.endsWith('u') || code.endsWith('~'))) {
+          // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
+          const codeNumber = parseInt(code.slice(1, -1), 10);
+          if (
+            codeNumber >= 'a'.charCodeAt(0) &&
+            codeNumber <= 'z'.charCodeAt(0)
+          ) {
+            name = String.fromCharCode(codeNumber);
           }
-          break;
+        }
       }
     } else if (ch === '\r') {
       // carriage return
