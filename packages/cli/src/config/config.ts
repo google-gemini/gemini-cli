@@ -68,6 +68,7 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  autoConfirmMcpSampling: boolean | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -201,6 +202,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('record-responses', {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
+          hidden: true,
+        })
+        .option('auto-confirm-mcp-sampling', {
+          type: 'boolean',
+          description: 'Automatically confirm all MCP sampling requests.',
           hidden: true,
         })
         .deprecateOption(
@@ -618,6 +624,7 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
+    autoConfirmMcpSampling: argv.autoConfirmMcpSampling,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},

@@ -297,6 +297,7 @@ export interface ConfigParameters {
   ptyInfo?: string;
   disableYoloMode?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
+  autoConfirmMcpSampling?: boolean;
   enableHooks?: boolean;
   experiments?: Experiments;
   hooks?: {
@@ -406,6 +407,7 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly autoConfirmMcpSampling: boolean;
   private readonly enableHooks: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
@@ -546,6 +548,7 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.autoConfirmMcpSampling = params.autoConfirmMcpSampling ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
 
@@ -768,6 +771,10 @@ export class Config {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  getAutoConfirmMcpSampling(): boolean {
+    return this.autoConfirmMcpSampling;
   }
 
   isRestrictiveSandbox(): boolean {

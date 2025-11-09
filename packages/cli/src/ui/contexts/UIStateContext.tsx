@@ -35,6 +35,13 @@ export interface ProQuotaDialogRequest {
   resolve: (intent: FallbackIntent) => void;
 }
 
+export interface McpSamplingRequest {
+  serverName: string;
+  prompt: unknown;
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+}
+
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 
@@ -123,6 +130,7 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
+  mcpSamplingRequest: McpSamplingRequest | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
