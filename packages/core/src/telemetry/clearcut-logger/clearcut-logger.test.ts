@@ -211,45 +211,6 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs the current surface from a github action', () => {
-      const { logger } = setup({});
-
-      vi.stubEnv('GITHUB_SHA', '8675309');
-
-      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
-
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: 'GitHub',
-      });
-    });
-
-    it('logs the current surface from Cloud Shell via EDITOR_IN_CLOUD_SHELL', () => {
-      const { logger } = setup({});
-
-      vi.stubEnv('EDITOR_IN_CLOUD_SHELL', 'true');
-
-      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
-
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: 'cloudshell',
-      });
-    });
-
-    it('logs the current surface from Cloud Shell via CLOUD_SHELL', () => {
-      const { logger } = setup({});
-
-      vi.stubEnv('CLOUD_SHELL', 'true');
-
-      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
-
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: 'cloudshell',
-      });
-    });
-
     it('logs default metadata', () => {
       // Define expected values
       const session_id = 'my-session-id';
@@ -329,20 +290,6 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs the current surface', () => {
-      const { logger } = setup({});
-
-      vi.stubEnv('TERM_PROGRAM', 'vscode');
-      vi.stubEnv('SURFACE', 'ide-1234');
-
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-        value: 'ide-1234',
-      });
-    });
-
     it('logs all user settings', () => {
       const { logger } = setup({
         config: { useSmartEdit: true, useModelRouter: true },
@@ -359,63 +306,85 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it.each([
+    type SurfaceDetectionTestCase = {
+      name: string;
+      env: Record<string, string | undefined>;
+      expected: string;
+    };
+
+    it.each<SurfaceDetectionTestCase>([
       {
-        env: {
-          CURSOR_TRACE_ID: 'abc123',
-          GITHUB_SHA: undefined,
-          TERM_PROGRAM: 'vscode',
-        },
-        expectedValue: 'cursor',
+        name: 'github action',
+        env: { GITHUB_SHA: '8675309' },
+        expected: 'GitHub',
       },
       {
+        name: 'Cloud Shell via EDITOR_IN_CLOUD_SHELL',
+        env: { EDITOR_IN_CLOUD_SHELL: 'true' },
+        expected: 'cloudshell',
+      },
+      {
+        name: 'Cloud Shell via CLOUD_SHELL',
+        env: { CLOUD_SHELL: 'true' },
+        expected: 'cloudshell',
+      },
+      {
+        name: 'VSCode via TERM_PROGRAM',
         env: {
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
           MONOSPACE_ENV: '',
         },
-        expectedValue: 'vscode',
+        expected: 'vscode',
       },
       {
+        name: 'SURFACE env var',
+        env: { SURFACE: 'ide-1234' },
+        expected: 'ide-1234',
+      },
+      {
+        name: 'SURFACE env var takes precedence',
+        env: { TERM_PROGRAM: 'vscode', SURFACE: 'ide-1234' },
+        expected: 'ide-1234',
+      },
+      {
+        name: 'Cursor',
+        env: {
+          CURSOR_TRACE_ID: 'abc123',
+          TERM_PROGRAM: 'vscode',
+          GITHUB_SHA: undefined,
+        },
+        expected: 'cursor',
+      },
+      {
+        name: 'Firebase Studio',
         env: {
           MONOSPACE_ENV: 'true',
-          GITHUB_SHA: undefined,
           TERM_PROGRAM: 'vscode',
+          GITHUB_SHA: undefined,
         },
-        expectedValue: 'firebasestudio',
+        expected: 'firebasestudio',
       },
       {
+        name: 'Devin',
         env: {
           __COG_BASHRC_SOURCED: 'true',
-          GITHUB_SHA: undefined,
           TERM_PROGRAM: 'vscode',
-        },
-        expectedValue: 'devin',
-      },
-      {
-        env: {
-          CLOUD_SHELL: 'true',
           GITHUB_SHA: undefined,
-          TERM_PROGRAM: 'vscode',
         },
-        expectedValue: 'cloudshell',
+        expected: 'devin',
       },
     ])(
-      'logs the current surface as $expectedValue, preempting vscode detection',
-      ({ env, expectedValue }) => {
+      'logs the current surface as $expected from $name',
+      ({ env, expected }) => {
         const { logger } = setup({});
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
         }
-        // Clear Cursor-specific environment variables that might interfere with tests
-        // Only clear if not explicitly testing Cursor detection
-        if (!env.CURSOR_TRACE_ID) {
-          vi.stubEnv('CURSOR_TRACE_ID', '');
-        }
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0]).toContainEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-          value: expectedValue,
+          value: expected,
         });
       },
     );

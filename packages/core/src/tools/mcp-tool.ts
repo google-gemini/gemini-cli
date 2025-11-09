@@ -77,7 +77,14 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
     // while still allowing specific tool rules
-    super(params, messageBus, `${serverName}__${serverToolName}`, displayName);
+
+    super(
+      params,
+      messageBus,
+      `${serverName}__${serverToolName}`,
+      displayName,
+      serverName,
+    );
   }
 
   protected override async getConfirmationDetails(
@@ -218,6 +225,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly trust?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
+    override readonly extensionName?: string,
     override readonly extensionId?: string,
     messageBus?: MessageBus,
   ) {
@@ -230,8 +238,13 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput,
       messageBus,
+      extensionName,
       extensionId,
     );
+  }
+
+  getFullyQualifiedPrefix(): string {
+    return `${this.serverName}__`;
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -242,8 +255,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.description,
       this.parameterSchema,
       this.trust,
-      `${this.serverName}__${this.serverToolName}`,
+      `${this.getFullyQualifiedPrefix()}${this.serverToolName}`,
       this.cliConfig,
+      this.extensionName,
       this.extensionId,
       this.messageBus,
     );

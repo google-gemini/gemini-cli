@@ -57,6 +57,7 @@ describe('handleAtCommand', () => {
       getToolRegistry,
       getTargetDir: () => testRootDir,
       isSandboxed: () => false,
+      getExcludeTools: vi.fn(),
       getFileService: () => new FileDiscoveryService(testRootDir),
       getFileFilteringRespectGitIgnore: () => true,
       getFileFilteringRespectGeminiIgnore: () => true,
@@ -84,6 +85,7 @@ describe('handleAtCommand', () => {
         getReadManyFilesExcludes: () => [],
       }),
       getUsageStatisticsEnabled: () => false,
+      getEnableExtensionReloading: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
@@ -44,18 +44,20 @@ const mockCommands: readonly SlashCommand[] = [
 
 describe('Help Component', () => {
   it('should not render hidden commands', () => {
-    const { lastFrame } = render(<Help commands={mockCommands} />);
+    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
     const output = lastFrame();
 
     expect(output).toContain('/test');
     expect(output).not.toContain('/hidden');
+    unmount();
   });
 
   it('should not render hidden subcommands', () => {
-    const { lastFrame } = render(<Help commands={mockCommands} />);
+    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
     const output = lastFrame();
 
     expect(output).toContain('visible-child');
     expect(output).not.toContain('hidden-child');
+    unmount();
   });
 });

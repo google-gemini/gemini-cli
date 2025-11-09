@@ -20,7 +20,7 @@ import type { FileDiff, ToolEditConfirmationDetails } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { type EditToolParams } from './edit.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -32,10 +32,10 @@ import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
-import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { IdeClient } from '../ide/ide-client.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -75,7 +75,7 @@ const mockConfigInternal = {
   getBaseLlmClient: vi.fn(), // Initialize as a plain mock function
   getFileSystemService: () => fsService,
   getIdeMode: vi.fn(() => false),
-  getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
+  getWorkspaceContext: () => new WorkspaceContext(rootDir),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
   getSandbox: () => false,
@@ -207,9 +207,14 @@ describe('WriteFileTool', () => {
       expect(invocation.params).toEqual(params);
     });
 
-    it('should throw an error for a relative path', () => {
-      const params = { file_path: 'test.txt', content: 'hello' };
-      expect(() => tool.build(params)).toThrow(/File path must be absolute/);
+    it('should return an invocation for a valid relative path within root', () => {
+      const params = {
+        file_path: 'test.txt',
+        content: 'hello',
+      };
+      const invocation = tool.build(params);
+      expect(invocation).toBeDefined();
+      expect(invocation.params).toEqual(params);
     });
 
     it('should throw an error for a path outside root', () => {
@@ -564,6 +569,25 @@ describe('WriteFileTool', () => {
 
   describe('execute', () => {
     const abortSignal = new AbortController().signal;
+
+    it('should write a new file with a relative path', async () => {
+      const relativePath = 'execute_relative_new_file.txt';
+      const filePath = path.join(rootDir, relativePath);
+      const content = 'Content for relative path file.';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: relativePath, content };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toMatch(
+        /Successfully created and wrote to new file/,
+      );
+      expect(fs.existsSync(filePath)).toBe(true);
+      const writtenContent = await fsService.readTextFile(filePath);
+      expect(writtenContent).toBe(content);
+    });
 
     it('should return error if _getCorrectedFileContent returns an error during execute', async () => {
       const filePath = path.join(rootDir, 'execute_error_file.txt');

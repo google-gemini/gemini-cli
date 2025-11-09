@@ -6,11 +6,14 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/defaultModelConfigs.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
 export * from './policy/types.js';
 export * from './policy/policy-engine.js';
+export * from './policy/toml-loader.js';
+export * from './policy/config.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 
@@ -136,3 +139,6 @@ export { Storage } from './config/storage.js';
 
 // Export test utils
 export * from './test-utils/index.js';
+
+// Export hook types
+export * from './hooks/types.js';
