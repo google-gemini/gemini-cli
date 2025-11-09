@@ -473,8 +473,7 @@ export class IdeClient {
       logger.debug('Attempting to connect to IDE via HTTP SSE');
       this.client = new Client({
         name: 'streamable-http-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version: process.env['CLI_VERSION'] || '1.0.0',
       });
       transport = new StreamableHTTPClientTransport(
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
@@ -507,8 +506,7 @@ export class IdeClient {
       logger.debug('Attempting to connect to IDE via stdio');
       this.client = new Client({
         name: 'stdio-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version: process.env['CLI_VERSION'] || '1.0.0',
       });
 
       transport = new StdioClientTransport({

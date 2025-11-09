@@ -63,6 +63,7 @@ export class Task {
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
+  private promptId: string;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -80,6 +81,7 @@ export class Task {
   ) {
     this.id = id;
     this.contextId = contextId;
+    this.promptId = `task-${id}-${uuidv4()}`;
     this.config = config;
     this.scheduler = this.createScheduler();
     this.geminiClient = new GeminiClient(this.config);
@@ -807,11 +809,10 @@ export class Task {
     };
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
-    // TODO: Determine what it mean to have, then add a prompt ID.
     yield* this.geminiClient.sendMessageStream(
       llmParts,
       aborted,
-      /*prompt_id*/ '',
+      this.promptId,
     );
   }
 
@@ -847,11 +848,10 @@ export class Task {
       };
       // Set task state to working as we are about to call LLM
       this.setTaskStateAndPublishUpdate('working', stateChange);
-      // TODO: Determine what it mean to have, then add a prompt ID.
       yield* this.geminiClient.sendMessageStream(
         llmParts,
         aborted,
-        /*prompt_id*/ '',
+        this.promptId,
       );
     } else if (anyConfirmationHandled) {
       logger.info(

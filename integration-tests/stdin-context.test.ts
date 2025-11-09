@@ -24,9 +24,20 @@ describe.skip('stdin context', () => {
 
     const historyString = lastRequest.attributes.request_text;
 
-    // TODO: This test currently fails in sandbox mode (Docker/Podman) because
-    // stdin content is not properly forwarded to the container when used
-    // together with a --prompt argument. The test passes in non-sandbox mode.
+    // Known Issue: This test currently fails in sandbox mode (Docker/Podman) because
+    // stdin content is not properly forwarded to the container when used together with
+    // a --prompt argument. The test passes in non-sandbox mode.
+    //
+    // Root Cause: The stdin data written to the test process needs to be forwarded
+    // through multiple layers: test process → node process → container process.
+    // The current sandbox implementation (packages/cli/src/utils/sandbox.ts:870-872)
+    // uses 'stdio: inherit' which doesn't properly handle piped input when --prompt
+    // is specified. The stdin data is read by packages/cli/src/utils/readStdin.ts
+    // before the container is spawned, but isn't re-injected into the container's stdin.
+    //
+    // Potential Fix: Modify sandbox.ts to capture stdin data before spawning the
+    // container, then pass it via environment variable or temporary file that the
+    // containerized gemini process can read.
 
     expect(historyString).toContain(randomString);
     expect(historyString).toContain(prompt);

@@ -57,7 +57,9 @@ export class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
   }
 }
 
-// TODO: dedup with gemini-cli, add shouldConfirmExecute() support in core
+// Note: Similar to MockTool in packages/core/src/test-utils/tools.ts
+// This version provides mock function support for execute and shouldConfirmExecute
+// which is needed for a2a-server tests. Consider consolidating in the future.
 export class MockTool extends BaseDeclarativeTool<object, ToolResult> {
   constructor(
     name: string,

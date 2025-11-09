@@ -298,7 +298,7 @@ const createMcpServer = (diffManager: DiffManager) => {
         '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
       inputSchema: z.object({
         filePath: z.string(),
-        // TODO(chrstn): determine if this should be required or not.
+        // Optional: defaults to empty string to support creating new files or showing empty diffs
         newContent: z.string().optional(),
       }).shape,
     },
