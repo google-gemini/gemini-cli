@@ -68,7 +68,7 @@ function bufferBackslashEnter(
 
       if (key == null) {
         continue;
-      } else if (key.name !== '\\') {
+      } else if (key.sequence !== '\\') {
         keypressHandler(key);
         continue;
       }
@@ -84,7 +84,7 @@ function bufferBackslashEnter(
         keypressHandler(key);
       } else if (nextKey.name === 'return') {
         keypressHandler({
-          ...key,
+          ...nextKey,
           shift: true,
           sequence: '\r', // Corrected escaping for newline
         });
