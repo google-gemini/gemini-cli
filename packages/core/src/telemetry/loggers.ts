@@ -28,7 +28,6 @@ import type {
   LoopDetectionDisabledEvent,
   SlashCommandEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
   InvalidChunkEvent,
@@ -396,20 +395,6 @@ export function logChatCompression(
     tokens_before: event.tokens_before,
     tokens_after: event.tokens_after,
   });
-}
-
-export function logKittySequenceOverflow(
-  config: Config,
-  event: KittySequenceOverflowEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
-  if (!isTelemetrySdkInitialized()) return;
-  const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
 }
 
 export function logMalformedJsonResponse(
