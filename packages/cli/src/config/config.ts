@@ -4,23 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type {
-  FileFilteringOptions,
-  MCPServerConfig,
-  OutputFormat,
-  GeminiCLIExtension,
-} from '@google/gemini-cli-core';
+import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
-  loadServerHierarchicalMemory,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -38,6 +29,7 @@ import {
   getPty,
   EDIT_TOOL_NAME,
   debugLogger,
+  loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -49,9 +41,10 @@ import { appEvents } from '../utils/events.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
-import type { ExtensionLoader } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
+import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
+import type { EventEmitter } from 'node:stream';
 
 export interface CliArgs {
   query: string | undefined;
@@ -295,49 +288,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   return result as unknown as CliArgs;
 }
 
-// This function is now a thin wrapper around the server's implementation.
-// It's kept in the CLI for now as App.tsx directly calls it for memory refresh.
-// TODO: Consider if App.tsx should get memory via a server call or if Config should refresh itself.
-export async function loadHierarchicalGeminiMemory(
-  currentWorkingDirectory: string,
-  includeDirectoriesToReadGemini: readonly string[] = [],
-  debugMode: boolean,
-  fileService: FileDiscoveryService,
-  settings: Settings,
-  extensionLoader: ExtensionLoader,
-  folderTrust: boolean,
-  memoryImportFormat: 'flat' | 'tree' = 'tree',
-  fileFilteringOptions?: FileFilteringOptions,
-): Promise<{ memoryContent: string; fileCount: number; filePaths: string[] }> {
-  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = fs.realpathSync(path.resolve(currentWorkingDirectory));
-  const realHome = fs.realpathSync(path.resolve(homedir()));
-  const isHomeDirectory = realCwd === realHome;
-
-  // If it is the home directory, pass an empty string to the core memory
-  // function to signal that it should skip the workspace search.
-  const effectiveCwd = isHomeDirectory ? '' : currentWorkingDirectory;
-
-  if (debugMode) {
-    debugLogger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
-    );
-  }
-
-  // Directly call the server function with the corrected path.
-  return loadServerHierarchicalMemory(
-    effectiveCwd,
-    includeDirectoriesToReadGemini,
-    debugMode,
-    fileService,
-    extensionLoader,
-    folderTrust,
-    memoryImportFormat,
-    fileFilteringOptions,
-    settings.context?.discoveryMaxDirs,
-  );
-}
-
 /**
  * Creates a filter function to determine if a tool should be excluded.
  *
@@ -429,26 +379,26 @@ export async function loadCliConfig(
     requestSetting: promptForSetting,
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
+    eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
   });
   await extensionManager.loadExtensions();
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =
-    await loadHierarchicalGeminiMemory(
+    await loadServerHierarchicalMemory(
       cwd,
       settings.context?.loadMemoryFromIncludeDirectories
         ? includeDirectories
         : [],
       debugMode,
       fileService,
-      settings,
       extensionManager,
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
+      settings.context?.discoveryMaxDirs,
     );
 
-  let mcpServers = mergeMcpServers(settings, extensionManager.getExtensions());
   const question = argv.promptInteractive || argv.prompt || '';
 
   // Determine approval mode with backward compatibility
@@ -519,26 +469,8 @@ export async function loadCliConfig(
     approvalMode,
   );
 
-  // Debug: Log the merged policy configuration
-  // Only log when message bus integration is enabled (when policies are active)
   const enableMessageBusIntegration =
     settings.tools?.enableMessageBusIntegration ?? false;
-  if (enableMessageBusIntegration) {
-    debugLogger.debug('=== Policy Engine Configuration ===');
-    debugLogger.debug(
-      `Default decision: ${policyEngineConfig.defaultDecision}`,
-    );
-    debugLogger.debug(`Total rules: ${policyEngineConfig.rules?.length || 0}`);
-    if (policyEngineConfig.rules && policyEngineConfig.rules.length > 0) {
-      debugLogger.debug('Rules (sorted by priority):');
-      policyEngineConfig.rules.forEach((rule, index) => {
-        debugLogger.debug(
-          `  [${index}] toolName: ${rule.toolName || '*'}, decision: ${rule.decision}, priority: ${rule.priority}, argsPattern: ${rule.argsPattern ? rule.argsPattern.source : 'none'}`,
-        );
-      });
-    }
-    debugLogger.debug('===================================');
-  }
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -583,37 +515,8 @@ export async function loadCliConfig(
 
   const excludeTools = mergeExcludeTools(
     settings,
-    extensionManager.getExtensions(),
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
-  const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
-
-  if (!argv.allowedMcpServerNames) {
-    if (settings.mcp?.allowed) {
-      mcpServers = allowedMcpServers(
-        mcpServers,
-        settings.mcp.allowed,
-        blockedMcpServers,
-      );
-    }
-
-    if (settings.mcp?.excluded) {
-      const excludedNames = new Set(settings.mcp.excluded.filter(Boolean));
-      if (excludedNames.size > 0) {
-        mcpServers = Object.fromEntries(
-          Object.entries(mcpServers).filter(([key]) => !excludedNames.has(key)),
-        );
-      }
-    }
-  }
-
-  if (argv.allowedMcpServerNames) {
-    mcpServers = allowedMcpServers(
-      mcpServers,
-      argv.allowedMcpServerNames,
-      blockedMcpServers,
-    );
-  }
 
   const useModelRouter = settings.experimental?.useModelRouter ?? true;
   const defaultModel = useModelRouter
@@ -651,7 +554,11 @@ export async function loadCliConfig(
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: settings.mcp?.serverCommand,
-    mcpServers,
+    mcpServers: settings.mcpServers,
+    allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
+    blockedMcpServers: argv.allowedMcpServerNames
+      ? [] // explicitly allowed servers overrides everything
+      : settings.mcp?.excluded,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
@@ -681,7 +588,6 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
-    blockedMcpServers,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -711,81 +617,20 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
+    modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
   });
 }
 
-function allowedMcpServers(
-  mcpServers: { [x: string]: MCPServerConfig },
-  allowMCPServers: string[],
-  blockedMcpServers: Array<{ name: string; extensionName: string }>,
-) {
-  const allowedNames = new Set(allowMCPServers.filter(Boolean));
-  if (allowedNames.size > 0) {
-    mcpServers = Object.fromEntries(
-      Object.entries(mcpServers).filter(([key, server]) => {
-        const isAllowed = allowedNames.has(key);
-        if (!isAllowed) {
-          blockedMcpServers.push({
-            name: key,
-            extensionName: server.extension?.name || '',
-          });
-        }
-        return isAllowed;
-      }),
-    );
-  } else {
-    blockedMcpServers.push(
-      ...Object.entries(mcpServers).map(([key, server]) => ({
-        name: key,
-        extensionName: server.extension?.name || '',
-      })),
-    );
-    mcpServers = {};
-  }
-  return mcpServers;
-}
-
-function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
-  const mcpServers = { ...(settings.mcpServers || {}) };
-  for (const extension of extensions) {
-    if (!extension.isActive) {
-      continue;
-    }
-    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
-        debugLogger.warn(
-          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-        );
-        return;
-      }
-      mcpServers[key] = {
-        ...server,
-        extension,
-      };
-    });
-  }
-  return mcpServers;
-}
-
 function mergeExcludeTools(
   settings: Settings,
-  extensions: GeminiCLIExtension[],
   extraExcludes?: string[] | undefined,
 ): string[] {
   const allExcludeTools = new Set([
     ...(settings.tools?.exclude || []),
     ...(extraExcludes || []),
   ]);
-  for (const extension of extensions) {
-    if (!extension.isActive) {
-      continue;
-    }
-    for (const tool of extension.excludeTools || []) {
-      allExcludeTools.add(tool);
-    }
-  }
   return [...allExcludeTools];
 }

@@ -13,7 +13,12 @@ import type {
   LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
 } from './types.js';
+import type {
+  ListExperimentsRequest,
+  ListExperimentsResponse,
+} from './experiments/types.js';
 import type {
   CountTokensParameters,
   CountTokensResponse,
@@ -147,6 +152,23 @@ export class CodeAssistServer implements ContentGenerator {
     _req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     throw Error();
+  }
+
+  async listExperiments(
+    metadata: ClientMetadata,
+  ): Promise<ListExperimentsResponse> {
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
+    const req: ListExperimentsRequest = {
+      project: projectId,
+      metadata: { ...metadata, duetProject: projectId },
+    };
+    return await this.requestPost<ListExperimentsResponse>(
+      'listExperiments',
+      req,
+    );
   }
 
   async requestPost<T>(

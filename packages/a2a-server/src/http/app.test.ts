@@ -28,6 +28,7 @@ import {
   vi,
 } from 'vitest';
 import { createApp } from './app.js';
+import { commandRegistry } from '../commands/command-registry.js';
 import {
   assertUniqueFinalEventIsLast,
   assertTaskCreationAndWorkingStatus,
@@ -35,6 +36,7 @@ import {
   createMockConfig,
 } from '../utils/testing_utils.js';
 import { MockTool } from '@google/gemini-cli-core';
+import type { Command } from '../commands/types.js';
 
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;
@@ -827,6 +829,104 @@ describe('E2E Tests', () => {
     expect(thoughtEvent.metadata?.['traceId']).toBe(traceId);
   });
 
+  describe('/listCommands', () => {
+    it('should return a list of top-level commands', async () => {
+      const mockCommands = [
+        {
+          name: 'test-command',
+          description: 'A test command',
+          topLevel: true,
+          arguments: [{ name: 'arg1', description: 'Argument 1' }],
+          subCommands: [
+            {
+              name: 'sub-command',
+              description: 'A sub command',
+              topLevel: false,
+              execute: vi.fn(),
+            },
+          ],
+          execute: vi.fn(),
+        },
+        {
+          name: 'another-command',
+          description: 'Another test command',
+          topLevel: true,
+          execute: vi.fn(),
+        },
+        {
+          name: 'not-top-level',
+          description: 'Not a top level command',
+          topLevel: false,
+          execute: vi.fn(),
+        },
+      ];
+
+      const getAllCommandsSpy = vi
+        .spyOn(commandRegistry, 'getAllCommands')
+        .mockReturnValue(mockCommands);
+
+      const agent = request.agent(app);
+      const res = await agent.get('/listCommands').expect(200);
+
+      expect(res.body).toEqual({
+        commands: [
+          {
+            name: 'test-command',
+            description: 'A test command',
+            arguments: [{ name: 'arg1', description: 'Argument 1' }],
+            subCommands: [
+              {
+                name: 'sub-command',
+                description: 'A sub command',
+                arguments: [],
+                subCommands: [],
+              },
+            ],
+          },
+          {
+            name: 'another-command',
+            description: 'Another test command',
+            arguments: [],
+            subCommands: [],
+          },
+        ],
+      });
+
+      expect(getAllCommandsSpy).toHaveBeenCalledOnce();
+      getAllCommandsSpy.mockRestore();
+    });
+
+    it('should handle cyclic commands gracefully', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const cyclicCommand: Command = {
+        name: 'cyclic-command',
+        description: 'A cyclic command',
+        topLevel: true,
+        execute: vi.fn(),
+        subCommands: [],
+      };
+      cyclicCommand.subCommands?.push(cyclicCommand); // Create cycle
+
+      const getAllCommandsSpy = vi
+        .spyOn(commandRegistry, 'getAllCommands')
+        .mockReturnValue([cyclicCommand]);
+
+      const agent = request.agent(app);
+      const res = await agent.get('/listCommands').expect(200);
+
+      expect(res.body.commands[0].name).toBe('cyclic-command');
+      expect(res.body.commands[0].subCommands).toEqual([]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Command cyclic-command already inserted in the response, skipping',
+      );
+
+      getAllCommandsSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+  });
+
   describe('/executeCommand', () => {
     const mockExtensions = [{ name: 'test-extension', version: '0.0.1' }];
 
@@ -846,7 +946,10 @@ describe('E2E Tests', () => {
         .set('Content-Type', 'application/json')
         .expect(200);
 
-      expect(res.body).toEqual(mockExtensions);
+      expect(res.body).toEqual({
+        name: 'extensions list',
+        data: mockExtensions,
+      });
       expect(getExtensionsSpy).toHaveBeenCalled();
     });
 

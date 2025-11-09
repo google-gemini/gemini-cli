@@ -108,6 +108,10 @@ vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
+vi.mock('./utils/mouse.js', () => ({
+  enableMouseEvents: vi.fn(),
+  disableMouseEvents: vi.fn(),
+}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -134,6 +138,7 @@ import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
+import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -290,6 +295,7 @@ describe('AppContainer State Management', () => {
       getExtensions: vi.fn().mockReturnValue([]),
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
+      start: vi.fn(),
     } as unknown as ExtensionManager);
     vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
       mockExtensionManager,
@@ -665,9 +671,9 @@ describe('AppContainer State Management', () => {
 
       // You can even verify that the plumbed function is callable
       act(() => {
-        capturedUIActions.handleProQuotaChoice('auth');
+        capturedUIActions.handleProQuotaChoice('retry_later');
       });
-      expect(mockHandler).toHaveBeenCalledWith('auth');
+      expect(mockHandler).toHaveBeenCalledWith('retry_later');
       unmount();
     });
   });
@@ -1367,6 +1373,171 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Copy Mode (CTRL+S)', () => {
+    let handleGlobalKeypress: (key: Key) => void;
+    let rerender: () => void;
+    let unmount: () => void;
+
+    const setupCopyModeTest = async (isAlternateMode = false) => {
+      // Update settings for this test run
+      const testSettings = {
+        ...mockSettings,
+        merged: {
+          ...mockSettings.merged,
+          ui: {
+            ...mockSettings.merged.ui,
+            useAlternateBuffer: isAlternateMode,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      const renderResult = render(
+        <AppContainer
+          config={mockConfig}
+          settings={testSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      rerender = () =>
+        renderResult.rerender(
+          <AppContainer
+            config={mockConfig}
+            settings={testSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+      unmount = renderResult.unmount;
+    };
+
+    beforeEach(() => {
+      mockStdout.write.mockClear();
+      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
+        handleGlobalKeypress = callback;
+      });
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    describe.each([
+      {
+        isAlternateMode: false,
+        shouldEnable: false,
+        modeName: 'Normal Mode',
+      },
+      {
+        isAlternateMode: true,
+        shouldEnable: true,
+        modeName: 'Alternate Buffer Mode',
+      },
+    ])('$modeName', ({ isAlternateMode, shouldEnable }) => {
+      it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when Ctrl+S is pressed`, async () => {
+        await setupCopyModeTest(isAlternateMode);
+        mockStdout.write.mockClear(); // Clear initial enable call
+
+        act(() => {
+          handleGlobalKeypress({
+            name: 's',
+            ctrl: true,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: '\x13',
+          });
+        });
+        rerender();
+
+        if (shouldEnable) {
+          expect(disableMouseEvents).toHaveBeenCalled();
+        } else {
+          expect(disableMouseEvents).not.toHaveBeenCalled();
+        }
+        unmount();
+      });
+
+      if (shouldEnable) {
+        it('should toggle mouse back on when Ctrl+S is pressed again', async () => {
+          await setupCopyModeTest(isAlternateMode);
+          mockStdout.write.mockClear();
+
+          // Turn it on (disable mouse)
+          act(() => {
+            handleGlobalKeypress({
+              name: 's',
+              ctrl: true,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: '\x13',
+            });
+          });
+          rerender();
+          expect(disableMouseEvents).toHaveBeenCalled();
+
+          // Turn it off (enable mouse)
+          act(() => {
+            handleGlobalKeypress({
+              name: 'any', // Any key should exit copy mode
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: 'a',
+            });
+          });
+          rerender();
+
+          expect(enableMouseEvents).toHaveBeenCalled();
+          unmount();
+        });
+
+        it('should exit copy mode on any key press', async () => {
+          await setupCopyModeTest(isAlternateMode);
+
+          // Enter copy mode
+          act(() => {
+            handleGlobalKeypress({
+              name: 's',
+              ctrl: true,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: '\x13',
+            });
+          });
+          rerender();
+
+          mockStdout.write.mockClear();
+
+          // Press any other key
+          act(() => {
+            handleGlobalKeypress({
+              name: 'a',
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence: 'a',
+            });
+          });
+          rerender();
+
+          // Should have re-enabled mouse
+          expect(enableMouseEvents).toHaveBeenCalled();
+          unmount();
+        });
+      }
+    });
+  });
+
   describe('Model Dialog Integration', () => {
     it('should provide isModelDialogOpen in the UIStateContext', async () => {
       mockedUseModelCommand.mockReturnValue({
@@ -1499,6 +1670,79 @@ describe('AppContainer State Management', () => {
         }),
         expect.any(Number),
       );
+      unmount();
+    });
+
+    it('updates currentModel when ModelChanged event is received', async () => {
+      // Arrange: Mock initial model
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
+
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Verify initial model
+      await act(async () => {
+        await vi.waitFor(() => {
+          expect(capturedUIState?.currentModel).toBe('initial-model');
+        });
+      });
+
+      // Get the registered handler for ModelChanged
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ModelChanged,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      // Act: Simulate ModelChanged event
+      act(() => {
+        handler({ model: 'new-model' });
+      });
+
+      // Assert: Verify model is updated
+      expect(capturedUIState.currentModel).toBe('new-model');
+      unmount();
+    });
+  });
+
+  describe('Shell Interaction', () => {
+    it('should not crash if resizing the pty fails', async () => {
+      const resizePtySpy = vi
+        .spyOn(ShellExecutionService, 'resizePty')
+        .mockImplementation(() => {
+          throw new Error('Cannot resize a pty that has already exited');
+        });
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+        activePtyId: 'some-pty-id', // Make sure activePtyId is set
+      });
+
+      // The main assertion is that the render does not throw.
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(resizePtySpy).toHaveBeenCalled();
       unmount();
     });
   });

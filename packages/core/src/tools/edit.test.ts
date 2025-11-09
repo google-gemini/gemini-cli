@@ -55,10 +55,10 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { Content, Part, SchemaUnion } from '@google/genai';
-import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -88,7 +88,7 @@ describe('EditTool', () => {
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
-      getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
+      getWorkspaceContext: () => new WorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
       getIdeMode: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
@@ -300,17 +300,6 @@ describe('EditTool', () => {
       expect(tool.validateToolParams(params)).toBeNull();
     });
 
-    it('should return error for relative path', () => {
-      const params: EditToolParams = {
-        file_path: 'test.txt',
-        old_string: 'old',
-        new_string: 'new',
-      };
-      expect(tool.validateToolParams(params)).toMatch(
-        /File path must be absolute/,
-      );
-    });
-
     it('should return error for path outside root', () => {
       const params: EditToolParams = {
         file_path: path.join(tempDir, 'outside-root.txt'),
@@ -332,13 +321,29 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
     });
 
-    it('should throw an error if params are invalid', async () => {
+    it('should resolve relative path and request confirmation', async () => {
+      fs.writeFileSync(filePath, 'some old content here');
       const params: EditToolParams = {
-        file_path: 'relative.txt',
+        file_path: testFile, // relative path
         old_string: 'old',
         new_string: 'new',
       };
-      expect(() => tool.build(params)).toThrow();
+      // ensureCorrectEdit will be called by shouldConfirmExecute
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, file_path: filePath },
+        occurrences: 1,
+      });
+      const invocation = tool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).toEqual(
+        expect.objectContaining({
+          title: `Confirm Edit: ${testFile}`,
+          fileName: testFile,
+          fileDiff: expect.any(String),
+        }),
+      );
     });
 
     it('should request confirmation for valid edit', async () => {
@@ -531,13 +536,21 @@ describe('EditTool', () => {
       });
     });
 
-    it('should throw error if file path is not absolute', async () => {
+    it('should resolve relative path and execute successfully', async () => {
+      const initialContent = 'This is some old text.';
+      const newContent = 'This is some new text.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
       const params: EditToolParams = {
-        file_path: 'relative.txt',
+        file_path: testFile, // relative path
         old_string: 'old',
         new_string: 'new',
       };
-      expect(() => tool.build(params)).toThrow(/File path must be absolute/);
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
     });
 
     it('should throw error if file path is empty', async () => {
@@ -927,13 +940,13 @@ describe('EditTool', () => {
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_CHANGE);
     });
 
-    it('should throw INVALID_PARAMETERS error for relative path', async () => {
+    it('should not throw error for relative path', async () => {
       const params: EditToolParams = {
         file_path: 'relative/path.txt',
         old_string: 'a',
         new_string: 'b',
       };
-      expect(() => tool.build(params)).toThrow();
+      expect(() => tool.build(params)).not.toThrow();
     });
 
     it('should return FILE_WRITE_FAILURE on write error', async () => {
@@ -1046,9 +1059,7 @@ describe('EditTool', () => {
       expect(
         (schema.parametersJsonSchema as EditFileParameterSchema).properties
           .file_path.description,
-      ).toBe(
-        "The absolute path to the file to modify (e.g., 'C:\\Users\\project\\file.txt'). Must be an absolute path.",
-      );
+      ).toBe('The path to the file to modify.');
     });
 
     it('should use unix-style path examples on non-windows platforms', () => {
@@ -1059,9 +1070,7 @@ describe('EditTool', () => {
       expect(
         (schema.parametersJsonSchema as EditFileParameterSchema).properties
           .file_path.description,
-      ).toBe(
-        "The absolute path to the file to modify (e.g., '/home/user/project/file.txt'). Must start with '/'.",
-      );
+      ).toBe('The path to the file to modify.');
     });
   });
 

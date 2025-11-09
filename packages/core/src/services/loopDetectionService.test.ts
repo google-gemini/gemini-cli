@@ -207,6 +207,82 @@ describe('LoopDetectionService', () => {
       expect(isLoop).toBe(false);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
+
+    it('should detect a loop with longer repeating patterns (e.g. ~150 chars)', () => {
+      service.reset('');
+      const longPattern = createRepetitiveContent(1, 150);
+      expect(longPattern.length).toBe(150);
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
+        isLoop = service.addAndCheck(createContentEvent(longPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect the specific user-provided loop example', () => {
+      service.reset('');
+      const userPattern = `I will not output any text.
+  I will just end the turn.
+  I am done.
+  I will not do anything else.
+  I will wait for the user's next command.
+`;
+
+      let isLoop = false;
+      // Loop enough times to trigger the threshold
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(userPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect the second specific user-provided loop example', () => {
+      service.reset('');
+      const userPattern =
+        'I have added all the requested logs and verified the test file. I will now mark the task as complete.\n  ';
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(userPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect a loop of alternating short phrases', () => {
+      service.reset('');
+      const alternatingPattern = 'Thinking... Done. ';
+
+      let isLoop = false;
+      // Needs more iterations because the pattern is short relative to chunk size,
+      // so it takes a few slides of the window to find the exact alignment.
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD * 3; i++) {
+        isLoop = service.addAndCheck(createContentEvent(alternatingPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect a loop of repeated complex thought processes', () => {
+      service.reset('');
+      const thoughtPattern =
+        'I need to check the file. The file does not exist. I will create the file. ';
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(thoughtPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Content Loop Detection with Code Blocks', () => {
@@ -659,6 +735,12 @@ describe('LoopDetectionService LLM Checks', () => {
       getBaseLlmClient: () => mockBaseLlmClient,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockReturnValue({
+          model: 'cognitive-loop-v1',
+          generateContentConfig: {},
+        }),
+      },
     } as unknown as Config;
 
     service = new LoopDetectionService(mockConfig);
@@ -689,9 +771,9 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
+        modelConfigKey: expect.any(Object),
         systemInstruction: expect.any(String),
         contents: expect.any(Array),
-        model: expect.any(String),
         schema: expect.any(Object),
         promptId: expect.any(String),
       }),

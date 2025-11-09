@@ -7,6 +7,7 @@
 let detectionComplete = false;
 let protocolSupported = false;
 let protocolEnabled = false;
+let sgrMouseEnabled = false;
 
 /**
  * Detects Kitty keyboard protocol support.
@@ -76,11 +77,16 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
           process.stdout.write('\x1b[>1u');
           protocolSupported = true;
           protocolEnabled = true;
-
-          // Set up cleanup on exit
-          process.on('exit', disableProtocol);
-          process.on('SIGTERM', disableProtocol);
         }
+
+        // Broaden mouse support by enabling SGR mode if we get any device
+        // attribute response, which is a strong signal of a modern terminal.
+        process.stdout.write('\x1b[?1006h');
+        sgrMouseEnabled = true;
+
+        // Set up cleanup on exit for all enabled protocols
+        process.on('exit', disableAllProtocols);
+        process.on('SIGTERM', disableAllProtocols);
 
         detectionComplete = true;
         resolve(protocolSupported);
@@ -100,10 +106,14 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
   });
 }
 
-function disableProtocol() {
+function disableAllProtocols() {
   if (protocolEnabled) {
     process.stdout.write('\x1b[<u');
     protocolEnabled = false;
+  }
+  if (sgrMouseEnabled) {
+    process.stdout.write('\x1b[?1006l'); // Disable SGR Mouse
+    sgrMouseEnabled = false;
   }
 }
 

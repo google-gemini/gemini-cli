@@ -23,7 +23,8 @@ import {
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {
@@ -48,7 +49,7 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 export interface ShellToolParams {
   command: string;
   description?: string;
-  directory?: string;
+  dir_path?: string;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -70,8 +71,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     let description = `${this.params.command}`;
     // append optional [in directory]
     // note description is needed even if validation fails due to absolute path
-    if (this.params.directory) {
-      description += ` [in ${this.params.directory}]`;
+    if (this.params.dir_path) {
+      description += ` [in ${this.params.dir_path}]`;
+    } else {
+      description += ` [current working directory ${process.cwd()}]`;
     }
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
@@ -158,7 +161,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = this.params.directory || this.config.getTargetDir();
+      const cwd = this.params.dir_path
+        ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
+        : this.config.getTargetDir();
 
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
@@ -257,7 +262,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         llmContent = [
           `Command: ${this.params.command}`,
-          `Directory: ${this.params.directory || '(root)'}`,
+          `Directory: ${this.params.dir_path || '(root)'}`,
           `Output: ${result.output || '(empty)'}`,
           `Error: ${finalError}`, // Use the cleaned error string.
           `Exit Code: ${result.exitCode ?? '(none)'}`,
@@ -400,10 +405,10 @@ export class ShellTool extends BaseDeclarativeTool<
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
           },
-          directory: {
+          dir_path: {
             type: 'string',
             description:
-              '(OPTIONAL) The absolute path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
+              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
           },
         },
         required: ['command'],
@@ -434,17 +439,14 @@ export class ShellTool extends BaseDeclarativeTool<
     if (getCommandRoots(params.command).length === 0) {
       return 'Could not identify command root to obtain permission from user.';
     }
-    if (params.directory) {
-      if (!path.isAbsolute(params.directory)) {
-        return 'Directory must be an absolute path.';
-      }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const isWithinWorkspace = workspaceDirs.some((wsDir) =>
-        params.directory!.startsWith(wsDir),
+    if (params.dir_path) {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.dir_path,
       );
-
-      if (!isWithinWorkspace) {
-        return `Directory '${params.directory}' is not within any of the registered workspace directories.`;
+      const workspaceContext = this.config.getWorkspaceContext();
+      if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
+        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
       }
     }
     return null;
