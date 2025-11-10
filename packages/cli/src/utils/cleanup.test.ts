@@ -4,8 +4,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import type { registerCleanup, runExitCleanup } from './cleanup.js';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  type MockInstance,
+} from 'vitest';
+import type * as Fs from 'node:fs'; // Import the full type
+import {
+  cleanupCheckpoints as cleanupCheckpointsImpl, // Import the implementation
+} from './cleanup.js';
+import type {
+  cleanupCheckpoints,
+  registerCleanup,
+  runExitCleanup,
+} from './cleanup.js';
+import { join } from 'node:path';
+
+vi.mock('node:fs', () => ({
+  promises: {
+    rm: vi.fn(),
+  },
+}));
+
+const mockGetProjectTempDir = vi.fn();
+vi.mock('@google/gemini-cli-core', () => ({
+  Storage: class {
+    getProjectTempDir = mockGetProjectTempDir;
+  },
+}));
+
+type FsMock = {
+  promises: {
+    rm: MockInstance<typeof Fs.promises.rm>;
+  };
+};
 
 describe('cleanup', () => {
   let register: typeof registerCleanup;
@@ -61,5 +96,46 @@ describe('cleanup', () => {
 
     expect(errorFn).toHaveBeenCalledTimes(1);
     expect(successFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('cleanupCheckpoints', () => {
+  let cleanup: typeof cleanupCheckpoints;
+  let fs: FsMock;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    cleanup = cleanupCheckpointsImpl;
+    fs = (await import('node:fs')) as unknown as FsMock;
+  });
+
+  it('should construct the correct path and call fs.rm', async () => {
+    // Arrange
+    const fakeTempDir = '/fake/project/root/.gemini/temp';
+    mockGetProjectTempDir.mockReturnValue(fakeTempDir);
+    const expectedPath = join(fakeTempDir, 'checkpoints');
+
+    // Act
+    await cleanup();
+
+    // Assert
+    expect(mockGetProjectTempDir).toHaveBeenCalledTimes(1);
+    expect(fs.promises.rm).toHaveBeenCalledTimes(1);
+    expect(fs.promises.rm).toHaveBeenCalledWith(expectedPath, {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it('should ignore errors if fs.rm fails', async () => {
+    // Arrange
+    const fakeTempDir = '/fake/project/root/.gemini/temp';
+    mockGetProjectTempDir.mockReturnValue(fakeTempDir);
+    fs.promises.rm.mockRejectedValue(new Error('ENOENT')); // Simulate file not found
+
+    // Act & Assert
+    // Expect the function to resolve without throwing an error
+    await expect(cleanup()).resolves.not.toThrow();
+    expect(fs.promises.rm).toHaveBeenCalledTimes(1);
   });
 });
