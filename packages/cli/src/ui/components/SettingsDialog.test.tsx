@@ -234,7 +234,7 @@ const renderDialog = (
   },
 ) =>
   render(
-    <KeypressProvider kittyProtocolEnabled={false}>
+    <KeypressProvider>
       <SettingsDialog
         settings={settings}
         onSelect={onSelect}
@@ -679,7 +679,7 @@ describe('SettingsDialog', () => {
 
       const { stdin, unmount } = render(
         <VimModeProvider settings={settings}>
-          <KeypressProvider kittyProtocolEnabled={false}>
+          <KeypressProvider>
             <SettingsDialog settings={settings} onSelect={onSelect} />
           </KeypressProvider>
         </VimModeProvider>,
@@ -1062,7 +1062,7 @@ describe('SettingsDialog', () => {
       const onSelect = vi.fn();
 
       const { stdin, unmount, rerender } = render(
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
       );
@@ -1087,7 +1087,7 @@ describe('SettingsDialog', () => {
         {},
       );
       rerender(
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
       );

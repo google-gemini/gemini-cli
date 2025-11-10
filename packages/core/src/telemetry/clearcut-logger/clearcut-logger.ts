@@ -18,7 +18,6 @@ import type {
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ChatCompressionEvent,
   FileOperationEvent,
   InvalidChunkEvent,
@@ -102,6 +101,7 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
+  gws_experiment: number[];
 }
 
 export interface EventValue {
@@ -237,6 +237,7 @@ export class ClearcutLogger {
         {
           event_time_ms: Date.now(),
           source_extension_json: safeJsonStringify(event),
+          gws_experiment: this.config?.getExperiments()?.experimentIds ?? [],
         },
       ]);
 
@@ -843,20 +844,6 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.CONVERSATION_FINISHED, data),
-    );
-    this.flushIfNeeded();
-  }
-
-  logKittySequenceOverflowEvent(event: KittySequenceOverflowEvent): void {
-    const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_SEQUENCE_LENGTH,
-        value: event.sequence_length.toString(),
-      },
-    ];
-
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.KITTY_SEQUENCE_OVERFLOW, data),
     );
     this.flushIfNeeded();
   }

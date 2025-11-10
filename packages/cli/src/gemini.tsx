@@ -184,11 +184,10 @@ export async function startInteractiveUI(
 
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
-    const kittyProtocolStatus = useKittyKeyboardProtocol();
+    useKittyKeyboardProtocol();
     return (
       <SettingsContext.Provider value={settings}>
         <KeypressProvider
-          kittyProtocolEnabled={kittyProtocolStatus.enabled}
           config={config}
           debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
         >
