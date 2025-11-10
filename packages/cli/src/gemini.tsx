@@ -73,6 +73,7 @@ import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
+import ansiEscapes from 'ansi-escapes';
 
 const SLOW_RENDER_MS = 200;
 
@@ -233,6 +234,7 @@ export async function startInteractiveUI(
         }
       },
       alternateBuffer: settings.merged.ui?.useAlternateBuffer,
+      alternateBufferAlreadyActive: settings.merged.ui?.useAlternateBuffer,
     },
   );
 
@@ -419,6 +421,12 @@ export async function main() {
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
       process.stdin.setRawMode(true);
+
+      if (settings.merged.ui?.useAlternateBuffer) {
+        process.stdout.write(ansiEscapes.enterAlternativeScreen);
+
+        // Ink will cleanup so there is no need for us to manually cleanup.
+      }
 
       // This cleanup isn't strictly needed but may help in certain situations.
       process.on('SIGTERM', () => {
