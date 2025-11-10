@@ -73,6 +73,7 @@ import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
+import ansiEscapes from 'ansi-escapes';
 
 const SLOW_RENDER_MS = 200;
 
@@ -422,7 +423,7 @@ export async function main() {
       process.stdin.setRawMode(true);
 
       if (settings.merged.ui?.useAlternateBuffer) {
-        process.stdout.write('\x1b[?1049h');
+        process.stdout.write(ansiEscapes.enterAlternativeScreen);
 
         // Ink will cleanup so there is no need for us to manually cleanup.
       }
