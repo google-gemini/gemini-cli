@@ -42,6 +42,7 @@ interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
   toHaveEventName: (name: EventNames) => R;
   toHaveMetadataKey: (key: EventMetadataKey) => R;
+  toHaveGwsExperiments: (exps: number[]) => R;
 }
 
 declare module 'vitest' {
@@ -92,6 +93,21 @@ expect.extend({
         `event ${received} ${isNot ? 'has' : 'does not have'} the metadata key ${key}`,
     };
   },
+
+  toHaveGwsExperiments(received: LogEventEntry[], expected_exps: number[]) {
+    const { isNot } = this;
+    const exps = received[0].gws_experiment;
+
+    const pass =
+      exps.length === expected_exps.length &&
+      exps.every((value, index) => value === expected_exps[index]);
+
+    return {
+      pass,
+      message: () =>
+        `event ${received} ${isNot ? 'has' : 'does not have'} expected exp ids: ${expected_exps.join(',')}`,
+    };
+  },
 });
 
 vi.mock('../../utils/userAccountManager.js');
@@ -133,7 +149,11 @@ describe('ClearcutLogger', () => {
   });
 
   function setup({
-    config = {} as Partial<ConfigParameters>,
+    config = {
+      experiments: {
+        experimentIds: [123, 456, 789],
+      },
+    } as unknown as Partial<ConfigParameters>,
     lifetimeGoogleAccounts = 1,
     cachedGoogleAccount = 'test@google.com',
   } = {}) {
@@ -564,6 +584,7 @@ describe('ClearcutLogger', () => {
           {
             event_time_ms: Date.now(),
             source_extension_json: JSON.stringify({ event_id: i }),
+            gws_experiment: [],
           },
         ]);
       }
@@ -597,6 +618,7 @@ describe('ClearcutLogger', () => {
           {
             event_time_ms: Date.now(),
             source_extension_json: JSON.stringify({ event_id: `failed_${i}` }),
+            gws_experiment: [],
           },
         ]);
       }
@@ -710,6 +732,20 @@ describe('ClearcutLogger', () => {
         EventMetadataKey.GEMINI_CLI_AGENT_NAME,
         'TestAgent',
       ]);
+    });
+  });
+
+  describe('logExperiments', () => {
+    it('logs an event with gws_experiment field containing exp ids', () => {
+      const { logger } = setup();
+      const event = new AgentStartEvent('agent-123', 'TestAgent');
+
+      logger?.logAgentStartEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_START);
+      expect(events[0]).toHaveGwsExperiments([123, 456, 789]);
     });
   });
 
