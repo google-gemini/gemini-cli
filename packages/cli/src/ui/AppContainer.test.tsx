@@ -596,7 +596,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Session Resumption', () => {
-    it('handles resumed session data correctly', () => {
+    it('handles resumed session data correctly', async () => {
       const mockResumedSessionData = {
         conversation: {
           sessionId: 'test-session-123',
@@ -623,8 +623,9 @@ describe('AppContainer State Management', () => {
         filePath: '/tmp/test-session.json',
       };
 
-      expect(() => {
-        render(
+      let unmount: () => void;
+      await act(async () => {
+        const result = render(
           <AppContainer
             config={mockConfig}
             settings={mockSettings}
@@ -633,12 +634,17 @@ describe('AppContainer State Management', () => {
             resumedSessionData={mockResumedSessionData}
           />,
         );
-      }).not.toThrow();
+        unmount = result.unmount;
+      });
+      await act(async () => {
+        unmount();
+      });
     });
 
-    it('renders without resumed session data', () => {
-      expect(() => {
-        render(
+    it('renders without resumed session data', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = render(
           <AppContainer
             config={mockConfig}
             settings={mockSettings}
@@ -647,7 +653,11 @@ describe('AppContainer State Management', () => {
             resumedSessionData={undefined}
           />,
         );
-      }).not.toThrow();
+        unmount = result.unmount;
+      });
+      await act(async () => {
+        unmount();
+      });
     });
 
     it('initializes chat recording service when config has it', () => {
