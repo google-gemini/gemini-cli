@@ -60,17 +60,11 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
 
   if (loadRes.currentTier) {
     if (!loadRes.cloudaicompanionProject) {
-      if (projectId) {
-        return {
-          projectId,
-          userTier: loadRes.currentTier.id,
-        };
-      }
-      // Return reason for error if the user was found to be ineligible for the proposed tier.
-      if (loadRes.ineligibleTiers?.[0]?.reasonMessage) {
-        throw new IneligibleTierError(loadRes.ineligibleTiers[0].reasonMessage);
-      }
-      throw new ProjectIdRequiredError();
+      handleMissingProjectId(loadRes, projectId);
+      return {
+        projectId: projectId!,
+        userTier: loadRes.currentTier.id,
+      };
     }
     return {
       projectId: loadRes.cloudaicompanionProject,
@@ -108,24 +102,32 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
   }
 
   if (!lroRes.response?.cloudaicompanionProject?.id) {
-    if (projectId) {
-      return {
-        projectId,
-        userTier: tier.id,
-      };
-    }
-    // Looks like the user is not eligible. check and print why they aren't eligible
-    if (loadRes.ineligibleTiers?.[0]?.reasonMessage) {
-      throw new IneligibleTierError(loadRes.ineligibleTiers[0].reasonMessage);
-    }
-    //If ineligibilty reason wasn't found print the default error recommending a ProjectId
-    throw new ProjectIdRequiredError();
+    handleMissingProjectId(loadRes, projectId);
+    return {
+      projectId: projectId!,
+      userTier: tier.id,
+    };
   }
 
   return {
     projectId: lroRes.response.cloudaicompanionProject.id,
     userTier: tier.id,
   };
+}
+
+function handleMissingProjectId(
+  loadRes: LoadCodeAssistResponse,
+  projectId?: string,
+) {
+  if (projectId) {
+    return;
+  }
+  // Looks like the user is not eligible. check and print why they aren't eligible
+  if (loadRes.ineligibleTiers?.[0]?.reasonMessage) {
+    throw new IneligibleTierError(loadRes.ineligibleTiers[0].reasonMessage);
+  }
+  //If ineligibilty reason wasn't found print the default error recommending a ProjectId
+  throw new ProjectIdRequiredError();
 }
 
 function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {
