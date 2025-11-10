@@ -198,7 +198,7 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS and GEMINI_AUTH_TOKEN for GoogleGenAI requests', async () => {
+  it('If GOOGLE_GEMINI_BASE_URL is defined and is a databricks URL, should pass in the api key as a header', async () => {
     const mockConfig = {
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
@@ -211,7 +211,10 @@ describe('createContentGenerator', () => {
       'GEMINI_CLI_CUSTOM_HEADERS',
       'X-Test-Header: test, Another: value',
     );
-    vi.stubEnv('GEMINI_AUTH_TOKEN', 'test-api-token');
+    vi.stubEnv(
+      'GOOGLE_GEMINI_BASE_URL',
+      'https://test-workspace.databricks.com',
+    );
 
     const generator = await createContentGenerator(
       {
@@ -228,7 +231,7 @@ describe('createContentGenerator', () => {
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
           'X-Test-Header': 'test',
-          Authorization: 'Bearer test-api-token',
+          Authorization: 'Bearer test-api-key',
           Another: 'value',
         }),
       },
@@ -241,7 +244,7 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('GEMINI_AUTH_TOKEN should take precedence over GEMINI_CLI_CUSTOM_HEADERS', async () => {
+  it('If GOOGLE_GEMINI_BASE_URL is defined and is a databricks URL, auth header should take precedence over GEMINI_CLI_CUSTOM_HEADERS', async () => {
     const mockConfig = {
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
@@ -254,23 +257,26 @@ describe('createContentGenerator', () => {
       'GEMINI_CLI_CUSTOM_HEADERS',
       'Authorization: Bearer wrong-api-token, Another: value',
     );
-    vi.stubEnv('GEMINI_AUTH_TOKEN', 'correct-api-token');
+    vi.stubEnv(
+      'GOOGLE_GEMINI_BASE_URL',
+      'https://test-workspace.databricks.com',
+    );
 
     const generator = await createContentGenerator(
       {
-        apiKey: 'test-api-key',
+        apiKey: 'correct-api-key',
         authType: AuthType.USE_GEMINI,
       },
       mockConfig,
     );
 
     expect(GoogleGenAI).toHaveBeenCalledWith({
-      apiKey: 'test-api-key',
+      apiKey: 'correct-api-key',
       vertexai: undefined,
       httpOptions: {
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
-          Authorization: 'Bearer correct-api-token',
+          Authorization: 'Bearer correct-api-key',
           Another: 'value',
         }),
       },
