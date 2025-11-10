@@ -42,7 +42,7 @@ interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
   toHaveEventName: (name: EventNames) => R;
   toHaveMetadataKey: (key: EventMetadataKey) => R;
-  toHaveGwsExperiments: ([exps]: number[]) => R;
+  toHaveGwsExperiments: (exps: number[]) => R;
 }
 
 declare module 'vitest' {
@@ -97,7 +97,6 @@ expect.extend({
   toHaveGwsExperiments(received: LogEventEntry[], expected_exps: number[]) {
     const { isNot } = this;
     const exps = received[0].gws_experiment;
-    console.log('received exps: ', exps.join(','));
 
     const pass =
       exps.length === expected_exps.length &&
@@ -106,7 +105,7 @@ expect.extend({
     return {
       pass,
       message: () =>
-        `event ${received} ${isNot ? 'has' : 'does not have'} expected exp ids: ${expected_exps.join(',')}}`,
+        `event ${received} ${isNot ? 'has' : 'does not have'} expected exp ids: ${expected_exps.join(',')}`,
     };
   },
 });
