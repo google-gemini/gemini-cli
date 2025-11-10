@@ -594,7 +594,7 @@ describe('extension tests', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should not load github extensions if githubExtensionsBlocked is set', async () => {
+    it('should not load github extensions if blockGitExtensions is set', async () => {
       createExtension({
         extensionsDir: userExtensionsDir,
         name: 'my-ext',
@@ -605,16 +605,16 @@ describe('extension tests', () => {
         },
       });
 
-      const blockGithubExtensionsSetting = {
+      const blockGitExtensionsSetting = {
         security: {
-          blockGithubExtensions: true,
+          blockGitExtensions: true,
         },
       };
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        settings: blockGithubExtensionsSetting,
+        settings: blockGitExtensionsSetting,
       });
       const extensions = await extensionManager.loadExtensions();
       const extension = extensions.find((e) => e.name === 'my-ext');
@@ -904,18 +904,18 @@ describe('extension tests', () => {
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should not install a github extension if blockGithubExtensions is set', async () => {
+    it('should not install a github extension if blockGitExtensions is set', async () => {
       const gitUrl = 'https://somehost.com/somerepo.git';
-      const blockGithubExtensionsSetting = {
+      const blockGitExtensionsSetting = {
         security: {
-          blockGithubExtensions: true,
+          blockGitExtensions: true,
         },
       };
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        settings: blockGithubExtensionsSetting,
+        settings: blockGitExtensionsSetting,
       });
       await extensionManager.loadExtensions();
       await expect(

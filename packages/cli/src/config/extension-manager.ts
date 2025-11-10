@@ -131,7 +131,7 @@ export class ExtensionManager extends ExtensionLoader {
     if (
       (installMetadata.type === 'git' ||
         installMetadata.type === 'github-release') &&
-      this.settings.security?.blockGithubExtensions
+      this.settings.security?.blockGitExtensions
     ) {
       throw new Error(
         'Installing extensions from remote sources is disallowed by your current settings.',
@@ -457,8 +457,8 @@ export class ExtensionManager extends ExtensionLoader {
     if (
       (installMetadata?.type === 'git' ||
         installMetadata?.type === 'github-release') &&
-        this.settings.security?.blockGithubExtensions
-      ) {
+      this.settings.security?.blockGitExtensions
+    ) {
       return null;
     }
 
