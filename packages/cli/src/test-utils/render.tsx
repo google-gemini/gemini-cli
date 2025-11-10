@@ -120,7 +120,6 @@ export const renderWithProviders = (
     settings = mockSettings,
     uiState: providedUiState,
     width,
-    kittyProtocolEnabled = true,
     mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
   }: {
@@ -128,7 +127,6 @@ export const renderWithProviders = (
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
-    kittyProtocolEnabled?: boolean;
     mouseEventsEnabled?: boolean;
     config?: Config;
   } = {},
@@ -166,7 +164,7 @@ export const renderWithProviders = (
         <UIStateContext.Provider value={finalUiState}>
           <VimModeProvider settings={settings}>
             <ShellFocusContext.Provider value={shellFocus}>
-              <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
+              <KeypressProvider>
                 <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
                   <ScrollProvider>
                     <Box
