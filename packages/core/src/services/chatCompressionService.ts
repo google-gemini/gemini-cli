@@ -18,8 +18,11 @@ import { getInitialChatHistory } from '../utils/environmentContext.js';
 /**
  * Default threshold for compression token count as a fraction of the model's
  * token limit. If the chat history exceeds this threshold, it will be compressed.
+ * For messages with image references, a higher threshold is used to prevent
+ * unnecessary compression.
  */
 export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.2;
+export const IMAGE_COMPRESSION_TOKEN_THRESHOLD = 0.8;
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
@@ -105,9 +108,24 @@ export class ChatCompressionService {
 
     // Don't compress if not forced and we are under the limit.
     if (!force) {
+      // Check if the message contains image references
+      const hasImageReferences = curatedHistory.some((content) =>
+        content.parts?.some(
+          (part) =>
+            'text' in part &&
+            typeof part.text === 'string' &&
+            part.text.includes('@') &&
+            /\.(png|jpg|jpeg|gif|webp)/.test(part.text),
+        ),
+      );
+
+      // Use higher threshold for messages with image references
       const threshold =
         (await config.getCompressionThreshold()) ??
-        DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
+        (hasImageReferences
+          ? IMAGE_COMPRESSION_TOKEN_THRESHOLD
+          : DEFAULT_COMPRESSION_TOKEN_THRESHOLD);
+
       if (originalTokenCount < threshold * tokenLimit(model)) {
         return {
           newHistory: null,
@@ -176,12 +194,28 @@ export class ChatCompressionService {
     // Use a shared utility to construct the initial history for an accurate token count.
     const fullNewHistory = await getInitialChatHistory(config, extraHistory);
 
-    // Estimate token count 1 token ≈ 4 characters
+    // Calculate token count:
+    // - Text content: estimate 1 token ≈ 4 characters
+    // - Images/binary: fixed token cost (50) since they're handled specially by the model
+    // This prevents image data from being counted as text tokens and inflating the count
     const newTokenCount = Math.floor(
-      fullNewHistory.reduce(
-        (total, content) => total + JSON.stringify(content).length,
-        0,
-      ) / 4,
+      fullNewHistory.reduce((total, content) => {
+        if (!content.parts) return total;
+
+        return (
+          total +
+          content.parts.reduce((partTotal, part) => {
+            if ('text' in part) {
+              // Text: estimate 1 token ≈ 4 characters
+              return partTotal + (part.text?.length || 0) / 4;
+            } else if ('inlineData' in part) {
+              // Images and other binary data: count only the metadata
+              return partTotal + 50; // Fixed token cost for images
+            }
+            return partTotal;
+          }, 0)
+        );
+      }, 0),
     );
 
     logChatCompression(

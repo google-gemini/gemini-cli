@@ -66,6 +66,42 @@ export function isThinkingDefault(model: string) {
 const MAX_TURNS = 100;
 
 export class GeminiClient {
+  /**
+   * Estimates the token count for a request, handling different content types appropriately:
+   * - Text: Uses character length / 4 as an approximation
+   * - Images/Binary: Uses a fixed token cost since they're handled specially by the model
+   * - File references: Uses a minimal token cost for metadata
+   */
+  private estimateTokenCount(request: PartListUnion): number {
+    // If request is a single part, wrap it in an array
+    const parts = Array.isArray(request) ? request : [request];
+
+    return Math.floor(
+      parts.reduce((total, part) => {
+        // Handle string parts (plain text)
+        if (typeof part === 'string') {
+          return total + part.length / 4;
+        }
+
+        // Handle object parts
+        if (typeof part === 'object' && part !== null) {
+          if ('text' in part && typeof part.text === 'string') {
+            return total + part.text.length / 4;
+          }
+          if ('inlineData' in part) {
+            // Images and other binary data: use fixed token cost
+            return total + 50;
+          }
+          if ('fileData' in part) {
+            // File references: minimal token cost for metadata
+            return total + 10;
+          }
+        }
+
+        return total;
+      }, 0),
+    );
+  }
   private chat?: GeminiChat;
   private readonly generateContentConfig: GenerateContentConfig = {
     temperature: 0,
@@ -429,9 +465,8 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
 
-    const estimatedRequestTokenCount = Math.floor(
-      JSON.stringify(request).length / 4,
-    );
+    // Calculate token count for request, handling images differently
+    const estimatedRequestTokenCount = this.estimateTokenCount(request);
 
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
