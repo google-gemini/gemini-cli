@@ -21,8 +21,6 @@ export async function handleFallback(
 
   const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 
-  if (failedModel === fallbackModel) return null;
-
   // Consult UI Handler for Intent
   const fallbackModelHandler = config.fallbackModelHandler;
   if (typeof fallbackModelHandler !== 'function') return null;
@@ -46,7 +44,7 @@ export async function handleFallback(
         activateFallbackMode(config, authType);
         return false;
 
-      case 'auth':
+      case 'retry_later':
         return false;
 
       default:

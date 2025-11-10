@@ -72,6 +72,7 @@ import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
+import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -183,11 +184,10 @@ export async function startInteractiveUI(
 
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
-    const kittyProtocolStatus = useKittyKeyboardProtocol();
+    useKittyKeyboardProtocol();
     return (
       <SettingsContext.Provider value={settings}>
         <KeypressProvider
-          kittyProtocolEnabled={kittyProtocolStatus.enabled}
           config={config}
           debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
         >
@@ -197,17 +197,19 @@ export async function startInteractiveUI(
               settings.merged.general?.debugKeystrokeLogging
             }
           >
-            <SessionStatsProvider>
-              <VimModeProvider settings={settings}>
-                <AppContainer
-                  config={config}
-                  settings={settings}
-                  startupWarnings={startupWarnings}
-                  version={version}
-                  initializationResult={initializationResult}
-                />
-              </VimModeProvider>
-            </SessionStatsProvider>
+            <ScrollProvider>
+              <SessionStatsProvider>
+                <VimModeProvider settings={settings}>
+                  <AppContainer
+                    config={config}
+                    settings={settings}
+                    startupWarnings={startupWarnings}
+                    version={version}
+                    initializationResult={initializationResult}
+                  />
+                </VimModeProvider>
+              </SessionStatsProvider>
+            </ScrollProvider>
           </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
