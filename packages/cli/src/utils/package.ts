@@ -29,7 +29,12 @@ export async function getPackageJson(): Promise<PackageJson | undefined> {
 
   const result = await readPackageUp({ cwd: __dirname });
   if (!result) {
-    // TODO: Maybe bubble this up as an error.
+    // This should only happen in malformed installations where package.json
+    // is missing from the entire directory tree. Log a warning but return
+    // undefined to allow callers to gracefully degrade (e.g., version: 'unknown').
+    console.warn(
+      'Warning: Could not find package.json. CLI features may be degraded.',
+    );
     return;
   }
 
