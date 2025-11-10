@@ -24,6 +24,7 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `!`                                                | Toggle shell mode when the input is empty.                                                                                          |
 | `\` (at end of line) + `Enter`                     | Insert a newline.                                                                                                                   |
+| `Ctrl+Enter` / `Meta+Enter`                        | Execute the current input as a shell command directly without switching to shell mode (works in prompt mode).                       |
 | `Down Arrow`                                       | Navigate down through the input history.                                                                                            |
 | `Enter`                                            | Submit the current prompt.                                                                                                          |
 | `Meta+Delete` / `Ctrl+Delete`                      | Delete the word to the right of the cursor.                                                                                         |
