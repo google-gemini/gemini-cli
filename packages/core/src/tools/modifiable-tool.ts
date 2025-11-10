@@ -46,6 +46,11 @@ export interface ModifyResult<ToolParams> {
   updatedDiff: string;
 }
 
+export interface ModifyContentOverrides {
+  currentContent?: string | null;
+  proposedContent?: string;
+}
+
 /**
  * Type guard to check if a declarative tool is modifiable.
  */
@@ -172,14 +177,24 @@ export async function modifyWithEditor<ToolParams>(
   editorType: EditorType,
   _abortSignal: AbortSignal,
   onEditorClose: () => void,
+  overrides?: ModifyContentOverrides,
 ): Promise<ModifyResult<ToolParams>> {
-  const currentContent = await modifyContext.getCurrentContent(originalParams);
-  const proposedContent =
-    await modifyContext.getProposedContent(originalParams);
+  const hasCurrentOverride =
+    overrides !== undefined && 'currentContent' in overrides;
+  const hasProposedOverride =
+    overrides !== undefined && 'proposedContent' in overrides;
+
+  const currentContent = hasCurrentOverride
+    ? (overrides!.currentContent ?? '')
+    : await modifyContext.getCurrentContent(originalParams);
+
+  const proposedContent = hasProposedOverride
+    ? (overrides!.proposedContent ?? '')
+    : await modifyContext.getProposedContent(originalParams);
 
   const { oldPath, newPath, dirPath } = createTempFilesForModify(
-    currentContent,
-    proposedContent,
+    currentContent ?? '',
+    proposedContent ?? '',
     modifyContext.getFilePath(originalParams),
   );
 
