@@ -38,7 +38,7 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe(`useKeypress with useKitty=%s`, () => {
+describe(`useKeypress`, () => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
@@ -144,6 +144,7 @@ describe(`useKeypress with useKitty=%s`, () => {
         meta: false,
         shift: false,
         paste: true,
+        insertable: true,
         sequence: pasteText,
       });
     });
@@ -281,6 +282,7 @@ describe(`useKeypress with useKitty=%s`, () => {
         meta: false,
         shift: false,
         paste: true,
+        insertable: true,
         sequence: pasteText,
       });
     });
