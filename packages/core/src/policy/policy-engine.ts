@@ -140,7 +140,8 @@ export class PolicyEngine {
               toolCall,
               checkerRule.checker,
             );
-            if (result.decision !== SafetyCheckDecision.ALLOW) {
+
+            if (result.decision === SafetyCheckDecision.DENY) {
               debugLogger.debug(
                 `[PolicyEngine.check] Safety checker denied: ${result.reason}`,
               );
@@ -148,6 +149,11 @@ export class PolicyEngine {
                 decision: PolicyDecision.DENY,
                 rule: matchedRule,
               };
+            } else if (result.decision === SafetyCheckDecision.ASK_USER) {
+              debugLogger.debug(
+                `[PolicyEngine.check] Safety checker requested ASK_USER: ${result.reason}`,
+              );
+              decision = PolicyDecision.ASK_USER;
             }
           } catch (error) {
             debugLogger.debug(
@@ -163,7 +169,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision,
+      decision: this.applyNonInteractiveMode(decision),
       rule: matchedRule,
     };
   }

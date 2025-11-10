@@ -1198,5 +1198,56 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
       expect(mockCheckerRunner.runChecker).toHaveBeenCalled();
     });
+
+    it('should downgrade ALLOW to ASK_USER if checker returns ASK_USER', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'tool', decision: PolicyDecision.ALLOW },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          checker: {
+            type: 'in-process',
+            name: InProcessCheckerType.ALLOWED_PATH,
+          },
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ASK_USER,
+        reason: 'Suspicious path',
+      });
+
+      const result = await engine.check({ name: 'tool' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should DENY if checker returns ASK_USER in non-interactive mode', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'tool', decision: PolicyDecision.ALLOW },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          checker: {
+            type: 'in-process',
+            name: InProcessCheckerType.ALLOWED_PATH,
+          },
+        },
+      ];
+
+      engine = new PolicyEngine(
+        { rules, checkers, nonInteractive: true },
+        mockCheckerRunner,
+      );
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ASK_USER,
+        reason: 'Suspicious path',
+      });
+
+      const result = await engine.check({ name: 'tool' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
   });
 });
