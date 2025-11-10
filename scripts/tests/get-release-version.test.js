@@ -80,7 +80,10 @@ describe('getVersion', () => {
 
     it('should calculate the next preview version from the latest nightly', () => {
       vi.mocked(execSync).mockImplementation(mockExecSync);
-      const result = getVersion({ type: 'preview' });
+      const result = getVersion({
+        type: 'preview',
+        'stable-base-version': '0.7.0',
+      });
       expect(result.releaseVersion).toBe('0.8.0-preview.0');
       expect(result.npmTag).toBe('preview');
       expect(result.previousReleaseTag).toBe('v0.7.0-preview.1');
@@ -136,7 +139,10 @@ describe('getVersion', () => {
       };
       vi.mocked(execSync).mockImplementation(mockWithDeprecated);
 
-      const result = getVersion({ type: 'preview' });
+      const result = getVersion({
+        type: 'preview',
+        'stable-base-version': '0.7.0',
+      });
       // It should base the preview off 0.8.0, not the deprecated 0.9.0
       expect(result.releaseVersion).toBe('0.8.0-preview.0');
     });
@@ -178,7 +184,10 @@ describe('getVersion', () => {
       };
       vi.mocked(execSync).mockImplementation(mockWithConflict);
 
-      const result = getVersion({ type: 'preview' });
+      const result = getVersion({
+        type: 'preview',
+        'stable-base-version': '0.7.0',
+      });
       // Should have skipped preview.0 and landed on preview.1
       expect(result.releaseVersion).toBe('0.8.0-preview.1');
     });
