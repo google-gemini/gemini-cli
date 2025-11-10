@@ -40,6 +40,7 @@ import type {
   Unsubscribe,
   WorkspaceContext,
 } from '../utils/workspaceContext.js';
+import { validateCommand, validateEnvironment, CommandValidationError } from '../security/command-validator.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -1338,6 +1339,31 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
+    // SECURITY: Validate command before executing
+    try {
+      validateCommand(
+        mcpServerConfig.command,
+        mcpServerConfig.args || [],
+        {
+          requireAbsolutePath: false, // Allow commands in PATH
+          allowDangerousCommands: false,
+          trusted: mcpServerConfig.trust,
+        },
+      );
+
+      // SECURITY: Validate environment variables
+      if (mcpServerConfig.env) {
+        validateEnvironment(mcpServerConfig.env);
+      }
+    } catch (error) {
+      if (error instanceof CommandValidationError) {
+        throw new Error(
+          `Security validation failed for MCP server '${mcpServerName}': ${error.message}`,
+        );
+      }
+      throw error;
+    }
+
     const transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
