@@ -67,7 +67,6 @@ export enum SafetyCheckDecision {
   ALLOW = 'allow',
   DENY = 'deny',
   ASK_USER = 'ask_user',
-  CONTINUE_CHECKING = 'continue_checking',
 }
 
 /**
@@ -92,8 +91,4 @@ export type SafetyCheckResult =
   | {
       decision: SafetyCheckDecision.ASK_USER;
       reason: string;
-    }
-  | {
-      decision: SafetyCheckDecision.CONTINUE_CHECKING;
-      reason?: string;
     };
