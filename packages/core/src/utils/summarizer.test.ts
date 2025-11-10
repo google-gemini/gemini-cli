@@ -14,6 +14,11 @@ import {
   defaultSummarizer,
 } from './summarizer.js';
 import type { ToolResult } from '../tools/tools.js';
+import type {
+  ModelConfigService,
+  ResolvedModelConfig,
+} from '../services/modelConfigService.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -22,11 +27,18 @@ vi.mock('../config/config.js');
 describe('summarizers', () => {
   let mockGeminiClient: GeminiClient;
   let MockConfig: Mock;
+  let mockConfigInstance: Config;
   const abortSignal = new AbortController().signal;
+  const mockResolvedConfig = {
+    model: 'gemini-pro',
+    generateContentConfig: {
+      maxOutputTokens: 2000,
+    },
+  } as unknown as ResolvedModelConfig;
 
   beforeEach(() => {
     MockConfig = vi.mocked(Config);
-    const mockConfigInstance = new MockConfig(
+    mockConfigInstance = new MockConfig(
       'test-api-key',
       'gemini-pro',
       false,
@@ -38,6 +50,9 @@ describe('summarizers', () => {
       undefined,
       undefined,
     );
+    (mockConfigInstance.modelConfigService as unknown) = {
+      getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
+    } as unknown as ModelConfigService;
 
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     (mockGeminiClient.generateContent as Mock) = vi.fn();
@@ -54,10 +69,11 @@ describe('summarizers', () => {
     it('should return original text if it is shorter than maxLength', async () => {
       const shortText = 'This is a short text.';
       const result = await summarizeToolOutput(
+        mockConfigInstance,
+        { model: DEFAULT_GEMINI_MODEL },
         shortText,
         mockGeminiClient,
         abortSignal,
-        2000,
       );
       expect(result).toBe(shortText);
       expect(mockGeminiClient.generateContent).not.toHaveBeenCalled();
@@ -66,10 +82,11 @@ describe('summarizers', () => {
     it('should return original text if it is empty', async () => {
       const emptyText = '';
       const result = await summarizeToolOutput(
+        mockConfigInstance,
+        { model: DEFAULT_GEMINI_MODEL },
         emptyText,
         mockGeminiClient,
         abortSignal,
-        2000,
       );
       expect(result).toBe(emptyText);
       expect(mockGeminiClient.generateContent).not.toHaveBeenCalled();
@@ -81,12 +98,12 @@ describe('summarizers', () => {
       (mockGeminiClient.generateContent as Mock).mockResolvedValue({
         candidates: [{ content: { parts: [{ text: summary }] } }],
       });
-
       const result = await summarizeToolOutput(
+        mockConfigInstance,
+        { model: DEFAULT_GEMINI_MODEL },
         longText,
         mockGeminiClient,
         abortSignal,
-        2000,
       );
 
       expect(mockGeminiClient.generateContent).toHaveBeenCalledTimes(1);
@@ -99,10 +116,11 @@ describe('summarizers', () => {
       (mockGeminiClient.generateContent as Mock).mockRejectedValue(error);
 
       const result = await summarizeToolOutput(
+        mockConfigInstance,
+        { model: DEFAULT_GEMINI_MODEL },
         longText,
         mockGeminiClient,
         abortSignal,
-        2000,
       );
 
       expect(mockGeminiClient.generateContent).toHaveBeenCalledTimes(1);
@@ -115,8 +133,24 @@ describe('summarizers', () => {
       (mockGeminiClient.generateContent as Mock).mockResolvedValue({
         candidates: [{ content: { parts: [{ text: summary }] } }],
       });
+      (mockConfigInstance.modelConfigService as unknown) = {
+        getResolvedConfig() {
+          return {
+            model: 'gemini-pro-limited',
+            generateContentConfig: {
+              maxOutputTokens: 1000,
+            },
+          };
+        },
+      };
 
-      await summarizeToolOutput(longText, mockGeminiClient, abortSignal, 1000);
+      await summarizeToolOutput(
+        mockConfigInstance,
+        { model: 'gemini-pro-limited' },
+        longText,
+        mockGeminiClient,
+        abortSignal,
+      );
 
       const expectedPrompt = `Summarize the following tool output to be a maximum of 1000 tokens. The summary should be concise and capture the main points of the tool output.
 
@@ -133,7 +167,7 @@ Return the summary string which should first contain an overall summarization of
 `;
       const calledWith = (mockGeminiClient.generateContent as Mock).mock
         .calls[0];
-      const contents = calledWith[0];
+      const contents = calledWith[1];
       expect(contents[0].parts[0].text).toBe(expectedPrompt);
     });
   });
@@ -150,6 +184,7 @@ Return the summary string which should first contain an overall summarization of
       });
 
       const result = await llmSummarizer(
+        mockConfigInstance,
         toolResult,
         mockGeminiClient,
         abortSignal,
@@ -171,6 +206,7 @@ Return the summary string which should first contain an overall summarization of
       });
 
       const result = await llmSummarizer(
+        mockConfigInstance,
         toolResult,
         mockGeminiClient,
         abortSignal,
@@ -179,7 +215,7 @@ Return the summary string which should first contain an overall summarization of
       expect(mockGeminiClient.generateContent).toHaveBeenCalledTimes(1);
       const calledWith = (mockGeminiClient.generateContent as Mock).mock
         .calls[0];
-      const contents = calledWith[0];
+      const contents = calledWith[1];
       expect(contents[0].parts[0].text).toContain(`"${longText}"`);
       expect(result).toBe(summary);
     });
@@ -193,6 +229,7 @@ Return the summary string which should first contain an overall summarization of
       };
 
       const result = await defaultSummarizer(
+        mockConfigInstance,
         toolResult,
         mockGeminiClient,
         abortSignal,
