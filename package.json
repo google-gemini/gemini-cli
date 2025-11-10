@@ -61,7 +61,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.1",
+    "ink": "npm:@jrichman/ink@6.4.2",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -118,6 +118,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "ink": "npm:@jrichman/ink@6.4.2",
     "latest-version": "^9.0.0",
     "simple-git": "^3.28.0"
   },
