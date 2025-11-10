@@ -188,6 +188,7 @@ describe('<ModelDialog />', () => {
       meta: false,
       shift: false,
       paste: false,
+      isPrintable: false,
       sequence: '',
     });
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -198,6 +199,7 @@ describe('<ModelDialog />', () => {
       meta: false,
       shift: false,
       paste: false,
+      isPrintable: true,
       sequence: '',
     });
     expect(props.onClose).toHaveBeenCalledTimes(1);

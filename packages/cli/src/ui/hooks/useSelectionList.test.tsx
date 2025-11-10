@@ -62,6 +62,7 @@ describe('useSelectionList', () => {
           meta: false,
           shift: options.shift ?? false,
           paste: false,
+          isPrintable: false,
         };
         activeKeypressHandler(key);
       } else {
@@ -331,6 +332,7 @@ describe('useSelectionList', () => {
           meta: false,
           shift: false,
           paste: false,
+          isPrintable: true,
         };
         handler(key);
       };
@@ -380,6 +382,7 @@ describe('useSelectionList', () => {
             meta: false,
             shift: false,
             paste: false,
+            isPrintable: false,
           };
           handler(key);
         };
