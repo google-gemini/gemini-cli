@@ -15,6 +15,7 @@ import {
   INSTALL_METADATA_FILENAME,
 } from '../config/extensions/variables.js';
 import type { ExtensionSetting } from '../config/extensions/extensionSettings.js';
+import type { ExtensionSettings } from '../config/extension-settings.js';
 
 export function createExtension({
   extensionsDir = 'extensions-dir',
@@ -25,12 +26,29 @@ export function createExtension({
   mcpServers = {} as Record<string, MCPServerConfig>,
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
   settings = undefined as ExtensionSetting[] | undefined,
-} = {}): string {
+  ...extensionSettings
+}: {
+  extensionsDir?: string;
+  name?: string;
+  version?: string;
+  addContextFile?: boolean;
+  contextFileName?: string;
+  mcpServers?: Record<string, MCPServerConfig>;
+  installMetadata?: ExtensionInstallMetadata;
+  settings?: ExtensionSetting[];
+} & Partial<ExtensionSettings> = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName, mcpServers, settings }),
+    JSON.stringify({
+      name,
+      version,
+      contextFileName,
+      mcpServers,
+      settings,
+      ...extensionSettings,
+    }),
   );
 
   if (addContextFile) {

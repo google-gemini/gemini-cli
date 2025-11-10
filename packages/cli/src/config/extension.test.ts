@@ -1083,7 +1083,7 @@ This extension will run the following MCP servers:
       ).resolves.toMatchObject({ name: 'my-local-extension' });
     });
 
-    it('should cancel installation if user declines prompt for local extension with mcp servers', async () => {
+    it('should cancel installation if user declines prompt for local s...', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
         name: 'my-local-extension',
@@ -1095,7 +1095,13 @@ This extension will run the following MCP servers:
           },
         },
       });
-      mockRequestConsent.mockResolvedValue(false);
+      // Mock consent to return false for the generic install prompt
+      mockRequestConsent.mockImplementation(async (consentString) => {
+        if (consentString.includes(INSTALL_WARNING_MESSAGE)) {
+          return false; // Decline generic install consent
+        }
+        return true; // Accept other consents (e.g., settings)
+      });
       await extensionManager.loadExtensions();
       await expect(
         extensionManager.installOrUpdateExtension({
@@ -1132,7 +1138,7 @@ This extension will run the following MCP servers:
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should ignore consent flow if not required', async () => {
+    it('should only request consent on initial install', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
         name: 'my-local-extension',
@@ -1143,6 +1149,10 @@ This extension will run the following MCP servers:
             args: ['server.js'],
           },
         },
+        // Add some new settings to trigger the settings consent flow
+        general: {
+          vimMode: true,
+        },
       });
 
       await extensionManager.loadExtensions();
@@ -1151,7 +1161,10 @@ This extension will run the following MCP servers:
         source: sourceExtDir,
         type: 'local',
       });
-      expect(mockRequestConsent).toHaveBeenCalledOnce();
+      // Called once for generic warning, once for settings
+      expect(mockRequestConsent).toHaveBeenCalledTimes(2);
+
+      vi.clearAllMocks(); // Clear mocks before update
 
       // Now update it without changing anything.
       await expect(
@@ -1162,8 +1175,8 @@ This extension will run the following MCP servers:
         ),
       ).resolves.toMatchObject({ name: 'my-local-extension' });
 
-      // Still only called once
-      expect(mockRequestConsent).toHaveBeenCalledOnce();
+      // Should not be called on update
+      expect(mockRequestConsent).not.toHaveBeenCalled();
     });
 
     it('should prompt for settings if promptForSettings', async () => {

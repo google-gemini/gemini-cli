@@ -33,6 +33,252 @@ import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
+import { ExtensionSettingsValidator } from './extension-settings-validator.js';
+import type { ExtensionSettings } from './extension-settings.js';
+import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+
+interface ConflictTracker {
+  conflicts: Map<string, { extensions: string[]; value: unknown }>;
+  ownership: Map<string, string>;
+}
+
+function deepMergeWithArrayAppend(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  path = '',
+  tracker?: ConflictTracker,
+  extensionName?: string,
+): unknown {
+  const validator = new ExtensionSettingsValidator();
+
+  if (Array.isArray(target) && Array.isArray(source)) {
+    if (validator.isArrayAppendSetting(path)) {
+      return [...target, ...source].filter(
+        (item, index, self) => self.indexOf(item) === index,
+      );
+    } else {
+      return source;
+    }
+  }
+
+  if (
+    typeof target === 'object' &&
+    typeof source === 'object' &&
+    target !== null &&
+    source !== null &&
+    !Array.isArray(target) &&
+    !Array.isArray(source)
+  ) {
+    const merged = { ...target };
+
+    for (const [key, value] of Object.entries(source)) {
+      const currentPath = path ? `${path}.${key}` : key;
+
+      if (key in merged) {
+        merged[key] = deepMergeWithArrayAppend(
+          merged[key] as Record<string, unknown>,
+          value as Record<string, unknown>,
+          currentPath,
+          tracker,
+          extensionName,
+        );
+      } else {
+        merged[key] = value;
+        if (tracker && extensionName) {
+          tracker.ownership.set(currentPath, extensionName);
+        }
+      }
+    }
+
+    return merged;
+  }
+
+  if (tracker && extensionName && path) {
+    const previousOwner = tracker.ownership.get(path);
+    if (previousOwner && previousOwner !== extensionName) {
+      const existing = tracker.conflicts.get(path);
+      if (existing) {
+        if (!existing.extensions.includes(extensionName)) {
+          existing.extensions.push(extensionName);
+        }
+      } else {
+        tracker.conflicts.set(path, {
+          extensions: [previousOwner, extensionName],
+          value: source,
+        });
+      }
+    }
+    tracker.ownership.set(path, extensionName);
+  }
+
+  return source;
+}
+
+function resolveExtensionVariables(
+  settings: unknown,
+  extensionPath: string,
+  workspacePath?: string,
+): unknown {
+  if (typeof settings === 'string') {
+    return settings
+      .replace(/\${extensionPath}/g, extensionPath)
+      .replace(/\${workspacePath}/g, workspacePath || process.cwd())
+      .replace(/\${\/}/g, path.sep)
+      .replace(/\${pathSeparator}/g, path.sep);
+  }
+
+  if (Array.isArray(settings)) {
+    return settings.map((item) =>
+      resolveExtensionVariables(item, extensionPath, workspacePath),
+    );
+  }
+
+  if (typeof settings === 'object' && settings !== null) {
+    const resolved: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(settings)) {
+      resolved[key] = resolveExtensionVariables(
+        value,
+        extensionPath,
+        workspacePath,
+      );
+    }
+    return resolved;
+  }
+
+  return settings;
+}
+
+function parseEnabledExtensionsFromArgv(): string[] | undefined {
+  // Handle test environments where process.argv might not be set
+  if (!process.argv || !Array.isArray(process.argv)) {
+    return undefined;
+  }
+
+  const args = process.argv.slice(2);
+  const extensions: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '-e' || arg === '--extensions') {
+      if (i + 1 < args.length) {
+        extensions.push(...args[i + 1].split(',').map((e) => e.trim()));
+        i++;
+      }
+    } else if (arg.startsWith('--extensions=')) {
+      const value = arg.substring('--extensions='.length);
+      extensions.push(...value.split(',').map((e) => e.trim()));
+    }
+  }
+
+  return extensions.length > 0 ? extensions : undefined;
+}
+
+export function loadExtensionSettings(): Partial<Settings> {
+  const extensionsDir = path.join(homedir(), '.gemini', 'extensions');
+
+  if (!fs.existsSync(extensionsDir)) {
+    return {};
+  }
+
+  let extensionNames: string[];
+  try {
+    extensionNames = fs
+      .readdirSync(extensionsDir)
+      .filter((name) => {
+        const extPath = path.join(extensionsDir, name);
+        try {
+          return fs.statSync(extPath).isDirectory();
+        } catch {
+          return false;
+        }
+      })
+      .sort();
+  } catch {
+    // Directory doesn't exist or can't be read
+    return {};
+  }
+
+  const enabledExtensionOverrides = parseEnabledExtensionsFromArgv();
+
+  const enablementManager = new ExtensionEnablementManager(
+    enabledExtensionOverrides,
+  );
+  const currentPath = process.cwd();
+
+  let mergedSettings: Partial<Settings> = {};
+  const tracker: ConflictTracker = {
+    conflicts: new Map(),
+    ownership: new Map(),
+  };
+
+  for (const extensionName of extensionNames) {
+    if (!enablementManager.isEnabled(extensionName, currentPath)) {
+      continue;
+    }
+
+    const settingsPath = path.join(
+      extensionsDir,
+      extensionName,
+      'extension-settings.json',
+    );
+
+    if (!fs.existsSync(settingsPath)) {
+      continue;
+    }
+
+    try {
+      const settingsContent = fs.readFileSync(settingsPath, 'utf-8');
+      const extensionSettings: ExtensionSettings = JSON.parse(settingsContent);
+
+      const validator = new ExtensionSettingsValidator();
+      const validationResult = validator.validate(extensionSettings);
+      if (!validationResult.valid) {
+        console.warn(
+          `Extension "${extensionName}" has invalid settings (allowlist may have changed):`,
+        );
+        for (const error of validationResult.errors) {
+          console.warn(`  - ${error}`);
+        }
+        continue;
+      }
+
+      const extensionPath = path.join(extensionsDir, extensionName);
+      const resolvedSettings = resolveExtensionVariables(
+        extensionSettings,
+        extensionPath,
+        currentPath,
+      );
+
+      mergedSettings = deepMergeWithArrayAppend(
+        mergedSettings,
+        resolvedSettings as Record<string, unknown>,
+        '',
+        tracker,
+        extensionName,
+      ) as Partial<Settings>;
+    } catch (error) {
+      console.warn(
+        `Failed to load settings from extension "${extensionName}":`,
+        error,
+      );
+    }
+  }
+
+  // Warn about scalar conflicts
+  if (tracker.conflicts.size > 0) {
+    console.warn('\nExtension settings conflicts detected:');
+    for (const [settingPath, conflict] of tracker.conflicts.entries()) {
+      const winner = conflict.extensions[conflict.extensions.length - 1];
+      console.warn(
+        `  Setting "${settingPath}" set by multiple extensions: ${conflict.extensions.join(', ')}`,
+      );
+      console.warn(`  Using value from "${winner}" (alphabetically last)`);
+    }
+    console.warn('');
+  }
+
+  return mergedSettings;
+}
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -402,6 +648,7 @@ function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
   user: Settings,
+  extensions: Settings,
   workspace: Settings,
   isTrusted: boolean,
 ): Settings {
@@ -411,13 +658,15 @@ function mergeSettings(
   // single values):
   // 1. System Defaults
   // 2. User Settings
-  // 3. Workspace Settings
-  // 4. System Settings (as overrides)
+  // 3. Extension Settings
+  // 4. Workspace Settings
+  // 5. System Settings (as overrides)
   return customDeepMerge(
     getMergeStrategyForPath,
     {}, // Start with an empty object
     systemDefaults,
     user,
+    extensions,
     safeWorkspace,
     system,
   ) as Settings;
@@ -459,6 +708,7 @@ export class LoadedSettings {
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
+      loadExtensionSettings() as Settings,
       this.workspace.settings,
       this.isTrusted,
     );
@@ -731,6 +981,7 @@ export function loadSettings(
     systemSettings,
     systemDefaultSettings,
     userSettings,
+    loadExtensionSettings() as Settings,
     workspaceSettings,
     isTrusted,
   );
