@@ -268,6 +268,8 @@ export interface ConfigParameters {
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
+  importFormat?: 'tree' | 'flat';
+  discoveryMaxDirs?: number;
   compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
@@ -373,6 +375,8 @@ export class Config {
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
+  private readonly importFormat: 'tree' | 'flat';
+  private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
   private readonly interactive: boolean;
   private readonly ptyInfo: string;
@@ -485,6 +489,8 @@ export class Config {
     this.ideMode = params.ideMode ?? false;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
+    this.importFormat = params.importFormat ?? 'tree';
+    this.discoveryMaxDirs = params.discoveryMaxDirs ?? 200;
     this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
@@ -505,7 +511,7 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? true;
+    this.useWriteTodos = params.useWriteTodos ?? false;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
@@ -717,6 +723,14 @@ export class Config {
     return this.loadMemoryFromIncludeDirectories;
   }
 
+  getImportFormat(): 'tree' | 'flat' {
+    return this.importFormat;
+  }
+
+  getDiscoveryMaxDirs(): number {
+    return this.discoveryMaxDirs;
+  }
+
   getContentGeneratorConfig(): ContentGeneratorConfig {
     return this.contentGeneratorConfig;
   }
@@ -822,7 +836,7 @@ export class Config {
    *
    * May change over time.
    */
-  getExcludeTools(): string[] | undefined {
+  getExcludeTools(): Set<string> | undefined {
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
       if (!extension.isActive) {
@@ -832,7 +846,7 @@ export class Config {
         excludeToolsSet.add(tool);
       }
     }
-    return [...excludeToolsSet];
+    return excludeToolsSet;
   }
 
   getToolDiscoveryCommand(): string | undefined {
@@ -1286,7 +1300,6 @@ export class Config {
       const className = ToolClass.name;
       const toolName = ToolClass.Name || className;
       const coreTools = this.getCoreTools();
-      const excludeTools = this.getExcludeTools() || [];
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
 
@@ -1299,14 +1312,6 @@ export class Config {
             tool.startsWith(`${toolName}(`) ||
             tool.startsWith(`${normalizedClassName}(`),
         );
-      }
-
-      const isExcluded = excludeTools.some(
-        (tool) => tool === toolName || tool === normalizedClassName,
-      );
-
-      if (isExcluded) {
-        isEnabled = false;
       }
 
       if (isEnabled) {
@@ -1367,15 +1372,12 @@ export class Config {
       );
       if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
-        const excludeTools = this.getExcludeTools() || [];
-
         const allowedTools = this.getAllowedTools();
 
-        const isExcluded = excludeTools.includes(definition.name);
         const isAllowed =
           !allowedTools || allowedTools.includes(definition.name);
 
-        if (isAllowed && !isExcluded) {
+        if (isAllowed) {
           const messageBusEnabled = this.getEnableMessageBusIntegration();
           const wrapper = new SubagentToolWrapper(
             definition,

@@ -391,7 +391,8 @@ describe('Server Config (config.ts)', () => {
   });
 
   it('should initialize WorkspaceContext with includeDirectories', () => {
-    const includeDirectories = ['/path/to/dir1', '/path/to/dir2'];
+    const resolved = path.resolve(baseParams.targetDir);
+    const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
       ...baseParams,
       includeDirectories,
@@ -399,12 +400,11 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(paramsWithIncludeDirs);
     const workspaceContext = config.getWorkspaceContext();
     const directories = workspaceContext.getDirectories();
-
     // Should include the target directory plus the included directories
     expect(directories).toHaveLength(3);
-    expect(directories).toContain(path.resolve(baseParams.targetDir));
-    expect(directories).toContain('/path/to/dir1');
-    expect(directories).toContain('/path/to/dir2');
+    expect(directories).toContain(resolved);
+    expect(directories).toContain(path.join(resolved, 'dir1'));
+    expect(directories).toContain(path.join(resolved, 'dir2'));
   });
 
   it('Config constructor should set telemetry to true when provided as true', () => {
@@ -870,27 +870,6 @@ describe('Server Config (config.ts)', () => {
           registerToolMock as Mock
         ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
         expect(wasShellToolRegistered).toBe(true);
-      });
-
-      it('should not register a tool if excludeTools contains the non-minified class name', async () => {
-        const params: ConfigParameters = {
-          ...baseParams,
-          coreTools: undefined, // all tools enabled by default
-          excludeTools: ['ShellTool'],
-        };
-        const config = new Config(params);
-        await config.initialize();
-
-        const registerToolMock = (
-          (await vi.importMock('../tools/tool-registry')) as {
-            ToolRegistry: { prototype: { registerTool: Mock } };
-          }
-        ).ToolRegistry.prototype.registerTool;
-
-        const wasShellToolRegistered = (
-          registerToolMock as Mock
-        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
-        expect(wasShellToolRegistered).toBe(false);
       });
 
       it('should register a tool if coreTools contains an argument-specific pattern with the non-minified class name', async () => {

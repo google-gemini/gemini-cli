@@ -842,6 +842,52 @@ describe('FileCommandLoader', () => {
         assert.fail('Incorrect action type');
       }
     });
+
+    it('correctly loads extensionId for extension commands', async () => {
+      const extensionId = 'my-test-ext-id-123';
+      const extensionDir = path.join(
+        process.cwd(),
+        GEMINI_DIR,
+        'extensions',
+        'my-test-ext',
+      );
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'my-test-ext',
+            id: extensionId,
+            version: '1.0.0',
+          }),
+          commands: {
+            'my-cmd.toml': 'prompt = "My test command"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'my-test-ext',
+            id: extensionId,
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command.name).toBe('my-cmd');
+      expect(command.extensionName).toBe('my-test-ext');
+      expect(command.extensionId).toBe(extensionId);
+    });
   });
 
   describe('Argument Handling Integration (via ShellProcessor)', () => {

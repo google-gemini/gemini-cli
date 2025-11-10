@@ -95,6 +95,25 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     scrollablesRef.current = scrollables;
   }, [scrollables]);
 
+  const pendingScrollsRef = useRef(new Map<string, number>());
+  const flushScheduledRef = useRef(false);
+
+  const scheduleFlush = useCallback(() => {
+    if (!flushScheduledRef.current) {
+      flushScheduledRef.current = true;
+      setTimeout(() => {
+        flushScheduledRef.current = false;
+        for (const [id, delta] of pendingScrollsRef.current.entries()) {
+          const entry = scrollablesRef.current.get(id);
+          if (entry) {
+            entry.scrollBy(delta);
+          }
+        }
+        pendingScrollsRef.current.clear();
+      }, 0);
+    }
+  }, []);
+
   const handleScroll = (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
     const delta = direction === 'up' ? -1 : 1;
     const candidates = findScrollableCandidates(
@@ -105,18 +124,23 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     for (const candidate of candidates) {
       const { scrollTop, scrollHeight, innerHeight } =
         candidate.getScrollState();
+      const pendingDelta = pendingScrollsRef.current.get(candidate.id) || 0;
+      const effectiveScrollTop = scrollTop + pendingDelta;
 
       // Epsilon to handle floating point inaccuracies.
-      const canScrollUp = scrollTop > 0.001;
-      const canScrollDown = scrollTop < scrollHeight - innerHeight - 0.001;
+      const canScrollUp = effectiveScrollTop > 0.001;
+      const canScrollDown =
+        effectiveScrollTop < scrollHeight - innerHeight - 0.001;
 
       if (direction === 'up' && canScrollUp) {
-        candidate.scrollBy(delta);
+        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
+        scheduleFlush();
         return;
       }
 
       if (direction === 'down' && canScrollDown) {
-        candidate.scrollBy(delta);
+        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
+        scheduleFlush();
         return;
       }
     }

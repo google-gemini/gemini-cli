@@ -394,12 +394,40 @@ priority = -1
       expect(error.details).toContain('>= 0');
     });
 
+    it('should return a schema_validation error if priority is much lower than 0', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "test"
+decision = "allow"
+priority = -9999
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('priority');
+      expect(error.details).toContain('>= 0');
+    });
+
     it('should return a schema_validation error if priority is >= 1000', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "test"
 decision = "allow"
 priority = 1000
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('priority');
+      expect(error.details).toContain('<= 999');
+    });
+
+    it('should return a schema_validation error if priority is much higher than 1000', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "test"
+decision = "allow"
+priority = 9999
 `);
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];
