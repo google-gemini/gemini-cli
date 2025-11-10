@@ -1,0 +1,96 @@
+description = "Generate a comprehensive PR summary with changelog entries"
+
+prompt = """
+## Mission: Generate PR Summary
+
+Create a professional PR summary that includes a changelog entry.
+
+### Instructions
+
+1. **Analyze Changes**
+   - Review all modified files
+   - Understand the scope of changes
+   - Identify the type of change (feature, fix, refactor, etc.)
+
+2. **Extract Key Information**
+   - What problem does this solve?
+   - What are the main changes?
+   - Are there any breaking changes?
+   - What testing was done?
+
+3. **Generate Summary**
+
+   #### Title
+   Create a clear, concise title following conventional commits:
+   - `feat: ` for new features
+   - `fix: ` for bug fixes
+   - `refactor: ` for code refactoring
+   - `docs: ` for documentation
+   - `test: ` for tests
+   - `chore: ` for maintenance
+
+   #### Description
+   Include:
+   - Motivation and context
+   - Changes made
+   - How it's been tested
+   - Screenshots if UI changes
+
+   #### Changelog Entry
+   Format for CHANGELOG.md:
+   ```
+   ### [Type] - YYYY-MM-DD
+   - Brief description of change
+   ```
+
+### Output Format
+```markdown
+## Suggested PR Title
+[conventional-commit-type]: [clear description]
+
+## Description
+
+### What
+[What was changed]
+
+### Why
+[Why this change was necessary]
+
+### How
+[How it was implemented]
+
+## Changes Made
+- [ ] Change 1
+- [ ] Change 2
+- [ ] Change 3
+
+## Breaking Changes
+- [ ] Yes/No - [Explanation if yes]
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Integration tests added/updated
+- [ ] Manual testing performed
+- [ ] All existing tests pass
+
+## Checklist
+- [ ] Code follows project style guidelines
+- [ ] Self-review completed
+- [ ] Comments added for complex code
+- [ ] Documentation updated
+- [ ] No new warnings
+- [ ] Tests added that prove fix/feature works
+
+## Changelog Entry
+\`\`\`markdown
+### [Type] - [Date]
+- [Description for changelog]
+\`\`\`
+
+## Screenshots (if applicable)
+[Add screenshots for UI changes]
+```
+
+### Context
+{{args}}
+"""

@@ -1,0 +1,107 @@
+# Gemini CLI Configuration for Automated Workflows
+# Place this file at: .gemini/config.yaml
+
+# GitHub Pull Request Review Bot Configuration
+# https://github.com/marketplace/gemini-code-assist
+have_fun: false
+
+# Code Review Settings
+code_review:
+  # Enable/disable automated code reviews
+  disable: false
+
+  # Minimum severity to post comments (HIGH, MEDIUM, LOW)
+  comment_severity_threshold: 'MEDIUM'
+
+  # Maximum number of review comments (-1 for unlimited)
+  max_review_comments: 25
+
+  # Actions when PR is opened
+  pull_request_opened:
+    help: false         # Post help message
+    summary: true       # Post summary of changes
+    code_review: true   # Perform code review
+
+  # Actions when PR is updated
+  pull_request_updated:
+    summary: true
+    code_review: true
+
+# Issue Triage Settings
+issue_triage:
+  # Enable/disable automated issue triage
+  enabled: true
+
+  # Auto-label based on content
+  auto_label: true
+
+  # Priority detection
+  priority_detection: true
+
+  # Request more information if incomplete
+  request_info_if_incomplete: true
+
+# Patterns to Ignore
+ignore_patterns:
+  - 'node_modules/**'
+  - 'dist/**'
+  - 'build/**'
+  - '.next/**'
+  - 'coverage/**'
+  - '**/*.min.js'
+  - '**/*.map'
+  - 'package-lock.json'
+  - 'yarn.lock'
+  - 'pnpm-lock.yaml'
+
+# File Types to Review
+review_file_types:
+  - '*.ts'
+  - '*.tsx'
+  - '*.js'
+  - '*.jsx'
+  - '*.py'
+  - '*.go'
+  - '*.java'
+  - '*.rb'
+  - '*.php'
+  - '*.rs'
+  - '*.vue'
+  - '*.svelte'
+
+# Custom Review Focus Areas (optional)
+review_focus:
+  security: true        # Focus on security issues
+  performance: true     # Focus on performance
+  best_practices: true  # Focus on best practices
+  accessibility: true   # Focus on a11y (for web projects)
+  testing: true         # Check test coverage
+
+# AI Collaboration Settings
+ai_collaboration:
+  # Enable Gemini + Claude collaboration
+  unified_mode: true
+
+  # Which AI handles what
+  gemini_for:
+    - 'analysis'
+    - 'planning'
+    - 'research'
+    - 'review'
+
+  claude_for:
+    - 'implementation'
+    - 'debugging'
+    - 'refactoring'
+
+# Notification Settings
+notifications:
+  # Post welcome message on new issues
+  welcome_new_contributors: true
+
+  # Thank contributors on merged PRs
+  thank_on_merge: true
+
+  # Notify on stale issues/PRs
+  stale_warning: true
+  stale_days: 30

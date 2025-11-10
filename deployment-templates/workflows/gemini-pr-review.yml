@@ -1,0 +1,291 @@
+name: '📝 Gemini Automated PR Review'
+
+on:
+  pull_request:
+    types: ['opened', 'reopened', 'synchronize']
+  pull_request_review_comment:
+    types: ['created']
+  issue_comment:
+    types: ['created']
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
+        type: number
+
+concurrency:
+  group: 'gemini-pr-review-${{ github.event.pull_request.number || github.event.inputs.pr_number }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  review-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@gemini-cli review'))
+
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.event.pull_request.head.ref }}
+
+      - name: 'Get PR Details'
+        id: pr_details
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request?.number ||
+                           context.payload.inputs?.pr_number;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            core.setOutput('pr_title', pr.title);
+            core.setOutput('pr_body', pr.body || 'No description provided');
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('base_branch', pr.base.ref);
+            core.setOutput('head_branch', pr.head.ref);
+            core.setOutput('files_changed', files.length);
+            core.setOutput('additions', pr.additions);
+            core.setOutput('deletions', pr.deletions);
+
+            return { pr, files };
+
+      - name: 'Get Changed Files'
+        id: changed_files
+        run: |
+          git diff --name-only ${{ steps.pr_details.outputs.base_branch }}...${{ steps.pr_details.outputs.head_branch }} > changed_files.txt
+          echo "Changed files:"
+          cat changed_files.txt
+
+      - name: 'Run Gemini PR Analysis'
+        id: gemini_review
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          PR_TITLE: ${{ steps.pr_details.outputs.pr_title }}
+          PR_BODY: ${{ steps.pr_details.outputs.pr_body }}
+          PR_NUMBER: ${{ steps.pr_details.outputs.pr_number }}
+          BASE_BRANCH: ${{ steps.pr_details.outputs.base_branch }}
+          HEAD_BRANCH: ${{ steps.pr_details.outputs.head_branch }}
+          FILES_CHANGED: ${{ steps.pr_details.outputs.files_changed }}
+          ADDITIONS: ${{ steps.pr_details.outputs.additions }}
+          DELETIONS: ${{ steps.pr_details.outputs.deletions }}
+          REPO_NAME: ${{ github.repository }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: |
+            {
+              "maxSessionTurns": 25,
+              "coreTools": ["read_file", "ripgrep", "glob", "run_shell_command"],
+              "autoAccept": {
+                "read_file": true,
+                "ripgrep": true,
+                "glob": true
+              },
+              "telemetry": {
+                "enabled": false
+              }
+            }
+          prompt: |
+            ## Role
+            You are a senior code reviewer for the ${{ github.repository }} repository.
+
+            ## Task
+            Review Pull Request #${PR_NUMBER} and provide comprehensive feedback.
+
+            ## PR Information
+            - **Title**: ${PR_TITLE}
+            - **Description**: ${PR_BODY}
+            - **Base Branch**: ${BASE_BRANCH}
+            - **Head Branch**: ${HEAD_BRANCH}
+            - **Files Changed**: ${FILES_CHANGED}
+            - **Lines Added**: ${ADDITIONS}
+            - **Lines Deleted**: ${DELETIONS}
+
+            ## Review Checklist
+
+            ### 1. Code Quality
+            - [ ] Code follows project conventions and style guide
+            - [ ] No code duplication
+            - [ ] Functions/methods are well-named and focused
+            - [ ] Appropriate use of design patterns
+            - [ ] Error handling is comprehensive
+
+            ### 2. Security
+            - [ ] No injection vulnerabilities (SQL, XSS, Command, etc.)
+            - [ ] Proper input validation
+            - [ ] No hardcoded secrets or credentials
+            - [ ] Secure authentication/authorization
+            - [ ] Dependencies are up-to-date and secure
+
+            ### 3. Performance
+            - [ ] No obvious performance bottlenecks
+            - [ ] Efficient algorithms and data structures
+            - [ ] Proper resource management
+            - [ ] No memory leaks
+
+            ### 4. Testing
+            - [ ] New features have tests
+            - [ ] Bug fixes have regression tests
+            - [ ] Tests are comprehensive and meaningful
+            - [ ] Edge cases are covered
+
+            ### 5. Documentation
+            - [ ] Code is self-documenting or well-commented
+            - [ ] Public APIs are documented
+            - [ ] README updated if needed
+            - [ ] Breaking changes are documented
+
+            ## Instructions
+            1. Read the GEMINI.md file if it exists to understand project-specific guidelines
+            2. Review all changed files in the PR
+            3. Look for the issues mentioned in the checklist
+            4. Provide specific, actionable feedback
+            5. Highlight both good practices and areas for improvement
+
+            ## Output Format
+            Provide your review in the following JSON format:
+            ```json
+            {
+              "summary": "Brief overall assessment",
+              "approval_status": "APPROVE|REQUEST_CHANGES|COMMENT",
+              "critical_issues": [
+                {
+                  "severity": "HIGH|MEDIUM|LOW",
+                  "category": "security|performance|bugs|style",
+                  "file": "path/to/file",
+                  "line": 42,
+                  "issue": "Description of issue",
+                  "suggestion": "How to fix it"
+                }
+              ],
+              "positive_notes": ["Good practices observed"],
+              "general_comments": "Additional context or suggestions"
+            }
+            ```
+
+            ## Guidelines
+            - Be constructive and specific
+            - Prioritize security and correctness over style
+            - Suggest alternatives, don't just point out problems
+            - Acknowledge good practices
+            - Consider the PR's scope and purpose
+
+      - name: 'Post Review Comments'
+        if: steps.gemini_review.outputs.summary != ''
+        env:
+          REVIEW_OUTPUT: ${{ steps.gemini_review.outputs.summary }}
+          PR_NUMBER: ${{ steps.pr_details.outputs.pr_number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const rawOutput = process.env.REVIEW_OUTPUT;
+
+            // Parse JSON from output
+            const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+            if (!jsonMatch) {
+              core.setFailed('Could not parse JSON from Gemini output');
+              return;
+            }
+
+            const review = JSON.parse(jsonMatch[1].trim());
+
+            // Build review body
+            let reviewBody = `## 🤖 Automated Code Review\n\n`;
+            reviewBody += `### Summary\n${review.summary}\n\n`;
+
+            if (review.critical_issues && review.critical_issues.length > 0) {
+              reviewBody += `### 🔍 Issues Found (${review.critical_issues.length})\n\n`;
+
+              const high = review.critical_issues.filter(i => i.severity === 'HIGH');
+              const medium = review.critical_issues.filter(i => i.severity === 'MEDIUM');
+              const low = review.critical_issues.filter(i => i.severity === 'LOW');
+
+              if (high.length > 0) {
+                reviewBody += `#### 🔴 High Priority\n`;
+                high.forEach(issue => {
+                  reviewBody += `- **${issue.category}** in \`${issue.file}:${issue.line}\`\n`;
+                  reviewBody += `  - ${issue.issue}\n`;
+                  reviewBody += `  - 💡 ${issue.suggestion}\n\n`;
+                });
+              }
+
+              if (medium.length > 0) {
+                reviewBody += `#### 🟡 Medium Priority\n`;
+                medium.forEach(issue => {
+                  reviewBody += `- **${issue.category}** in \`${issue.file}:${issue.line}\`\n`;
+                  reviewBody += `  - ${issue.issue}\n`;
+                  reviewBody += `  - 💡 ${issue.suggestion}\n\n`;
+                });
+              }
+
+              if (low.length > 0) {
+                reviewBody += `<details><summary>🟢 Low Priority (${low.length})</summary>\n\n`;
+                low.forEach(issue => {
+                  reviewBody += `- **${issue.category}** in \`${issue.file}:${issue.line}\`\n`;
+                  reviewBody += `  - ${issue.issue}\n`;
+                  reviewBody += `  - 💡 ${issue.suggestion}\n\n`;
+                });
+                reviewBody += `</details>\n\n`;
+              }
+            }
+
+            if (review.positive_notes && review.positive_notes.length > 0) {
+              reviewBody += `### ✨ Good Practices\n`;
+              review.positive_notes.forEach(note => {
+                reviewBody += `- ${note}\n`;
+              });
+              reviewBody += `\n`;
+            }
+
+            if (review.general_comments) {
+              reviewBody += `### 💭 Additional Comments\n${review.general_comments}\n\n`;
+            }
+
+            reviewBody += `---\n*Reviewed by Gemini CLI* 🚀`;
+
+            // Post review
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(process.env.PR_NUMBER),
+              body: reviewBody,
+              event: review.approval_status || 'COMMENT'
+            });
+
+      - name: 'Handle Failure'
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }},
+              body: '⚠️ Automated code review encountered an error. Please review manually.'
+            });

@@ -1,0 +1,80 @@
+description = "Investigate and debug an issue systematically"
+
+prompt = """
+## Mission: Debug and Resolve Issue
+
+You are a debugging expert tasked with investigating and resolving an issue.
+
+### Investigation Process
+
+1. **Understand the Issue**
+   - Read the issue description: {{args}}
+   - Identify what's expected vs what's happening
+   - Determine severity and impact
+
+2. **Gather Information**
+   - Search for relevant code
+   - Check recent commits (git log)
+   - Look for related issues
+   - Review error logs if provided
+   - Check tests related to the functionality
+
+3. **Reproduce**
+   - Identify steps to reproduce
+   - Verify reproduction path
+   - Note environment details
+
+4. **Analyze**
+   - Identify root cause
+   - Check for similar patterns elsewhere
+   - Review recent changes that might have caused this
+   - Consider edge cases
+
+5. **Propose Solution**
+   - Suggest specific fixes with code examples
+   - Explain why this fix addresses the root cause
+   - Mention any trade-offs or side effects
+   - Suggest how to prevent similar issues
+
+6. **Testing Strategy**
+   - Recommend how to test the fix
+   - Suggest regression tests to add
+   - List edge cases to verify
+
+### Output Format
+```markdown
+## Debugging Report
+
+### Issue Summary
+[Brief description]
+
+### Root Cause
+[Detailed explanation of what's causing the issue]
+
+### Affected Components
+- [Component 1]
+- [Component 2]
+
+### Proposed Solution
+\`\`\`[language]
+// Code fix with explanation
+\`\`\`
+
+### Why This Works
+[Explanation of how the fix resolves the issue]
+
+### Testing Plan
+1. [Test step 1]
+2. [Test step 2]
+
+### Prevention
+[How to prevent similar issues in the future]
+
+### Files to Modify
+- [ ] \`file1.ts\` - [what to change]
+- [ ] \`file2.ts\` - [what to change]
+```
+
+### Issue to Debug
+{{args}}
+"""
