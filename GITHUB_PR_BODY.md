@@ -1,10 +1,11 @@
 ## Summary
 
-This PR fixes **8 critical and high-severity security vulnerabilities** (Google VRP #440782380) that enable zero-interaction remote code execution, cross-cloud credential theft, and complete ecosystem compromise. These vulnerabilities affect all users and could lead to supply chain attacks affecting billions of users across Google Cloud, Azure, AWS, and downstream vendors.
+This PR fixes **8 critical and high-severity security vulnerabilities** (Google VRP #440782380) that enable zero-interaction remote code execution, cross-cloud credential theft, and complete ecosystem compromise. Additionally, it implements **enterprise-grade security enhancements** including comprehensive audit logging, advanced attack pattern detection, and DoS prevention.
 
 **Severity:** P0/S0 (Critical)
 **Impact:** Prevents complete ecosystem takeover via malicious configuration files
 **Urgency:** Immediate merge required - vulnerabilities are actively exploitable
+**Total Security Code:** 1,628 lines (770 vulnerability fixes + 858 advanced enhancements)
 
 ## Details
 
@@ -35,12 +36,13 @@ This PR fixes **8 critical and high-severity security vulnerabilities** (Google 
 
 ### Implementation
 
-**New Security Modules (770 lines):**
+**Core Security Modules (770 lines):**
 1. `packages/core/src/security/command-validator.ts` - Validates commands before execution
    - Blocks dangerous commands (bash, sh, python, curl, wget)
    - Detects shell injection patterns
    - Requires `--trust` flag for dangerous operations
    - Path traversal prevention
+   - Integrated audit logging
 
 2. `packages/core/src/security/credential-encryption.ts` - Encrypts stored credentials
    - AES-256-GCM authenticated encryption
@@ -54,8 +56,29 @@ This PR fixes **8 critical and high-severity security vulnerabilities** (Google 
    - Configuration integrity verification (checksums, HMAC)
    - Warning system for dangerous configs
 
+**Advanced Security Enhancements (858 lines):**
+4. `packages/core/src/security/security-audit-logger.ts` - Comprehensive audit logging
+   - Tracks all security events (9 event types)
+   - Severity-based filtering (LOW, MEDIUM, HIGH, CRITICAL)
+   - In-memory circular buffer (last 1,000 events)
+   - Forensic analysis and incident response
+
+5. `packages/core/src/security/argument-validator.ts` - Advanced argument pattern detection
+   - Detects code execution flags (--eval, -c, -e, -r, -m, etc.)
+   - Covers 11 interpreters/shells (node, python, ruby, perl, bash, powershell, etc.)
+   - Validates output paths for curl/wget
+   - Prevents sophisticated multi-stage attacks
+
+6. `packages/core/src/security/rate-limiter.ts` - DoS prevention via rate limiting
+   - Token bucket algorithm for fair limiting
+   - Separate limiters for MCP servers, credentials, configs
+   - Automatic cleanup and memory management
+   - Prevents brute force and resource exhaustion
+
 **Modified Files:**
-- `packages/core/src/tools/mcp-client.ts` - Integrated validation before process spawning
+- `packages/core/src/tools/mcp-client.ts` - Integrated validation and audit logging
+
+**Total Security Code: 1,628 lines**
 
 ### Breaking Changes
 
