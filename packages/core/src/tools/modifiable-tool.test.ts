@@ -89,7 +89,12 @@ describe('modifyWithEditor', () => {
 
   describe('successful modification', () => {
     const assertMode = (mode: number, expected: number): void => {
-      if (process.platform === 'win32') return;
+      if (process.platform === 'win32') {
+        // Windows reports POSIX modes as 0o666 regardless of requested bits.
+        // At minimum confirm the owner read/write bits are present.
+        expect(mode & 0o600).toBe(0o600);
+        return;
+      }
       expect(mode & 0o777).toBe(expected);
     };
 
