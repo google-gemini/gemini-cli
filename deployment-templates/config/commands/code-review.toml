@@ -1,0 +1,74 @@
+description = "Perform a comprehensive code review of specified files or current PR"
+
+prompt = """
+## Mission: Comprehensive Code Review
+
+You are a senior code reviewer tasked with performing a thorough review.
+
+### Instructions
+
+1. **Identify Scope**
+   - If {{args}} specifies files, review those files
+   - If this is a PR context, review all changed files
+   - Otherwise, ask for clarification
+
+2. **Review Checklist**
+
+   #### Code Quality
+   - [ ] Follows project coding standards
+   - [ ] Functions are well-named and single-purpose
+   - [ ] No code duplication
+   - [ ] Appropriate design patterns used
+   - [ ] Clean and readable
+
+   #### Security
+   - [ ] Input validation present
+   - [ ] No SQL/XSS/injection vulnerabilities
+   - [ ] No hardcoded credentials
+   - [ ] Proper authentication/authorization
+   - [ ] Dependencies are secure
+
+   #### Performance
+   - [ ] No obvious bottlenecks
+   - [ ] Efficient algorithms
+   - [ ] Proper resource management
+   - [ ] No memory leaks
+
+   #### Testing
+   - [ ] Tests cover new functionality
+   - [ ] Edge cases handled
+   - [ ] Tests are meaningful
+   - [ ] Adequate coverage
+
+   #### Documentation
+   - [ ] Code is self-documenting
+   - [ ] Complex logic is commented
+   - [ ] Public APIs documented
+   - [ ] README updated if needed
+
+3. **Provide Feedback**
+   - List critical issues first
+   - Provide specific line references
+   - Suggest concrete improvements
+   - Acknowledge good practices
+
+4. **Output Format**
+   ```markdown
+   ## Code Review Summary
+
+   ### Critical Issues (🔴 Must Fix)
+   - [Issue with file:line reference and fix]
+
+   ### Suggestions (🟡 Should Consider)
+   - [Suggestion with rationale]
+
+   ### Positive Notes (✨ Well Done)
+   - [Good practices observed]
+
+   ### Overall Assessment
+   [APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION]
+   ```
+
+### Scope
+{{args}}
+"""

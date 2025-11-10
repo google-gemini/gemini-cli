@@ -1,0 +1,352 @@
+name: '🤝 Unified Gemini + Claude Automation'
+
+on:
+  issue_comment:
+    types: ['created']
+  pull_request_review_comment:
+    types: ['created']
+  workflow_dispatch:
+    inputs:
+      issue_or_pr_number:
+        description: 'Issue or PR number'
+        required: true
+        type: number
+      command:
+        description: 'Command to run'
+        required: true
+        type: string
+
+concurrency:
+  group: 'unified-ai-${{ github.event.issue.number || github.event.inputs.issue_or_pr_number }}'
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  process-request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.comment.body, '@gemini-cli') ||
+      contains(github.event.comment.body, '@claude-code')
+
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 'Parse Command'
+        id: parse_command
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = context.payload.comment?.body ||
+                          context.payload.inputs?.command || '';
+
+            // Determine which AI system to use
+            const useGemini = comment.includes('@gemini-cli');
+            const useClaude = comment.includes('@claude-code');
+            const useBoth = comment.includes('@both') || comment.includes('@ai-team');
+
+            // Extract the actual command
+            let command = comment
+              .replace(/@gemini-cli/g, '')
+              .replace(/@claude-code/g, '')
+              .replace(/@both/g, '')
+              .replace(/@ai-team/g, '')
+              .trim();
+
+            // Detect command type
+            let commandType = 'general';
+            if (command.includes('review') || command.includes('analyze')) {
+              commandType = 'review';
+            } else if (command.includes('fix') || command.includes('implement')) {
+              commandType = 'implementation';
+            } else if (command.includes('explain') || command.includes('document')) {
+              commandType = 'documentation';
+            } else if (command.includes('debug') || command.includes('investigate')) {
+              commandType = 'debugging';
+            }
+
+            core.setOutput('use_gemini', useGemini || useBoth);
+            core.setOutput('use_claude', useClaude || useBoth);
+            core.setOutput('command', command);
+            core.setOutput('command_type', commandType);
+
+            // Get issue/PR details
+            const issueNumber = context.payload.issue?.number ||
+                              context.payload.pull_request?.number ||
+                              context.payload.inputs?.issue_or_pr_number;
+
+            const isPR = !!context.payload.pull_request || !!context.payload.issue?.pull_request;
+
+            core.setOutput('issue_number', issueNumber);
+            core.setOutput('is_pr', isPR);
+
+            return {
+              useGemini: useGemini || useBoth,
+              useClaude: useClaude || useBoth,
+              command,
+              commandType,
+              issueNumber,
+              isPR
+            };
+
+      - name: 'Post Acknowledgment'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const useGemini = '${{ steps.parse_command.outputs.use_gemini }}' === 'true';
+            const useClaude = '${{ steps.parse_command.outputs.use_claude }}' === 'true';
+
+            let aiSystems = [];
+            if (useGemini) aiSystems.push('Gemini CLI');
+            if (useClaude) aiSystems.push('Claude Code');
+
+            const message = `🤖 Processing your request with **${aiSystems.join(' + ')}**...\n\n` +
+                          `Command type: \`${{ steps.parse_command.outputs.command_type }}\`\n\n` +
+                          `I'll analyze this and provide a response shortly. ⏳`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.parse_command.outputs.issue_number }},
+              body: message
+            });
+
+      # GEMINI ANALYSIS PHASE
+      - name: 'Gemini Analysis'
+        if: steps.parse_command.outputs.use_gemini == 'true'
+        id: gemini_analysis
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          COMMAND: ${{ steps.parse_command.outputs.command }}
+          COMMAND_TYPE: ${{ steps.parse_command.outputs.command_type }}
+          ISSUE_NUMBER: ${{ steps.parse_command.outputs.issue_number }}
+          IS_PR: ${{ steps.parse_command.outputs.is_pr }}
+          REPO_NAME: ${{ github.repository }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: |
+            {
+              "maxSessionTurns": 50,
+              "coreTools": [
+                "read_file",
+                "ripgrep",
+                "glob",
+                "run_shell_command",
+                "web_search"
+              ],
+              "autoAccept": {
+                "read_file": true,
+                "ripgrep": true,
+                "glob": true
+              },
+              "telemetry": {
+                "enabled": false
+              }
+            }
+          prompt: |
+            ## Role
+            You are Gemini CLI, working collaboratively with Claude Code on the ${{ github.repository }} repository.
+
+            ## Context
+            - **Command**: ${COMMAND}
+            - **Type**: ${COMMAND_TYPE}
+            - **Issue/PR**: #${ISSUE_NUMBER}
+            - **Is PR**: ${IS_PR}
+
+            ## Your Responsibilities (Gemini)
+            As Gemini, you excel at:
+            1. **Analysis & Planning**: Understand the problem deeply
+            2. **Research**: Explore the codebase and documentation
+            3. **Strategy**: Create comprehensive plans
+            4. **Search**: Find relevant code, patterns, and examples
+            5. **Knowledge**: Provide context and best practices
+
+            ## Task
+            Based on the command type, perform the appropriate analysis:
+
+            ### For "review" commands:
+            - Read and analyze the relevant code
+            - Identify issues, bugs, and improvements
+            - Provide detailed technical assessment
+            - Generate recommendations
+
+            ### For "implementation" commands:
+            - Analyze requirements
+            - Search for relevant patterns in codebase
+            - Create detailed implementation plan
+            - Identify files that need changes
+            - Prepare for Claude to execute
+
+            ### For "documentation" commands:
+            - Read and understand the code
+            - Analyze architecture and patterns
+            - Generate comprehensive explanations
+            - Prepare documentation structure
+
+            ### For "debugging" commands:
+            - Investigate the issue
+            - Search for related code and logs
+            - Identify root causes
+            - Suggest debugging approaches
+
+            ## Output Format
+            Provide your analysis in JSON:
+            ```json
+            {
+              "analysis": "Comprehensive analysis of the situation",
+              "findings": ["Key findings from investigation"],
+              "plan": {
+                "steps": ["Detailed steps if implementation needed"],
+                "files_to_modify": ["List of files"],
+                "risks": ["Potential risks"]
+              },
+              "recommendations": ["Specific recommendations"],
+              "for_claude": "Instructions for Claude if implementation is needed",
+              "response_to_user": "Direct response to the user's request"
+            }
+            ```
+
+            Now, analyze the request and provide comprehensive insights.
+
+      # CLAUDE IMPLEMENTATION PHASE (if needed)
+      - name: 'Determine if Implementation Needed'
+        if: steps.gemini_analysis.outputs.summary != ''
+        id: check_implementation
+        uses: actions/github-script@v7
+        env:
+          GEMINI_OUTPUT: ${{ steps.gemini_analysis.outputs.summary }}
+          USE_CLAUDE: ${{ steps.parse_command.outputs.use_claude }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const rawOutput = process.env.GEMINI_OUTPUT;
+            const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+
+            if (!jsonMatch) {
+              core.setOutput('needs_implementation', 'false');
+              return false;
+            }
+
+            const analysis = JSON.parse(jsonMatch[1].trim());
+
+            // Check if implementation is needed
+            const needsImplementation =
+              analysis.plan &&
+              analysis.plan.steps &&
+              analysis.plan.steps.length > 0 &&
+              process.env.USE_CLAUDE === 'true';
+
+            core.setOutput('needs_implementation', needsImplementation);
+            core.setOutput('analysis', JSON.stringify(analysis));
+
+            return needsImplementation;
+
+      - name: 'Claude Implementation'
+        if: steps.check_implementation.outputs.needs_implementation == 'true' && secrets.CLAUDE_API_KEY != ''
+        id: claude_implementation
+        run: |
+          echo "Claude Code implementation would go here"
+          echo "This requires Claude Code to be installed and configured"
+          echo "For now, we'll provide the implementation plan to the user"
+
+      # POST RESULTS
+      - name: 'Post Results'
+        if: steps.gemini_analysis.outputs.summary != ''
+        uses: actions/github-script@v7
+        env:
+          GEMINI_OUTPUT: ${{ steps.gemini_analysis.outputs.summary }}
+          ISSUE_NUMBER: ${{ steps.parse_command.outputs.issue_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const rawOutput = process.env.GEMINI_OUTPUT;
+            const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+
+            if (!jsonMatch) {
+              // Post raw output if JSON parsing fails
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(process.env.ISSUE_NUMBER),
+                body: `## 🤖 Analysis Results\n\n${rawOutput}`
+              });
+              return;
+            }
+
+            const analysis = JSON.parse(jsonMatch[1].trim());
+
+            // Build response
+            let response = `## 🤖 AI Analysis Complete\n\n`;
+
+            if (analysis.response_to_user) {
+              response += `${analysis.response_to_user}\n\n`;
+            }
+
+            if (analysis.analysis) {
+              response += `### 📊 Analysis\n${analysis.analysis}\n\n`;
+            }
+
+            if (analysis.findings && analysis.findings.length > 0) {
+              response += `### 🔍 Key Findings\n`;
+              analysis.findings.forEach(finding => {
+                response += `- ${finding}\n`;
+              });
+              response += `\n`;
+            }
+
+            if (analysis.plan && analysis.plan.steps) {
+              response += `### 📋 Implementation Plan\n`;
+              analysis.plan.steps.forEach((step, i) => {
+                response += `${i + 1}. ${step}\n`;
+              });
+              response += `\n`;
+
+              if (analysis.plan.files_to_modify) {
+                response += `**Files to modify:**\n`;
+                analysis.plan.files_to_modify.forEach(file => {
+                  response += `- \`${file}\`\n`;
+                });
+                response += `\n`;
+              }
+            }
+
+            if (analysis.recommendations && analysis.recommendations.length > 0) {
+              response += `### 💡 Recommendations\n`;
+              analysis.recommendations.forEach(rec => {
+                response += `- ${rec}\n`;
+              });
+              response += `\n`;
+            }
+
+            response += `---\n*Powered by Gemini CLI* 🚀`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              body: response
+            });
+
+      - name: 'Handle Failure'
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.parse_command.outputs.issue_number }},
+              body: '⚠️ An error occurred while processing your request. Please try again or contact a maintainer.'
+            });

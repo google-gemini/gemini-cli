@@ -1,0 +1,163 @@
+name: '🏷️ Gemini Automated Issue Triage'
+
+on:
+  issues:
+    types: ['opened', 'reopened', 'edited']
+  issue_comment:
+    types: ['created']
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to triage'
+        required: true
+        type: number
+
+concurrency:
+  group: 'gemini-triage-${{ github.event.issue.number || github.event.inputs.issue_number }}'
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  triage-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'needs-triage')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@gemini-cli /triage'))
+
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@v4
+
+      - name: 'Get Available Labels'
+        id: get_labels
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const labelNames = labels.map(label => label.name);
+            core.setOutput('available_labels', labelNames.join(','));
+            return labelNames;
+
+      - name: 'Run Gemini Issue Analysis'
+        id: gemini_analysis
+        uses: google-github-actions/run-gemini-cli@v0
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title || steps.get_issue_data.outputs.title }}
+          ISSUE_BODY: ${{ github.event.issue.body || steps.get_issue_data.outputs.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+          AVAILABLE_LABELS: ${{ steps.get_labels.outputs.available_labels }}
+          REPO_NAME: ${{ github.repository }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          settings: |
+            {
+              "maxSessionTurns": 10,
+              "coreTools": ["run_shell_command(echo)"],
+              "telemetry": {
+                "enabled": false
+              }
+            }
+          prompt: |
+            ## Role
+            You are an issue triage assistant for the ${{ github.repository }} repository.
+
+            ## Task
+            Analyze this GitHub issue and suggest appropriate labels.
+
+            ## Available Information
+            - **Title**: ${ISSUE_TITLE}
+            - **Body**: ${ISSUE_BODY}
+            - **Issue Number**: ${ISSUE_NUMBER}
+            - **Available Labels**: ${AVAILABLE_LABELS}
+
+            ## Instructions
+            1. Review the issue title and body carefully
+            2. Identify the type of issue (bug, feature, question, documentation, etc.)
+            3. Determine the priority (critical, high, medium, low)
+            4. Identify relevant areas or components
+            5. Check if sufficient information is provided
+
+            ## Output Format
+            Output your analysis in JSON format:
+            ```json
+            {
+              "labels_to_set": ["type/bug", "priority/high", "area/core"],
+              "explanation": "This is a critical bug affecting the core authentication module. The reporter provided clear reproduction steps and logs."
+            }
+            ```
+
+            ## Guidelines
+            - Only use labels from the available labels list
+            - Be conservative with "critical" priority
+            - If information is missing, suggest "needs-more-info" label
+            - Provide clear explanation for your choices
+
+      - name: 'Apply Labels'
+        if: steps.gemini_analysis.outputs.summary != ''
+        env:
+          LABELS_OUTPUT: ${{ steps.gemini_analysis.outputs.summary }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const rawOutput = process.env.LABELS_OUTPUT;
+
+            // Parse JSON from output (handle markdown code blocks)
+            const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+            if (!jsonMatch) {
+              core.setFailed('Could not parse JSON from Gemini output');
+              return;
+            }
+
+            const parsedLabels = JSON.parse(jsonMatch[1].trim());
+            const labelsToSet = parsedLabels.labels_to_set || [];
+            const explanation = parsedLabels.explanation || '';
+
+            // Add "bot-triaged" label
+            labelsToSet.push('bot-triaged');
+
+            // Set labels
+            if (labelsToSet.length > 0) {
+              await github.rest.issues.setLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(process.env.ISSUE_NUMBER),
+                labels: labelsToSet
+              });
+
+              core.info(`Applied labels: ${labelsToSet.join(', ')}`);
+            }
+
+            // Post explanation comment if provided
+            if (explanation) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(process.env.ISSUE_NUMBER),
+                body: `🤖 **Automated Triage**\n\n${explanation}\n\n*Triaged by Gemini CLI*`
+              });
+            }
+
+      - name: 'Handle Failure'
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.issue.number || github.event.inputs.issue_number }},
+              body: '⚠️ Automated triage encountered an error. A maintainer will review this issue manually.'
+            });
