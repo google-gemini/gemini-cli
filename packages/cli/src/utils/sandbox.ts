@@ -302,47 +302,7 @@ export async function start_sandbox(
           sandboxEnv['NO_PROXY'] = noProxy;
           sandboxEnv['no_proxy'] = noProxy;
         }
-// helper at top of file
-function parseProxyCommand(cmd: string, env = process.env): [string, ...string[]] {
-  const tokens = parse(cmd, env).filter((t): t is string => typeof t === 'string');
-  if (tokens.length === 0) {
-    throw new FatalSandboxError(`Invalid GEMINI_SANDBOX_PROXY_COMMAND: '${cmd}'`);
-  }
-  return tokens as [string, ...string[]];
-}
-
-// …later in first block…
-if (proxyCommand) {
-  const [proxyBin, ...proxyArgs] = parseProxyCommand(proxyCommand);
-  proxyProcess = spawn(proxyBin, proxyArgs, {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false,
-    detached: true,
-  });
-  // …
-}
-
-// …and in the container block…
-if (proxyCommand) {
-  const userArgs = userFlag ? userFlag.split(' ') : [];
-  const [, ...proxyArgsParsed] = parseProxyCommand(proxyCommand);
-  const proxyRunArgs = [
-    'run', '--rm', '--init', ...userArgs,
-    '--name', SANDBOX_PROXY_NAME,
-    '--network', SANDBOX_PROXY_NAME,
-    '-p', '8877:8877',
-    '-v', `${process.cwd()}:${workdir}`,
-    '--workdir', workdir,
-    image,
-    ...proxyArgsParsed,
-  ];
-  proxyProcess = spawn(config.command, proxyRunArgs, {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false,
-    detached: true,
-  });
-  // …
-}
+        const parsedProxy = parse(proxyCommand, process.env).filter(
           (t): t is string => typeof t === 'string',
         );
         if (parsedProxy.length === 0) {
