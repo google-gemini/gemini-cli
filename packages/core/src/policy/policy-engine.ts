@@ -128,8 +128,8 @@ export class PolicyEngine {
       decision = this.applyNonInteractiveMode(this.defaultDecision);
     }
 
-    // If decision is ALLOW, run safety checkers
-    if (decision === PolicyDecision.ALLOW && this.checkerRunner) {
+    // If decision is not DENY, run safety checkers
+    if (decision !== PolicyDecision.DENY && this.checkerRunner) {
       for (const checkerRule of this.checkers) {
         if (ruleMatches(checkerRule, toolCall, stringifiedArgs, serverName)) {
           debugLogger.debug(

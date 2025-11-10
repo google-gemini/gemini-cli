@@ -944,13 +944,17 @@ describe('PolicyEngine', () => {
       ];
       engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
 
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ALLOW,
+      });
+
       const result = await engine.check(
         { name: 'test-tool', args: { foo: 'bar' } },
         undefined,
       );
 
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
-      expect(mockCheckerRunner.runChecker).not.toHaveBeenCalled();
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalled();
     });
 
     it('should run checkers when rule allows', async () => {
@@ -1145,6 +1149,54 @@ describe('PolicyEngine', () => {
         expect.anything(),
         expect.objectContaining({ name: 'wildcard' }),
       );
+    });
+    it('should run safety checkers when decision is ASK_USER and downgrade to DENY on failure', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'tool', decision: PolicyDecision.ASK_USER },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          checker: {
+            type: 'in-process',
+            name: InProcessCheckerType.ALLOWED_PATH,
+          },
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.DENY,
+        reason: 'Safety check failed',
+      });
+
+      const result = await engine.check({ name: 'tool' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalled();
+    });
+
+    it('should run safety checkers when decision is ASK_USER and keep ASK_USER on success', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'tool', decision: PolicyDecision.ASK_USER },
+      ];
+      const checkers: SafetyCheckerRule[] = [
+        {
+          checker: {
+            type: 'in-process',
+            name: InProcessCheckerType.ALLOWED_PATH,
+          },
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, checkers }, mockCheckerRunner);
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ALLOW,
+      });
+
+      const result = await engine.check({ name: 'tool' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalled();
     });
   });
 });

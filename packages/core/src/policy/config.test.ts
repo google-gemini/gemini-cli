@@ -828,6 +828,8 @@ name = "invalid-name"
     expect(rule).toBeUndefined();
 
     vi.doUnmock('node:fs/promises');
+  });
+
   it('should have default ASK_USER rule for discovered tools', async () => {
     vi.resetModules();
     vi.doUnmock('node:fs/promises');
