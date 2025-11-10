@@ -1450,7 +1450,7 @@ describe('AppContainer State Management', () => {
             meta: false,
             shift: false,
             paste: false,
-            isPrintable: false,
+            insertable: false,
             sequence: '\x13',
           });
         });
@@ -1477,7 +1477,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
-              isPrintable: false,
+              insertable: false,
               sequence: '\x13',
             });
           });
@@ -1492,7 +1492,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
-              isPrintable: true,
+              insertable: true,
               sequence: 'a',
             });
           });
@@ -1513,7 +1513,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
-              isPrintable: false,
+              insertable: false,
               sequence: '\x13',
             });
           });
@@ -1529,7 +1529,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
-              isPrintable: true,
+              insertable: true,
               sequence: 'a',
             });
           });

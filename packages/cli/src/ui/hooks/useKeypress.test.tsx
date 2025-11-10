@@ -144,7 +144,7 @@ describe(`useKeypress`, () => {
         meta: false,
         shift: false,
         paste: true,
-        isPrintable: true,
+        insertable: true,
         sequence: pasteText,
       });
     });
@@ -282,7 +282,7 @@ describe(`useKeypress`, () => {
         meta: false,
         shift: false,
         paste: true,
-        isPrintable: true,
+        insertable: true,
         sequence: pasteText,
       });
     });

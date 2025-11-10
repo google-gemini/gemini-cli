@@ -224,7 +224,7 @@ function bufferPaste(
           meta: false,
           shift: false,
           paste: true,
-          isPrintable: true,
+          insertable: true,
           sequence: buffer,
         });
       }
@@ -274,7 +274,7 @@ function* emitKeys(
     let meta = false;
     let shift = false;
     let code = undefined;
-    let isPrintable = false;
+    let insertable = false;
 
     if (ch === ESC) {
       escaped = true;
@@ -457,7 +457,7 @@ function* emitKeys(
     } else if (ch === ' ') {
       name = 'space';
       meta = escaped;
-      isPrintable = true;
+      insertable = true;
     } else if (!escaped && ch <= '\x1a') {
       // ctrl+letter
       name = String.fromCharCode(ch.charCodeAt(0) + 'a'.charCodeAt(0) - 1);
@@ -467,7 +467,7 @@ function* emitKeys(
       name = ch.toLowerCase();
       shift = /^[A-Z]$/.exec(ch) !== null;
       meta = escaped;
-      isPrintable = true;
+      insertable = true;
     } else if (MAC_ALT_KEY_CHARACTER_MAP[ch] && process.platform === 'darwin') {
       name = MAC_ALT_KEY_CHARACTER_MAP[ch];
       meta = true;
@@ -483,7 +483,7 @@ function* emitKeys(
         meta,
         shift,
         paste: false,
-        isPrintable: false,
+        insertable: false,
         sequence: ESC,
       });
     } else if (escaped) {
@@ -492,7 +492,7 @@ function* emitKeys(
       meta = true;
     } else {
       // Any other character is considered printable.
-      isPrintable = true;
+      insertable = true;
     }
 
     if (
@@ -505,7 +505,7 @@ function* emitKeys(
         meta,
         shift,
         paste: false,
-        isPrintable,
+        insertable,
         sequence,
       });
     }
@@ -519,7 +519,7 @@ export interface Key {
   meta: boolean;
   shift: boolean;
   paste: boolean;
-  isPrintable: boolean;
+  insertable: boolean;
   sequence: string;
 }
 

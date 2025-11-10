@@ -17,7 +17,7 @@ describe('keyMatchers', () => {
     meta: false,
     shift: false,
     paste: false,
-    isPrintable: false,
+    insertable: false,
     sequence: name,
     ...mods,
   });
