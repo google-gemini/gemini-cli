@@ -258,7 +258,13 @@ gemini mcp add server node server.js -e PORT=8080 -e HOST=localhost
     - [ ] npx
     - [ ] Docker
 
-**Note:** Platform validation should be performed by the Google security team during review. All security fixes have been tested for correctness and effectiveness against attack scenarios.
+**Note on Platform Validation:**
+- Code review validation: ✅ Complete
+- TypeScript configuration: ✅ Fixed and verified
+- Security logic validation: ✅ Complete (see `VALIDATION_STATUS.md`)
+- Platform testing: ⏸️ Deferred to CI/CD (network constraints in development environment)
+- GitHub Actions will perform full build/test validation across all platforms
+- All security modules use only standard Node.js APIs (no platform-specific code)
 
 ---
 
