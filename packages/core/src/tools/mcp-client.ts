@@ -1185,7 +1185,6 @@ export async function createTransport(
       requestInit: createTransportRequestInit(mcpServerConfig, {}),
       authProvider: provider,
     };
-    console.log('Headers are ' + mcpServerConfig.headers);
 
     if (mcpServerConfig.httpUrl) {
       return new StreamableHTTPClientTransport(
