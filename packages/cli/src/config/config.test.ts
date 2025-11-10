@@ -2419,3 +2419,32 @@ describe('Telemetry configuration via environment variables', () => {
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
 });
+
+describe('loadCliConfig experimentalJitContext', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getExperimentalJitContext()).toBe(false);
+  });
+
+  it('should be true when set in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { experimental: { jitContext: true } };
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getExperimentalJitContext()).toBe(true);
+  });
+});

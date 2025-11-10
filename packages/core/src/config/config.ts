@@ -35,6 +35,7 @@ import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import { ContextManager } from '../services/contextManager.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
@@ -255,6 +256,7 @@ export interface ConfigParameters {
   model: string;
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
+  experimentalJitContext?: boolean;
   listExtensions?: boolean;
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
@@ -331,6 +333,8 @@ export class Config {
   private readonly mcpServerCommand: string | undefined;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
+  private globalMemory: string = '';
+  private environmentMemory: string = '';
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private approvalMode: ApprovalMode;
@@ -348,6 +352,7 @@ export class Config {
     disableFuzzySearch: boolean;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
+  private contextManager: ContextManager | null = null;
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
   private readonly proxy: string | undefined;
@@ -370,6 +375,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
+  private readonly experimentalJitContext: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
@@ -473,6 +479,7 @@ export class Config {
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.listExtensions = params.listExtensions ?? false;
     this._extensionLoader =
       params.extensionLoader ?? new SimpleExtensionLoader([]);
@@ -603,6 +610,9 @@ export class Config {
 
     // Initialize centralized FileDiscoveryService
     this.getFileService();
+    if (this.experimentalJitContext) {
+      this.contextManager = new ContextManager(this.targetDir);
+    }
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
@@ -884,6 +894,22 @@ export class Config {
     this.userMemory = newUserMemory;
   }
 
+  getGlobalMemory(): string {
+    return this.globalMemory;
+  }
+
+  setGlobalMemory(memory: string): void {
+    this.globalMemory = memory;
+  }
+
+  getEnvironmentMemory(): string {
+    return this.environmentMemory;
+  }
+
+  setEnvironmentMemory(memory: string): void {
+    this.environmentMemory = memory;
+  }
+
   getGeminiMdFileCount(): number {
     return this.geminiMdFileCount;
   }
@@ -1021,12 +1047,20 @@ export class Config {
     return this.fileDiscoveryService;
   }
 
+  getContextManager(): ContextManager | null {
+    return this.contextManager;
+  }
+
   getUsageStatisticsEnabled(): boolean {
     return this.usageStatisticsEnabled;
   }
 
   getExperimentalZedIntegration(): boolean {
     return this.experimentalZedIntegration;
+  }
+
+  getExperimentalJitContext(): boolean {
+    return this.experimentalJitContext;
   }
 
   getListExtensions(): boolean {
