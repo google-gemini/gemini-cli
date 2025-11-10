@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThemeDialog } from './ThemeDialog.js';
 import { LoadedSettings } from '../../config/settings.js';
@@ -77,7 +78,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -90,7 +91,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame, stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -112,7 +113,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog
             {...baseProps}
             onCancel={mockOnCancel}
@@ -126,7 +127,7 @@ describe('ThemeDialog Snapshots', () => {
       stdin.write('\x1b');
     });
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOnCancel).toHaveBeenCalled();
     });
   });
