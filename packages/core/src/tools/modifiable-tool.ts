@@ -66,10 +66,12 @@ function createTempFilesForModify(
 
   try {
     fs.chmodSync(diffDir, 0o700);
-  } catch {
+  } catch (e) {
     debugLogger.error(
       `Error setting permissions on temp diff directory: ${diffDir}`,
+      e,
     );
+    throw e;
   }
 
   const ext = path.extname(file_path);
