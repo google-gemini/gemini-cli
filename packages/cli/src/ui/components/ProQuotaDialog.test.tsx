@@ -22,29 +22,27 @@ describe('ProQuotaDialog', () => {
 
   it('should render with correct title and options', () => {
     const { lastFrame, unmount } = render(
-      <ProQuotaDialog
-        failedModel="gemini-2.5-pro"
-        fallbackModel="gemini-2.5-flash"
-        onChoice={() => {}}
-      />,
+      <ProQuotaDialog fallbackModel="gemini-2.5-flash" onChoice={() => {}} />,
     );
 
     const output = lastFrame();
-    expect(output).toContain('Pro quota limit reached for gemini-2.5-pro.');
+    expect(output).toContain(
+      'Note: You can always use /model to select a different option.',
+    );
 
     // Check that RadioButtonSelect was called with the correct items
     expect(RadioButtonSelect).toHaveBeenCalledWith(
       expect.objectContaining({
         items: [
           {
-            label: 'Change auth (executes the /auth command)',
-            value: 'auth',
-            key: 'auth',
+            label: 'Try again later',
+            value: 'retry_later' as const,
+            key: 'retry_later',
           },
           {
-            label: `Continue with gemini-2.5-flash`,
-            value: 'continue',
-            key: 'continue',
+            label: `Switch to gemini-2.5-flash for the rest of this session`,
+            value: 'retry' as const,
+            key: 'retry',
           },
         ],
       }),
@@ -57,7 +55,6 @@ describe('ProQuotaDialog', () => {
     const mockOnChoice = vi.fn();
     const { unmount } = render(
       <ProQuotaDialog
-        failedModel="gemini-2.5-pro"
         fallbackModel="gemini-2.5-flash"
         onChoice={mockOnChoice}
       />,
@@ -79,7 +76,6 @@ describe('ProQuotaDialog', () => {
     const mockOnChoice = vi.fn();
     const { unmount } = render(
       <ProQuotaDialog
-        failedModel="gemini-2.5-pro"
         fallbackModel="gemini-2.5-flash"
         onChoice={mockOnChoice}
       />,
@@ -90,10 +86,10 @@ describe('ProQuotaDialog', () => {
 
     // Simulate the selection
     act(() => {
-      onSelect('continue');
+      onSelect('retry');
     });
 
-    expect(mockOnChoice).toHaveBeenCalledWith('continue');
+    expect(mockOnChoice).toHaveBeenCalledWith('retry');
     unmount();
   });
 });

@@ -38,7 +38,7 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
+describe(`useKeypress`, () => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
@@ -50,7 +50,7 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
       return null;
     }
     return render(
-      <KeypressProvider kittyProtocolEnabled={useKitty}>
+      <KeypressProvider>
         <TestComponent />
       </KeypressProvider>,
     );
@@ -88,6 +88,7 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
     { key: { name: 'right', sequence: '\x1b[C' } },
     { key: { name: 'up', sequence: '\x1b[A' } },
     { key: { name: 'down', sequence: '\x1b[B' } },
+    { key: { name: 'tab', sequence: '\x1b[Z', shift: true } },
   ])('should listen for keypress when active for key $key.name', ({ key }) => {
     renderKeypressHook(true);
     act(() => stdin.write(key.sequence));
@@ -143,6 +144,7 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
         meta: false,
         shift: false,
         paste: true,
+        insertable: true,
         sequence: pasteText,
       });
     });
@@ -195,20 +197,13 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
         stdin.write('do');
       });
 
-      if (useKitty) {
-        vi.advanceTimersByTime(60); // wait for kitty timeout
-        expect(onKeypress).toHaveBeenCalledExactlyOnceWith(
-          expect.objectContaining({ sequence: '\x1B[200do' }),
-        );
-      } else {
-        expect(onKeypress).toHaveBeenCalledWith(
-          expect.objectContaining({ sequence: '\x1B[200d' }),
-        );
-        expect(onKeypress).toHaveBeenCalledWith(
-          expect.objectContaining({ sequence: 'o' }),
-        );
-        expect(onKeypress).toHaveBeenCalledTimes(2);
-      }
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: '\x1B[200d' }),
+      );
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: 'o' }),
+      );
+      expect(onKeypress).toHaveBeenCalledTimes(2);
     });
 
     it('should handle back to back pastes', () => {
@@ -248,11 +243,11 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
       const pasteText = 'pasted';
       await act(async () => {
         stdin.write(PASTE_START.slice(0, 3));
-        vi.advanceTimersByTime(50);
+        vi.advanceTimersByTime(40);
         stdin.write(PASTE_START.slice(3) + pasteText.slice(0, 3));
-        vi.advanceTimersByTime(50);
+        vi.advanceTimersByTime(40);
         stdin.write(pasteText.slice(3) + PASTE_END.slice(0, 3));
-        vi.advanceTimersByTime(50);
+        vi.advanceTimersByTime(40);
         stdin.write(PASTE_END.slice(3));
       });
       expect(onKeypress).toHaveBeenCalledWith(
@@ -287,6 +282,7 @@ describe.each([true, false])(`useKeypress with useKitty=%s`, (useKitty) => {
         meta: false,
         shift: false,
         paste: true,
+        insertable: true,
         sequence: pasteText,
       });
     });

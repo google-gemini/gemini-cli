@@ -295,6 +295,7 @@ describe('AppContainer State Management', () => {
       getExtensions: vi.fn().mockReturnValue([]),
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
+      start: vi.fn(),
     } as unknown as ExtensionManager);
     vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
       mockExtensionManager,
@@ -670,9 +671,9 @@ describe('AppContainer State Management', () => {
 
       // You can even verify that the plumbed function is callable
       act(() => {
-        capturedUIActions.handleProQuotaChoice('auth');
+        capturedUIActions.handleProQuotaChoice('retry_later');
       });
-      expect(mockHandler).toHaveBeenCalledWith('auth');
+      expect(mockHandler).toHaveBeenCalledWith('retry_later');
       unmount();
     });
   });
@@ -1449,6 +1450,7 @@ describe('AppContainer State Management', () => {
             meta: false,
             shift: false,
             paste: false,
+            insertable: false,
             sequence: '\x13',
           });
         });
@@ -1475,6 +1477,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: false,
               sequence: '\x13',
             });
           });
@@ -1489,6 +1492,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: true,
               sequence: 'a',
             });
           });
@@ -1509,6 +1513,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: false,
               sequence: '\x13',
             });
           });
@@ -1524,6 +1529,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: true,
               sequence: 'a',
             });
           });
@@ -1705,6 +1711,43 @@ describe('AppContainer State Management', () => {
 
       // Assert: Verify model is updated
       expect(capturedUIState.currentModel).toBe('new-model');
+      unmount();
+    });
+  });
+
+  describe('Shell Interaction', () => {
+    it('should not crash if resizing the pty fails', async () => {
+      const resizePtySpy = vi
+        .spyOn(ShellExecutionService, 'resizePty')
+        .mockImplementation(() => {
+          throw new Error('Cannot resize a pty that has already exited');
+        });
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+        activePtyId: 'some-pty-id', // Make sure activePtyId is set
+      });
+
+      // The main assertion is that the render does not throw.
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(resizePtySpy).toHaveBeenCalled();
       unmount();
     });
   });

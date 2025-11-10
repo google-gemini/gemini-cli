@@ -22,6 +22,11 @@ export interface ExtensionSetting {
   sensitive?: boolean;
 }
 
+const getKeychainStorageName = (
+  extensionName: string,
+  extensionId: string,
+): string => `Gemini CLI Extensions ${extensionName} ${extensionId}`;
+
 export async function maybePromptForSettings(
   extensionConfig: ExtensionConfig,
   extensionId: string,
@@ -38,7 +43,9 @@ export async function maybePromptForSettings(
     return;
   }
   const envFilePath = new ExtensionStorage(extensionName).getEnvFilePath();
-  const keychain = new KeychainTokenStorage(extensionId);
+  const keychain = new KeychainTokenStorage(
+    getKeychainStorageName(extensionName, extensionId),
+  );
 
   if (!settings || settings.length === 0) {
     await clearSettings(envFilePath, keychain);
@@ -107,7 +114,9 @@ export async function getEnvContents(
     return Promise.resolve({});
   }
   const extensionStorage = new ExtensionStorage(extensionConfig.name);
-  const keychain = new KeychainTokenStorage(extensionId);
+  const keychain = new KeychainTokenStorage(
+    getKeychainStorageName(extensionConfig.name, extensionId),
+  );
   let customEnv: Record<string, string> = {};
   if (fsSync.existsSync(extensionStorage.getEnvFilePath())) {
     const envFile = fsSync.readFileSync(
