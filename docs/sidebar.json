@@ -28,6 +28,10 @@
         "slug": "docs/get-started/authentication"
       },
       {
+        "label": "Authentication Setup",
+        "slug": "docs/auth-setup"
+      },
+      {
         "label": "Configuration",
         "slug": "docs/get-started/configuration"
       },

@@ -17,7 +17,14 @@ import type { AuthClient } from 'google-auth-library';
 export class ProjectIdRequiredError extends Error {
   constructor() {
     super(
-      'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+      'Google Cloud Project ID Required\n\n' +
+        'When using Google account authentication (GCA), you must set a Google Cloud Project ID.\n\n' +
+        'Option 1: Set your project ID:\n' +
+        '  export GOOGLE_CLOUD_PROJECT=your-project-id\n\n' +
+        'Option 2: Switch to using an API key instead:\n' +
+        '  1. Get an API key from https://aistudio.google.com/app/apikey\n' +
+        '  2. export GEMINI_API_KEY=your-api-key\n\n' +
+        'For more details see: https://goo.gle/gemini-cli-auth-docs#workspace-gca',
     );
   }
 }
