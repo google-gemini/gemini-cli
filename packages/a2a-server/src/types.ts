@@ -102,14 +102,15 @@ export interface TaskMetadata {
     tools: Array<{
       name: string;
       description: string;
-      parameterSchema: unknown;
+      parameterSchema: object | undefined;
     }>;
   }>;
   availableTools: Array<{
     name: string;
     description: string;
-    parameterSchema: unknown;
+    parameterSchema: object | undefined;
   }>;
+  checkpointFile?: string;
 }
 
 export interface PersistedStateMetadata {

@@ -34,8 +34,7 @@ export async function saveRestorableToolCall(
   config: Config,
   geminiClient: GeminiClient,
   taskId: string,
-): Promise<void> {
-  console.log('Saving restorable tool call:', toolCall);
+): Promise<string | undefined> {
   if (!RESTORABLE_TOOLS.has(toolCall.name)) {
     return;
   }
@@ -62,18 +61,16 @@ export async function saveRestorableToolCall(
 
   const checkpointDirPath = getCheckpointDir(config);
   await fs.mkdir(checkpointDirPath, { recursive: true });
-  const filePath = path.join(checkpointDirPath, `checkpoint-${taskId}.json`);
+  const fileName = `checkpoint-${taskId}.json`;
+  const filePath = path.join(checkpointDirPath, fileName);
   await fs.writeFile(filePath, JSON.stringify(toolCallData, null, 2));
-  console.log('Checkpoint saved:', filePath);
+  return fileName;
 }
 
 export async function listCheckpointFiles(config: Config): Promise<string[]> {
-  console.log('Listing checkpoint files...');
   const checkpointDirPath = getCheckpointDir(config);
-  console.log('Checkpoint dir:', checkpointDirPath);
   await fs.mkdir(checkpointDirPath, { recursive: true });
   const files = await fs.readdir(checkpointDirPath);
-  console.log('Checkpoint files:', files);
   return files.filter((file) => file.endsWith('.json'));
 }
 
@@ -81,21 +78,17 @@ export async function readCheckpointData(
   config: Config,
   filename: string,
 ): Promise<ToolCallData> {
-  console.log('Reading checkpoint data:', filename);
   const checkpointDirPath = getCheckpointDir(config);
   const filePath = path.join(checkpointDirPath, filename);
   const data = await fs.readFile(filePath, 'utf-8');
-  console.log('Checkpoint data:', data);
   return JSON.parse(data) as ToolCallData;
 }
 
 export async function getCheckpointInfoList(
   config: Config,
 ): Promise<CheckpointInfo[]> {
-  console.log('Getting checkpoint info list...');
   const jsonFiles = await listCheckpointFiles(config);
   const checkpointInfoList: CheckpointInfo[] = [];
-  console.log('JSON files:', jsonFiles);
 
   for (const file of jsonFiles) {
     const toolCallData = await readCheckpointData(config, file);
@@ -106,14 +99,12 @@ export async function getCheckpointInfoList(
       });
     }
   }
-  console.log('Checkpoint info list:', checkpointInfoList);
   return checkpointInfoList;
 }
 
 export async function getFormattedCheckpointList(
   config: Config,
 ): Promise<string> {
-  console.log('Getting formatted checkpoint list...');
   const jsonFiles = await listCheckpointFiles(config);
   const truncatedFiles = jsonFiles.map((file) => {
     const components = file.split('.');
@@ -123,6 +114,5 @@ export async function getFormattedCheckpointList(
     components.pop();
     return components.join('.');
   });
-  console.log('Formatted checkpoint list:', truncatedFiles.join('\n'));
   return truncatedFiles.join('\n');
 }

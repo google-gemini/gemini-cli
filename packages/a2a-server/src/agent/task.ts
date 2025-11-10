@@ -66,6 +66,7 @@ export class Task {
   taskState: TaskState;
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
+  checkpointFile?: string;
   skipFinalTrueAfterInlineEdit = false;
 
   // For tool waiting logic
@@ -222,6 +223,7 @@ export class Task {
     timestamp?: string,
     metadataError?: string,
     traceId?: string,
+    checkpointFile?: string,
   ): TaskStatusUpdateEvent {
     const metadata: {
       coderAgent: CoderAgentMessage;
@@ -229,6 +231,7 @@ export class Task {
       userTier?: UserTierId;
       error?: string;
       traceId?: string;
+      checkpointFile?: string;
     } = {
       coderAgent: coderAgentMessage,
       model: this.config.getModel(),
@@ -241,6 +244,10 @@ export class Task {
 
     if (traceId) {
       metadata.traceId = traceId;
+    }
+
+    if (checkpointFile) {
+      metadata.checkpointFile = checkpointFile;
     }
 
     return {
@@ -265,6 +272,7 @@ export class Task {
     final = false,
     metadataError?: string,
     traceId?: string,
+    checkpointFile?: string,
   ): void {
     this.taskState = newState;
     let message: Message | undefined;
@@ -290,6 +298,7 @@ export class Task {
       undefined,
       metadataError,
       traceId,
+      checkpointFile,
     );
     this.eventBus?.publish(event);
   }
@@ -385,6 +394,10 @@ export class Task {
           coderAgentMessage,
           message,
           false, // Always false for these continuous updates
+          undefined,
+          undefined,
+          undefined,
+          this.checkpointFile,
         );
         this.eventBus?.publish(event);
       }
@@ -426,6 +439,9 @@ export class Task {
         undefined,
         undefined,
         /*final*/ true,
+        undefined,
+        undefined,
+        this.checkpointFile,
       );
     }
   }
@@ -552,12 +568,16 @@ export class Task {
     }
 
     for (const request of requests) {
-      await saveRestorableToolCall(
+      const checkpointFile = await saveRestorableToolCall(
         request,
         this.config,
         this.geminiClient,
         this.id,
       );
+      console.log('Checkpoint file:', checkpointFile);
+      if (checkpointFile) {
+        this.checkpointFile = checkpointFile;
+      }
     }
 
     const updatedRequests = await Promise.all(

@@ -72,7 +72,6 @@ export interface CommandContext {
     toggleCorgiMode: () => void;
     toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
-    setGeminiMdFileCount: (count: number) => void;
     reloadCommands: () => void;
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;

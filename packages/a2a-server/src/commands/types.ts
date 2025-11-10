@@ -8,7 +8,7 @@ import type { Config, GitService } from '@google/gemini-cli-core';
 
 export interface CommandContext {
   config: Config;
-  git: GitService;
+  git?: GitService;
 }
 
 export interface CommandArgument {

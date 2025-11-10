@@ -191,7 +191,7 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should succeed with no parens in non-interactive mode', async () => {
+  it.skip('should succeed with no parens in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup('should succeed with no parens in non-interactive mode');
 

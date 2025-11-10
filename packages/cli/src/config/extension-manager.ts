@@ -303,7 +303,7 @@ export class ExtensionManager extends ExtensionLoader {
           throw new Error(`Extension not found`);
         }
         if (isUpdate) {
-          logExtensionUpdateEvent(
+          await logExtensionUpdateEvent(
             this.telemetryConfig,
             new ExtensionUpdateEvent(
               hashValue(newExtensionConfig.name),
@@ -315,7 +315,7 @@ export class ExtensionManager extends ExtensionLoader {
             ),
           );
         } else {
-          logExtensionInstallEvent(
+          await logExtensionInstallEvent(
             this.telemetryConfig,
             new ExtensionInstallEvent(
               hashValue(newExtensionConfig.name),
@@ -348,7 +348,7 @@ export class ExtensionManager extends ExtensionLoader {
         ? getExtensionId(config, installMetadata)
         : undefined;
       if (isUpdate) {
-        logExtensionUpdateEvent(
+        await logExtensionUpdateEvent(
           this.telemetryConfig,
           new ExtensionUpdateEvent(
             hashValue(config?.name ?? ''),
@@ -360,7 +360,7 @@ export class ExtensionManager extends ExtensionLoader {
           ),
         );
       } else {
-        logExtensionInstallEvent(
+        await logExtensionInstallEvent(
           this.telemetryConfig,
           new ExtensionInstallEvent(
             hashValue(newExtensionConfig?.name ?? ''),
@@ -403,7 +403,7 @@ export class ExtensionManager extends ExtensionLoader {
 
     this.extensionEnablementManager.remove(extension.name);
 
-    logExtensionUninstall(
+    await logExtensionUninstall(
       this.telemetryConfig,
       new ExtensionUninstallEvent(
         hashValue(extension.name),
@@ -569,6 +569,8 @@ export class ExtensionManager extends ExtensionLoader {
     const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
     let output = `${status} ${extension.name} (${extension.version})`;
     output += `\n ID: ${extension.id}`;
+    output += `\n name: ${hashValue(extension.name)}`;
+
     output += `\n Path: ${extension.path}`;
     if (extension.installMetadata) {
       output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
@@ -621,7 +623,7 @@ export class ExtensionManager extends ExtensionLoader {
         scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
       this.extensionEnablementManager.disable(name, true, scopePath);
     }
-    logExtensionDisable(
+    await logExtensionDisable(
       this.telemetryConfig,
       new ExtensionDisableEvent(hashValue(name), extension.id, scope),
     );
@@ -656,7 +658,7 @@ export class ExtensionManager extends ExtensionLoader {
         scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
       this.extensionEnablementManager.enable(name, true, scopePath);
     }
-    logExtensionEnable(
+    await logExtensionEnable(
       this.telemetryConfig,
       new ExtensionEnableEvent(hashValue(name), extension.id, scope),
     );

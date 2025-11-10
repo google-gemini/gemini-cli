@@ -8,6 +8,7 @@ import type { Message, Task as SDKTask } from '@a2a-js/sdk';
 import type {
   TaskStore,
   AgentExecutor,
+  AgentExecutionEvent,
   RequestContext,
   ExecutionEventBus,
 } from '@a2a-js/sdk/server';
@@ -300,6 +301,11 @@ export class CoderAgentExecutor implements AgentExecutor {
       `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
     );
 
+    eventBus.on('event', (event: AgentExecutionEvent) =>
+      // only log metadata
+      logger.info('[EventBus event]: ', event),
+    );
+
     const store = requestStorage.getStore();
     if (!store) {
       logger.error(
@@ -549,12 +555,18 @@ export class CoderAgentExecutor implements AgentExecutor {
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };
+
+      // Add checkpoint info to the final message
+      console.log('checkpointFile', currentTask.checkpointFile);
       currentTask.setTaskStateAndPublishUpdate(
         'input-required',
         stateChange,
-        undefined,
+        undefined, // No longer sending as a text message
         undefined,
         true,
+        undefined,
+        undefined,
+        currentTask.checkpointFile, // Pass checkpointFile here
       );
     } catch (error) {
       if (abortSignal.aborted) {
