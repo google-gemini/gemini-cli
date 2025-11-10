@@ -233,6 +233,7 @@ export async function startInteractiveUI(
         }
       },
       alternateBuffer: settings.merged.ui?.useAlternateBuffer,
+      alternateBufferAlreadyActive: settings.merged.ui?.useAlternateBuffer,
     },
   );
 
@@ -419,6 +420,12 @@ export async function main() {
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
       process.stdin.setRawMode(true);
+
+      if (settings.merged.ui?.useAlternateBuffer) {
+        process.stdout.write('\x1b[?1049h');
+
+        // Ink will cleanup so there is no need for us to manually cleanup.
+      }
 
       // This cleanup isn't strictly needed but may help in certain situations.
       process.on('SIGTERM', () => {
