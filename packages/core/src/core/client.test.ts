@@ -260,6 +260,7 @@ describe('Gemini Client (client.ts)', () => {
           reasoning: 'test',
         }),
       }),
+      isInteractive: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     client = new GeminiClient(mockConfig);
