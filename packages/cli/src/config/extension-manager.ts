@@ -390,7 +390,7 @@ export class ExtensionManager extends ExtensionLoader {
       throw new Error(`Extension not found.`);
     }
     await this.unloadExtension(extension);
-    const storage = new ExtensionStorage(extension.name);
+    const storage = new ExtensionStorage(path.basename(extension.path));
 
     await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
