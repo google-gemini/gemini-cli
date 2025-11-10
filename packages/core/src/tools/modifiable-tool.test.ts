@@ -88,6 +88,11 @@ describe('modifyWithEditor', () => {
   });
 
   describe('successful modification', () => {
+    const assertMode = (mode: number, expected: number): void => {
+      if (process.platform === 'win32') return;
+      expect(mode & 0o777).toBe(expected);
+    };
+
     it('should successfully modify content with VSCode editor', async () => {
       const result = await modifyWithEditor(
         mockParams,
@@ -149,9 +154,9 @@ describe('modifyWithEditor', () => {
         const oldStats = await fsp.stat(oldPath);
         const newStats = await fsp.stat(newPath);
 
-        expect(dirStats.mode & 0o777).toBe(0o700);
-        expect(oldStats.mode & 0o777).toBe(0o600);
-        expect(newStats.mode & 0o777).toBe(0o600);
+        assertMode(dirStats.mode, 0o700);
+        assertMode(oldStats.mode, 0o600);
+        assertMode(newStats.mode, 0o600);
 
         await fsp.writeFile(newPath, modifiedContent, 'utf8');
       });
