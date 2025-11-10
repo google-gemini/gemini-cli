@@ -17,6 +17,7 @@ const mockPaidTier: GeminiUserTier = {
   id: UserTierId.STANDARD,
   name: 'paid',
   description: 'Paid tier',
+  tierDescription: 'Standard tier',
   isDefault: true,
 };
 
@@ -24,6 +25,7 @@ const mockFreeTier: GeminiUserTier = {
   id: UserTierId.FREE,
   name: 'free',
   description: 'Free tier',
+  tierDescription: 'Free tier',
   isDefault: true,
 };
 
@@ -87,6 +89,8 @@ describe('setupUser for existing user', () => {
     expect(projectId).toEqual({
       projectId: 'server-project',
       userTier: 'standard-tier',
+      tierName: 'paid',
+      tierDescription: 'Paid tier',
     });
   });
 
@@ -158,6 +162,8 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'server-project',
       userTier: 'standard-tier',
+      tierName: 'paid',
+      tierDescription: 'Paid tier',
     });
   });
 
@@ -187,6 +193,8 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'server-project',
       userTier: 'free-tier',
+      tierName: 'free',
+      tierDescription: 'Free tier',
     });
   });
 
@@ -205,6 +213,8 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'test-project',
       userTier: 'standard-tier',
+      tierName: 'paid',
+      tierDescription: 'Paid tier',
     });
   });
 

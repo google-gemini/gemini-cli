@@ -232,6 +232,12 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
+export type HistoryItemLicenseInfo = HistoryItemBase & {
+  type: 'license_info';
+  licenseName: string;
+  licenseDescription: string;
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -255,7 +261,8 @@ export type HistoryItemWithoutId =
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemMcpStatus
-  | HistoryItemChatList;
+  | HistoryItemChatList
+  | HistoryItemLicenseInfo;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -277,6 +284,7 @@ export enum MessageType {
   TOOLS_LIST = 'tools_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
+  LICENSE_INFO = 'license_info',
 }
 
 // Simplified message structure for internal feedback

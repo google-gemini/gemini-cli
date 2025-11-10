@@ -112,9 +112,10 @@ describe('oauth2', () => {
       // Mock the UserInfo API response
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
-        json: vi
-          .fn()
-          .mockResolvedValue({ email: 'test-google-account@gmail.com' }),
+        json: vi.fn().mockResolvedValue({
+          email: 'test-google-account@gmail.com',
+          name: 'Test User',
+        }),
       } as unknown as Response);
 
       let requestCallback!: http.RequestListener<
@@ -190,14 +191,16 @@ describe('oauth2', () => {
       const cachedGoogleAccount = fs.readFileSync(googleAccountPath, 'utf-8');
       expect(JSON.parse(cachedGoogleAccount)).toEqual({
         active: 'test-google-account@gmail.com',
+        activeName: 'Test User',
         old: [],
       });
 
       // Verify the getCachedGoogleAccount function works
       const userAccountManager = new UserAccountManager();
-      expect(userAccountManager.getCachedGoogleAccount()).toBe(
-        'test-google-account@gmail.com',
-      );
+      expect(userAccountManager.getCachedGoogleAccount()).toEqual({
+        email: 'test-google-account@gmail.com',
+        name: 'Test User',
+      });
     });
 
     it('should perform login with user code', async () => {
@@ -486,9 +489,10 @@ describe('oauth2', () => {
         // Mock the UserInfo API response for fetchAndCacheUserInfo
         (global.fetch as Mock).mockResolvedValue({
           ok: true,
-          json: vi
-            .fn()
-            .mockResolvedValue({ email: 'test-gcp-account@gmail.com' }),
+          json: vi.fn().mockResolvedValue({
+            email: 'test-gcp-account@gmail.com',
+            name: 'Test GCP User',
+          }),
         } as unknown as Response);
 
         const client = await getOauthClient(
@@ -521,6 +525,7 @@ describe('oauth2', () => {
         const cachedContent = fs.readFileSync(googleAccountPath, 'utf-8');
         expect(JSON.parse(cachedContent)).toEqual({
           active: 'test-gcp-account@gmail.com',
+          activeName: 'Test GCP User',
           old: [],
         });
       });
@@ -971,7 +976,11 @@ describe('oauth2', () => {
           GEMINI_DIR,
           'google_accounts.json',
         );
-        const accountData = { active: 'test@example.com', old: [] };
+        const accountData = {
+          active: 'test@example.com',
+          activeName: 'Test User',
+          old: [],
+        };
         await fs.promises.writeFile(
           googleAccountPath,
           JSON.stringify(accountData),
@@ -980,9 +989,10 @@ describe('oauth2', () => {
 
         expect(fs.existsSync(credsPath)).toBe(true);
         expect(fs.existsSync(googleAccountPath)).toBe(true);
-        expect(userAccountManager.getCachedGoogleAccount()).toBe(
-          'test@example.com',
-        );
+        expect(userAccountManager.getCachedGoogleAccount()).toEqual({
+          email: 'test@example.com',
+          name: 'Test User',
+        });
 
         await clearCachedCredentialFile();
         expect(fs.existsSync(credsPath)).toBe(false);

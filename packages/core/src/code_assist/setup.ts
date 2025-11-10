@@ -25,6 +25,8 @@ export class ProjectIdRequiredError extends Error {
 export interface UserData {
   projectId: string;
   userTier: UserTierId;
+  tierName?: string;
+  tierDescription?: string;
 }
 
 /**
@@ -58,6 +60,8 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
         return {
           projectId,
           userTier: loadRes.currentTier.id,
+          tierName: loadRes.currentTier.name,
+          tierDescription: loadRes.currentTier.description,
         };
       }
       throw new ProjectIdRequiredError();
@@ -65,6 +69,8 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
     return {
       projectId: loadRes.cloudaicompanionProject,
       userTier: loadRes.currentTier.id,
+      tierName: loadRes.currentTier.name,
+      tierDescription: loadRes.currentTier.description,
     };
   }
 
@@ -101,6 +107,8 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
       return {
         projectId,
         userTier: tier.id,
+        tierName: tier.name,
+        tierDescription: tier.description,
       };
     }
     throw new ProjectIdRequiredError();
@@ -109,6 +117,8 @@ export async function setupUser(client: AuthClient): Promise<UserData> {
   return {
     projectId: lroRes.response.cloudaicompanionProject.id,
     userTier: tier.id,
+    tierName: tier.name,
+    tierDescription: tier.description,
   };
 }
 

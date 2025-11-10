@@ -60,6 +60,7 @@ export interface GeminiUserTier {
   id: UserTierId;
   name?: string;
   description?: string;
+  tierDescription?: string;
   // This value is used to declare whether a given tier requires the user to configure the project setting on the IDE settings or not.
   userDefinedCloudaicompanionProject?: boolean | null;
   isDefault?: boolean;
