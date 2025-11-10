@@ -971,10 +971,6 @@ export async function connectToMcpServer(
   let httpReturned404 = false; // Track if HTTP returned 404 to skip it in OAuth retry
   let sseError: Error | null = null; // Track SSE fallback error
 
-  // Pre-fetch stored OAuth token so it's available for fallback attempts
-  // This ensures SSE fallback can use the token if HTTP fails
-  const storedToken = await getStoredOAuthToken(mcpServerName);
-
   try {
     const transport = await createTransport(
       mcpServerName,
@@ -1017,7 +1013,11 @@ export async function connectToMcpServer(
       try {
         // Try SSE with stored OAuth token if available
         // This ensures that SSE fallback works for authenticated servers
-        await connectWithSSETransport(mcpClient, mcpServerConfig, storedToken);
+        await connectWithSSETransport(
+          mcpClient,
+          mcpServerConfig,
+          await getStoredOAuthToken(mcpServerName),
+        );
 
         debugLogger.log(
           `MCP server '${mcpServerName}': Successfully connected using SSE transport.`,
