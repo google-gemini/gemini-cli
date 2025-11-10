@@ -1348,12 +1348,13 @@ export async function createTransport(
           requireAbsolutePath: false, // Allow commands in PATH
           allowDangerousCommands: false,
           trusted: mcpServerConfig.trust,
+          serverName: mcpServerName, // For audit logging
         },
       );
 
       // SECURITY: Validate environment variables
       if (mcpServerConfig.env) {
-        validateEnvironment(mcpServerConfig.env);
+        validateEnvironment(mcpServerConfig.env, mcpServerName);
       }
     } catch (error) {
       if (error instanceof CommandValidationError) {
