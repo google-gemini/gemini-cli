@@ -24,6 +24,13 @@ import { debugLogger } from '../utils/debugLogger.js';
 const DEFAULT_HOOK_TIMEOUT = 60000;
 
 /**
+ * Exit code constants for hook execution
+ */
+const EXIT_CODE_SUCCESS = 0;
+const EXIT_CODE_BLOCKING_ERROR = 2;
+const EXIT_CODE_NON_BLOCKING_ERROR = 1;
+
+/**
  * Hook runner that executes command hooks
  */
 export class HookRunner {
@@ -48,7 +55,8 @@ export class HookRunner {
       );
     } catch (error) {
       const duration = Date.now() - startTime;
-      const errorMessage = `Hook execution failed: ${error}`;
+      const hookSource = hookConfig.command || 'unknown';
+      const errorMessage = `Hook execution failed for event '${eventName}' (source: ${hookSource}): ${error}`;
       debugLogger.warn(`Hook execution error (non-fatal): ${errorMessage}`);
 
       return {
@@ -258,7 +266,7 @@ export class HookRunner {
 
         // Parse output
         let output: HookOutput | undefined;
-        if (exitCode === 0 && stdout.trim()) {
+        if (exitCode === EXIT_CODE_SUCCESS && stdout.trim()) {
           try {
             let parsed = JSON.parse(stdout.trim());
             if (typeof parsed === 'string') {
@@ -273,22 +281,22 @@ export class HookRunner {
             // Not JSON, convert plain text to structured output
             output = this.convertPlainTextToHookOutput(stdout.trim(), exitCode);
           }
-        } else if (exitCode !== 0 && stderr.trim()) {
+        } else if (exitCode !== EXIT_CODE_SUCCESS && stderr.trim()) {
           // Convert error output to structured format
           output = this.convertPlainTextToHookOutput(
             stderr.trim(),
-            exitCode || 1,
+            exitCode || EXIT_CODE_NON_BLOCKING_ERROR,
           );
         }
 
         resolve({
           hookConfig,
           eventName,
-          success: exitCode === 0,
+          success: exitCode === EXIT_CODE_SUCCESS,
           output,
           stdout,
           stderr,
-          exitCode: exitCode || 0,
+          exitCode: exitCode || EXIT_CODE_SUCCESS,
           duration,
         });
       });
@@ -327,20 +335,20 @@ export class HookRunner {
     text: string,
     exitCode: number,
   ): HookOutput {
-    if (exitCode === 0) {
+    if (exitCode === EXIT_CODE_SUCCESS) {
       // Success - treat as system message or additional context
       return {
         decision: 'allow',
         systemMessage: text,
       };
-    } else if (exitCode === 2) {
+    } else if (exitCode === EXIT_CODE_BLOCKING_ERROR) {
       // Blocking error
       return {
         decision: 'deny',
         reason: text,
       };
     } else {
-      // Non-blocking error
+      // Non-blocking error (EXIT_CODE_NON_BLOCKING_ERROR or any other code)
       return {
         decision: 'allow',
         systemMessage: `Warning: ${text}`,
