@@ -200,10 +200,11 @@ async function initOauthClient(
   } else {
     const webLogin = await authWithWeb(client);
 
+    const terminalWidth = process.stdout?.columns ?? 80;
     debugLogger.log(
       `\n\nCode Assist login required.\n` +
         `Attempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${wrap(webLogin.authUrl, process.stdout?.columns ?? 80)}\n\n`,
+        `Otherwise navigate to:\n\n${wrap(webLogin.authUrl, terminalWidth)}\n\n`,
     );
     try {
       // Attempt to open the authentication URL in the default browser.
