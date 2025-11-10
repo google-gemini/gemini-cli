@@ -51,13 +51,6 @@ export interface SafetyCheckInput {
     };
 
     /**
-     * A selection of non-sensitive configuration variables that may be
-     * relevant to the checker. The policy engine is responsible for
-     * populating this, ensuring no secrets are leaked.
-     */
-    config?: Record<string, unknown>;
-
-    /**
      * The recent history of the conversation. This can be used by checkers
      * that need to understand the intent behind a tool call.
      */

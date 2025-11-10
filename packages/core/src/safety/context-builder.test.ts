@@ -39,18 +39,6 @@ describe('ContextBuilder', () => {
     expect(context.environment.cwd).toBe(mockCwd);
     expect(context.environment.workspaces).toEqual(mockWorkspaces);
     expect(context.history?.turns).toEqual(mockHistory);
-    expect(context.config).toBeDefined();
-  });
-
-  it('should filter out sensitive config keys recursively', () => {
-    const context = contextBuilder.buildFullContext();
-    expect(context.config).not.toHaveProperty('apiKey');
-    expect(context.config).toHaveProperty('somePublicConfig', 'public-value');
-    const config = context.config as {
-      nested: { secretToken?: string; public: string };
-    };
-    expect(config.nested).not.toHaveProperty('secretToken');
-    expect(config.nested).toHaveProperty('public', 'visible');
   });
 
   it('should build minimal context with only required keys', () => {
