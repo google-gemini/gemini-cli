@@ -62,6 +62,7 @@ export interface UIState {
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
+  embeddedShellExitConfirmationRequest: ConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
