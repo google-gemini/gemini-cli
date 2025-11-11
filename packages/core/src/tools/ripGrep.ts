@@ -7,7 +7,6 @@
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { EOL } from 'node:os';
 import { spawn } from 'node:child_process';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
@@ -88,7 +87,7 @@ export interface RipGrepToolParams {
   /**
    * The directory to search in (optional, defaults to current directory relative to root)
    */
-  path?: string;
+  dir_path?: string;
 
   /**
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
@@ -163,8 +162,8 @@ class GrepToolInvocation extends BaseToolInvocation<
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
-      const searchDirAbs = this.resolveAndValidatePath(this.params.path);
-      const searchDirDisplay = this.params.path || '.';
+      const searchDirAbs = this.resolveAndValidatePath(this.params.dir_path);
+      const searchDirDisplay = this.params.dir_path || '.';
 
       // Determine which directories to search
       let searchDirectories: readonly string[];
@@ -276,39 +275,36 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
   }
 
-  private parseRipgrepOutput(output: string, basePath: string): GrepMatch[] {
+  private parseRipgrepJsonOutput(
+    output: string,
+    basePath: string,
+  ): GrepMatch[] {
     const results: GrepMatch[] = [];
     if (!output) return results;
 
-    const lines = output.split(EOL);
+    const lines = output.trim().split('\n');
 
     for (const line of lines) {
       if (!line.trim()) continue;
 
-      const firstColonIndex = line.indexOf(':');
-      if (firstColonIndex === -1) continue;
+      try {
+        const json = JSON.parse(line);
+        if (json.type === 'match') {
+          const match = json.data;
+          // Defensive check: ensure text properties exist (skips binary/invalid encoding)
+          if (match.path?.text && match.lines?.text) {
+            const absoluteFilePath = path.resolve(basePath, match.path.text);
+            const relativeFilePath = path.relative(basePath, absoluteFilePath);
 
-      const secondColonIndex = line.indexOf(':', firstColonIndex + 1);
-      if (secondColonIndex === -1) continue;
-
-      const filePathRaw = line.substring(0, firstColonIndex);
-      const lineNumberStr = line.substring(
-        firstColonIndex + 1,
-        secondColonIndex,
-      );
-      const lineContent = line.substring(secondColonIndex + 1);
-
-      const lineNumber = parseInt(lineNumberStr, 10);
-
-      if (!isNaN(lineNumber)) {
-        const absoluteFilePath = path.resolve(basePath, filePathRaw);
-        const relativeFilePath = path.relative(basePath, absoluteFilePath);
-
-        results.push({
-          filePath: relativeFilePath || path.basename(absoluteFilePath),
-          lineNumber,
-          line: lineContent,
-        });
+            results.push({
+              filePath: relativeFilePath || path.basename(absoluteFilePath),
+              lineNumber: match.line_number,
+              line: match.lines.text.trimEnd(),
+            });
+          }
+        }
+      } catch (error) {
+        debugLogger.warn(`Failed to parse ripgrep JSON line: ${line}`, error);
       }
     }
     return results;
@@ -322,14 +318,7 @@ class GrepToolInvocation extends BaseToolInvocation<
   }): Promise<GrepMatch[]> {
     const { pattern, path: absolutePath, include } = options;
 
-    const rgArgs = [
-      '--line-number',
-      '--no-heading',
-      '--with-filename',
-      '--ignore-case',
-      '--regexp',
-      pattern,
-    ];
+    const rgArgs = ['--json', '--ignore-case', '--regexp', pattern];
 
     if (include) {
       rgArgs.push('--glob', include);
@@ -399,7 +388,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         });
       });
 
-      return this.parseRipgrepOutput(output, absolutePath);
+      return this.parseRipgrepJsonOutput(output, absolutePath);
     } catch (error: unknown) {
       console.error(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
       throw error;
@@ -416,14 +405,14 @@ class GrepToolInvocation extends BaseToolInvocation<
     if (this.params.include) {
       description += ` in ${this.params.include}`;
     }
-    if (this.params.path) {
+    if (this.params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
-        this.params.path,
+        this.params.dir_path,
       );
       if (
         resolvedPath === this.config.getTargetDir() ||
-        this.params.path === '.'
+        this.params.dir_path === '.'
       ) {
         description += ` within ./`;
       } else {
@@ -470,7 +459,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
               "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
             type: 'string',
           },
-          path: {
+          dir_path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
             type: 'string',
@@ -546,9 +535,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
     }
 
     // Only validate path if one is provided
-    if (params.path) {
+    if (params.dir_path) {
       try {
-        this.resolveAndValidatePath(params.path);
+        this.resolveAndValidatePath(params.dir_path);
       } catch (error) {
         return getErrorMessage(error);
       }

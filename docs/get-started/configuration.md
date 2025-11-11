@@ -296,6 +296,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
+#### `modelConfigs`
+
+- **`modelConfigs.aliases`** (object):
+  - **Description:** Named presets for model configs. Can be used in place of a
+    model name and can inherit from other aliases using an `extends` property.
+  - **Default:**
+    `{"base":{"modelConfig":{"generateContentConfig":{"temperature":0,"topP":1}}},"chat-base":{"extends":"base","modelConfig":{"generateContentConfig":{"thinkingConfig":{"includeThoughts":true,"thinkingBudget":-1}}}},"gemini-2.5-pro":{"extends":"chat-base","modelConfig":{"model":"gemini-2.5-pro"}},"gemini-2.5-flash":{"extends":"chat-base","modelConfig":{"model":"gemini-2.5-flash"}},"gemini-2.5-flash-lite":{"extends":"chat-base","modelConfig":{"model":"gemini-2.5-flash-lite"}},"gemini-2.5-flash-base":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash"}},"classifier":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":1024,"thinkingConfig":{"thinkingBudget":512}}}},"prompt-completion":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"temperature":0.3,"maxOutputTokens":16000,"thinkingConfig":{"thinkingBudget":0}}}},"edit-corrector":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"thinkingConfig":{"thinkingBudget":0}}}},"summarizer-default":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":2000}}},"summarizer-shell":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":2000}}},"web-search":{"extends":"gemini-2.5-flash-base","modelConfig":{"generateContentConfig":{"tools":[{"googleSearch":{}}]}}},"web-fetch":{"extends":"gemini-2.5-flash-base","modelConfig":{"generateContentConfig":{"tools":[{"urlContext":{}}]}}},"web-fetch-fallback":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"loop-detection":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"llm-edit-fixer":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"next-speaker-checker":{"extends":"gemini-2.5-flash-base","modelConfig":{}}}`
+
+- **`modelConfigs.overrides`** (array):
+  - **Description:** Apply specific configuration overrides based on matches,
+    with a primary key of model (or alias). The most specific match will be
+    used.
+  - **Default:** `[]`
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -467,12 +481,17 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`useWriteTodos`** (boolean):
   - **Description:** Enable the write_todos_list tool.
-  - **Default:** `true`
+  - **Default:** `false`
 
 #### `security`
 
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.blockGitExtensions`** (boolean):
+  - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
   - **Requires restart:** Yes
 

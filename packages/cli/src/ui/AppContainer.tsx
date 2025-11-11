@@ -42,16 +42,18 @@ import {
   getAllGeminiMdFilenames,
   AuthType,
   clearCachedCredentialFile,
+  type ResumedSessionData,
   recordExitFail,
   ShellExecutionService,
   saveApiKey,
   debugLogger,
   coreEvents,
   CoreEvent,
+  refreshServerHierarchicalMemory,
   type ModelChangedPayload,
+  type MemoryChangedPayload,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
-import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
@@ -76,11 +78,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useVim } from './hooks/vim.js';
-import {
-  type LoadableSettingScope,
-  type LoadedSettings,
-  SettingScope,
-} from '../config/settings.js';
+import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useBracketedPaste } from './hooks/useBracketedPaste.js';
@@ -104,9 +102,12 @@ import {
   useExtensionUpdates,
 } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import { useSessionResume } from './hooks/useSessionResume.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
+import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
+import { useSettings } from './contexts/SettingsContext.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -124,10 +125,10 @@ function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
 
 interface AppContainerProps {
   config: Config;
-  settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
   initializationResult: InitializationResult;
+  resumedSessionData?: ResumedSessionData;
 }
 
 /**
@@ -143,9 +144,11 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
-  const { settings, config, initializationResult } = props;
+  const { config, initializationResult, resumedSessionData } = props;
   const historyManager = useHistory();
   useMemoryMonitor(historyManager);
+  const settings = useSettings();
+  const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
@@ -160,9 +163,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const [showDebugProfiler, setShowDebugProfiler] = useState(false);
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
 
-  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
-    initializationResult.geminiMdFileCount,
-  );
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
@@ -358,11 +358,11 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [historyManager.history, logger]);
 
   const refreshStatic = useCallback(() => {
-    if (settings.merged.ui?.useAlternateBuffer === false) {
+    if (!isAlternateBuffer) {
       stdout.write(ansiEscapes.clearTerminal);
     }
     setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, stdout, settings]);
+  }, [setHistoryRemountKey, stdout, isAlternateBuffer]);
 
   const {
     isThemeDialogOpen,
@@ -390,13 +390,25 @@ export const AppContainer = (props: AppContainerProps) => {
     config,
     historyManager,
     userTier,
-    setAuthState,
     setModelSwitchedFromQuotaError,
   });
 
   // Derive auth state variables for backward compatibility with UIStateContext
   const isAuthDialogOpen = authState === AuthState.Updating;
   const isAuthenticating = authState === AuthState.Unauthenticated;
+
+  // Session browser and resume functionality
+  const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
+
+  useSessionResume({
+    config,
+    historyManager,
+    refreshStatic,
+    isGeminiClientInitialized,
+    setQuittingMessages,
+    resumedSessionData,
+    isAuthenticating,
+  });
 
   // Create handleAuthSelect wrapper for backward compatibility
   const handleAuthSelect = useCallback(
@@ -570,7 +582,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
     refreshStatic,
     toggleVimEnabled,
     setIsProcessing,
-    setGeminiMdFileCount,
     slashCommandActions,
     extensionsUpdateStateInternal,
     isConfigInitialized,
@@ -585,26 +596,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       Date.now(),
     );
     try {
-      const { memoryContent, fileCount, filePaths } =
-        await loadHierarchicalGeminiMemory(
-          process.cwd(),
-          settings.merged.context?.loadMemoryFromIncludeDirectories
-            ? config.getWorkspaceContext().getDirectories()
-            : [],
-          config.getDebugMode(),
-          config.getFileService(),
-          settings.merged,
-          config.getExtensionLoader(),
-          config.isTrustedFolder(),
-          settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
-          config.getFileFilteringOptions(),
-        );
-
-      config.setUserMemory(memoryContent);
-      config.setGeminiMdFileCount(fileCount);
-      config.setGeminiMdFilePaths(filePaths);
-
-      setGeminiMdFileCount(fileCount);
+      const { memoryContent, fileCount } =
+        await refreshServerHierarchicalMemory(config);
 
       historyManager.addItem(
         {
@@ -636,7 +629,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       );
       debugLogger.warn('Error refreshing memory:', error);
     }
-  }, [config, historyManager, settings.merged]);
+  }, [config, historyManager]);
 
   const cancelHandlerRef = useRef<() => void>(() => {});
 
@@ -1042,10 +1035,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
-      if (
-        settings.merged.ui?.useAlternateBuffer &&
-        keyMatchers[Command.TOGGLE_COPY_MODE](key)
-      ) {
+      if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
         return;
@@ -1117,7 +1107,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       refreshStatic,
       setCopyModeEnabled,
       copyModeEnabled,
-      settings.merged.ui?.useAlternateBuffer,
+      isAlternateBuffer,
     ],
   );
 
@@ -1248,6 +1238,19 @@ Logging in with Google... Please restart Gemini CLI to continue.
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
+
+  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
+    config.getGeminiMdFileCount(),
+  );
+  useEffect(() => {
+    const handleMemoryChanged = (result: MemoryChangedPayload) => {
+      setGeminiMdFileCount(result.fileCount);
+    };
+    coreEvents.on(CoreEvent.MemoryChanged, handleMemoryChanged);
+    return () => {
+      coreEvents.off(CoreEvent.MemoryChanged, handleMemoryChanged);
+    };
+  }, []);
 
   const uiState: UIState = useMemo(
     () => ({
