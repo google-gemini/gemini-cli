@@ -21,6 +21,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_MODEL_CONFIGS,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -689,6 +690,38 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  modelConfigs: {
+    type: 'object',
+    label: 'Model Configs',
+    category: 'Model',
+    requiresRestart: false,
+    default: DEFAULT_MODEL_CONFIGS,
+    description: 'Model configurations.',
+    showInDialog: false,
+    properties: {
+      aliases: {
+        type: 'object',
+        label: 'Model Config Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: DEFAULT_MODEL_CONFIGS.aliases,
+        description:
+          'Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
+        showInDialog: false,
+      },
+      overrides: {
+        type: 'array',
+        label: 'Model Config Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.',
+        showInDialog: false,
+      },
+    },
+  },
+
   context: {
     type: 'object',
     label: 'Context',
@@ -1056,7 +1089,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use Write Todos',
     category: 'Advanced',
     requiresRestart: false,
-    default: true,
+    default: false,
     description: 'Enable the write_todos_list tool.',
     showInDialog: false,
   },

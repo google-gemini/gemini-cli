@@ -19,7 +19,8 @@ import type {
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import type { ToolCallRequestInfo } from '../core/turn.js';
+import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
 import {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -110,6 +111,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny>
   private readonly toolRegistry: ToolRegistry;
   private readonly runtimeContext: Config;
   private readonly onActivity?: ActivityCallback;
+  private readonly compressionService: ChatCompressionService;
+  private hasFailedCompressionAttempt = false;
 
   /**
    * Creates and validates a new `AgentExecutor` instance.
@@ -151,6 +154,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny>
         // registered; their schemas are passed directly to the model later.
       }
 
+      agentToolRegistry.sortTools();
       // Validate that all registered tools are safe for non-interactive
       // execution.
       await AgentExecutor.validateTools(agentToolRegistry, definition.name);
@@ -197,6 +201,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny>
     this.runtimeContext = runtimeContext;
     this.toolRegistry = toolRegistry;
     this.onActivity = onActivity;
+    this.compressionService = new ChatCompressionService();
     this.agentId = createAgentId(this.definition.name, parentPromptId);
   }
 
@@ -216,6 +221,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny>
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
+
+    await this.tryCompressChat(chat, promptId);
 
     const { functionCalls } = await promptIdContext.run(promptId, async () =>
       this.callModel(chat, currentMessage, tools, combinedSignal, promptId),
@@ -578,6 +585,34 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny>
           terminateReason,
         ),
       );
+    }
+  }
+
+  private async tryCompressChat(
+    chat: GeminiChat,
+    prompt_id: string,
+  ): Promise<void> {
+    const model = this.definition.modelConfig.model;
+
+    const { newHistory, info } = await this.compressionService.compress(
+      chat,
+      prompt_id,
+      false,
+      model,
+      this.runtimeContext,
+      this.hasFailedCompressionAttempt,
+    );
+
+    if (
+      info.compressionStatus ===
+      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
+    ) {
+      this.hasFailedCompressionAttempt = true;
+    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+      if (newHistory) {
+        chat.setHistory(newHistory);
+        this.hasFailedCompressionAttempt = false;
+      }
     }
   }
 

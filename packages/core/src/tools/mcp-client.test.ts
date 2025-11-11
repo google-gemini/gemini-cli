@@ -89,6 +89,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -153,6 +154,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -237,6 +239,7 @@ describe('mcp-client', () => {
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -286,6 +289,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -340,6 +344,7 @@ describe('mcp-client', () => {
         unregisterTool: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
         removeMcpToolsByServer: vi.fn(),
+        sortTools: vi.fn(),
       } as unknown as ToolRegistry;
       const mockedPromptRegistry = {
         registerPrompt: vi.fn(),
@@ -496,6 +501,9 @@ describe('mcp-client', () => {
             oauth: {
               scopes: ['scope1'],
             },
+            headers: {
+              'X-Goog-User-Project': 'myproject',
+            },
           },
           false,
         );
@@ -504,6 +512,11 @@ describe('mcp-client', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const authProvider = (transport as any)._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const googUserProject = (transport as any)._requestInit?.headers?.[
+          'X-Goog-User-Project'
+        ];
+        expect(googUserProject).toBe('myproject');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {

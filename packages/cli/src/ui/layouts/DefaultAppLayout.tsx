@@ -13,30 +13,40 @@ import { Composer } from '../components/Composer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
-import { useSettings } from '../contexts/SettingsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { CopyModeWarning } from '../components/CopyModeWarning.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
-  const { rootUiRef, terminalHeight } = uiState;
-  const settings = useSettings();
-  useFlickerDetector(rootUiRef, terminalHeight);
+  const isAlternateBuffer = useAlternateBuffer();
 
+  const { rootUiRef, terminalHeight } = uiState;
+  useFlickerDetector(rootUiRef, terminalHeight);
+  // If in alternate buffer mode, need to leave room to draw the scrollbar on
+  // the right side of the terminal.
+  const width = isAlternateBuffer
+    ? uiState.terminalWidth
+    : uiState.mainAreaWidth;
   return (
     <Box
       flexDirection="column"
-      width={uiState.mainAreaWidth}
-      ref={uiState.rootUiRef}
-      height={
-        settings.merged.ui?.useAlternateBuffer ? terminalHeight - 1 : undefined
-      }
+      width={width}
+      height={isAlternateBuffer ? terminalHeight - 1 : undefined}
       flexShrink={0}
       flexGrow={0}
       overflow="hidden"
+      ref={uiState.rootUiRef}
     >
       <MainContent />
 
-      <Box flexDirection="column" ref={uiState.mainControlsRef}>
+      <Box
+        flexDirection="column"
+        ref={uiState.mainControlsRef}
+        flexShrink={0}
+        flexGrow={0}
+      >
         <Notifications />
+        <CopyModeWarning />
 
         {uiState.dialogsVisible ? (
           <DialogManager

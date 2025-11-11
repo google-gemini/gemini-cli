@@ -25,6 +25,7 @@ export interface ToolConfirmationRequest {
   type: MessageBusType.TOOL_CONFIRMATION_REQUEST;
   toolCall: FunctionCall;
   correlationId: string;
+  serverName?: string;
 }
 
 export interface ToolConfirmationDisplayRequest {
