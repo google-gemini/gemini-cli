@@ -1483,7 +1483,7 @@ describe('loggers', () => {
       vi.spyOn(metrics, 'recordModelRoutingMetrics');
     });
 
-    it('should log model routing event', () => {
+    it('should log the event to Clearcut and OTEL, and record metrics', () => {
       const event = new ModelRoutingEvent(
         'gemini-pro',
         'default',

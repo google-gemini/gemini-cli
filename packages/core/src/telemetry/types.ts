@@ -172,7 +172,7 @@ export class EndSessionEvent implements BaseTelemetryEvent {
   }
 
   toLogBody(): string {
-    return 'CLI configuration loaded.';
+    return 'Session ended.';
   }
 }
 
