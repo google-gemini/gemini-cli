@@ -1555,6 +1555,34 @@ This extension will run the following MCP servers:
       expect(fs.existsSync(otherExtDir)).toBe(true);
     });
 
+    it('should uninstall an extension on non-matching extension directory name', async () => {
+      // Create an extension with a name that differs from the directory name.
+      const sourceExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'My-Local-Extension',
+        version: '1.0.0',
+      });
+      const newSourceExtDir = path.join(
+        userExtensionsDir,
+        'my-local-extension',
+      );
+      fs.renameSync(sourceExtDir, newSourceExtDir);
+
+      const otherExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'other-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.uninstallExtension('my-local-extension', false);
+
+      expect(fs.existsSync(sourceExtDir)).toBe(false);
+      expect(fs.existsSync(newSourceExtDir)).toBe(false);
+      expect(extensionManager.getExtensions()).toHaveLength(1);
+      expect(fs.existsSync(otherExtDir)).toBe(true);
+    });
+
     it('should throw an error if the extension does not exist', async () => {
       await extensionManager.loadExtensions();
       await expect(
