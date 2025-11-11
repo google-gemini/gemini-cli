@@ -85,6 +85,10 @@ const mockConfig = {
   getTargetDir: () => '/tmp',
   getDebugMode: () => false,
   getGeminiMdFileCount: () => 0,
+  getExperiments: () => ({
+    flags: {},
+    experimentIds: [],
+  }),
 } as unknown as Config;
 
 describe('AlternateBufferQuittingDisplay', () => {
