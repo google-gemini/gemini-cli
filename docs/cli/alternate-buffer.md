@@ -26,11 +26,10 @@ experience:
 - **Stable Input Prompt:** Say goodbye to the bouncing input prompt! It now
   remains anchored at the bottom of your terminal, providing a consistent and
   predictable experience.
-- **Full Chat History on Exit:** Even though we’re now rendering with an
-  alternate buffer, your complete chat history is still accessible upon exiting
-  the CLI. Now you don’t have to worry that Gemini CLI will have cleared your
-  terminal history. No matter what you have done while using Gemini CLI, on exit
-  your previous input history is available.
+- **Full Chat History on Exit:** When you exit, your complete chat history
+  from the session is printed to your terminal. This preserves the
+  conversation in your terminal's scrollback buffer, unlike many other
+  full-screen applications that would cause it to be lost.
 
 ## Enabling Alternate Screen Buffer
 
