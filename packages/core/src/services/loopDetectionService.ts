@@ -26,6 +26,7 @@ import {
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -455,15 +456,14 @@ export class LoopDetectionService {
       if (
         flashResult['unproductive_state_confidence'] >= LLM_CONFIDENCE_THRESHOLD
       ) {
-        const mainModel = this.config.getModel();
-        if (mainModel === DEFAULT_GEMINI_FLASH_MODEL) {
+        if (this.config.isInFallbackMode()) {
           this.handleConfirmedLoop(flashResult);
           return true;
         }
 
         // Double check with configured model
         const mainModelResult = await this.queryLoopDetectionModel(
-          mainModel,
+          DEFAULT_GEMINI_MODEL,
           contents,
           schema,
           signal,
