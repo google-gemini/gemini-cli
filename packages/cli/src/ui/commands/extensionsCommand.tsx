@@ -530,7 +530,9 @@ async function uninstallAction(
     return;
   }
 
-  const extension = extensions.find((ext) => ext.name === trimmedArgs);
+  const extension = extensions.find(
+    (ext) => ext.name.toLowerCase() === trimmedArgs.toLowerCase(),
+  );
   if (!extension) {
     context.ui.addItem(
       {
@@ -610,7 +612,9 @@ const uninstallExtensionsCommand: SlashCommand = {
       ? listExtensions(context.services.config)
       : [];
     const extensionNames = extensions.map((ext) => ext.name);
-    return extensionNames.filter((name) => name.startsWith(partialArg));
+    return extensionNames.filter((name) =>
+      name.toLowerCase().startsWith(partialArg.toLowerCase()),
+    );
   },
 };
 
@@ -618,19 +622,19 @@ export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
   const conditionalCommands = enableExtensionReloading
-    ? [disableCommand, enableCommand]
+    ? [enableCommand, disableCommand]
     : [];
   return {
     name: 'extensions',
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
     subCommands: [
-      exploreExtensionsCommand,
       listExtensionsCommand,
+      exploreExtensionsCommand,
+      ...conditionalCommands,
       restartCommand,
       updateExtensionsCommand,
       uninstallExtensionsCommand,
-      ...conditionalCommands,
     ],
     action: (context, args) =>
       // Default to list if no subcommand is provided
