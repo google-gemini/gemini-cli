@@ -5,15 +5,12 @@
  */
 
 import type { ToolResult } from '../tools/tools.js';
-import type {
-  Content,
-  GenerateContentConfig,
-  GenerateContentResponse,
-} from '@google/genai';
+import type { Content } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
-import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import { getResponseText, partToString } from './partUtils.js';
 import { debugLogger } from './debugLogger.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
+import type { Config } from '../config/config.js';
 
 /**
  * A function that summarizes the result of a tool execution.
@@ -22,6 +19,7 @@ import { debugLogger } from './debugLogger.js';
  * @returns The summary of the result.
  */
 export type Summarizer = (
+  config: Config,
   result: ToolResult,
   geminiClient: GeminiClient,
   abortSignal: AbortSignal,
@@ -36,6 +34,7 @@ export type Summarizer = (
  * @returns The summary of the result.
  */
 export const defaultSummarizer: Summarizer = (
+  _config: Config,
   result: ToolResult,
   _geminiClient: GeminiClient,
   _abortSignal: AbortSignal,
@@ -55,19 +54,30 @@ Text to summarize:
 Return the summary string which should first contain an overall summarization of text followed by the full stack trace of errors and warnings in the tool output.
 `;
 
-export const llmSummarizer: Summarizer = (result, geminiClient, abortSignal) =>
+export const llmSummarizer: Summarizer = async (
+  config,
+  result,
+  geminiClient,
+  abortSignal,
+) =>
   summarizeToolOutput(
+    config,
+    { model: 'summarizer-default' },
     partToString(result.llmContent),
     geminiClient,
     abortSignal,
   );
 
 export async function summarizeToolOutput(
+  config: Config,
+  modelConfigKey: ModelConfigKey,
   textToSummarize: string,
   geminiClient: GeminiClient,
   abortSignal: AbortSignal,
-  maxOutputTokens: number = 2000,
 ): Promise<string> {
+  const maxOutputTokens =
+    config.modelConfigService.getResolvedConfig(modelConfigKey)
+      .generateContentConfig.maxOutputTokens ?? 2000;
   // There is going to be a slight difference here since we are comparing length of string with maxOutputTokens.
   // This is meant to be a ballpark estimation of if we need to summarize the tool output.
   if (!textToSummarize || textToSummarize.length < maxOutputTokens) {
@@ -79,16 +89,12 @@ export async function summarizeToolOutput(
   ).replace('{textToSummarize}', textToSummarize);
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
-  const toolOutputSummarizerConfig: GenerateContentConfig = {
-    maxOutputTokens,
-  };
   try {
-    const parsedResponse = (await geminiClient.generateContent(
+    const parsedResponse = await geminiClient.generateContent(
+      modelConfigKey,
       contents,
-      toolOutputSummarizerConfig,
       abortSignal,
-      DEFAULT_GEMINI_FLASH_LITE_MODEL,
-    )) as unknown as GenerateContentResponse;
+    );
     return getResponseText(parsedResponse) || textToSummarize;
   } catch (error) {
     debugLogger.warn('Failed to summarize tool output.', error);
