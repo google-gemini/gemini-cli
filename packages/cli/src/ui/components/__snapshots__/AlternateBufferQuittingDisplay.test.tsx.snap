@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AlternateBufferQuittingDisplay > renders with active and pending tool messages 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information.
+╭────────────────────────────────────────────────────────────────────────────╮
+│ToolMessage: tool1 - Success                                                │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│ToolMessage: tool2 - Success                                                │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────╮
+│ToolMessage: tool3 - Pending                                                │
+╰────────────────────────────────────────────────────────────────────────────╯"
+`;

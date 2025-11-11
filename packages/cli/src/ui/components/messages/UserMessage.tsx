@@ -12,9 +12,10 @@ import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.
 
 interface UserMessageProps {
   text: string;
+  width: number;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
   const isSlashCommand = checkIsSlashCommand(text);
@@ -22,8 +23,14 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
 
   return (
-    <Box flexDirection="row" paddingY={0} marginY={1} alignSelf="flex-start">
-      <Box width={prefixWidth}>
+    <Box
+      flexDirection="row"
+      paddingY={0}
+      marginY={1}
+      alignSelf="flex-start"
+      width={width}
+    >
+      <Box width={prefixWidth} flexShrink={0}>
         <Text color={theme.text.accent} aria-label={SCREEN_READER_USER_PREFIX}>
           {prefix}
         </Text>

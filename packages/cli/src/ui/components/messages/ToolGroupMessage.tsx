@@ -14,6 +14,7 @@ import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -47,6 +48,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const config = useConfig();
+  const isAlternateBuffer = useAlternateBuffer();
   const isShellCommand = toolCalls.some(
     (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
@@ -59,8 +61,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
   // This is a bit of a magic number, but it accounts for the border and
-  // marginLeft.
-  const innerWidth = terminalWidth - 4;
+  // marginLeft in regular mode and just the border in alternate buffer mode.
+  const innerWidth = isAlternateBuffer ? terminalWidth - 3 : terminalWidth - 4;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
   // note, after the CTA, this automatically moves over to the next 'confirming' tool
@@ -106,24 +108,23 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       {toolCalls.map((tool) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         return (
-          <Box key={tool.callId} flexDirection="column" minHeight={1}>
-            <Box flexDirection="row" alignItems="center">
-              <ToolMessage
-                {...tool}
-                availableTerminalHeight={availableTerminalHeightPerToolMessage}
-                terminalWidth={innerWidth}
-                emphasis={
-                  isConfirming
-                    ? 'high'
-                    : toolAwaitingApproval
-                      ? 'low'
-                      : 'medium'
-                }
-                activeShellPtyId={activeShellPtyId}
-                embeddedShellFocused={embeddedShellFocused}
-                config={config}
-              />
-            </Box>
+          <Box
+            key={tool.callId}
+            flexDirection="column"
+            minHeight={1}
+            width={innerWidth}
+          >
+            <ToolMessage
+              {...tool}
+              availableTerminalHeight={availableTerminalHeightPerToolMessage}
+              terminalWidth={innerWidth}
+              emphasis={
+                isConfirming ? 'high' : toolAwaitingApproval ? 'low' : 'medium'
+              }
+              activeShellPtyId={activeShellPtyId}
+              embeddedShellFocused={embeddedShellFocused}
+              config={config}
+            />
             {tool.status === ToolCallStatus.Confirming &&
               isConfirming &&
               tool.confirmationDetails && (
