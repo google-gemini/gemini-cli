@@ -20,13 +20,11 @@ import {
   LlmLoopCheckEvent,
 } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -443,7 +441,7 @@ export class LoopDetectionService {
     };
 
     const flashResult = await this.queryLoopDetectionModel(
-      DEFAULT_GEMINI_FLASH_MODEL,
+      'loop-detection',
       contents,
       schema,
       signal,
@@ -463,7 +461,7 @@ export class LoopDetectionService {
 
         // Double check with configured model
         const mainModelResult = await this.queryLoopDetectionModel(
-          DEFAULT_GEMINI_MODEL,
+          'loop-detection-double-check',
           contents,
           schema,
           signal,

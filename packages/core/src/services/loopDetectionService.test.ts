@@ -776,7 +776,7 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelConfigKey: expect.any(Object),
+        modelConfigKey: { model: 'loop-detection' },
         systemInstruction: expect.any(String),
         contents: expect.any(Array),
         schema: expect.any(Object),
@@ -793,6 +793,11 @@ describe('LoopDetectionService LLM Checks', () => {
     });
     await advanceTurns(30);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
 
     // The confidence of 0.85 will result in a low interval.
     // The interval will be: 5 + (15 - 5) * (1 - 0.85) = 5 + 10 * 0.15 = 6.5 -> rounded to 7
@@ -908,6 +913,18 @@ describe('LoopDetectionService LLM Checks', () => {
 
     // It should have called generateJson twice
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection-double-check' },
+      }),
+    );
 
     // And it should have detected a loop
     expect(loggers.logLoopDetected).toHaveBeenCalledWith(
@@ -937,6 +954,18 @@ describe('LoopDetectionService LLM Checks', () => {
     await advanceTurns(30);
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection-double-check' },
+      }),
+    );
 
     // Should NOT have detected a loop
     expect(loggers.logLoopDetected).not.toHaveBeenCalled();
@@ -965,6 +994,11 @@ describe('LoopDetectionService LLM Checks', () => {
 
     // It should have called generateJson only once
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
 
     // And it should have detected a loop
     expect(loggers.logLoopDetected).toHaveBeenCalledWith(
