@@ -93,6 +93,7 @@ describe('runNonInteractive', () => {
   let processStderrSpy: MockInstance;
   let mockGeminiClient: {
     sendMessageStream: Mock;
+    resumeChat: Mock;
     getChatRecordingService: Mock;
   };
   const MOCK_SESSION_METRICS: SessionMetrics = {
@@ -142,6 +143,7 @@ describe('runNonInteractive', () => {
 
     mockGeminiClient = {
       sendMessageStream: vi.fn(),
+      resumeChat: vi.fn().mockResolvedValue(undefined),
       getChatRecordingService: vi.fn(() => ({
         initialize: vi.fn(),
         recordMessage: vi.fn(),
