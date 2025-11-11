@@ -366,6 +366,7 @@ export class GeminiChat {
       const modelToUse = getEffectiveModel(
         this.config.isInFallbackMode(),
         model,
+        this.config.getPreviewFeatures(),
       );
 
       if (

@@ -8,10 +8,10 @@ import type React from 'react';
 import { useCallback, useContext, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import {
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+  GEMINI_MODEL_ALIAS_PRO,
   ModelSlashCommandEvent,
   logModelSlashCommand,
 } from '@google/gemini-cli-core';
@@ -32,22 +32,22 @@ const MODEL_OPTIONS = [
     key: DEFAULT_GEMINI_MODEL_AUTO,
   },
   {
-    value: DEFAULT_GEMINI_MODEL,
+    value: GEMINI_MODEL_ALIAS_PRO,
     title: 'Pro',
     description: 'For complex tasks that require deep reasoning and creativity',
-    key: DEFAULT_GEMINI_MODEL,
+    key: GEMINI_MODEL_ALIAS_PRO,
   },
   {
-    value: DEFAULT_GEMINI_FLASH_MODEL,
+    value: GEMINI_MODEL_ALIAS_FLASH,
     title: 'Flash',
     description: 'For tasks that need a balance of speed and reasoning',
-    key: DEFAULT_GEMINI_FLASH_MODEL,
+    key: GEMINI_MODEL_ALIAS_FLASH,
   },
   {
-    value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    value: GEMINI_MODEL_ALIAS_FLASH_LITE,
     title: 'Flash-Lite',
     description: 'For simple tasks that need to be done quickly',
-    key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    key: GEMINI_MODEL_ALIAS_FLASH_LITE,
   },
 ];
 
