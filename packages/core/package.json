@@ -62,7 +62,7 @@
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
-    "strip-ansi": "^7.1.0",
+    "strip-ansi": "^7.1.2",
     "tree-sitter-bash": "^0.25.0",
     "undici": "^7.10.0",
     "web-tree-sitter": "^0.25.10",

@@ -564,16 +564,11 @@ export class ShellExecutionService {
           }
         });
 
-        const handleOutput = (data: Buffer) => {
+        const handleOutput = (data: string) => {
           processingChain = processingChain.then(
             () =>
               new Promise<void>((resolve) => {
-                if (!decoder) {
-                  // Always use UTF-8, do not guess the encoding.
-                  decoder = new TextDecoder('utf-8');
-                }
-
-                outputChunks.push(data);
+                outputChunks.push(Buffer.from(data, 'utf-8'));
 
                 if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
                   const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
@@ -586,13 +581,12 @@ export class ShellExecutionService {
                 }
 
                 if (isStreamingRawContent) {
-                  const decodedChunk = decoder.decode(data, { stream: true });
-                  if (decodedChunk.length === 0) {
+                  if (data.length === 0) {
                     resolve();
                     return;
                   }
                   isWriting = true;
-                  headlessTerminal.write(decodedChunk, () => {
+                  headlessTerminal.write(data, () => {
                     render();
                     isWriting = false;
                     resolve();
@@ -613,8 +607,7 @@ export class ShellExecutionService {
         };
 
         ptyProcess.onData((data: string) => {
-          const bufferData = Buffer.from(data, 'utf-8');
-          handleOutput(bufferData);
+          handleOutput(data);
         });
 
         ptyProcess.onExit(
