@@ -37,8 +37,8 @@ file in your project's temporary directory, typically located at
 
 ## Enabling the Feature
 
-The Checkpointing feature is disabled by default. To enable it, you need to edit your
-`settings.json` file.
+The Checkpointing feature is disabled by default. To enable it, you need to edit
+your `settings.json` file.
 
 Add the following key to your `settings.json`:
 
