@@ -22,6 +22,7 @@ import { LoopDetectionService } from './loopDetectionService.js';
 vi.mock('../telemetry/loggers.js', () => ({
   logLoopDetected: vi.fn(),
   logLoopDetectionDisabled: vi.fn(),
+  logLlmLoopCheck: vi.fn(),
 }));
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
@@ -736,6 +737,7 @@ describe('LoopDetectionService LLM Checks', () => {
       getBaseLlmClient: () => mockBaseLlmClient,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
+      getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue({
           model: 'cognitive-loop-v1',
@@ -884,5 +886,92 @@ describe('LoopDetectionService LLM Checks', () => {
     });
     // Verify the original history follows
     expect(calledArg.contents[1]).toEqual(functionCallHistory[0]);
+  });
+
+  it('should detect a loop when confidence is exactly equal to the threshold (0.9)', async () => {
+    // Mock getModel to return a different model than flash
+    vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Flash says loop',
+      })
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Main says loop',
+      });
+
+    await advanceTurns(30);
+
+    // It should have called generateJson twice
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+
+    // And it should have detected a loop
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        'event.name': 'loop_detected',
+        loop_type: LoopType.LLM_DETECTED_LOOP,
+      }),
+    );
+  });
+
+  it('should not detect a loop when Flash is confident (0.9) but Main model is not (0.89)', async () => {
+    // Mock getModel to return a different model than flash
+    vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-pro');
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Flash says loop',
+      })
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.89,
+        unproductive_state_analysis: 'Main says no loop',
+      });
+
+    await advanceTurns(30);
+
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+
+    // Should NOT have detected a loop
+    expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+
+    // But should have updated the interval based on the main model's confidence (0.89)
+    // Interval = 5 + (15-5) * (1 - 0.89) = 5 + 10 * 0.11 = 5 + 1.1 = 6.1 -> 6
+
+    // Advance by 6 turns
+    await advanceTurns(6);
+
+    // Next turn (37) should trigger another check
+    await service.turnStarted(abortController.signal);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(3);
+  });
+
+  it('should only call Flash model if Main model is the same as Flash model', async () => {
+    // Mock getModel to return the same model as flash
+    vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-flash');
+
+    mockBaseLlmClient.generateJson = vi.fn().mockResolvedValueOnce({
+      unproductive_state_confidence: 0.9,
+      unproductive_state_analysis: 'Flash says loop',
+    });
+
+    await advanceTurns(30);
+
+    // It should have called generateJson only once
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+
+    // And it should have detected a loop
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        'event.name': 'loop_detected',
+        loop_type: LoopType.LLM_DETECTED_LOOP,
+      }),
+    );
   });
 });

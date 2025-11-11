@@ -1417,6 +1417,48 @@ export class ModelSlashCommandEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_LLM_LOOP_CHECK = 'gemini_cli.llm_loop_check';
+export class LlmLoopCheckEvent implements BaseTelemetryEvent {
+  'event.name': 'llm_loop_check';
+  'event.timestamp': string;
+  prompt_id: string;
+  flash_confidence: number;
+  main_model: string;
+  main_model_confidence: number;
+
+  constructor(
+    prompt_id: string,
+    flash_confidence: number,
+    main_model: string,
+    main_model_confidence: number,
+  ) {
+    this['event.name'] = 'llm_loop_check';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.flash_confidence = flash_confidence;
+    this.main_model = main_model;
+    this.main_model_confidence = main_model_confidence;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_LLM_LOOP_CHECK,
+      'event.timestamp': this['event.timestamp'],
+      prompt_id: this.prompt_id,
+      flash_confidence: this.flash_confidence,
+      main_model: this.main_model,
+      main_model_confidence: this.main_model_confidence,
+    };
+  }
+
+  toLogBody(): string {
+    return this.main_model_confidence === -1
+      ? `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) check skipped`
+      : `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) confidence: ${this.main_model_confidence.toFixed(2)}`;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -1446,6 +1488,7 @@ export type TelemetryEvent =
   | AgentStartEvent
   | AgentFinishEvent
   | RecoveryAttemptEvent
+  | LlmLoopCheckEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
