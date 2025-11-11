@@ -23,7 +23,7 @@ import type {
   ChatDetail,
 } from '../types.js';
 import { MessageType } from '../types.js';
-import type { Content } from '@google/genai';
+import type { HistoryContent } from '@google/gemini-cli-core/src/common/types.js';
 
 const getSavedChatTags = async (
   context: CommandContext,
@@ -255,7 +255,7 @@ const deleteCommand: SlashCommand = {
   },
 };
 
-export function serializeHistoryToMarkdown(history: Content[]): string {
+export function serializeHistoryToMarkdown(history: HistoryContent[]): string {
   return history
     .map((item) => {
       const text =

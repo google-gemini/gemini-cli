@@ -24,6 +24,7 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import type { HistoryContent } from '../common/types.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -161,6 +162,45 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should mark history as partial if stream is interrupted', async () => {
+      const interruptedStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'This is a partial response.' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        throw new Error('Stream interrupted');
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        interruptedStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test message' },
+        'prompt-id-interrupted',
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow('Stream interrupted');
+
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      const modelTurn = history[1] as HistoryContent;
+      expect(modelTurn.isPartial).toBe(true);
+      expect(modelTurn.parts?.[0]!.text).toBe('This is a partial response.');
+    });
     it('should succeed if a tool call is followed by an empty part', async () => {
       // 1. Mock a stream that contains a tool call, then an invalid (empty) part.
       const streamWithToolCall = (async function* () {
@@ -727,6 +767,63 @@ describe('GeminiChat', () => {
         },
         'prompt-id-1',
       );
+    });
+
+    it('should use curated history (excluding partials) for model requests', async () => {
+      const initialHistory: HistoryContent[] = [
+        { role: 'user', parts: [{ text: 'First question' }] },
+        { role: 'model', parts: [{ text: 'First answer' }] },
+        {
+          role: 'model',
+          parts: [{ text: 'This is a partial thought' }],
+          isPartial: true,
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      const response = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'Final answer' }],
+                role: 'model',
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'Second question' },
+        'prompt-id-curated',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      const expectedContents: HistoryContent[] = [
+        { role: 'user', parts: [{ text: 'First question' }] },
+        { role: 'model', parts: [{ text: 'First answer' }] },
+        { role: 'user', parts: [{ text: 'Second question' }] },
+      ];
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expectedContents,
+        }),
+        'prompt-id-curated',
+      );
+
+      // Also verify the full history (for the user) still contains the partial one.
+      const fullHistory = chat.getHistory();
+      expect(fullHistory.length).toBe(5); // 3 initial + new user message + new model response
+      expect(fullHistory[2].isPartial).toBe(true);
     });
   });
 

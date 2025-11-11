@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import type { Content } from '@google/genai';
+import type { HistoryContent } from '../common/types.js';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -314,7 +314,10 @@ export class Logger {
     return newPath;
   }
 
-  async saveCheckpoint(conversation: Content[], tag: string): Promise<void> {
+  async saveCheckpoint(
+    conversation: HistoryContent[],
+    tag: string,
+  ): Promise<void> {
     if (!this.initialized) {
       debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
@@ -330,7 +333,7 @@ export class Logger {
     }
   }
 
-  async loadCheckpoint(tag: string): Promise<Content[]> {
+  async loadCheckpoint(tag: string): Promise<HistoryContent[]> {
     if (!this.initialized) {
       debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
@@ -348,7 +351,7 @@ export class Logger {
         );
         return [];
       }
-      return parsedContent as Content[];
+      return parsedContent as HistoryContent[];
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
