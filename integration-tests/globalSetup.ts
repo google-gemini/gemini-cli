@@ -12,6 +12,7 @@ if (process.env['NO_COLOR'] !== undefined) {
 import { mkdir, readdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { canUseRipgrep } from '../packages/core/src/tools/ripGrep.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
@@ -31,6 +32,12 @@ export async function setup() {
   // We also need to set the config dir explicitly, since the code might
   // construct the path before the HOME env var is set.
   process.env['GEMINI_CONFIG_DIR'] = join(runDir, '.gemini');
+
+  // Download ripgrep to avoid race conditions in parallel tests
+  const available = await canUseRipgrep();
+  if (!available) {
+    throw new Error('Failed to download ripgrep binary');
+  }
 
   // Clean up old test runs, but keep the latest few for debugging
   try {
