@@ -8,6 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
@@ -247,7 +249,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.8,
               },
             },
@@ -261,7 +263,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.0,
               },
             },
@@ -273,6 +275,43 @@ describe('Server Config (config.ts)', () => {
       it('should return undefined if there are no experiments', async () => {
         const config = new Config(baseParams);
         expect(await config.getCompressionThreshold()).toBeUndefined();
+      });
+    });
+
+    describe('getUserCaching', () => {
+      it('should return the remote experiment flag when available', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.USER_CACHING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        });
+        expect(await config.getUserCaching()).toBe(true);
+      });
+
+      it('should return false when the remote flag is false', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.USER_CACHING]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        });
+        expect(await config.getUserCaching()).toBe(false);
+      });
+
+      it('should return undefined if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getUserCaching()).toBeUndefined();
       });
     });
   });
@@ -1480,5 +1519,66 @@ describe('Config getExperiments', () => {
     const retrievedExps = config.getExperiments();
     expect(retrievedExps).toEqual(mockExps);
     expect(retrievedExps).toBe(mockExps); // Should return the same reference
+  });
+});
+
+describe('Config setExperiments logging', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('logs a sorted, non-truncated summary of experiments when they are set', () => {
+    const config = new Config(baseParams);
+    const debugSpy = vi
+      .spyOn(debugLogger, 'debug')
+      .mockImplementation(() => {});
+    const experiments = {
+      flags: {
+        ZetaFlag: {
+          boolValue: true,
+          stringValue: 'zeta',
+          int32ListValue: { values: [1, 2] },
+        },
+        AlphaFlag: {
+          boolValue: false,
+          stringValue: 'alpha',
+          stringListValue: { values: ['a', 'b', 'c'] },
+        },
+        MiddleFlag: {
+          // Intentionally sparse to ensure undefined values are omitted
+          floatValue: 0.42,
+          int32ListValue: { values: [] },
+        },
+      },
+      experimentIds: [101, 99],
+    };
+
+    config.setExperiments(experiments);
+
+    const logCall = debugSpy.mock.calls.find(
+      ([message]) => message === 'Experiments loaded',
+    );
+    expect(logCall).toBeDefined();
+    const loggedSummary = logCall?.[1] as string;
+    expect(typeof loggedSummary).toBe('string');
+    expect(loggedSummary).toContain('experimentIds');
+    expect(loggedSummary).toContain('101');
+    expect(loggedSummary).toContain('AlphaFlag');
+    expect(loggedSummary).toContain('ZetaFlag');
+    const alphaIndex = loggedSummary.indexOf('AlphaFlag');
+    const zetaIndex = loggedSummary.indexOf('ZetaFlag');
+    expect(alphaIndex).toBeGreaterThan(-1);
+    expect(zetaIndex).toBeGreaterThan(-1);
+    expect(alphaIndex).toBeLessThan(zetaIndex);
+    expect(loggedSummary).toContain('\n');
+    expect(loggedSummary).not.toContain('stringListLength: 0');
+    expect(loggedSummary).not.toContain('int32ListLength: 0');
+
+    debugSpy.mockRestore();
   });
 });
