@@ -305,6 +305,7 @@ export interface ConfigParameters {
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
+  previewFeatures?: boolean;
 }
 
 export class Config {
@@ -357,6 +358,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
+  private readonly previewFeatures: boolean;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -475,6 +477,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.previewFeatures = params.previewFeatures ?? false;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -820,6 +823,10 @@ export class Config {
   }
   getQuestion(): string | undefined {
     return this.question;
+  }
+
+  getPreviewFeatures(): boolean {
+    return this.previewFeatures;
   }
 
   getCoreTools(): string[] | undefined {
