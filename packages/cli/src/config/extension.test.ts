@@ -594,6 +594,34 @@ describe('extension tests', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should not load github extensions if blockGitExtensions is set', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://somehost.com/foo/bar',
+        },
+      });
+
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === 'my-ext');
+
+      expect(extension).toBeUndefined();
+    });
+
     describe('id generation', () => {
       it('should generate id from source for non-github git urls', async () => {
         createExtension({
@@ -874,6 +902,30 @@ describe('extension tests', () => {
         type: 'link',
       });
       fs.rmSync(targetExtDir, { recursive: true, force: true });
+    });
+
+    it('should not install a github extension if blockGitExtensions is set', async () => {
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      await extensionManager.loadExtensions();
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: gitUrl,
+          type: 'git',
+        }),
+      ).rejects.toThrow(
+        'Installing extensions from remote sources is disallowed by your current settings.',
+      );
     });
 
     it('should prompt for trust if workspace is not trusted', async () => {
