@@ -206,7 +206,7 @@ export interface SlashCommand {
     | SlashCommandActionReturn
     | Promise<void | SlashCommandActionReturn>;
 
-  // Provides argument completion (e.g., completing a tag for `/chat resume <tag>`).
+  // Provides argument completion (e.g., completing a tag for `/chat load <tag>`).
   completion?: (
     context: CommandContext,
     partialArg: string,

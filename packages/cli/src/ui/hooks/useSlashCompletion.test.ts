@@ -651,8 +651,8 @@ describe('useSlashCompletion', () => {
           description: 'Manage chat history',
           subCommands: [
             createTestCommand({
-              name: 'resume',
-              description: 'Resume a saved chat',
+              name: 'load',
+              description: 'Load a saved chat',
               completion: mockCompletionFn,
             }),
           ],
@@ -662,7 +662,7 @@ describe('useSlashCompletion', () => {
       const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/chat resume my-ch',
+          '/chat load my-ch',
           slashCommands,
           mockCommandContext,
         ),
@@ -673,8 +673,8 @@ describe('useSlashCompletion', () => {
           expect(mockCompletionFn).toHaveBeenCalledWith(
             expect.objectContaining({
               invocation: {
-                raw: '/chat resume my-ch',
-                name: 'resume',
+                raw: '/chat load my-ch',
+                name: 'load',
                 args: 'my-ch',
               },
             }),
@@ -689,7 +689,7 @@ describe('useSlashCompletion', () => {
             { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
             { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
           ]);
-          expect(result.current.completionStart).toBe(13);
+          expect(result.current.completionStart).toBe(11);
           expect(result.current.isLoadingSuggestions).toBe(false);
         });
       });
@@ -707,8 +707,8 @@ describe('useSlashCompletion', () => {
           description: 'Manage chat history',
           subCommands: [
             createTestCommand({
-              name: 'resume',
-              description: 'Resume a saved chat',
+              name: 'load',
+              description: 'Load a saved chat',
               completion: mockCompletionFn,
             }),
           ],
@@ -718,7 +718,7 @@ describe('useSlashCompletion', () => {
       const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/chat resume ',
+          '/chat load ',
           slashCommands,
           mockCommandContext,
         ),
@@ -729,8 +729,8 @@ describe('useSlashCompletion', () => {
           expect(mockCompletionFn).toHaveBeenCalledWith(
             expect.objectContaining({
               invocation: {
-                raw: '/chat resume ',
-                name: 'resume',
+                raw: '/chat load ',
+                name: 'load',
                 args: '',
               },
             }),
@@ -742,7 +742,7 @@ describe('useSlashCompletion', () => {
       await act(async () => {
         await waitFor(() => {
           expect(result.current.suggestions).toHaveLength(3);
-          expect(result.current.completionStart).toBe(13);
+          expect(result.current.completionStart).toBe(11);
         });
       });
       unmount();

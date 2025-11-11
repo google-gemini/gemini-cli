@@ -35,7 +35,7 @@ describe('chatCommand', () => {
   let mockGetHistory: ReturnType<typeof vi.fn>;
 
   const getSubCommand = (
-    name: 'list' | 'save' | 'resume' | 'delete' | 'share',
+    name: 'list' | 'save' | 'load' | 'delete' | 'share',
   ): SlashCommand => {
     const subCommand = chatCommand.subCommands?.find(
       (cmd) => cmd.name === name,
@@ -224,29 +224,33 @@ describe('chatCommand', () => {
     });
   });
 
-  describe('resume subcommand', () => {
+  describe('load subcommand', () => {
     const goodTag = 'good-tag';
     const badTag = 'bad-tag';
 
-    let resumeCommand: SlashCommand;
+    let loadCommand: SlashCommand;
     beforeEach(() => {
-      resumeCommand = getSubCommand('resume');
+      loadCommand = getSubCommand('load');
+    });
+
+    it('should have "resume" as an alias', () => {
+      expect(loadCommand.altNames).toContain('resume');
     });
 
     it('should return an error if tag is missing', async () => {
-      const result = await resumeCommand?.action?.(mockContext, '');
+      const result = await loadCommand?.action?.(mockContext, '');
 
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat resume <tag>',
+        content: 'Missing tag. Usage: /chat load <tag>',
       });
     });
 
     it('should inform if checkpoint is not found', async () => {
       mockLoadCheckpoint.mockResolvedValue([]);
 
-      const result = await resumeCommand?.action?.(mockContext, badTag);
+      const result = await loadCommand?.action?.(mockContext, badTag);
 
       expect(result).toEqual({
         type: 'message',
@@ -255,14 +259,14 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should resume a conversation', async () => {
+    it('should load a conversation', async () => {
       const conversation: Content[] = [
         { role: 'user', parts: [{ text: 'hello gemini' }] },
         { role: 'model', parts: [{ text: 'hello world' }] },
       ];
       mockLoadCheckpoint.mockResolvedValue(conversation);
 
-      const result = await resumeCommand?.action?.(mockContext, goodTag);
+      const result = await loadCommand?.action?.(mockContext, goodTag);
 
       expect(result).toEqual({
         type: 'load_history',
@@ -289,7 +293,7 @@ describe('chatCommand', () => {
             }) as Stats) as unknown as typeof fsPromises.stat,
         );
 
-        const result = await resumeCommand?.completion?.(mockContext, 'a');
+        const result = await loadCommand?.completion?.(mockContext, 'a');
 
         expect(result).toEqual(['alpha']);
       });
@@ -310,7 +314,7 @@ describe('chatCommand', () => {
           return { mtime: new Date(date.getTime() + 1000) } as Stats;
         }) as unknown as typeof fsPromises.stat);
 
-        const result = await resumeCommand?.completion?.(mockContext, '');
+        const result = await loadCommand?.completion?.(mockContext, '');
         // Sort items by last modified time (newest first)
         expect(result).toEqual(['test2', 'test1']);
       });

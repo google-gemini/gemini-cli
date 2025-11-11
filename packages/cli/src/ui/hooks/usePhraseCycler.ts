@@ -241,7 +241,7 @@ export const INFORMATIVE_TIPS = [
   'File a bug report directly with /bug...',
   'List your saved chat checkpoints with /chat list...',
   'Save your current conversation with /chat save <tag>...',
-  'Resume a saved conversation with /chat resume <tag>...',
+  'Load a saved conversation with /chat load <tag>...',
   'Delete a conversation checkpoint with /chat delete <tag>...',
   'Share your conversation to a file with /chat share <file>...',
   'Clear the screen and history with /clear...',

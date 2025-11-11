@@ -144,11 +144,10 @@ const saveCommand: SlashCommand = {
   },
 };
 
-const resumeCommand: SlashCommand = {
-  name: 'resume',
-  altNames: ['load'],
-  description:
-    'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
+const loadCommand: SlashCommand = {
+  name: 'load',
+  altNames: ['resume'],
+  description: 'Load a conversation from a checkpoint. Usage: /chat load <tag>',
   kind: CommandKind.BUILT_IN,
   action: async (context, args) => {
     const tag = args.trim();
@@ -156,7 +155,7 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat resume <tag>',
+        content: 'Missing tag. Usage: /chat load <tag>',
       };
     }
 
@@ -362,7 +361,7 @@ export const chatCommand: SlashCommand = {
   subCommands: [
     listCommand,
     saveCommand,
-    resumeCommand,
+    loadCommand,
     deleteCommand,
     shareCommand,
   ],
