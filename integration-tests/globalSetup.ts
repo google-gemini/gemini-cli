@@ -34,7 +34,7 @@ export async function setup() {
   process.env['GEMINI_CONFIG_DIR'] = join(runDir, '.gemini');
 
   // Download ripgrep to avoid race conditions in parallel tests
-  console.log('Downloading ripgrep binary for tests...');
+  console.log('Ensuring ripgrep binary is available for tests...');
   const available = await canUseRipgrep();
   if (!available) {
     throw new Error('Failed to download ripgrep binary');
