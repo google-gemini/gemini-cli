@@ -18,7 +18,11 @@ const AdkMainLoopOutputSchema = z.object({
     .describe(
       'An ordered list of each tool call and the parameters passed to it.',
     ),
-  FinalResult: z.string().describe('The final output of the main loop agent.'),
+  FinalResult: z
+    .string()
+    .describe(
+      'The final output of the main loop agent. This will be displayed to the user, and should be as comprehensive as possible.',
+    ),
 });
 
 export const AdkMainLoopAgent: AgentDefinition<typeof AdkMainLoopOutputSchema> =

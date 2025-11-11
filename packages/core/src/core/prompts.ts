@@ -84,7 +84,8 @@ export function getCoreSystemPrompt(
     return `Please use the adk_main_loop tool to handle all queries.
     Do not plan or execute any actions other than to call the adk_main_loop
     tool and pass it the query you received verbatim. The adk_main_loop
-    tool will handle all planning and execution.`;
+    tool will handle all planning and execution. Return the results of the 
+    adk_main_loop tool verbatim.`;
   }
   return resolveSystemPrompt(config, userMemory);
 }
