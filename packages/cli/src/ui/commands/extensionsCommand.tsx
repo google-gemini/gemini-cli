@@ -6,6 +6,7 @@
 
 import { debugLogger, listExtensions } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
+import { ExtensionUpdateState } from '../state/extensions.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
   emptyIcon,
@@ -25,8 +26,6 @@ import { Text } from 'ink';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { theme } from '../semantic-colors.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
-import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 async function listAction(context: CommandContext) {
   const historyItem: HistoryItemExtensionsList = {
@@ -515,7 +514,7 @@ async function uninstallAction(
     return;
   }
 
-  // If no extension name is provided, list available extensions and show usage.
+  // If no extension name is provided, show available extensions and usage.
   const trimmedArgs = args.trim();
   if (!trimmedArgs) {
     const extensionNames = extensions
@@ -524,7 +523,7 @@ async function uninstallAction(
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `Please specify an extension to uninstall.\nUsage: /extensions uninstall <extension-name>\n\nInstalled extensions:\n${extensionNames}`,
+        text: `Usage: /extensions uninstall <extension-name>\n\nInstalled extensions:\n${extensionNames}`,
       },
       Date.now(),
     );
@@ -561,12 +560,6 @@ async function uninstallAction(
 
   // Proceed with uninstallation
   try {
-    const extensionLoader = context.services.config?.getExtensionLoader();
-    if (!(extensionLoader instanceof ExtensionManager)) {
-      throw new Error('Extension management is not available in this context.');
-    }
-    const extensionManager = extensionLoader;
-
     await extensionManager.uninstallExtension(extension.name, false);
 
     context.ui.addItem(
@@ -577,7 +570,17 @@ async function uninstallAction(
       Date.now(),
     );
 
-    // Manually update the list of extensions in the UI with the fresh list.
+    // Dispatch state update to indicate the extension has been removed
+    // This will help update the UI state that tracks extension statuses
+    context.ui.dispatchExtensionStateUpdate({
+      type: 'SET_STATE',
+      payload: {
+        name: extension.name,
+        state: ExtensionUpdateState.UNKNOWN, // Mark as unknown since it's uninstalled
+      },
+    });
+
+    // Update the list of extensions in the UI with the refreshed list.
     const historyItem: HistoryItemExtensionsList = {
       type: MessageType.EXTENSIONS_LIST,
       extensions: extensionManager.getExtensions(),
@@ -610,7 +613,6 @@ const uninstallExtensionsCommand: SlashCommand = {
     return extensionNames.filter((name) => name.startsWith(partialArg));
   },
 };
-};
 
 export function extensionsCommand(
   enableExtensionReloading?: boolean,
@@ -623,10 +625,10 @@ export function extensionsCommand(
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
     subCommands: [
-      listExtensionsCommand,
-      updateExtensionsCommand,
       exploreExtensionsCommand,
+      listExtensionsCommand,
       restartCommand,
+      updateExtensionsCommand,
       uninstallExtensionsCommand,
       ...conditionalCommands,
     ],
