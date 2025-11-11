@@ -146,6 +146,10 @@ vi.mock('./slashCommandProcessor.js', () => ({
   handleSlashCommand: vi.fn().mockReturnValue(false),
 }));
 
+vi.mock('./useAlternateBuffer.js', () => ({
+  useAlternateBuffer: vi.fn(() => false),
+}));
+
 // --- END MOCKS ---
 
 // --- Tests for useGeminiStream Hook ---
