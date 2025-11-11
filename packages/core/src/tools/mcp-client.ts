@@ -850,8 +850,11 @@ export async function connectToMcpServer(
   mcpClient.setRequestHandler(CreateMessageRequestSchema, async (req) => {
     const autoConfirm = cliConfig.getAutoConfirmMcpSampling();
 
+    let rejectSampling: ((reason?: unknown) => void) | undefined;
+
     if (!autoConfirm) {
       const consentPromise = new Promise<void>((resolve, reject) => {
+        rejectSampling = reject; // Store for error handling
         coreEvents.emit(CoreEvent.McpSamplingRequest, {
           serverName: mcpServerName,
           prompt: req.params.messages,
@@ -864,108 +867,127 @@ export async function connectToMcpServer(
       await consentPromise;
     }
 
-    const geminiClient = cliConfig.getGeminiClient();
-    const contents = req.params.messages.map((message) => {
-      // MCP spec: message.content is a single object (not an array)
-      const content = message.content as {
-        type: string;
-        text?: string;
-        data?: string;
-        mimeType?: string;
-      };
+    try {
+      const geminiClient = cliConfig.getGeminiClient();
+      const contents = req.params.messages.map((message) => {
+        // MCP spec: message.content is a single object (not an array)
+        const content = message.content as {
+          type: string;
+          text?: string;
+          data?: string;
+          mimeType?: string;
+        };
 
-      let parts;
-      if (content.type === 'text' && content.text) {
-        parts = [{ text: content.text }];
-      } else if (content.type === 'image' && content.data && content.mimeType) {
-        // For image content, convert to Gemini format
-        parts = [
-          {
-            inlineData: {
-              mimeType: content.mimeType,
-              data: content.data,
+        let parts;
+        if (content.type === 'text' && content.text) {
+          parts = [{ text: content.text }];
+        } else if (
+          content.type === 'image' &&
+          content.data &&
+          content.mimeType
+        ) {
+          // For image content, convert to Gemini format
+          parts = [
+            {
+              inlineData: {
+                mimeType: content.mimeType,
+                data: content.data,
+              },
             },
-          },
-        ];
-      } else if (content.type === 'audio' && content.data && content.mimeType) {
-        // For audio content, convert to Gemini format
-        parts = [
-          {
-            inlineData: {
-              mimeType: content.mimeType,
-              data: content.data,
+          ];
+        } else if (
+          content.type === 'audio' &&
+          content.data &&
+          content.mimeType
+        ) {
+          // For audio content, convert to Gemini format
+          parts = [
+            {
+              inlineData: {
+                mimeType: content.mimeType,
+                data: content.data,
+              },
             },
-          },
-        ];
-      } else {
-        throw new Error(`Unsupported or invalid content type: ${content.type}`);
+          ];
+        } else {
+          throw new Error(
+            `Unsupported or invalid content type: ${content.type}`,
+          );
+        }
+
+        return {
+          role: message.role as 'user' | 'model',
+          parts,
+        };
+      });
+
+      // Resolve the model to use for sampling
+      // If the config model is "auto", use flash as it's faster and cheaper for sampling
+      let modelToUse = cliConfig.getModel();
+      if (modelToUse === DEFAULT_GEMINI_MODEL_AUTO) {
+        modelToUse = DEFAULT_GEMINI_FLASH_MODEL;
       }
 
+      // TODO: Consider req.params.modelPreferences to select model based on server hints
+      // For now, we just use the resolved model from config
+
+      const result = await geminiClient.generateContent(
+        contents,
+        {},
+        new AbortController().signal,
+        modelToUse,
+      );
+
+      const firstCandidate = result.candidates?.[0];
+      if (
+        !firstCandidate ||
+        !firstCandidate.content ||
+        !firstCandidate.content.parts
+      ) {
+        throw new Error('No response from Gemini');
+      }
+
+      // MCP spec: response content should be a single object (not an array)
+      // Gemini can return multiple parts, so we'll concatenate text parts
+      const textParts: string[] = [];
+      for (const part of firstCandidate.content.parts) {
+        if ('text' in part && part.text) {
+          textParts.push(part.text);
+        } else {
+          throw new Error(
+            'Unsupported response part type - only text parts are supported',
+          );
+        }
+      }
+
+      const responseContent = {
+        type: 'text' as const,
+        text: textParts.join(''),
+      };
+
+      // Map Gemini's finish reason to MCP's stopReason
+      // Gemini: STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER, BLOCKLIST, PROHIBITED_CONTENT, SPII
+      // MCP: endTurn, maxTokens, stopSequence (we'll map to endTurn or maxTokens)
+      let stopReason: 'endTurn' | 'maxTokens' | 'stopSequence' = 'endTurn';
+      if (firstCandidate.finishReason === 'MAX_TOKENS') {
+        stopReason = 'maxTokens';
+      }
+
+      // MCP spec: return role, content, model, and stopReason at top level (not wrapped in "message")
       return {
-        role: message.role as 'user' | 'model',
-        parts,
+        role: 'assistant' as const,
+        content: responseContent,
+        model: modelToUse,
+        stopReason,
       };
-    });
-
-    // Resolve the model to use for sampling
-    // If the config model is "auto", use flash as it's faster and cheaper for sampling
-    let modelToUse = cliConfig.getModel();
-    if (modelToUse === DEFAULT_GEMINI_MODEL_AUTO) {
-      modelToUse = DEFAULT_GEMINI_FLASH_MODEL;
-    }
-
-    // TODO: Consider req.params.modelPreferences to select model based on server hints
-    // For now, we just use the resolved model from config
-
-    const result = await geminiClient.generateContent(
-      contents,
-      {},
-      new AbortController().signal,
-      modelToUse,
-    );
-
-    const firstCandidate = result.candidates?.[0];
-    if (
-      !firstCandidate ||
-      !firstCandidate.content ||
-      !firstCandidate.content.parts
-    ) {
-      throw new Error('No response from Gemini');
-    }
-
-    // MCP spec: response content should be a single object (not an array)
-    // Gemini can return multiple parts, so we'll concatenate text parts
-    const textParts: string[] = [];
-    for (const part of firstCandidate.content.parts) {
-      if ('text' in part && part.text) {
-        textParts.push(part.text);
-      } else {
-        throw new Error(
-          'Unsupported response part type - only text parts are supported',
-        );
+    } catch (error) {
+      // Close the dialog with an error message if consent was required
+      if (rejectSampling) {
+        rejectSampling(error);
       }
+      // Re-throw to propagate to MCP server
+      throw error;
     }
-
-    const responseContent = {
-      type: 'text' as const,
-      text: textParts.join(''),
-    };
-
-    // Map Gemini's finish reason to MCP's stopReason
-    // Gemini: STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER, BLOCKLIST, PROHIBITED_CONTENT, SPII
-    // MCP: endTurn, maxTokens, stopSequence (we'll map to endTurn or maxTokens)
-    let stopReason: 'endTurn' | 'maxTokens' | 'stopSequence' = 'endTurn';
-    if (firstCandidate.finishReason === 'MAX_TOKENS') {
-      stopReason = 'maxTokens';
-    }
-
-    // MCP spec: return role, content, model, and stopReason at top level (not wrapped in "message")
-    return {
-      role: 'assistant' as const,
-      content: responseContent,
-      model: modelToUse,
-      stopReason,
-    };
   });
 
   let unlistenDirectories: Unsubscribe | undefined =
