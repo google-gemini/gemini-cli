@@ -708,26 +708,38 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
   'event.timestamp': string;
   loop_type: LoopType;
   prompt_id: string;
+  confirmed_by_model?: string;
 
-  constructor(loop_type: LoopType, prompt_id: string) {
+  constructor(
+    loop_type: LoopType,
+    prompt_id: string,
+    confirmed_by_model?: string,
+  ) {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
     this.prompt_id = prompt_id;
+    this.confirmed_by_model = confirmed_by_model;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': this['event.name'],
       'event.timestamp': this['event.timestamp'],
       loop_type: this.loop_type,
       prompt_id: this.prompt_id,
     };
+
+    if (this.confirmed_by_model) {
+      attributes['confirmed_by_model'] = this.confirmed_by_model;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {
-    return `Loop detected. Type: ${this.loop_type}.`;
+    return `Loop detected. Type: ${this.loop_type}.${this.confirmed_by_model ? ` Confirmed by: ${this.confirmed_by_model}` : ''}`;
   }
 }
 

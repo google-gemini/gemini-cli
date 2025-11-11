@@ -447,72 +447,73 @@ export class LoopDetectionService {
       signal,
     );
 
-    if (
-      flashResult &&
-      typeof flashResult['unproductive_state_confidence'] === 'number'
-    ) {
-      if (
-        flashResult['unproductive_state_confidence'] >= LLM_CONFIDENCE_THRESHOLD
-      ) {
-        if (this.config.isInFallbackMode()) {
-          this.handleConfirmedLoop(flashResult);
-          return true;
-        }
+    if (!this.isValidResult(flashResult)) {
+      return false;
+    }
 
-        // Double check with configured model
-        const mainModelResult = await this.queryLoopDetectionModel(
-          'loop-detection-double-check',
-          contents,
-          schema,
-          signal,
-        );
+    const flashConfidence = flashResult[
+      'unproductive_state_confidence'
+    ] as number;
 
-        logLlmLoopCheck(
-          this.config,
-          new LlmLoopCheckEvent(
-            this.promptId,
-            flashResult['unproductive_state_confidence'] as number,
-            this.config.getModel(),
-            typeof mainModelResult?.['unproductive_state_confidence'] ===
-            'number'
-              ? (mainModelResult['unproductive_state_confidence'] as number)
-              : 0,
-          ),
-        );
-
-        if (
-          mainModelResult &&
-          typeof mainModelResult['unproductive_state_confidence'] === 'number'
-        ) {
-          if (
-            mainModelResult['unproductive_state_confidence'] >=
-            LLM_CONFIDENCE_THRESHOLD
-          ) {
-            this.handleConfirmedLoop(mainModelResult);
-            return true;
-          } else {
-            this.updateCheckInterval(
-              mainModelResult['unproductive_state_confidence'],
-            );
-          }
-        }
-      } else {
-        logLlmLoopCheck(
-          this.config,
-          new LlmLoopCheckEvent(
-            this.promptId,
-            flashResult['unproductive_state_confidence'] as number,
-            this.config.getModel(),
-            -1,
-          ),
-        );
-        this.updateCheckInterval(
-          flashResult['unproductive_state_confidence'] as number,
-        );
+    if (flashConfidence >= LLM_CONFIDENCE_THRESHOLD) {
+      if (this.config.isInFallbackMode()) {
+        this.handleConfirmedLoop(flashResult, 'loop-detection');
+        return true;
       }
+
+      // Double check with configured model
+      const doubleCheckModel = 'loop-detection-double-check';
+      const mainModelResult = await this.queryLoopDetectionModel(
+        doubleCheckModel,
+        contents,
+        schema,
+        signal,
+      );
+
+      const mainModelConfidence = this.isValidResult(mainModelResult)
+        ? (mainModelResult['unproductive_state_confidence'] as number)
+        : 0;
+
+      logLlmLoopCheck(
+        this.config,
+        new LlmLoopCheckEvent(
+          this.promptId,
+          flashConfidence,
+          doubleCheckModel,
+          this.isValidResult(mainModelResult) ? mainModelConfidence : 0,
+        ),
+      );
+
+      if (this.isValidResult(mainModelResult)) {
+        if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
+          this.handleConfirmedLoop(mainModelResult, doubleCheckModel);
+          return true;
+        } else {
+          this.updateCheckInterval(mainModelConfidence);
+        }
+      }
+    } else {
+      logLlmLoopCheck(
+        this.config,
+        new LlmLoopCheckEvent(
+          this.promptId,
+          flashConfidence,
+          'loop-detection-double-check',
+          -1,
+        ),
+      );
+      this.updateCheckInterval(flashConfidence);
     }
 
     return false;
+  }
+
+  private isValidResult(
+    result: Record<string, unknown> | null,
+  ): result is Record<string, unknown> {
+    return (
+      !!result && typeof result['unproductive_state_confidence'] === 'number'
+    );
   }
 
   private async queryLoopDetectionModel(
@@ -537,7 +538,10 @@ export class LoopDetectionService {
     }
   }
 
-  private handleConfirmedLoop(result: Record<string, unknown>): void {
+  private handleConfirmedLoop(
+    result: Record<string, unknown>,
+    modelName: string,
+  ): void {
     if (
       typeof result['unproductive_state_analysis'] === 'string' &&
       result['unproductive_state_analysis']
@@ -546,7 +550,11 @@ export class LoopDetectionService {
     }
     logLoopDetected(
       this.config,
-      new LoopDetectedEvent(LoopType.LLM_DETECTED_LOOP, this.promptId),
+      new LoopDetectedEvent(
+        LoopType.LLM_DETECTED_LOOP,
+        this.promptId,
+        modelName,
+      ),
     );
   }
 

@@ -489,4 +489,7 @@ export enum EventMetadataKey {
 
   // Logs the confidence score from the main model loop check.
   GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL_CONFIDENCE = 128,
+
+  // Logs the model that confirmed the loop.
+  GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL = 129,
 }

@@ -815,6 +815,7 @@ describe('LoopDetectionService LLM Checks', () => {
       expect.objectContaining({
         'event.name': 'loop_detected',
         loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'loop-detection-double-check',
       }),
     );
   });
@@ -932,6 +933,7 @@ describe('LoopDetectionService LLM Checks', () => {
       expect.objectContaining({
         'event.name': 'loop_detected',
         loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'loop-detection-double-check',
       }),
     );
   });
@@ -1006,6 +1008,7 @@ describe('LoopDetectionService LLM Checks', () => {
       expect.objectContaining({
         'event.name': 'loop_detected',
         loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'loop-detection',
       }),
     );
   });

@@ -737,6 +737,14 @@ export class ClearcutLogger {
       },
     ];
 
+    if (event.confirmed_by_model) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL,
+        value: event.confirmed_by_model,
+      });
+    }
+
     this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
     this.flushIfNeeded();
   }
