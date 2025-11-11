@@ -1301,6 +1301,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: this.getConfigJson(),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_INTERACTIVE,
+        value: this.config?.isInteractive().toString() ?? 'false',
+      },
     ];
     return [...data, ...defaultLogMetadata];
   }

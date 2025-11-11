@@ -4,19 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { Text } from 'ink';
-import type React from 'react';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
-import type {
-  Config,
-  ToolCallConfirmationDetails,
-} from '@google/gemini-cli-core';
+import type { ToolCallConfirmationDetails } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
-import { ConfigContext } from '../../contexts/ConfigContext.js';
 
 // Mock child components to isolate ToolGroupMessage behavior
 vi.mock('./ToolMessage.js', () => ({
@@ -66,8 +61,6 @@ vi.mock('./ToolConfirmationMessage.js', () => ({
 }));
 
 describe('<ToolGroupMessage />', () => {
-  const mockConfig: Config = {} as Config;
-
   const createToolCall = (
     overrides: Partial<IndividualToolCallDisplay> = {},
   ): IndividualToolCallDisplay => ({
@@ -86,14 +79,6 @@ describe('<ToolGroupMessage />', () => {
     terminalWidth: 80,
     isFocused: true,
   };
-
-  // Helper to wrap component with required providers
-  const renderWithProviders = (component: React.ReactElement) =>
-    render(
-      <ConfigContext.Provider value={mockConfig}>
-        {component}
-      </ConfigContext.Provider>,
-    );
 
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
