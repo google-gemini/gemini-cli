@@ -75,9 +75,8 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     params: LSToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
   }
 
   /**
@@ -263,7 +262,6 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   ) {
     super(
       LSTool.Name,
-      'ReadFolder',
       'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
       Kind.Search,
       {
@@ -332,14 +330,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     params: LSToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<LSToolParams, ToolResult> {
-    return new LSToolInvocation(
-      this.config,
-      params,
-      messageBus,
-      _toolName,
-      _toolDisplayName,
-    );
+    return new LSToolInvocation(this.config, params, messageBus, _toolName);
   }
 }

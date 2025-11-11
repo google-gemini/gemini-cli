@@ -77,7 +77,6 @@ export abstract class BaseToolInvocation<
     readonly params: TParams,
     protected readonly messageBus?: MessageBus,
     readonly _toolName?: string,
-    readonly _toolDisplayName?: string,
     readonly _serverName?: string,
   ) {}
 
@@ -98,9 +97,7 @@ export abstract class BaseToolInvocation<
 
       if (decision === 'DENY') {
         throw new Error(
-          `Tool execution for "${
-            this._toolDisplayName || this._toolName
-          }" denied by policy.`,
+          `Tool execution for "${this._toolName}" denied by policy.`,
         );
       }
 
@@ -126,7 +123,7 @@ export abstract class BaseToolInvocation<
 
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
-      title: `Confirm: ${this._toolDisplayName || this._toolName}`,
+      title: `Confirm: ${this._toolName}`,
       prompt: this.getDescription(),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -253,11 +250,6 @@ export interface ToolBuilder<
   name: string;
 
   /**
-   * The user-friendly display name of the tool.
-   */
-  displayName: string;
-
-  /**
    * Description of what the tool does.
    */
   description: string;
@@ -301,7 +293,6 @@ export abstract class DeclarativeTool<
 {
   constructor(
     readonly name: string,
-    readonly displayName: string,
     readonly description: string,
     readonly kind: Kind,
     readonly parameterSchema: unknown,
@@ -433,12 +424,7 @@ export abstract class BaseDeclarativeTool<
     if (validationError) {
       throw new Error(validationError);
     }
-    return this.createInvocation(
-      params,
-      this.messageBus,
-      this.name,
-      this.displayName,
-    );
+    return this.createInvocation(params, this.messageBus, this.name);
   }
 
   override validateToolParams(params: TParams): string | null {
@@ -462,7 +448,6 @@ export abstract class BaseDeclarativeTool<
     params: TParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<TParams, TResult>;
 }
 
@@ -663,7 +648,6 @@ export interface ToolMcpConfirmationDetails {
   title: string;
   serverName: string;
   toolName: string;
-  toolDisplayName: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 

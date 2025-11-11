@@ -103,9 +103,8 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     params: WriteTodosToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
   }
 
   getDescription(): string {
@@ -146,39 +145,33 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   static readonly Name = WRITE_TODOS_TOOL_NAME;
 
   constructor() {
-    super(
-      WriteTodosTool.Name,
-      'Write Todos',
-      WRITE_TODOS_DESCRIPTION,
-      Kind.Other,
-      {
-        type: 'object',
-        properties: {
-          todos: {
-            type: 'array',
-            description:
-              'The complete list of todo items. This will replace the existing list.',
-            items: {
-              type: 'object',
-              description: 'A single todo item.',
-              properties: {
-                description: {
-                  type: 'string',
-                  description: 'The description of the task.',
-                },
-                status: {
-                  type: 'string',
-                  description: 'The current status of the task.',
-                  enum: TODO_STATUSES,
-                },
+    super(WriteTodosTool.Name, WRITE_TODOS_DESCRIPTION, Kind.Other, {
+      type: 'object',
+      properties: {
+        todos: {
+          type: 'array',
+          description:
+            'The complete list of todo items. This will replace the existing list.',
+          items: {
+            type: 'object',
+            description: 'A single todo item.',
+            properties: {
+              description: {
+                type: 'string',
+                description: 'The description of the task.',
               },
-              required: ['description', 'status'],
+              status: {
+                type: 'string',
+                description: 'The current status of the task.',
+                enum: TODO_STATUSES,
+              },
             },
+            required: ['description', 'status'],
           },
         },
-        required: ['todos'],
       },
-    );
+      required: ['todos'],
+    });
   }
 
   protected override validateToolParamValues(
@@ -216,13 +209,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
     params: WriteTodosToolParams,
     _messageBus?: MessageBus,
     _toolName?: string,
-    _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
-    return new WriteTodosToolInvocation(
-      params,
-      _messageBus,
-      _toolName,
-      _displayName,
-    );
+    return new WriteTodosToolInvocation(params, _messageBus, _toolName);
   }
 }

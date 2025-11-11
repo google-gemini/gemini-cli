@@ -74,7 +74,6 @@ class TestTool extends BaseDeclarativeTool<TestParams, TestResult> {
   constructor(messageBus?: MessageBus) {
     super(
       'test-tool',
-      'Test Tool',
       'A test tool for message bus integration',
       Kind.Other,
       {

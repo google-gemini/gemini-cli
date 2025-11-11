@@ -160,7 +160,6 @@ Signal: Signal number or \`(none)\` if no signal was received.
 `;
     super(
       prefixedName,
-      prefixedName,
       fullDescription,
       Kind.Other,
       parameterSchema,
@@ -175,7 +174,6 @@ Signal: Signal number or \`(none)\` if no signal was received.
     params: ToolParams,
     _messageBus?: MessageBus,
     _toolName?: string,
-    _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
     return new DiscoveredToolInvocation(
       this.config,
@@ -503,9 +501,7 @@ export class ToolRegistry {
    * Returns an array of all registered and discovered tool instances.
    */
   getAllTools(): AnyDeclarativeTool[] {
-    return this.getActiveTools().sort((a, b) =>
-      a.displayName.localeCompare(b.displayName),
-    );
+    return this.getActiveTools().sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**

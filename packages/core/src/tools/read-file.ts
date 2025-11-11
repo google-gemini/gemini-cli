@@ -52,9 +52,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     params: ReadFileToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
     this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
       this.params.file_path,
@@ -153,7 +152,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadFileTool.Name,
-      'ReadFile',
       `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
       Kind.Read,
       {
@@ -227,14 +225,12 @@ export class ReadFileTool extends BaseDeclarativeTool<
     params: ReadFileToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<ReadFileToolParams, ToolResult> {
     return new ReadFileToolInvocation(
       this.config,
       params,
       messageBus,
       _toolName,
-      _toolDisplayName,
     );
   }
 }

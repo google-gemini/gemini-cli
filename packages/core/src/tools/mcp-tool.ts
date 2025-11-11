@@ -68,7 +68,6 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     private readonly mcpTool: CallableTool,
     readonly serverName: string,
     readonly serverToolName: string,
-    readonly displayName: string,
     readonly trust?: boolean,
     params: ToolParams = {},
     private readonly cliConfig?: Config,
@@ -78,13 +77,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     // This enables server wildcards (e.g., "google-workspace__*")
     // while still allowing specific tool rules
 
-    super(
-      params,
-      messageBus,
-      `${serverName}__${serverToolName}`,
-      displayName,
-      serverName,
-    );
+    super(params, messageBus, `${serverName}__${serverToolName}`, serverName);
   }
 
   protected override async getConfirmationDetails(
@@ -108,8 +101,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       type: 'mcp',
       title: 'Confirm MCP Tool Execution',
       serverName: this.serverName,
-      toolName: this.serverToolName, // Display original tool name in confirmation
-      toolDisplayName: this.displayName, // Display global registry name exposed to model and user
+      toolName: this.serverToolName,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
@@ -231,7 +223,6 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
-      `${serverToolName} (${serverName} MCP Server)`,
       description,
       Kind.Other,
       parameterSchema,
@@ -267,13 +258,11 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     params: ToolParams,
     _messageBus?: MessageBus,
     _toolName?: string,
-    _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
     return new DiscoveredMCPToolInvocation(
       this.mcpTool,
       this.serverName,
       this.serverToolName,
-      this.displayName,
       this.trust,
       params,
       this.cliConfig,

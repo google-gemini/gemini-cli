@@ -101,7 +101,6 @@ describe('convertSessionToHistoryFormats', () => {
           {
             id: 'tool-1',
             name: 'bash',
-            displayName: 'Execute Command',
             description: 'Run bash command',
             args: { command: 'ls -la' },
             status: 'success',
@@ -112,7 +111,6 @@ describe('convertSessionToHistoryFormats', () => {
           {
             id: 'tool-2',
             name: 'read',
-            displayName: 'Read File',
             description: 'Read file contents',
             args: { path: '/etc/hosts' },
             status: 'error',
@@ -138,7 +136,7 @@ describe('convertSessionToHistoryFormats', () => {
       expect(result.uiHistory[1].tools).toHaveLength(2);
       expect(result.uiHistory[1].tools[0]).toEqual({
         callId: 'tool-1',
-        name: 'Execute Command',
+        name: 'bash',
         description: 'Run bash command',
         renderOutputAsMarkdown: false,
         status: ToolCallStatus.Success,
@@ -147,7 +145,7 @@ describe('convertSessionToHistoryFormats', () => {
       });
       expect(result.uiHistory[1].tools[1]).toEqual({
         callId: 'tool-2',
-        name: 'Read File',
+        name: 'read',
         description: 'Read file contents',
         renderOutputAsMarkdown: true, // default value
         status: ToolCallStatus.Error,

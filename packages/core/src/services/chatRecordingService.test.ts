@@ -328,7 +328,6 @@ describe('ChatRecordingService', () => {
         toolCalls: [
           {
             ...toolCall,
-            displayName: 'Test Tool',
             description: 'A test tool',
             renderOutputAsMarkdown: false,
           },
@@ -381,7 +380,6 @@ describe('ChatRecordingService', () => {
         toolCalls: [
           {
             ...toolCall,
-            displayName: 'Test Tool',
             description: 'A test tool',
             renderOutputAsMarkdown: false,
           },

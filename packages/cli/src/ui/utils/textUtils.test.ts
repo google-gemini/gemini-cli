@@ -91,7 +91,6 @@ describe('textUtils', () => {
             title: '\u001b[34mCloud Run\u001b[0m',
             serverName: '\u001b[31mmy-server\u001b[0m',
             toolName: '\u001b[32mdeploy\u001b[0m',
-            toolDisplayName: '\u001b[33mDeploy Service\u001b[0m',
             onConfirm: async () => {},
           };
 
@@ -101,9 +100,6 @@ describe('textUtils', () => {
             expect(sanitized.title).toBe('\\u001b[34mCloud Run\\u001b[0m');
             expect(sanitized.serverName).toBe('\\u001b[31mmy-server\\u001b[0m');
             expect(sanitized.toolName).toBe('\\u001b[32mdeploy\\u001b[0m');
-            expect(sanitized.toolDisplayName).toBe(
-              '\\u001b[33mDeploy Service\\u001b[0m',
-            );
           }
         });
 

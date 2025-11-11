@@ -430,7 +430,7 @@ export async function handleAtCommand({
     const result = await invocation.execute(signal);
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
-      name: readManyFilesTool.displayName,
+      name: readManyFilesTool.name,
       description: invocation.getDescription(),
       status: ToolCallStatus.Success,
       resultDisplay:
@@ -496,7 +496,7 @@ export async function handleAtCommand({
   } catch (error: unknown) {
     toolCallDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
-      name: readManyFilesTool.displayName,
+      name: readManyFilesTool.name,
       description:
         invocation?.getDescription() ??
         'Error attempting to execute tool to read files',

@@ -482,7 +482,7 @@ export class GeminiChat {
             hasCycleInSchema(tool.schema.parametersJsonSchema)) ||
           (tool.schema.parameters && hasCycleInSchema(tool.schema.parameters))
         ) {
-          cyclicSchemaTools.push(tool.displayName);
+          cyclicSchemaTools.push(tool.name);
         }
       }
       if (cyclicSchemaTools.length > 0) {

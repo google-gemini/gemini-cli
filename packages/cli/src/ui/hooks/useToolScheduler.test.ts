@@ -85,13 +85,11 @@ const mockConfig = {
 
 const mockTool = new MockTool({
   name: 'mockTool',
-  displayName: 'Mock Tool',
   execute: vi.fn(),
   shouldConfirmExecute: vi.fn(),
 });
 const mockToolWithLiveOutput = new MockTool({
   name: 'mockToolWithLiveOutput',
-  displayName: 'Mock Tool With Live Output',
   description: 'A mock tool for testing',
   params: {},
   isOutputMarkdown: true,
@@ -102,7 +100,6 @@ const mockToolWithLiveOutput = new MockTool({
 let mockOnUserConfirmForToolConfirmation: Mock;
 const mockToolRequiresConfirmation = new MockTool({
   name: 'mockToolRequiresConfirmation',
-  displayName: 'Mock Tool Requires Confirmation',
   execute: vi.fn(),
   shouldConfirmExecute: vi.fn(),
 });
@@ -652,7 +649,6 @@ describe('useReactToolScheduler', () => {
   it('should schedule and execute multiple tool calls', async () => {
     const tool1 = new MockTool({
       name: 'tool1',
-      displayName: 'Tool 1',
       execute: vi.fn().mockResolvedValue({
         llmContent: 'Output 1',
         returnDisplay: 'Display 1',
@@ -661,7 +657,6 @@ describe('useReactToolScheduler', () => {
 
     const tool2 = new MockTool({
       name: 'tool2',
-      displayName: 'Tool 2',
       execute: vi.fn().mockResolvedValue({
         llmContent: 'Output 2',
         returnDisplay: 'Display 2',
@@ -826,7 +821,6 @@ describe('mapToDisplay', () => {
 
   const baseTool = new MockTool({
     name: 'testTool',
-    displayName: 'Test Tool Display',
     execute: vi.fn(),
     shouldConfirmExecute: vi.fn(),
   });
@@ -889,7 +883,7 @@ describe('mapToDisplay', () => {
       status: 'validating',
       extraProps: { tool: baseTool, invocation: baseInvocation },
       expectedStatus: ToolCallStatus.Executing,
-      expectedName: baseTool.displayName,
+      expectedName: baseTool.name,
       expectedDescription: baseInvocation.getDescription(),
     },
     {
@@ -904,7 +898,6 @@ describe('mapToDisplay', () => {
           title: 'Test Tool Display',
           serverName: 'testTool',
           toolName: 'testTool',
-          toolDisplayName: 'Test Tool Display',
           filePath: 'mock',
           fileName: 'test.ts',
           fileDiff: 'Test diff',
@@ -913,7 +906,7 @@ describe('mapToDisplay', () => {
         } as ToolCallConfirmationDetails,
       },
       expectedStatus: ToolCallStatus.Confirming,
-      expectedName: baseTool.displayName,
+      expectedName: baseTool.name,
       expectedDescription: baseInvocation.getDescription(),
     },
     {
@@ -921,7 +914,7 @@ describe('mapToDisplay', () => {
       status: 'scheduled',
       extraProps: { tool: baseTool, invocation: baseInvocation },
       expectedStatus: ToolCallStatus.Pending,
-      expectedName: baseTool.displayName,
+      expectedName: baseTool.name,
       expectedDescription: baseInvocation.getDescription(),
     },
     {
@@ -929,7 +922,7 @@ describe('mapToDisplay', () => {
       status: 'executing',
       extraProps: { tool: baseTool, invocation: baseInvocation },
       expectedStatus: ToolCallStatus.Executing,
-      expectedName: baseTool.displayName,
+      expectedName: baseTool.name,
       expectedDescription: baseInvocation.getDescription(),
     },
     {
@@ -942,7 +935,7 @@ describe('mapToDisplay', () => {
       },
       expectedStatus: ToolCallStatus.Executing,
       expectedResultDisplay: 'Live test output',
-      expectedName: baseTool.displayName,
+      expectedName: baseTool.name,
       expectedDescription: baseInvocation.getDescription(),
     },
     {
@@ -955,7 +948,7 @@ describe('mapToDisplay', () => {
       },
       expectedStatus: ToolCallStatus.Success,
       expectedResultDisplay: baseResponse.resultDisplay as any,
-      expectedName: baseTool.displayName,
+      expectedName: baseTool.name,
       expectedDescription: baseInvocation.getDescription(),
     },
     {
@@ -986,7 +979,7 @@ describe('mapToDisplay', () => {
       },
       expectedStatus: ToolCallStatus.Error,
       expectedResultDisplay: 'Execution failed display',
-      expectedName: baseTool.displayName, // Changed from baseTool.name
+      expectedName: baseTool.name, // Changed from baseTool.name
       expectedDescription: JSON.stringify(baseRequest.args),
     },
     {
@@ -1002,7 +995,7 @@ describe('mapToDisplay', () => {
       },
       expectedStatus: ToolCallStatus.Canceled,
       expectedResultDisplay: 'Cancelled display',
-      expectedName: baseTool.displayName,
+      expectedName: baseTool.name,
       expectedDescription: baseInvocation.getDescription(),
     },
   ];
@@ -1060,7 +1053,6 @@ describe('mapToDisplay', () => {
     } as ToolCall;
     const toolForCall2 = new MockTool({
       name: baseTool.name,
-      displayName: baseTool.displayName,
       isOutputMarkdown: true,
       execute: vi.fn(),
       shouldConfirmExecute: vi.fn(),

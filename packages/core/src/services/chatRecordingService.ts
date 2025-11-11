@@ -51,7 +51,6 @@ export interface ToolCallRecord {
   status: Status;
   timestamp: string;
   // UI-specific fields for display purposes
-  displayName?: string;
   description?: string;
   resultDisplay?: string;
   renderOutputAsMarkdown?: boolean;
@@ -295,7 +294,6 @@ export class ChatRecordingService {
       const toolInstance = toolRegistry.getTool(toolCall.name);
       return {
         ...toolCall,
-        displayName: toolInstance?.displayName || toolCall.name,
         description: toolInstance?.description || '',
         renderOutputAsMarkdown: toolInstance?.isOutputMarkdown || false,
       };

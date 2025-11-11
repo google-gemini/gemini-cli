@@ -66,9 +66,8 @@ class WebSearchToolInvocation extends BaseToolInvocation<
     params: WebSearchToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
   }
 
   override getDescription(): string {
@@ -195,7 +194,6 @@ export class WebSearchTool extends BaseDeclarativeTool<
   ) {
     super(
       WebSearchTool.Name,
-      'GoogleSearch',
       'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
       Kind.Search,
       {
@@ -232,14 +230,12 @@ export class WebSearchTool extends BaseDeclarativeTool<
     params: WebSearchToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
     return new WebSearchToolInvocation(
       this.config,
       params,
       messageBus,
       _toolName,
-      _toolDisplayName,
     );
   }
 }

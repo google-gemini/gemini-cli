@@ -76,23 +76,10 @@ describe('SubagentToolWrapper', () => {
       const wrapper = new SubagentToolWrapper(mockDefinition, mockConfig);
 
       expect(wrapper.name).toBe(mockDefinition.name);
-      expect(wrapper.displayName).toBe(mockDefinition.displayName);
       expect(wrapper.description).toBe(mockDefinition.description);
       expect(wrapper.kind).toBe(Kind.Think);
       expect(wrapper.isOutputMarkdown).toBe(true);
       expect(wrapper.canUpdateOutput).toBe(true);
-    });
-
-    it('should fall back to the agent name for displayName if it is not provided', () => {
-      const definitionWithoutDisplayName = {
-        ...mockDefinition,
-        displayName: undefined,
-      };
-      const wrapper = new SubagentToolWrapper(
-        definitionWithoutDisplayName,
-        mockConfig,
-      );
-      expect(wrapper.displayName).toBe(definitionWithoutDisplayName.name);
     });
 
     it('should generate a valid tool schema using the definition and converted schema', () => {

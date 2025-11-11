@@ -64,9 +64,8 @@ class GrepToolInvocation extends BaseToolInvocation<
     params: GrepToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
     this.fileExclusions = config.getFileExclusions();
   }
 
@@ -575,7 +574,6 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   ) {
     super(
       GrepTool.Name,
-      'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
       Kind.Search,
       {
@@ -676,14 +674,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     params: GrepToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<GrepToolParams, ToolResult> {
-    return new GrepToolInvocation(
-      this.config,
-      params,
-      messageBus,
-      _toolName,
-      _toolDisplayName,
-    );
+    return new GrepToolInvocation(this.config, params, messageBus, _toolName);
   }
 }

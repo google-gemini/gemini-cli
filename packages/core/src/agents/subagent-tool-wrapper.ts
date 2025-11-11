@@ -46,7 +46,6 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
 
     super(
       definition.name,
-      definition.displayName ?? definition.name,
       definition.description,
       Kind.Think,
       parameterSchema,

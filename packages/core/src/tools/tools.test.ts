@@ -36,7 +36,7 @@ class TestTool extends DeclarativeTool<object, ToolResult> {
   private readonly buildFn: (params: object) => TestToolInvocation;
 
   constructor(buildFn: (params: object) => TestToolInvocation) {
-    super('test-tool', 'Test Tool', 'A tool for testing', Kind.Other, {});
+    super('test-tool', 'A tool for testing', Kind.Other, {});
     this.buildFn = buildFn;
   }
 

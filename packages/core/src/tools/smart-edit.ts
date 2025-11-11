@@ -388,9 +388,8 @@ class EditToolInvocation
     params: EditToolParams,
     messageBus?: MessageBus,
     toolName?: string,
-    displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(params, messageBus, toolName);
   }
 
   override toolLocations(): ToolLocation[] {
@@ -845,15 +844,12 @@ export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  static readonly Name = EDIT_TOOL_NAME;
-
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      SmartEditTool.Name,
-      'Edit',
+      EDIT_TOOL_NAME,
       `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
@@ -957,7 +953,6 @@ A good instruction should concisely answer:
       params,
       this.messageBus,
       this.name,
-      this.displayName,
     );
   }
 

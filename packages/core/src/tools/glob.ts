@@ -93,9 +93,8 @@ class GlobToolInvocation extends BaseToolInvocation<
     params: GlobToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
   }
 
   getDescription(): string {
@@ -266,7 +265,6 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   ) {
     super(
       GlobTool.Name,
-      'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
       Kind.Search,
       {
@@ -350,14 +348,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
     params: GlobToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<GlobToolParams, ToolResult> {
-    return new GlobToolInvocation(
-      this.config,
-      params,
-      messageBus,
-      _toolName,
-      _toolDisplayName,
-    );
+    return new GlobToolInvocation(this.config, params, messageBus, _toolName);
   }
 }

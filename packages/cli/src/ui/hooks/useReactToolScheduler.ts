@@ -265,10 +265,10 @@ export function mapToDisplay(
         displayName =
           trackedCall.tool === undefined
             ? trackedCall.request.name
-            : trackedCall.tool.displayName;
+            : trackedCall.tool.name;
         description = JSON.stringify(trackedCall.request.args);
       } else {
-        displayName = trackedCall.tool.displayName;
+        displayName = trackedCall.tool.name;
         description = trackedCall.invocation.getDescription();
         renderOutputAsMarkdown = trackedCall.tool.isOutputMarkdown;
       }

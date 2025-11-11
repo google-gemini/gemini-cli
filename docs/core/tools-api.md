@@ -10,7 +10,6 @@ content, and perform various actions beyond simple text generation.
 - **Tool (`tools.ts`):** An interface and base class (`BaseTool`) that defines
   the contract for all tools. Each tool must have:
   - `name`: A unique internal name (used in API calls to Gemini).
-  - `displayName`: A user-friendly name.
   - `description`: A clear explanation of what the tool does, which is provided
     to the Gemini model.
   - `parameterSchema`: A JSON schema defining the parameters that the tool

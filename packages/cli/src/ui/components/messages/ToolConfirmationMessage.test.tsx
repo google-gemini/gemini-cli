@@ -99,7 +99,6 @@ describe('ToolConfirmationMessage', () => {
       title: 'Confirm MCP Tool',
       serverName: 'test-server',
       toolName: 'test-tool',
-      toolDisplayName: 'Test Tool',
       onConfirm: vi.fn(),
     };
 

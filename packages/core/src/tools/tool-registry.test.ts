@@ -159,11 +159,9 @@ describe('ToolRegistry', () => {
   describe('excluded tools', () => {
     const simpleTool = new MockTool({
       name: 'tool-a',
-      displayName: 'Tool a',
     });
     const excludedTool = new ExcludedMockTool({
       name: 'excluded-tool-class',
-      displayName: 'Excluded Tool Class',
     });
     const mockCallable = {} as CallableTool;
     const mcpTool = new DiscoveredMCPTool(
@@ -175,7 +173,6 @@ describe('ToolRegistry', () => {
     );
     const allowedTool = new MockTool({
       name: 'allowed-tool',
-      displayName: 'Allowed Tool',
     });
 
     it.each([
@@ -226,30 +223,30 @@ describe('ToolRegistry', () => {
   });
 
   describe('getAllTools', () => {
-    it('should return all registered tools sorted alphabetically by displayName', () => {
-      // Register tools with displayNames in non-alphabetical order
-      const toolC = new MockTool({ name: 'c-tool', displayName: 'Tool C' });
-      const toolA = new MockTool({ name: 'a-tool', displayName: 'Tool A' });
-      const toolB = new MockTool({ name: 'b-tool', displayName: 'Tool B' });
+    it('should return all registered tools sorted alphabetically by name', () => {
+      // Register tools with names in non-alphabetical order
+      const toolC = new MockTool({ name: 'c-tool' });
+      const toolA = new MockTool({ name: 'a-tool' });
+      const toolB = new MockTool({ name: 'b-tool' });
 
       toolRegistry.registerTool(toolC);
       toolRegistry.registerTool(toolA);
       toolRegistry.registerTool(toolB);
 
       const allTools = toolRegistry.getAllTools();
-      const displayNames = allTools.map((t) => t.displayName);
+      const toolNames = allTools.map((t) => t.name);
 
-      // Assert that the returned array is sorted by displayName
-      expect(displayNames).toEqual(['Tool A', 'Tool B', 'Tool C']);
+      // Assert that the returned array is sorted by name
+      expect(toolNames).toEqual(['a-tool', 'b-tool', 'c-tool']);
     });
   });
 
   describe('getAllToolNames', () => {
     it('should return all registered tool names', () => {
-      // Register tools with displayNames in non-alphabetical order
-      const toolC = new MockTool({ name: 'c-tool', displayName: 'Tool C' });
-      const toolA = new MockTool({ name: 'a-tool', displayName: 'Tool A' });
-      const toolB = new MockTool({ name: 'b-tool', displayName: 'Tool B' });
+      // Register tools with names in non-alphabetical order
+      const toolC = new MockTool({ name: 'c-tool' });
+      const toolA = new MockTool({ name: 'a-tool' });
+      const toolB = new MockTool({ name: 'b-tool' });
 
       toolRegistry.registerTool(toolC);
       toolRegistry.registerTool(toolA);

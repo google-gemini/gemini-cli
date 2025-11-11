@@ -90,7 +90,6 @@ export class MockTool extends BaseDeclarativeTool<
   constructor(options: MockToolOptions) {
     super(
       options.name,
-      options.displayName ?? options.name,
       options.description ?? options.name,
       Kind.Other,
       options.params,
@@ -189,7 +188,7 @@ export class MockModifiableTool
   shouldConfirm = true;
 
   constructor(name = 'mockModifiableTool') {
-    super(name, name, 'A mock modifiable tool for testing.', Kind.Other, {
+    super(name, 'A mock modifiable tool for testing.', Kind.Other, {
       type: 'object',
       properties: { param: { type: 'string' } },
     });

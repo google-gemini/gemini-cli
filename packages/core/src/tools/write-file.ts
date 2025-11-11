@@ -150,9 +150,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     params: WriteFileToolParams,
     messageBus?: MessageBus,
     toolName?: string,
-    displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(params, messageBus, toolName);
     this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
       this.params.file_path,
@@ -408,7 +407,6 @@ export class WriteFileTool
   ) {
     super(
       WriteFileTool.Name,
-      'WriteFile',
       `Writes content to a specified file in the local filesystem.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
@@ -476,7 +474,6 @@ export class WriteFileTool
       params,
       this.messageBus,
       this.name,
-      this.displayName,
     );
   }
 

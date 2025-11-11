@@ -120,9 +120,8 @@ class EditToolInvocation
     params: EditToolParams,
     messageBus?: MessageBus,
     toolName?: string,
-    displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(params, messageBus, toolName);
     this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
       this.params.file_path,
@@ -492,7 +491,6 @@ export class EditTool
   ) {
     super(
       EditTool.Name,
-      'Edit',
       `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
 
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
@@ -566,14 +564,12 @@ Expectation for required parameters:
     params: EditToolParams,
     messageBus?: MessageBus,
     toolName?: string,
-    displayName?: string,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
       this.config,
       params,
       messageBus ?? this.messageBus,
       toolName ?? this.name,
-      displayName ?? this.displayName,
     );
   }
 

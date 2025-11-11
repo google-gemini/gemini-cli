@@ -113,9 +113,8 @@ class GrepToolInvocation extends BaseToolInvocation<
     params: RipGrepToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
   }
 
   /**
@@ -449,7 +448,6 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ) {
     super(
       RipGrepTool.Name,
-      'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers. Total results limited to 20,000 matches like VSCode.',
       Kind.Search,
       {
@@ -550,14 +548,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     params: RipGrepToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
-    return new GrepToolInvocation(
-      this.config,
-      params,
-      messageBus,
-      _toolName,
-      _toolDisplayName,
-    );
+    return new GrepToolInvocation(this.config, params, messageBus, _toolName);
   }
 }

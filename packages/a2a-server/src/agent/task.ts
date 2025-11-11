@@ -476,7 +476,6 @@ export class Task {
       serializableToolCall.tool = this._pickFields(
         tc.tool,
         'name',
-        'displayName',
         'description',
         'kind',
         'isOutputMarkdown',

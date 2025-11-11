@@ -188,7 +188,6 @@ export type HistoryItemChatList = HistoryItemBase & {
 
 export interface ToolDefinition {
   name: string;
-  displayName: string;
   description?: string;
 }
 

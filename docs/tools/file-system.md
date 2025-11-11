@@ -10,14 +10,13 @@ current working directory where you launched the CLI) for security. Paths that
 you provide to these tools are generally expected to be absolute or are resolved
 relative to this root directory.
 
-## 1. `list_directory` (ReadFolder)
+## 1. `list_directory`
 
 `list_directory` lists the names of files and subdirectories directly within a
 specified directory path. It can optionally ignore entries matching provided
 glob patterns.
 
 - **Tool name:** `list_directory`
-- **Display name:** ReadFolder
 - **File:** `ls.ts`
 - **Parameters:**
   - `path` (string, required): The absolute path to the directory to list.
@@ -33,14 +32,13 @@ glob patterns.
   `Directory listing for /path/to/your/folder:\n[DIR] subfolder1\nfile1.txt\nfile2.png`
 - **Confirmation:** No.
 
-## 2. `read_file` (ReadFile)
+## 2. `read_file`
 
 `read_file` reads and returns the content of a specified file. This tool handles
 text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it
 can read specific line ranges. Other binary file types are generally skipped.
 
 - **Tool name:** `read_file`
-- **Display name:** ReadFile
 - **File:** `read-file.ts`
 - **Parameters:**
   - `path` (string, required): The absolute path to the file to read.
@@ -68,14 +66,13 @@ can read specific line ranges. Other binary file types are generally skipped.
     `Cannot display content of binary file: /path/to/data.bin`.
 - **Confirmation:** No.
 
-## 3. `write_file` (WriteFile)
+## 3. `write_file`
 
 `write_file` writes content to a specified file. If the file exists, it will be
 overwritten. If the file doesn't exist, it (and any necessary parent
 directories) will be created.
 
 - **Tool name:** `write_file`
-- **Display name:** WriteFile
 - **File:** `write-file.ts`
 - **Parameters:**
   - `file_path` (string, required): The absolute path to the file to write to.
@@ -89,13 +86,12 @@ directories) will be created.
 - **Confirmation:** Yes. Shows a diff of changes and asks for user approval
   before writing.
 
-## 4. `glob` (FindFiles)
+## 4. `glob`
 
 `glob` finds files matching specific glob patterns (e.g., `src/**/*.ts`,
 `*.md`), returning absolute paths sorted by modification time (newest first).
 
 - **Tool name:** `glob`
-- **Display name:** FindFiles
 - **File:** `glob.ts`
 - **Parameters:**
   - `pattern` (string, required): The glob pattern to match against (e.g.,
@@ -116,7 +112,7 @@ directories) will be created.
   `Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
 - **Confirmation:** No.
 
-## 5. `search_file_content` (SearchText)
+## 5. `search_file_content`
 
 `search_file_content` searches for a regular expression pattern within the
 content of files in a specified directory. Can filter files by a glob pattern.
@@ -124,7 +120,6 @@ Returns the lines containing matches, along with their file paths and line
 numbers.
 
 - **Tool name:** `search_file_content`
-- **Display name:** SearchText
 - **File:** `grep.ts`
 - **Parameters:**
   - `pattern` (string, required): The regular expression (regex) to search for
@@ -153,7 +148,7 @@ numbers.
   ```
 - **Confirmation:** No.
 
-## 6. `replace` (Edit)
+## 6. `replace`
 
 `replace` replaces text within a file. By default, replaces a single occurrence,
 but can replace multiple occurrences when `expected_replacements` is specified.
@@ -161,7 +156,6 @@ This tool is designed for precise, targeted changes and requires significant
 context around the `old_string` to ensure it modifies the correct location.
 
 - **Tool name:** `replace`
-- **Display name:** Edit
 - **File:** `edit.ts`
 - **Parameters:**
   - `file_path` (string, required): The absolute path to the file to modify.

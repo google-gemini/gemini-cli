@@ -42,7 +42,6 @@ describe('BaseToolInvocation', () => {
       {},
       messageBus,
       'test-tool',
-      'Test Tool',
       serverName,
     );
 
@@ -97,7 +96,6 @@ describe('BaseToolInvocation', () => {
       {},
       messageBus,
       'test-tool',
-      'Test Tool',
       // no serverName
     );
 

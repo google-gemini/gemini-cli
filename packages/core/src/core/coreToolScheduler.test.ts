@@ -51,7 +51,6 @@ class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   constructor(private config: Config) {
     super(
       TestApprovalTool.Name,
-      'TestApprovalTool',
       'A tool for testing approval logic',
       Kind.Edit,
       {
@@ -154,7 +153,6 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
   ) {
     super(
       'abortDuringConfirmationTool',
-      'Abort During Confirmation Tool',
       'A tool that aborts while confirming execution.',
       Kind.Other,
       {
@@ -912,7 +910,7 @@ class MockEditTool extends BaseDeclarativeTool<
   ToolResult
 > {
   constructor() {
-    super('mockEditTool', 'mockEditTool', 'A mock edit tool', Kind.Edit, {});
+    super('mockEditTool', 'A mock edit tool', Kind.Edit, {});
   }
 
   protected createInvocation(

@@ -402,7 +402,6 @@ describe('useGeminiStream', () => {
           },
     tool: {
       name: toolName,
-      displayName: toolName,
       description: `${toolName} description`,
       build: vi.fn(),
     } as any,
@@ -480,7 +479,6 @@ describe('useGeminiStream', () => {
         },
         tool: {
           name: 'tool1',
-          displayName: 'tool1',
           description: 'desc1',
           build: vi.fn(),
         } as any,
@@ -501,7 +499,6 @@ describe('useGeminiStream', () => {
         responseSubmittedToGemini: false,
         tool: {
           name: 'tool2',
-          displayName: 'tool2',
           description: 'desc2',
           build: vi.fn(),
         } as any,
@@ -543,7 +540,7 @@ describe('useGeminiStream', () => {
           errorType: undefined, // FIX: Added missing property
         },
         tool: {
-          displayName: 'MockTool',
+          name: 'MockTool',
         },
         invocation: {
           getDescription: () => `Mock description`,
@@ -641,7 +638,7 @@ describe('useGeminiStream', () => {
         },
         responseSubmittedToGemini: false,
         tool: {
-          displayName: 'mock tool',
+          name: 'mock tool',
         },
         invocation: {
           getDescription: () => `Mock description`,
@@ -712,7 +709,6 @@ describe('useGeminiStream', () => {
       },
       tool: {
         name: 'toolA',
-        displayName: 'toolA',
         description: 'descA',
         build: vi.fn(),
       } as any,
@@ -741,7 +737,6 @@ describe('useGeminiStream', () => {
       },
       tool: {
         name: 'toolB',
-        displayName: 'toolB',
         description: 'descB',
         build: vi.fn(),
       } as any,
@@ -844,7 +839,6 @@ describe('useGeminiStream', () => {
         responseSubmittedToGemini: false,
         tool: {
           name: 'tool1',
-          displayName: 'tool1',
           description: 'desc',
           build: vi.fn(),
         } as any,

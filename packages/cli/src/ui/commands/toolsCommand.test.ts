@@ -15,13 +15,11 @@ import type { ToolBuilder, ToolResult } from '@google/gemini-cli-core';
 const mockTools = [
   {
     name: 'file-reader',
-    displayName: 'File Reader',
     description: 'Reads files from the local system.',
     schema: {},
   },
   {
     name: 'code-editor',
-    displayName: 'Code Editor',
     description: 'Edits code files.',
     schema: {},
   },
@@ -90,8 +88,8 @@ describe('toolsCommand', () => {
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(false);
     expect(message.tools).toHaveLength(2);
-    expect(message.tools[0].displayName).toBe('File Reader');
-    expect(message.tools[1].displayName).toBe('Code Editor');
+    expect(message.tools[0].name).toBe('file-reader');
+    expect(message.tools[1].name).toBe('code-editor');
   });
 
   it('should list tools with descriptions when "desc" arg is passed', async () => {

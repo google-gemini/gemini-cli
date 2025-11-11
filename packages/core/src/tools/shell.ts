@@ -62,9 +62,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
     private readonly allowlist: Set<string>,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, messageBus, _toolName);
   }
 
   getDescription(): string {
@@ -391,7 +390,6 @@ export class ShellTool extends BaseDeclarativeTool<
     });
     super(
       ShellTool.Name,
-      'Shell',
       getShellToolDescription(),
       Kind.Execute,
       {
@@ -457,7 +455,6 @@ export class ShellTool extends BaseDeclarativeTool<
     params: ShellToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
-    _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.config,
@@ -465,7 +462,6 @@ export class ShellTool extends BaseDeclarativeTool<
       this.allowlist,
       messageBus,
       _toolName,
-      _toolDisplayName,
     );
   }
 }
