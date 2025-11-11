@@ -34,6 +34,7 @@ import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+import { READ_MANY_FILES_TOOL_NAME } from '../tools/tool-names.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -1038,6 +1039,40 @@ describe('Server Config (config.ts)', () => {
       new Config(paramsWithProxy);
 
       expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('checkDeprecatedTools', () => {
+    it('should emit a warning when a deprecated tool is in coreTools', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        coreTools: [READ_MANY_FILES_TOOL_NAME],
+      };
+      const config = new Config(params);
+      await config.initialize();
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          `The tool '${READ_MANY_FILES_TOOL_NAME}' (or 'ReadManyFilesTool') specified in 'tools.core' is deprecated`,
+        ),
+      );
+    });
+
+    it('should emit a warning when a deprecated tool is in allowedTools', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        allowedTools: ['ReadManyFilesTool'],
+      };
+      const config = new Config(params);
+      await config.initialize();
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          `The tool '${READ_MANY_FILES_TOOL_NAME}' (or 'ReadManyFilesTool') specified in 'tools.allowed' is deprecated`,
+        ),
+      );
     });
   });
 });

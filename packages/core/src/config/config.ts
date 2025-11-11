@@ -164,6 +164,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { READ_MANY_FILES_TOOL_NAME } from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -631,6 +632,32 @@ export class Config {
     ]);
 
     await this.geminiClient.initialize();
+
+    this.checkDeprecatedTools();
+  }
+
+  private checkDeprecatedTools(): void {
+    const deprecatedTools = [
+      {
+        name: READ_MANY_FILES_TOOL_NAME,
+        alternateName: 'ReadManyFilesTool',
+      },
+    ];
+
+    const checkList = (list: string[] | undefined, listName: string) => {
+      if (!list) return;
+      for (const tool of deprecatedTools) {
+        if (list.includes(tool.name) || list.includes(tool.alternateName)) {
+          coreEvents.emitFeedback(
+            'warning',
+            `The tool '${tool.name}' (or '${tool.alternateName}') specified in '${listName}' is deprecated and will be removed in v0.14.0.`,
+          );
+        }
+      }
+    };
+
+    checkList(this.coreTools, 'tools.core');
+    checkList(this.allowedTools, 'tools.allowed');
   }
 
   getContentGenerator(): ContentGenerator {
