@@ -34,6 +34,8 @@ const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
+const EVENT_HOOK_CALL_COUNT = 'gemini_cli.hook_call.count';
+const EVENT_HOOK_CALL_LATENCY = 'gemini_cli.hook_call.latency';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -202,6 +204,16 @@ const COUNTER_DEFINITIONS = {
     assign: (c: Counter) => (exitFailCounter = c),
     attributes: {} as Record<string, never>,
   },
+  [EVENT_HOOK_CALL_COUNT]: {
+    description: 'Counts hook calls, tagged by hook event name and success.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (hookCallCounter = c),
+    attributes: {} as {
+      hook_event_name: string;
+      hook_name: string;
+      success: boolean;
+    },
+  },
 } as const;
 
 const HISTOGRAM_DEFINITIONS = {
@@ -295,6 +307,17 @@ const HISTOGRAM_DEFINITIONS = {
       'server.address'?: string;
       'server.port'?: number;
       'error.type'?: string;
+    },
+  },
+  [EVENT_HOOK_CALL_LATENCY]: {
+    description: 'Latency of hook calls in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (c: Histogram) => (hookCallLatencyHistogram = c),
+    attributes: {} as {
+      hook_event_name: string;
+      hook_name: string;
+      success: boolean;
     },
   },
 } as const;
@@ -506,6 +529,8 @@ let agentRecoveryAttemptDurationHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
 let slowRenderHistogram: Histogram | undefined;
+let hookCallCounter: Counter | undefined;
+let hookCallLatencyHistogram: Histogram | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -1161,4 +1186,25 @@ export function recordApiResponseMetrics(
       ...attributes.genAiAttributes,
     });
   }
+}
+
+export function recordHookCallMetrics(
+  config: Config,
+  hookEventName: string,
+  hookName: string,
+  durationMs: number,
+  success: boolean,
+): void {
+  if (!hookCallCounter || !hookCallLatencyHistogram || !isMetricsInitialized)
+    return;
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    hook_event_name: hookEventName,
+    hook_name: hookName,
+    success,
+  };
+
+  hookCallCounter.add(1, metricAttributes);
+  hookCallLatencyHistogram.record(durationMs, metricAttributes);
 }

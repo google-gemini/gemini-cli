@@ -32,7 +32,9 @@ import {
   ToolConfirmationOutcome,
   ApprovalMode,
   MockTool,
+  HookSystem,
 } from '@google/gemini-cli-core';
+import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { ToolCallStatus } from '../types.js';
 
 // Mocks
@@ -80,7 +82,10 @@ const mockConfig = {
   getEnableMessageBusIntegration: () => false,
   getMessageBus: () => null,
   getPolicyEngine: () => null,
+  getEnableHooks: () => false,
 } as unknown as Config;
+mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
+mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));
 
 const mockTool = new MockTool({
   name: 'mockTool',
