@@ -997,6 +997,13 @@
           "default": false,
           "type": "boolean"
         },
+        "blockGitExtensions": {
+          "title": "Blocks extensions from Git",
+          "description": "Blocks installing and loading extensions from Git.",
+          "markdownDescription": "Blocks installing and loading extensions from Git.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "folderTrust": {
           "title": "Folder Trust",
           "description": "Settings for folder trust.",

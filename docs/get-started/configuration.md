@@ -490,6 +490,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.blockGitExtensions`** (boolean):
+  - **Description:** Blocks installing and loading extensions from Git.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
   - **Default:** `false`
