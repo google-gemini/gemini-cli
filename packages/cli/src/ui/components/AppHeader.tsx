@@ -18,16 +18,18 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly } = useUIState();
+  const { nightly, isFolderTrustDialogOpen } = useUIState();
 
   return (
     <Box flexDirection="column">
       {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
         <Header version={version} nightly={nightly} />
       )}
-      {!(settings.merged.ui?.hideTips || config.getScreenReader()) && (
-        <Tips config={config} />
-      )}
+      {!(
+        settings.merged.ui?.hideTips ||
+        config.getScreenReader() ||
+        isFolderTrustDialogOpen
+      ) && <Tips config={config} />}
     </Box>
   );
 };

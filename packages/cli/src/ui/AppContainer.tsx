@@ -1296,7 +1296,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       suggestionsWidth,
       isInputActive,
       shouldShowIdePrompt,
-      isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
+      isFolderTrustDialogOpen,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
