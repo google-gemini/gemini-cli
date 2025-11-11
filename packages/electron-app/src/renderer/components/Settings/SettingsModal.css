@@ -19,15 +19,20 @@
   padding: 40px 20px 20px;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .settings-sidebar h2 {
   margin-top: 0;
   font-size: 20px;
+  flex-shrink: 0;
 }
 
 .scope-selector {
   margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .scope-selector label {
@@ -50,6 +55,8 @@
   padding: 0;
   margin: 0;
   flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .settings-sidebar li {
@@ -76,6 +83,8 @@
   border-radius: 4px;
   cursor: pointer;
   text-align: center;
+  flex-shrink: 0;
+  margin-top: 10px;
 }
 
 .settings-content {

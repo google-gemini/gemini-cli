@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import './SettingsModal.css';
 import type {
   Settings,
@@ -108,6 +108,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [availableThemes, setAvailableThemes] = useState<ThemeDisplay[]>([]);
   const [scope, setScope] = useState('User');
   const [activeCategory, setActiveCategory] = useState('General');
+  const [envInput, setEnvInput] = useState('');
+  const envInitialized = useRef(false);
 
   const flattenedSettings = useMemo(
     () => (schema ? flattenSchema(schema) : []),
@@ -141,6 +143,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   useEffect(() => {
     if (fullSettings?.merged) {
       setSettings(fullSettings.merged);
+      if (!envInitialized.current) {
+        setEnvInput(
+          ((fullSettings.merged as Record<string, unknown>).env as string) ||
+            '',
+        );
+        envInitialized.current = true;
+      }
     }
   }, [fullSettings]);
 
@@ -171,6 +180,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const handleClose = async () => {
     try {
+      await window.electron.settings.set({
+        changes: { env: envInput },
+        scope,
+      });
       await window.electron.settings.restartTerminal();
     } catch (error) {
       console.error('Failed to restart terminal:', error);
@@ -305,19 +318,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           </div>
         )}
-        {activeCategory === 'General' && (
-          <div className="setting-item">
-            <div className="setting-info">
-              <label>Language Mappings</label>
-              <p>
-                Map file extensions to language names for syntax highlighting.
-              </p>
-            </div>
-            <div className="setting-control">
-              <LanguageMappingsManager />
-            </div>
-          </div>
-        )}
         {flattenedSettings
           .filter((s) => s.category === activeCategory)
           .map((config) => (
@@ -329,6 +329,38 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div className="setting-control">{renderSetting(config)}</div>
             </div>
           ))}
+        {activeCategory === 'General' && (
+          <>
+            <div className="setting-item">
+              <div className="setting-info">
+                <label htmlFor="env">Environment Variables</label>
+                <p>
+                  Set environment variables for the terminal session (e.g.
+                  API_KEY=value). Separate entries with newlines or spaces.
+                </p>
+              </div>
+              <div className="setting-control">
+                <textarea
+                  id="env"
+                  value={envInput}
+                  onChange={(e) => setEnvInput(e.target.value)}
+                  placeholder="KEY=VALUE ANOTHER_KEY=VALUE"
+                />
+              </div>
+            </div>
+            <div className="setting-item">
+              <div className="setting-info">
+                <label>Language Mappings</label>
+                <p>
+                  Map file extensions to language names for syntax highlighting.
+                </p>
+              </div>
+              <div className="setting-control">
+                <LanguageMappingsManager />
+              </div>
+            </div>
+          </>
+        )}
         {activeCategory === 'MCP Servers' && (
           <McpServerManager
             mcpServers={settings.mcpServers || {}}
