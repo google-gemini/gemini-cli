@@ -8,7 +8,10 @@ import * as GenAiLib from '@google/genai';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProviderType, type Config } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
@@ -676,7 +679,10 @@ describe('connectToMcpServer with OAuth', () => {
     const wwwAuthHeader = `Bearer realm="test", resource_metadata="http://test-server.com/.well-known/oauth-protected-resource"`;
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
-      new Error(`401 Unauthorized\nwww-authenticate: ${wwwAuthHeader}`),
+      new StreamableHTTPError(
+        401,
+        `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+      ),
     );
 
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
@@ -717,7 +723,7 @@ describe('connectToMcpServer with OAuth', () => {
     const tokenUrl = 'http://auth.example.com/token';
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
-      new Error('401 Unauthorized'),
+      new StreamableHTTPError(401, 'Unauthorized'),
     );
 
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({

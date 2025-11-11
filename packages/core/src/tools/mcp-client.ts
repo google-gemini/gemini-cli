@@ -35,7 +35,11 @@ import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
-import { getErrorMessage } from '../utils/errors.js';
+import {
+  getErrorMessage,
+  isAuthenticationError,
+  UnauthorizedError,
+} from '../utils/errors.js';
 import type {
   Unsubscribe,
   WorkspaceContext,
@@ -825,9 +829,7 @@ async function showAuthRequiredMessage(serverName: string): Promise<never> {
     : `MCP server '${serverName}' requires authentication using: /mcp auth ${serverName}`;
 
   coreEvents.emitFeedback('info', message);
-  throw new Error(
-    `401 error received without OAuth configuration.\nPlease authenticate using: /mcp auth ${serverName}`,
-  );
+  throw new UnauthorizedError(message);
 }
 
 /**
@@ -989,11 +991,10 @@ export async function connectToMcpServer(
     }
   } catch (initialError) {
     let error = initialError;
-    const errorString = String(error);
 
     // Check if this is a 401 error FIRST (before attempting SSE fallback)
     // This ensures OAuth flow happens before we try SSE
-    if (errorString.includes('401') && hasNetworkTransport(mcpServerConfig)) {
+    if (isAuthenticationError(error) && hasNetworkTransport(mcpServerConfig)) {
       // Continue to OAuth handling below (after SSE fallback section)
     } else if (
       // If not 401, and HTTP failed with url without explicit type, try SSE fallback
@@ -1003,7 +1004,7 @@ export async function connectToMcpServer(
       !mcpServerConfig.httpUrl
     ) {
       // Check if HTTP returned 404 - if so, we know it's not an HTTP server
-      httpReturned404 = errorString.includes('404');
+      httpReturned404 = String(firstAttemptError).includes('404');
 
       const logMessage = httpReturned404
         ? `HTTP returned 404, trying SSE transport...`
@@ -1025,10 +1026,9 @@ export async function connectToMcpServer(
         return mcpClient;
       } catch (sseFallbackError) {
         sseError = sseFallbackError as Error;
-        const sseErrorString = String(sseError);
 
         // If SSE also returned 401, handle OAuth below
-        if (sseErrorString.includes('401')) {
+        if (isAuthenticationError(sseError)) {
           debugLogger.log(
             `MCP server '${mcpServerName}': SSE returned 401, OAuth authentication required.`,
           );
@@ -1046,11 +1046,7 @@ export async function connectToMcpServer(
     }
 
     // Check if this is a 401 error that might indicate OAuth is required
-    const currentErrorString = String(error);
-    if (
-      currentErrorString.includes('401') &&
-      hasNetworkTransport(mcpServerConfig)
-    ) {
+    if (isAuthenticationError(error) && hasNetworkTransport(mcpServerConfig)) {
       mcpServerRequiresOAuth.set(mcpServerName, true);
 
       // Only trigger automatic OAuth if explicitly enabled in config
@@ -1062,6 +1058,7 @@ export async function connectToMcpServer(
       }
 
       // Try to extract www-authenticate header from the error
+      const errorString = String(error);
       let wwwAuthenticate = extractWWWAuthenticateHeader(errorString);
 
       // If we didn't get the header from the error string, try to get it from the server
@@ -1235,24 +1232,8 @@ export async function connectToMcpServer(
       }
     } else {
       // Handle other connection errors
-      // Create a concise error message
-      const errorMessage = (error as Error).message || String(error);
-      const isNetworkError =
-        errorMessage.includes('ENOTFOUND') ||
-        errorMessage.includes('ECONNREFUSED');
-
-      let conciseError: string;
-      if (isNetworkError) {
-        conciseError = `Cannot connect to '${mcpServerName}' - server may be down or URL incorrect`;
-      } else {
-        conciseError = `Connection failed for '${mcpServerName}': ${errorMessage}`;
-      }
-
-      if (process.env['SANDBOX']) {
-        conciseError += ` (check sandbox availability)`;
-      }
-
-      throw new Error(conciseError);
+      // Re-throw the original error to preserve its structure
+      throw error;
     }
   }
 }
