@@ -29,7 +29,10 @@ import * as path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
-import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
+
+import { debugLogger } from '@google/gemini-cli-core';
+
+export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
 const execAsync = promisify(exec);
 
@@ -88,7 +91,7 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
         return 'vscode';
     } catch (error) {
       // Continue detection even if process check fails
-      console.debug('Parent process detection failed:', error);
+      debugLogger.debug('Parent process detection failed:', error);
     }
   }
 
@@ -103,7 +106,7 @@ async function backupFile(filePath: string): Promise<void> {
     await fs.copyFile(filePath, backupPath);
   } catch (error) {
     // Log backup errors but continue with operation
-    console.warn(`Failed to create backup of ${filePath}:`, error);
+    debugLogger.warn(`Failed to create backup of ${filePath}:`, error);
   }
 }
 

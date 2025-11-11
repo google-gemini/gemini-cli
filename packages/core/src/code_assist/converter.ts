@@ -73,6 +73,7 @@ interface VertexGenerationConfig {
 
 export interface CaGenerateContentResponse {
   response: VertexGenerateContentResponse;
+  traceId?: string;
 }
 
 interface VertexGenerateContentResponse {
@@ -80,6 +81,7 @@ interface VertexGenerateContentResponse {
   automaticFunctionCallingHistory?: Content[];
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
+  modelVersion?: string;
 }
 
 export interface CaCountTokenRequest {
@@ -137,6 +139,8 @@ export function fromGenerateContentResponse(
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
+  out.modelVersion = inres.modelVersion;
+  out.responseId = res.traceId;
   return out;
 }
 

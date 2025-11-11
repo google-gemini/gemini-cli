@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThemeDialog } from './ThemeDialog.js';
 import { LoadedSettings } from '../../config/settings.js';
@@ -58,6 +59,7 @@ const createMockSettings = (
 describe('ThemeDialog Snapshots', () => {
   const baseProps = {
     onSelect: vi.fn(),
+    onCancel: vi.fn(),
     onHighlight: vi.fn(),
     availableTerminalHeight: 40,
     terminalWidth: 120,
@@ -76,7 +78,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -89,7 +91,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame, stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -104,5 +106,29 @@ describe('ThemeDialog Snapshots', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('should call onCancel when ESC is pressed', async () => {
+    const mockOnCancel = vi.fn();
+    const settings = createMockSettings();
+    const { stdin } = render(
+      <SettingsContext.Provider value={settings}>
+        <KeypressProvider>
+          <ThemeDialog
+            {...baseProps}
+            onCancel={mockOnCancel}
+            settings={settings}
+          />
+        </KeypressProvider>
+      </SettingsContext.Provider>,
+    );
+
+    act(() => {
+      stdin.write('\x1b');
+    });
+
+    await waitFor(() => {
+      expect(mockOnCancel).toHaveBeenCalled();
+    });
   });
 });

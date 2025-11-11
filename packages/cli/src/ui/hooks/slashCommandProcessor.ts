@@ -8,7 +8,11 @@ import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import type { Config } from '@google/gemini-cli-core';
+import type {
+  Config,
+  ExtensionsStartingEvent,
+  ExtensionsStoppingEvent,
+} from '@google/gemini-cli-core';
 import {
   GitService,
   Logger,
@@ -25,6 +29,7 @@ import type {
   HistoryItemWithoutId,
   SlashCommandProcessorResult,
   HistoryItem,
+  ConfirmationRequest,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -33,7 +38,12 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
-import type { ExtensionUpdateState } from '../state/extensions.js';
+import { parseSlashCommand } from '../../utils/commands.js';
+import {
+  type ExtensionUpdateAction,
+  type ExtensionUpdateStatus,
+} from '../state/extensions.js';
+import { appEvents } from '../../utils/events.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -41,12 +51,14 @@ interface SlashCommandProcessorActions {
   openEditorDialog: () => void;
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
+  openModelDialog: () => void;
+  openPermissionsDialog: () => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
-  setExtensionsUpdateState: (
-    updateState: Map<string, ExtensionUpdateState>,
-  ) => void;
+  toggleDebugProfiler: () => void;
+  dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
+  addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
 
 /**
@@ -61,13 +73,14 @@ export const useSlashCommandProcessor = (
   refreshStatic: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
-  setGeminiMdFileCount: (count: number) => void,
   actions: SlashCommandProcessorActions,
-  extensionsUpdateState: Map<string, ExtensionUpdateState>,
+  extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
   isConfigInitialized: boolean,
 ) => {
   const session = useSessionStats();
-  const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
+  const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
+    undefined,
+  );
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
@@ -191,11 +204,13 @@ export const useSlashCommandProcessor = (
         pendingItem,
         setPendingItem,
         toggleCorgiMode: actions.toggleCorgiMode,
+        toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
-        setGeminiMdFileCount,
         reloadCommands,
         extensionsUpdateState,
-        setExtensionsUpdateState: actions.setExtensionsUpdateState,
+        dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
+        addConfirmUpdateExtensionRequest:
+          actions.addConfirmUpdateExtensionRequest,
       },
       session: {
         stats: session.stats,
@@ -217,7 +232,6 @@ export const useSlashCommandProcessor = (
       setPendingItem,
       toggleVimEnabled,
       sessionShellAllowlist,
-      setGeminiMdFileCount,
       reloadCommands,
       extensionsUpdateState,
     ],
@@ -237,30 +251,44 @@ export const useSlashCommandProcessor = (
       ideClient.addStatusChangeListener(listener);
     })();
 
+    // TODO: Ideally this would happen more directly inside the ExtensionLoader,
+    // but the CommandService today is not conducive to that since it isn't a
+    // long lived service but instead gets fully re-created based on reload
+    // events within this hook.
+    const extensionEventListener = (
+      _event: ExtensionsStartingEvent | ExtensionsStoppingEvent,
+    ) => {
+      // We only care once at least one extension has completed
+      // starting/stopping
+      reloadCommands();
+    };
+    appEvents.on('extensionsStarting', extensionEventListener);
+    appEvents.on('extensionsStopping', extensionEventListener);
+
     return () => {
       (async () => {
         const ideClient = await IdeClient.getInstance();
         ideClient.removeStatusChangeListener(listener);
       })();
+      appEvents.off('extensionsStarting', extensionEventListener);
+      appEvents.off('extensionsStopping', extensionEventListener);
     };
   }, [config, reloadCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
-    const load = async () => {
-      const loaders = [
-        new McpPromptLoader(config),
-        new BuiltinCommandLoader(config),
-        new FileCommandLoader(config),
-      ];
+
+    (async () => {
       const commandService = await CommandService.create(
-        loaders,
+        [
+          new McpPromptLoader(config),
+          new BuiltinCommandLoader(config),
+          new FileCommandLoader(config),
+        ],
         controller.signal,
       );
       setCommands(commandService.getCommands());
-    };
-
-    load();
+    })();
 
     return () => {
       controller.abort();
@@ -273,6 +301,9 @@ export const useSlashCommandProcessor = (
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
+      if (!commands) {
+        return false;
+      }
       if (typeof rawQuery !== 'string') {
         return false;
       }
@@ -287,47 +318,13 @@ export const useSlashCommandProcessor = (
       const userMessageTimestamp = Date.now();
       addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
 
-      const parts = trimmed.substring(1).trim().split(/\s+/);
-      const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
-
-      let currentCommands = commands;
-      let commandToExecute: SlashCommand | undefined;
-      let pathIndex = 0;
       let hasError = false;
-      const canonicalPath: string[] = [];
+      const {
+        commandToExecute,
+        args,
+        canonicalPath: resolvedCommandPath,
+      } = parseSlashCommand(trimmed, commands);
 
-      for (const part of commandPath) {
-        // TODO: For better performance and architectural clarity, this two-pass
-        // search could be replaced. A more optimal approach would be to
-        // pre-compute a single lookup map in `CommandService.ts` that resolves
-        // all name and alias conflicts during the initial loading phase. The
-        // processor would then perform a single, fast lookup on that map.
-
-        // First pass: check for an exact match on the primary command name.
-        let foundCommand = currentCommands.find((cmd) => cmd.name === part);
-
-        // Second pass: if no primary name matches, check for an alias.
-        if (!foundCommand) {
-          foundCommand = currentCommands.find((cmd) =>
-            cmd.altNames?.includes(part),
-          );
-        }
-
-        if (foundCommand) {
-          commandToExecute = foundCommand;
-          canonicalPath.push(foundCommand.name);
-          pathIndex++;
-          if (foundCommand.subCommands) {
-            currentCommands = foundCommand.subCommands;
-          } else {
-            break;
-          }
-        } else {
-          break;
-        }
-      }
-
-      const resolvedCommandPath = canonicalPath;
       const subcommand =
         resolvedCommandPath.length > 1
           ? resolvedCommandPath.slice(1).join(' ')
@@ -335,8 +332,6 @@ export const useSlashCommandProcessor = (
 
       try {
         if (commandToExecute) {
-          const args = parts.slice(pathIndex).join(' ');
-
           if (commandToExecute.action) {
             const fullCommandContext: CommandContext = {
               ...commandContext,
@@ -400,6 +395,12 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'settings':
                       actions.openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'model':
+                      actions.openModelDialog();
+                      return { type: 'handled' };
+                    case 'permissions':
+                      actions.openPermissionsDialog();
                       return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };
@@ -535,6 +536,7 @@ export const useSlashCommandProcessor = (
             command: resolvedCommandPath[0],
             subcommand,
             status: SlashCommandStatus.ERROR,
+            extension_id: commandToExecute?.extensionId,
           });
           logSlashCommand(config, event);
         }
@@ -552,6 +554,7 @@ export const useSlashCommandProcessor = (
             command: resolvedCommandPath[0],
             subcommand,
             status: SlashCommandStatus.SUCCESS,
+            extension_id: commandToExecute?.extensionId,
           });
           logSlashCommand(config, event);
         }

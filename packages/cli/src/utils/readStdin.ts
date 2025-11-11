@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
+
 export async function readStdin(): Promise<string> {
   const MAX_STDIN_SIZE = 8 * 1024 * 1024; // 8MB
   return new Promise((resolve, reject) => {
@@ -30,7 +32,7 @@ export async function readStdin(): Promise<string> {
         if (totalSize + chunk.length > MAX_STDIN_SIZE) {
           const remainingSize = MAX_STDIN_SIZE - totalSize;
           data += chunk.slice(0, remainingSize);
-          console.warn(
+          debugLogger.warn(
             `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
           );
           process.stdin.destroy(); // Stop reading further

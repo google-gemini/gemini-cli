@@ -31,6 +31,10 @@ export enum Command {
   NAVIGATION_UP = 'navigationUp',
   NAVIGATION_DOWN = 'navigationDown',
 
+  // Dialog navigation
+  DIALOG_NAVIGATION_UP = 'dialogNavigationUp',
+  DIALOG_NAVIGATION_DOWN = 'dialogNavigationDown',
+
   // Auto-completion
   ACCEPT_SUGGESTION = 'acceptSuggestion',
   COMPLETION_UP = 'completionUp',
@@ -46,8 +50,10 @@ export enum Command {
 
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
-  TOGGLE_TOOL_DESCRIPTIONS = 'toggleToolDescriptions',
+  SHOW_FULL_TODOS = 'showFullTodos',
   TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
+  TOGGLE_MARKDOWN = 'toggleMarkdown',
+  TOGGLE_COPY_MODE = 'toggleCopyMode',
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
@@ -57,6 +63,10 @@ export enum Command {
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
   TOGGLE_SHELL_INPUT_FOCUS = 'toggleShellInputFocus',
+
+  // Suggestion expansion
+  EXPAND_SUGGESTION = 'expandSuggestion',
+  COLLAPSE_SUGGESTION = 'collapseSuggestion',
 }
 
 /**
@@ -94,8 +104,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.ESCAPE]: [{ key: 'escape' }],
 
   // Cursor movement
-  [Command.HOME]: [{ key: 'a', ctrl: true }],
-  [Command.END]: [{ key: 'e', ctrl: true }],
+  [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
+  [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
 
   // Text deletion
   [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
@@ -111,16 +121,34 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
 
   // History navigation
-  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true }],
-  [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true }],
-  [Command.NAVIGATION_UP]: [{ key: 'up' }],
-  [Command.NAVIGATION_DOWN]: [{ key: 'down' }],
+  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
+  [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true, shift: false }],
+  [Command.NAVIGATION_UP]: [{ key: 'up', shift: false }],
+  [Command.NAVIGATION_DOWN]: [{ key: 'down', shift: false }],
+
+  // Dialog navigation
+  // Navigation shortcuts appropriate for dialogs where we do not need to accept
+  // text input.
+  [Command.DIALOG_NAVIGATION_UP]: [
+    { key: 'up', shift: false },
+    { key: 'k', shift: false },
+  ],
+  [Command.DIALOG_NAVIGATION_DOWN]: [
+    { key: 'down', shift: false },
+    { key: 'j', shift: false },
+  ],
 
   // Auto-completion
   [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
   // Completion navigation (arrow or Ctrl+P/N)
-  [Command.COMPLETION_UP]: [{ key: 'up' }, { key: 'p', ctrl: true }],
-  [Command.COMPLETION_DOWN]: [{ key: 'down' }, { key: 'n', ctrl: true }],
+  [Command.COMPLETION_UP]: [
+    { key: 'up', shift: false },
+    { key: 'p', ctrl: true, shift: false },
+  ],
+  [Command.COMPLETION_DOWN]: [
+    { key: 'down', shift: false },
+    { key: 'n', ctrl: true, shift: false },
+  ],
 
   // Text input
   // Must also exclude shift to allow shift+enter for newline
@@ -151,9 +179,11 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.PASTE_CLIPBOARD_IMAGE]: [{ key: 'v', ctrl: true }],
 
   // App level bindings
-  [Command.SHOW_ERROR_DETAILS]: [{ key: 'o', ctrl: true }],
-  [Command.TOGGLE_TOOL_DESCRIPTIONS]: [{ key: 't', ctrl: true }],
+  [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
+  [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
+  [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
+  [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
@@ -164,4 +194,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
   [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
+
+  // Suggestion expansion
+  [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
+  [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
 };

@@ -27,6 +27,11 @@ vi.mock('./oauth-token-storage.js', () => {
     })),
   };
 });
+vi.mock('../utils/events.js', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
+  },
+}));
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
@@ -39,6 +44,12 @@ import type {
 import { MCPOAuthProvider } from './oauth-provider.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
+import {
+  OAuthUtils,
+  type OAuthAuthorizationServerMetadata,
+  type OAuthProtectedResourceMetadata,
+} from './oauth-utils.js';
+import { coreEvents } from '../utils/events.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -93,11 +104,12 @@ const createMockResponse = (options: {
   return response;
 };
 
-// Define a reusable mock server with .listen, .close, and .on methods
+// Define a reusable mock server with .listen, .close, .on, and .address methods
 const mockHttpServer = {
   listen: vi.fn(),
   close: vi.fn(),
   on: vi.fn(),
+  address: vi.fn(() => ({ address: 'localhost', family: 'IPv4', port: 7777 })),
 };
 vi.mock('node:http', () => ({
   createServer: vi.fn(() => mockHttpServer),
@@ -329,8 +341,11 @@ describe('MCPOAuthProvider', () => {
       );
     });
 
-    it('should perform dynamic client registration when no client ID provided', async () => {
-      const configWithoutClient = { ...mockConfig };
+    it('should perform dynamic client registration when no client ID is provided but registration URL is provided', async () => {
+      const configWithoutClient: MCPOAuthConfig = {
+        ...mockConfig,
+        registrationUrl: 'https://auth.example.com/register',
+      };
       delete configWithoutClient.clientId;
 
       const mockRegistrationResponse: OAuthClientRegistrationResponse = {
@@ -342,7 +357,80 @@ describe('MCPOAuthProvider', () => {
         token_endpoint_auth_method: 'none',
       };
 
-      const mockAuthServerMetadata = {
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockRegistrationResponse),
+          json: mockRegistrationResponse,
+        }),
+      );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'test-server',
+        configWithoutClient,
+      );
+
+      expect(result).toBeDefined();
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.example.com/register',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+
+    it('should perform OAuth discovery and dynamic client registration when no client ID or registration URL provided', async () => {
+      const configWithoutClient: MCPOAuthConfig = { ...mockConfig };
+      delete configWithoutClient.clientId;
+
+      const mockRegistrationResponse: OAuthClientRegistrationResponse = {
+        client_id: 'dynamic_client_id',
+        client_secret: 'dynamic_client_secret',
+        redirect_uris: ['http://localhost:7777/oauth/callback'],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      };
+
+      const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
         authorization_endpoint: 'https://auth.example.com/authorize',
         token_endpoint: 'https://auth.example.com/token',
         registration_endpoint: 'https://auth.example.com/register',
@@ -404,6 +492,117 @@ describe('MCPOAuthProvider', () => {
       const result = await authProvider.authenticate(
         'test-server',
         configWithoutClient,
+      );
+
+      expect(result).toBeDefined();
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.example.com/register',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+
+    it('should perform OAuth discovery once and dynamic client registration when no client ID, authorization URL or registration URL provided', async () => {
+      const configWithoutClientAndAuthorizationUrl: MCPOAuthConfig = {
+        ...mockConfig,
+      };
+      delete configWithoutClientAndAuthorizationUrl.clientId;
+      delete configWithoutClientAndAuthorizationUrl.authorizationUrl;
+
+      const mockResourceMetadata: OAuthProtectedResourceMetadata = {
+        resource: 'https://api.example.com',
+        authorization_servers: ['https://auth.example.com'],
+      };
+
+      const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: 'https://auth.example.com/register',
+      };
+
+      const mockRegistrationResponse: OAuthClientRegistrationResponse = {
+        client_id: 'dynamic_client_id',
+        client_secret: 'dynamic_client_secret',
+        redirect_uris: ['http://localhost:7777/oauth/callback'],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            status: 200,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockRegistrationResponse),
+            json: mockRegistrationResponse,
+          }),
+        );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'test-server',
+        configWithoutClientAndAuthorizationUrl,
+        'https://api.example.com',
       );
 
       expect(result).toBeDefined();
@@ -747,8 +946,10 @@ describe('MCPOAuthProvider', () => {
       expect(tokenStorage.deleteCredentials).toHaveBeenCalledWith(
         'test-server',
       );
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to refresh token'),
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Failed to refresh auth token'),
+        expect.any(Error),
       );
     });
 
@@ -990,6 +1191,278 @@ describe('MCPOAuthProvider', () => {
       expect(url.searchParams.get('client_id')).toBe('test-client-id');
       expect(url.hash).toBe('#login');
       expect(url.pathname).toBe('/authorize');
+    });
+
+    it('should use user-configured scopes over discovered scopes', async () => {
+      let capturedUrl: string | undefined;
+      mockOpenBrowserSecurely.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve();
+      });
+
+      const configWithUserScopes: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        scopes: ['user-scope'],
+      };
+      delete configWithUserScopes.authorizationUrl;
+      delete configWithUserScopes.tokenUrl;
+
+      const mockResourceMetadata = {
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        scopes_supported: ['discovered-scope'],
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate(
+        'test-server',
+        configWithUserScopes,
+        'https://api.example.com',
+      );
+
+      expect(capturedUrl).toBeDefined();
+      const url = new URL(capturedUrl!);
+      expect(url.searchParams.get('scope')).toBe('user-scope');
+    });
+
+    it('should use discovered scopes when no user-configured scopes are provided', async () => {
+      let capturedUrl: string | undefined;
+      mockOpenBrowserSecurely.mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve();
+      });
+
+      const configWithoutScopes: MCPOAuthConfig = {
+        ...mockConfig,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+      };
+      delete configWithoutScopes.scopes;
+      delete configWithoutScopes.authorizationUrl;
+      delete configWithoutScopes.tokenUrl;
+
+      const mockResourceMetadata = {
+        authorization_servers: ['https://discovered.auth.com'],
+      };
+
+      const mockAuthServerMetadata = {
+        authorization_endpoint: 'https://discovered.auth.com/authorize',
+        token_endpoint: 'https://discovered.auth.com/token',
+        scopes_supported: ['discovered-scope-1', 'discovered-scope-2'],
+      };
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse({ ok: true, status: 200 }))
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        );
+
+      // Setup callback handler
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate(
+        'test-server',
+        configWithoutScopes,
+        'https://api.example.com',
+      );
+
+      expect(capturedUrl).toBeDefined();
+      const url = new URL(capturedUrl!);
+      expect(url.searchParams.get('scope')).toBe(
+        'discovered-scope-1 discovered-scope-2',
+      );
+    });
+  });
+
+  describe('issuer discovery conformance', () => {
+    const registrationMetadata: OAuthAuthorizationServerMetadata = {
+      issuer: 'http://localhost:8888/realms/my-realm',
+      authorization_endpoint:
+        'http://localhost:8888/realms/my-realm/protocol/openid-connect/auth',
+      token_endpoint:
+        'http://localhost:8888/realms/my-realm/protocol/openid-connect/token',
+      registration_endpoint:
+        'http://localhost:8888/realms/my-realm/clients-registrations/openid-connect',
+    };
+
+    it('falls back to path-based issuer when origin discovery fails', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        discoverAuthServerMetadataForRegistration: (
+          authorizationUrl: string,
+        ) => Promise<{
+          issuerUrl: string;
+          metadata: OAuthAuthorizationServerMetadata;
+        }>;
+      };
+
+      vi.spyOn(
+        OAuthUtils,
+        'discoverAuthorizationServerMetadata',
+      ).mockImplementation(async (issuer) => {
+        if (issuer === 'http://localhost:8888/realms/my-realm') {
+          return registrationMetadata;
+        }
+        return null;
+      });
+
+      const result =
+        await providerWithAccess.discoverAuthServerMetadataForRegistration(
+          'http://localhost:8888/realms/my-realm/protocol/openid-connect/auth',
+        );
+
+      expect(
+        vi.mocked(OAuthUtils.discoverAuthorizationServerMetadata).mock.calls,
+      ).toEqual([
+        ['http://localhost:8888'],
+        ['http://localhost:8888/realms/my-realm'],
+      ]);
+      expect(result.issuerUrl).toBe('http://localhost:8888/realms/my-realm');
+      expect(result.metadata).toBe(registrationMetadata);
+    });
+
+    it('trims versioned segments from authorization endpoints', async () => {
+      const authProvider = new MCPOAuthProvider();
+      const providerWithAccess = authProvider as unknown as {
+        discoverAuthServerMetadataForRegistration: (
+          authorizationUrl: string,
+        ) => Promise<{
+          issuerUrl: string;
+          metadata: OAuthAuthorizationServerMetadata;
+        }>;
+      };
+
+      const oktaMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.okta.local/oauth2/default',
+        authorization_endpoint:
+          'https://auth.okta.local/oauth2/default/v1/authorize',
+        token_endpoint: 'https://auth.okta.local/oauth2/default/v1/token',
+        registration_endpoint:
+          'https://auth.okta.local/oauth2/default/v1/register',
+      };
+
+      const attempts: string[] = [];
+      vi.spyOn(
+        OAuthUtils,
+        'discoverAuthorizationServerMetadata',
+      ).mockImplementation(async (issuer) => {
+        attempts.push(issuer);
+        if (issuer === 'https://auth.okta.local/oauth2/default') {
+          return oktaMetadata;
+        }
+        return null;
+      });
+
+      const result =
+        await providerWithAccess.discoverAuthServerMetadataForRegistration(
+          'https://auth.okta.local/oauth2/default/v1/authorize',
+        );
+
+      expect(attempts).toEqual([
+        'https://auth.okta.local',
+        'https://auth.okta.local/oauth2/default/v1',
+        'https://auth.okta.local/oauth2/default',
+      ]);
+      expect(result.issuerUrl).toBe('https://auth.okta.local/oauth2/default');
+      expect(result.metadata).toBe(oktaMetadata);
     });
   });
 });

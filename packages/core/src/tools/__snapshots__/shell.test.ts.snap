@@ -6,7 +6,7 @@ exports[`ShellTool > getDescription > should return the non-windows description 
       The following information is returned:
 
       Command: Executed command.
-      Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+      Directory: Directory where command was executed, or \`(root)\`.
       Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Error: Error or \`(none)\` if no error was reported for the subprocess.
@@ -17,12 +17,12 @@ exports[`ShellTool > getDescription > should return the non-windows description 
 `;
 
 exports[`ShellTool > getDescription > should return the windows description when on windows 1`] = `
-"This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.
+"This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.
 
       The following information is returned:
 
       Command: Executed command.
-      Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+      Directory: Directory where command was executed, or \`(root)\`.
       Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Error: Error or \`(none)\` if no error was reported for the subprocess.

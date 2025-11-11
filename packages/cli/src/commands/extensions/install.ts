@@ -4,21 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Argv } from 'yargs';
+import type { Argv, CommandModule } from 'yargs';
 import {
-  installExtension,
+  debugLogger,
   type ExtensionInstallMetadata,
-} from '../../config/extension.js';
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
+import { stat } from 'node:fs/promises';
+import {
+  INSTALL_WARNING_MESSAGE,
+  requestConsentNonInteractive,
+} from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { loadSettings } from '../../config/settings.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 // Regular expression to match 'org/repo' format.
 const ORG_REPO_REGEX = /^[a-zA-Z0-9-]+\/[\w.-]+$/;
 
 // Defines the shape of the arguments for the install command.
 interface InstallArgs {
-  source?: string;
-  path?: string;
+  source: string;
   ref?: string;
+  autoUpdate?: boolean;
+  allowPreRelease?: boolean;
+  consent?: boolean;
 }
 
 /**
@@ -28,83 +38,122 @@ interface InstallArgs {
 export async function handleInstall(args: InstallArgs) {
   try {
     let installMetadata: ExtensionInstallMetadata;
+    let { source } = args;
 
-    if (args.source) {
-      let { source } = args;
-
-      // Check if the source is a shorthand and convert it to a full GitHub URL.
-      if (
-        !source.startsWith('http://') &&
-        !source.startsWith('https://') &&
-        !source.startsWith('git@')
-      ) {
-        if (ORG_REPO_REGEX.test(source)) {
-          source = `https://github.com/${source}.git`;
-        } else {
-          throw new Error(
-            `The source "${source}" is not a valid URL or "org/repo" format.`,
-          );
-        }
-      }
-
+    if (
+      source.startsWith('http://') ||
+      source.startsWith('https://') ||
+      source.startsWith('git@') ||
+      source.startsWith('sso://')
+    ) {
+      // It's a full URL
       installMetadata = {
         source,
         type: 'git',
         ref: args.ref,
+        autoUpdate: args.autoUpdate,
+        allowPreRelease: args.allowPreRelease,
       };
-    } else if (args.path) {
+    } else if (ORG_REPO_REGEX.test(source)) {
+      // It's an 'org/repo' shorthand
+      source = `https://github.com/${source}.git`;
       installMetadata = {
-        source: args.path,
-        type: 'local',
+        source,
+        type: 'git',
+        ref: args.ref,
+        autoUpdate: args.autoUpdate,
+        allowPreRelease: args.allowPreRelease,
       };
     } else {
-      // This should not be reached due to the yargs check, but serves as a safeguard.
-      throw new Error('Either --source or --path must be provided.');
+      // Assume it's a local path and check
+      if (args.ref || args.autoUpdate || args.allowPreRelease) {
+        throw new Error(
+          '--ref, --auto-update, and --pre-release are not applicable for local extensions.',
+        );
+      }
+      try {
+        await stat(source);
+        installMetadata = {
+          source,
+          type: 'local',
+        };
+      } catch {
+        throw new Error(
+          `Install source "${source}" not found or is not a valid URL, 'org/repo' format, or local path.`,
+        );
+      }
     }
 
-    const name = await installExtension(installMetadata);
-    console.log(`Extension "${name}" installed successfully and enabled.`);
+    const requestConsent = args.consent
+      ? () => Promise.resolve(true)
+      : requestConsentNonInteractive;
+    if (args.consent) {
+      debugLogger.log('You have consented to the following:');
+      debugLogger.log(INSTALL_WARNING_MESSAGE);
+    }
+
+    const workspaceDir = process.cwd();
+    const extensionManager = new ExtensionManager({
+      workspaceDir,
+      requestConsent,
+      requestSetting: promptForSetting,
+      settings: loadSettings(workspaceDir).merged,
+    });
+    await extensionManager.loadExtensions();
+    const extension =
+      await extensionManager.installOrUpdateExtension(installMetadata);
+    debugLogger.log(
+      `Extension "${extension.name}" installed successfully and enabled.`,
+    );
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }
 
-export const installCommand = {
-  command: 'install',
-  describe: 'Installs an extension from a local path or git repository.',
-  builder: (yargs: Argv) => {
-    return yargs
-      .option('source', {
-        alias: 's',
+export const installCommand: CommandModule = {
+  command: 'install <source> [--auto-update] [--pre-release]',
+  describe:
+    'Installs an extension from a git repo (URL or `org/repo`) or a local path.',
+  builder: (yargs) =>
+    yargs
+      .positional('source', {
+        describe:
+          'The git URL, `org/repo` shorthand, or local path of the extension to install.',
         type: 'string',
-        description:
-          'The git repository URL or `org/repo` abbreviation to install from.',
-      })
-      .option('path', {
-        alias: 'p',
-        type: 'string',
-        description: 'The local path to install from.',
+        demandOption: true,
       })
       .option('ref', {
         describe: 'The git ref (branch, tag, or commit) to install from.',
         type: 'string',
       })
-      // Ensure that 'source' and 'path' are not used together.
-      .conflicts('source', 'path')
-      // Ensure that 'ref' is not used with 'path'.
-      .conflicts('path', 'ref')
-      // Custom validation check.
+      .option('auto-update', {
+        describe: 'Enable auto-update for this extension.',
+        type: 'boolean',
+      })
+      .option('pre-release', {
+        describe: 'Enable pre-release versions for this extension.',
+        type: 'boolean',
+      })
+      .option('consent', {
+        describe:
+          'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
-        if (!argv.source && !argv.path) {
-          throw new Error('Either --source or --path must be provided.');
+        if (!argv.source) {
+          throw new Error('The source argument must be provided.');
         }
         return true;
-      });
-  },
-  handler: async (argv: unknown) => {
-    // The unknown type is used here to bridge the yargs argv type with our strictly typed interface.
-    // The builder's options and checks ensure the object shape is correct.
-    await handleInstall(argv as InstallArgs);
+      }),
+  handler: async (argv) => {
+    await handleInstall({
+      source: argv['source'] as string,
+      ref: argv['ref'] as string | undefined,
+      autoUpdate: argv['auto-update'] as boolean | undefined,
+      allowPreRelease: argv['pre-release'] as boolean | undefined,
+      consent: argv['consent'] as boolean | undefined,
+    });
   },
 };

@@ -5,22 +5,24 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const draculaColors: ColorsTheme = {
   type: 'dark',
   Background: '#282a36',
-  Foreground: '#f8f8f2',
+  Foreground: '#a3afb7',
   LightBlue: '#8be9fd',
   AccentBlue: '#8be9fd',
   AccentPurple: '#ff79c6',
   AccentCyan: '#8be9fd',
   AccentGreen: '#50fa7b',
-  AccentYellow: '#f1fa8c',
+  AccentYellow: '#fff783',
   AccentRed: '#ff5555',
   DiffAdded: '#11431d',
   DiffRemoved: '#6e1818',
   Comment: '#6272a4',
   Gray: '#6272a4',
+  DarkGray: interpolateColor('#6272a4', '#282a36', 0.5),
   GradientColors: ['#ff79c6', '#8be9fd'],
 };
 

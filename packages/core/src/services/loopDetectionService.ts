@@ -8,19 +8,26 @@ import type { Content } from '@google/genai';
 import { createHash } from 'node:crypto';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
-import { logLoopDetected } from '../telemetry/loggers.js';
-import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
+import {
+  logLoopDetected,
+  logLoopDetectionDisabled,
+} from '../telemetry/loggers.js';
+import {
+  LoopDetectedEvent,
+  LoopDetectionDisabledEvent,
+  LoopType,
+} from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
-const MAX_HISTORY_LENGTH = 1000;
+const MAX_HISTORY_LENGTH = 5000;
 
 /**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
@@ -49,6 +56,17 @@ const MIN_LLM_CHECK_INTERVAL = 5;
  * This is used when the confidence of a loop is low, to check less frequently.
  */
 const MAX_LLM_CHECK_INTERVAL = 15;
+
+const LOOP_DETECTION_SYSTEM_PROMPT = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+
+An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
+
+Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
+
+Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
+
+Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
+For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.`;
 
 /**
  * Service for detecting and preventing infinite loops in AI responses.
@@ -86,6 +104,10 @@ export class LoopDetectionService {
    */
   disableForSession(): void {
     this.disabledForSession = true;
+    logLoopDetectionDisabled(
+      this.config,
+      new LoopDetectionDisabledEvent(this.promptId),
+    );
   }
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
@@ -100,7 +122,11 @@ export class LoopDetectionService {
    * @returns true if a loop is detected, false otherwise
    */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
-    if (this.loopDetected || this.disabledForSession) {
+    if (this.disabledForSession) {
+      return false;
+    }
+
+    if (this.loopDetected) {
       return this.loopDetected;
     }
 
@@ -301,7 +327,7 @@ export class LoopDetectionService {
    * 2. Verify actual content matches to prevent hash collisions
    * 3. Track all positions where this chunk appears
    * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
-   *    within a small average distance (≤ 1.5 * chunk size)
+   *    within a small average distance (≤ 5 * chunk size)
    */
   private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
     const existingIndices = this.contentStats.get(hash);
@@ -326,7 +352,7 @@ export class LoopDetectionService {
     const totalDistance =
       recentIndices[recentIndices.length - 1] - recentIndices[0];
     const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
-    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 1.5;
+    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 5;
 
     return averageDistance <= maxAllowedDistance;
   }
@@ -375,53 +401,60 @@ export class LoopDetectionService {
 
     const trimmedHistory = this.trimRecentHistory(recentHistory);
 
-    const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Provide your response in the requested JSON format.`;
 
-An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
-
-Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
-
-Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
-
-Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
-For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.
-
-Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state.`;
     const contents = [
       ...trimmedHistory,
-      { role: 'user', parts: [{ text: prompt }] },
+      { role: 'user', parts: [{ text: taskPrompt }] },
     ];
+    if (contents.length > 0 && isFunctionCall(contents[0])) {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Recent conversation history:' }],
+      });
+    }
     const schema: Record<string, unknown> = {
       type: 'object',
       properties: {
-        reasoning: {
+        unproductive_state_analysis: {
           type: 'string',
           description:
             'Your reasoning on if the conversation is looping without forward progress.',
         },
-        confidence: {
+        unproductive_state_confidence: {
           type: 'number',
           description:
             'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
         },
       },
-      required: ['reasoning', 'confidence'],
+      required: [
+        'unproductive_state_analysis',
+        'unproductive_state_confidence',
+      ],
     };
     let result;
     try {
-      result = await this.config
-        .getGeminiClient()
-        .generateJson(contents, schema, signal, DEFAULT_GEMINI_FLASH_MODEL);
+      result = await this.config.getBaseLlmClient().generateJson({
+        modelConfigKey: { model: 'loop-detection' },
+        contents,
+        schema,
+        systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,
+        abortSignal: signal,
+        promptId: this.promptId,
+      });
     } catch (e) {
       // Do nothing, treat it as a non-loop.
-      this.config.getDebugMode() ? console.error(e) : console.debug(e);
+      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
       return false;
     }
 
-    if (typeof result['confidence'] === 'number') {
-      if (result['confidence'] > 0.9) {
-        if (typeof result['reasoning'] === 'string' && result['reasoning']) {
-          console.warn(result['reasoning']);
+    if (typeof result['unproductive_state_confidence'] === 'number') {
+      if (result['unproductive_state_confidence'] > 0.9) {
+        if (
+          typeof result['unproductive_state_analysis'] === 'string' &&
+          result['unproductive_state_analysis']
+        ) {
+          debugLogger.warn(result['unproductive_state_analysis']);
         }
         logLoopDetected(
           this.config,
@@ -432,7 +465,7 @@ Please analyze the conversation history to determine the possibility that the co
         this.llmCheckInterval = Math.round(
           MIN_LLM_CHECK_INTERVAL +
             (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result['confidence']),
+              (1 - result['unproductive_state_confidence']),
         );
       }
     }

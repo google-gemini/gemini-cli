@@ -27,20 +27,15 @@ import type { Content } from '@google/genai';
 
 import crypto from 'node:crypto';
 import os from 'node:os';
+import { GEMINI_DIR } from '../utils/paths.js';
 
-const GEMINI_DIR_NAME = '.gemini';
 const TMP_DIR_NAME = 'tmp';
 const LOG_FILE_NAME = 'logs.json';
 const CHECKPOINT_FILE_NAME = 'checkpoint.json';
 
 const projectDir = process.cwd();
 const hash = crypto.createHash('sha256').update(projectDir).digest('hex');
-const TEST_GEMINI_DIR = path.join(
-  os.homedir(),
-  GEMINI_DIR_NAME,
-  TMP_DIR_NAME,
-  hash,
-);
+const TEST_GEMINI_DIR = path.join(os.homedir(), GEMINI_DIR, TMP_DIR_NAME, hash);
 
 const TEST_LOG_FILE_PATH = path.join(TEST_GEMINI_DIR, LOG_FILE_NAME);
 const TEST_CHECKPOINT_FILE_PATH = path.join(

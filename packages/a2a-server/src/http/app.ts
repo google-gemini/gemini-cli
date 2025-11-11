@@ -16,6 +16,19 @@ import type { AgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
+import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
+import { loadSettings } from '../config/settings.js';
+import { loadExtensions } from '../config/extension.js';
+import { commandRegistry } from '../commands/command-registry.js';
+import { SimpleExtensionLoader } from '@google/gemini-cli-core';
+import type { Command, CommandArgument } from '../commands/types.js';
+
+type CommandResponse = {
+  name: string;
+  description: string;
+  arguments: CommandArgument[];
+  subCommands: CommandResponse[];
+};
 
 const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
@@ -61,6 +74,17 @@ export function updateCoderAgentCardUrl(port: number) {
 
 export async function createApp() {
   try {
+    // Load the server configuration once on startup.
+    const workspaceRoot = setTargetDir(undefined);
+    loadEnvironment();
+    const settings = loadSettings(workspaceRoot);
+    const extensions = loadExtensions(workspaceRoot);
+    const config = await loadConfig(
+      settings,
+      new SimpleExtensionLoader(extensions),
+      'a2a-server',
+    );
+
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
     let taskStoreForExecutor: TaskStore;
@@ -116,6 +140,80 @@ export async function createApp() {
             ? error.message
             : 'Unknown error creating task';
         res.status(500).send({ error: errorMessage });
+      }
+    });
+
+    expressApp.post('/executeCommand', async (req, res) => {
+      try {
+        const { command, args } = req.body;
+
+        if (typeof command !== 'string') {
+          return res.status(400).json({ error: 'Invalid "command" field.' });
+        }
+
+        if (args && !Array.isArray(args)) {
+          return res
+            .status(400)
+            .json({ error: '"args" field must be an array.' });
+        }
+
+        const commandToExecute = commandRegistry.get(command);
+
+        if (!commandToExecute) {
+          return res
+            .status(404)
+            .json({ error: `Command not found: ${command}` });
+        }
+
+        const result = await commandToExecute.execute(config, args ?? []);
+        return res.status(200).json(result);
+      } catch (e) {
+        logger.error('Error executing /executeCommand:', e);
+        const errorMessage =
+          e instanceof Error ? e.message : 'Unknown error executing command';
+        return res.status(500).json({ error: errorMessage });
+      }
+    });
+
+    expressApp.get('/listCommands', (req, res) => {
+      try {
+        const transformCommand = (
+          command: Command,
+          visited: string[],
+        ): CommandResponse | undefined => {
+          const commandName = command.name;
+          if (visited.includes(commandName)) {
+            console.warn(
+              `Command ${commandName} already inserted in the response, skipping`,
+            );
+            return undefined;
+          }
+
+          return {
+            name: command.name,
+            description: command.description,
+            arguments: command.arguments ?? [],
+            subCommands: (command.subCommands ?? [])
+              .map((subCommand) =>
+                transformCommand(subCommand, visited.concat(commandName)),
+              )
+              .filter(
+                (subCommand): subCommand is CommandResponse => !!subCommand,
+              ),
+          };
+        };
+
+        const commands = commandRegistry
+          .getAllCommands()
+          .filter((command) => command.topLevel)
+          .map((command) => transformCommand(command, []));
+
+        return res.status(200).json({ commands });
+      } catch (e) {
+        logger.error('Error executing /listCommands:', e);
+        const errorMessage =
+          e instanceof Error ? e.message : 'Unknown error listing commands';
+        return res.status(500).json({ error: errorMessage });
       }
     });
 

@@ -10,36 +10,23 @@ import {
   expect,
   beforeEach,
   afterEach,
+  afterAll,
   vi,
-  type Mock,
 } from 'vitest';
 import type { RipGrepToolParams } from './ripGrep.js';
 import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import os, { EOL } from 'node:os';
+import os from 'node:os';
 import type { Config } from '../config/config.js';
+import { Storage } from '../config/storage.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
-import { fileExists } from '../utils/fileUtils.js';
-
 // Mock dependencies for canUseRipgrep
 vi.mock('@joshua.litt/get-ripgrep', () => ({
   downloadRipGrep: vi.fn(),
-}));
-vi.mock('../utils/fileUtils.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../utils/fileUtils.js')>();
-  return {
-    ...actual,
-    fileExists: vi.fn(),
-  };
-});
-vi.mock('../config/storage.js', () => ({
-  Storage: {
-    getGlobalBinDir: vi.fn().mockReturnValue('/mock/bin/dir'),
-  },
 }));
 
 // Mock child_process for ripgrep calls
@@ -48,96 +35,167 @@ vi.mock('child_process', () => ({
 }));
 
 const mockSpawn = vi.mocked(spawn);
+const downloadRipGrepMock = vi.mocked(downloadRipGrep);
+const originalGetGlobalBinDir = Storage.getGlobalBinDir.bind(Storage);
+const storageSpy = vi.spyOn(Storage, 'getGlobalBinDir');
 
 describe('canUseRipgrep', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  let tempRootDir: string;
+  let binDir: string;
+
+  beforeEach(async () => {
+    downloadRipGrepMock.mockReset();
+    downloadRipGrepMock.mockResolvedValue(undefined);
+    tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
+    binDir = path.join(tempRootDir, 'bin');
+    await fs.mkdir(binDir, { recursive: true });
+    storageSpy.mockImplementation(() => binDir);
+  });
+
+  afterEach(async () => {
+    storageSpy.mockImplementation(() => originalGetGlobalBinDir());
+    await fs.rm(tempRootDir, { recursive: true, force: true });
   });
 
   it('should return true if ripgrep already exists', async () => {
-    (fileExists as Mock).mockResolvedValue(true);
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const existingPath = path.join(binDir, candidateNames[0]);
+    await fs.writeFile(existingPath, '');
+
     const result = await canUseRipgrep();
     expect(result).toBe(true);
-    expect(fileExists).toHaveBeenCalledWith(path.join('/mock/bin/dir', 'rg'));
-    expect(downloadRipGrep).not.toHaveBeenCalled();
+    expect(downloadRipGrepMock).not.toHaveBeenCalled();
   });
 
   it('should download ripgrep and return true if it does not exist initially', async () => {
-    (fileExists as Mock)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
-    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const expectedPath = path.join(binDir, candidateNames[0]);
+
+    downloadRipGrepMock.mockImplementation(async () => {
+      await fs.writeFile(expectedPath, '');
+    });
 
     const result = await canUseRipgrep();
 
     expect(result).toBe(true);
-    expect(fileExists).toHaveBeenCalledTimes(2);
-    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
+    await expect(fs.access(expectedPath)).resolves.toBeUndefined();
   });
 
   it('should return false if download fails and file does not exist', async () => {
-    (fileExists as Mock).mockResolvedValue(false);
-    (downloadRipGrep as Mock).mockResolvedValue(undefined);
-
     const result = await canUseRipgrep();
 
     expect(result).toBe(false);
-    expect(fileExists).toHaveBeenCalledTimes(2);
-    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
   });
 
   it('should propagate errors from downloadRipGrep', async () => {
     const error = new Error('Download failed');
-    (fileExists as Mock).mockResolvedValue(false);
-    (downloadRipGrep as Mock).mockRejectedValue(error);
+    downloadRipGrepMock.mockRejectedValue(error);
 
     await expect(canUseRipgrep()).rejects.toThrow(error);
-    expect(fileExists).toHaveBeenCalledTimes(1);
-    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
+  });
+
+  it('should only download once when called concurrently', async () => {
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const expectedPath = path.join(binDir, candidateNames[0]);
+
+    downloadRipGrepMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          setTimeout(() => {
+            fs.writeFile(expectedPath, '')
+              .then(() => resolve())
+              .catch(reject);
+          }, 0);
+        }),
+    );
+
+    const firstCall = ensureRgPath();
+    const secondCall = ensureRgPath();
+
+    const [pathOne, pathTwo] = await Promise.all([firstCall, secondCall]);
+
+    expect(pathOne).toBe(expectedPath);
+    expect(pathTwo).toBe(expectedPath);
+    expect(downloadRipGrepMock).toHaveBeenCalledTimes(1);
+    await expect(fs.access(expectedPath)).resolves.toBeUndefined();
   });
 });
 
 describe('ensureRgPath', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  let tempRootDir: string;
+  let binDir: string;
+
+  beforeEach(async () => {
+    downloadRipGrepMock.mockReset();
+    downloadRipGrepMock.mockResolvedValue(undefined);
+    tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
+    binDir = path.join(tempRootDir, 'bin');
+    await fs.mkdir(binDir, { recursive: true });
+    storageSpy.mockImplementation(() => binDir);
+  });
+
+  afterEach(async () => {
+    storageSpy.mockImplementation(() => originalGetGlobalBinDir());
+    await fs.rm(tempRootDir, { recursive: true, force: true });
   });
 
   it('should return rg path if ripgrep already exists', async () => {
-    (fileExists as Mock).mockResolvedValue(true);
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const existingPath = path.join(binDir, candidateNames[0]);
+    await fs.writeFile(existingPath, '');
+
     const rgPath = await ensureRgPath();
-    expect(rgPath).toBe(path.join('/mock/bin/dir', 'rg'));
-    expect(fileExists).toHaveBeenCalledOnce();
+    expect(rgPath).toBe(existingPath);
     expect(downloadRipGrep).not.toHaveBeenCalled();
   });
 
   it('should return rg path if ripgrep is downloaded successfully', async () => {
-    (fileExists as Mock)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
-    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const expectedPath = path.join(binDir, candidateNames[0]);
+
+    downloadRipGrepMock.mockImplementation(async () => {
+      await fs.writeFile(expectedPath, '');
+    });
+
     const rgPath = await ensureRgPath();
-    expect(rgPath).toBe(path.join('/mock/bin/dir', 'rg'));
-    expect(downloadRipGrep).toHaveBeenCalledOnce();
-    expect(fileExists).toHaveBeenCalledTimes(2);
+    expect(rgPath).toBe(expectedPath);
+    expect(downloadRipGrep).toHaveBeenCalledTimes(1);
+    await expect(fs.access(expectedPath)).resolves.toBeUndefined();
   });
 
   it('should throw an error if ripgrep cannot be used after download attempt', async () => {
-    (fileExists as Mock).mockResolvedValue(false);
-    (downloadRipGrep as Mock).mockResolvedValue(undefined);
     await expect(ensureRgPath()).rejects.toThrow('Cannot use ripgrep.');
-    expect(downloadRipGrep).toHaveBeenCalledOnce();
-    expect(fileExists).toHaveBeenCalledTimes(2);
+    expect(downloadRipGrep).toHaveBeenCalledTimes(1);
   });
 
   it('should propagate errors from downloadRipGrep', async () => {
     const error = new Error('Download failed');
-    (fileExists as Mock).mockResolvedValue(false);
-    (downloadRipGrep as Mock).mockRejectedValue(error);
+    downloadRipGrepMock.mockRejectedValue(error);
 
     await expect(ensureRgPath()).rejects.toThrow(error);
-    expect(fileExists).toHaveBeenCalledTimes(1);
-    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+    expect(downloadRipGrep).toHaveBeenCalledWith(binDir);
   });
+
+  it.runIf(process.platform === 'win32')(
+    'should detect ripgrep when only rg.exe exists on Windows',
+    async () => {
+      const expectedRgExePath = path.join(binDir, 'rg.exe');
+      await fs.writeFile(expectedRgExePath, '');
+
+      const rgPath = await ensureRgPath();
+      expect(rgPath).toBe(expectedRgExePath);
+      expect(downloadRipGrep).not.toHaveBeenCalled();
+      await expect(fs.access(expectedRgExePath)).resolves.toBeUndefined();
+    },
+  );
 });
 
 // Helper function to create mock spawn implementations
@@ -190,6 +248,9 @@ function createMockSpawn(
 
 describe('RipGrepTool', () => {
   let tempRootDir: string;
+  let tempBinRoot: string;
+  let binDir: string;
+  let ripgrepBinaryPath: string;
   let grepTool: RipGrepTool;
   const abortSignal = new AbortController().signal;
 
@@ -200,10 +261,16 @@ describe('RipGrepTool', () => {
   } as unknown as Config;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
-    (downloadRipGrep as Mock).mockResolvedValue(undefined);
-    (fileExists as Mock).mockResolvedValue(true);
-    mockSpawn.mockClear();
+    downloadRipGrepMock.mockReset();
+    downloadRipGrepMock.mockResolvedValue(undefined);
+    mockSpawn.mockReset();
+    tempBinRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
+    binDir = path.join(tempBinRoot, 'bin');
+    await fs.mkdir(binDir, { recursive: true });
+    const binaryName = process.platform === 'win32' ? 'rg.exe' : 'rg';
+    ripgrepBinaryPath = path.join(binDir, binaryName);
+    await fs.writeFile(ripgrepBinaryPath, '');
+    storageSpy.mockImplementation(() => binDir);
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
     grepTool = new RipGrepTool(mockConfig);
 
@@ -228,7 +295,9 @@ describe('RipGrepTool', () => {
   });
 
   afterEach(async () => {
+    storageSpy.mockImplementation(() => originalGetGlobalBinDir());
     await fs.rm(tempRootDir, { recursive: true, force: true });
+    await fs.rm(tempBinRoot, { recursive: true, force: true });
   });
 
   describe('validateToolParams', () => {
@@ -238,21 +307,21 @@ describe('RipGrepTool', () => {
     });
 
     it('should return null for valid params (pattern and path)', () => {
-      const params: RipGrepToolParams = { pattern: 'hello', path: '.' };
+      const params: RipGrepToolParams = { pattern: 'hello', dir_path: '.' };
       expect(grepTool.validateToolParams(params)).toBeNull();
     });
 
     it('should return null for valid params (pattern, path, and include)', () => {
       const params: RipGrepToolParams = {
         pattern: 'hello',
-        path: '.',
+        dir_path: '.',
         include: '*.txt',
       };
       expect(grepTool.validateToolParams(params)).toBeNull();
     });
 
     it('should return error if pattern is missing', () => {
-      const params = { path: '.' } as unknown as RipGrepToolParams;
+      const params = { dir_path: '.' } as unknown as RipGrepToolParams;
       expect(grepTool.validateToolParams(params)).toBe(
         `params must have required property 'pattern'`,
       );
@@ -266,7 +335,7 @@ describe('RipGrepTool', () => {
     it('should return error if path does not exist', () => {
       const params: RipGrepToolParams = {
         pattern: 'hello',
-        path: 'nonexistent',
+        dir_path: 'nonexistent',
       };
       // Check for the core error message, as the full path might vary
       expect(grepTool.validateToolParams(params)).toContain(
@@ -277,7 +346,10 @@ describe('RipGrepTool', () => {
 
     it('should return error if path is a file, not a directory', async () => {
       const filePath = path.join(tempRootDir, 'fileA.txt');
-      const params: RipGrepToolParams = { pattern: 'hello', path: filePath };
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        dir_path: filePath,
+      };
       expect(grepTool.validateToolParams(params)).toContain(
         `Path is not a directory: ${filePath}`,
       );
@@ -288,7 +360,34 @@ describe('RipGrepTool', () => {
     it('should find matches for a simple pattern in all files', async () => {
       mockSpawn.mockImplementationOnce(
         createMockSpawn({
-          outputData: `fileA.txt:1:hello world${EOL}fileA.txt:2:second line with world${EOL}sub/fileC.txt:1:another world in sub dir${EOL}`,
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 2,
+                lines: { text: 'second line with world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'sub/fileC.txt' },
+                line_number: 1,
+                lines: { text: 'another world in sub dir\n' },
+              },
+            }) +
+            '\n',
           exitCode: 0,
         }),
       );
@@ -313,12 +412,20 @@ describe('RipGrepTool', () => {
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
       mockSpawn.mockImplementationOnce(
         createMockSpawn({
-          outputData: `fileC.txt:1:another world in sub dir${EOL}`,
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileC.txt' },
+                line_number: 1,
+                lines: { text: 'another world in sub dir\n' },
+              },
+            }) + '\n',
           exitCode: 0,
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: 'world', path: 'sub' };
+      const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -333,7 +440,15 @@ describe('RipGrepTool', () => {
       // Setup specific mock for this test
       mockSpawn.mockImplementationOnce(
         createMockSpawn({
-          outputData: `fileB.js:2:function baz() { return "hello"; }${EOL}`,
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileB.js' },
+                line_number: 2,
+                lines: { text: 'function baz() { return "hello"; }\n' },
+              },
+            }) + '\n',
           exitCode: 0,
         }),
       );
@@ -383,7 +498,18 @@ describe('RipGrepTool', () => {
 
           if (onData) {
             // Only return match from the .js file in sub directory
-            onData(Buffer.from(`another.js:1:const greeting = "hello";${EOL}`));
+            onData(
+              Buffer.from(
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'another.js' },
+                    line_number: 1,
+                    lines: { text: 'const greeting = "hello";\n' },
+                  },
+                }) + '\n',
+              ),
+            );
           }
           if (onClose) {
             onClose(0);
@@ -395,7 +521,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = {
         pattern: 'hello',
-        path: 'sub',
+        dir_path: 'sub',
         include: '*.js',
       };
       const invocation = grepTool.build(params);
@@ -468,7 +594,18 @@ describe('RipGrepTool', () => {
 
           if (onData) {
             // Return match for the regex pattern
-            onData(Buffer.from(`fileB.js:1:const foo = "bar";${EOL}`));
+            onData(
+              Buffer.from(
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'fileB.js' },
+                    line_number: 1,
+                    lines: { text: 'const foo = "bar";\n' },
+                  },
+                }) + '\n',
+              ),
+            );
           }
           if (onClose) {
             onClose(0);
@@ -517,7 +654,24 @@ describe('RipGrepTool', () => {
             // Return case-insensitive matches for 'HELLO'
             onData(
               Buffer.from(
-                `fileA.txt:1:hello world${EOL}fileB.js:2:function baz() { return "hello"; }${EOL}`,
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'fileA.txt' },
+                    line_number: 1,
+                    lines: { text: 'hello world\n' },
+                  },
+                }) +
+                  '\n' +
+                  JSON.stringify({
+                    type: 'match',
+                    data: {
+                      path: { text: 'fileB.js' },
+                      line_number: 2,
+                      lines: { text: 'function baz() { return "hello"; }\n' },
+                    },
+                  }) +
+                  '\n',
               ),
             );
           }
@@ -544,16 +698,15 @@ describe('RipGrepTool', () => {
     });
 
     it('should throw an error if params are invalid', async () => {
-      const params = { path: '.' } as unknown as RipGrepToolParams; // Invalid: pattern missing
+      const params = { dir_path: '.' } as unknown as RipGrepToolParams; // Invalid: pattern missing
       expect(() => grepTool.build(params)).toThrow(
         /params must have required property 'pattern'/,
       );
     });
 
     it('should throw an error if ripgrep is not available', async () => {
-      // Make ensureRgPath throw
-      (fileExists as Mock).mockResolvedValue(false);
-      (downloadRipGrep as Mock).mockResolvedValue(undefined);
+      await fs.rm(ripgrepBinaryPath, { force: true });
+      downloadRipGrepMock.mockResolvedValue(undefined);
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
@@ -620,18 +773,54 @@ describe('RipGrepTool', () => {
           if (callCount === 1) {
             // First directory (tempRootDir)
             outputData =
-              [
-                'fileA.txt:1:hello world',
-                'fileA.txt:2:second line with world',
-                'sub/fileC.txt:1:another world in sub dir',
-              ].join(EOL) + EOL;
+              JSON.stringify({
+                type: 'match',
+                data: {
+                  path: { text: 'fileA.txt' },
+                  line_number: 1,
+                  lines: { text: 'hello world\n' },
+                },
+              }) +
+              '\n' +
+              JSON.stringify({
+                type: 'match',
+                data: {
+                  path: { text: 'fileA.txt' },
+                  line_number: 2,
+                  lines: { text: 'second line with world\n' },
+                },
+              }) +
+              '\n' +
+              JSON.stringify({
+                type: 'match',
+                data: {
+                  path: { text: 'sub/fileC.txt' },
+                  line_number: 1,
+                  lines: { text: 'another world in sub dir\n' },
+                },
+              }) +
+              '\n';
           } else if (callCount === 2) {
             // Second directory (secondDir)
             outputData =
-              [
-                'other.txt:2:world in second',
-                'another.js:1:function world() { return "test"; }',
-              ].join(EOL) + EOL;
+              JSON.stringify({
+                type: 'match',
+                data: {
+                  path: { text: 'other.txt' },
+                  line_number: 2,
+                  lines: { text: 'world in second\n' },
+                },
+              }) +
+              '\n' +
+              JSON.stringify({
+                type: 'match',
+                data: {
+                  path: { text: 'another.js' },
+                  line_number: 1,
+                  lines: { text: 'function world() { return "test"; }\n' },
+                },
+              }) +
+              '\n';
           }
 
           if (stdoutDataHandler && outputData) {
@@ -718,7 +907,18 @@ describe('RipGrepTool', () => {
           )?.[1];
 
           if (onData) {
-            onData(Buffer.from(`fileC.txt:1:another world in sub dir${EOL}`));
+            onData(
+              Buffer.from(
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'fileC.txt' },
+                    line_number: 1,
+                    lines: { text: 'another world in sub dir\n' },
+                  },
+                }) + '\n',
+              ),
+            );
           }
           if (onClose) {
             onClose(0);
@@ -731,7 +931,7 @@ describe('RipGrepTool', () => {
       const multiDirGrepTool = new RipGrepTool(multiDirConfig);
 
       // Search only in the 'sub' directory of the first workspace
-      const params: RipGrepToolParams = { pattern: 'world', path: 'sub' };
+      const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
       const invocation = multiDirGrepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -813,7 +1013,10 @@ describe('RipGrepTool', () => {
 
   describe('error handling and edge cases', () => {
     it('should handle workspace boundary violations', () => {
-      const params: RipGrepToolParams = { pattern: 'test', path: '../outside' };
+      const params: RipGrepToolParams = {
+        pattern: 'test',
+        dir_path: '../outside',
+      };
       expect(() => grepTool.build(params)).toThrow(/Path validation failed/);
     });
 
@@ -850,7 +1053,7 @@ describe('RipGrepTool', () => {
         return mockProcess as unknown as ChildProcess;
       });
 
-      const params: RipGrepToolParams = { pattern: 'test', path: 'empty' };
+      const params: RipGrepToolParams = { pattern: 'test', dir_path: 'empty' };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -931,7 +1134,14 @@ describe('RipGrepTool', () => {
           if (onData) {
             onData(
               Buffer.from(
-                `${specialFileName}:1:hello world with special chars${EOL}`,
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: specialFileName },
+                    line_number: 1,
+                    lines: { text: 'hello world with special chars\n' },
+                  },
+                }) + '\n',
               ),
             );
           }
@@ -986,7 +1196,14 @@ describe('RipGrepTool', () => {
           if (onData) {
             onData(
               Buffer.from(
-                `a/b/c/d/e/deep.txt:1:content in deep directory${EOL}`,
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'a/b/c/d/e/deep.txt' },
+                    line_number: 1,
+                    lines: { text: 'content in deep directory\n' },
+                  },
+                }) + '\n',
               ),
             );
           }
@@ -1041,7 +1258,14 @@ describe('RipGrepTool', () => {
           if (onData) {
             onData(
               Buffer.from(
-                `code.js:1:function getName() { return "test"; }${EOL}`,
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'code.js' },
+                    line_number: 1,
+                    lines: { text: 'function getName() { return "test"; }\n' },
+                  },
+                }) + '\n',
               ),
             );
           }
@@ -1094,7 +1318,33 @@ describe('RipGrepTool', () => {
           if (onData) {
             onData(
               Buffer.from(
-                `case.txt:1:Hello World${EOL}case.txt:2:hello world${EOL}case.txt:3:HELLO WORLD${EOL}`,
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'case.txt' },
+                    line_number: 1,
+                    lines: { text: 'Hello World\n' },
+                  },
+                }) +
+                  '\n' +
+                  JSON.stringify({
+                    type: 'match',
+                    data: {
+                      path: { text: 'case.txt' },
+                      line_number: 2,
+                      lines: { text: 'hello world\n' },
+                    },
+                  }) +
+                  '\n' +
+                  JSON.stringify({
+                    type: 'match',
+                    data: {
+                      path: { text: 'case.txt' },
+                      line_number: 3,
+                      lines: { text: 'HELLO WORLD\n' },
+                    },
+                  }) +
+                  '\n',
               ),
             );
           }
@@ -1146,7 +1396,18 @@ describe('RipGrepTool', () => {
           )?.[1];
 
           if (onData) {
-            onData(Buffer.from(`special.txt:1:Price: $19.99${EOL}`));
+            onData(
+              Buffer.from(
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'special.txt' },
+                    line_number: 1,
+                    lines: { text: 'Price: $19.99\n' },
+                  },
+                }) + '\n',
+              ),
+            );
           }
           if (onClose) {
             onClose(0);
@@ -1205,7 +1466,24 @@ describe('RipGrepTool', () => {
           if (onData) {
             onData(
               Buffer.from(
-                `test.ts:1:typescript content${EOL}test.tsx:1:tsx content${EOL}`,
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'test.ts' },
+                    line_number: 1,
+                    lines: { text: 'typescript content\n' },
+                  },
+                }) +
+                  '\n' +
+                  JSON.stringify({
+                    type: 'match',
+                    data: {
+                      path: { text: 'test.tsx' },
+                      line_number: 1,
+                      lines: { text: 'tsx content\n' },
+                    },
+                  }) +
+                  '\n',
               ),
             );
           }
@@ -1263,7 +1541,18 @@ describe('RipGrepTool', () => {
           )?.[1];
 
           if (onData) {
-            onData(Buffer.from(`src/main.ts:1:source code${EOL}`));
+            onData(
+              Buffer.from(
+                JSON.stringify({
+                  type: 'match',
+                  data: {
+                    path: { text: 'src/main.ts' },
+                    line_number: 1,
+                    lines: { text: 'source code\n' },
+                  },
+                }) + '\n',
+              ),
+            );
           }
           if (onClose) {
             onClose(0);
@@ -1306,7 +1595,7 @@ describe('RipGrepTool', () => {
       await fs.mkdir(dirPath, { recursive: true });
       const params: RipGrepToolParams = {
         pattern: 'testPattern',
-        path: path.join('src', 'app'),
+        dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);
       // The path will be relative to the tempRootDir, so we check for containment.
@@ -1337,7 +1626,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'testPattern',
         include: '*.ts',
-        path: path.join('src', 'app'),
+        dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toContain(
@@ -1347,9 +1636,15 @@ describe('RipGrepTool', () => {
     });
 
     it('should use ./ for root path in description', () => {
-      const params: RipGrepToolParams = { pattern: 'testPattern', path: '.' };
+      const params: RipGrepToolParams = {
+        pattern: 'testPattern',
+        dir_path: '.',
+      };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' within ./");
     });
   });
+});
+afterAll(() => {
+  storageSpy.mockRestore();
 });

@@ -6,12 +6,14 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 export enum FolderTrustChoice {
   TRUST_FOLDER = 'trust_folder',
@@ -28,22 +30,28 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   onSelect,
   isRestarting,
 }) => {
-  useKeypress(
-    (key) => {
-      if (key.name === 'escape') {
-        onSelect(FolderTrustChoice.DO_NOT_TRUST);
+  const [exiting, setExiting] = useState(false);
+  useEffect(() => {
+    const doRelaunch = async () => {
+      if (isRestarting) {
+        setTimeout(async () => {
+          await relaunchApp();
+        }, 250);
       }
-    },
-    { isActive: !isRestarting },
-  );
+    };
+    doRelaunch();
+  }, [isRestarting]);
 
   useKeypress(
     (key) => {
-      if (key.name === 'r') {
-        process.exit(0);
+      if (key.name === 'escape') {
+        setExiting(true);
+        setTimeout(() => {
+          process.exit(1);
+        }, 100);
       }
     },
-    { isActive: !!isRestarting },
+    { isActive: !isRestarting },
   );
 
   const dirName = path.basename(process.cwd());
@@ -53,14 +61,17 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     {
       label: `Trust folder (${dirName})`,
       value: FolderTrustChoice.TRUST_FOLDER,
+      key: `Trust folder (${dirName})`,
     },
     {
       label: `Trust parent folder (${parentFolder})`,
       value: FolderTrustChoice.TRUST_PARENT,
+      key: `Trust parent folder (${parentFolder})`,
     },
     {
-      label: "Don't trust (esc)",
+      label: "Don't trust",
       value: FolderTrustChoice.DO_NOT_TRUST,
+      key: "Don't trust",
     },
   ];
 
@@ -94,8 +105,15 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       {isRestarting && (
         <Box marginLeft={1} marginTop={1}>
           <Text color={theme.status.warning}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
+            Gemini CLI is restarting to apply the trust changes...
+          </Text>
+        </Box>
+      )}
+      {exiting && (
+        <Box marginLeft={1} marginTop={1}>
+          <Text color={theme.status.warning}>
+            A folder trust level must be selected to continue. Exiting since
+            escape was pressed.
           </Text>
         </Box>
       )}

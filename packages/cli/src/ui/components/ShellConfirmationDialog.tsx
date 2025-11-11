@@ -53,53 +53,58 @@ export const ShellConfirmationDialog: React.FC<
     {
       label: 'Yes, allow once',
       value: ToolConfirmationOutcome.ProceedOnce,
+      key: 'Yes, allow once',
     },
     {
       label: 'Yes, allow always for this session',
       value: ToolConfirmationOutcome.ProceedAlways,
+      key: 'Yes, allow always for this session',
     },
     {
       label: 'No (esc)',
       value: ToolConfirmationOutcome.Cancel,
+      key: 'No (esc)',
     },
   ];
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={theme.status.warning}
-      padding={1}
-      width="100%"
-      marginLeft={1}
-    >
-      <Box flexDirection="column" marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          Shell Command Execution
-        </Text>
-        <Text color={theme.text.primary}>
-          A custom command wants to run the following shell commands:
-        </Text>
-        <Box
-          flexDirection="column"
-          borderStyle="round"
-          borderColor={theme.border.default}
-          paddingX={1}
-          marginTop={1}
-        >
-          {commands.map((cmd) => (
-            <Text key={cmd} color={theme.text.link}>
-              <RenderInline text={cmd} />
-            </Text>
-          ))}
+    <Box flexDirection="row" width="100%">
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={theme.status.warning}
+        padding={1}
+        flexGrow={1}
+        marginLeft={1}
+      >
+        <Box flexDirection="column" marginBottom={1}>
+          <Text bold color={theme.text.primary}>
+            Shell Command Execution
+          </Text>
+          <Text color={theme.text.primary}>
+            A custom command wants to run the following shell commands:
+          </Text>
+          <Box
+            flexDirection="column"
+            borderStyle="round"
+            borderColor={theme.border.default}
+            paddingX={1}
+            marginTop={1}
+          >
+            {commands.map((cmd) => (
+              <Text key={cmd} color={theme.text.link}>
+                <RenderInline text={cmd} defaultColor={theme.text.link} />
+              </Text>
+            ))}
+          </Box>
         </Box>
-      </Box>
 
-      <Box marginBottom={1}>
-        <Text color={theme.text.primary}>Do you want to proceed?</Text>
-      </Box>
+        <Box marginBottom={1}>
+          <Text color={theme.text.primary}>Do you want to proceed?</Text>
+        </Box>
 
-      <RadioButtonSelect items={options} onSelect={handleSelect} isFocused />
+        <RadioButtonSelect items={options} onSelect={handleSelect} isFocused />
+      </Box>
     </Box>
   );
 };
