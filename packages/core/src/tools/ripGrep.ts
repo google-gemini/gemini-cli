@@ -199,7 +199,6 @@ class GrepToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      const workspaceContext = this.config.getWorkspaceContext();
       // Default to '.' if path is explicitly undefined/null.
       // This forces CWD search instead of 'all workspaces' search by default.
       const pathParam = this.params.dir_path || '.';
@@ -207,62 +206,29 @@ class GrepToolInvocation extends BaseToolInvocation<
       const searchDirAbs = resolveAndValidatePath(this.config, pathParam);
       const searchDirDisplay = pathParam;
 
-      // Determine which directories to search
-      let searchDirectories: readonly string[];
-      if (searchDirAbs === null) {
-        // Fallback only if something went wrong with '.' resolution, though it should be caught by validation
-        searchDirectories = workspaceContext.getDirectories();
-      } else {
-        searchDirectories = [searchDirAbs];
-      }
-
-      let allMatches: GrepMatch[] = [];
       const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
-
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
-      for (const searchDir of searchDirectories) {
-        const searchResult = await this.performRipgrepSearch({
-          pattern: this.params.pattern,
-          path: searchDir,
-          include: this.params.include,
-          case_sensitive: this.params.case_sensitive,
-          fixed_strings: this.params.fixed_strings,
-          context: this.params.context,
-          after: this.params.after,
-          before: this.params.before,
-          no_ignore: this.params.no_ignore,
-          signal,
-        });
+      let allMatches = await this.performRipgrepSearch({
+        pattern: this.params.pattern,
+        path: searchDirAbs!,
+        include: this.params.include,
+        case_sensitive: this.params.case_sensitive,
+        fixed_strings: this.params.fixed_strings,
+        context: this.params.context,
+        after: this.params.after,
+        before: this.params.before,
+        no_ignore: this.params.no_ignore,
+        signal,
+      });
 
-        if (searchDirectories.length > 1) {
-          const dirName = path.basename(searchDir);
-          searchResult.forEach((match) => {
-            match.filePath = path.join(dirName, match.filePath);
-          });
-        }
-
-        allMatches = allMatches.concat(searchResult);
-
-        if (allMatches.length >= totalMaxMatches) {
-          allMatches = allMatches.slice(0, totalMaxMatches);
-          break;
-        }
+      if (allMatches.length >= totalMaxMatches) {
+        allMatches = allMatches.slice(0, totalMaxMatches);
       }
 
-      let searchLocationDescription: string;
-      if (searchDirAbs === null) {
-        const numDirs = workspaceContext.getDirectories().length;
-        searchLocationDescription =
-          numDirs > 1
-            ? `across ${numDirs} workspace directories`
-            : `in the workspace directory`;
-      } else {
-        searchLocationDescription = `in path "${searchDirDisplay}"`;
-      }
-
+      const searchLocationDescription = `in path "${searchDirDisplay}"`;
       if (allMatches.length === 0) {
         const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
         return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
@@ -389,6 +355,9 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     if (fixed_strings) {
       rgArgs.push('--fixed-strings');
+      rgArgs.push(pattern);
+    } else {
+      rgArgs.push('--regexp', pattern);
     }
 
     if (context) {
@@ -403,8 +372,6 @@ class GrepToolInvocation extends BaseToolInvocation<
     if (no_ignore) {
       rgArgs.push('--no-ignore');
     }
-
-    rgArgs.push('--regexp', pattern);
 
     if (include) {
       rgArgs.push('--glob', include);
