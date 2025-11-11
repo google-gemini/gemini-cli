@@ -206,7 +206,6 @@ export async function startInteractiveUI(
                 <VimModeProvider settings={settings}>
                   <AppContainer
                     config={config}
-                    settings={settings}
                     startupWarnings={startupWarnings}
                     version={version}
                     resumedSessionData={resumedSessionData}

@@ -14,6 +14,7 @@ import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { StickyHeader } from '../StickyHeader.js';
 import {
   SHELL_COMMAND_NAME,
   SHELL_NAME,
@@ -22,6 +23,7 @@ import {
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -58,6 +60,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   config,
 }) => {
   const { renderMarkdown } = useUIState();
+  const isAlternateBuffer = useAlternateBuffer();
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
@@ -108,23 +111,93 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     : undefined;
 
   // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // we're forcing it to not render as markdown when the response is too long, it will fallback
+  // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
   // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight) {
+  if (availableHeight && !isAlternateBuffer) {
     renderOutputAsMarkdown = false;
   }
+  const childWidth = terminalWidth;
 
-  const childWidth = terminalWidth - 3; // account for padding.
-  if (typeof resultDisplay === 'string') {
-    if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-      // Truncate the result display to fit within the available width.
-      resultDisplay =
-        '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+  const truncatedResultDisplay = React.useMemo(() => {
+    if (typeof resultDisplay === 'string') {
+      if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
+        return '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+      }
     }
-  }
+    return resultDisplay;
+  }, [resultDisplay]);
+
+  const renderedResult = React.useMemo(() => {
+    if (!truncatedResultDisplay) return null;
+
+    return (
+      <Box width={terminalWidth} flexDirection="column" paddingLeft={1}>
+        <Box flexDirection="column">
+          {typeof truncatedResultDisplay === 'string' &&
+          renderOutputAsMarkdown ? (
+            <Box flexDirection="column">
+              <MarkdownDisplay
+                text={truncatedResultDisplay}
+                terminalWidth={childWidth}
+                renderMarkdown={renderMarkdown}
+                isPending={false}
+              />
+            </Box>
+          ) : typeof truncatedResultDisplay === 'string' &&
+            !renderOutputAsMarkdown ? (
+            isAlternateBuffer ? (
+              <Box flexDirection="column" width={childWidth}>
+                <Text wrap="wrap" color={theme.text.primary}>
+                  {truncatedResultDisplay}
+                </Text>
+              </Box>
+            ) : (
+              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+                <Box>
+                  <Text wrap="wrap" color={theme.text.primary}>
+                    {truncatedResultDisplay}
+                  </Text>
+                </Box>
+              </MaxSizedBox>
+            )
+          ) : typeof truncatedResultDisplay === 'object' &&
+            'fileDiff' in truncatedResultDisplay ? (
+            <DiffRenderer
+              diffContent={truncatedResultDisplay.fileDiff}
+              filename={truncatedResultDisplay.fileName}
+              availableTerminalHeight={availableHeight}
+              terminalWidth={childWidth}
+            />
+          ) : typeof truncatedResultDisplay === 'object' &&
+            'todos' in truncatedResultDisplay ? (
+            // display nothing, as the TodoTray will handle rendering todos
+            <></>
+          ) : (
+            <AnsiOutputText
+              data={truncatedResultDisplay as AnsiOutput}
+              availableTerminalHeight={availableHeight}
+              width={childWidth}
+            />
+          )}
+        </Box>
+      </Box>
+    );
+  }, [
+    truncatedResultDisplay,
+    renderOutputAsMarkdown,
+    childWidth,
+    renderMarkdown,
+    isAlternateBuffer,
+    availableHeight,
+    terminalWidth,
+  ]);
+
   return (
-    <Box paddingX={1} paddingY={0} flexDirection="column">
-      <Box minHeight={1}>
+    // We have the StickyHeader intentionally exceedsthe allowed width for this
+    // component by 1 so tne horizontal line it renders can extend into the 1
+    // pixel of padding of the box drawn by the parent of the ToolMessage.
+    <>
+      <StickyHeader width={terminalWidth + 1}>
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}
@@ -140,50 +213,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           </Box>
         )}
         {emphasis === 'high' && <TrailingIndicator />}
-      </Box>
-      {resultDisplay && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
-          <Box flexDirection="column">
-            {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
-              <Box flexDirection="column">
-                <MarkdownDisplay
-                  text={resultDisplay}
-                  isPending={false}
-                  availableTerminalHeight={availableHeight}
-                  terminalWidth={childWidth}
-                  renderMarkdown={renderMarkdown}
-                />
-              </Box>
-            ) : typeof resultDisplay === 'string' && !renderOutputAsMarkdown ? (
-              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
-                <Box>
-                  <Text wrap="wrap" color={theme.text.primary}>
-                    {resultDisplay}
-                  </Text>
-                </Box>
-              </MaxSizedBox>
-            ) : typeof resultDisplay === 'object' &&
-              'fileDiff' in resultDisplay ? (
-              <DiffRenderer
-                diffContent={resultDisplay.fileDiff}
-                filename={resultDisplay.fileName}
-                availableTerminalHeight={availableHeight}
-                terminalWidth={childWidth}
-              />
-            ) : typeof resultDisplay === 'object' &&
-              'todos' in resultDisplay ? (
-              // display nothing, as the TodoTray will handle rendering todos
-              <></>
-            ) : (
-              <AnsiOutputText
-                data={resultDisplay as AnsiOutput}
-                availableTerminalHeight={availableHeight}
-                width={childWidth}
-              />
-            )}
-          </Box>
-        </Box>
-      )}
+      </StickyHeader>
+      {renderedResult}
       {isThisShellFocused && config && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
           <ShellInputPrompt
@@ -192,7 +223,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           />
         </Box>
       )}
-    </Box>
+    </>
   );
 };
 
@@ -271,10 +302,7 @@ const ToolInfo: React.FC<ToolInfo> = ({
   }, [emphasis]);
   return (
     <Box>
-      <Text
-        wrap="truncate-end"
-        strikethrough={status === ToolCallStatus.Canceled}
-      >
+      <Text strikethrough={status === ToolCallStatus.Canceled}>
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}
