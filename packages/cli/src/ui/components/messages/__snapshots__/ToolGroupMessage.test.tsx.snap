@@ -91,9 +91,10 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
 "╭──────────────────────────────────────╮
 │MockTool[tool-123]: ✓                 │
-│very-long-tool-name-that-might-wrap - │
-│This is a very long description that  │
-│might cause wrapping issues (medium)  │
+│very-long-tool-name-that-might-wrap   │
+│- This is a very long description     │
+│that might cause wrapping issues      │
+│(medium)                              │
 ╰──────────────────────────────────────╯"
 `;
 

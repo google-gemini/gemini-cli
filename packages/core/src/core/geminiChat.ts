@@ -30,7 +30,10 @@ import {
   logContentRetry,
   logContentRetryFailure,
 } from '../telemetry/loggers.js';
-import { ChatRecordingService } from '../services/chatRecordingService.js';
+import {
+  ChatRecordingService,
+  type ResumedSessionData,
+} from '../services/chatRecordingService.js';
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
@@ -191,10 +194,11 @@ export class GeminiChat {
     private readonly config: Config,
     private readonly generationConfig: GenerateContentConfig = {},
     private history: Content[] = [],
+    resumedSessionData?: ResumedSessionData,
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
-    this.chatRecordingService.initialize();
+    this.chatRecordingService.initialize(resumedSessionData);
     this.lastPromptTokenCount = Math.ceil(
       JSON.stringify(this.history).length / 4,
     );

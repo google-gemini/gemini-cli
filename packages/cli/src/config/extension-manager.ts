@@ -128,6 +128,15 @@ export class ExtensionManager extends ExtensionLoader {
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
   ): Promise<GeminiCLIExtension> {
+    if (
+      (installMetadata.type === 'git' ||
+        installMetadata.type === 'github-release') &&
+      this.settings.security?.blockGitExtensions
+    ) {
+      throw new Error(
+        'Installing extensions from remote sources is disallowed by your current settings.',
+      );
+    }
     const isUpdate = !!previousExtensionConfig;
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
@@ -390,7 +399,11 @@ export class ExtensionManager extends ExtensionLoader {
       throw new Error(`Extension not found.`);
     }
     await this.unloadExtension(extension);
-    const storage = new ExtensionStorage(extension.name);
+    const storage = new ExtensionStorage(
+      extension.installMetadata?.type === 'link'
+        ? extension.name
+        : path.basename(extension.path),
+    );
 
     await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
@@ -445,6 +458,13 @@ export class ExtensionManager extends ExtensionLoader {
 
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
+    if (
+      (installMetadata?.type === 'git' ||
+        installMetadata?.type === 'github-release') &&
+      this.settings.security?.blockGitExtensions
+    ) {
+      return null;
+    }
 
     if (installMetadata?.type === 'link') {
       effectiveExtensionPath = installMetadata.source;
