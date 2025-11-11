@@ -193,6 +193,9 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ]);
 
   return (
+    // We have the StickyHeader intentionally exceedsthe allowed width for this
+    // component by 1 so tne horizontal line it renders can extend into the 1
+    // pixel of padding of the box drawn by the parent of the ToolMessage.
     <>
       <StickyHeader width={terminalWidth + 1}>
         <ToolStatusIndicator status={status} name={name} />

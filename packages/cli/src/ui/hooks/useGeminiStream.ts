@@ -66,7 +66,6 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { useAlternateBuffer } from './useAlternateBuffer.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -121,7 +120,6 @@ export const useGeminiStream = (
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
-  const isAlternateBuffer = useAlternateBuffer();
   const storage = config.storage;
   const logger = useLogger(storage);
   const gitService = useMemo(() => {
@@ -497,52 +495,41 @@ export const useGeminiStream = (
         setPendingHistoryItem({ type: 'gemini', text: '' });
         newGeminiMessageBuffer = eventValue;
       }
-      if (isAlternateBuffer) {
-        // There is no need to split up messages in alternate buffer mode as
-        // messages that exceed the terminal height will not cause flicker.
-
-        // Update the existing message with accumulated content.
+      // Split large messages for better rendering performance. Ideally,
+      // we should maximize the amount of output sent to <Static />.
+      const splitPoint = findLastSafeSplitPoint(newGeminiMessageBuffer);
+      if (splitPoint === newGeminiMessageBuffer.length) {
+        // Update the existing message with accumulated content
         setPendingHistoryItem((item) => ({
           type: item?.type as 'gemini' | 'gemini_content',
           text: newGeminiMessageBuffer,
         }));
       } else {
-        // Split large messages for to avoid flicker when not rendering in
-        // alternate buffer mode.
-        const splitPoint = findLastSafeSplitPoint(newGeminiMessageBuffer);
-        if (splitPoint === newGeminiMessageBuffer.length) {
-          // Update the existing message with accumulated content
-          setPendingHistoryItem((item) => ({
-            type: item?.type as 'gemini' | 'gemini_content',
-            text: newGeminiMessageBuffer,
-          }));
-        } else {
-          // This indicates that we need to split up this Gemini Message.
-          // Splitting a message is primarily a performance consideration. There is a
-          // <Static> component at the root of App.tsx which takes care of rendering
-          // content statically or dynamically. Everything but the last message is
-          // treated as static in order to prevent re-rendering an entire message history
-          // multiple times per-second (as streaming occurs). Prior to this change you'd
-          // see heavy flickering of the terminal. This ensures that larger messages get
-          // broken up so that there are more "statically" rendered.
-          const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
-          const afterText = newGeminiMessageBuffer.substring(splitPoint);
-          addItem(
-            {
-              type: pendingHistoryItemRef.current?.type as
-                | 'gemini'
-                | 'gemini_content',
-              text: beforeText,
-            },
-            userMessageTimestamp,
-          );
-          setPendingHistoryItem({ type: 'gemini_content', text: afterText });
-          newGeminiMessageBuffer = afterText;
-        }
+        // This indicates that we need to split up this Gemini Message.
+        // Splitting a message is primarily a performance consideration. There is a
+        // <Static> component at the root of App.tsx which takes care of rendering
+        // content statically or dynamically. Everything but the last message is
+        // treated as static in order to prevent re-rendering an entire message history
+        // multiple times per-second (as streaming occurs). Prior to this change you'd
+        // see heavy flickering of the terminal. This ensures that larger messages get
+        // broken up so that there are more "statically" rendered.
+        const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
+        const afterText = newGeminiMessageBuffer.substring(splitPoint);
+        addItem(
+          {
+            type: pendingHistoryItemRef.current?.type as
+              | 'gemini'
+              | 'gemini_content',
+            text: beforeText,
+          },
+          userMessageTimestamp,
+        );
+        setPendingHistoryItem({ type: 'gemini_content', text: afterText });
+        newGeminiMessageBuffer = afterText;
       }
       return newGeminiMessageBuffer;
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, isAlternateBuffer],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
   const handleUserCancelledEvent = useCallback(
