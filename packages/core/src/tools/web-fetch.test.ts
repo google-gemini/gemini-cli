@@ -142,6 +142,7 @@ describe('WebFetchTool', () => {
       setApprovalMode: vi.fn(),
       getProxy: vi.fn(),
       getGeminiClient: mockGetGeminiClient,
+      isInteractive: () => false,
     } as unknown as Config;
   });
 

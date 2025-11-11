@@ -40,6 +40,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     isInFallbackMode: vi.fn(() => false),
     setFallbackMode: vi.fn(),
     fallbackHandler: undefined,
+    isInteractive: vi.fn(() => false),
     ...overrides,
   }) as unknown as Config;
 

@@ -69,23 +69,6 @@ const mockContentGenerator = {
   embedContent: mockEmbedContent,
 } as unknown as Mocked<ContentGenerator>;
 
-const mockConfig = {
-  getSessionId: vi.fn().mockReturnValue('test-session-id'),
-  getContentGeneratorConfig: vi
-    .fn()
-    .mockReturnValue({ authType: AuthType.USE_GEMINI }),
-  getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
-  modelConfigService: {
-    getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
-      model,
-      generateContentConfig: {
-        temperature: 0,
-        topP: 1,
-      },
-    })),
-  },
-} as unknown as Mocked<Config>;
-
 // Helper to create a mock GenerateContentResponse
 const createMockResponse = (text: string): GenerateContentResponse =>
   ({
@@ -96,6 +79,7 @@ describe('BaseLlmClient', () => {
   let client: BaseLlmClient;
   let abortController: AbortController;
   let defaultOptions: GenerateJsonOptions;
+  let mockConfig: Mocked<Config>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,6 +87,25 @@ describe('BaseLlmClient', () => {
     vi.mocked(getErrorMessage).mockImplementation((e) =>
       e instanceof Error ? e.message : String(e),
     );
+
+    mockConfig = {
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue({ authType: AuthType.USE_GEMINI }),
+      getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
+      isInteractive: vi.fn().mockReturnValue(false),
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+          model,
+          generateContentConfig: {
+            temperature: 0,
+            topP: 1,
+          },
+        })),
+      },
+    } as unknown as Mocked<Config>;
+
     client = new BaseLlmClient(mockContentGenerator, mockConfig);
     abortController = new AbortController();
     defaultOptions = {

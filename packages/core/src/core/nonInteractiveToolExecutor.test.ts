@@ -65,6 +65,7 @@ describe('executeToolCall', () => {
       getEnableMessageBusIntegration: () => false,
       getMessageBus: () => null,
       getPolicyEngine: () => null,
+      isInteractive: () => false,
     } as unknown as Config;
 
     abortController = new AbortController();

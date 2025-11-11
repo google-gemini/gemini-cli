@@ -17,6 +17,7 @@ export function getCommonAttributes(config: Config): Attributes {
   return {
     'session.id': config.getSessionId(),
     'installation.id': installationManager.getInstallationId(),
+    interactive: config.isInteractive(),
     ...(email && { 'user.email': email }),
   };
 }

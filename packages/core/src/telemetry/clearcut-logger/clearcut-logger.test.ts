@@ -887,8 +887,7 @@ describe('ClearcutLogger', () => {
         status: 'success',
       } as SuccessfulToolCall;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -933,8 +932,7 @@ describe('ClearcutLogger', () => {
         status: 'success',
       } as SuccessfulToolCall;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);

@@ -110,6 +110,7 @@ describe('EditTool', () => {
       getGeminiMdFileCount: () => 0,
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any, // Minimal mock for ToolRegistry
+      isInteractive: () => false,
     } as unknown as Config;
 
     // Reset mocks before each test
