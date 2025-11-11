@@ -9,9 +9,15 @@ import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { escapeAnsiCtrlCodes } from './textUtils.js';
+import { escapeAnsiCtrlCodes, stripUnsafeCharacters } from './textUtils.js';
 
 describe('textUtils', () => {
+  describe('stripUnsafeCharacters', () => {
+    it('should not strip tab characters', () => {
+      const input = 'hello	world';
+      expect(stripUnsafeCharacters(input)).toBe('hello	world');
+    });
+  });
   describe('escapeAnsiCtrlCodes', () => {
     describe('escapeAnsiCtrlCodes string case study', () => {
       it('should replace ANSI escape codes with a visible representation', () => {
