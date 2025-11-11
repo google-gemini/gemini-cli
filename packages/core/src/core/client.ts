@@ -175,6 +175,16 @@ export class GeminiClient {
     });
   }
 
+  async updateSystemInstruction(): Promise<void> {
+    if (!this.isInitialized()) {
+      return;
+    }
+
+    const userMemory = this.config.getUserMemory();
+    const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+    this.getChat().setSystemInstruction(systemInstruction);
+  }
+
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
