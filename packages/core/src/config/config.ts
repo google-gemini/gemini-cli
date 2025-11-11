@@ -656,13 +656,8 @@ export class Config {
       }
     };
 
-    console.log(
-      `the coretools are: ${this.coreTools}\nthe allowed tools are ${this.allowedTools}\nthe excluded tools are ${this.excludeTools}`,
-    );
-
     checkList(this.coreTools, 'tools.core');
     checkList(this.allowedTools, 'tools.allowed');
-    checkList(this.excludeTools, 'tools.exclude');
   }
 
   getContentGenerator(): ContentGenerator {
