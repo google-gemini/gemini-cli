@@ -192,7 +192,6 @@ Mandates').
 # Operational Guidelines
 ${(function () {
   if (config.getEnableShellOutputEfficiency()) {
-    const tempDir = config.storage.getProjectTempDir();
     return `
 ## Shell tool output token efficiency:
 
@@ -202,17 +201,8 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - Aim to minimize tool output tokens while still capturing necessary information.
 - If a command is expected to produce a lot of output, use quiet or silent flags where available and appropriate.
 - Always consider the trade-off between output verbosity and the need for information. If a command's full output is essential for understanding the result, avoid overly aggressive quieting that might obscure important details.
-- If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory: ${tempDir}. For example: 'command > ${path.posix.join(
-      tempDir,
-      'out.log',
-    )} 2> ${path.posix.join(tempDir, 'err.log')}'.
-- After the command runs, inspect the temp files (e.g. '${path.posix.join(
-      tempDir,
-      'out.log',
-    )}' and '${path.posix.join(
-      tempDir,
-      'err.log',
-    )}') using commands like 'grep', 'tail', 'head', ... (or platform equivalents). Remove the temp files when done.
+- If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory. For example: 'command > <temp_dir>/out.log 2> <temp_dir>/err.log'.
+- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') using commands like 'grep', 'tail', 'head', ... (or platform equivalents). Remove the temp files when done.
 `;
   }
   return '';
