@@ -30,7 +30,7 @@ input:
       - State management for conversations or sessions
       - Server-side configuration
 
-3.  \*\*Tools (`packages/core/src/tools/`):
+3.  **Tools (`packages/core/src/tools/`):**
     - **Purpose:** These are individual modules that extend the capabilities of
       the Gemini model, allowing it to interact with the local environment
       (e.g., file system, shell commands, web fetching).
