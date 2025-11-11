@@ -43,16 +43,20 @@ export class RetryableQuotaError extends Error {
 }
 
 /**
- * Parses a duration string (e.g., "34.074824224s", "60s") and returns the time in seconds.
+ * Parses a duration string (e.g., "34.074824224s", "60s", "900ms") and returns the time in seconds.
  * @param duration The duration string to parse.
  * @returns The duration in seconds, or null if parsing fails.
  */
 function parseDurationInSeconds(duration: string): number | null {
-  if (!duration.endsWith('s')) {
-    return null;
+  if (duration.endsWith('ms')) {
+    const milliseconds = parseFloat(duration.slice(0, -2));
+    return isNaN(milliseconds) ? null : milliseconds / 1000;
   }
-  const seconds = parseFloat(duration.slice(0, -1));
-  return isNaN(seconds) ? null : seconds;
+  if (duration.endsWith('s')) {
+    const seconds = parseFloat(duration.slice(0, -1));
+    return isNaN(seconds) ? null : seconds;
+  }
+  return null;
 }
 
 /**
@@ -64,6 +68,7 @@ function parseDurationInSeconds(duration: string): number | null {
  * - If the error suggests a retry delay of more than 2 minutes, it's a `TerminalQuotaError`.
  * - If the error suggests a retry delay of 2 minutes or less, it's a `RetryableQuotaError`.
  * - If the error indicates a per-minute limit, it's a `RetryableQuotaError`.
+ * - If the error message contains the phrase "Please retry in X[s|ms]", it's a `RetryableQuotaError`.
  *
  * @param error The error to classify.
  * @returns A `TerminalQuotaError`, `RetryableQuotaError`, or the original `unknown` error.
@@ -72,6 +77,24 @@ export function classifyGoogleError(error: unknown): unknown {
   const googleApiError = parseGoogleApiError(error);
 
   if (!googleApiError || googleApiError.code !== 429) {
+    // Fallback: try to parse the error message for a retry delay
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const match = errorMessage.match(/Please retry in ([0-9.]+(?:ms|s))/);
+    if (match?.[1]) {
+      const retryDelaySeconds = parseDurationInSeconds(match[1]);
+      if (retryDelaySeconds !== null) {
+        return new RetryableQuotaError(
+          errorMessage,
+          googleApiError ?? {
+            code: 429,
+            message: errorMessage,
+            details: [],
+          },
+          retryDelaySeconds,
+        );
+      }
+    }
+
     return error; // Not a 429 error we can handle.
   }
 

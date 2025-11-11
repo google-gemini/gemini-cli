@@ -26,7 +26,10 @@ import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
-import type { ChatRecordingService } from '../services/chatRecordingService.js';
+import type {
+  ChatRecordingService,
+  ResumedSessionData,
+} from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -152,6 +155,13 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
   }
 
+  async resumeChat(
+    history: Content[],
+    resumedSessionData?: ResumedSessionData,
+  ): Promise<void> {
+    this.chat = await this.startChat(history, resumedSessionData);
+  }
+
   getChatRecordingService(): ChatRecordingService | undefined {
     return this.chat?.getChatRecordingService();
   }
@@ -175,7 +185,10 @@ export class GeminiClient {
     });
   }
 
-  async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+  async startChat(
+    extraHistory?: Content[],
+    resumedSessionData?: ResumedSessionData,
+  ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
 
@@ -207,6 +220,7 @@ export class GeminiClient {
           tools,
         },
         history,
+        resumedSessionData,
       );
     } catch (error) {
       await reportError(

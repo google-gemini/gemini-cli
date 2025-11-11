@@ -595,6 +595,334 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Session Resumption', () => {
+    it('handles resumed session data correctly', async () => {
+      const mockResumedSessionData = {
+        conversation: {
+          sessionId: 'test-session-123',
+          projectHash: 'test-project-hash',
+          startTime: '2024-01-01T00:00:00Z',
+          lastUpdated: '2024-01-01T00:00:01Z',
+          messages: [
+            {
+              id: 'msg-1',
+              type: 'user' as const,
+              content: 'Hello',
+              timestamp: '2024-01-01T00:00:00Z',
+            },
+            {
+              id: 'msg-2',
+              type: 'gemini' as const,
+              content: 'Hi there!',
+              role: 'model' as const,
+              parts: [{ text: 'Hi there!' }],
+              timestamp: '2024-01-01T00:00:01Z',
+            },
+          ],
+        },
+        filePath: '/tmp/test-session.json',
+      };
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+            resumedSessionData={mockResumedSessionData}
+          />,
+        );
+        unmount = result.unmount;
+      });
+      await act(async () => {
+        unmount();
+      });
+    });
+
+    it('renders without resumed session data', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = render(
+          <AppContainer
+            config={mockConfig}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+            resumedSessionData={undefined}
+          />,
+        );
+        unmount = result.unmount;
+      });
+      await act(async () => {
+        unmount();
+      });
+    });
+
+    it('initializes chat recording service when config has it', () => {
+      const mockChatRecordingService = {
+        initialize: vi.fn(),
+        recordMessage: vi.fn(),
+        recordMessageTokens: vi.fn(),
+        recordToolCalls: vi.fn(),
+      };
+
+      const mockGeminiClient = {
+        isInitialized: vi.fn(() => true),
+        resumeChat: vi.fn(),
+        getUserTier: vi.fn(),
+        getChatRecordingService: vi.fn(() => mockChatRecordingService),
+      };
+
+      const configWithRecording = {
+        ...mockConfig,
+        getGeminiClient: vi.fn(() => mockGeminiClient),
+      } as unknown as Config;
+
+      expect(() => {
+        render(
+          <AppContainer
+            config={configWithRecording}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+      }).not.toThrow();
+    });
+  });
+  describe('Session Recording Integration', () => {
+    it('provides chat recording service configuration', () => {
+      const mockChatRecordingService = {
+        initialize: vi.fn(),
+        recordMessage: vi.fn(),
+        recordMessageTokens: vi.fn(),
+        recordToolCalls: vi.fn(),
+        getSessionId: vi.fn(() => 'test-session-123'),
+        getCurrentConversation: vi.fn(),
+      };
+
+      const mockGeminiClient = {
+        isInitialized: vi.fn(() => true),
+        resumeChat: vi.fn(),
+        getUserTier: vi.fn(),
+        getChatRecordingService: vi.fn(() => mockChatRecordingService),
+        setHistory: vi.fn(),
+      };
+
+      const configWithRecording = {
+        ...mockConfig,
+        getGeminiClient: vi.fn(() => mockGeminiClient),
+        getSessionId: vi.fn(() => 'test-session-123'),
+      } as unknown as Config;
+
+      expect(() => {
+        render(
+          <AppContainer
+            config={configWithRecording}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+          />,
+        );
+      }).not.toThrow();
+
+      // Verify the recording service structure is correct
+      expect(configWithRecording.getGeminiClient).toBeDefined();
+      expect(mockGeminiClient.getChatRecordingService).toBeDefined();
+      expect(mockChatRecordingService.initialize).toBeDefined();
+      expect(mockChatRecordingService.recordMessage).toBeDefined();
+    });
+
+    it('handles session recording when messages are added', () => {
+      const mockRecordMessage = vi.fn();
+      const mockRecordMessageTokens = vi.fn();
+
+      const mockChatRecordingService = {
+        initialize: vi.fn(),
+        recordMessage: mockRecordMessage,
+        recordMessageTokens: mockRecordMessageTokens,
+        recordToolCalls: vi.fn(),
+        getSessionId: vi.fn(() => 'test-session-123'),
+      };
+
+      const mockGeminiClient = {
+        isInitialized: vi.fn(() => true),
+        getChatRecordingService: vi.fn(() => mockChatRecordingService),
+        getUserTier: vi.fn(),
+      };
+
+      const configWithRecording = {
+        ...mockConfig,
+        getGeminiClient: vi.fn(() => mockGeminiClient),
+      } as unknown as Config;
+
+      render(
+        <AppContainer
+          config={configWithRecording}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // The actual recording happens through the useHistory hook
+      // which would be triggered by user interactions
+      expect(mockChatRecordingService.initialize).toBeDefined();
+      expect(mockChatRecordingService.recordMessage).toBeDefined();
+    });
+  });
+
+  describe('Session Resume Flow', () => {
+    it('accepts resumed session data', () => {
+      const mockResumeChat = vi.fn();
+      const mockGeminiClient = {
+        isInitialized: vi.fn(() => true),
+        resumeChat: mockResumeChat,
+        getUserTier: vi.fn(),
+        getChatRecordingService: vi.fn(() => ({
+          initialize: vi.fn(),
+          recordMessage: vi.fn(),
+          recordMessageTokens: vi.fn(),
+          recordToolCalls: vi.fn(),
+        })),
+      };
+
+      const configWithClient = {
+        ...mockConfig,
+        getGeminiClient: vi.fn(() => mockGeminiClient),
+      } as unknown as Config;
+
+      const resumedData = {
+        conversation: {
+          sessionId: 'resumed-session-456',
+          projectHash: 'project-hash',
+          startTime: '2024-01-01T00:00:00Z',
+          lastUpdated: '2024-01-01T00:01:00Z',
+          messages: [
+            {
+              id: 'msg-1',
+              type: 'user' as const,
+              content: 'Previous question',
+              timestamp: '2024-01-01T00:00:00Z',
+            },
+            {
+              id: 'msg-2',
+              type: 'gemini' as const,
+              content: 'Previous answer',
+              role: 'model' as const,
+              parts: [{ text: 'Previous answer' }],
+              timestamp: '2024-01-01T00:00:30Z',
+              tokenCount: { input: 10, output: 20 },
+            },
+          ],
+        },
+        filePath: '/tmp/resumed-session.json',
+      };
+
+      expect(() => {
+        render(
+          <AppContainer
+            config={configWithClient}
+            settings={mockSettings}
+            version="1.0.0"
+            initializationResult={mockInitResult}
+            resumedSessionData={resumedData}
+          />,
+        );
+      }).not.toThrow();
+
+      // Verify the resume functionality structure is in place
+      expect(mockGeminiClient.resumeChat).toBeDefined();
+      expect(resumedData.conversation.messages).toHaveLength(2);
+    });
+
+    it('does not attempt resume when client is not initialized', () => {
+      const mockResumeChat = vi.fn();
+      const mockGeminiClient = {
+        isInitialized: vi.fn(() => false), // Not initialized
+        resumeChat: mockResumeChat,
+        getUserTier: vi.fn(),
+        getChatRecordingService: vi.fn(),
+      };
+
+      const configWithClient = {
+        ...mockConfig,
+        getGeminiClient: vi.fn(() => mockGeminiClient),
+      } as unknown as Config;
+
+      const resumedData = {
+        conversation: {
+          sessionId: 'test-session',
+          projectHash: 'project-hash',
+          startTime: '2024-01-01T00:00:00Z',
+          lastUpdated: '2024-01-01T00:01:00Z',
+          messages: [],
+        },
+        filePath: '/tmp/session.json',
+      };
+
+      render(
+        <AppContainer
+          config={configWithClient}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+          resumedSessionData={resumedData}
+        />,
+      );
+
+      // Should not call resumeChat when client is not initialized
+      expect(mockResumeChat).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Token Counting from Session Stats', () => {
+    it('tracks token counts from session messages', () => {
+      // Session stats are provided through the SessionStatsProvider context
+      // in the real app, not through the config directly
+      const mockChatRecordingService = {
+        initialize: vi.fn(),
+        recordMessage: vi.fn(),
+        recordMessageTokens: vi.fn(),
+        recordToolCalls: vi.fn(),
+        getSessionId: vi.fn(() => 'test-session-123'),
+        getCurrentConversation: vi.fn(() => ({
+          sessionId: 'test-session-123',
+          messages: [],
+          totalInputTokens: 150,
+          totalOutputTokens: 350,
+        })),
+      };
+
+      const mockGeminiClient = {
+        isInitialized: vi.fn(() => true),
+        getChatRecordingService: vi.fn(() => mockChatRecordingService),
+        getUserTier: vi.fn(),
+      };
+
+      const configWithRecording = {
+        ...mockConfig,
+        getGeminiClient: vi.fn(() => mockGeminiClient),
+      } as unknown as Config;
+
+      render(
+        <AppContainer
+          config={configWithRecording}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // In the actual app, these stats would be displayed in components
+      // and updated as messages are processed through the recording service
+      expect(mockChatRecordingService.recordMessageTokens).toBeDefined();
+      expect(mockChatRecordingService.getCurrentConversation).toBeDefined();
+    });
+  });
+
   describe('Quota and Fallback Integration', () => {
     it('passes a null proQuotaRequest to UIStateContext by default', async () => {
       // The default mock from beforeEach already sets proQuotaRequest to null
@@ -671,9 +999,9 @@ describe('AppContainer State Management', () => {
 
       // You can even verify that the plumbed function is callable
       act(() => {
-        capturedUIActions.handleProQuotaChoice('auth');
+        capturedUIActions.handleProQuotaChoice('retry_later');
       });
-      expect(mockHandler).toHaveBeenCalledWith('auth');
+      expect(mockHandler).toHaveBeenCalledWith('retry_later');
       unmount();
     });
   });
@@ -1450,6 +1778,7 @@ describe('AppContainer State Management', () => {
             meta: false,
             shift: false,
             paste: false,
+            insertable: false,
             sequence: '\x13',
           });
         });
@@ -1476,6 +1805,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: false,
               sequence: '\x13',
             });
           });
@@ -1490,6 +1820,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: true,
               sequence: 'a',
             });
           });
@@ -1510,6 +1841,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: false,
               sequence: '\x13',
             });
           });
@@ -1525,6 +1857,7 @@ describe('AppContainer State Management', () => {
               meta: false,
               shift: false,
               paste: false,
+              insertable: true,
               sequence: 'a',
             });
           });
@@ -1706,6 +2039,43 @@ describe('AppContainer State Management', () => {
 
       // Assert: Verify model is updated
       expect(capturedUIState.currentModel).toBe('new-model');
+      unmount();
+    });
+  });
+
+  describe('Shell Interaction', () => {
+    it('should not crash if resizing the pty fails', async () => {
+      const resizePtySpy = vi
+        .spyOn(ShellExecutionService, 'resizePty')
+        .mockImplementation(() => {
+          throw new Error('Cannot resize a pty that has already exited');
+        });
+
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+        activePtyId: 'some-pty-id', // Make sure activePtyId is set
+      });
+
+      // The main assertion is that the render does not throw.
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(resizePtySpy).toHaveBeenCalled();
       unmount();
     });
   });

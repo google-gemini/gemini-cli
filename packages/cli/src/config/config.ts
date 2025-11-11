@@ -4,21 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type {
-  FileFilteringOptions,
-  OutputFormat,
-} from '@google/gemini-cli-core';
+import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
-  loadServerHierarchicalMemory,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -36,6 +29,7 @@ import {
   getPty,
   EDIT_TOOL_NAME,
   debugLogger,
+  loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -47,10 +41,7 @@ import { appEvents } from '../utils/events.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
-import type {
-  ExtensionEvents,
-  ExtensionLoader,
-} from '@google/gemini-cli-core/src/utils/extensionLoader.js';
+import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
@@ -70,6 +61,9 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  resume: string | 'latest' | undefined;
+  listSessions: boolean | undefined;
+  deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
@@ -181,6 +175,35 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'List all available extensions and exit.',
         })
+        .option('resume', {
+          alias: 'r',
+          type: 'string',
+          // `skipValidation` so that we can distinguish between it being passed with a value, without
+          // one, and not being passed at all.
+          skipValidation: true,
+          description:
+            'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+          coerce: (value: string): string => {
+            // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
+            // When --resume passed without a value (`gemini --resume`): value = "" (string)
+            // When --resume not passed at all: this `coerce` function is not called at all, and
+            //   `yargsInstance.argv.resume` is undefined.
+            if (value === '') {
+              return 'latest';
+            }
+            return value;
+          },
+        })
+        .option('list-sessions', {
+          type: 'boolean',
+          description:
+            'List available sessions for the current project and exit.',
+        })
+        .option('delete-session', {
+          type: 'string',
+          description:
+            'Delete a session by index number (use --list-sessions to see available sessions).',
+        })
         .option('include-directories', {
           type: 'array',
           string: true,
@@ -235,6 +258,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           }
           if (argv['prompt'] && argv['promptInteractive']) {
             return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+          }
+          if (argv.resume && !argv.prompt && !process.stdin.isTTY) {
+            throw new Error(
+              'When resuming a session, you must provide a message via --prompt (-p) or stdin',
+            );
           }
           if (argv.yolo && argv['approvalMode']) {
             return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
@@ -295,49 +323,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
   return result as unknown as CliArgs;
-}
-
-// This function is now a thin wrapper around the server's implementation.
-// It's kept in the CLI for now as App.tsx directly calls it for memory refresh.
-// TODO: Consider if App.tsx should get memory via a server call or if Config should refresh itself.
-export async function loadHierarchicalGeminiMemory(
-  currentWorkingDirectory: string,
-  includeDirectoriesToReadGemini: readonly string[] = [],
-  debugMode: boolean,
-  fileService: FileDiscoveryService,
-  settings: Settings,
-  extensionLoader: ExtensionLoader,
-  folderTrust: boolean,
-  memoryImportFormat: 'flat' | 'tree' = 'tree',
-  fileFilteringOptions?: FileFilteringOptions,
-): Promise<{ memoryContent: string; fileCount: number; filePaths: string[] }> {
-  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = fs.realpathSync(path.resolve(currentWorkingDirectory));
-  const realHome = fs.realpathSync(path.resolve(homedir()));
-  const isHomeDirectory = realCwd === realHome;
-
-  // If it is the home directory, pass an empty string to the core memory
-  // function to signal that it should skip the workspace search.
-  const effectiveCwd = isHomeDirectory ? '' : currentWorkingDirectory;
-
-  if (debugMode) {
-    debugLogger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
-    );
-  }
-
-  // Directly call the server function with the corrected path.
-  return loadServerHierarchicalMemory(
-    effectiveCwd,
-    includeDirectoriesToReadGemini,
-    debugMode,
-    fileService,
-    extensionLoader,
-    folderTrust,
-    memoryImportFormat,
-    fileFilteringOptions,
-    settings.context?.discoveryMaxDirs,
-  );
 }
 
 /**
@@ -437,18 +422,18 @@ export async function loadCliConfig(
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =
-    await loadHierarchicalGeminiMemory(
+    await loadServerHierarchicalMemory(
       cwd,
       settings.context?.loadMemoryFromIncludeDirectories
         ? includeDirectories
         : [],
       debugMode,
       fileService,
-      settings,
       extensionManager,
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
+      settings.context?.discoveryMaxDirs,
     );
 
   const question = argv.promptInteractive || argv.prompt || '';
@@ -637,6 +622,8 @@ export async function loadCliConfig(
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
+    listSessions: argv.listSessions || false,
+    deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
@@ -669,6 +656,7 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
+    modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},

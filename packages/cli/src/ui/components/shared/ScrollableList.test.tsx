@@ -78,7 +78,7 @@ const TestComponent = ({
 
   return (
     <MouseProvider mouseEventsEnabled={false}>
-      <KeypressProvider kittyProtocolEnabled={false}>
+      <KeypressProvider>
         <ScrollProvider>
           <Box flexDirection="column" width={80} height={24} padding={1}>
             <Box flexGrow={1} borderStyle="round" borderColor="cyan">

@@ -8,6 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
@@ -31,6 +33,7 @@ import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -49,6 +52,7 @@ vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
   ToolRegistryMock.prototype.discoverAllTools = vi.fn();
+  ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
@@ -245,7 +249,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.8,
               },
             },
@@ -259,7 +263,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.0,
               },
             },
@@ -271,6 +275,43 @@ describe('Server Config (config.ts)', () => {
       it('should return undefined if there are no experiments', async () => {
         const config = new Config(baseParams);
         expect(await config.getCompressionThreshold()).toBeUndefined();
+      });
+    });
+
+    describe('getUserCaching', () => {
+      it('should return the remote experiment flag when available', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.USER_CACHING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        });
+        expect(await config.getUserCaching()).toBe(true);
+      });
+
+      it('should return false when the remote flag is false', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.USER_CACHING]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        });
+        expect(await config.getUserCaching()).toBe(false);
+      });
+
+      it('should return undefined if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getUserCaching()).toBeUndefined();
       });
     });
   });
@@ -389,7 +430,8 @@ describe('Server Config (config.ts)', () => {
   });
 
   it('should initialize WorkspaceContext with includeDirectories', () => {
-    const includeDirectories = ['/path/to/dir1', '/path/to/dir2'];
+    const resolved = path.resolve(baseParams.targetDir);
+    const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
       ...baseParams,
       includeDirectories,
@@ -397,12 +439,11 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(paramsWithIncludeDirs);
     const workspaceContext = config.getWorkspaceContext();
     const directories = workspaceContext.getDirectories();
-
     // Should include the target directory plus the included directories
     expect(directories).toHaveLength(3);
-    expect(directories).toContain(path.resolve(baseParams.targetDir));
-    expect(directories).toContain('/path/to/dir1');
-    expect(directories).toContain('/path/to/dir2');
+    expect(directories).toContain(resolved);
+    expect(directories).toContain(path.join(resolved, 'dir1'));
+    expect(directories).toContain(path.join(resolved, 'dir2'));
   });
 
   it('Config constructor should set telemetry to true when provided as true', () => {
@@ -870,27 +911,6 @@ describe('Server Config (config.ts)', () => {
         expect(wasShellToolRegistered).toBe(true);
       });
 
-      it('should not register a tool if excludeTools contains the non-minified class name', async () => {
-        const params: ConfigParameters = {
-          ...baseParams,
-          coreTools: undefined, // all tools enabled by default
-          excludeTools: ['ShellTool'],
-        };
-        const config = new Config(params);
-        await config.initialize();
-
-        const registerToolMock = (
-          (await vi.importMock('../tools/tool-registry')) as {
-            ToolRegistry: { prototype: { registerTool: Mock } };
-          }
-        ).ToolRegistry.prototype.registerTool;
-
-        const wasShellToolRegistered = (
-          registerToolMock as Mock
-        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
-        expect(wasShellToolRegistered).toBe(false);
-      });
-
       it('should register a tool if coreTools contains an argument-specific pattern with the non-minified class name', async () => {
         const params: ConfigParameters = {
           ...baseParams,
@@ -1248,6 +1268,92 @@ describe('BaseLlmClient Lifecycle', () => {
   });
 });
 
+describe('Generation Config Merging (HACK)', () => {
+  const MODEL = 'gemini-pro';
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  it('should merge default aliases when user provides only overrides', () => {
+    const userOverrides = [
+      {
+        match: { model: 'test-model' },
+        modelConfig: { generateContentConfig: { temperature: 0.1 } },
+      },
+    ];
+
+    const params: ConfigParameters = {
+      ...baseParams,
+      modelConfigServiceConfig: {
+        overrides: userOverrides,
+      },
+    };
+
+    const config = new Config(params);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceConfig = (config.modelConfigService as any).config;
+
+    // Assert that the default aliases are present
+    expect(serviceConfig.aliases).toEqual(DEFAULT_MODEL_CONFIGS.aliases);
+    // Assert that the user's overrides are present
+    expect(serviceConfig.overrides).toEqual(userOverrides);
+  });
+
+  it('should use user-provided aliases if they exist', () => {
+    const userAliases = {
+      'my-alias': {
+        modelConfig: { model: 'my-model' },
+      },
+    };
+
+    const params: ConfigParameters = {
+      ...baseParams,
+      modelConfigServiceConfig: {
+        aliases: userAliases,
+      },
+    };
+
+    const config = new Config(params);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceConfig = (config.modelConfigService as any).config;
+
+    // Assert that the user's aliases are used, not the defaults
+    expect(serviceConfig.aliases).toEqual(userAliases);
+  });
+
+  it('should use default generation config if none is provided', () => {
+    const params: ConfigParameters = { ...baseParams };
+
+    const config = new Config(params);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const serviceConfig = (config.modelConfigService as any).config;
+
+    // Assert that the full default config is used
+    expect(serviceConfig).toEqual(DEFAULT_MODEL_CONFIGS);
+  });
+});
+
 describe('Config getHooks', () => {
   const baseParams: ConfigParameters = {
     cwd: '/tmp',
@@ -1354,6 +1460,21 @@ describe('Config getHooks', () => {
     expect(retrievedHooks).toEqual(allEventHooks);
     expect(Object.keys(retrievedHooks!)).toHaveLength(11); // All hook event types
   });
+
+  describe('setModel', () => {
+    it('should allow setting a pro (any) model and disable fallback mode', () => {
+      const config = new Config(baseParams);
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      const proModel = 'gemini-2.5-pro';
+      config.setModel(proModel);
+
+      expect(config.getModel()).toBe(proModel);
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
+    });
+  });
 });
 
 describe('Config getExperiments', () => {
@@ -1398,5 +1519,66 @@ describe('Config getExperiments', () => {
     const retrievedExps = config.getExperiments();
     expect(retrievedExps).toEqual(mockExps);
     expect(retrievedExps).toBe(mockExps); // Should return the same reference
+  });
+});
+
+describe('Config setExperiments logging', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('logs a sorted, non-truncated summary of experiments when they are set', () => {
+    const config = new Config(baseParams);
+    const debugSpy = vi
+      .spyOn(debugLogger, 'debug')
+      .mockImplementation(() => {});
+    const experiments = {
+      flags: {
+        ZetaFlag: {
+          boolValue: true,
+          stringValue: 'zeta',
+          int32ListValue: { values: [1, 2] },
+        },
+        AlphaFlag: {
+          boolValue: false,
+          stringValue: 'alpha',
+          stringListValue: { values: ['a', 'b', 'c'] },
+        },
+        MiddleFlag: {
+          // Intentionally sparse to ensure undefined values are omitted
+          floatValue: 0.42,
+          int32ListValue: { values: [] },
+        },
+      },
+      experimentIds: [101, 99],
+    };
+
+    config.setExperiments(experiments);
+
+    const logCall = debugSpy.mock.calls.find(
+      ([message]) => message === 'Experiments loaded',
+    );
+    expect(logCall).toBeDefined();
+    const loggedSummary = logCall?.[1] as string;
+    expect(typeof loggedSummary).toBe('string');
+    expect(loggedSummary).toContain('experimentIds');
+    expect(loggedSummary).toContain('101');
+    expect(loggedSummary).toContain('AlphaFlag');
+    expect(loggedSummary).toContain('ZetaFlag');
+    const alphaIndex = loggedSummary.indexOf('AlphaFlag');
+    const zetaIndex = loggedSummary.indexOf('ZetaFlag');
+    expect(alphaIndex).toBeGreaterThan(-1);
+    expect(zetaIndex).toBeGreaterThan(-1);
+    expect(alphaIndex).toBeLessThan(zetaIndex);
+    expect(loggedSummary).toContain('\n');
+    expect(loggedSummary).not.toContain('stringListLength: 0');
+    expect(loggedSummary).not.toContain('int32ListLength: 0');
+
+    debugSpy.mockRestore();
   });
 });

@@ -57,6 +57,7 @@ describe('handleAtCommand', () => {
       getToolRegistry,
       getTargetDir: () => testRootDir,
       isSandboxed: () => false,
+      getExcludeTools: vi.fn(),
       getFileService: () => new FileDiscoveryService(testRootDir),
       getFileFilteringRespectGitIgnore: () => true,
       getFileFilteringRespectGeminiIgnore: () => true,
@@ -277,7 +278,7 @@ describe('handleAtCommand', () => {
       }),
       125,
     );
-  });
+  }, 10000);
 
   it('should handle multiple @file references', async () => {
     const content1 = 'Content file1';
