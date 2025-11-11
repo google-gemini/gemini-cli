@@ -455,44 +455,7 @@ export class LoopDetectionService {
       'unproductive_state_confidence'
     ] as number;
 
-    if (flashConfidence >= LLM_CONFIDENCE_THRESHOLD) {
-      if (this.config.isInFallbackMode()) {
-        this.handleConfirmedLoop(flashResult, 'loop-detection');
-        return true;
-      }
-
-      // Double check with configured model
-      const doubleCheckModel = 'loop-detection-double-check';
-      const mainModelResult = await this.queryLoopDetectionModel(
-        doubleCheckModel,
-        contents,
-        schema,
-        signal,
-      );
-
-      const mainModelConfidence = this.isValidResult(mainModelResult)
-        ? (mainModelResult['unproductive_state_confidence'] as number)
-        : 0;
-
-      logLlmLoopCheck(
-        this.config,
-        new LlmLoopCheckEvent(
-          this.promptId,
-          flashConfidence,
-          doubleCheckModel,
-          this.isValidResult(mainModelResult) ? mainModelConfidence : 0,
-        ),
-      );
-
-      if (this.isValidResult(mainModelResult)) {
-        if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
-          this.handleConfirmedLoop(mainModelResult, doubleCheckModel);
-          return true;
-        } else {
-          this.updateCheckInterval(mainModelConfidence);
-        }
-      }
-    } else {
+    if (flashConfidence < LLM_CONFIDENCE_THRESHOLD) {
       logLlmLoopCheck(
         this.config,
         new LlmLoopCheckEvent(
@@ -503,6 +466,44 @@ export class LoopDetectionService {
         ),
       );
       this.updateCheckInterval(flashConfidence);
+      return false;
+    }
+
+    if (this.config.isInFallbackMode()) {
+      this.handleConfirmedLoop(flashResult, 'loop-detection');
+      return true;
+    }
+
+    // Double check with configured model
+    const doubleCheckModel = 'loop-detection-double-check';
+    const mainModelResult = await this.queryLoopDetectionModel(
+      doubleCheckModel,
+      contents,
+      schema,
+      signal,
+    );
+
+    const mainModelConfidence = this.isValidResult(mainModelResult)
+      ? (mainModelResult['unproductive_state_confidence'] as number)
+      : 0;
+
+    logLlmLoopCheck(
+      this.config,
+      new LlmLoopCheckEvent(
+        this.promptId,
+        flashConfidence,
+        doubleCheckModel,
+        this.isValidResult(mainModelResult) ? mainModelConfidence : 0,
+      ),
+    );
+
+    if (this.isValidResult(mainModelResult)) {
+      if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
+        this.handleConfirmedLoop(mainModelResult, doubleCheckModel);
+        return true;
+      } else {
+        this.updateCheckInterval(mainModelConfidence);
+      }
     }
 
     return false;
