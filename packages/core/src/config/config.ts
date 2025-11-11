@@ -85,6 +85,7 @@ import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 import { ApprovalMode } from '../policy/types.js';
@@ -1148,7 +1149,7 @@ export class Config {
     await this.ensureExperimentsLoaded();
 
     const remoteThreshold =
-      this.experiments?.flags['GeminiCLIContextCompression__threshold_fraction']
+      this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
         ?.floatValue;
     if (remoteThreshold === 0) {
       return undefined;
@@ -1159,7 +1160,7 @@ export class Config {
   async getUserCaching(): Promise<boolean | undefined> {
     await this.ensureExperimentsLoaded();
 
-    return this.experiments?.flags['GcliUserCaching__user_caching']?.boolValue;
+    return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {

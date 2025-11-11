@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
@@ -248,7 +249,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.8,
               },
             },
@@ -262,7 +263,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.0,
               },
             },
@@ -283,7 +284,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GcliUserCaching__user_caching: {
+              [ExperimentFlags.USER_CACHING]: {
                 boolValue: true,
               },
             },
@@ -298,7 +299,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GcliUserCaching__user_caching: {
+              [ExperimentFlags.USER_CACHING]: {
                 boolValue: false,
               },
             },
