@@ -148,19 +148,19 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   constructor() {
     super(
       WriteTodosTool.Name,
-      'Write Todos',
+      'WriteTodos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
       {
         type: 'object',
-        description:
-          'The complete list of todo items. This will replace the existing list.',
         properties: {
           todos: {
             type: 'array',
-            description: 'A single todo item.',
+            description:
+              'The complete list of todo items. This will replace the existing list.',
             items: {
               type: 'object',
+              description: 'A single todo item.',
               properties: {
                 description: {
                   type: 'string',
