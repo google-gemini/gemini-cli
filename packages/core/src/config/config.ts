@@ -650,7 +650,7 @@ export class Config {
         if (list.includes(tool.name) || list.includes(tool.alternateName)) {
           coreEvents.emitFeedback(
             'warning',
-            `The tool '${tool.name}' (or '${tool.alternateName}') specified in '${listName}' is deprecated and will be removed in v0.14.0.`,
+            `The tool '${tool.name}' (or '${tool.alternateName}') specified in '${listName}' is deprecated and will be removed in v0.16.0.`,
           );
         }
       }
