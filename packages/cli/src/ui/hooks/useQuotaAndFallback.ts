@@ -12,6 +12,7 @@ import {
   TerminalQuotaError,
   UserTierId,
   DEFAULT_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -84,10 +85,16 @@ export function useQuotaAndFallback({
         message = messageLines.join('\n');
       } else {
         // Capacity error
-        message = [
-          `🚦Pardon Our Congestion! It looks like ${failedModel} is very popular at the moment.`,
-          `Please retry again later.`,
-        ].join('\n');
+        if (failedModel === PREVIEW_GEMINI_MODEL) {
+          message = [
+            `🚦Pardon Our Congestion! It looks like Preview Model is very popular at the moment. We are busy fixing this`,
+          ].join('\n');
+        } else {
+          message = [
+            `🚦Pardon Our Congestion! It looks like ${failedModel} is very popular at the moment.`,
+            `Please retry again later.`,
+          ].join('\n');
+        }
       }
 
       // Add message to UI history
@@ -136,14 +143,25 @@ export function useQuotaAndFallback({
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
 
-      if (choice === 'retry') {
-        historyManager.addItem(
-          {
-            type: MessageType.INFO,
-            text: 'Switched to fallback model. Tip: Press Ctrl+P (or Up Arrow) to recall your previous prompt and submit it again if you wish.',
-          },
-          Date.now(),
-        );
+      if (choice === 'retry_always') {
+        // If we were recovering from a Preview Model failure, show a specific message.
+        if (proQuotaRequest.failedModel === PREVIEW_GEMINI_MODEL) {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}. We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.`,
+            },
+            Date.now(),
+          );
+        } else {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: 'Switched to fallback model. Tip: Press Ctrl+P (or Up Arrow) to recall your previous prompt and submit it again if you wish.',
+            },
+            Date.now(),
+          );
+        }
       }
     },
     [proQuotaRequest, historyManager],

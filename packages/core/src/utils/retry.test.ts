@@ -433,4 +433,37 @@ describe('retryWithBackoff', () => {
     );
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
+  it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
+    const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
+
+    let fallbackOccurred = false;
+    const mockFn = vi.fn().mockImplementation(async () => {
+      if (!fallbackOccurred) {
+        const error: HttpError = new Error('Internal Server Error');
+        error.status = 500;
+        throw error;
+      }
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      onPersistent429: async (authType?: string, error?: unknown) => {
+        fallbackOccurred = true;
+        return await fallbackCallback(authType, error);
+      },
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toBe('success');
+    expect(fallbackCallback).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+      expect.objectContaining({ status: 500 }),
+    );
+    // 3 attempts (initial + 2 retries) fail with 500, then fallback triggers, then 1 success
+    expect(mockFn).toHaveBeenCalledTimes(4);
+  });
 });

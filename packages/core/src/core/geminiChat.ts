@@ -21,6 +21,8 @@ import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
   getEffectiveModel,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
@@ -243,6 +245,11 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
+    // Preview Model Bypass mode for the new request.
+    // This ensures that we attempt to use Preview Model for every new user turn
+    // (unless the "Always" fallback mode is active, which is handled separately).
+    this.config.setPreviewModelBypassMode(false);
+
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -275,11 +282,17 @@ export class GeminiChat {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
 
-        for (
-          let attempt = 0;
-          attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
-          attempt++
+        let maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
+        // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
+        // when probing the Preview Model.
+        if (
+          self.config.isPreviewModelFallbackMode() &&
+          model === PREVIEW_GEMINI_MODEL
         ) {
+          maxAttempts = 1;
+        }
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
             if (attempt > 0) {
               yield { type: StreamEventType.RETRY };
@@ -313,7 +326,7 @@ export class GeminiChat {
 
             if (isContentError) {
               // Check if we have more attempts left.
-              if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
+              if (attempt < maxAttempts - 1) {
                 logContentRetry(
                   self.config,
                   new ContentRetryEvent(
@@ -342,13 +355,22 @@ export class GeminiChat {
             logContentRetryFailure(
               self.config,
               new ContentRetryFailureEvent(
-                INVALID_CONTENT_RETRY_OPTIONS.maxAttempts,
+                maxAttempts,
                 (lastError as InvalidStreamError).type,
                 model,
               ),
             );
           }
           throw lastError;
+        } else {
+          // Preview Model successfully used, disable fallback mode.
+          // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
+          if (
+            model === PREVIEW_GEMINI_MODEL &&
+            !self.config.isPreviewModelBypassMode()
+          ) {
+            self.config.setPreviewModelFallbackMode(false);
+          }
         }
       } finally {
         streamDoneResolver!();
@@ -362,12 +384,23 @@ export class GeminiChat {
     params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    let effectiveModel = model;
     const apiCall = () => {
-      const modelToUse = getEffectiveModel(
+      let modelToUse = getEffectiveModel(
         this.config.isInFallbackMode(),
         model,
         this.config.getPreviewFeatures(),
       );
+
+      // Preview Model Bypass Logic:
+      // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
+      // IF the effective model is currently Preview Model.
+      if (
+        this.config.isPreviewModelBypassMode() &&
+        modelToUse === PREVIEW_GEMINI_MODEL
+      ) {
+        modelToUse = DEFAULT_GEMINI_MODEL;
+      }
 
       if (
         this.config.getQuotaErrorOccurred() &&
@@ -377,6 +410,8 @@ export class GeminiChat {
           'Please submit a new query to continue with the Flash model.',
         );
       }
+
+      effectiveModel = modelToUse;
 
       return this.config.getContentGenerator().generateContentStream(
         {
@@ -391,13 +426,18 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => await handleFallback(this.config, model, authType, error);
+    ) => await handleFallback(this.config, effectiveModel, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: params.config?.abortSignal,
+      maxAttempts:
+        this.config.isPreviewModelFallbackMode() &&
+        model === PREVIEW_GEMINI_MODEL
+          ? 1
+          : undefined,
     });
 
     return this.processStreamResponse(model, streamResponse);

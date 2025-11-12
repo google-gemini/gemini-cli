@@ -421,6 +421,9 @@ export class Config {
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
 
+  private previewModelFallbackMode = false;
+  private previewModelBypassMode = false;
+
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.embeddingModel =
@@ -761,6 +764,26 @@ export class Config {
 
   setFallbackModelHandler(handler: FallbackModelHandler): void {
     this.fallbackModelHandler = handler;
+  }
+
+  getFallbackModelHandler(): FallbackModelHandler | undefined {
+    return this.fallbackModelHandler;
+  }
+
+  isPreviewModelFallbackMode(): boolean {
+    return this.previewModelFallbackMode;
+  }
+
+  setPreviewModelFallbackMode(active: boolean): void {
+    this.previewModelFallbackMode = active;
+  }
+
+  isPreviewModelBypassMode(): boolean {
+    return this.previewModelBypassMode;
+  }
+
+  setPreviewModelBypassMode(active: boolean): void {
+    this.previewModelBypassMode = active;
   }
 
   getMaxSessionTurns(): number {
