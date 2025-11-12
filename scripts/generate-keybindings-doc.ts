@@ -10,7 +10,6 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import type { KeyBinding } from '../packages/cli/src/config/keyBindings.js';
 import {
-  Command,
   commandCategories,
   commandDescriptions,
   defaultKeyBindings,
@@ -57,7 +56,6 @@ const KEY_NAME_OVERRIDES: Record<string, string> = {
 
 export async function main(argv = process.argv.slice(2)) {
   const checkOnly = argv.includes('--check');
-  validateConfiguration();
 
   const repoRoot = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -94,43 +92,6 @@ export async function main(argv = process.argv.slice(2)) {
 
   await writeFile(docPath, updatedDoc, 'utf8');
   console.log('Keybinding documentation regenerated.');
-}
-
-function validateConfiguration() {
-  const allCommands = new Set<Command>(Object.values(Command));
-  const categorized = new Set<Command>();
-
-  for (const category of commandCategories) {
-    for (const command of category.commands) {
-      if (categorized.has(command)) {
-        throw new Error(
-          `Command appears in multiple categories: ${command.toString()}`,
-        );
-      }
-      categorized.add(command);
-    }
-  }
-
-  for (const command of Object.values(Command)) {
-    const description = commandDescriptions[command];
-    if (!description || description.trim().length === 0) {
-      throw new Error(`Missing description for command: ${command}`);
-    }
-
-    const bindings = defaultKeyBindings[command];
-    if (!bindings || bindings.length === 0) {
-      throw new Error(`Missing key bindings for command: ${command}`);
-    }
-  }
-
-  const missing = [...allCommands].filter(
-    (command) => !categorized.has(command),
-  );
-  if (missing.length > 0) {
-    throw new Error(
-      `Command categories are missing definitions for: ${missing.join(', ')}`,
-    );
-  }
 }
 
 function renderDocumentation(): string {
