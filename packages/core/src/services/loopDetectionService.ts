@@ -476,7 +476,10 @@ export class LoopDetectionService {
     }
 
     if (this.config.isInFallbackMode()) {
-      this.handleConfirmedLoop(flashResult, 'loop-detection');
+      const flashModelName = this.config.modelConfigService.getResolvedConfig({
+        model: 'loop-detection',
+      }).model;
+      this.handleConfirmedLoop(flashResult, flashModelName);
       return true;
     }
 

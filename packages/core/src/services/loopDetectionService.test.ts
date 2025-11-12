@@ -740,9 +740,14 @@ describe('LoopDetectionService LLM Checks', () => {
       getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),
       isInFallbackMode: vi.fn().mockReturnValue(false),
       modelConfigService: {
-        getResolvedConfig: vi.fn().mockReturnValue({
-          model: 'cognitive-loop-v1',
-          generateContentConfig: {},
+        getResolvedConfig: vi.fn().mockImplementation((key) => {
+          if (key.model === 'loop-detection') {
+            return { model: 'gemini-2.5-flash', generateContentConfig: {} };
+          }
+          return {
+            model: 'cognitive-loop-v1',
+            generateContentConfig: {},
+          };
         }),
       },
       isInteractive: () => false,
@@ -815,7 +820,7 @@ describe('LoopDetectionService LLM Checks', () => {
       expect.objectContaining({
         'event.name': 'loop_detected',
         loop_type: LoopType.LLM_DETECTED_LOOP,
-        confirmed_by_model: 'loop-detection-double-check',
+        confirmed_by_model: 'cognitive-loop-v1',
       }),
     );
   });
@@ -933,7 +938,7 @@ describe('LoopDetectionService LLM Checks', () => {
       expect.objectContaining({
         'event.name': 'loop_detected',
         loop_type: LoopType.LLM_DETECTED_LOOP,
-        confirmed_by_model: 'loop-detection-double-check',
+        confirmed_by_model: 'cognitive-loop-v1',
       }),
     );
   });
@@ -1008,7 +1013,7 @@ describe('LoopDetectionService LLM Checks', () => {
       expect.objectContaining({
         'event.name': 'loop_detected',
         loop_type: LoopType.LLM_DETECTED_LOOP,
-        confirmed_by_model: 'loop-detection',
+        confirmed_by_model: 'gemini-2.5-flash',
       }),
     );
   });
