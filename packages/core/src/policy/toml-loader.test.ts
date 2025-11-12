@@ -20,7 +20,9 @@ describe('policy-toml-loader', () => {
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    if (tempDir) {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
   });
 
   async function runLoadPoliciesFromToml(
