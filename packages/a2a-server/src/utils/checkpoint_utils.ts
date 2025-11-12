@@ -16,7 +16,7 @@ import * as path from 'node:path';
 
 export interface CheckpointInfo {
   messageId: string;
-  checkpointFile: string;
+  checkpoint: string;
 }
 
 let checkpointDirPath: string;
@@ -55,10 +55,10 @@ export async function saveRestorableToolCall(
 
   const checkpointDirPath = getCheckpointDir(config);
   await fs.mkdir(checkpointDirPath, { recursive: true });
-  const fileName = `checkpoint-${uuidv4()}.json`;
-  const filePath = path.join(checkpointDirPath, fileName);
+  const checkpoint = uuidv4();
+  const filePath = path.join(checkpointDirPath, `${checkpoint}.json`);
   await fs.writeFile(filePath, JSON.stringify(toolCallData, null, 2));
-  return fileName;
+  return checkpoint;
 }
 
 export async function listCheckpointFiles(config: Config): Promise<string[]> {
@@ -89,7 +89,7 @@ export async function getCheckpointInfoList(
     if (toolCallData.messageId) {
       checkpointInfoList.push({
         messageId: toolCallData.messageId,
-        checkpointFile: file,
+        checkpoint: file.replace('.json', ''),
       });
     }
   }

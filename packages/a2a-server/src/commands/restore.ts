@@ -15,13 +15,13 @@ import {
   readCheckpointData,
   getCheckpointInfoList,
   getFormattedCheckpointList,
-} from '../utils/checkpointUtils.js';
+} from '../utils/checkpoint_utils.js';
 import { logger } from '../utils/logger.js';
 
 export class RestoreCommand implements Command {
   readonly name = 'restore';
   readonly description =
-    'Restore a previous tool call, or list available tool calls to restore.';
+    'Restore to a previous checkpoint, or list available checkpoints to restore. This will reset the conversation and file history to the state it was in when the checkpoint was created';
   readonly topLevel = true;
   readonly subCommands = [new ListCheckpointsCommand()];
 
@@ -43,7 +43,7 @@ export class RestoreCommand implements Command {
               yield {
                 type: 'message',
                 messageType: 'info',
-                content: 'No restorable tool calls found.',
+                content: 'No restorable checkpoints found.',
               };
             })(),
           };
@@ -55,7 +55,7 @@ export class RestoreCommand implements Command {
             yield {
               type: 'message',
               messageType: 'info',
-              content: `Available tool calls to restore:\n\n${fileList}`,
+              content: `Available checkpoints to restore:\n\n${fileList}`,
             };
           })(),
         };
@@ -81,9 +81,7 @@ export class RestoreCommand implements Command {
       const toolCallData = await readCheckpointData(config, selectedFile);
       const restoreResult = await performRestore(toolCallData, gitService);
 
-      logger.info(
-        `Restore command for "${selectedFile}" completed successfully.`,
-      );
+      logger.info(`[Command] Restored to checkpoint ${argsStr}.`);
 
       return {
         name: this.name,
@@ -96,7 +94,7 @@ export class RestoreCommand implements Command {
           yield {
             type: 'message',
             messageType: 'error',
-            content: `Could not read restorable tool calls. This is the error: ${error}`,
+            content: `Could not read restorable checkpoints. This is the error: ${error}`,
           };
         })(),
       };

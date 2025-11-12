@@ -40,7 +40,6 @@ export async function* performRestore(
         content: 'Restored project to the state before the tool call.',
       };
     } catch (e) {
-      console.error('Error restoring project from commit hash:', e);
       const error = e as Error;
       if (error.message.includes('unable to read tree')) {
         yield {

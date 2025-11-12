@@ -112,6 +112,11 @@ export class GitService {
     try {
       const repo = this.shadowGitRepository;
       await repo.add('.');
+      const status = await repo.status();
+      if (status.isClean()) {
+        // If no changes are staged, return the current HEAD commit hash
+        return this.getCurrentCommitHash();
+      }
       const commitResult = await repo.commit(message);
       return commitResult.commit;
     } catch (error) {

@@ -37,6 +37,7 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  LlmLoopCheckEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -92,6 +93,7 @@ export enum EventNames {
   AGENT_FINISH = 'agent_finish',
   RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
+  LLM_LOOP_CHECK = 'llm_loop_check',
 }
 
 export interface LogResponse {
@@ -101,6 +103,7 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
+  gws_experiment: number[];
 }
 
 export interface EventValue {
@@ -236,6 +239,7 @@ export class ClearcutLogger {
         {
           event_time_ms: Date.now(),
           source_extension_json: safeJsonStringify(event),
+          gws_experiment: this.config?.getExperiments()?.experimentIds ?? [],
         },
       ]);
 
@@ -732,6 +736,14 @@ export class ClearcutLogger {
         value: JSON.stringify(event.loop_type),
       },
     ];
+
+    if (event.confirmed_by_model) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL,
+        value: event.confirmed_by_model,
+      });
+    }
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
     this.flushIfNeeded();
@@ -1267,6 +1279,32 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logLlmLoopCheckEvent(event: LlmLoopCheckEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: event.prompt_id,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_FLASH_CONFIDENCE,
+        value: event.flash_confidence.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL,
+        value: event.main_model,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL_CONFIDENCE,
+        value: event.main_model_confidence.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.LLM_LOOP_CHECK, data));
+    this.flushIfNeeded();
+  }
+
   /**
    * Adds default fields to data, and returns a new data array.  This fields
    * should exist on all log events.
@@ -1298,6 +1336,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: this.getConfigJson(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_INTERACTIVE,
+        value: this.config?.isInteractive().toString() ?? 'false',
       },
     ];
     return [...data, ...defaultLogMetadata];
