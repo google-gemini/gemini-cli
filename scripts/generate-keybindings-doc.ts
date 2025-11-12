@@ -54,6 +54,16 @@ const KEY_NAME_OVERRIDES: Record<string, string> = {
   f12: 'F12',
 };
 
+export interface KeybindingDocCommand {
+  description: string;
+  bindings: readonly KeyBinding[];
+}
+
+export interface KeybindingDocSection {
+  title: string;
+  commands: readonly KeybindingDocCommand[];
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const checkOnly = argv.includes('--check');
 
@@ -63,7 +73,8 @@ export async function main(argv = process.argv.slice(2)) {
   );
   const docPath = path.join(repoRoot, ...OUTPUT_RELATIVE_PATH);
 
-  const generatedBlock = renderDocumentation();
+  const sections = buildDefaultDocSections();
+  const generatedBlock = renderDocumentation(sections);
   const currentDoc = await readFile(docPath, 'utf8');
   const injectedDoc = injectBetweenMarkers({
     document: currentDoc,
@@ -94,18 +105,28 @@ export async function main(argv = process.argv.slice(2)) {
   console.log('Keybinding documentation regenerated.');
 }
 
-function renderDocumentation(): string {
-  const sections = commandCategories.map((category) => {
-    const rows = category.commands.map((command) => {
-      const bindings = defaultKeyBindings[command];
-      const formattedBindings = formatBindings(bindings);
-      const description = commandDescriptions[command];
+export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
+  return commandCategories.map((category) => ({
+    title: category.title,
+    commands: category.commands.map((command) => ({
+      description: commandDescriptions[command],
+      bindings: defaultKeyBindings[command],
+    })),
+  }));
+}
+
+export function renderDocumentation(
+  sections: readonly KeybindingDocSection[],
+): string {
+  const renderedSections = sections.map((section) => {
+    const rows = section.commands.map((command) => {
+      const formattedBindings = formatBindings(command.bindings);
       const keysCell = formattedBindings.join('<br />');
-      return `| ${description} | ${keysCell} |`;
+      return `| ${command.description} | ${keysCell} |`;
     });
 
     return [
-      `#### ${category.title}`,
+      `#### ${section.title}`,
       '',
       '| Action | Keys |',
       '| --- | --- |',
@@ -113,7 +134,7 @@ function renderDocumentation(): string {
     ].join('\n');
   });
 
-  return sections.join('\n\n');
+  return renderedSections.join('\n\n');
 }
 
 function formatBindings(bindings: readonly KeyBinding[]): string[] {

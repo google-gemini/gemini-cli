@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { main as generateKeybindingDocs } from '../generate-keybindings-doc.ts';
+import {
+  main as generateKeybindingDocs,
+  renderDocumentation,
+  type KeybindingDocSection,
+} from '../generate-keybindings-doc.ts';
 
 describe('generate-keybindings-doc', () => {
   it('keeps keyboard shortcut documentation in sync in check mode', async () => {
@@ -19,5 +23,30 @@ describe('generate-keybindings-doc', () => {
     } finally {
       process.exitCode = previousExitCode;
     }
+  });
+
+  it('renders provided sections into markdown tables', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'Custom Controls',
+        commands: [
+          {
+            description: 'Trigger custom action.',
+            bindings: [{ key: 'x', ctrl: true }],
+          },
+          {
+            description: 'Submit with Enter if no modifiers are held.',
+            bindings: [{ key: 'return', ctrl: false, shift: false }],
+          },
+        ],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    expect(markdown).toContain('#### Custom Controls');
+    expect(markdown).toContain('Trigger custom action.');
+    expect(markdown).toContain('`Ctrl + X`');
+    expect(markdown).toContain('Submit with Enter if no modifiers are held.');
+    expect(markdown).toContain('`Enter (no Ctrl, no Shift)`');
   });
 });
