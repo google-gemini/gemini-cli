@@ -199,3 +199,135 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
 };
+
+interface CommandCategory {
+  readonly title: string;
+  readonly commands: readonly Command[];
+}
+
+/**
+ * Presentation metadata for grouping commands in documentation or UI.
+ */
+export const commandCategories: readonly CommandCategory[] = [
+  {
+    title: 'Basic Controls',
+    commands: [Command.RETURN, Command.ESCAPE],
+  },
+  {
+    title: 'Cursor Movement',
+    commands: [Command.HOME, Command.END],
+  },
+  {
+    title: 'Editing',
+    commands: [
+      Command.KILL_LINE_RIGHT,
+      Command.KILL_LINE_LEFT,
+      Command.CLEAR_INPUT,
+      Command.DELETE_WORD_BACKWARD,
+    ],
+  },
+  {
+    title: 'Screen Control',
+    commands: [Command.CLEAR_SCREEN],
+  },
+  {
+    title: 'History & Search',
+    commands: [
+      Command.HISTORY_UP,
+      Command.HISTORY_DOWN,
+      Command.REVERSE_SEARCH,
+      Command.SUBMIT_REVERSE_SEARCH,
+      Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
+    ],
+  },
+  {
+    title: 'Navigation',
+    commands: [
+      Command.NAVIGATION_UP,
+      Command.NAVIGATION_DOWN,
+      Command.DIALOG_NAVIGATION_UP,
+      Command.DIALOG_NAVIGATION_DOWN,
+    ],
+  },
+  {
+    title: 'Suggestions & Completions',
+    commands: [
+      Command.ACCEPT_SUGGESTION,
+      Command.COMPLETION_UP,
+      Command.COMPLETION_DOWN,
+      Command.EXPAND_SUGGESTION,
+      Command.COLLAPSE_SUGGESTION,
+    ],
+  },
+  {
+    title: 'Text Input',
+    commands: [Command.SUBMIT, Command.NEWLINE],
+  },
+  {
+    title: 'External Tools',
+    commands: [Command.OPEN_EXTERNAL_EDITOR, Command.PASTE_CLIPBOARD_IMAGE],
+  },
+  {
+    title: 'App Controls',
+    commands: [
+      Command.SHOW_ERROR_DETAILS,
+      Command.SHOW_FULL_TODOS,
+      Command.TOGGLE_IDE_CONTEXT_DETAIL,
+      Command.TOGGLE_MARKDOWN,
+      Command.TOGGLE_COPY_MODE,
+      Command.SHOW_MORE_LINES,
+      Command.TOGGLE_SHELL_INPUT_FOCUS,
+    ],
+  },
+  {
+    title: 'Session Control',
+    commands: [Command.QUIT, Command.EXIT],
+  },
+];
+
+/**
+ * Human-readable descriptions for each command, used in docs/tooling.
+ */
+export const commandDescriptions: Readonly<Record<Command, string>> = {
+  [Command.RETURN]: 'Confirm the current selection or choice.',
+  [Command.ESCAPE]: 'Dismiss dialogs or cancel the current focus.',
+  [Command.HOME]: 'Move the cursor to the start of the line.',
+  [Command.END]: 'Move the cursor to the end of the line.',
+  [Command.KILL_LINE_RIGHT]: 'Delete from the cursor to the end of the line.',
+  [Command.KILL_LINE_LEFT]: 'Delete from the cursor to the start of the line.',
+  [Command.CLEAR_INPUT]: 'Clear all text in the input field.',
+  [Command.DELETE_WORD_BACKWARD]: 'Delete the previous word.',
+  [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.HISTORY_UP]: 'Show the previous entry in history.',
+  [Command.HISTORY_DOWN]: 'Show the next entry in history.',
+  [Command.NAVIGATION_UP]: 'Move selection up in lists.',
+  [Command.NAVIGATION_DOWN]: 'Move selection down in lists.',
+  [Command.DIALOG_NAVIGATION_UP]: 'Move up within dialog options.',
+  [Command.DIALOG_NAVIGATION_DOWN]: 'Move down within dialog options.',
+  [Command.ACCEPT_SUGGESTION]: 'Accept the inline suggestion.',
+  [Command.COMPLETION_UP]: 'Move to the previous completion option.',
+  [Command.COMPLETION_DOWN]: 'Move to the next completion option.',
+  [Command.SUBMIT]: 'Submit the current prompt.',
+  [Command.NEWLINE]: 'Insert a newline without submitting.',
+  [Command.OPEN_EXTERNAL_EDITOR]:
+    'Open the current prompt in an external editor.',
+  [Command.PASTE_CLIPBOARD_IMAGE]: 'Paste an image from the clipboard.',
+  [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
+  [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
+  [Command.TOGGLE_IDE_CONTEXT_DETAIL]: 'Toggle IDE context details.',
+  [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
+  [Command.TOGGLE_COPY_MODE]:
+    'Toggle copy mode when the terminal is using the alternate buffer.',
+  [Command.QUIT]: 'Cancel the current request or quit the CLI.',
+  [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
+  [Command.SHOW_MORE_LINES]:
+    'Expand a height-constrained response to show additional lines.',
+  [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
+  [Command.SUBMIT_REVERSE_SEARCH]: 'Insert the selected reverse-search match.',
+  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
+    'Accept a suggestion while reverse searching.',
+  [Command.TOGGLE_SHELL_INPUT_FOCUS]:
+    'Toggle focus between the shell and Gemini input.',
+  [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
+  [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+};
