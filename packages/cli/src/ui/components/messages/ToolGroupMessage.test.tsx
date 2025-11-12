@@ -6,59 +6,10 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
-import { Text } from 'ink';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
-import type { ToolCallConfirmationDetails } from '@google/gemini-cli-core';
-import { TOOL_STATUS } from '../../constants.js';
-
-// Mock child components to isolate ToolGroupMessage behavior
-vi.mock('./ToolMessage.js', () => ({
-  ToolMessage: function MockToolMessage({
-    callId,
-    name,
-    description,
-    status,
-    emphasis,
-  }: {
-    callId: string;
-    name: string;
-    description: string;
-    status: ToolCallStatus;
-    emphasis: string;
-  }) {
-    // Use the same constants as the real component
-    const statusSymbolMap: Record<ToolCallStatus, string> = {
-      [ToolCallStatus.Success]: TOOL_STATUS.SUCCESS,
-      [ToolCallStatus.Pending]: TOOL_STATUS.PENDING,
-      [ToolCallStatus.Executing]: TOOL_STATUS.EXECUTING,
-      [ToolCallStatus.Confirming]: TOOL_STATUS.CONFIRMING,
-      [ToolCallStatus.Canceled]: TOOL_STATUS.CANCELED,
-      [ToolCallStatus.Error]: TOOL_STATUS.ERROR,
-    };
-    const statusSymbol = statusSymbolMap[status] || '?';
-    return (
-      <Text>
-        MockTool[{callId}]: {statusSymbol} {name} - {description} ({emphasis})
-      </Text>
-    );
-  },
-}));
-
-vi.mock('./ToolConfirmationMessage.js', () => ({
-  ToolConfirmationMessage: function MockToolConfirmationMessage({
-    confirmationDetails,
-  }: {
-    confirmationDetails: ToolCallConfirmationDetails;
-  }) {
-    const displayText =
-      confirmationDetails?.type === 'info'
-        ? (confirmationDetails as { prompt: string }).prompt
-        : confirmationDetails?.title || 'confirm';
-    return <Text>MockConfirmation: {displayText}</Text>;
-  },
-}));
+import { Scrollable } from '../shared/Scrollable.js';
 
 describe('<ToolGroupMessage />', () => {
   const createToolCall = (
@@ -246,6 +197,45 @@ describe('<ToolGroupMessage />', () => {
     it('renders empty tool calls array', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={[]} />,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders sticky header when scrolled', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: '1',
+          name: 'tool-1',
+          description: 'Description 1\n'.repeat(5),
+        }),
+        createToolCall({
+          callId: '2',
+          name: 'tool-2',
+          description: 'Description 2\n'.repeat(5),
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />
+        </Scrollable>,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders tool call with outputFile', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-output-file',
+          name: 'tool-with-file',
+          description: 'Tool that saved output to file',
+          status: ToolCallStatus.Success,
+          outputFile: '/path/to/output.txt',
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
