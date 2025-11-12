@@ -493,7 +493,7 @@ export class LoopDetectionService {
         this.promptId,
         flashConfidence,
         doubleCheckModel,
-        this.isValidResult(mainModelResult) ? mainModelConfidence : 0,
+        mainModelConfidence,
       ),
     );
 
