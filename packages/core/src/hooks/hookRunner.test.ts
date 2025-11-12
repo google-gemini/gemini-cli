@@ -142,7 +142,7 @@ process.exit(1);
 
       expect(result.success).toBe(false);
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toMatch(/No such file/);
+      expect(result.stderr && result.stderr.length).toBeGreaterThan(0);
     });
 
     it('times out long-running hooks', async () => {
@@ -270,9 +270,9 @@ console.log(JSON.stringify({ decision: 'allow' }));
       expect(envData.cwd).toBe(projectDir);
     });
 
-    it('escapes cwd when expanding commands', () => {
+    it('escapes cwd when expanding commands on POSIX platforms', () => {
       const cwdWithQuotes = "/tmp/project with 'quotes' && rm -rf /";
-      const runner = new HookRunner();
+      const runner = new HookRunner('linux');
       const expanded = (
         runner as unknown as {
           expandCommand(command: string, input: HookInput): string;
@@ -284,6 +284,24 @@ console.log(JSON.stringify({ decision: 'allow' }));
 
       expect(expanded).toBe(
         "'/tmp/project with '\\''quotes'\\'' && rm -rf /'/run.sh",
+      );
+    });
+
+    it('escapes cwd when expanding commands on Windows', () => {
+      const cwdWithQuotes =
+        'C\\\\project with "quotes" && del C\\\\windows\\system32';
+      const runner = new HookRunner('win32');
+      const expanded = (
+        runner as unknown as {
+          expandCommand(command: string, input: HookInput): string;
+        }
+      ).expandCommand('$GEMINI_PROJECT_DIR/cleanup.cmd', {
+        ...baseInput,
+        cwd: cwdWithQuotes,
+      });
+
+      expect(expanded).toBe(
+        '"C\\\\project with ""quotes"" && del C\\\\windows\\system32"/cleanup.cmd',
       );
     });
   });

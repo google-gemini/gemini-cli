@@ -34,7 +34,7 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
  * Hook runner that executes command hooks
  */
 export class HookRunner {
-  constructor() {}
+  constructor(private readonly platform: NodeJS.Platform = process.platform) {}
 
   /**
    * Execute a single hook
@@ -334,10 +334,23 @@ export class HookRunner {
    * Wrap a value so the shell treats it as a literal argument.
    */
   private escapeShellArg(value: string): string {
+    if (this.platform === 'win32') {
+      return this.escapeWindowsShellArg(value);
+    }
+    return this.escapePosixShellArg(value);
+  }
+
+  private escapePosixShellArg(value: string): string {
     // Single quotes prevent the shell from interpreting metacharacters.
     // Any embedded single quote is escaped by closing, inserting '\'',
     // then reopening the quote (POSIX-compliant technique).
     return `'${value.replace(/'/g, "'\\''")}'`;
+  }
+
+  private escapeWindowsShellArg(value: string): string {
+    // Double quotes protect spaces and metacharacters in cmd.exe.
+    // Double any embedded double quotes so they are interpreted literally.
+    return `"${value.replace(/"/g, '""')}"`;
   }
 
   /**
