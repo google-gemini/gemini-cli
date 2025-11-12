@@ -51,6 +51,31 @@ export interface GenerateJsonOptions {
 }
 
 /**
+ * Options for the generateContent utility function.
+ */
+export interface GenerateContentOptions {
+  /** The desired model config. */
+  modelConfigKey: ModelConfigKey;
+  /** The input prompt or history. */
+  contents: Content[];
+  /**
+   * Task-specific system instructions.
+   * If omitted, no system instruction is sent.
+   */
+  systemInstruction?: string | Part | Part[] | Content;
+  /** Signal for cancellation. */
+  abortSignal: AbortSignal;
+  /**
+   * A unique ID for the prompt, used for logging/telemetry correlation.
+   */
+  promptId: string;
+  /**
+   * The maximum number of attempts for the request.
+   */
+  maxAttempts?: number;
+}
+
+/**
  * A client dedicated to stateless, utility-focused LLM calls.
  */
 export class BaseLlmClient {
@@ -62,88 +87,47 @@ export class BaseLlmClient {
   async generateJson(
     options: GenerateJsonOptions,
   ): Promise<Record<string, unknown>> {
-    const {
-      modelConfigKey,
-      contents,
-      schema,
-      abortSignal,
-      systemInstruction,
-      promptId,
-      maxAttempts,
-    } = options;
+    const { schema, modelConfigKey } = options;
 
-    const { model, generateContentConfig } =
-      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
-    const requestConfig: GenerateContentConfig = {
-      abortSignal,
-      ...generateContentConfig,
-      ...(systemInstruction && { systemInstruction }),
+    const customizeRequestConfig = (config: GenerateContentConfig) => ({
+      ...config,
       responseJsonSchema: schema,
       responseMimeType: 'application/json',
+    });
+
+    const shouldRetryOnContent = (response: GenerateContentResponse) => {
+      const text = getResponseText(response)?.trim();
+      if (!text) {
+        return true; // Retry on empty response
+      }
+      try {
+        // We don't use the result, just check if it's valid JSON
+        JSON.parse(
+          this.cleanJsonResponse(
+            text,
+            modelConfigKey.model /* model name or alias */,
+          ),
+        );
+        return false; // It's valid, don't retry
+      } catch (_e) {
+        return true; // It's not valid, retry
+      }
     };
 
-    try {
-      const apiCall = () =>
-        this.contentGenerator.generateContent(
-          {
-            model,
-            config: requestConfig,
-            contents,
-          },
-          promptId,
-        );
+    const result = await this._generateWithRetry(
+      options,
+      customizeRequestConfig,
+      shouldRetryOnContent,
+      'generateJson',
+    );
 
-      const shouldRetryOnContent = (response: GenerateContentResponse) => {
-        const text = getResponseText(response)?.trim();
-        if (!text) {
-          return true; // Retry on empty response
-        }
-        try {
-          JSON.parse(this.cleanJsonResponse(text, model));
-          return false;
-        } catch (_e) {
-          return true;
-        }
-      };
-
-      const result = await retryWithBackoff(apiCall, {
-        shouldRetryOnContent,
-        maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
-      });
-
-      // If we are here, the content is valid (not empty and parsable).
-      return JSON.parse(
-        this.cleanJsonResponse(getResponseText(result)!.trim(), model),
-      );
-    } catch (error) {
-      if (abortSignal.aborted) {
-        throw error;
-      }
-
-      // Check if the error is from exhausting retries, and report accordingly.
-      if (
-        error instanceof Error &&
-        error.message.includes('Retry attempts exhausted')
-      ) {
-        await reportError(
-          error,
-          'API returned invalid content (empty or unparsable JSON) after all retries.',
-          contents,
-          'generateJson-invalid-content',
-        );
-      } else {
-        await reportError(
-          error,
-          'Error generating JSON content via API.',
-          contents,
-          'generateJson-api',
-        );
-      }
-
-      throw new Error(
-        `Failed to generate JSON content: ${getErrorMessage(error)}`,
-      );
-    }
+    // If we are here, the content is valid (not empty and parsable).
+    return JSON.parse(
+      this.cleanJsonResponse(
+        getResponseText(result)!.trim(),
+        modelConfigKey.model,
+      ),
+    );
   }
 
   async generateEmbedding(texts: string[]): Promise<number[][]> {
@@ -192,5 +176,93 @@ export class BaseLlmClient {
       return text.substring(prefix.length, text.length - suffix.length).trim();
     }
     return text;
+  }
+
+  async generateContent(
+    options: GenerateContentOptions,
+  ): Promise<GenerateContentResponse> {
+    const shouldRetryOnContent = (response: GenerateContentResponse) => {
+      const text = getResponseText(response)?.trim();
+      return !text; // Retry on empty response
+    };
+
+    return this._generateWithRetry(
+      options,
+      (config) => config, // No special config customization needed
+      shouldRetryOnContent,
+      'generateContent',
+    );
+  }
+
+  private async _generateWithRetry(
+    options: GenerateContentOptions,
+    customizeRequestConfig: (
+      config: GenerateContentConfig,
+    ) => GenerateContentConfig,
+    shouldRetryOnContent: (response: GenerateContentResponse) => boolean,
+    errorContext: 'generateJson' | 'generateContent',
+  ): Promise<GenerateContentResponse> {
+    const {
+      modelConfigKey,
+      contents,
+      abortSignal,
+      systemInstruction,
+      promptId,
+      maxAttempts,
+    } = options;
+
+    const { model, generateContentConfig } =
+      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+
+    const baseRequestConfig: GenerateContentConfig = {
+      abortSignal,
+      ...generateContentConfig,
+      ...(systemInstruction && { systemInstruction }),
+    };
+
+    const requestConfig = customizeRequestConfig(baseRequestConfig);
+
+    try {
+      const apiCall = () =>
+        this.contentGenerator.generateContent(
+          {
+            model,
+            config: requestConfig,
+            contents,
+          },
+          promptId,
+        );
+
+      return await retryWithBackoff(apiCall, {
+        shouldRetryOnContent,
+        maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      });
+    } catch (error) {
+      if (abortSignal.aborted) {
+        throw error;
+      }
+
+      // Check if the error is from exhausting retries, and report accordingly.
+      if (
+        error instanceof Error &&
+        error.message.includes('Retry attempts exhausted')
+      ) {
+        await reportError(
+          error,
+          `API returned invalid content after all retries.`,
+          contents,
+          `${errorContext}-invalid-content`,
+        );
+      } else {
+        await reportError(
+          error,
+          `Error generating content via API.`,
+          contents,
+          `${errorContext}-api`,
+        );
+      }
+
+      throw new Error(`Failed to generate content: ${getErrorMessage(error)}`);
+    }
   }
 }

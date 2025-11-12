@@ -153,5 +153,20 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
+    'chat-compression-pro': {
+      modelConfig: {
+        model: 'gemini-2.5-pro',
+      },
+    },
+    'chat-compression-flash': {
+      modelConfig: {
+        model: 'gemini-2.5-flash',
+      },
+    },
+    'chat-compression-flash-lite': {
+      modelConfig: {
+        model: 'gemini-2.5-flash-lite',
+      },
+    },
   },
 };
