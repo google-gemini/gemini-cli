@@ -89,6 +89,7 @@ const mockConfig = {
     flags: {},
     experimentIds: [],
   }),
+  getPreviewFeatures: () => false,
 } as unknown as Config;
 
 describe('AlternateBufferQuittingDisplay', () => {
