@@ -120,17 +120,17 @@ export const renderWithProviders = (
     settings = mockSettings,
     uiState: providedUiState,
     width,
-    kittyProtocolEnabled = true,
     mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
+    useAlternateBuffer,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
-    kittyProtocolEnabled?: boolean;
     mouseEventsEnabled?: boolean;
     config?: Config;
+    useAlternateBuffer?: boolean;
   } = {},
 ): ReturnType<typeof render> => {
   const baseState: UIState = new Proxy(
@@ -152,7 +152,18 @@ export const renderWithProviders = (
   ) as UIState;
 
   const terminalWidth = width ?? baseState.terminalWidth;
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
+  let finalSettings = settings;
+  if (useAlternateBuffer !== undefined) {
+    finalSettings = createMockSettings({
+      ...settings.merged,
+      ui: {
+        ...settings.merged.ui,
+        useAlternateBuffer,
+      },
+    });
+  }
+
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, finalSettings);
 
   const finalUiState = {
     ...baseState,
@@ -162,11 +173,11 @@ export const renderWithProviders = (
 
   return render(
     <ConfigContext.Provider value={config}>
-      <SettingsContext.Provider value={settings}>
+      <SettingsContext.Provider value={finalSettings}>
         <UIStateContext.Provider value={finalUiState}>
-          <VimModeProvider settings={settings}>
+          <VimModeProvider settings={finalSettings}>
             <ShellFocusContext.Provider value={shellFocus}>
-              <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
+              <KeypressProvider>
                 <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
                   <ScrollProvider>
                     <Box
