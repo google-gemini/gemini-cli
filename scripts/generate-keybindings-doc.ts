@@ -15,7 +15,11 @@ import {
   commandDescriptions,
   defaultKeyBindings,
 } from '../packages/cli/src/config/keyBindings.js';
-import { formatWithPrettier, normalizeForCompare } from './utils/autogen.js';
+import {
+  formatWithPrettier,
+  injectBetweenMarkers,
+  normalizeForCompare,
+} from './utils/autogen.js';
 
 const START_MARKER = '<!-- KEYBINDINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- KEYBINDINGS-AUTOGEN:END -->';
@@ -63,22 +67,15 @@ export async function main(argv = process.argv.slice(2)) {
 
   const generatedBlock = renderDocumentation();
   const currentDoc = await readFile(docPath, 'utf8');
-
-  const startIndex = currentDoc.indexOf(START_MARKER);
-  const endIndex = currentDoc.indexOf(END_MARKER);
-
-  if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
-    throw new Error(
-      `Could not locate documentation markers (${START_MARKER}, ${END_MARKER}).`,
-    );
-  }
-
-  const before = currentDoc.slice(0, startIndex + START_MARKER.length);
-  const after = currentDoc.slice(endIndex);
-  const updatedDoc = await formatWithPrettier(
-    `${before}\n\n${generatedBlock}\n${after}`,
-    docPath,
-  );
+  const injectedDoc = injectBetweenMarkers({
+    document: currentDoc,
+    startMarker: START_MARKER,
+    endMarker: END_MARKER,
+    newContent: generatedBlock,
+    paddingBefore: '\n\n',
+    paddingAfter: '\n',
+  });
+  const updatedDoc = await formatWithPrettier(injectedDoc, docPath);
 
   if (normalizeForCompare(updatedDoc) === normalizeForCompare(currentDoc)) {
     if (!checkOnly) {
