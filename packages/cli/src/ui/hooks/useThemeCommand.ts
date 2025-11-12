@@ -6,7 +6,10 @@
 
 import { useState, useCallback } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
-import type { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, MessageType } from '../types.js';
 import process from 'node:process';
 
@@ -14,7 +17,7 @@ interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
   openThemeDialog: () => void;
   closeThemeDialog: () => void;
-  handleThemeSelect: (themeName: string, scope: SettingScope) => void;
+  handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
 
@@ -68,7 +71,7 @@ export const useThemeCommand = (
   }, [applyTheme, loadedSettings]);
 
   const handleThemeSelect = useCallback(
-    (themeName: string, scope: SettingScope) => {
+    (themeName: string, scope: LoadableSettingScope) => {
       try {
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {

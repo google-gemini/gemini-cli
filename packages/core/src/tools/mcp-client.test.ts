@@ -89,6 +89,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -153,6 +154,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -237,6 +239,7 @@ describe('mcp-client', () => {
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -286,6 +289,7 @@ describe('mcp-client', () => {
       } as unknown as GenAiLib.CallableTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
+        sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
       const client = new McpClient(
@@ -302,6 +306,72 @@ describe('mcp-client', () => {
       await client.discover({} as Config);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+    });
+
+    it('should remove tools and prompts on disconnect', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        close: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ tools: {}, prompts: {} }),
+        request: vi.fn().mockResolvedValue({
+          prompts: [{ id: 'prompt1', text: 'a prompt' }],
+        }),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'testTool',
+                description: 'A test tool',
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        unregisterTool: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+        removeMcpToolsByServer: vi.fn(),
+        sortTools: vi.fn(),
+      } as unknown as ToolRegistry;
+      const mockedPromptRegistry = {
+        registerPrompt: vi.fn(),
+        unregisterPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        mockedPromptRegistry,
+        workspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover({} as Config);
+
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      expect(mockedPromptRegistry.registerPrompt).toHaveBeenCalledOnce();
+
+      await client.disconnect();
+
+      expect(mockedClient.close).toHaveBeenCalledOnce();
+      expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledOnce();
+      expect(mockedPromptRegistry.removePromptsByServer).toHaveBeenCalledOnce();
     });
   });
   describe('appendMcpServerCommand', () => {
@@ -431,6 +501,9 @@ describe('mcp-client', () => {
             oauth: {
               scopes: ['scope1'],
             },
+            headers: {
+              'X-Goog-User-Project': 'myproject',
+            },
           },
           false,
         );
@@ -439,6 +512,11 @@ describe('mcp-client', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const authProvider = (transport as any)._authProvider;
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const googUserProject = (transport as any)._requestInit?.headers?.[
+          'X-Goog-User-Project'
+        ];
+        expect(googUserProject).toBe('myproject');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {

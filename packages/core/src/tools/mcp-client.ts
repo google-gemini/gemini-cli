@@ -151,6 +151,7 @@ export class McpClient {
     for (const tool of tools) {
       this.toolRegistry.registerTool(tool);
     }
+    this.toolRegistry.sortTools();
   }
 
   /**
@@ -161,6 +162,7 @@ export class McpClient {
       return;
     }
     this.toolRegistry.removeMcpToolsByServer(this.serverName);
+    this.promptRegistry.removePromptsByServer(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -207,6 +209,10 @@ export class McpClient {
   private async discoverPrompts(): Promise<Prompt[]> {
     this.assertConnected();
     return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
+  }
+
+  getServerConfig(): MCPServerConfig {
+    return this.serverConfig;
   }
 }
 
@@ -389,6 +395,24 @@ async function handleAutomaticOAuth(
 }
 
 /**
+ * Create RequestInit for TransportOptions.
+ *
+ * @param mcpServerConfig The MCP server configuration
+ * @param headers Additional headers
+ */
+function createTransportRequestInit(
+  mcpServerConfig: MCPServerConfig,
+  headers: Record<string, string>,
+): RequestInit {
+  return {
+    headers: {
+      ...mcpServerConfig.headers,
+      ...headers,
+    },
+  };
+}
+
+/**
  * Create a transport with OAuth token for the given server configuration.
  *
  * @param mcpServerName The name of the MCP server
@@ -405,12 +429,9 @@ async function createTransportWithOAuth(
     if (mcpServerConfig.httpUrl) {
       // Create HTTP transport with OAuth token
       const oauthTransportOptions: StreamableHTTPClientTransportOptions = {
-        requestInit: {
-          headers: {
-            ...mcpServerConfig.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
+        requestInit: createTransportRequestInit(mcpServerConfig, {
+          Authorization: `Bearer ${accessToken}`,
+        }),
       };
 
       return new StreamableHTTPClientTransport(
@@ -420,12 +441,9 @@ async function createTransportWithOAuth(
     } else if (mcpServerConfig.url) {
       // Create SSE transport with OAuth token in Authorization header
       return new SSEClientTransport(new URL(mcpServerConfig.url), {
-        requestInit: {
-          headers: {
-            ...mcpServerConfig.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
+        requestInit: createTransportRequestInit(mcpServerConfig, {
+          Authorization: `Bearer ${accessToken}`,
+        }),
       });
     }
 
@@ -563,6 +581,7 @@ export async function connectAndDiscover(
     for (const tool of tools) {
       toolRegistry.registerTool(tool);
     }
+    toolRegistry.sortTools();
   } catch (error) {
     if (mcpClient) {
       mcpClient.close();
@@ -632,15 +651,6 @@ export async function discoverTools(
           mcpServerConfig.extension?.id,
           messageBus,
         );
-
-        if (
-          cliConfig.getDebugMode?.() &&
-          cliConfig.getEnableMessageBusIntegration?.()
-        ) {
-          debugLogger.log(
-            `[DEBUG] Discovered MCP tool '${funcDecl.name}' from server '${mcpServerName}' with messageBus: ${messageBus ? 'YES' : 'NO'}`,
-          );
-        }
 
         discoveredTools.push(tool);
       } catch (error) {
@@ -1172,6 +1182,7 @@ export async function createTransport(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
+      requestInit: createTransportRequestInit(mcpServerConfig, {}),
       authProvider: provider,
     };
 
@@ -1199,6 +1210,7 @@ export async function createTransport(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
+      requestInit: createTransportRequestInit(mcpServerConfig, {}),
       authProvider: provider,
     };
     if (mcpServerConfig.httpUrl) {

@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.13.0-nightly.20251031.c89bc30d",
+  "version": "0.16.0-nightly.20251112.c961f274",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.13.0-nightly.20251031.c89bc30d"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.16.0-nightly.20251112.c961f274"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -27,6 +27,9 @@
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
+    "predocs:settings": "npm run build --workspace @google/gemini-cli-core",
+    "schema:settings": "tsx ./scripts/generate-settings-schema.ts",
+    "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
     "build": "node scripts/build.js",
     "build-and-start": "npm run build && npm run start",
     "build:vscode": "node scripts/build_vscode_companion.js",
@@ -58,7 +61,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.0",
+    "ink": "npm:@jrichman/ink@6.4.2",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -97,7 +100,6 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
-    "ink": "npm:@jrichman/ink@6.4.0",
     "ink-testing-library": "^4.0.0",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
@@ -116,6 +118,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "ink": "npm:@jrichman/ink@6.4.2",
     "latest-version": "^9.0.0",
     "simple-git": "^3.28.0"
   },

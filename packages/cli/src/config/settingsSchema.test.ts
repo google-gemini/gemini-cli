@@ -7,6 +7,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   getSettingsSchema,
+  SETTINGS_SCHEMA_DEFINITIONS,
+  type SettingCollectionDefinition,
   type SettingDefinition,
   type Settings,
   type SettingsSchema,
@@ -333,6 +335,52 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().experimental.properties.useModelRouter.default,
       ).toBe(true);
+    });
+  });
+
+  it('has JSON schema definitions for every referenced ref', () => {
+    const schema = getSettingsSchema();
+    const referenced = new Set<string>();
+
+    const visitDefinition = (definition: SettingDefinition) => {
+      if (definition.ref) {
+        referenced.add(definition.ref);
+        expect(SETTINGS_SCHEMA_DEFINITIONS).toHaveProperty(definition.ref);
+      }
+      if (definition.properties) {
+        Object.values(definition.properties).forEach(visitDefinition);
+      }
+      if (definition.items) {
+        visitCollection(definition.items);
+      }
+      if (definition.additionalProperties) {
+        visitCollection(definition.additionalProperties);
+      }
+    };
+
+    const visitCollection = (collection: SettingCollectionDefinition) => {
+      if (collection.ref) {
+        referenced.add(collection.ref);
+        expect(SETTINGS_SCHEMA_DEFINITIONS).toHaveProperty(collection.ref);
+        return;
+      }
+      if (collection.properties) {
+        Object.values(collection.properties).forEach(visitDefinition);
+      }
+      if (collection.type === 'array' && collection.properties) {
+        Object.values(collection.properties).forEach(visitDefinition);
+      }
+    };
+
+    Object.values(schema).forEach(visitDefinition);
+
+    // Ensure definitions map doesn't accumulate stale entries.
+    Object.keys(SETTINGS_SCHEMA_DEFINITIONS).forEach((key) => {
+      if (!referenced.has(key)) {
+        throw new Error(
+          `Definition "${key}" is exported but never referenced in the schema`,
+        );
+      }
     });
   });
 });

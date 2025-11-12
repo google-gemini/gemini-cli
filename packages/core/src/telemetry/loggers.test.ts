@@ -192,11 +192,9 @@ describe('loggers', () => {
         getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringAllowBuildArtifacts: () => false,
         getDebugMode: () => true,
-        getMcpServers: () => ({
-          'test-server': {
-            command: 'test-command',
-          },
-        }),
+        getMcpServers: () => {
+          throw new Error('Should not call');
+        },
         getQuestion: () => 'test-question',
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
@@ -206,6 +204,14 @@ describe('loggers', () => {
             { name: 'ext-one', id: 'id-one' },
             { name: 'ext-two', id: 'id-two' },
           ] as GeminiCLIExtension[],
+        getMcpClientManager: () => ({
+          getMcpServers: () => ({
+            'test-server': {
+              command: 'test-command',
+            },
+          }),
+        }),
+        isInteractive: () => false,
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -219,6 +225,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_CLI_CONFIG,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           model: 'test-model',
           embedding_model: 'test-embedding-model',
           sandbox_enabled: true,
@@ -249,6 +256,7 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -269,6 +277,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           prompt_length: 11,
           prompt: 'test-prompt',
           prompt_id: 'prompt-id-8',
@@ -284,6 +293,7 @@ describe('loggers', () => {
         getTelemetryLogPromptsEnabled: () => false,
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
+        isInteractive: () => false,
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
@@ -302,6 +312,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           prompt_length: 11,
           prompt_id: 'prompt-id-9',
           auth_type: 'cloud-shell',
@@ -317,6 +328,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      isInteractive: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -491,6 +503,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      isInteractive: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -622,6 +635,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      isInteractive: () => false,
     } as Config;
 
     it('should log an API request with request_text', () => {
@@ -641,6 +655,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           model: 'test-model',
           request_text: 'This is a test request',
           prompt_id: 'prompt-id-7',
@@ -661,6 +676,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           model: 'test-model',
           prompt_id: 'prompt-id-6',
         },
@@ -672,6 +688,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     it('should log flash fallback event', () => {
@@ -687,6 +704,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_FLASH_FALLBACK,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           auth_type: 'vertex-ai',
         },
       });
@@ -697,6 +715,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -789,6 +808,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      isInteractive: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -860,6 +880,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           function_name: 'test-function',
           function_args: JSON.stringify(
             {
@@ -876,7 +897,8 @@ describe('loggers', () => {
           tool_type: 'native',
           error: undefined,
           error_type: undefined,
-
+          mcp_server_name: undefined,
+          extension_id: undefined,
           metadata: {
             model_added_lines: 1,
             model_removed_lines: 2,
@@ -957,6 +979,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           function_name: 'test-function',
           function_args: JSON.stringify(
             {
@@ -973,6 +996,8 @@ describe('loggers', () => {
           tool_type: 'native',
           error: undefined,
           error_type: undefined,
+          mcp_server_name: undefined,
+          extension_id: undefined,
           metadata: undefined,
           content_length: undefined,
         },
@@ -1034,6 +1059,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           function_name: 'test-function',
           function_args: JSON.stringify(
             {
@@ -1050,6 +1076,8 @@ describe('loggers', () => {
           tool_type: 'native',
           error: undefined,
           error_type: undefined,
+          mcp_server_name: undefined,
+          extension_id: undefined,
           metadata: undefined,
           content_length: 13,
         },
@@ -1110,6 +1138,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           function_name: 'test-function',
           function_args: JSON.stringify(
             {
@@ -1126,6 +1155,8 @@ describe('loggers', () => {
           decision: undefined,
           error: undefined,
           error_type: undefined,
+          mcp_server_name: undefined,
+          extension_id: undefined,
           metadata: undefined,
           content_length: 13,
         },
@@ -1185,6 +1216,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           function_name: 'test-function',
           function_args: JSON.stringify(
             {
@@ -1203,6 +1235,8 @@ describe('loggers', () => {
           prompt_id: 'prompt-id-5',
           tool_type: 'native',
           decision: undefined,
+          mcp_server_name: undefined,
+          extension_id: undefined,
           metadata: undefined,
           content_length: errorMessage.length,
         },
@@ -1268,7 +1302,6 @@ describe('loggers', () => {
         durationMs: 100,
       };
       const event = new ToolCallEvent(call);
-
       logToolCall(mockConfig, event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
@@ -1281,6 +1314,7 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'test-extension',
           extension_id: 'test-extension-id',
+          interactive: false,
           function_name: 'mock_mcp_tool',
           function_args: JSON.stringify(
             {
@@ -1328,6 +1362,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_MALFORMED_JSON_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           model: 'test-model',
         },
       });
@@ -1341,6 +1376,7 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
+      isInteractive: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -1373,6 +1409,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_FILE_OPERATION,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           tool_name: 'test-tool',
           operation: 'read',
           lines: 10,
@@ -1399,6 +1436,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     it('should log a tool output truncated event', () => {
@@ -1421,6 +1459,7 @@ describe('loggers', () => {
           'event.name': EVENT_TOOL_OUTPUT_TRUNCATED,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           eventName: 'tool_output_truncated',
+          interactive: false,
           prompt_id: 'prompt-id-1',
           tool_name: 'test-tool',
           original_content_length: 1000,
@@ -1436,6 +1475,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1467,6 +1507,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
+          interactive: false,
         },
       });
 
@@ -1504,6 +1545,7 @@ describe('loggers', () => {
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
       getUseModelRouter: () => null,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1511,10 +1553,10 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
-    it('should log extension install event', () => {
+    it('should log extension install event', async () => {
       const event = new ExtensionInstallEvent(
         'testing',
         'testing-id',
@@ -1523,7 +1565,7 @@ describe('loggers', () => {
         'success',
       );
 
-      logExtensionInstallEvent(mockConfig, event);
+      await logExtensionInstallEvent(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionInstallEvent,
@@ -1537,6 +1579,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_INSTALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           extension_name: 'testing',
           extension_version: '0.1.0',
           extension_source: 'git',
@@ -1546,13 +1589,14 @@ describe('loggers', () => {
     });
   });
 
-  describe('logExtensionUpdate', () => {
+  describe('logExtensionUpdate', async () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
       getUseModelRouter: () => null,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1560,10 +1604,10 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
-    it('should log extension update event', () => {
+    it('should log extension update event', async () => {
       const event = new ExtensionUpdateEvent(
         'testing',
         'testing-id',
@@ -1573,7 +1617,7 @@ describe('loggers', () => {
         'success',
       );
 
-      logExtensionUpdateEvent(mockConfig, event);
+      await logExtensionUpdateEvent(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionUpdateEvent,
@@ -1587,6 +1631,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_UPDATE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           extension_name: 'testing',
           extension_version: '0.1.0',
           extension_previous_version: '0.1.1',
@@ -1597,13 +1642,14 @@ describe('loggers', () => {
     });
   });
 
-  describe('logExtensionUninstall', () => {
+  describe('logExtensionUninstall', async () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
       getUseModelRouter: () => null,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1611,17 +1657,16 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
-
-    it('should log extension uninstall event', () => {
+    it('should log extension uninstall event', async () => {
       const event = new ExtensionUninstallEvent(
         'testing',
         'testing-id',
         'success',
       );
 
-      logExtensionUninstall(mockConfig, event);
+      await logExtensionUninstall(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionUninstallEvent,
@@ -1635,6 +1680,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_UNINSTALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           extension_name: 'testing',
           status: 'success',
         },
@@ -1642,10 +1688,11 @@ describe('loggers', () => {
     });
   });
 
-  describe('logExtensionEnable', () => {
+  describe('logExtensionEnable', async () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1653,13 +1700,13 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
-    it('should log extension enable event', () => {
+    it('should log extension enable event', async () => {
       const event = new ExtensionEnableEvent('testing', 'testing-id', 'user');
 
-      logExtensionEnable(mockConfig, event);
+      await logExtensionEnable(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionEnableEvent,
@@ -1673,6 +1720,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_ENABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           extension_name: 'testing',
           setting_scope: 'user',
         },
@@ -1684,6 +1732,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1691,13 +1740,13 @@ describe('loggers', () => {
     });
 
     afterEach(() => {
-      vi.resetAllMocks();
+      vi.clearAllMocks();
     });
 
-    it('should log extension disable event', () => {
+    it('should log extension disable event', async () => {
       const event = new ExtensionDisableEvent('testing', 'testing-id', 'user');
 
-      logExtensionDisable(mockConfig, event);
+      await logExtensionDisable(mockConfig, event);
 
       expect(
         ClearcutLogger.prototype.logExtensionDisableEvent,
@@ -1711,6 +1760,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_DISABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           extension_name: 'testing',
           setting_scope: 'user',
         },
@@ -1722,6 +1772,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1745,6 +1796,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_AGENT_START,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           agent_id: 'agent-123',
           agent_name: 'TestAgent',
         },
@@ -1756,6 +1808,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1786,6 +1839,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_AGENT_FINISH,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           agent_id: 'agent-123',
           agent_name: 'TestAgent',
           duration_ms: 1000,
@@ -1805,6 +1859,7 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1828,6 +1883,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
           reason: 'private_ip',
         },
       });

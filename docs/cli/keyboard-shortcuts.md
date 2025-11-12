@@ -11,6 +11,7 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 | `Ctrl+D`    | Exit the application if the input is empty. Press twice to confirm.                                                   |
 | `Ctrl+L`    | Clear the screen.                                                                                                     |
 | `Ctrl+S`    | Allows long responses to print fully, disabling truncation. Use your terminal's scrollback to view the entire output. |
+| `Ctrl+S`    | Toggle copy mode (alternate buffer mode only).                                                                        |
 | `Ctrl+T`    | Toggle the display of the todo list.                                                                                  |
 | `Ctrl+Y`    | Toggle auto-approval (YOLO mode) for all tool calls.                                                                  |
 | `Shift+Tab` | Toggle auto-accepting edits approval mode.                                                                            |
@@ -51,11 +52,11 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 
 ## Suggestions
 
-| Shortcut        | Description                            |
-| --------------- | -------------------------------------- |
-| `Down Arrow`    | Navigate down through the suggestions. |
-| `Tab` / `Enter` | Accept the selected suggestion.        |
-| `Up Arrow`      | Navigate up through the suggestions.   |
+| Shortcut                | Description                            |
+| ----------------------- | -------------------------------------- |
+| `Down Arrow` / `Ctrl+N` | Navigate down through the suggestions. |
+| `Tab` / `Enter`         | Accept the selected suggestion.        |
+| `Up Arrow` / `Ctrl+P`   | Navigate up through the suggestions.   |
 
 ## Radio Button Select
 

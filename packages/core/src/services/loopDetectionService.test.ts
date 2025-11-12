@@ -22,6 +22,7 @@ import { LoopDetectionService } from './loopDetectionService.js';
 vi.mock('../telemetry/loggers.js', () => ({
   logLoopDetected: vi.fn(),
   logLoopDetectionDisabled: vi.fn(),
+  logLlmLoopCheck: vi.fn(),
 }));
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
@@ -35,6 +36,7 @@ describe('LoopDetectionService', () => {
   beforeEach(() => {
     mockConfig = {
       getTelemetryEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
     service = new LoopDetectionService(mockConfig);
     vi.clearAllMocks();
@@ -206,6 +208,82 @@ describe('LoopDetectionService', () => {
       }
       expect(isLoop).toBe(false);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should detect a loop with longer repeating patterns (e.g. ~150 chars)', () => {
+      service.reset('');
+      const longPattern = createRepetitiveContent(1, 150);
+      expect(longPattern.length).toBe(150);
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 2; i++) {
+        isLoop = service.addAndCheck(createContentEvent(longPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect the specific user-provided loop example', () => {
+      service.reset('');
+      const userPattern = `I will not output any text.
+  I will just end the turn.
+  I am done.
+  I will not do anything else.
+  I will wait for the user's next command.
+`;
+
+      let isLoop = false;
+      // Loop enough times to trigger the threshold
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(userPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect the second specific user-provided loop example', () => {
+      service.reset('');
+      const userPattern =
+        'I have added all the requested logs and verified the test file. I will now mark the task as complete.\n  ';
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(userPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect a loop of alternating short phrases', () => {
+      service.reset('');
+      const alternatingPattern = 'Thinking... Done. ';
+
+      let isLoop = false;
+      // Needs more iterations because the pattern is short relative to chunk size,
+      // so it takes a few slides of the window to find the exact alignment.
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD * 3; i++) {
+        isLoop = service.addAndCheck(createContentEvent(alternatingPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect a loop of repeated complex thought processes', () => {
+      service.reset('');
+      const thoughtPattern =
+        'I need to check the file. The file does not exist. I will create the file. ';
+
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(thoughtPattern));
+        if (isLoop) break;
+      }
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -659,6 +737,20 @@ describe('LoopDetectionService LLM Checks', () => {
       getBaseLlmClient: () => mockBaseLlmClient,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
+      getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),
+      isInFallbackMode: vi.fn().mockReturnValue(false),
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation((key) => {
+          if (key.model === 'loop-detection') {
+            return { model: 'gemini-2.5-flash', generateContentConfig: {} };
+          }
+          return {
+            model: 'cognitive-loop-v1',
+            generateContentConfig: {},
+          };
+        }),
+      },
+      isInteractive: () => false,
     } as unknown as Config;
 
     service = new LoopDetectionService(mockConfig);
@@ -689,9 +781,9 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
         systemInstruction: expect.any(String),
         contents: expect.any(Array),
-        model: expect.any(String),
         schema: expect.any(Object),
         promptId: expect.any(String),
       }),
@@ -706,6 +798,11 @@ describe('LoopDetectionService LLM Checks', () => {
     });
     await advanceTurns(30);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
 
     // The confidence of 0.85 will result in a low interval.
     // The interval will be: 5 + (15 - 5) * (1 - 0.85) = 5 + 10 * 0.15 = 6.5 -> rounded to 7
@@ -723,6 +820,7 @@ describe('LoopDetectionService LLM Checks', () => {
       expect.objectContaining({
         'event.name': 'loop_detected',
         loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'cognitive-loop-v1',
       }),
     );
   });
@@ -800,5 +898,123 @@ describe('LoopDetectionService LLM Checks', () => {
     });
     // Verify the original history follows
     expect(calledArg.contents[1]).toEqual(functionCallHistory[0]);
+  });
+
+  it('should detect a loop when confidence is exactly equal to the threshold (0.9)', async () => {
+    // Mock isInFallbackMode to false so it double checks
+    vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(false);
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Flash says loop',
+      })
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Main says loop',
+      });
+
+    await advanceTurns(30);
+
+    // It should have called generateJson twice
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection-double-check' },
+      }),
+    );
+
+    // And it should have detected a loop
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        'event.name': 'loop_detected',
+        loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'cognitive-loop-v1',
+      }),
+    );
+  });
+
+  it('should not detect a loop when Flash is confident (0.9) but Main model is not (0.89)', async () => {
+    // Mock isInFallbackMode to false so it double checks
+    vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(false);
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Flash says loop',
+      })
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.89,
+        unproductive_state_analysis: 'Main says no loop',
+      });
+
+    await advanceTurns(30);
+
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection-double-check' },
+      }),
+    );
+
+    // Should NOT have detected a loop
+    expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+
+    // But should have updated the interval based on the main model's confidence (0.89)
+    // Interval = 5 + (15-5) * (1 - 0.89) = 5 + 10 * 0.11 = 5 + 1.1 = 6.1 -> 6
+
+    // Advance by 6 turns
+    await advanceTurns(6);
+
+    // Next turn (37) should trigger another check
+    await service.turnStarted(abortController.signal);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(3);
+  });
+
+  it('should only call Flash model if in fallback mode', async () => {
+    // Mock isInFallbackMode to true
+    vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
+
+    mockBaseLlmClient.generateJson = vi.fn().mockResolvedValueOnce({
+      unproductive_state_confidence: 0.9,
+      unproductive_state_analysis: 'Flash says loop',
+    });
+
+    await advanceTurns(30);
+
+    // It should have called generateJson only once
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+
+    // And it should have detected a loop
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        'event.name': 'loop_detected',
+        loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'gemini-2.5-flash',
+      }),
+    );
   });
 });

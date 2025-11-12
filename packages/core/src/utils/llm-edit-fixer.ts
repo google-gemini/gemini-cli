@@ -8,11 +8,11 @@ import { createHash } from 'node:crypto';
 import { type Content, Type } from '@google/genai';
 import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 
 const MAX_CACHE_SIZE = 50;
+const GENERATE_JSON_TIMEOUT_MS = 40000; // 40 seconds
 
 const EDIT_SYS_PROMPT = `
 You are an expert code-editing assistant specializing in debugging and correcting failed search-and-replace operations.
@@ -89,6 +89,32 @@ const editCorrectionWithInstructionCache = new LruCache<
   SearchReplaceEdit
 >(MAX_CACHE_SIZE);
 
+async function generateJsonWithTimeout<T>(
+  client: BaseLlmClient,
+  params: Parameters<BaseLlmClient['generateJson']>[0],
+  timeoutMs: number,
+): Promise<T | null> {
+  try {
+    // Create a signal that aborts automatically after the specified timeout.
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+
+    const result = await client.generateJson({
+      ...params,
+      // The operation will be aborted if either the original signal is aborted
+      // or if the timeout is reached.
+      abortSignal: AbortSignal.any([
+        params.abortSignal ?? new AbortController().signal,
+        timeoutSignal,
+      ]),
+    });
+    return result as T;
+  } catch (_err) {
+    // An AbortError will be thrown on timeout.
+    // We catch it and return null to signal that the operation timed out.
+    return null;
+  }
+}
+
 /**
  * Attempts to fix a failed edit by using an LLM to generate a new search and replace pair.
  * @param instruction The instruction for what needs to be done.
@@ -109,7 +135,7 @@ export async function FixLLMEditWithInstruction(
   current_content: string,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
-): Promise<SearchReplaceEdit> {
+): Promise<SearchReplaceEdit | null> {
   let promptId = promptIdContext.getStore();
   if (!promptId) {
     promptId = `llm-fixer-fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -146,17 +172,23 @@ export async function FixLLMEditWithInstruction(
     },
   ];
 
-  const result = (await baseLlmClient.generateJson({
-    contents,
-    schema: SearchReplaceEditSchema,
-    abortSignal,
-    model: DEFAULT_GEMINI_FLASH_MODEL,
-    systemInstruction: EDIT_SYS_PROMPT,
-    promptId,
-    maxAttempts: 1,
-  })) as unknown as SearchReplaceEdit;
+  const result = await generateJsonWithTimeout<SearchReplaceEdit>(
+    baseLlmClient,
+    {
+      modelConfigKey: { model: 'llm-edit-fixer' },
+      contents,
+      schema: SearchReplaceEditSchema,
+      abortSignal,
+      systemInstruction: EDIT_SYS_PROMPT,
+      promptId,
+      maxAttempts: 1,
+    },
+    GENERATE_JSON_TIMEOUT_MS,
+  );
 
-  editCorrectionWithInstructionCache.set(cacheKey, result);
+  if (result) {
+    editCorrectionWithInstructionCache.set(cacheKey, result);
+  }
   return result;
 }
 

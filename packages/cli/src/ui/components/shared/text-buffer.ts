@@ -17,6 +17,7 @@ import {
   stripUnsafeCharacters,
   getCachedStringWidth,
 } from '../../utils/textUtils.js';
+import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 
@@ -1907,14 +1908,7 @@ export function useTextBuffer({
   );
 
   const handleInput = useCallback(
-    (key: {
-      name: string;
-      ctrl: boolean;
-      meta: boolean;
-      shift: boolean;
-      paste: boolean;
-      sequence: string;
-    }): void => {
+    (key: Key): void => {
       const { sequence: input } = key;
 
       if (key.paste) {
@@ -1964,7 +1958,7 @@ export function useTextBuffer({
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (key.ctrl && !key.shift && key.name === 'z') undo();
       else if (key.ctrl && key.shift && key.name === 'z') redo();
-      else if (input && !key.ctrl && !key.meta && key.name !== 'tab') {
+      else if (key.insertable) {
         insert(input, { paste: key.paste });
       }
     },
@@ -2016,6 +2010,36 @@ export function useTextBuffer({
     dispatch({ type: 'move_to_offset', payload: { offset } });
   }, []);
 
+  const moveToVisualPosition = useCallback(
+    (visRow: number, visCol: number): void => {
+      const { visualLines, visualToLogicalMap } = visualLayout;
+      // Clamp visRow to valid range
+      const clampedVisRow = Math.max(
+        0,
+        Math.min(visRow, visualLines.length - 1),
+      );
+      const visualLine = visualLines[clampedVisRow] || '';
+      // Clamp visCol to the length of the visual line
+      const clampedVisCol = Math.max(0, Math.min(visCol, cpLen(visualLine)));
+
+      if (visualToLogicalMap[clampedVisRow]) {
+        const [logRow, logStartCol] = visualToLogicalMap[clampedVisRow];
+        const newCursorRow = logRow;
+        const newCursorCol = logStartCol + clampedVisCol;
+
+        dispatch({
+          type: 'set_cursor',
+          payload: {
+            cursorRow: newCursorRow,
+            cursorCol: newCursorCol,
+            preferredCol: clampedVisCol,
+          },
+        });
+      }
+    },
+    [visualLayout],
+  );
+
   const returnValue: TextBuffer = useMemo(
     () => ({
       lines,
@@ -2041,6 +2065,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
 
@@ -2104,6 +2129,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
       killLineRight,
@@ -2234,14 +2260,7 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (key: {
-    name: string;
-    ctrl: boolean;
-    meta: boolean;
-    shift: boolean;
-    paste: boolean;
-    sequence: string;
-  }) => void;
+  handleInput: (key: Key) => void;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
@@ -2265,6 +2284,7 @@ export interface TextBuffer {
     replacementText: string,
   ) => void;
   moveToOffset(offset: number): void;
+  moveToVisualPosition(visualRow: number, visualCol: number): void;
 
   // Vim-specific operations
   /**
