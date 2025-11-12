@@ -5,7 +5,6 @@
  */
 
 import { spawn } from 'node:child_process';
-import path from 'node:path';
 import type { HookConfig } from './types.js';
 import { HookEventName } from './types.js';
 import type {
@@ -34,27 +33,19 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
 /**
  * Hook runner that executes command hooks
  */
-type ShellFlavor = 'posix' | 'cmd' | 'powershell';
+type ShellFlavor = 'posix' | 'powershell';
 
 export interface HookRunnerOptions {
-  platform?: NodeJS.Platform;
-  shell?: string;
-  shellFlavor?: ShellFlavor;
+  platformOverride?: NodeJS.Platform;
 }
 
 export class HookRunner {
   private readonly platform: NodeJS.Platform;
-  private readonly shellCommand?: string;
   private readonly shellFlavor: ShellFlavor;
 
   constructor(options: HookRunnerOptions = {}) {
-    this.platform = options.platform ?? process.platform;
-    const envShell =
-      process.env.GEMINI_HOOK_SHELL ?? process.env.CLAUDE_HOOK_SHELL;
-    this.shellCommand = this.normalizeShellCommand(options.shell ?? envShell);
-    this.shellFlavor =
-      options.shellFlavor ??
-      this.detectShellFlavor(this.shellCommand, this.platform);
+    this.platform = options.platformOverride ?? process.platform;
+    this.shellFlavor = this.platform === 'win32' ? 'powershell' : 'posix';
   }
 
   /**
@@ -235,7 +226,7 @@ export class HookRunner {
         env,
         cwd: input.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: this.shellCommand ?? true,
+        shell: this.shellFlavor === 'powershell' ? 'powershell.exe' : true,
       });
 
       // Set up timeout
@@ -355,14 +346,9 @@ export class HookRunner {
    * Wrap a value so the shell treats it as a literal argument.
    */
   private escapeShellArg(value: string): string {
-    switch (this.shellFlavor) {
-      case 'cmd':
-        return this.escapeCmdShellArg(value);
-      case 'powershell':
-        return this.escapePowerShellArg(value);
-      default:
-        return this.escapePosixShellArg(value);
-    }
+    return this.shellFlavor === 'powershell'
+      ? this.escapePowerShellArg(value)
+      : this.escapePosixShellArg(value);
   }
 
   private escapePosixShellArg(value: string): string {
@@ -372,50 +358,10 @@ export class HookRunner {
     return `'${value.replace(/'/g, "'\\''")}'`;
   }
 
-  private escapeCmdShellArg(value: string): string {
-    // Double quotes protect spaces and metacharacters in cmd.exe.
-    // Double any embedded double quotes so they are interpreted literally.
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-
   private escapePowerShellArg(value: string): string {
     // Single quotes in PowerShell behave like literal strings.
     // Escape embedded single quotes by doubling them up.
     return `'${value.replace(/'/g, "''")}'`;
-  }
-
-  private normalizeShellCommand(shellValue?: string): string | undefined {
-    if (!shellValue) {
-      return undefined;
-    }
-    const trimmed = shellValue.trim();
-    if (!trimmed) {
-      return undefined;
-    }
-    if (/^powershell$/i.test(trimmed)) {
-      return this.platform === 'win32' ? 'powershell.exe' : 'pwsh';
-    }
-    if (/^pwsh$/i.test(trimmed)) {
-      return 'pwsh';
-    }
-    return trimmed;
-  }
-
-  private detectShellFlavor(
-    shellCommand: string | undefined,
-    platform: NodeJS.Platform,
-  ): ShellFlavor {
-    if (shellCommand) {
-      const shellName = path.basename(shellCommand).toLowerCase();
-      if (shellName.includes('powershell') || shellName === 'pwsh') {
-        return 'powershell';
-      }
-      if (platform === 'win32') {
-        return 'cmd';
-      }
-      return 'posix';
-    }
-    return platform === 'win32' ? 'cmd' : 'posix';
   }
 
   /**
