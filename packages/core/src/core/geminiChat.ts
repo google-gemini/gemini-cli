@@ -24,6 +24,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   getEffectiveModel,
+  isGemini2Model,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
@@ -324,7 +325,7 @@ export class GeminiChat {
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
 
-            if (isContentError) {
+            if (isContentError && isGemini2Model(model)) {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 logContentRetry(
@@ -350,7 +351,7 @@ export class GeminiChat {
           }
         }
 
-        if (lastError) {
+        if (lastError && isGemini2Model(model)) {
           if (lastError instanceof InvalidStreamError) {
             logContentRetryFailure(
               self.config,
