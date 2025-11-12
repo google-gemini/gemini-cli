@@ -323,9 +323,21 @@ export class HookRunner {
    * Expand command with environment variables and input context
    */
   private expandCommand(command: string, input: HookInput): string {
+    const escapedCwd = this.escapeShellArg(input.cwd);
+
     return command
-      .replace(/\$GEMINI_PROJECT_DIR/g, input.cwd)
-      .replace(/\$CLAUDE_PROJECT_DIR/g, input.cwd); // For compatibility
+      .replace(/\$GEMINI_PROJECT_DIR/g, escapedCwd)
+      .replace(/\$CLAUDE_PROJECT_DIR/g, escapedCwd); // For compatibility
+  }
+
+  /**
+   * Wrap a value so the shell treats it as a literal argument.
+   */
+  private escapeShellArg(value: string): string {
+    // Single quotes prevent the shell from interpreting metacharacters.
+    // Any embedded single quote is escaped by closing, inserting '\'',
+    // then reopening the quote (POSIX-compliant technique).
+    return `'${value.replace(/'/g, "'\\''")}'`;
   }
 
   /**
