@@ -25,6 +25,21 @@ import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
 
+/* -----------------------------------------------------------
+   Function Name Sanitizer (Gemini API constraint workaround)
+   • Must start with [A-Za-z_] then [A-Za-z0-9_.:-]{0,63}
+   • Max length 64
+----------------------------------------------------------- */
+const NAME_RE = /^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$/;
+
+function sanitizeName(name: unknown): string {
+  let s = typeof name === 'string' ? name : String(name ?? '');
+  // Replace illegal characters; ensure valid first char; enforce length
+  s = s.replace(/[^A-Za-z0-9_.:-]/g, '_').replace(/^[^A-Za-z_]+/, '_');
+  return s.length > 64 ? s.slice(0, 64) : s;
+}
+/* ----------------------------------------------------------- */
+
 class DiscoveredToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
@@ -404,11 +419,17 @@ export class ToolRegistry {
           !Array.isArray(func.parametersJsonSchema)
             ? func.parametersJsonSchema
             : {};
+
+        // Sanitize the *prefixed* tool name we expose to the model
+        const sanitizedPrefixed = sanitizeName(
+          DISCOVERED_TOOL_PREFIX + func.name,
+        );
+
         this.registerTool(
           new DiscoveredTool(
             this.config,
-            func.name,
-            DISCOVERED_TOOL_PREFIX + func.name,
+            func.name, // original (for execution)
+            sanitizedPrefixed, // exposed & schema name
             func.description ?? '',
             parameters as Record<string, unknown>,
             this.messageBus,
@@ -469,7 +490,21 @@ export class ToolRegistry {
   getFunctionDeclarations(): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     this.getActiveTools().forEach((tool) => {
-      declarations.push(tool.schema);
+      const schema = { ...tool.schema };
+      if (schema && typeof schema.name === 'string') {
+        const original = schema.name;
+        const sanitized = sanitizeName(original);
+        if (!NAME_RE.test(original)) {
+          // keep visibility when something needed sanitizing
+           
+          console.error('[Gemini CLI] Sanitized invalid function name:', {
+            original,
+            sanitized,
+          });
+        }
+        schema.name = sanitized;
+      }
+      declarations.push(schema);
     });
     return declarations;
   }
@@ -484,7 +519,20 @@ export class ToolRegistry {
     for (const name of toolNames) {
       const tool = this.allKnownTools.get(name);
       if (tool && this.isActiveTool(tool)) {
-        declarations.push(tool.schema);
+        const schema = { ...tool.schema };
+        if (schema && typeof schema.name === 'string') {
+          const original = schema.name;
+          const sanitized = sanitizeName(original);
+          if (!NAME_RE.test(original)) {
+             
+            console.error(
+              '[Gemini CLI] Sanitized invalid function name (filtered):',
+              { original, sanitized },
+            );
+          }
+          schema.name = sanitized;
+        }
+        declarations.push(schema);
       }
     }
     return declarations;
