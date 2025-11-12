@@ -116,6 +116,11 @@ function validateConfiguration() {
     if (!description || description.trim().length === 0) {
       throw new Error(`Missing description for command: ${command}`);
     }
+
+    const bindings = defaultKeyBindings[command];
+    if (!bindings || bindings.length === 0) {
+      throw new Error(`Missing key bindings for command: ${command}`);
+    }
   }
 
   const missing = [...allCommands].filter(
