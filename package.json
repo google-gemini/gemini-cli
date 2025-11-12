@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.15.0-nightly.20251107.b8eeb553",
+  "version": "0.15.0-nightly.20251111.51f952e7",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.15.0-nightly.20251107.b8eeb553"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.15.0-nightly.20251111.51f952e7"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -61,7 +61,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.1",
+    "ink": "npm:@jrichman/ink@6.4.2",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -118,6 +118,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "ink": "npm:@jrichman/ink@6.4.2",
     "latest-version": "^9.0.0",
     "simple-git": "^3.28.0"
   },

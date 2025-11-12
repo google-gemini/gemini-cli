@@ -25,6 +25,12 @@ describe('WebSearchTool', () => {
     const mockConfigInstance = {
       getGeminiClient: () => mockGeminiClient,
       getProxy: () => undefined,
+      generationConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+          model,
+          sdkConfig: {},
+        })),
+      },
     } as unknown as Config;
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     tool = new WebSearchTool(mockConfigInstance);

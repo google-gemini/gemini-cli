@@ -161,6 +161,19 @@ export class EndSessionEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.session_id = config?.getSessionId();
   }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': this['event.name'],
+      'event.timestamp': this['event.timestamp'],
+      session_id: this.session_id,
+    };
+  }
+
+  toLogBody(): string {
+    return 'Session ended.';
+  }
 }
 
 export const EVENT_USER_PROMPT = 'gemini_cli.user_prompt';
@@ -299,7 +312,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         }
       }
     } else {
-      this.function_name = function_name!;
+      this.function_name = function_name as string;
       this.function_args = function_args!;
       this.duration_ms = duration_ms!;
       this.success = success!;

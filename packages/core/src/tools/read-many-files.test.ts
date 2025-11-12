@@ -88,6 +88,7 @@ describe('ReadManyFilesTool', () => {
         buildExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
         getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
       }),
+      isInteractive: () => false,
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig);
 
@@ -502,6 +503,7 @@ describe('ReadManyFilesTool', () => {
           buildExcludePatterns: () => [],
           getReadManyFilesExcludes: () => [],
         }),
+        isInteractive: () => false,
       } as Partial<Config> as Config;
       tool = new ReadManyFilesTool(mockConfig);
 

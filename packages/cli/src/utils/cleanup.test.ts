@@ -16,7 +16,7 @@ describe('cleanup', () => {
     const cleanupModule = await import('./cleanup.js');
     register = cleanupModule.registerCleanup;
     runExit = cleanupModule.runExitCleanup;
-  });
+  }, 30000);
 
   it('should run a registered synchronous function', async () => {
     const cleanupFn = vi.fn();

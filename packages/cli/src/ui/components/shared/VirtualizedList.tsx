@@ -481,6 +481,7 @@ function VirtualizedList<T>(
       width="100%"
       height="100%"
       flexDirection="column"
+      paddingRight={1}
     >
       <Box flexShrink={0} width="100%" flexDirection="column">
         <Box height={topSpacerHeight} flexShrink={0} />

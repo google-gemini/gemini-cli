@@ -114,7 +114,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
-    'web-search-tool': {
+    'web-search': {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {
         generateContentConfig: {
@@ -122,13 +122,18 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
-    'web-fetch-tool': {
+    'web-fetch': {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {
         generateContentConfig: {
           tools: [{ urlContext: {} }],
         },
       },
+    },
+    // TODO(joshualitt): During cleanup, make modelConfig optional.
+    'web-fetch-fallback': {
+      extends: 'gemini-2.5-flash-base',
+      modelConfig: {},
     },
     'loop-detection': {
       extends: 'gemini-2.5-flash-base',

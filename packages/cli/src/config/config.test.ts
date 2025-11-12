@@ -451,6 +451,36 @@ describe('parseArguments', () => {
     mockConsoleError.mockRestore();
   });
 
+  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '--resume', 'session-id'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    try {
+      await expect(parseArguments({} as Settings)).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
+        ),
+      );
+    } finally {
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
   it('should support comma-separated values for --allowed-tools', async () => {
     process.argv = [
       'node',

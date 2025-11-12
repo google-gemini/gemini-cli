@@ -412,6 +412,24 @@ async function handleAutomaticOAuth(
 }
 
 /**
+ * Create RequestInit for TransportOptions.
+ *
+ * @param mcpServerConfig The MCP server configuration
+ * @param headers Additional headers
+ */
+function createTransportRequestInit(
+  mcpServerConfig: MCPServerConfig,
+  headers: Record<string, string>,
+): RequestInit {
+  return {
+    headers: {
+      ...mcpServerConfig.headers,
+      ...headers,
+    },
+  };
+}
+
+/**
  * Create a transport with OAuth token for the given server configuration.
  *
  * @param mcpServerName The name of the MCP server
@@ -428,12 +446,9 @@ async function createTransportWithOAuth(
     if (mcpServerConfig.httpUrl) {
       // Create HTTP transport with OAuth token
       const oauthTransportOptions: StreamableHTTPClientTransportOptions = {
-        requestInit: {
-          headers: {
-            ...mcpServerConfig.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
+        requestInit: createTransportRequestInit(mcpServerConfig, {
+          Authorization: `Bearer ${accessToken}`,
+        }),
       };
 
       return new StreamableHTTPClientTransport(
@@ -443,12 +458,9 @@ async function createTransportWithOAuth(
     } else if (mcpServerConfig.url) {
       // Create SSE transport with OAuth token in Authorization header
       return new SSEClientTransport(new URL(mcpServerConfig.url), {
-        requestInit: {
-          headers: {
-            ...mcpServerConfig.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
+        requestInit: createTransportRequestInit(mcpServerConfig, {
+          Authorization: `Bearer ${accessToken}`,
+        }),
       });
     }
 
@@ -1347,6 +1359,7 @@ export async function createTransport(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
+      requestInit: createTransportRequestInit(mcpServerConfig, {}),
       authProvider: provider,
     };
 
@@ -1374,6 +1387,7 @@ export async function createTransport(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
+      requestInit: createTransportRequestInit(mcpServerConfig, {}),
       authProvider: provider,
     };
     if (mcpServerConfig.httpUrl) {

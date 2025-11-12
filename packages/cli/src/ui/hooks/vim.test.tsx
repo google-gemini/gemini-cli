@@ -40,6 +40,7 @@ const createKey = (partial: Partial<Key>): Key => ({
   meta: partial.meta || false,
   shift: partial.shift || false,
   paste: partial.paste || false,
+  insertable: partial.insertable || false,
   ...partial,
 });
 

@@ -26,7 +26,7 @@ export const DetailedMessagesDisplay: React.FC<
 > = ({ messages, maxHeight, width, hasFocus }) => {
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
 
-  const borderAndPadding = 4;
+  const borderAndPadding = 3;
 
   const estimatedItemHeight = useCallback(
     (index: number) => {

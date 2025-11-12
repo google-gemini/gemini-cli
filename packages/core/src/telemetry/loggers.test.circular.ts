@@ -69,7 +69,6 @@ describe('Circular Reference Handling', () => {
       durationMs: 100,
     };
 
-    // Create a tool call event with circular references in function_args
     const event = new ToolCallEvent(mockCompletedToolCall);
 
     // This should not throw an error

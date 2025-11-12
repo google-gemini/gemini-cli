@@ -80,6 +80,7 @@ const mockConfig = {
   getEnableMessageBusIntegration: () => false,
   getMessageBus: () => null,
   getPolicyEngine: () => null,
+  isInteractive: () => false,
 } as unknown as Config;
 
 const mockTool = new MockTool({

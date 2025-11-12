@@ -130,6 +130,7 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
+  copyModeEnabled: boolean;
   mcpSamplingRequest: McpSamplingRequest | null;
 }
 

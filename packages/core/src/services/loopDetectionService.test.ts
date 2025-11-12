@@ -35,6 +35,7 @@ describe('LoopDetectionService', () => {
   beforeEach(() => {
     mockConfig = {
       getTelemetryEnabled: () => true,
+      isInteractive: () => false,
     } as unknown as Config;
     service = new LoopDetectionService(mockConfig);
     vi.clearAllMocks();
@@ -741,6 +742,7 @@ describe('LoopDetectionService LLM Checks', () => {
           generateContentConfig: {},
         }),
       },
+      isInteractive: () => false,
     } as unknown as Config;
 
     service = new LoopDetectionService(mockConfig);

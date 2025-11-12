@@ -473,4 +473,7 @@ export enum EventMetadataKey {
 
   // Logs whether the agent recovery attempt was successful.
   GEMINI_CLI_AGENT_RECOVERY_SUCCESS = 124,
+
+  // Logs whether the session is interactive.
+  GEMINI_CLI_INTERACTIVE = 125,
 }
