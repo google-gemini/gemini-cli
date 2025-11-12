@@ -40,6 +40,18 @@ describe('generate-keybindings-doc', () => {
           },
         ],
       },
+      {
+        title: 'Navigation',
+        commands: [
+          {
+            description: 'Move up through results.',
+            bindings: [
+              { key: 'up', shift: false },
+              { key: 'p', ctrl: true, shift: false },
+            ],
+          },
+        ],
+      },
     ];
 
     const markdown = renderDocumentation(sections);
@@ -48,5 +60,9 @@ describe('generate-keybindings-doc', () => {
     expect(markdown).toContain('`Ctrl + X`');
     expect(markdown).toContain('Submit with Enter if no modifiers are held.');
     expect(markdown).toContain('`Enter (no Ctrl, no Shift)`');
+    expect(markdown).toContain('#### Navigation');
+    expect(markdown).toContain('Move up through results.');
+    expect(markdown).toContain('`Up Arrow (no Shift)`');
+    expect(markdown).toContain('`Ctrl + P (no Shift)`');
   });
 });
