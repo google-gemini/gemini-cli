@@ -488,7 +488,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Full Width',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Use the entire width of the terminal for output.',
         showInDialog: true,
       },
@@ -1077,7 +1077,7 @@ const SETTINGS_SCHEMA = {
   },
   useWriteTodos: {
     type: 'boolean',
-    label: 'Use Write Todos',
+    label: 'Use WriteTodos',
     category: 'Advanced',
     requiresRestart: false,
     default: false,

@@ -26,7 +26,7 @@ export const calculateMainAreaWidth = (
   terminalWidth: number,
   settings: LoadedSettings,
 ): number => {
-  if (settings.merged.ui?.useFullWidth) {
+  if (settings.merged.ui?.useFullWidth !== false) {
     if (settings.merged.ui?.useAlternateBuffer) {
       return terminalWidth - 1;
     }
