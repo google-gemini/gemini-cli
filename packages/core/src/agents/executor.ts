@@ -19,7 +19,6 @@ import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
-import type { ModelConfigAlias } from '../services/modelConfigService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import {
   GLOB_TOOL_NAME,
@@ -53,6 +52,7 @@ import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getModelConfigAlias } from './registry.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -595,29 +595,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
-    const modelConfig = this.definition.modelConfig;
-
-    const runtimeAliasName = `${this.definition.name}-config`;
-    const runtimeAlias: ModelConfigAlias = {
-      modelConfig: {
-        model: modelConfig.model,
-        generateContentConfig: {
-          temperature: modelConfig.temp,
-          topP: modelConfig.top_p,
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingBudget: modelConfig.thinkingBudget ?? -1,
-          },
-        },
-      },
-    };
-
-    // TODO(12916): Migrate sub-agents to static runtime configs.
-    this.runtimeContext.modelConfigService.registerRuntimeModelConfig(
-      runtimeAliasName,
-      runtimeAlias,
-    );
-
     if (tools.length > 0) {
       // TODO(12622): Move tools back to config.
       chat.setTools([{ functionDeclarations: tools }]);
@@ -625,7 +602,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const responseStream = await chat.sendMessageStream(
       {
-        model: runtimeAliasName,
+        model: getModelConfigAlias(this.definition),
         overrideScope: this.definition.name,
       },
       message.parts || [],

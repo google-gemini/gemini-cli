@@ -228,7 +228,10 @@ export class GeminiChat {
    * sending the next message.
    *
    * @see {@link Chat#sendMessage} for non-streaming method.
-   * @param params - parameters for sending the message.
+   * @param modelConfigKey - The key for the model config.
+   * @param message - The list of messages to send.
+   * @param prompt_id - The ID of the prompt.
+   * @param signal - An abort signal for this message.
    * @return The model's response.
    *
    * @example
