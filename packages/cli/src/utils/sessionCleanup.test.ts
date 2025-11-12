@@ -44,27 +44,43 @@ function createTestSessions(): SessionInfo[] {
   return [
     {
       id: 'current123',
+      file: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.json`,
+      startTime: now.toISOString(),
       lastUpdated: now.toISOString(),
+      firstUserMessage: 'Current session',
       isCurrentSession: true,
+      index: 1,
     },
     {
       id: 'recent456',
+      file: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45.json`,
+      startTime: oneWeekAgo.toISOString(),
       lastUpdated: oneWeekAgo.toISOString(),
+      firstUserMessage: 'Recent session',
       isCurrentSession: false,
+      index: 2,
     },
     {
       id: 'old789abc',
+      file: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab.json`,
+      startTime: twoWeeksAgo.toISOString(),
       lastUpdated: twoWeeksAgo.toISOString(),
+      firstUserMessage: 'Old session',
       isCurrentSession: false,
+      index: 3,
     },
     {
       id: 'ancient12',
+      file: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1`,
       fileName: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1.json`,
+      startTime: oneMonthAgo.toISOString(),
       lastUpdated: oneMonthAgo.toISOString(),
+      firstUserMessage: 'Ancient session',
       isCurrentSession: false,
+      index: 4,
     },
   ];
 }
@@ -409,27 +425,43 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
         {
           id: 'session5d',
+          file: `${SESSION_FILE_PREFIX}5d`,
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
+          startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
+          firstUserMessage: '5 days',
           isCurrentSession: false,
+          index: 2,
         },
         {
           id: 'session8d',
+          file: `${SESSION_FILE_PREFIX}8d`,
           fileName: `${SESSION_FILE_PREFIX}8d.json`,
+          startTime: eightDaysAgo.toISOString(),
           lastUpdated: eightDaysAgo.toISOString(),
+          firstUserMessage: '8 days',
           isCurrentSession: false,
+          index: 3,
         },
         {
           id: 'session15d',
+          file: `${SESSION_FILE_PREFIX}15d`,
           fileName: `${SESSION_FILE_PREFIX}15d.json`,
+          startTime: fifteenDaysAgo.toISOString(),
           lastUpdated: fifteenDaysAgo.toISOString(),
+          firstUserMessage: '15 days',
           isCurrentSession: false,
+          index: 4,
         },
       ];
 
@@ -507,27 +539,43 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
         {
           id: 'session1d',
+          file: `${SESSION_FILE_PREFIX}1d`,
           fileName: `${SESSION_FILE_PREFIX}1d.json`,
+          startTime: oneDayAgo.toISOString(),
           lastUpdated: oneDayAgo.toISOString(),
+          firstUserMessage: '1 day',
           isCurrentSession: false,
+          index: 2,
         },
         {
           id: 'session7d',
+          file: `${SESSION_FILE_PREFIX}7d`,
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
+          startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
+          firstUserMessage: '7 days',
           isCurrentSession: false,
+          index: 3,
         },
         {
           id: 'session13d',
+          file: `${SESSION_FILE_PREFIX}13d`,
           fileName: `${SESSION_FILE_PREFIX}13d.json`,
+          startTime: thirteenDaysAgo.toISOString(),
           lastUpdated: thirteenDaysAgo.toISOString(),
+          firstUserMessage: '13 days',
           isCurrentSession: false,
+          index: 4,
         },
       ];
 
@@ -579,9 +627,13 @@ describe('Session Cleanup', () => {
       const sessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
       ];
 
@@ -590,9 +642,13 @@ describe('Session Cleanup', () => {
         const daysAgo = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
         sessions.push({
           id: `session${i}`,
+          file: `${SESSION_FILE_PREFIX}${i}d`,
           fileName: `${SESSION_FILE_PREFIX}${i}d.json`,
+          startTime: daysAgo.toISOString(),
           lastUpdated: daysAgo.toISOString(),
+          firstUserMessage: `${i} days`,
           isCurrentSession: false,
+          index: i + 1,
         });
       }
 
@@ -693,33 +749,53 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
         {
           id: 'session3d',
+          file: `${SESSION_FILE_PREFIX}3d`,
           fileName: `${SESSION_FILE_PREFIX}3d.json`,
+          startTime: threeDaysAgo.toISOString(),
           lastUpdated: threeDaysAgo.toISOString(),
+          firstUserMessage: '3 days',
           isCurrentSession: false,
+          index: 2,
         },
         {
           id: 'session5d',
+          file: `${SESSION_FILE_PREFIX}5d`,
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
+          startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
+          firstUserMessage: '5 days',
           isCurrentSession: false,
+          index: 3,
         },
         {
           id: 'session7d',
+          file: `${SESSION_FILE_PREFIX}7d`,
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
+          startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
+          firstUserMessage: '7 days',
           isCurrentSession: false,
+          index: 4,
         },
         {
           id: 'session12d',
+          file: `${SESSION_FILE_PREFIX}12d`,
           fileName: `${SESSION_FILE_PREFIX}12d.json`,
+          startTime: twelveDaysAgo.toISOString(),
           lastUpdated: twelveDaysAgo.toISOString(),
+          firstUserMessage: '12 days',
           isCurrentSession: false,
+          index: 5,
         },
       ];
 

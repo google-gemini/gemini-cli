@@ -103,7 +103,7 @@
       "maxOutputTokens": 2000
     }
   },
-  "web-search-tool": {
+  "web-search": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
       "temperature": 0,
@@ -115,7 +115,7 @@
       ]
     }
   },
-  "web-fetch-tool": {
+  "web-fetch": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
       "temperature": 0,
@@ -127,8 +127,22 @@
       ]
     }
   },
+  "web-fetch-fallback": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
   "loop-detection": {
     "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "loop-detection-double-check": {
+    "model": "gemini-2.5-pro",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
