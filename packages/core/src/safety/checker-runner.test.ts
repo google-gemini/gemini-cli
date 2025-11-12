@@ -38,12 +38,9 @@ describe('CheckerRunner', () => {
     mockRegistry = new CheckerRegistry('/mock/dist');
     CheckerRegistry.prototype.resolveInProcess = vi.fn();
 
-    runner = new CheckerRunner(mockContextBuilder, {
+    runner = new CheckerRunner(mockContextBuilder, mockRegistry, {
       checkersPath: '/mock/dist',
     });
-    // Inject mocked registry
-    // @ts-expect-error - accessing private property for test
-    runner['registry'] = mockRegistry;
   });
 
   afterEach(() => {

@@ -13,7 +13,7 @@ import type {
 } from '../policy/types.js';
 import type { SafetyCheckInput, SafetyCheckResult } from './protocol.js';
 import { SafetyCheckDecision } from './protocol.js';
-import { CheckerRegistry } from './registry.js';
+import type { CheckerRegistry } from './registry.js';
 import type { ContextBuilder } from './context-builder.js';
 
 /**
@@ -42,9 +42,13 @@ export class CheckerRunner {
   private readonly contextBuilder: ContextBuilder;
   private readonly timeout: number;
 
-  constructor(contextBuilder: ContextBuilder, config: CheckerRunnerConfig) {
+  constructor(
+    contextBuilder: ContextBuilder,
+    registry: CheckerRegistry,
+    config: CheckerRunnerConfig,
+  ) {
     this.contextBuilder = contextBuilder;
-    this.registry = new CheckerRegistry(config.checkersPath);
+    this.registry = registry;
     this.timeout = config.timeout ?? CheckerRunner.DEFAULT_TIMEOUT;
   }
 
