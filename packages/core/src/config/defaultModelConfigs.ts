@@ -139,6 +139,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
+    'loop-detection-double-check': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-pro',
+      },
+    },
     'llm-edit-fixer': {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {},
