@@ -74,7 +74,7 @@ export class GeminiClient {
   private readonly generateContentConfig: GenerateContentConfig = {
     temperature: 1,
     topP: 0.95,
-    topK: 40,
+    topK: 64,
   };
   private sessionTurnCount = 0;
 
