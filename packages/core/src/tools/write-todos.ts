@@ -148,7 +148,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   constructor() {
     super(
       WriteTodosTool.Name,
-      'Write Todos',
+      'WriteTodos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
       {

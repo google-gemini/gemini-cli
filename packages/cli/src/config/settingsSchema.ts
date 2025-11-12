@@ -1077,7 +1077,7 @@ const SETTINGS_SCHEMA = {
   },
   useWriteTodos: {
     type: 'boolean',
-    label: 'Use Write Todos',
+    label: 'Use WriteTodos',
     category: 'Advanced',
     requiresRestart: false,
     default: false,

@@ -977,7 +977,7 @@
       "type": "boolean"
     },
     "useWriteTodos": {
-      "title": "Use Write Todos",
+      "title": "Use WriteTodos",
       "description": "Enable the write_todos_list tool.",
       "markdownDescription": "Enable the write_todos_list tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
       "default": false,

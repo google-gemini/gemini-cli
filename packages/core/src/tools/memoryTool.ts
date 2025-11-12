@@ -303,7 +303,7 @@ export class MemoryTool
   constructor(messageBus?: MessageBus) {
     super(
       MemoryTool.Name,
-      'Save Memory',
+      'SaveMemory',
       memoryToolDescription,
       Kind.Think,
       memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
