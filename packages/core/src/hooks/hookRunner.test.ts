@@ -128,6 +128,23 @@ process.exit(1);
       });
     });
 
+    it('reports errors when the hook command is missing', async () => {
+      const config: HookConfig = {
+        type: HookType.Command,
+        command: './hooks/does-not-exist.cjs',
+      };
+
+      const result = await hookRunner.executeHook(
+        config,
+        HookEventName.BeforeTool,
+        createInput(),
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toMatch(/No such file/);
+    });
+
     it('times out long-running hooks', async () => {
       const command = writeHookScript(
         'hooks/hang.cjs',
