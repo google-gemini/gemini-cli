@@ -71,4 +71,46 @@ describe('<AppHeader />', () => {
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
+
+  it('should render the banner when previewFeatures is disabled', () => {
+    const mockConfig = makeFakeConfig({ previewFeatures: false });
+    mockConfig.getExperiments = () => ({
+      flags: {
+        GeminiCLIBannerText__no_capacity_issues: {
+          stringValue: 'This is the default banner',
+        },
+      },
+      experimentIds: [],
+    });
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig },
+    );
+
+    expect(lastFrame()).toContain('This is the default banner');
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should not render the banner when previewFeatures is enabled', () => {
+    const mockConfig = makeFakeConfig({ previewFeatures: true });
+    mockConfig.getExperiments = () => ({
+      flags: {
+        GeminiCLIBannerText__no_capacity_issues: {
+          stringValue: 'This is the default banner',
+        },
+      },
+      experimentIds: [],
+    });
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig },
+    );
+
+    expect(lastFrame()).not.toContain('This is the default banner');
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
 });

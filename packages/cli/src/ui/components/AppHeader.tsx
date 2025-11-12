@@ -34,7 +34,8 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const warningText =
     flags['GeminiCLIBannerText__capacity_issues']?.stringValue ?? '';
 
-  const bannerText = warningText === '' ? defaultText : warningText;
+  const showDefaultBanner = warningText === '' && !config.getPreviewFeatures();
+  const bannerText = showDefaultBanner ? defaultText : warningText;
 
   const defaultColor = Colors.AccentBlue;
   const fontColor = warningText === '' ? defaultColor : theme.status.warning;
