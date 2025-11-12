@@ -10,7 +10,6 @@ import type {
   HookExecutionResult,
   BeforeToolSelectionOutput,
 } from './types.js';
-import type { HookToolConfig } from './hookTranslator.js';
 import {
   DefaultHookOutput,
   BeforeToolHookOutput,
@@ -35,10 +34,6 @@ export interface AggregatedHookResult {
  * Hook aggregator that merges results from multiple hooks using event-specific strategies
  */
 export class HookAggregator {
-  constructor() {
-    // No logger needed for now
-  }
-
   /**
    * Aggregate results from multiple hook executions
    */
@@ -80,6 +75,9 @@ export class HookAggregator {
 
   /**
    * Merge hook outputs using event-specific strategies
+   *
+   * Note: We always use the merge logic even for single hooks to ensure
+   * consistent default behaviors (e.g., default decision='allow' for OR logic)
    */
   private mergeOutputs(
     outputs: HookOutput[],
@@ -87,10 +85,6 @@ export class HookAggregator {
   ): HookOutput | undefined {
     if (outputs.length === 0) {
       return undefined;
-    }
-
-    if (outputs.length === 1) {
-      return outputs[0];
     }
 
     switch (eventName) {
@@ -220,6 +214,16 @@ export class HookAggregator {
 
   /**
    * Merge tool selection outputs with specific logic for tool config
+   *
+   * Tool Selection Strategy:
+   * - The intent is to provide a UNION of tools from all hooks
+   * - If any hook specifies NONE mode, no tools are available (most restrictive wins)
+   * - If any hook specifies ANY mode (and no NONE), ANY mode is used
+   * - Otherwise AUTO mode is used
+   * - Function names are collected from all hooks and sorted for deterministic caching
+   *
+   * This means hooks can only add/enable tools, not filter them out individually.
+   * If one hook restricts and another re-enables, the union takes the re-enabled tool.
    */
   private mergeToolSelectionOutputs(
     outputs: BeforeToolSelectionOutput[],
@@ -229,11 +233,9 @@ export class HookAggregator {
     const allFunctionNames = new Set<string>();
     let hasNoneMode = false;
     let hasAnyMode = false;
-    let allAutoMode = true;
 
     for (const output of outputs) {
-      const toolConfig = output.hookSpecificOutput
-        ?.toolConfig as HookToolConfig;
+      const toolConfig = output.hookSpecificOutput?.toolConfig;
       if (!toolConfig) {
         continue;
       }
@@ -241,13 +243,11 @@ export class HookAggregator {
       // Check mode (using simplified HookToolConfig format)
       if (toolConfig.mode === 'NONE') {
         hasNoneMode = true;
-        allAutoMode = false;
       } else if (toolConfig.mode === 'ANY') {
         hasAnyMode = true;
-        allAutoMode = false;
       }
 
-      // Collect function names
+      // Collect function names (union of all hooks)
       if (toolConfig.allowedFunctionNames) {
         for (const name of toolConfig.allowedFunctionNames) {
           allFunctionNames.add(name);
@@ -260,17 +260,19 @@ export class HookAggregator {
     let finalFunctionNames: string[] = [];
 
     if (hasNoneMode) {
+      // NONE mode wins - most restrictive
       finalMode = FunctionCallingConfigMode.NONE;
       finalFunctionNames = [];
     } else if (hasAnyMode) {
+      // ANY mode if present (and no NONE)
       finalMode = FunctionCallingConfigMode.ANY;
-      finalFunctionNames = Array.from(allFunctionNames);
-    } else if (allAutoMode) {
-      finalMode = FunctionCallingConfigMode.AUTO;
-      finalFunctionNames = Array.from(allFunctionNames);
+      // Sort for deterministic output to ensure consistent caching
+      finalFunctionNames = Array.from(allFunctionNames).sort();
     } else {
+      // Default to AUTO mode
       finalMode = FunctionCallingConfigMode.AUTO;
-      finalFunctionNames = Array.from(allFunctionNames);
+      // Sort for deterministic output to ensure consistent caching
+      finalFunctionNames = Array.from(allFunctionNames).sort();
     }
 
     merged.hookSpecificOutput = {
@@ -278,7 +280,7 @@ export class HookAggregator {
       toolConfig: {
         mode: finalMode,
         allowedFunctionNames: finalFunctionNames,
-      } as HookToolConfig,
+      },
     };
 
     return merged;
