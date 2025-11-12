@@ -43,7 +43,6 @@ describe('AllowedPathChecker', () => {
     toolCall: {
       name: 'test_tool',
       args: toolArgs,
-      config,
     } as unknown as FunctionCall,
     context: {
       environment: {
@@ -51,6 +50,7 @@ describe('AllowedPathChecker', () => {
         workspaces: mockWorkspaces,
       },
     },
+    config,
   });
 
   it('should allow paths within CWD', async () => {
