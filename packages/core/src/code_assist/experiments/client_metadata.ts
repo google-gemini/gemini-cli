@@ -45,7 +45,8 @@ function getPlatform(): ClientMetadataPlatform {
 export async function getClientMetadata(): Promise<ClientMetadata> {
   if (!clientMetadataPromise) {
     clientMetadataPromise = (async () => ({
-      ideName: 'GEMINI_CLI',
+      ideName: 'IDE_UNSPECIFIED',
+      pluginType: 'GEMINI',
       ideVersion: process.env['CLI_VERSION'] || process.version,
       platform: getPlatform(),
       updateChannel: await getReleaseChannel(__dirname),

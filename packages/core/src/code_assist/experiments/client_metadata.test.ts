@@ -103,10 +103,16 @@ describe('client_metadata', () => {
       expect(getReleaseChannel).toHaveBeenCalledTimes(1);
     });
 
-    it('should always return the IDE name as GEMINI_CLI', async () => {
+    it('should always return the IDE name as IDE_UNSPECIFIED', async () => {
       const { getClientMetadata } = await import('./client_metadata.js');
       const metadata = await getClientMetadata();
-      expect(metadata.ideName).toBe('GEMINI_CLI');
+      expect(metadata.ideName).toBe('IDE_UNSPECIFIED');
+    });
+
+    it('should always return the pluginType as GEMINI', async () => {
+      const { getClientMetadata } = await import('./client_metadata.js');
+      const metadata = await getClientMetadata();
+      expect(metadata.pluginType).toBe('GEMINI');
     });
   });
 });
