@@ -102,12 +102,18 @@ function validateConfiguration() {
 
   for (const category of commandCategories) {
     for (const command of category.commands) {
+      if (categorized.has(command)) {
+        throw new Error(
+          `Command appears in multiple categories: ${command.toString()}`,
+        );
+      }
       categorized.add(command);
     }
   }
 
   for (const command of Object.values(Command)) {
-    if (!commandDescriptions[command]) {
+    const description = commandDescriptions[command];
+    if (!description || description.trim().length === 0) {
       throw new Error(`Missing description for command: ${command}`);
     }
   }
