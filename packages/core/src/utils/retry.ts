@@ -166,7 +166,11 @@ export async function retryWithBackoff<T>(
         throw classifiedError; // Throw if no fallback or fallback failed.
       }
 
-      if (classifiedError instanceof RetryableQuotaError) {
+      const errorCode = getErrorStatus(error);
+      const is500 =
+        errorCode !== undefined && errorCode >= 500 && errorCode < 600;
+
+      if (classifiedError instanceof RetryableQuotaError || is500) {
         if (attempt >= maxAttempts) {
           if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
             try {
@@ -183,13 +187,28 @@ export async function retryWithBackoff<T>(
               console.warn('Model fallback failed:', fallbackError);
             }
           }
-          throw classifiedError;
+          throw classifiedError instanceof RetryableQuotaError
+            ? classifiedError
+            : error;
         }
-        console.warn(
-          `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
-        );
-        await delay(classifiedError.retryDelayMs, signal);
-        continue;
+
+        if (classifiedError instanceof RetryableQuotaError) {
+          console.warn(
+            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
+          );
+          await delay(classifiedError.retryDelayMs, signal);
+          continue;
+        } else {
+          const errorStatus = getErrorStatus(error);
+          logRetryAttempt(attempt, error, errorStatus);
+
+          // Exponential backoff with jitter for non-quota errors
+          const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
+          const delayWithJitter = Math.max(0, currentDelay + jitter);
+          await delay(delayWithJitter, signal);
+          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+          continue;
+        }
       }
 
       // Generic retry logic for other errors

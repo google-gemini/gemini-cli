@@ -20,9 +20,14 @@ import {
 } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
-import { type RetryOptions } from '../utils/retry.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
+import { retryWithBackoff, type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 // Mock fs module to prevent actual file system operations during tests
@@ -129,6 +134,10 @@ describe('GeminiChat', () => {
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
+      setPreviewModelBypassMode: vi.fn(),
+      isPreviewModelFallbackMode: vi.fn().mockReturnValue(false),
+      setPreviewModelFallbackMode: vi.fn(),
       isInteractive: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
@@ -472,6 +481,126 @@ describe('GeminiChat', () => {
         'This is the visible text that should not be lost.',
       );
     });
+
+    it('should use maxAttempts=1 for retryWithBackoff when in Preview Model Fallback Mode', async () => {
+      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Success' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        PREVIEW_GEMINI_MODEL,
+        { message: 'test' },
+        'prompt-id-fast-retry',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          maxAttempts: 1,
+        }),
+      );
+    });
+
+    it('should NOT use maxAttempts=1 for other models even in Preview Model Fallback Mode', async () => {
+      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Success' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        DEFAULT_GEMINI_FLASH_MODEL,
+        { message: 'test' },
+        'prompt-id-normal-retry',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          maxAttempts: undefined, // Should use default
+        }),
+      );
+    });
+
+    it('should pass DEFAULT_GEMINI_MODEL to handleFallback when Preview Model is bypassed (downgraded)', async () => {
+      // ARRANGE
+      vi.mocked(mockConfig.isPreviewModelBypassMode).mockReturnValue(true);
+      // Mock retryWithBackoff to simulate catching the error and calling onPersistent429
+      vi.mocked(retryWithBackoff).mockImplementation(
+        async (apiCall, options) => {
+          const onPersistent429 = options?.onPersistent429;
+          try {
+            await apiCall();
+          } catch (error) {
+            if (onPersistent429) {
+              await onPersistent429(AuthType.LOGIN_WITH_GOOGLE, error);
+            }
+            throw error;
+          }
+        },
+      );
+
+      // We need the API call to fail so retryWithBackoff calls the callback.
+      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+        new TerminalQuotaError('Simulated Quota Error', {
+          code: 429,
+          message: 'Simulated Quota Error',
+          details: [],
+        }),
+      );
+
+      // ACT
+      const consumeStream = async () => {
+        const stream = await chat.sendMessageStream(
+          PREVIEW_GEMINI_MODEL,
+          { message: 'test' },
+          'prompt-id-bypass',
+        );
+        // Consume the stream to trigger execution
+        for await (const _ of stream) {
+          // do nothing
+        }
+      };
+
+      await expect(consumeStream()).rejects.toThrow('Simulated Quota Error');
+
+      expect(retryWithBackoff).toHaveBeenCalled();
+
+      // ASSERT
+      // handleFallback is called via onPersistent429Callback
+      // We verify it was called with DEFAULT_GEMINI_MODEL
+      expect(mockHandleFallback).toHaveBeenCalledWith(
+        expect.anything(),
+        DEFAULT_GEMINI_MODEL, // This is the key assertion
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
     it('should throw an error when a tool call is followed by an empty stream response', async () => {
       // 1. Setup: A history where the model has just made a function call.
       const initialHistory: Content[] = [
@@ -492,7 +621,6 @@ describe('GeminiChat', () => {
         },
       ];
       chat.setHistory(initialHistory);
-
       // 2. Mock the API to return an empty/thought-only stream.
       const emptyStreamResponse = (async function* () {
         yield {
@@ -1784,6 +1912,89 @@ describe('GeminiChat', () => {
           ],
         },
       ]);
+    });
+  });
+
+  describe('Preview Model Fallback Logic', () => {
+    it('should reset previewModelBypassMode to false at the start of sendMessageStream', async () => {
+      const stream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { role: 'model', parts: [{ text: 'Success' }] },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        stream,
+      );
+
+      await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-preview-model-reset',
+      );
+
+      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(false);
+    });
+
+    it('should reset previewModelFallbackMode to false upon successful Preview Model usage', async () => {
+      const stream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { role: 'model', parts: [{ text: 'Success' }] },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        stream,
+      );
+
+      const resultStream = await chat.sendMessageStream(
+        PREVIEW_GEMINI_MODEL,
+        { message: 'test' },
+        'prompt-id-preview-model-healing',
+      );
+      for await (const _ of resultStream) {
+        // consume stream
+      }
+
+      expect(mockConfig.setPreviewModelFallbackMode).toHaveBeenCalledWith(
+        false,
+      );
+    });
+    it('should NOT reset previewModelFallbackMode if Preview Model was bypassed (downgraded)', async () => {
+      const stream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { role: 'model', parts: [{ text: 'Success' }] },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        stream,
+      );
+      // Simulate bypass mode being active (downgrade happened)
+      vi.mocked(mockConfig.isPreviewModelBypassMode).mockReturnValue(true);
+
+      const resultStream = await chat.sendMessageStream(
+        PREVIEW_GEMINI_MODEL,
+        { message: 'test' },
+        'prompt-id-bypass-no-healing',
+      );
+      for await (const _ of resultStream) {
+        // consume stream
+      }
+
+      expect(mockConfig.setPreviewModelFallbackMode).not.toHaveBeenCalled();
     });
   });
 });

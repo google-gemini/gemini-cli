@@ -203,12 +203,12 @@ describe('useQuotaAndFallback', () => {
 
         // Simulate the user choosing to continue with the fallback model
         await act(() => {
-          result.current.handleProQuotaChoice('retry');
+          result.current.handleProQuotaChoice('retry_always');
         });
 
         // The original promise from the handler should now resolve
         const intent = await promise!;
-        expect(intent).toBe('retry');
+        expect(intent).toBe('retry_always');
 
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
@@ -253,11 +253,11 @@ describe('useQuotaAndFallback', () => {
         expect(result.current.proQuotaRequest).toBe(firstRequest);
 
         await act(() => {
-          result.current.handleProQuotaChoice('retry');
+          result.current.handleProQuotaChoice('retry_always');
         });
 
         const intent1 = await promise1!;
-        expect(intent1).toBe('retry');
+        expect(intent1).toBe('retry_always');
         expect(result.current.proQuotaRequest).toBeNull();
       });
 
@@ -354,13 +354,13 @@ describe('useQuotaAndFallback', () => {
 
           // Simulate the user choosing to continue with the fallback model
           await act(() => {
-            result.current.handleProQuotaChoice('retry');
+            result.current.handleProQuotaChoice('retry_always');
           });
 
           expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(true);
           // The original promise from the handler should now resolve
           const intent = await promise!;
-          expect(intent).toBe('retry');
+          expect(intent).toBe('retry_always');
 
           // The pending request should be cleared from the state
           expect(result.current.proQuotaRequest).toBeNull();
@@ -418,7 +418,7 @@ describe('useQuotaAndFallback', () => {
       expect(result.current.proQuotaRequest).toBeNull();
     });
 
-    it('should resolve intent to "retry" and add info message on continue', async () => {
+    it('should resolve intent to "retry_always" and add info message on continue', async () => {
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
@@ -441,11 +441,11 @@ describe('useQuotaAndFallback', () => {
       });
 
       await act(() => {
-        result.current.handleProQuotaChoice('retry');
+        result.current.handleProQuotaChoice('retry_always');
       });
 
       const intent = await promise!;
-      expect(intent).toBe('retry');
+      expect(intent).toBe('retry_always');
       expect(result.current.proQuotaRequest).toBeNull();
 
       // Check for the second "Switched to fallback model" message
