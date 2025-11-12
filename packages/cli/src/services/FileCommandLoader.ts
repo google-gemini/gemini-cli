@@ -124,7 +124,7 @@ export class FileCommandLoader implements ICommandLoader {
       } catch (error) {
         if (
           !signal.aborted &&
-          (error as NodeJS.ErrnoException).code !== 'ENOENT'
+          (error as { code?: string })?.code !== 'ENOENT'
         ) {
           console.error(
             `[FileCommandLoader] Error loading commands from ${dirInfo.path}:`,
