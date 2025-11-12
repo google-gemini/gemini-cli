@@ -46,11 +46,12 @@ describe('HookRunner', () => {
     timestamp: '2025-01-01T00:00:00.000Z',
   };
 
-  const createInput = <T extends HookInput>(overrides: Partial<T> = {}): T => ({
+  const createInput = <T extends HookInput>(overrides: Partial<T> = {}): T =>
+    ({
       ...baseInput,
       cwd: overrides.cwd ?? projectDir,
       ...overrides,
-    } as T);
+    }) as T;
 
   const writeHookScript = (
     relativePath: string,
@@ -65,7 +66,8 @@ describe('HookRunner', () => {
     return `./${rel}`;
   };
 
-  const readProjectFile = (relativePath: string, dir: string = projectDir) => readFileSync(path.join(dir, relativePath), 'utf8');
+  const readProjectFile = (relativePath: string, dir: string = projectDir) =>
+    readFileSync(path.join(dir, relativePath), 'utf8');
 
   beforeEach(() => {
     hookRunner = new HookRunner();
@@ -394,7 +396,12 @@ async function readStdin() {
         ...createInput({ hook_event_name: HookEventName.BeforeModel }),
         llm_request: {
           model: 'gemini-1.5-pro',
-          contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+          messages: [
+            {
+              role: 'user',
+              content: 'Hello',
+            },
+          ],
         },
       };
 
