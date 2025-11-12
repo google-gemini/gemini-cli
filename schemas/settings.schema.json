@@ -977,17 +977,10 @@
       "type": "boolean"
     },
     "useWriteTodos": {
-<<<<<<< HEAD
-      "title": "Use Write Todos",
-      "description": "Enable the write_todos_list tool.",
-      "markdownDescription": "Enable the write_todos_list tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
-      "default": false,
-=======
       "title": "Use WriteTodos",
       "description": "Enable the write_todos tool.",
       "markdownDescription": "Enable the write_todos tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
       "default": true,
->>>>>>> 7ec78452 (Enable write_todo tool and fix output function schema (#12905))
       "type": "boolean"
     },
     "security": {
