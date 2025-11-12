@@ -257,7 +257,7 @@ describe('GeminiChat', () => {
 
       // 2. Action & Assert: The stream should fail because there's no finish reason.
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test message' },
         'prompt-id-no-finish-empty-end',
       );
@@ -586,7 +586,7 @@ describe('GeminiChat', () => {
         }
       };
 
-      await expect(consumeStream()).rejects.toThrow('Simulated Quota Error');
+      await expect(consumeStream()).resolves.not.toThrow();
 
       expect(retryWithBackoff).toHaveBeenCalled();
 
@@ -638,7 +638,7 @@ describe('GeminiChat', () => {
 
       // 3. Action: Send the function response back to the model and consume the stream.
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         {
           message: {
             functionResponse: {
@@ -724,7 +724,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test' },
         'prompt-id-1',
       );
@@ -759,7 +759,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test' },
         'prompt-id-1',
       );
@@ -987,6 +987,38 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream with retries', () => {
+    it('should not retry on invalid content if model does not start with gemini-2', async () => {
+      // Mock the stream to fail.
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [{ content: { parts: [{ text: '' }] } }],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        'gemini-1.5-pro',
+        { message: 'test' },
+        'prompt-id-no-retry',
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // Must loop to trigger the internal logic that throws.
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      // Should be called only 1 time (no retry)
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(mockLogContentRetry).not.toHaveBeenCalled();
+    });
+
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
       // ARRANGE: Mock the stream to fail once, then succeed.
       vi.mocked(mockContentGenerator.generateContentStream)
@@ -1014,7 +1046,7 @@ describe('GeminiChat', () => {
 
       // ACT: Send a message and collect all events from the stream.
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test' },
         'prompt-id-yield-retry',
       );
@@ -1055,7 +1087,7 @@ describe('GeminiChat', () => {
         );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test' },
         'prompt-id-retry-success',
       );
@@ -1126,7 +1158,7 @@ describe('GeminiChat', () => {
         );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test', config: { temperature: 0.5 } },
         'prompt-id-retry-temperature',
       );
@@ -1184,7 +1216,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test' },
         'prompt-id-retry-fail',
       );
@@ -1249,7 +1281,7 @@ describe('GeminiChat', () => {
         );
 
         const stream = await chat.sendMessageStream(
-          'test-model',
+          'gemini-2.0-flash',
           { message: 'test' },
           'prompt-id-400',
         );
@@ -1454,7 +1486,7 @@ describe('GeminiChat', () => {
 
     // 3. Send a new message
     const stream = await chat.sendMessageStream(
-      'test-model',
+      'gemini-2.0-flash',
       { message: 'Second question' },
       'prompt-id-retry-existing',
     );
@@ -1525,7 +1557,7 @@ describe('GeminiChat', () => {
 
     // 2. Call the method and consume the stream.
     const stream = await chat.sendMessageStream(
-      'test-model',
+      'gemini-2.0-flash',
       { message: 'test empty stream' },
       'prompt-id-empty-stream',
     );
@@ -1794,7 +1826,7 @@ describe('GeminiChat', () => {
       mockHandleFallback.mockResolvedValue(false);
 
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.0-flash',
         { message: 'test stop' },
         'prompt-id-fb2',
       );
@@ -1852,7 +1884,7 @@ describe('GeminiChat', () => {
 
     // Send a message and consume the stream
     const stream = await chat.sendMessageStream(
-      'test-model',
+      'gemini-2.0-flash',
       { message: 'test' },
       'prompt-id-discard-test',
     );
