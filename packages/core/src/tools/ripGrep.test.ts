@@ -339,20 +339,18 @@ describe('RipGrepTool', () => {
       };
       // Check for the core error message, as the full path might vary
       expect(grepTool.validateToolParams(params)).toContain(
-        'Failed to access path stats for',
+        'Path does not exist',
       );
       expect(grepTool.validateToolParams(params)).toContain('nonexistent');
     });
 
-    it('should return error if path is a file, not a directory', async () => {
+    it('should allow path to be a file', async () => {
       const filePath = path.join(tempRootDir, 'fileA.txt');
       const params: RipGrepToolParams = {
         pattern: 'hello',
         dir_path: filePath,
       };
-      expect(grepTool.validateToolParams(params)).toContain(
-        `Path is not a directory: ${filePath}`,
-      );
+      expect(grepTool.validateToolParams(params)).toBeNull();
     });
   });
 
@@ -396,7 +394,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'Found 3 matches for pattern "world" in the workspace directory',
+        'Found 3 matches for pattern "world" in path "."',
       );
       expect(result.llmContent).toContain('File: fileA.txt');
       expect(result.llmContent).toContain('L1: hello world');
@@ -457,7 +455,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'Found 1 match for pattern "hello" in the workspace directory (filter: "*.js"):',
+        'Found 1 match for pattern "hello" in path "." (filter: "*.js"):',
       );
       expect(result.llmContent).toContain('File: fileB.js');
       expect(result.llmContent).toContain(
@@ -546,7 +544,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'No matches found for pattern "nonexistentpattern" in the workspace directory.',
+        'No matches found for pattern "nonexistentpattern" in path ".".',
       );
       expect(result.returnDisplay).toBe('No matches found');
     });
@@ -619,7 +617,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'Found 1 match for pattern "foo.*bar" in the workspace directory:',
+        'Found 1 match for pattern "foo.*bar" in path ".":',
       );
       expect(result.llmContent).toContain('File: fileB.js');
       expect(result.llmContent).toContain('L1: const foo = "bar";');
@@ -687,7 +685,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'Found 2 matches for pattern "HELLO" in the workspace directory:',
+        'Found 2 matches for pattern "HELLO" in path ".":',
       );
       expect(result.llmContent).toContain('File: fileA.txt');
       expect(result.llmContent).toContain('L1: hello world');
@@ -719,7 +717,7 @@ describe('RipGrepTool', () => {
   });
 
   describe('multi-directory workspace', () => {
-    it('should search across all workspace directories when no path is specified', async () => {
+    it('should search only CWD when no path is specified (default behavior)', async () => {
       // Create additional directory with test files
       const secondDir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'grep-tool-second-'),
@@ -840,9 +838,9 @@ describe('RipGrepTool', () => {
       const invocation = multiDirGrepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
-      // Should find matches in both directories
+      // Should find matches in CWD only (default behavior now)
       expect(result.llmContent).toContain(
-        'Found 5 matches for pattern "world"',
+        'Found 3 matches for pattern "world" in path "."',
       );
 
       // Matches from first directory
@@ -852,11 +850,11 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('fileC.txt');
       expect(result.llmContent).toContain('L1: another world in sub dir');
 
-      // Matches from both directories
-      expect(result.llmContent).toContain('other.txt');
-      expect(result.llmContent).toContain('L2: world in second');
-      expect(result.llmContent).toContain('another.js');
-      expect(result.llmContent).toContain('L1: function world()');
+      // Should NOT find matches from second directory
+      expect(result.llmContent).not.toContain('other.txt');
+      expect(result.llmContent).not.toContain('world in second');
+      expect(result.llmContent).not.toContain('another.js');
+      expect(result.llmContent).not.toContain('function world()');
 
       // Clean up
       await fs.rm(secondDir, { recursive: true, force: true });
@@ -1574,11 +1572,187 @@ describe('RipGrepTool', () => {
     });
   });
 
+  describe('advanced search options', () => {
+    it('should handle case_sensitive parameter', async () => {
+      // Case-insensitive search (default)
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+      let params: RipGrepToolParams = { pattern: 'HELLO' };
+      let invocation = grepTool.build(params);
+      let result = await invocation.execute(abortSignal);
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--ignore-case']),
+        expect.anything(),
+      );
+      expect(result.llmContent).toContain('Found 1 match for pattern "HELLO"');
+      expect(result.llmContent).toContain('L1: hello world');
+
+      // Case-sensitive search
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'HELLO world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+      params = { pattern: 'HELLO', case_sensitive: true };
+      invocation = grepTool.build(params);
+      result = await invocation.execute(abortSignal);
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.not.arrayContaining(['--ignore-case']),
+        expect.anything(),
+      );
+      expect(result.llmContent).toContain('Found 1 match for pattern "HELLO"');
+      expect(result.llmContent).toContain('L1: HELLO world');
+    });
+
+    it('should handle fixed_strings parameter', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello.world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = {
+        pattern: 'hello.world',
+        fixed_strings: true,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--fixed-strings']),
+        expect.anything(),
+      );
+      expect(result.llmContent).toContain(
+        'Found 1 match for pattern "hello.world"',
+      );
+      expect(result.llmContent).toContain('L1: hello.world');
+    });
+
+    it('should handle no_ignore parameter', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.log' },
+                line_number: 1,
+                lines: { text: 'secret log entry\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'secret', no_ignore: true };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Should have --no-ignore
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--no-ignore']),
+        expect.anything(),
+      );
+
+      // Should NOT have default excludes when no_ignore is true
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.not.arrayContaining(['--glob', '!node_modules']),
+        expect.anything(),
+      );
+      expect(result.llmContent).toContain('Found 1 match for pattern "secret"');
+      expect(result.llmContent).toContain('File: ignored.log');
+      expect(result.llmContent).toContain('L1: secret log entry');
+    });
+
+    it('should handle context parameters', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 2,
+                lines: { text: 'second line with world\n' },
+                lines_before: [{ text: 'hello world\n' }],
+                lines_after: [
+                  { text: 'third line\n' },
+                  { text: 'fourth line\n' },
+                ],
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = {
+        pattern: 'world',
+        context: 1,
+        after: 2,
+        before: 1,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining([
+          '--context',
+          '1',
+          '--after-context',
+          '2',
+          '--before-context',
+          '1',
+        ]),
+        expect.anything(),
+      );
+      expect(result.llmContent).toContain('Found 1 match for pattern "world"');
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L2: second line with world');
+      // Note: Ripgrep JSON output for context lines doesn't include line numbers for context lines directly
+      // The current parsing only extracts the matched line, so we only assert on that.
+    });
+  });
+
   describe('getDescription', () => {
     it('should generate correct description with pattern only', () => {
       const params: RipGrepToolParams = { pattern: 'testPattern' };
       const invocation = grepTool.build(params);
-      expect(invocation.getDescription()).toBe("'testPattern'");
+      expect(invocation.getDescription()).toBe("'testPattern' within ./");
     });
 
     it('should generate correct description with pattern and include', () => {
@@ -1587,7 +1761,9 @@ describe('RipGrepTool', () => {
         include: '*.ts',
       };
       const invocation = grepTool.build(params);
-      expect(invocation.getDescription()).toBe("'testPattern' in *.ts");
+      expect(invocation.getDescription()).toBe(
+        "'testPattern' in *.ts within ./",
+      );
     });
 
     it('should generate correct description with pattern and path', async () => {
@@ -1603,7 +1779,7 @@ describe('RipGrepTool', () => {
       expect(invocation.getDescription()).toContain(path.join('src', 'app'));
     });
 
-    it('should indicate searching across all workspace directories when no path specified', () => {
+    it('should use ./ when no path is specified (defaults to CWD)', () => {
       // Create a mock config with multiple directories
       const multiDirConfig = {
         getTargetDir: () => tempRootDir,
@@ -1615,9 +1791,7 @@ describe('RipGrepTool', () => {
       const multiDirGrepTool = new RipGrepTool(multiDirConfig);
       const params: RipGrepToolParams = { pattern: 'testPattern' };
       const invocation = multiDirGrepTool.build(params);
-      expect(invocation.getDescription()).toBe(
-        "'testPattern' across all workspace directories",
-      );
+      expect(invocation.getDescription()).toBe("'testPattern' within ./");
     });
 
     it('should generate correct description with pattern, include, and path', async () => {
