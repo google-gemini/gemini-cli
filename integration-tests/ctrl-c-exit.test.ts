@@ -11,7 +11,9 @@ import { TestRig } from './test-helper.js';
 describe('Ctrl+C exit', () => {
   it('should exit gracefully on second Ctrl+C', async () => {
     const rig = new TestRig();
-    await rig.setup('should exit gracefully on second Ctrl+C');
+    await rig.setup('should exit gracefully on second Ctrl+C', {
+      settings: { tools: { useRipgrep: false } },
+    });
 
     const run = await rig.runInteractive();
 

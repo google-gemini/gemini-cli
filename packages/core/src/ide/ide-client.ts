@@ -24,10 +24,11 @@ import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
 import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
+  debug: (...args: any[]) => debugLogger.debug('[DEBUG] [IDEClient]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
 };
@@ -576,7 +577,7 @@ export class IdeClient {
       return undefined;
     }
 
-    // For backwards compatability
+    // For backwards compatibility
     try {
       const portFile = path.join(
         os.tmpdir(),
@@ -667,7 +668,7 @@ export class IdeClient {
   }
 
   private createProxyAwareFetch() {
-    // ignore proxy for '127.0.0.1' by deafult to allow connecting to the ide mcp server
+    // ignore proxy for '127.0.0.1' by default to allow connecting to the ide mcp server
     const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
       noProxy: [existingNoProxy, '127.0.0.1'].filter(Boolean).join(','),
@@ -749,7 +750,7 @@ export class IdeClient {
       },
     );
 
-    // For backwards compatability. Newer extension versions will only send
+    // For backwards compatibility. Newer extension versions will only send
     // IdeDiffRejectedNotificationSchema.
     this.client.setNotificationHandler(
       IdeDiffClosedNotificationSchema,

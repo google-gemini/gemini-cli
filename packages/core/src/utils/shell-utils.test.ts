@@ -21,8 +21,10 @@ import {
   isCommandAllowed,
   initializeShellParsers,
   stripShellWrapper,
+  isShellInvocationAllowlisted,
 } from './shell-utils.js';
 import type { Config } from '../config/config.js';
+import type { AnyToolInvocation } from '../index.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -56,7 +58,7 @@ beforeEach(() => {
   );
   config = {
     getCoreTools: () => [],
-    getExcludeTools: () => [],
+    getExcludeTools: () => new Set([]),
     getAllowedTools: () => [],
   } as unknown as Config;
 });
@@ -87,7 +89,7 @@ describe('isCommandAllowed', () => {
   });
 
   it('should block a command if it is in the blocked list', () => {
-    config.getExcludeTools = () => ['ShellTool(badCommand --danger)'];
+    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
     const result = isCommandAllowed('badCommand --danger', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -97,7 +99,7 @@ describe('isCommandAllowed', () => {
 
   it('should prioritize the blocklist over the allowlist', () => {
     config.getCoreTools = () => ['ShellTool(badCommand --danger)'];
-    config.getExcludeTools = () => ['ShellTool(badCommand --danger)'];
+    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
     const result = isCommandAllowed('badCommand --danger', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -112,7 +114,7 @@ describe('isCommandAllowed', () => {
   });
 
   it('should block any command when a wildcard is in excludeTools', () => {
-    config.getExcludeTools = () => ['run_shell_command'];
+    config.getExcludeTools = () => new Set(['run_shell_command']);
     const result = isCommandAllowed('any random command', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -122,7 +124,7 @@ describe('isCommandAllowed', () => {
 
   it('should block a command on the blocklist even with a wildcard allow', () => {
     config.getCoreTools = () => ['ShellTool'];
-    config.getExcludeTools = () => ['ShellTool(badCommand --danger)'];
+    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
     const result = isCommandAllowed('badCommand --danger', config);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
@@ -143,7 +145,7 @@ describe('isCommandAllowed', () => {
   });
 
   it('should block a chained command if any part is blocked', () => {
-    config.getExcludeTools = () => ['run_shell_command(badCommand)'];
+    config.getExcludeTools = () => new Set(['run_shell_command(badCommand)']);
     const result = isCommandAllowed(
       'echo "hello" && badCommand --danger',
       config,
@@ -151,6 +153,140 @@ describe('isCommandAllowed', () => {
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe(
       `Command 'badCommand --danger' is blocked by configuration`,
+    );
+  });
+
+  it('should block a command that redefines an allowed function to run an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed(
+      'echo () (curl google.com) ; echo Hello World',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block a multi-line function body that runs an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed(
+      `echo () {
+  curl google.com
+} ; echo ok`,
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block a function keyword declaration that runs an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed(
+      'function echo { curl google.com; } ; echo hi',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block command substitution that invokes an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo $(curl google.com)', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block pipelines that invoke an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo hi | curl google.com', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block background jobs that invoke an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo hi & curl google.com', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block command substitution inside a here-document when the inner command is unlisted', () => {
+    config.getCoreTools = () => [
+      'run_shell_command(echo)',
+      'run_shell_command(cat)',
+    ];
+    const result = isCommandAllowed(
+      `cat <<EOF
+$(rm -rf /)
+EOF`,
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "rm -rf /"`,
+    );
+  });
+
+  it('should block backtick substitution that invokes an unlisted command', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo `curl google.com`', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block process substitution using <() when the inner command is unlisted', () => {
+    config.getCoreTools = () => [
+      'run_shell_command(diff)',
+      'run_shell_command(echo)',
+    ];
+    const result = isCommandAllowed(
+      'diff <(curl google.com) <(echo safe)',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block process substitution using >() when the inner command is unlisted', () => {
+    config.getCoreTools = () => ['run_shell_command(echo)'];
+    const result = isCommandAllowed('echo "data" > >(curl google.com)', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
+    );
+  });
+
+  it('should block commands containing prompt transformations', () => {
+    const result = isCommandAllowed(
+      'echo "${var1=aa\\140 env| ls -l\\140}${var1@P}"',
+      config,
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      'Command rejected because it could not be parsed safely',
+    );
+  });
+
+  it('should block simple prompt transformation expansions', () => {
+    const result = isCommandAllowed('echo ${foo@P}', config);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe(
+      'Command rejected because it could not be parsed safely',
     );
   });
 
@@ -219,7 +355,7 @@ describe('checkCommandPermissions', () => {
     });
 
     it('should return a detailed failure object for a blocked command', () => {
-      config.getExcludeTools = () => ['ShellTool(badCommand)'];
+      config.getExcludeTools = () => new Set(['ShellTool(badCommand)']);
       const result = checkCommandPermissions('badCommand --danger', config);
       expect(result).toEqual({
         allAllowed: false,
@@ -288,7 +424,7 @@ describe('checkCommandPermissions', () => {
     });
 
     it('should block a command on the sessionAllowlist if it is also globally blocked', () => {
-      config.getExcludeTools = () => ['run_shell_command(badCommand)'];
+      config.getExcludeTools = () => new Set(['run_shell_command(badCommand)']);
       const result = checkCommandPermissions(
         'badCommand --danger',
         config,
@@ -347,6 +483,18 @@ describe('getCommandRoots', () => {
   it('should include backtick substitutions', () => {
     const result = getCommandRoots('echo `badCommand --danger`');
     expect(result).toEqual(['echo', 'badCommand']);
+  });
+
+  it('should treat parameter expansions with prompt transformations as unsafe', () => {
+    const roots = getCommandRoots(
+      'echo "${var1=aa\\140 env| ls -l\\140}${var1@P}"',
+    );
+    expect(roots).toEqual([]);
+  });
+
+  it('should not return roots for prompt transformation expansions', () => {
+    const roots = getCommandRoots('echo ${foo@P}');
+    expect(roots).toEqual([]);
   });
 });
 
@@ -417,6 +565,53 @@ describe('stripShellWrapper', () => {
 
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
+  });
+});
+
+describe('isShellInvocationAllowlisted', () => {
+  function createInvocation(command: string): AnyToolInvocation {
+    return { params: { command } } as unknown as AnyToolInvocation;
+  }
+
+  it('should return false when any chained command segment is not allowlisted', () => {
+    const invocation = createInvocation(
+      'git status && rm -rf /tmp/should-not-run',
+    );
+    expect(
+      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
+    ).toBe(false);
+  });
+
+  it('should return true when every segment is explicitly allowlisted', () => {
+    const invocation = createInvocation(
+      'git status && rm -rf /tmp/should-run && git diff',
+    );
+    expect(
+      isShellInvocationAllowlisted(invocation, [
+        'run_shell_command(git)',
+        'run_shell_command(rm -rf)',
+      ]),
+    ).toBe(true);
+  });
+
+  it('should return true when the allowlist contains a wildcard shell entry', () => {
+    const invocation = createInvocation('git status && rm -rf /tmp/should-run');
+    expect(
+      isShellInvocationAllowlisted(invocation, ['run_shell_command']),
+    ).toBe(true);
+  });
+
+  it('should treat piped commands as separate segments that must be allowlisted', () => {
+    const invocation = createInvocation('git status | tail -n 1');
+    expect(
+      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
+    ).toBe(false);
+    expect(
+      isShellInvocationAllowlisted(invocation, [
+        'run_shell_command(git)',
+        'run_shell_command(tail)',
+      ]),
+    ).toBe(true);
   });
 });
 

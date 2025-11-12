@@ -12,7 +12,15 @@ import {
   type Todo,
   type ToolResult,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
+
+const TODO_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
 
 // Inspired by langchain/deepagents.
 export const WRITE_TODOS_DESCRIPTION = `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
@@ -91,6 +99,15 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
   WriteTodosToolParams,
   ToolResult
 > {
+  constructor(
+    params: WriteTodosToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
   getDescription(): string {
     const count = this.params.todos?.length ?? 0;
     if (count === 0) {
@@ -126,12 +143,12 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   WriteTodosToolParams,
   ToolResult
 > {
-  static readonly Name: string = WRITE_TODOS_TOOL_NAME;
+  static readonly Name = WRITE_TODOS_TOOL_NAME;
 
   constructor() {
     super(
       WriteTodosTool.Name,
-      'Write Todos',
+      'WriteTodos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
       {
@@ -152,16 +169,50 @@ export class WriteTodosTool extends BaseDeclarativeTool<
                 status: {
                   type: 'string',
                   description: 'The current status of the task.',
-                  enum: ['pending', 'in_progress', 'completed'],
+                  enum: TODO_STATUSES,
                 },
               },
               required: ['description', 'status'],
+              additionalProperties: false,
             },
           },
         },
         required: ['todos'],
+        additionalProperties: false,
       },
     );
+  }
+
+  override get schema() {
+    return {
+      name: this.name,
+      description: this.description,
+      parametersJsonSchema: this.parameterSchema,
+      responseJsonSchema: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: {
+                  type: 'string',
+                },
+                status: {
+                  type: 'string',
+                  enum: TODO_STATUSES,
+                },
+              },
+              required: ['description', 'status'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['todos'],
+        additionalProperties: false,
+      },
+    };
   }
 
   protected override validateToolParamValues(
@@ -179,8 +230,8 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       if (typeof todo.description !== 'string' || !todo.description.trim()) {
         return 'Each todo must have a non-empty description string';
       }
-      if (!['pending', 'in_progress', 'completed'].includes(todo.status)) {
-        return 'Each todo must have a valid status (pending, in_progress, or completed)';
+      if (!TODO_STATUSES.includes(todo.status)) {
+        return `Each todo must have a valid status (${TODO_STATUSES.join(', ')})`;
       }
     }
 
@@ -197,7 +248,15 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WriteTodosToolParams,
+    _messageBus?: MessageBus,
+    _toolName?: string,
+    _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
-    return new WriteTodosToolInvocation(params);
+    return new WriteTodosToolInvocation(
+      params,
+      _messageBus,
+      _toolName,
+      _displayName,
+    );
   }
 }

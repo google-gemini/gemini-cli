@@ -62,6 +62,7 @@ describe('mcpCommand', () => {
     getBlockedMcpServers: ReturnType<typeof vi.fn>;
     getPromptRegistry: ReturnType<typeof vi.fn>;
     getGeminiClient: ReturnType<typeof vi.fn>;
+    getMcpClientManager: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -88,6 +89,10 @@ describe('mcpCommand', () => {
         getPromptsByServer: vi.fn().mockReturnValue([]),
       }),
       getGeminiClient: vi.fn(),
+      getMcpClientManager: vi.fn().mockImplementation(() => ({
+        getBlockedMcpServers: vi.fn(),
+        getMcpServers: vi.fn(),
+      })),
     };
 
     mockContext = createMockCommandContext({
@@ -175,33 +180,36 @@ describe('mcpCommand', () => {
             description: tool.description,
             schema: tool.schema,
           })),
-          showTips: true,
         }),
         expect.any(Number),
       );
     });
 
     it('should display tool descriptions when desc argument is used', async () => {
-      await mcpCommand.action!(mockContext, 'desc');
+      const descSubCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'desc',
+      );
+      await descSubCommand!.action!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.MCP_STATUS,
           showDescriptions: true,
-          showTips: false,
         }),
         expect.any(Number),
       );
     });
 
     it('should not display descriptions when nodesc argument is used', async () => {
-      await mcpCommand.action!(mockContext, 'nodesc');
+      const listSubCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'list',
+      );
+      await listSubCommand!.action!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.MCP_STATUS,
           showDescriptions: false,
-          showTips: false,
         }),
         expect.any(Number),
       );

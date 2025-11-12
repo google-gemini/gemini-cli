@@ -1,7 +1,7 @@
 # Release Confidence Strategy
 
 This document outlines the strategy for gaining confidence in every release of
-the Gemini CLI. It serves as a checklist and quality gate for maintainers to
+the Gemini CLI. It serves as a checklist and quality gate for release manager to
 ensure we are shipping a high-quality product.
 
 ## The Goal
@@ -68,8 +68,8 @@ The weekly release cadence promotes code from `main` -> `nightly` -> `preview`
 
 ### 2. Critical User Journey (CUJ) Checklist
 
-Before promoting a `preview` release to `stable`, a maintainer must manually run
-through this checklist.
+Before promoting a `preview` release to `stable`, a release manager must
+manually run through this checklist.
 
 - **Setup:**
   - [ ] Uninstall any existing global version:
@@ -107,6 +107,33 @@ through this checklist.
 If any of these CUJs fail, the release is a no-go until a patch is applied to
 the `preview` channel.
 
+### 3. Pre-Launch Bug Bash (Tier 1 & 2 Launches)
+
+For high-impact releases, an organized bug bash is required to ensure a higher
+level of quality and to catch issues across a wider range of environments and
+use cases.
+
+**Definition of Tiers:**
+
+- **Tier 1:** Industry-Moving News 🚀
+- **Tier 2:** Important News for Our Users 📣
+- **Tier 3:** Relevant, but Not Life-Changing 💡
+- **Tier 4:** Bug Fixes ⚒️
+
+**Requirement:**
+
+A bug bash must be scheduled at least **72 hours in advance** of any Tier 1 or
+Tier 2 launch.
+
+**Rule of Thumb:**
+
+A bug bash should be considered for any release that involves:
+
+- A blog post
+- Coordinated social media announcements
+- Media relations or press outreach
+- A "Turbo" launch event
+
 ## Level 3: Telemetry & Data Review
 
 ### Dashboard Health
@@ -129,7 +156,7 @@ Before triggering the `Release: Promote` workflow to move `preview` to `stable`:
 1.  [ ] **Level 1:** CI and E2E workflows are green for the commit corresponding
         to the current `preview` tag.
 2.  [ ] **Level 2:** The `preview` version has been out for one week, and the
-        CUJ checklist has been completed successfully by a maintainer. No
+        CUJ checklist has been completed successfully by a release manager. No
         blocking issues have been reported.
 3.  [ ] **Level 3:** Dashboard Health and Model Evaluation checks have been
         completed and show no regressions.

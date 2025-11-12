@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -40,6 +40,7 @@ import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
+import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -71,11 +72,13 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
+  onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
   isEmbeddedShellFocused?: boolean;
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
   popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
+  suggestionsPosition?: 'above' | 'below';
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -110,23 +113,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   approvalMode,
   onEscapePromptChange,
+  onSuggestionsVisibilityChange,
   vimHandleInput,
   isEmbeddedShellFocused,
   setQueueErrorMessage,
   streamingState,
   popAllMessages,
+  suggestionsPosition = 'below',
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
-  const [escPressCount, setEscPressCount] = useState(0);
+  const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
     number | null
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const innerBoxRef = useRef<DOMElement>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -184,7 +190,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       clearTimeout(escapeTimerRef.current);
       escapeTimerRef.current = null;
     }
-    setEscPressCount(0);
+    escPressCount.current = 0;
     setShowEscapePrompt(false);
   }, []);
 
@@ -356,6 +362,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [buffer, config]);
 
+  const handleMouse = useCallback(
+    (event: MouseEvent) => {
+      if (event.name === 'left-press' && innerBoxRef.current) {
+        const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
+        // Terminal mouse events are 1-based, Ink layout is 0-based.
+        const mouseX = event.col - 1;
+        const mouseY = event.row - 1;
+        if (
+          mouseX >= x &&
+          mouseX < x + width &&
+          mouseY >= y &&
+          mouseY < y + height
+        ) {
+          const relX = mouseX - x;
+          const relY = mouseY - y;
+          const visualRow = buffer.visualScrollRow + relY;
+          buffer.moveToVisualPosition(visualRow, relX);
+        }
+      }
+    },
+    [buffer],
+  );
+
+  useMouse(handleMouse, { isActive: focus && !isEmbeddedShellFocused });
+
   const handleInput = useCallback(
     (key: Key) => {
       // TODO(jacobr): this special case is likely not needed anymore.
@@ -401,7 +432,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Reset ESC count and hide prompt on any non-ESC key
       if (key.name !== 'escape') {
-        if (escPressCount > 0 || showEscapePrompt) {
+        if (escPressCount.current > 0 || showEscapePrompt) {
           resetEscapeState();
         }
       }
@@ -462,11 +493,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         // Handle double ESC for clearing input
-        if (escPressCount === 0) {
+        if (escPressCount.current === 0) {
           if (buffer.text === '') {
             return;
           }
-          setEscPressCount(1);
+          escPressCount.current = 1;
           setShowEscapePrompt(true);
           if (escapeTimerRef.current) {
             clearTimeout(escapeTimerRef.current);
@@ -774,7 +805,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchCompletion,
       handleClipboardImage,
       resetCompletionState,
-      escPressCount,
       showEscapePrompt,
       resetEscapeState,
       vimHandleInput,
@@ -917,6 +947,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const activeCompletion = getActiveCompletion();
   const shouldShowSuggestions = activeCompletion.showSuggestions;
 
+  useEffect(() => {
+    if (onSuggestionsVisibilityChange) {
+      onSuggestionsVisibilityChange(shouldShowSuggestions);
+    }
+  }, [shouldShowSuggestions, onSuggestionsVisibilityChange]);
+
   const showAutoAcceptStyling =
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
   const showYoloStyling =
@@ -935,8 +971,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
+  const suggestionsNode = shouldShowSuggestions ? (
+    <Box paddingRight={2}>
+      <SuggestionsDisplay
+        suggestions={activeCompletion.suggestions}
+        activeIndex={activeCompletion.activeSuggestionIndex}
+        isLoading={activeCompletion.isLoadingSuggestions}
+        width={suggestionsWidth}
+        scrollOffset={activeCompletion.visibleStartIndex}
+        userInput={buffer.text}
+        mode={
+          buffer.text.startsWith('/') &&
+          !reverseSearchActive &&
+          !commandSearchActive
+            ? 'slash'
+            : 'reverse'
+        }
+        expandedIndex={expandedSuggestionIndex}
+      />
+    </Box>
+  ) : null;
+
   return (
     <>
+      {suggestionsPosition === 'above' && suggestionsNode}
       <Box
         borderStyle="round"
         borderColor={
@@ -973,7 +1031,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             '>'
           )}{' '}
         </Text>
-        <Box flexGrow={1} flexDirection="column">
+        <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
           {buffer.text.length === 0 && placeholder ? (
             showCursor ? (
               <Text>
@@ -1115,26 +1173,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           )}
         </Box>
       </Box>
-      {shouldShowSuggestions && (
-        <Box paddingRight={2}>
-          <SuggestionsDisplay
-            suggestions={activeCompletion.suggestions}
-            activeIndex={activeCompletion.activeSuggestionIndex}
-            isLoading={activeCompletion.isLoadingSuggestions}
-            width={suggestionsWidth}
-            scrollOffset={activeCompletion.visibleStartIndex}
-            userInput={buffer.text}
-            mode={
-              buffer.text.startsWith('/') &&
-              !reverseSearchActive &&
-              !commandSearchActive
-                ? 'slash'
-                : 'reverse'
-            }
-            expandedIndex={expandedSuggestionIndex}
-          />
-        </Box>
-      )}
+      {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
 };

@@ -4,12 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { AgentExecutor, type ActivityCallback } from './executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
+import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
   GeminiChat,
   StreamEventType,
@@ -20,14 +28,23 @@ import {
   type Part,
   type GenerateContentResponse,
   type GenerateContentConfig,
+  type Content,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { z } from 'zod';
 import { promptIdContext } from '../utils/promptIdContext.js';
-import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
-import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
+import {
+  logAgentStart,
+  logAgentFinish,
+  logRecoveryAttempt,
+} from '../telemetry/loggers.js';
+import {
+  AgentStartEvent,
+  AgentFinishEvent,
+  RecoveryAttemptEvent,
+} from '../telemetry/types.js';
 import type {
   AgentDefinition,
   AgentInputs,
@@ -36,10 +53,26 @@ import type {
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
+import { CompressionStatus } from '../core/turn.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
 
-const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
-  mockSendMessageStream: vi.fn(),
-  mockExecuteToolCall: vi.fn(),
+const { mockSendMessageStream, mockExecuteToolCall, mockCompress } = vi.hoisted(
+  () => ({
+    mockSendMessageStream: vi.fn(),
+    mockExecuteToolCall: vi.fn(),
+    mockCompress: vi.fn(),
+  }),
+);
+
+let mockChatHistory: Content[] = [];
+const mockSetHistory = vi.fn((newHistory: Content[]) => {
+  mockChatHistory = newHistory;
+});
+
+vi.mock('../services/chatCompressionService.js', () => ({
+  ChatCompressionService: vi.fn().mockImplementation(() => ({
+    compress: mockCompress,
+  })),
 }));
 
 vi.mock('../core/geminiChat.js', async (importOriginal) => {
@@ -48,6 +81,8 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
     ...actual,
     GeminiChat: vi.fn().mockImplementation(() => ({
       sendMessageStream: mockSendMessageStream,
+      getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
+      setHistory: mockSetHistory,
     })),
   };
 });
@@ -61,6 +96,7 @@ vi.mock('../utils/environmentContext.js');
 vi.mock('../telemetry/loggers.js', () => ({
   logAgentStart: vi.fn(),
   logAgentFinish: vi.fn(),
+  logRecoveryAttempt: vi.fn(),
 }));
 
 vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
@@ -81,6 +117,7 @@ const mockedGetDirectoryContextString = vi.mocked(getDirectoryContextString);
 const mockedPromptIdContext = vi.mocked(promptIdContext);
 const mockedLogAgentStart = vi.mocked(logAgentStart);
 const mockedLogAgentFinish = vi.mocked(logAgentFinish);
+const mockedLogRecoveryAttempt = vi.mocked(logRecoveryAttempt);
 
 // Constants for testing
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
@@ -146,7 +183,7 @@ let parentToolRegistry: ToolRegistry;
  * Type-safe helper to create agent definitions for tests.
  */
 const createTestDefinition = <TOutput extends z.ZodTypeAny>(
-  tools: Array<string | MockTool> = [LSTool.Name],
+  tools: Array<string | MockTool> = [LS_TOOL_NAME],
   runConfigOverrides: Partial<AgentDefinition<TOutput>['runConfig']> = {},
   outputConfigMode: 'default' | 'none' = 'default',
   schema: TOutput = z.string() as unknown as TOutput,
@@ -183,6 +220,8 @@ describe('AgentExecutor', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    mockCompress.mockClear();
+    mockSetHistory.mockClear();
     mockSendMessageStream.mockReset();
     mockExecuteToolCall.mockReset();
     mockedLogAgentStart.mockReset();
@@ -190,10 +229,21 @@ describe('AgentExecutor', () => {
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
+    (ChatCompressionService as Mock).mockImplementation(() => ({
+      compress: mockCompress,
+    }));
+    mockCompress.mockResolvedValue({
+      newHistory: null,
+      info: { compressionStatus: CompressionStatus.NOOP },
+    });
+
     MockedGeminiChat.mockImplementation(
       () =>
         ({
           sendMessageStream: mockSendMessageStream,
+          getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
+          getLastPromptTokenCount: vi.fn(() => 100),
+          setHistory: mockSetHistory,
         }) as unknown as GeminiChat,
     );
 
@@ -202,7 +252,9 @@ describe('AgentExecutor', () => {
     mockConfig = makeFakeConfig();
     parentToolRegistry = new ToolRegistry(mockConfig);
     parentToolRegistry.registerTool(new LSTool(mockConfig));
-    parentToolRegistry.registerTool(new ReadFileTool(mockConfig));
+    parentToolRegistry.registerTool(
+      new MockTool({ name: READ_FILE_TOOL_NAME }),
+    );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
     vi.spyOn(mockConfig, 'getToolRegistry').mockResolvedValue(
@@ -225,7 +277,7 @@ describe('AgentExecutor', () => {
 
   describe('create (Initialization and Validation)', () => {
     it('should create successfully with allowed tools', async () => {
-      const definition = createTestDefinition([LSTool.Name]);
+      const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -242,7 +294,10 @@ describe('AgentExecutor', () => {
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {
-      const definition = createTestDefinition([LSTool.Name, ReadFileTool.Name]);
+      const definition = createTestDefinition([
+        LS_TOOL_NAME,
+        READ_FILE_TOOL_NAME,
+      ]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -253,7 +308,7 @@ describe('AgentExecutor', () => {
 
       expect(agentRegistry).not.toBe(parentToolRegistry);
       expect(agentRegistry.getAllToolNames()).toEqual(
-        expect.arrayContaining([LSTool.Name, ReadFileTool.Name]),
+        expect.arrayContaining([LS_TOOL_NAME, READ_FILE_TOOL_NAME]),
       );
       expect(agentRegistry.getAllToolNames()).toHaveLength(2);
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
@@ -273,6 +328,47 @@ describe('AgentExecutor', () => {
       expect(executor['agentId']).toMatch(
         new RegExp(`^${parentId}-${definition.name}-`),
       );
+    });
+
+    it('should correctly apply templates to initialMessages', async () => {
+      const definition = createTestDefinition();
+      // Override promptConfig to use initialMessages instead of systemPrompt
+      definition.promptConfig = {
+        initialMessages: [
+          { role: 'user', parts: [{ text: 'Goal: ${goal}' }] },
+          { role: 'model', parts: [{ text: 'OK, starting on ${goal}.' }] },
+        ],
+      };
+      const inputs = { goal: 'TestGoal' };
+
+      // Mock a response to prevent the loop from running forever
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      await executor.run(inputs, signal);
+
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const startHistory = chatConstructorArgs[2]; // history is the 3rd arg
+
+      expect(startHistory).toBeDefined();
+      expect(startHistory).toHaveLength(2);
+
+      // Perform checks on defined objects to satisfy TS
+      const firstPart = startHistory?.[0]?.parts?.[0];
+      expect(firstPart?.text).toBe('Goal: TestGoal');
+
+      const secondPart = startHistory?.[1]?.parts?.[0];
+      expect(secondPart?.text).toBe('OK, starting on TestGoal.');
     });
   });
 
@@ -315,14 +411,14 @@ describe('AgentExecutor', () => {
 
       // Turn 1: Model calls ls
       mockModelResponse(
-        [{ name: LSTool.Name, args: { path: '.' }, id: 'call1' }],
+        [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
         'T1: Listing',
       );
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: 'call1',
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -335,7 +431,7 @@ describe('AgentExecutor', () => {
           responseParts: [
             {
               functionResponse: {
-                name: LSTool.Name,
+                name: LS_TOOL_NAME,
                 response: { result: 'file1.txt' },
                 id: 'call1',
               },
@@ -365,9 +461,16 @@ describe('AgentExecutor', () => {
 
       const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
       const chatConfig = chatConstructorArgs[1];
-      expect(chatConfig?.systemInstruction).toContain(
+      const systemInstruction = chatConfig?.systemInstruction as string;
+
+      expect(systemInstruction).toContain(
         `MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool`,
       );
+      expect(systemInstruction).toContain('Mocked Environment Context');
+      expect(systemInstruction).toContain(
+        'You are running in a non-interactive mode',
+      );
+      expect(systemInstruction).toContain('Always use absolute paths');
 
       const turn1Params = getMockMessageParams(0);
 
@@ -385,7 +488,7 @@ describe('AgentExecutor', () => {
 
       expect(sentTools).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ name: LSTool.Name }),
+          expect.objectContaining({ name: LS_TOOL_NAME }),
           expect.objectContaining({ name: TASK_COMPLETE_TOOL_NAME }),
         ]),
       );
@@ -434,7 +537,7 @@ describe('AgentExecutor', () => {
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: { name: LSTool.Name, output: 'file1.txt' },
+            data: { name: LS_TOOL_NAME, output: 'file1.txt' },
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_START',
@@ -455,7 +558,7 @@ describe('AgentExecutor', () => {
     });
 
     it('should execute successfully when model calls complete_task without output (Happy Path No Output)', async () => {
-      const definition = createTestDefinition([LSTool.Name], {}, 'none');
+      const definition = createTestDefinition([LS_TOOL_NAME], {}, 'none');
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -463,13 +566,13 @@ describe('AgentExecutor', () => {
       );
 
       mockModelResponse([
-        { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
+        { name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: 'call1',
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -482,7 +585,7 @@ describe('AgentExecutor', () => {
           responseParts: [
             {
               functionResponse: {
-                name: LSTool.Name,
+                name: LS_TOOL_NAME,
                 response: {},
                 id: 'call1',
               },
@@ -535,13 +638,13 @@ describe('AgentExecutor', () => {
       );
 
       mockModelResponse([
-        { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
+        { name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: 'call1',
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -554,7 +657,7 @@ describe('AgentExecutor', () => {
           responseParts: [
             {
               functionResponse: {
-                name: LSTool.Name,
+                name: LS_TOOL_NAME,
                 response: {},
                 id: 'call1',
               },
@@ -566,22 +669,28 @@ describe('AgentExecutor', () => {
         },
       });
 
+      // Turn 2 (protocol violation)
       mockModelResponse([], 'I think I am done.');
+
+      // Turn 3 (recovery turn - also fails)
+      mockModelResponse([], 'I still give up.');
 
       const output = await executor.run({ goal: 'Strict test' }, signal);
 
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
 
-      const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`;
+      const expectedError = `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
 
-      expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
       expect(output.result).toBe(expectedError);
 
       // Telemetry check for error
       expect(mockedLogAgentFinish).toHaveBeenCalledWith(
         mockConfig,
         expect.objectContaining({
-          terminate_reason: AgentTerminateMode.ERROR,
+          terminate_reason: AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
         }),
       );
 
@@ -695,7 +804,7 @@ describe('AgentExecutor', () => {
     });
 
     it('should execute parallel tool calls and then complete', async () => {
-      const definition = createTestDefinition([LSTool.Name]);
+      const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -703,12 +812,12 @@ describe('AgentExecutor', () => {
       );
 
       const call1: FunctionCall = {
-        name: LSTool.Name,
+        name: LS_TOOL_NAME,
         args: { path: '/a' },
         id: 'c1',
       };
       const call2: FunctionCall = {
-        name: LSTool.Name,
+        name: LS_TOOL_NAME,
         args: { path: '/b' },
         id: 'c2',
       };
@@ -790,7 +899,7 @@ describe('AgentExecutor', () => {
     });
 
     it('SECURITY: should block unauthorized tools and provide explicit failure to model', async () => {
-      const definition = createTestDefinition([LSTool.Name]);
+      const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -801,7 +910,7 @@ describe('AgentExecutor', () => {
       const badCallId = 'bad_call_1';
       mockModelResponse([
         {
-          name: ReadFileTool.Name,
+          name: READ_FILE_TOOL_NAME,
           args: { path: 'secret.txt' },
           id: badCallId,
         },
@@ -839,7 +948,7 @@ describe('AgentExecutor', () => {
         expect.objectContaining({
           functionResponse: expect.objectContaining({
             id: badCallId,
-            name: ReadFileTool.Name,
+            name: READ_FILE_TOOL_NAME,
             response: {
               error: expect.stringContaining('Unauthorized tool call'),
             },
@@ -853,21 +962,218 @@ describe('AgentExecutor', () => {
           type: 'ERROR',
           data: expect.objectContaining({
             context: 'tool_call_unauthorized',
-            name: ReadFileTool.Name,
+            name: READ_FILE_TOOL_NAME,
           }),
         }),
       );
     });
   });
 
+  describe('Edge Cases and Error Handling', () => {
+    it('should report an error if complete_task output fails schema validation', async () => {
+      const definition = createTestDefinition(
+        [],
+        {},
+        'default',
+        z.string().min(10), // The schema is for the output value itself
+      );
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Invalid arg (too short)
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'short' },
+          id: 'call1',
+        },
+      ]);
+
+      // Turn 2: Corrected
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'This is a much longer and valid result' },
+          id: 'call2',
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Validation test' }, signal);
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+      const expectedError =
+        'Output validation failed: {"formErrors":["String must contain at least 10 character(s)"],"fieldErrors":{}}';
+
+      // Check that the error was reported in the activity stream
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: {
+            context: 'tool_call',
+            name: TASK_COMPLETE_TOOL_NAME,
+            error: expect.stringContaining('Output validation failed'),
+          },
+        }),
+      );
+
+      // Check that the error was sent back to the model for the next turn
+      const turn2Params = getMockMessageParams(1);
+      const turn2Parts = turn2Params.message;
+      expect(turn2Parts).toEqual([
+        expect.objectContaining({
+          functionResponse: expect.objectContaining({
+            name: TASK_COMPLETE_TOOL_NAME,
+            response: { error: expectedError },
+            id: 'call1',
+          }),
+        }),
+      ]);
+
+      // Check that the agent eventually succeeded
+      expect(output.result).toContain('This is a much longer and valid result');
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+    });
+
+    it('should throw and log if GeminiChat creation fails', async () => {
+      const definition = createTestDefinition();
+      const initError = new Error('Chat creation failed');
+      MockedGeminiChat.mockImplementationOnce(() => {
+        throw initError;
+      });
+
+      // We expect the error to be thrown during the run, not creation
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      await expect(executor.run({ goal: 'test' }, signal)).rejects.toThrow(
+        `Failed to create chat object: ${initError}`,
+      );
+
+      // Ensure the error was reported via the activity callback
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            error: `Error: Failed to create chat object: ${initError}`,
+          }),
+        }),
+      );
+
+      // Ensure the agent run was logged as a failure
+      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          terminate_reason: AgentTerminateMode.ERROR,
+        }),
+      );
+    });
+
+    it('should handle a failed tool call and feed the error to the model', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const toolErrorMessage = 'Tool failed spectacularly';
+
+      // Turn 1: Model calls a tool that will fail
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '/fake' }, id: 'call1' },
+      ]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'error',
+        request: {
+          callId: 'call1',
+          name: LS_TOOL_NAME,
+          args: { path: '/fake' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: '',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LS_TOOL_NAME,
+                response: { error: toolErrorMessage },
+                id: 'call1',
+              },
+            },
+          ],
+          error: {
+            type: 'ToolError',
+            message: toolErrorMessage,
+          },
+          errorType: 'ToolError',
+          contentLength: 0,
+        },
+      });
+
+      // Turn 2: Model sees the error and completes
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'Aborted due to tool failure.' },
+          id: 'call2',
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Tool failure test' }, signal);
+
+      expect(mockExecuteToolCall).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+      // Verify the error was reported in the activity stream
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: {
+            context: 'tool_call',
+            name: LS_TOOL_NAME,
+            error: toolErrorMessage,
+          },
+        }),
+      );
+
+      // Verify the error was sent back to the model
+      const turn2Params = getMockMessageParams(1);
+      const parts = turn2Params.message;
+      expect(parts).toEqual([
+        expect.objectContaining({
+          functionResponse: expect.objectContaining({
+            name: LS_TOOL_NAME,
+            id: 'call1',
+            response: {
+              error: toolErrorMessage,
+            },
+          }),
+        }),
+      ]);
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Aborted due to tool failure.');
+    });
+  });
+
   describe('run (Termination Conditions)', () => {
     const mockWorkResponse = (id: string) => {
-      mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id }]);
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: id,
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -878,7 +1184,7 @@ describe('AgentExecutor', () => {
           callId: id,
           resultDisplay: 'ok',
           responseParts: [
-            { functionResponse: { name: LSTool.Name, response: {}, id } },
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
           ],
           error: undefined,
           errorType: undefined,
@@ -889,27 +1195,88 @@ describe('AgentExecutor', () => {
 
     it('should terminate when max_turns is reached', async () => {
       const MAX = 2;
-      const definition = createTestDefinition([LSTool.Name], {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
       });
       const executor = await AgentExecutor.create(definition, mockConfig);
 
       mockWorkResponse('t1');
       mockWorkResponse('t2');
+      // Recovery turn
+      mockModelResponse([], 'I give up');
 
       const output = await executor.run({ goal: 'Turns test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
     });
 
-    it('should terminate if timeout is reached', async () => {
-      const definition = createTestDefinition([LSTool.Name], {
+    it('should terminate with TIMEOUT if a model call takes too long', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_time_minutes: 0.5, // 30 seconds
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock a model call that is interruptible by an abort signal.
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          await new Promise<void>((resolve) => {
+            // This promise resolves when aborted, ending the generator.
+            signal?.addEventListener('abort', () => {
+              resolve();
+            });
+          });
+        })();
+      });
+      // Recovery turn
+      mockModelResponse([], 'I give up');
+
+      const runPromise = executor.run({ goal: 'Timeout test' }, signal);
+
+      // Advance time past the timeout to trigger the abort.
+      await vi.advanceTimersByTimeAsync(31 * 1000);
+
+      const output = await runPromise;
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
+      expect(output.result).toContain('Agent timed out after 0.5 minutes.');
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+      // Verify activity stream reported the timeout
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'timeout',
+            error: 'Agent timed out after 0.5 minutes.',
+          }),
+        }),
+      );
+
+      // Verify telemetry
+      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          terminate_reason: AgentTerminateMode.TIMEOUT,
+        }),
+      );
+    });
+
+    it('should terminate with TIMEOUT if a tool call takes too long', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
         max_time_minutes: 1,
       });
       const executor = await AgentExecutor.create(definition, mockConfig);
 
-      mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id: 't1' }]);
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '.' }, id: 't1' },
+      ]);
 
       // Long running tool
       mockExecuteToolCall.mockImplementationOnce(async (_ctx, reqInfo) => {
@@ -930,10 +1297,13 @@ describe('AgentExecutor', () => {
         };
       });
 
+      // Recovery turn
+      mockModelResponse([], 'I give up');
+
       const output = await executor.run({ goal: 'Timeout test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
-      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
     });
 
     it('should terminate when AbortSignal is triggered', async () => {
@@ -955,6 +1325,605 @@ describe('AgentExecutor', () => {
       const output = await executor.run({ goal: 'Abort test' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.ABORTED);
+    });
+  });
+
+  describe('run (Recovery Turns)', () => {
+    const mockWorkResponse = (id: string) => {
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'success',
+        request: {
+          callId: id,
+          name: LS_TOOL_NAME,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      });
+    };
+
+    it('should recover successfully if complete_task is called during the grace turn after MAX_TURNS', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered!' },
+            id: 't2',
+          },
+        ],
+        'Recovering from max turns',
+      );
+
+      const output = await executor.run({ goal: 'Turns recovery' }, signal);
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Recovered!');
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1); // 1 regular + 1 recovery
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: {
+            text: 'Execution limit reached (MAX_TURNS). Attempting one final recovery turn with a grace period.',
+          },
+        }),
+      );
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: { text: 'Graceful recovery succeeded.' },
+        }),
+      );
+    });
+
+    it('should fail if complete_task is NOT called during the grace turn after MAX_TURNS', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (fails by calling no tools)
+      mockModelResponse([], 'I give up again.');
+
+      const output = await executor.run(
+        { goal: 'Turns recovery fail' },
+        signal,
+      );
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.MAX_TURNS);
+      expect(output.result).toContain('Agent reached max turns limit');
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'recovery_turn',
+            error: 'Graceful recovery attempt failed. Reason: stop',
+          }),
+        }),
+      );
+    });
+
+    it('should recover successfully from a protocol violation (no complete_task)', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Normal work
+      mockWorkResponse('t1');
+
+      // Turn 2: Protocol violation (no tool calls)
+      mockModelResponse([], 'I think I am done, but I forgot the right tool.');
+
+      // Turn 3: Recovery turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered from violation!' },
+            id: 't3',
+          },
+        ],
+        'My mistake, here is the completion.',
+      );
+
+      const output = await executor.run({ goal: 'Violation recovery' }, signal);
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Recovered from violation!');
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: {
+            text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
+          },
+        }),
+      );
+    });
+
+    it('should fail recovery from a protocol violation if it violates again', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Normal work
+      mockWorkResponse('t1');
+
+      // Turn 2: Protocol violation (no tool calls)
+      mockModelResponse([], 'I think I am done, but I forgot the right tool.');
+
+      // Turn 3: Recovery turn (fails again)
+      mockModelResponse([], 'I still dont know what to do.');
+
+      const output = await executor.run(
+        { goal: 'Violation recovery fail' },
+        signal,
+      );
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
+      expect(output.terminate_reason).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
+      expect(output.result).toContain(
+        `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'`,
+      );
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'recovery_turn',
+            error: 'Graceful recovery attempt failed. Reason: stop',
+          }),
+        }),
+      );
+    });
+
+    it('should recover successfully from a TIMEOUT', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_time_minutes: 0.5, // 30 seconds
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock a model call that gets interrupted by the timeout.
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          // This promise never resolves, it waits for abort.
+          await new Promise<void>((resolve) => {
+            signal?.addEventListener('abort', () => resolve());
+          });
+        })();
+      });
+
+      // Recovery turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered from timeout!' },
+            id: 't2',
+          },
+        ],
+        'Apologies for the delay, finishing up.',
+      );
+
+      const runPromise = executor.run({ goal: 'Timeout recovery' }, signal);
+
+      // Advance time past the timeout to trigger the abort and recovery.
+      await vi.advanceTimersByTimeAsync(31 * 1000);
+
+      const output = await runPromise;
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2); // 1 failed + 1 recovery
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Recovered from timeout!');
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'THOUGHT_CHUNK',
+          data: {
+            text: 'Execution limit reached (TIMEOUT). Attempting one final recovery turn with a grace period.',
+          },
+        }),
+      );
+    });
+
+    it('should fail recovery from a TIMEOUT if the grace period also times out', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_time_minutes: 0.5, // 30 seconds
+      });
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          await new Promise<void>((resolve) =>
+            signal?.addEventListener('abort', () => resolve()),
+          );
+        })();
+      });
+
+      // Mock the recovery call to also be long-running
+      mockSendMessageStream.mockImplementationOnce(async (_model, params) => {
+        const signal = params?.config?.abortSignal;
+        // eslint-disable-next-line require-yield
+        return (async function* () {
+          await new Promise<void>((resolve) =>
+            signal?.addEventListener('abort', () => resolve()),
+          );
+        })();
+      });
+
+      const runPromise = executor.run(
+        { goal: 'Timeout recovery fail' },
+        signal,
+      );
+
+      // 1. Trigger the main timeout
+      await vi.advanceTimersByTimeAsync(31 * 1000);
+      // 2. Let microtasks run (start recovery turn)
+      await vi.advanceTimersByTimeAsync(1);
+      // 3. Trigger the grace period timeout (60s)
+      await vi.advanceTimersByTimeAsync(61 * 1000);
+
+      const output = await runPromise;
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+      expect(output.terminate_reason).toBe(AgentTerminateMode.TIMEOUT);
+      expect(output.result).toContain('Agent timed out after 0.5 minutes.');
+
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'recovery_turn',
+            error: 'Graceful recovery attempt failed. Reason: stop',
+          }),
+        }),
+      );
+    });
+  });
+  describe('Telemetry and Logging', () => {
+    const mockWorkResponse = (id: string) => {
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'success',
+        request: {
+          callId: id,
+          name: LS_TOOL_NAME,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      });
+    };
+
+    beforeEach(() => {
+      mockedLogRecoveryAttempt.mockClear();
+    });
+
+    it('should log a RecoveryAttemptEvent when a recoverable error occurs and recovery fails', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(definition, mockConfig);
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (fails by calling no tools)
+      mockModelResponse([], 'I give up again.');
+
+      await executor.run({ goal: 'Turns recovery fail' }, signal);
+
+      expect(mockedLogRecoveryAttempt).toHaveBeenCalledTimes(1);
+      const recoveryEvent = mockedLogRecoveryAttempt.mock.calls[0][1];
+      expect(recoveryEvent).toBeInstanceOf(RecoveryAttemptEvent);
+      expect(recoveryEvent.agent_name).toBe(definition.name);
+      expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
+      expect(recoveryEvent.success).toBe(false);
+      expect(recoveryEvent.turn_count).toBe(1);
+      expect(recoveryEvent.duration_ms).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should log a successful RecoveryAttemptEvent when recovery succeeds', async () => {
+      const MAX = 1;
+      const definition = createTestDefinition([LS_TOOL_NAME], {
+        max_turns: MAX,
+      });
+      const executor = await AgentExecutor.create(definition, mockConfig);
+
+      // Turn 1 (hits max_turns)
+      mockWorkResponse('t1');
+
+      // Recovery Turn (succeeds)
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Recovered!' },
+            id: 't2',
+          },
+        ],
+        'Recovering from max turns',
+      );
+
+      await executor.run({ goal: 'Turns recovery success' }, signal);
+
+      expect(mockedLogRecoveryAttempt).toHaveBeenCalledTimes(1);
+      const recoveryEvent = mockedLogRecoveryAttempt.mock.calls[0][1];
+      expect(recoveryEvent).toBeInstanceOf(RecoveryAttemptEvent);
+      expect(recoveryEvent.success).toBe(true);
+      expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
+    });
+  });
+  describe('Chat Compression', () => {
+    const mockWorkResponse = (id: string) => {
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'success',
+        request: {
+          callId: id,
+          name: LS_TOOL_NAME,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      });
+    };
+
+    it('should attempt to compress chat history on each turn', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock compression to do nothing
+      mockCompress.mockResolvedValue({
+        newHistory: null,
+        info: { compressionStatus: CompressionStatus.NOOP },
+      });
+
+      // Turn 1
+      mockWorkResponse('t1');
+
+      // Turn 2: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 'call2',
+          },
+        ],
+        'T2',
+      );
+
+      await executor.run({ goal: 'Compress test' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(2);
+    });
+
+    it('should update chat history when compression is successful', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const compressedHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'compressed' }] },
+      ];
+
+      mockCompress.mockResolvedValue({
+        newHistory: compressedHistory,
+        info: { compressionStatus: CompressionStatus.COMPRESSED },
+      });
+
+      // Turn 1: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 'call1',
+          },
+        ],
+        'T1',
+      );
+
+      await executor.run({ goal: 'Compress success' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
+    });
+
+    it('should pass hasFailedCompressionAttempt=true to compression after a failure', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // First call fails
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: {
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        },
+      });
+      // Second call is neutral
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: { compressionStatus: CompressionStatus.NOOP },
+      });
+
+      // Turn 1
+      mockWorkResponse('t1');
+      // Turn 2: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 't2',
+          },
+        ],
+        'T2',
+      );
+
+      await executor.run({ goal: 'Compress fail' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(2);
+      // First call, hasFailedCompressionAttempt is false
+      expect(mockCompress.mock.calls[0][5]).toBe(false);
+      // Second call, hasFailedCompressionAttempt is true
+      expect(mockCompress.mock.calls[1][5]).toBe(true);
+    });
+
+    it('should reset hasFailedCompressionAttempt flag after a successful compression', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const compressedHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'compressed' }] },
+      ];
+
+      // Turn 1: Fails
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: {
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        },
+      });
+      // Turn 2: Succeeds
+      mockCompress.mockResolvedValueOnce({
+        newHistory: compressedHistory,
+        info: { compressionStatus: CompressionStatus.COMPRESSED },
+      });
+      // Turn 3: Neutral
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: { compressionStatus: CompressionStatus.NOOP },
+      });
+
+      // Turn 1
+      mockWorkResponse('t1');
+      // Turn 2
+      mockWorkResponse('t2');
+      // Turn 3: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 't3',
+          },
+        ],
+        'T3',
+      );
+
+      await executor.run({ goal: 'Compress reset' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(3);
+      // Call 1: hasFailed... is false
+      expect(mockCompress.mock.calls[0][5]).toBe(false);
+      // Call 2: hasFailed... is true
+      expect(mockCompress.mock.calls[1][5]).toBe(true);
+      // Call 3: hasFailed... is false again
+      expect(mockCompress.mock.calls[2][5]).toBe(false);
+
+      expect(mockSetHistory).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
     });
   });
 });

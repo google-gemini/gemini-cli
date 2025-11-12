@@ -6,6 +6,7 @@
 
 import type {
   CompressionStatus,
+  GeminiCLIExtension,
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
@@ -22,6 +23,8 @@ export enum AuthState {
   Unauthenticated = 'unauthenticated',
   // Auth dialog is open for user to select auth method
   Updating = 'updating',
+  // Waiting for user to input API key
+  AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
 }
@@ -78,6 +81,11 @@ export interface CompressionProps {
   compressionStatus: CompressionStatus | null;
 }
 
+/**
+ * For use when you want no icon.
+ */
+export const emptyIcon = '  ';
+
 export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
 }
@@ -100,6 +108,8 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  icon?: string;
+  color?: string;
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -163,6 +173,7 @@ export type HistoryItemCompression = HistoryItemBase & {
 
 export type HistoryItemExtensionsList = HistoryItemBase & {
   type: 'extensions_list';
+  extensions: GeminiCLIExtension[];
 };
 
 export interface ChatDetail {
@@ -219,7 +230,6 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
-  showTips: boolean;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's

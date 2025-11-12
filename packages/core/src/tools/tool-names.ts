@@ -14,9 +14,9 @@ export const WRITE_FILE_TOOL_NAME = 'write_file';
 export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
 export const EDIT_TOOL_NAME = 'replace';
-
-// TODO: Migrate other tool names here to follow this pattern and prevent future circular dependencies.
-// Candidates for migration:
-// - LSTool ('list_directory')
-// - ReadFileTool ('read_file')
-// - GrepTool ('search_file_content')
+export const SHELL_TOOL_NAME = 'run_shell_command';
+export const GREP_TOOL_NAME = 'search_file_content';
+export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
+export const READ_FILE_TOOL_NAME = 'read_file';
+export const LS_TOOL_NAME = 'list_directory';
+export const MEMORY_TOOL_NAME = 'save_memory';

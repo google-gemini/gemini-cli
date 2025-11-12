@@ -200,7 +200,7 @@ export const INFORMATIVE_TIPS = [
   'Set the number of lines to keep when truncating outputs (/settings)...',
   'Enable policy-based tool confirmation via message bus (/settings)...',
   'Enable smart-edit tool for more precise editing (/settings)...',
-  'Enable write_todos_list tool to generate task lists (/settings)...',
+  'Enable write_todos tool to generate task lists (/settings)...',
   'Enable model routing based on complexity (/settings)...',
   'Enable experimental subagents for task delegation (/settings)...',
   //Settings tips end here
@@ -209,7 +209,7 @@ export const INFORMATIVE_TIPS = [
   'Cancel a request with Ctrl+C, or press twice to exit...',
   'Exit the app with Ctrl+D on an empty line...',
   'Clear your screen at any time with Ctrl+L...',
-  'Toggle the debug console display with Ctrl+O...',
+  'Toggle the debug console display with F12...',
   'See full, untruncated responses with Ctrl+S...',
   'Toggle auto-approval (YOLO mode) for all tools with Ctrl+Y...',
   'Toggle shell mode by typing ! in an empty prompt...',

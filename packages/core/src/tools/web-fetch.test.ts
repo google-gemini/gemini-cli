@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { WebFetchTool, parsePrompt } from './web-fetch.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import * as fetchUtils from '../utils/fetch.js';
@@ -142,6 +142,13 @@ describe('WebFetchTool', () => {
       setApprovalMode: vi.fn(),
       getProxy: vi.fn(),
       getGeminiClient: mockGetGeminiClient,
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
+          model,
+          generateContentConfig: {},
+        })),
+      },
+      isInteractive: () => false,
     } as unknown as Config;
   });
 
@@ -269,7 +276,7 @@ describe('WebFetchTool', () => {
       } as Response);
 
       // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
+      mockGenerateContent.mockImplementationOnce(async (_, req) => ({
         candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
       }));
 
@@ -297,7 +304,7 @@ describe('WebFetchTool', () => {
       } as Response);
 
       // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
+      mockGenerateContent.mockImplementationOnce(async (_, req) => ({
         candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
       }));
 
@@ -319,7 +326,7 @@ describe('WebFetchTool', () => {
       } as Response);
 
       // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
+      mockGenerateContent.mockImplementationOnce(async (_, req) => ({
         candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
       }));
 
@@ -341,7 +348,7 @@ describe('WebFetchTool', () => {
       } as Response);
 
       // Mock fallback LLM call to return the content passed to it
-      mockGenerateContent.mockImplementationOnce(async (req) => ({
+      mockGenerateContent.mockImplementationOnce(async (_, req) => ({
         candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
       }));
 
@@ -471,7 +478,7 @@ describe('WebFetchTool', () => {
       expect(publishSpy).toHaveBeenCalledWith({
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall: {
-          name: 'WebFetchToolInvocation',
+          name: 'web_fetch',
           args: { prompt: 'fetch https://example.com' },
         },
         correlationId: 'test-correlation-id',
@@ -521,7 +528,7 @@ describe('WebFetchTool', () => {
 
       // Should reject with error when denied
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool execution denied by policy',
+        'Tool execution for "WebFetch" denied by policy.',
       );
     });
 
@@ -559,7 +566,7 @@ describe('WebFetchTool', () => {
       abortController.abort();
 
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool execution denied by policy.',
+        'Tool execution for "WebFetch" denied by policy.',
       );
     });
 
