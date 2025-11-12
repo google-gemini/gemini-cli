@@ -11,11 +11,13 @@ import { GeminiEventType } from '../core/turn.js';
 import {
   logLoopDetected,
   logLoopDetectionDisabled,
+  logLlmLoopCheck,
 } from '../telemetry/loggers.js';
 import {
   LoopDetectedEvent,
   LoopDetectionDisabledEvent,
   LoopType,
+  LlmLoopCheckEvent,
 } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import {
@@ -57,6 +59,12 @@ const MIN_LLM_CHECK_INTERVAL = 5;
  */
 const MAX_LLM_CHECK_INTERVAL = 15;
 
+/**
+ * The confidence threshold above which the LLM is considered to have detected a loop.
+ */
+const LLM_CONFIDENCE_THRESHOLD = 0.9;
+const DOUBLE_CHECK_MODEL_ALIAS = 'loop-detection-double-check';
+
 const LOOP_DETECTION_SYSTEM_PROMPT = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
 An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
@@ -67,6 +75,23 @@ Cognitive Loop: The assistant seems unable to determine the next logical step. I
 
 Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
 For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.`;
+
+const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    unproductive_state_analysis: {
+      type: 'string',
+      description:
+        'Your reasoning on if the conversation is looping without forward progress.',
+    },
+    unproductive_state_confidence: {
+      type: 'number',
+      description:
+        'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
+    },
+  },
+  required: ['unproductive_state_analysis', 'unproductive_state_confidence'],
+};
 
 /**
  * Service for detecting and preventing infinite loops in AI responses.
@@ -413,63 +438,136 @@ export class LoopDetectionService {
         parts: [{ text: 'Recent conversation history:' }],
       });
     }
-    const schema: Record<string, unknown> = {
-      type: 'object',
-      properties: {
-        unproductive_state_analysis: {
-          type: 'string',
-          description:
-            'Your reasoning on if the conversation is looping without forward progress.',
-        },
-        unproductive_state_confidence: {
-          type: 'number',
-          description:
-            'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
-        },
-      },
-      required: [
-        'unproductive_state_analysis',
-        'unproductive_state_confidence',
-      ],
-    };
-    let result;
-    try {
-      result = await this.config.getBaseLlmClient().generateJson({
-        modelConfigKey: { model: 'loop-detection' },
-        contents,
-        schema,
-        systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,
-        abortSignal: signal,
-        promptId: this.promptId,
-      });
-    } catch (e) {
-      // Do nothing, treat it as a non-loop.
-      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
+
+    const flashResult = await this.queryLoopDetectionModel(
+      'loop-detection',
+      contents,
+      signal,
+    );
+
+    if (!flashResult) {
       return false;
     }
 
-    if (typeof result['unproductive_state_confidence'] === 'number') {
-      if (result['unproductive_state_confidence'] > 0.9) {
-        if (
-          typeof result['unproductive_state_analysis'] === 'string' &&
-          result['unproductive_state_analysis']
-        ) {
-          debugLogger.warn(result['unproductive_state_analysis']);
-        }
-        logLoopDetected(
-          this.config,
-          new LoopDetectedEvent(LoopType.LLM_DETECTED_LOOP, this.promptId),
-        );
+    const flashConfidence = flashResult[
+      'unproductive_state_confidence'
+    ] as number;
+
+    const doubleCheckModelName =
+      this.config.modelConfigService.getResolvedConfig({
+        model: DOUBLE_CHECK_MODEL_ALIAS,
+      }).model;
+
+    if (flashConfidence < LLM_CONFIDENCE_THRESHOLD) {
+      logLlmLoopCheck(
+        this.config,
+        new LlmLoopCheckEvent(
+          this.promptId,
+          flashConfidence,
+          doubleCheckModelName,
+          -1,
+        ),
+      );
+      this.updateCheckInterval(flashConfidence);
+      return false;
+    }
+
+    if (this.config.isInFallbackMode()) {
+      const flashModelName = this.config.modelConfigService.getResolvedConfig({
+        model: 'loop-detection',
+      }).model;
+      this.handleConfirmedLoop(flashResult, flashModelName);
+      return true;
+    }
+
+    // Double check with configured model
+    const mainModelResult = await this.queryLoopDetectionModel(
+      DOUBLE_CHECK_MODEL_ALIAS,
+      contents,
+      signal,
+    );
+
+    const mainModelConfidence = mainModelResult
+      ? (mainModelResult['unproductive_state_confidence'] as number)
+      : 0;
+
+    logLlmLoopCheck(
+      this.config,
+      new LlmLoopCheckEvent(
+        this.promptId,
+        flashConfidence,
+        doubleCheckModelName,
+        mainModelConfidence,
+      ),
+    );
+
+    if (mainModelResult) {
+      if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
+        this.handleConfirmedLoop(mainModelResult, doubleCheckModelName);
         return true;
       } else {
-        this.llmCheckInterval = Math.round(
-          MIN_LLM_CHECK_INTERVAL +
-            (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result['unproductive_state_confidence']),
-        );
+        this.updateCheckInterval(mainModelConfidence);
       }
     }
+
     return false;
+  }
+
+  private async queryLoopDetectionModel(
+    model: string,
+    contents: Content[],
+    signal: AbortSignal,
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      const result = (await this.config.getBaseLlmClient().generateJson({
+        modelConfigKey: { model },
+        contents,
+        schema: LOOP_DETECTION_SCHEMA,
+        systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,
+        abortSignal: signal,
+        promptId: this.promptId,
+        maxAttempts: 2,
+      })) as Record<string, unknown>;
+
+      if (
+        result &&
+        typeof result['unproductive_state_confidence'] === 'number'
+      ) {
+        return result;
+      }
+      return null;
+    } catch (e) {
+      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
+      return null;
+    }
+  }
+
+  private handleConfirmedLoop(
+    result: Record<string, unknown>,
+    modelName: string,
+  ): void {
+    if (
+      typeof result['unproductive_state_analysis'] === 'string' &&
+      result['unproductive_state_analysis']
+    ) {
+      debugLogger.warn(result['unproductive_state_analysis']);
+    }
+    logLoopDetected(
+      this.config,
+      new LoopDetectedEvent(
+        LoopType.LLM_DETECTED_LOOP,
+        this.promptId,
+        modelName,
+      ),
+    );
+  }
+
+  private updateCheckInterval(unproductive_state_confidence: number): void {
+    this.llmCheckInterval = Math.round(
+      MIN_LLM_CHECK_INTERVAL +
+        (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
+          (1 - unproductive_state_confidence),
+    );
   }
 
   /**

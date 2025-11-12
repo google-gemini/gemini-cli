@@ -37,6 +37,7 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  LlmLoopCheckEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -92,6 +93,7 @@ export enum EventNames {
   AGENT_FINISH = 'agent_finish',
   RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
+  LLM_LOOP_CHECK = 'llm_loop_check',
 }
 
 export interface LogResponse {
@@ -735,6 +737,14 @@ export class ClearcutLogger {
       },
     ];
 
+    if (event.confirmed_by_model) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL,
+        value: event.confirmed_by_model,
+      });
+    }
+
     this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
     this.flushIfNeeded();
   }
@@ -1266,6 +1276,32 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.WEB_FETCH_FALLBACK_ATTEMPT, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logLlmLoopCheckEvent(event: LlmLoopCheckEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: event.prompt_id,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_FLASH_CONFIDENCE,
+        value: event.flash_confidence.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL,
+        value: event.main_model,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL_CONFIDENCE,
+        value: event.main_model_confidence.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.LLM_LOOP_CHECK, data));
     this.flushIfNeeded();
   }
 
