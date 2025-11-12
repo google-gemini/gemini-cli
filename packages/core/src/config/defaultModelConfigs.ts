@@ -29,7 +29,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
           },
           temperature: 1,
           topP: 0.95,
-          topK: 40,
+          topK: 64,
         },
       },
     },
