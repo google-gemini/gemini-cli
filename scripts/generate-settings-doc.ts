@@ -12,6 +12,7 @@ import {
   escapeBackticks,
   formatDefaultValue,
   formatWithPrettier,
+  injectBetweenMarkers,
   normalizeForCompare,
 } from './utils/autogen.js';
 
@@ -52,21 +53,15 @@ export async function main(argv = process.argv.slice(2)) {
   const generatedBlock = renderSections(sections);
 
   const doc = await readFile(docPath, 'utf8');
-  const startIndex = doc.indexOf(START_MARKER);
-  const endIndex = doc.indexOf(END_MARKER);
-
-  if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
-    throw new Error(
-      `Could not locate documentation markers (${START_MARKER}, ${END_MARKER}).`,
-    );
-  }
-
-  const before = doc.slice(0, startIndex + START_MARKER.length);
-  const after = doc.slice(endIndex);
-  const formattedDoc = await formatWithPrettier(
-    `${before}\n${generatedBlock}\n${after}`,
-    docPath,
-  );
+  const injectedDoc = injectBetweenMarkers({
+    document: doc,
+    startMarker: START_MARKER,
+    endMarker: END_MARKER,
+    newContent: generatedBlock,
+    paddingBefore: '\n',
+    paddingAfter: '\n',
+  });
+  const formattedDoc = await formatWithPrettier(injectedDoc, docPath);
 
   if (normalizeForCompare(doc) === normalizeForCompare(formattedDoc)) {
     if (!checkOnly) {
