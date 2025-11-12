@@ -144,43 +144,42 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
-  static readonly Schema = {
-    type: 'object',
-    description:
-      'The complete list of todos which will overwrite any existing list.',
-    properties: {
-      todos: {
-        type: 'array',
-        items: {
-          type: 'object',
-          description: 'A single task in the todo list.',
-          properties: {
-            description: {
-              type: 'string',
-              description: 'The description of the task.',
-            },
-            status: {
-              type: 'string',
-              enum: TODO_STATUSES,
-              description: 'The status of the task.',
-            },
-          },
-          required: ['description', 'status'],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ['todos'],
-    additionalProperties: false,
-  };
 
   constructor() {
     super(
       WriteTodosTool.Name,
-      'WriteTodos',
+      'Write Todos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
-      WriteTodosTool.Schema,
+      {
+        type: 'object',
+        description:
+          'The complete list of todo items. This will replace the existing list.',
+        properties: {
+          todos: {
+            type: 'array',
+            description: 'A single todo item.',
+            items: {
+              type: 'object',
+              properties: {
+                description: {
+                  type: 'string',
+                  description: 'The description of the task.',
+                },
+                status: {
+                  type: 'string',
+                  description: 'The current status of the task.',
+                  enum: TODO_STATUSES,
+                },
+              },
+              required: ['description', 'status'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['todos'],
+        additionalProperties: false,
+      },
     );
   }
 
@@ -189,7 +188,30 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       name: this.name,
       description: this.description,
       parametersJsonSchema: this.parameterSchema,
-      responseJsonSchema: WriteTodosTool.Schema,
+      responseJsonSchema: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: {
+                  type: 'string',
+                },
+                status: {
+                  type: 'string',
+                  enum: TODO_STATUSES,
+                },
+              },
+              required: ['description', 'status'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['todos'],
+        additionalProperties: false,
+      },
     };
   }
 
