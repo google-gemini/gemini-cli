@@ -58,6 +58,12 @@ export interface SafetyCheckInput {
       turns: ConversationTurn[];
     };
   };
+
+  /**
+   * Configuration for the safety checker.
+   * This allows checkers to be parameterized (e.g. allowed paths).
+   */
+  config?: unknown;
 }
 
 /**

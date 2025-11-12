@@ -77,15 +77,11 @@ export class CheckerRunner {
           )
         : this.contextBuilder.buildFullContext();
 
-      const toolCallWithConfig = {
-        ...toolCall,
-        config: checkerConfig.config,
-      };
-
       const input: SafetyCheckInput = {
         protocolVersion: '1.0.0',
-        toolCall: toolCallWithConfig as FunctionCall,
+        toolCall,
         context,
+        config: checkerConfig.config,
       };
 
       // In-process checkers can be async, but we'll also apply a timeout
@@ -121,6 +117,7 @@ export class CheckerRunner {
         protocolVersion: '1.0.0',
         toolCall,
         context,
+        config: checkerConfig.config,
       };
 
       // Run the checker process

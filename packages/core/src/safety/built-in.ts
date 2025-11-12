@@ -23,8 +23,7 @@ export interface InProcessChecker {
 export class AllowedPathChecker implements InProcessChecker {
   async check(input: SafetyCheckInput): Promise<SafetyCheckResult> {
     const { toolCall, context } = input;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const config = (toolCall as any).config as AllowedPathConfig | undefined;
+    const config = input.config as AllowedPathConfig | undefined;
 
     // Build list of allowed directories
     const allowedDirs = [

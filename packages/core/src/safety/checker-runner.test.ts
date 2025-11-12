@@ -149,9 +149,8 @@ describe('CheckerRunner', () => {
 
     expect(mockChecker.check).toHaveBeenCalledWith(
       expect.objectContaining({
-        toolCall: expect.objectContaining({
-          config: mockConfig,
-        }),
+        toolCall: mockToolCall,
+        config: mockConfig,
       }),
     );
   });
