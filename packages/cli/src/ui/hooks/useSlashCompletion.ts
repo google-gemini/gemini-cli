@@ -33,9 +33,9 @@ interface FzfCommandCacheEntry {
 function logErrorSafely(error: unknown, context: string): void {
   if (error instanceof Error) {
     // Log full error details securely for debugging
-    console.error(`[${context}]`, error);
+    debugLogger.warn(`[${context}]`, error);
   } else {
-    console.error(`[${context}] Non-error thrown:`, error);
+    debugLogger.warn(`[${context}] Non-error thrown:`, error);
   }
 }
 
@@ -159,6 +159,7 @@ interface PerfectMatchResult {
 }
 
 function useCommandSuggestions(
+  query: string | null,
   parserResult: CommandParserResult,
   commandContext: CommandContext,
   getFzfForCommands: (
@@ -207,7 +208,7 @@ function useCommandSuggestions(
               {
                 ...commandContext,
                 invocation: {
-                  raw: `/${rawParts.join(' ')}`,
+                  raw: query || `/${rawParts.join(' ')}`,
                   name: leafCommand.name,
                   args: argString,
                 },
@@ -306,7 +307,13 @@ function useCommandSuggestions(
 
     setSuggestions([]);
     return () => abortController.abort();
-  }, [parserResult, commandContext, getFzfForCommands, getPrefixSuggestions]);
+  }, [
+    query,
+    parserResult,
+    commandContext,
+    getFzfForCommands,
+    getPrefixSuggestions,
+  ]);
 
   return { suggestions, isLoading };
 }
@@ -475,6 +482,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   // Use extracted hooks for better separation of concerns
   const parserResult = useCommandParser(query, slashCommands);
   const { suggestions: hookSuggestions, isLoading } = useCommandSuggestions(
+    query,
     parserResult,
     commandContext,
     getFzfForCommands,
@@ -503,7 +511,11 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       return;
     }
 
-    setSuggestions(hookSuggestions);
+    if (isPerfectMatch) {
+      setSuggestions([]);
+    } else {
+      setSuggestions(hookSuggestions);
+    }
     setIsLoadingSuggestions(isLoading);
     setIsPerfectMatch(isPerfectMatch);
     setCompletionStart(calculatedStart);

@@ -4,19 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { Text } from 'ink';
-import type React from 'react';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
-import type {
-  Config,
-  ToolCallConfirmationDetails,
-} from '@google/gemini-cli-core';
+import type { ToolCallConfirmationDetails } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
-import { ConfigContext } from '../../contexts/ConfigContext.js';
 
 // Mock child components to isolate ToolGroupMessage behavior
 vi.mock('./ToolMessage.js', () => ({
@@ -66,8 +61,6 @@ vi.mock('./ToolConfirmationMessage.js', () => ({
 }));
 
 describe('<ToolGroupMessage />', () => {
-  const mockConfig: Config = {} as Config;
-
   const createToolCall = (
     overrides: Partial<IndividualToolCallDisplay> = {},
   ): IndividualToolCallDisplay => ({
@@ -87,21 +80,14 @@ describe('<ToolGroupMessage />', () => {
     isFocused: true,
   };
 
-  // Helper to wrap component with required providers
-  const renderWithProviders = (component: React.ReactElement) =>
-    render(
-      <ConfigContext.Provider value={mockConfig}>
-        {component}
-      </ConfigContext.Provider>,
-    );
-
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
       const toolCalls = [createToolCall()];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders multiple tool calls with different statuses', () => {
@@ -125,10 +111,11 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Error,
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders tool call awaiting confirmation', () => {
@@ -146,10 +133,11 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders shell command with yellow border', () => {
@@ -161,10 +149,11 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Success,
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders mixed tool calls including shell command', () => {
@@ -188,10 +177,11 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Pending,
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders with limited terminal height', () => {
@@ -210,7 +200,7 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'More output here',
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           toolCalls={toolCalls}
@@ -218,11 +208,12 @@ describe('<ToolGroupMessage />', () => {
         />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders when not focused', () => {
       const toolCalls = [createToolCall()];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           toolCalls={toolCalls}
@@ -230,6 +221,7 @@ describe('<ToolGroupMessage />', () => {
         />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders with narrow terminal width', () => {
@@ -240,7 +232,7 @@ describe('<ToolGroupMessage />', () => {
             'This is a very long description that might cause wrapping issues',
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           toolCalls={toolCalls}
@@ -248,24 +240,27 @@ describe('<ToolGroupMessage />', () => {
         />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('renders empty tool calls array', () => {
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={[]} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
   });
 
   describe('Border Color Logic', () => {
     it('uses yellow border when tools are pending', () => {
       const toolCalls = [createToolCall({ status: ToolCallStatus.Pending })];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       // The snapshot will capture the visual appearance including border color
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('uses yellow border for shell commands even when successful', () => {
@@ -275,10 +270,11 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Success,
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('uses gray border when all tools are successful and no shell commands', () => {
@@ -290,10 +286,11 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Success,
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
   });
 
@@ -313,7 +310,7 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: '', // No result
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           toolCalls={toolCalls}
@@ -321,6 +318,7 @@ describe('<ToolGroupMessage />', () => {
         />,
       );
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
   });
 
@@ -350,11 +348,12 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
-      const { lastFrame } = renderWithProviders(
+      const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
       );
       // Should only show confirmation for the first tool
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
   });
 });

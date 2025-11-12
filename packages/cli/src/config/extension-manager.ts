@@ -12,7 +12,11 @@ import { ExtensionEnablementManager } from './extensions/extensionEnablement.js'
 import { type Settings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import {
+  isWorkspaceTrusted,
+  loadTrustedFolders,
+  TrustLevel,
+} from './trustedFolders.js';
 import {
   cloneFromGit,
   downloadFromGitHubRelease,
@@ -24,6 +28,7 @@ import {
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   ExtensionInstallEvent,
+  ExtensionLoader,
   ExtensionUninstallEvent,
   ExtensionUpdateEvent,
   getErrorMessage,
@@ -32,6 +37,7 @@ import {
   logExtensionInstallEvent,
   logExtensionUninstall,
   logExtensionUpdateEvent,
+  type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
@@ -50,11 +56,7 @@ import {
   maybePromptForSettings,
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
-import type {
-  ExtensionEvents,
-  ExtensionLoader,
-} from '@google/gemini-cli-core/src/utils/extensionLoader.js';
-import { EventEmitter } from 'node:events';
+import type { EventEmitter } from 'node:stream';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -62,6 +64,7 @@ interface ExtensionManagerParams {
   requestConsent: (consent: string) => Promise<boolean>;
   requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;
   workspaceDir: string;
+  eventEmitter?: EventEmitter<ExtensionEvents>;
 }
 
 /**
@@ -69,7 +72,7 @@ interface ExtensionManagerParams {
  *
  * You must call `loadExtensions` prior to calling other methods on this class.
  */
-export class ExtensionManager implements ExtensionLoader {
+export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
   private settings: Settings;
   private requestConsent: (consent: string) => Promise<boolean>;
@@ -79,9 +82,9 @@ export class ExtensionManager implements ExtensionLoader {
   private telemetryConfig: Config;
   private workspaceDir: string;
   private loadedExtensions: GeminiCLIExtension[] | undefined;
-  private eventEmitter: EventEmitter<ExtensionEvents>;
 
   constructor(options: ExtensionManagerParams) {
+    super(options.eventEmitter);
     this.workspaceDir = options.workspaceDir;
     this.extensionEnablementManager = new ExtensionEnablementManager(
       options.enabledExtensionOverrides,
@@ -98,7 +101,6 @@ export class ExtensionManager implements ExtensionLoader {
     });
     this.requestConsent = options.requestConsent;
     this.requestSetting = options.requestSetting ?? undefined;
-    this.eventEmitter = new EventEmitter();
   }
 
   setRequestConsent(
@@ -122,25 +124,38 @@ export class ExtensionManager implements ExtensionLoader {
     return this.loadedExtensions!;
   }
 
-  extensionEvents(): EventEmitter<ExtensionEvents> {
-    return this.eventEmitter;
-  }
-
   async installOrUpdateExtension(
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
   ): Promise<GeminiCLIExtension> {
+    if (
+      (installMetadata.type === 'git' ||
+        installMetadata.type === 'github-release') &&
+      this.settings.security?.blockGitExtensions
+    ) {
+      throw new Error(
+        'Installing extensions from remote sources is disallowed by your current settings.',
+      );
+    }
     const isUpdate = !!previousExtensionConfig;
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
     let extension: GeminiCLIExtension | null;
     try {
       if (!isWorkspaceTrusted(this.settings).isTrusted) {
-        throw new Error(
-          `Could not install extension from untrusted folder at ${installMetadata.source}`,
-        );
+        if (
+          await this.requestConsent(
+            `The current workspace at "${this.workspaceDir}" is not trusted. Do you want to trust this workspace to install extensions?`,
+          )
+        ) {
+          const trustedFolders = loadTrustedFolders();
+          trustedFolders.setValue(this.workspaceDir, TrustLevel.TRUST_FOLDER);
+        } else {
+          throw new Error(
+            `Could not install extension because the current workspace at ${this.workspaceDir} is not trusted.`,
+          );
+        }
       }
-
       const extensionsDir = ExtensionStorage.getUserExtensionsDir();
       await fs.promises.mkdir(extensionsDir, { recursive: true });
 
@@ -291,13 +306,13 @@ export class ExtensionManager implements ExtensionLoader {
         await fs.promises.writeFile(metadataPath, metadataString);
 
         // TODO: Gracefully handle this call failing, we should back up the old
-        // extension prior to overwriting it and then restore it.
+        // extension prior to overwriting it and then restore and restart it.
         extension = await this.loadExtension(destinationPath)!;
         if (!extension) {
           throw new Error(`Extension not found`);
         }
         if (isUpdate) {
-          logExtensionUpdateEvent(
+          await logExtensionUpdateEvent(
             this.telemetryConfig,
             new ExtensionUpdateEvent(
               hashValue(newExtensionConfig.name),
@@ -308,9 +323,8 @@ export class ExtensionManager implements ExtensionLoader {
               'success',
             ),
           );
-          this.eventEmitter.emit('extensionUpdated', { extension });
         } else {
-          logExtensionInstallEvent(
+          await logExtensionInstallEvent(
             this.telemetryConfig,
             new ExtensionInstallEvent(
               hashValue(newExtensionConfig.name),
@@ -320,7 +334,6 @@ export class ExtensionManager implements ExtensionLoader {
               'success',
             ),
           );
-          this.eventEmitter.emit('extensionInstalled', { extension });
           this.enableExtension(newExtensionConfig.name, SettingScope.User);
         }
       } finally {
@@ -344,7 +357,7 @@ export class ExtensionManager implements ExtensionLoader {
         ? getExtensionId(config, installMetadata)
         : undefined;
       if (isUpdate) {
-        logExtensionUpdateEvent(
+        await logExtensionUpdateEvent(
           this.telemetryConfig,
           new ExtensionUpdateEvent(
             hashValue(config?.name ?? ''),
@@ -356,7 +369,7 @@ export class ExtensionManager implements ExtensionLoader {
           ),
         );
       } else {
-        logExtensionInstallEvent(
+        await logExtensionInstallEvent(
           this.telemetryConfig,
           new ExtensionInstallEvent(
             hashValue(newExtensionConfig?.name ?? ''),
@@ -385,8 +398,12 @@ export class ExtensionManager implements ExtensionLoader {
     if (!extension) {
       throw new Error(`Extension not found.`);
     }
-    this.unloadExtension(extension);
-    const storage = new ExtensionStorage(extension.name);
+    await this.unloadExtension(extension);
+    const storage = new ExtensionStorage(
+      extension.installMetadata?.type === 'link'
+        ? extension.name
+        : path.basename(extension.path),
+    );
 
     await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
@@ -399,7 +416,7 @@ export class ExtensionManager implements ExtensionLoader {
 
     this.extensionEnablementManager.remove(extension.name);
 
-    logExtensionUninstall(
+    await logExtensionUninstall(
       this.telemetryConfig,
       new ExtensionUninstallEvent(
         hashValue(extension.name),
@@ -407,9 +424,11 @@ export class ExtensionManager implements ExtensionLoader {
         'success',
       ),
     );
-    this.eventEmitter.emit('extensionUninstalled', { extension });
   }
 
+  /**
+   * Loads all installed extensions, should only be called once.
+   */
   async loadExtensions(): Promise<GeminiCLIExtension[]> {
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
@@ -421,12 +440,14 @@ export class ExtensionManager implements ExtensionLoader {
     }
     for (const subdir of fs.readdirSync(extensionsDir)) {
       const extensionDir = path.join(extensionsDir, subdir);
-
       await this.loadExtension(extensionDir);
     }
     return this.loadedExtensions;
   }
 
+  /**
+   * Adds `extension` to the list of extensions and starts it if appropriate.
+   */
   private async loadExtension(
     extensionDir: string,
   ): Promise<GeminiCLIExtension | null> {
@@ -437,6 +458,13 @@ export class ExtensionManager implements ExtensionLoader {
 
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
+    if (
+      (installMetadata?.type === 'git' ||
+        installMetadata?.type === 'github-release') &&
+      this.settings.security?.blockGitExtensions
+    ) {
+      return null;
+    }
 
     if (installMetadata?.type === 'link') {
       effectiveExtensionPath = installMetadata.source;
@@ -487,8 +515,9 @@ export class ExtensionManager implements ExtensionLoader {
         ),
         id: getExtensionId(config, installMetadata),
       };
-      this.eventEmitter.emit('extensionLoaded', { extension });
-      this.getExtensions().push(extension);
+      this.loadedExtensions = [...this.loadedExtensions, extension];
+
+      await this.maybeStartExtension(extension);
       return extension;
     } catch (e) {
       debugLogger.error(
@@ -500,11 +529,17 @@ export class ExtensionManager implements ExtensionLoader {
     }
   }
 
-  private unloadExtension(extension: GeminiCLIExtension) {
+  /**
+   * Removes `extension` from the list of extensions and stops it if
+   * appropriate.
+   */
+  private unloadExtension(
+    extension: GeminiCLIExtension,
+  ): Promise<void> | undefined {
     this.loadedExtensions = this.getExtensions().filter(
       (entry) => extension !== entry,
     );
-    this.eventEmitter.emit('extensionUnloaded', { extension });
+    return this.maybeStopExtension(extension);
   }
 
   loadExtensionConfig(extensionDir: string): ExtensionConfig {
@@ -554,6 +589,8 @@ export class ExtensionManager implements ExtensionLoader {
     const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
     let output = `${status} ${extension.name} (${extension.version})`;
     output += `\n ID: ${extension.id}`;
+    output += `\n name: ${hashValue(extension.name)}`;
+
     output += `\n Path: ${extension.path}`;
     if (extension.installMetadata) {
       output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
@@ -601,17 +638,27 @@ export class ExtensionManager implements ExtensionLoader {
       throw new Error(`Extension with name ${name} does not exist.`);
     }
 
-    const scopePath =
-      scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
-    this.extensionEnablementManager.disable(name, true, scopePath);
-    logExtensionDisable(
+    if (scope !== SettingScope.Session) {
+      const scopePath =
+        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+      this.extensionEnablementManager.disable(name, true, scopePath);
+    }
+    await logExtensionDisable(
       this.telemetryConfig,
       new ExtensionDisableEvent(hashValue(name), extension.id, scope),
     );
-    extension.isActive = false;
-    this.eventEmitter.emit('extensionDisabled', { extension });
+    if (!this.config || this.config.getEnableExtensionReloading()) {
+      // Only toggle the isActive state if we are actually going to disable it
+      // in the current session, or we haven't been initialized yet.
+      extension.isActive = false;
+    }
+    await this.maybeStopExtension(extension);
   }
 
+  /**
+   * Enables an existing extension for a given scope, and starts it if
+   * appropriate.
+   */
   async enableExtension(name: string, scope: SettingScope) {
     if (
       scope === SettingScope.System ||
@@ -625,15 +672,22 @@ export class ExtensionManager implements ExtensionLoader {
     if (!extension) {
       throw new Error(`Extension with name ${name} does not exist.`);
     }
-    const scopePath =
-      scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
-    this.extensionEnablementManager.enable(name, true, scopePath);
-    logExtensionEnable(
+
+    if (scope !== SettingScope.Session) {
+      const scopePath =
+        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+      this.extensionEnablementManager.enable(name, true, scopePath);
+    }
+    await logExtensionEnable(
       this.telemetryConfig,
       new ExtensionEnableEvent(hashValue(name), extension.id, scope),
     );
-    extension.isActive = true;
-    this.eventEmitter.emit('extensionEnabled', { extension });
+    if (!this.config || this.config.getEnableExtensionReloading()) {
+      // Only toggle the isActive state if we are actually going to disable it
+      // in the current session, or we haven't been initialized yet.
+      extension.isActive = true;
+    }
+    await this.maybeStartExtension(extension);
   }
 }
 

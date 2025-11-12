@@ -42,6 +42,11 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import type {
+  ModelConfigKey,
+  ResolvedModelConfig,
+} from '../services/modelConfigService.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -174,6 +179,7 @@ describe('Gemini Client (client.ts)', () => {
   let mockGenerateContentFn: Mock;
   beforeEach(async () => {
     vi.resetAllMocks();
+    ClearcutLogger.clearInstance();
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
 
     vi.mocked(ChatCompressionService.prototype.compress).mockResolvedValue({
@@ -260,11 +266,25 @@ describe('Gemini Client (client.ts)', () => {
           reasoning: 'test',
         }),
       }),
+      modelConfigService: {
+        getResolvedConfig(modelConfigKey: ModelConfigKey) {
+          return {
+            model: modelConfigKey.model,
+            generateContentConfig: {
+              temperature: 0,
+              topP: 1,
+            } as unknown as ResolvedModelConfig,
+          };
+        },
+      },
+      isInteractive: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     client = new GeminiClient(mockConfig);
     await client.initialize();
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
+
+    vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
   });
 
   afterEach(() => {
@@ -316,6 +336,29 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('startChat', () => {
+    it('should include environment context when resuming a session', async () => {
+      const extraHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Old message' }] },
+        { role: 'model', parts: [{ text: 'Old response' }] },
+      ];
+
+      const chat = await client.startChat(extraHistory);
+      const history = chat.getHistory();
+
+      // The first message should be the environment context
+      expect(history[0].role).toBe('user');
+      expect(history[0].parts?.[0]?.text).toContain('This is the Gemini CLI');
+      expect(history[0].parts?.[0]?.text).toContain(
+        "The project's temporary directory is:",
+      );
+
+      // The subsequent messages should be the extra history
+      expect(history[1]).toEqual(extraHistory[0]);
+      expect(history[2]).toEqual(extraHistory[1]);
+    });
+  });
+
   describe('tryCompressChat', () => {
     const mockGetHistory = vi.fn();
 
@@ -328,6 +371,7 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: mockGetHistory,
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        getLastPromptTokenCount: vi.fn(),
       } as unknown as GeminiChat;
     });
 
@@ -343,6 +387,7 @@ describe('Gemini Client (client.ts)', () => {
       const mockOriginalChat: Partial<GeminiChat> = {
         getHistory: vi.fn((_curated?: boolean) => chatHistory),
         setHistory: vi.fn(),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(originalTokenCount),
       };
       client['chat'] = mockOriginalChat as GeminiChat;
 
@@ -370,6 +415,7 @@ describe('Gemini Client (client.ts)', () => {
       const mockNewChat: Partial<GeminiChat> = {
         getHistory: vi.fn().mockReturnValue(newHistory),
         setHistory: vi.fn(),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(newTokenCount),
       };
 
       client['startChat'] = vi
@@ -651,6 +697,7 @@ describe('Gemini Client (client.ts)', () => {
       const mockChat = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       } as unknown as GeminiChat;
       client['chat'] = mockChat;
 
@@ -713,6 +760,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -773,6 +821,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -849,6 +898,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -895,6 +945,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -942,6 +993,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1006,6 +1058,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1062,6 +1115,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1118,9 +1172,11 @@ ${JSON.stringify(
 
       // Set last prompt token count
       const lastPromptTokenCount = 900;
-      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
-        lastPromptTokenCount,
-      );
+      const mockChat: Partial<GeminiChat> = {
+        getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
 
       // Remaining = 100. Threshold (95%) = 95.
       // We need a request > 95 tokens.
@@ -1177,9 +1233,11 @@ ${JSON.stringify(
 
       // Set token count
       const lastPromptTokenCount = 900;
-      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
-        lastPromptTokenCount,
-      );
+      const mockChat: Partial<GeminiChat> = {
+        getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
 
       // Remaining (sticky) = 100. Threshold (95%) = 95.
       // We need a request > 95 tokens.
@@ -1236,6 +1294,13 @@ ${JSON.stringify(
             yield { type: 'content', value: 'Hello' };
           })(),
         );
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+          getLastPromptTokenCount: vi.fn(),
+        };
+        client['chat'] = mockChat as GeminiChat;
       });
 
       it('should use the model router service to select a model on the first turn', async () => {
@@ -1409,6 +1474,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1460,6 +1526,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1493,6 +1560,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1539,6 +1607,7 @@ ${JSON.stringify(
             .mockReturnValue([
               { role: 'user', parts: [{ text: 'previous message' }] },
             ]),
+          getLastPromptTokenCount: vi.fn(),
         };
         client['chat'] = mockChat as GeminiChat;
       });
@@ -1797,6 +1866,7 @@ ${JSON.stringify(
           addHistory: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]), // Default empty history
           setHistory: vi.fn(),
+          getLastPromptTokenCount: vi.fn(),
         };
         client['chat'] = mockChat as GeminiChat;
 
@@ -2137,6 +2207,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2173,6 +2244,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2209,6 +2281,7 @@ ${JSON.stringify(
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2233,14 +2306,12 @@ ${JSON.stringify(
   describe('generateContent', () => {
     it('should call generateContent with the correct parameters', async () => {
       const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const generationConfig = { temperature: 0.5 };
       const abortSignal = new AbortController().signal;
 
       await client.generateContent(
+        { model: DEFAULT_GEMINI_FLASH_MODEL },
         contents,
-        generationConfig,
         abortSignal,
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2249,7 +2320,7 @@ ${JSON.stringify(
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt({} as unknown as Config, ''),
-            temperature: 0.5,
+            temperature: 0,
             topP: 1,
           },
           contents,
@@ -2266,10 +2337,9 @@ ${JSON.stringify(
       vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
 
       await client.generateContent(
+        { model: DEFAULT_GEMINI_FLASH_MODEL },
         contents,
-        {},
         new AbortController().signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       expect(mockContentGenerator.generateContent).not.toHaveBeenCalledWith({
@@ -2289,7 +2359,6 @@ ${JSON.stringify(
 
     it('should use the Flash model when fallback mode is active', async () => {
       const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const generationConfig = { temperature: 0.5 };
       const abortSignal = new AbortController().signal;
       const requestedModel = 'gemini-2.5-pro'; // A non-flash model
 
@@ -2297,10 +2366,9 @@ ${JSON.stringify(
       vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
 
       await client.generateContent(
+        { model: requestedModel },
         contents,
-        generationConfig,
         abortSignal,
-        requestedModel,
       );
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(

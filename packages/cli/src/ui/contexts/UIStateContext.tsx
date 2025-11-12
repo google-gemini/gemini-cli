@@ -47,6 +47,8 @@ export interface UIState {
   isConfigInitialized: boolean;
   authError: string | null;
   isAuthDialogOpen: boolean;
+  isAwaitingApiKeyInput: boolean;
+  apiKeyDefaultValue?: string;
   editorError: string | null;
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;
@@ -121,6 +123,7 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
+  copyModeEnabled: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

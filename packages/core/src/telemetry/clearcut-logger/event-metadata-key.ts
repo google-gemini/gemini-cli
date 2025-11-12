@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 122
+  // Next ID: 129
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -464,4 +464,32 @@ export enum EventMetadataKey {
 
   // Logs the reason for agent termination.
   GEMINI_CLI_AGENT_TERMINATE_REASON = 115,
+
+  // Logs the reason for an agent recovery attempt.
+  GEMINI_CLI_AGENT_RECOVERY_REASON = 122,
+
+  // Logs the duration of an agent recovery attempt in milliseconds.
+  GEMINI_CLI_AGENT_RECOVERY_DURATION_MS = 123,
+
+  // Logs whether the agent recovery attempt was successful.
+  GEMINI_CLI_AGENT_RECOVERY_SUCCESS = 124,
+
+  // Logs whether the session is interactive.
+  GEMINI_CLI_INTERACTIVE = 125,
+
+  // ==========================================================================
+  // LLM Loop Check Event Keys
+  // ==========================================================================
+
+  // Logs the confidence score from the flash model loop check.
+  GEMINI_CLI_LLM_LOOP_CHECK_FLASH_CONFIDENCE = 126,
+
+  // Logs the name of the main model used for the secondary loop check.
+  GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL = 127,
+
+  // Logs the confidence score from the main model loop check.
+  GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL_CONFIDENCE = 128,
+
+  // Logs the model that confirmed the loop.
+  GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL = 129,
 }

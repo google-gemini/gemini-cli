@@ -28,7 +28,6 @@ import type {
   LoopDetectionDisabledEvent,
   SlashCommandEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
   InvalidChunkEvent,
@@ -46,8 +45,10 @@ import type {
   SmartEditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  LlmLoopCheckEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -63,6 +64,8 @@ import {
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordAgentRunMetrics,
+  recordRecoveryAttemptMetrics,
+  recordLinesChanged,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -118,15 +121,22 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     success: event.success,
     decision: event.decision,
     tool_type: event.tool_type,
-    ...(event.metadata
-      ? {
-          model_added_lines: event.metadata['model_added_lines'],
-          model_removed_lines: event.metadata['model_removed_lines'],
-          user_added_lines: event.metadata['user_added_lines'],
-          user_removed_lines: event.metadata['user_removed_lines'],
-        }
-      : {}),
   });
+
+  if (event.metadata) {
+    const added = event.metadata['model_added_lines'];
+    if (typeof added === 'number' && added > 0) {
+      recordLinesChanged(config, added, 'added', {
+        function_name: event.function_name,
+      });
+    }
+    const removed = event.metadata['model_removed_lines'];
+    if (typeof removed === 'number' && removed > 0) {
+      recordLinesChanged(config, removed, 'removed', {
+        function_name: event.function_name,
+      });
+    }
+  }
 }
 
 export function logToolOutputTruncated(
@@ -388,20 +398,6 @@ export function logChatCompression(
   });
 }
 
-export function logKittySequenceOverflow(
-  config: Config,
-  event: KittySequenceOverflowEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
-  if (!isTelemetrySdkInitialized()) return;
-  const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
-}
-
 export function logMalformedJsonResponse(
   config: Config,
   event: MalformedJsonResponseEvent,
@@ -497,11 +493,11 @@ export function logModelSlashCommand(
   recordModelSlashCommand(config, event);
 }
 
-export function logExtensionInstallEvent(
+export async function logExtensionInstallEvent(
   config: Config,
   event: ExtensionInstallEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -512,11 +508,11 @@ export function logExtensionInstallEvent(
   logger.emit(logRecord);
 }
 
-export function logExtensionUninstall(
+export async function logExtensionUninstall(
   config: Config,
   event: ExtensionUninstallEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -527,11 +523,11 @@ export function logExtensionUninstall(
   logger.emit(logRecord);
 }
 
-export function logExtensionUpdateEvent(
+export async function logExtensionUpdateEvent(
   config: Config,
   event: ExtensionUpdateEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionUpdateEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionUpdateEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -542,11 +538,11 @@ export function logExtensionUpdateEvent(
   logger.emit(logRecord);
 }
 
-export function logExtensionEnable(
+export async function logExtensionEnable(
   config: Config,
   event: ExtensionEnableEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -557,11 +553,11 @@ export function logExtensionEnable(
   logger.emit(logRecord);
 }
 
-export function logExtensionDisable(
+export async function logExtensionDisable(
   config: Config,
   event: ExtensionDisableEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
+): Promise<void> {
+  await ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -628,11 +624,43 @@ export function logAgentFinish(config: Config, event: AgentFinishEvent): void {
   recordAgentRunMetrics(config, event);
 }
 
+export function logRecoveryAttempt(
+  config: Config,
+  event: RecoveryAttemptEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logRecoveryAttemptEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+
+  recordRecoveryAttemptMetrics(config, event);
+}
+
 export function logWebFetchFallbackAttempt(
   config: Config,
   event: WebFetchFallbackAttemptEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logWebFetchFallbackAttemptEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+}
+
+export function logLlmLoopCheck(
+  config: Config,
+  event: LlmLoopCheckEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logLlmLoopCheckEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);

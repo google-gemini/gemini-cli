@@ -243,8 +243,7 @@ export async function handleAtCommand({
           : pathName;
 
         if (stats.isDirectory()) {
-          currentPathSpec =
-            relativePath + (relativePath.endsWith(path.sep) ? `**` : `/**`);
+          currentPathSpec = path.join(relativePath, '**');
           onDebugMessage(
             `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
           );
@@ -416,7 +415,7 @@ export async function handleAtCommand({
   const processedQueryParts: PartUnion[] = [{ text: initialQueryText }];
 
   const toolArgs = {
-    paths: pathSpecsToRead,
+    include: pathSpecsToRead,
     file_filtering_options: {
       respect_git_ignore: respectFileIgnore.respectGitIgnore,
       respect_gemini_ignore: respectFileIgnore.respectGeminiIgnore,

@@ -42,16 +42,19 @@ installed on your machine. See
 for help.
 
 ```
-gemini extensions install https://github.com/gemini-cli-extensions/security
+gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent]
 ```
 
-This will install the Gemini CLI Security extension, which offers support for a
-`/security:analyze` command.
+- `<source>`: The github URL or local path of the extension to install.
+- `--ref`: The git ref to install from.
+- `--auto-update`: Enable auto-update for this extension.
+- `--pre-release`: Enable pre-release versions for this extension.
+- `--consent`: Acknowledge the security risks of installing an extension and
+  skip the confirmation prompt.
 
 ### Uninstalling an extension
 
-To uninstall, run `gemini extensions uninstall extension-name`, so, in the case
-of the install example:
+To uninstall, run `gemini extensions uninstall <name>`:
 
 ```
 gemini extensions uninstall gemini-cli-security
@@ -62,37 +65,37 @@ gemini extensions uninstall gemini-cli-security
 Extensions are, by default, enabled across all workspaces. You can disable an
 extension entirely or for specific workspace.
 
-For example, `gemini extensions disable extension-name` will disable the
-extension at the user level, so it will be disabled everywhere.
-`gemini extensions disable extension-name --scope=workspace` will only disable
-the extension in the current workspace.
+```
+gemini extensions disable <name> [--scope <scope>]
+```
+
+- `<name>`: The name of the extension to disable.
+- `--scope`: The scope to disable the extension in (`user` or `workspace`).
 
 ### Enabling an extension
 
-You can enable extensions using `gemini extensions enable extension-name`. You
-can also enable an extension for a specific workspace using
-`gemini extensions enable extension-name --scope=workspace` from within that
-workspace.
+You can enable extensions using `gemini extensions enable <name>`. You can also
+enable an extension for a specific workspace using
+`gemini extensions enable <name> --scope=workspace` from within that workspace.
 
-This is useful if you have an extension disabled at the top-level and only
-enabled in specific places.
+```
+gemini extensions enable <name> [--scope <scope>]
+```
+
+- `<name>`: The name of the extension to enable.
+- `--scope`: The scope to enable the extension in (`user` or `workspace`).
 
 ### Updating an extension
 
 For extensions installed from a local path or a git repository, you can
 explicitly update to the latest version (as reflected in the
-`gemini-extension.json` `version` field) with
-`gemini extensions update extension-name`.
+`gemini-extension.json` `version` field) with `gemini extensions update <name>`.
 
 You can update all extensions with:
 
 ```
 gemini extensions update --all
 ```
-
-## Extension creation
-
-We offer commands to make extension development easier.
 
 ### Create a boilerplate extension
 
@@ -104,8 +107,11 @@ To copy one of these examples into a development directory using the type of
 your choosing, run:
 
 ```
-gemini extensions new path/to/directory custom-commands
+gemini extensions new <path> [template]
 ```
+
+- `<path>`: The path to create the extension in.
+- `[template]`: The boilerplate template to use.
 
 ### Link a local extension
 
@@ -116,8 +122,10 @@ This is useful so you don't have to run `gemini extensions update` every time
 you make changes you'd like to test.
 
 ```
-gemini extensions link path/to/directory
+gemini extensions link <path>
 ```
+
+- `<path>`: The path of the extension to link.
 
 ## How it works
 
@@ -178,6 +186,9 @@ configurations. If there are any conflicts, the workspace configuration takes
 precedence.
 
 ### Settings
+
+_Note: This is an experimental feature. We do not yet recommend extension
+authors introduce settings as part of their core flows._
 
 Extensions can define settings that the user will be prompted to provide upon
 installation. This is useful for things like API keys, URLs, or other

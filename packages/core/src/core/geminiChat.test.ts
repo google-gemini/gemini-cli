@@ -128,6 +128,7 @@ describe('GeminiChat', () => {
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      isInteractive: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     // Disable 429 simulation for tests
@@ -139,6 +140,25 @@ describe('GeminiChat', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.resetAllMocks();
+  });
+
+  describe('constructor', () => {
+    it('should initialize lastPromptTokenCount based on history size', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+      ];
+      const chatWithHistory = new GeminiChat(mockConfig, config, history);
+      const estimatedTokens = Math.ceil(JSON.stringify(history).length / 4);
+      expect(chatWithHistory.getLastPromptTokenCount()).toBe(estimatedTokens);
+    });
+
+    it('should initialize lastPromptTokenCount for empty history', () => {
+      const chatEmpty = new GeminiChat(mockConfig, config, []);
+      expect(chatEmpty.getLastPromptTokenCount()).toBe(
+        Math.ceil(JSON.stringify([]).length / 4),
+      );
+    });
   });
 
   describe('sendMessageStream', () => {
@@ -707,14 +727,6 @@ describe('GeminiChat', () => {
           config: {},
         },
         'prompt-id-1',
-      );
-
-      // Verify that token counting is called when usageMetadata is present
-      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
-        42,
-      );
-      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(
-        1,
       );
     });
   });

@@ -11,7 +11,8 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
-import type { ApprovalMode } from '../config/config.js';
+import type { ApprovalMode } from '../policy/types.js';
+
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { FileDiff } from '../tools/tools.js';
@@ -67,11 +68,14 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_tools?: string;
   output_format: OutputFormat;
   extensions_count: number;
+  extensions: string;
   extension_ids: string;
+  auth_type?: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
-    const mcpServers = config.getMcpServers();
+    const mcpServers =
+      config.getMcpClientManager()?.getMcpServers() ?? config.getMcpServers();
 
     let useGemini = false;
     let useVertex = false;
@@ -101,7 +105,9 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.output_format = config.getOutputFormat();
     const extensions = config.getExtensions();
     this.extensions_count = extensions.length;
+    this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
+    this.auth_type = generatorConfig?.authType;
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -133,8 +139,10 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       mcp_tools: this.mcp_tools,
       mcp_tools_count: this.mcp_tools_count,
       output_format: this.output_format,
+      extensions: this.extensions,
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
+      auth_type: this.auth_type,
     };
   }
 
@@ -152,6 +160,19 @@ export class EndSessionEvent implements BaseTelemetryEvent {
     this['event.name'] = 'end_session';
     this['event.timestamp'] = new Date().toISOString();
     this.session_id = config?.getSessionId();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': this['event.name'],
+      'event.timestamp': this['event.timestamp'],
+      session_id: this.session_id,
+    };
+  }
+
+  toLogBody(): string {
+    return 'Session ended.';
   }
 }
 
@@ -217,6 +238,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   tool_type: 'native' | 'mcp';
   content_length?: number;
   mcp_server_name?: string;
+  extension_name?: string;
   extension_id?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
@@ -263,6 +285,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       ) {
         this.tool_type = 'mcp';
         this.mcp_server_name = call.tool.serverName;
+        this.extension_name = call.tool.extensionName;
         this.extension_id = call.tool.extensionId;
       } else {
         this.tool_type = 'native';
@@ -289,7 +312,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         }
       }
     } else {
-      this.function_name = function_name!;
+      this.function_name = function_name as string;
       this.function_args = function_args!;
       this.duration_ms = duration_ms!;
       this.success = success!;
@@ -313,6 +336,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       tool_type: this.tool_type,
       content_length: this.content_length,
       mcp_server_name: this.mcp_server_name,
+      extension_name: this.extension_name,
       extension_id: this.extension_id,
       metadata: this.metadata,
     };
@@ -684,26 +708,38 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
   'event.timestamp': string;
   loop_type: LoopType;
   prompt_id: string;
+  confirmed_by_model?: string;
 
-  constructor(loop_type: LoopType, prompt_id: string) {
+  constructor(
+    loop_type: LoopType,
+    prompt_id: string,
+    confirmed_by_model?: string,
+  ) {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
     this.prompt_id = prompt_id;
+    this.confirmed_by_model = confirmed_by_model;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': this['event.name'],
       'event.timestamp': this['event.timestamp'],
       loop_type: this.loop_type,
       prompt_id: this.prompt_id,
     };
+
+    if (this.confirmed_by_model) {
+      attributes['confirmed_by_model'] = this.confirmed_by_model;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {
-    return `Loop detected. Type: ${this.loop_type}.`;
+    return `Loop detected. Type: ${this.loop_type}.${this.confirmed_by_model ? ` Confirmed by: ${this.confirmed_by_model}` : ''}`;
   }
 }
 
@@ -935,34 +971,6 @@ export class ConversationFinishedEvent {
 
   toLogBody(): string {
     return `Conversation finished.`;
-  }
-}
-
-export class KittySequenceOverflowEvent {
-  'event.name': 'kitty_sequence_overflow';
-  'event.timestamp': string; // ISO 8601
-  sequence_length: number;
-  truncated_sequence: string;
-  constructor(sequence_length: number, truncated_sequence: string) {
-    this['event.name'] = 'kitty_sequence_overflow';
-    this['event.timestamp'] = new Date().toISOString();
-    this.sequence_length = sequence_length;
-    // Truncate to first 20 chars for logging (avoid logging sensitive data)
-    this.truncated_sequence = truncated_sequence.substring(0, 20);
-  }
-
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
-      ...getCommonAttributes(config),
-      'event.name': this['event.name'],
-      'event.timestamp': this['event.timestamp'],
-      sequence_length: this.sequence_length,
-      truncated_sequence: this.truncated_sequence,
-    };
-  }
-
-  toLogBody(): string {
-    return `Kitty sequence buffer overflow: ${this.sequence_length} bytes`;
   }
 }
 
@@ -1421,6 +1429,48 @@ export class ModelSlashCommandEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_LLM_LOOP_CHECK = 'gemini_cli.llm_loop_check';
+export class LlmLoopCheckEvent implements BaseTelemetryEvent {
+  'event.name': 'llm_loop_check';
+  'event.timestamp': string;
+  prompt_id: string;
+  flash_confidence: number;
+  main_model: string;
+  main_model_confidence: number;
+
+  constructor(
+    prompt_id: string,
+    flash_confidence: number,
+    main_model: string,
+    main_model_confidence: number,
+  ) {
+    this['event.name'] = 'llm_loop_check';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.flash_confidence = flash_confidence;
+    this.main_model = main_model;
+    this.main_model_confidence = main_model_confidence;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_LLM_LOOP_CHECK,
+      'event.timestamp': this['event.timestamp'],
+      prompt_id: this.prompt_id,
+      flash_confidence: this.flash_confidence,
+      main_model: this.main_model,
+      main_model_confidence: this.main_model_confidence,
+    };
+  }
+
+  toLogBody(): string {
+    return this.main_model_confidence === -1
+      ? `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) check skipped`
+      : `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) confidence: ${this.main_model_confidence.toFixed(2)}`;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -1433,7 +1483,6 @@ export type TelemetryEvent =
   | LoopDetectedEvent
   | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
   | ConversationFinishedEvent
@@ -1450,6 +1499,8 @@ export type TelemetryEvent =
   | ModelSlashCommandEvent
   | AgentStartEvent
   | AgentFinishEvent
+  | RecoveryAttemptEvent
+  | LlmLoopCheckEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
@@ -1539,15 +1590,16 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_AGENT_START = 'gemini_cli.agent.start';
-export class AgentStartEvent implements BaseTelemetryEvent {
-  'event.name': 'agent_start';
+abstract class BaseAgentEvent implements BaseTelemetryEvent {
+  abstract 'event.name':
+    | 'agent_start'
+    | 'agent_finish'
+    | 'agent_recovery_attempt';
   'event.timestamp': string;
   agent_id: string;
   agent_name: string;
 
   constructor(agent_id: string, agent_name: string) {
-    this['event.name'] = 'agent_start';
     this['event.timestamp'] = new Date().toISOString();
     this.agent_id = agent_id;
     this.agent_name = agent_name;
@@ -1556,10 +1608,27 @@ export class AgentStartEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_AGENT_START,
       'event.timestamp': this['event.timestamp'],
       agent_id: this.agent_id,
       agent_name: this.agent_name,
+    };
+  }
+
+  abstract toLogBody(): string;
+}
+
+export const EVENT_AGENT_START = 'gemini_cli.agent.start';
+export class AgentStartEvent extends BaseAgentEvent {
+  'event.name' = 'agent_start' as const;
+
+  constructor(agent_id: string, agent_name: string) {
+    super(agent_id, agent_name);
+  }
+
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...super.toOpenTelemetryAttributes(config),
+      'event.name': EVENT_AGENT_START,
     };
   }
 
@@ -1569,11 +1638,8 @@ export class AgentStartEvent implements BaseTelemetryEvent {
 }
 
 export const EVENT_AGENT_FINISH = 'gemini_cli.agent.finish';
-export class AgentFinishEvent implements BaseTelemetryEvent {
-  'event.name': 'agent_finish';
-  'event.timestamp': string;
-  agent_id: string;
-  agent_name: string;
+export class AgentFinishEvent extends BaseAgentEvent {
+  'event.name' = 'agent_finish' as const;
   duration_ms: number;
   turn_count: number;
   terminate_reason: AgentTerminateMode;
@@ -1585,22 +1651,16 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
     turn_count: number,
     terminate_reason: AgentTerminateMode,
   ) {
-    this['event.name'] = 'agent_finish';
-    this['event.timestamp'] = new Date().toISOString();
-    this.agent_id = agent_id;
-    this.agent_name = agent_name;
+    super(agent_id, agent_name);
     this.duration_ms = duration_ms;
     this.turn_count = turn_count;
     this.terminate_reason = terminate_reason;
   }
 
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
-      ...getCommonAttributes(config),
+      ...super.toOpenTelemetryAttributes(config),
       'event.name': EVENT_AGENT_FINISH,
-      'event.timestamp': this['event.timestamp'],
-      agent_id: this.agent_id,
-      agent_name: this.agent_name,
       duration_ms: this.duration_ms,
       turn_count: this.turn_count,
       terminate_reason: this.terminate_reason,
@@ -1609,6 +1669,45 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Agent ${this.agent_name} finished. Reason: ${this.terminate_reason}. Duration: ${this.duration_ms}ms. Turns: ${this.turn_count}.`;
+  }
+}
+
+export const EVENT_AGENT_RECOVERY_ATTEMPT = 'gemini_cli.agent.recovery_attempt';
+export class RecoveryAttemptEvent extends BaseAgentEvent {
+  'event.name' = 'agent_recovery_attempt' as const;
+  reason: AgentTerminateMode;
+  duration_ms: number;
+  success: boolean;
+  turn_count: number;
+
+  constructor(
+    agent_id: string,
+    agent_name: string,
+    reason: AgentTerminateMode,
+    duration_ms: number,
+    success: boolean,
+    turn_count: number,
+  ) {
+    super(agent_id, agent_name);
+    this.reason = reason;
+    this.duration_ms = duration_ms;
+    this.success = success;
+    this.turn_count = turn_count;
+  }
+
+  override toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...super.toOpenTelemetryAttributes(config),
+      'event.name': EVENT_AGENT_RECOVERY_ATTEMPT,
+      reason: this.reason,
+      duration_ms: this.duration_ms,
+      success: this.success,
+      turn_count: this.turn_count,
+    };
+  }
+
+  toLogBody(): string {
+    return `Agent ${this.agent_name} recovery attempt. Reason: ${this.reason}. Success: ${this.success}. Duration: ${this.duration_ms}ms.`;
   }
 }
 

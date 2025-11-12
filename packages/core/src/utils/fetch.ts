@@ -58,9 +58,5 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
-  try {
-    setGlobalDispatcher(new ProxyAgent(proxy));
-  } catch (e) {
-    console.error(`Failed to set proxy: ${getErrorMessage(e)}`);
-  }
+  setGlobalDispatcher(new ProxyAgent(proxy));
 }
