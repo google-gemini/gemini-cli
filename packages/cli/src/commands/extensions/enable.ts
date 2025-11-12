@@ -32,9 +32,9 @@ export async function handleEnable(args: EnableArgs) {
 
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      extensionManager.enableExtension(args.name, SettingScope.Workspace);
+      await extensionManager.enableExtension(args.name, SettingScope.Workspace);
     } else {
-      extensionManager.enableExtension(args.name, SettingScope.User);
+      await extensionManager.enableExtension(args.name, SettingScope.User);
     }
     if (args.scope) {
       debugLogger.log(
@@ -81,8 +81,8 @@ export const enableCommand: CommandModule = {
         }
         return true;
       }),
-  handler: (argv) => {
-    handleEnable({
+  handler: async (argv) => {
+    await handleEnable({
       name: argv['name'] as string,
       scope: argv['scope'] as string,
     });
