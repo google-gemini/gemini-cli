@@ -734,9 +734,16 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();
     clearConsoleMessagesState();
-    console.clear();
+    if (!isAlternateBuffer) {
+      console.clear();
+    }
     refreshStatic();
-  }, [historyManager, clearConsoleMessagesState, refreshStatic]);
+  }, [
+    historyManager,
+    clearConsoleMessagesState,
+    refreshStatic,
+    isAlternateBuffer,
+  ]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
