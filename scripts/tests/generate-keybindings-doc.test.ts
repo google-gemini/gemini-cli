@@ -10,7 +10,14 @@ import { main as generateKeybindingDocs } from '../generate-keybindings-doc.ts';
 describe('generate-keybindings-doc', () => {
   it('keeps keyboard shortcut documentation in sync in check mode', async () => {
     const previousExitCode = process.exitCode;
-    await expect(generateKeybindingDocs(['--check'])).resolves.toBeUndefined();
-    expect(process.exitCode).toBe(previousExitCode);
+    try {
+      process.exitCode = 0;
+      await expect(
+        generateKeybindingDocs(['--check']),
+      ).resolves.toBeUndefined();
+      expect(process.exitCode).toBe(0);
+    } finally {
+      process.exitCode = previousExitCode;
+    }
   });
 });

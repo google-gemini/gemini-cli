@@ -316,10 +316,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: 'Toggle IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
-  [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode in the alternate buffer.',
+  [Command.TOGGLE_COPY_MODE]:
+    'Toggle copy mode when the terminal is using the alternate buffer.',
   [Command.QUIT]: 'Cancel the current request or quit the CLI.',
   [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
-  [Command.SHOW_MORE_LINES]: 'Expand the current response to show more lines.',
+  [Command.SHOW_MORE_LINES]:
+    'Expand a height-constrained response to show additional lines.',
   [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
   [Command.SUBMIT_REVERSE_SEARCH]: 'Insert the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
