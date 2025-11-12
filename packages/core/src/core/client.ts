@@ -55,16 +55,29 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import type { ModelInfoService } from '../services/modelInfoService.js';
 
-export function isThinkingSupported(model: string) {
-  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
+export async function isThinkingSupported(
+  model: string,
+  modelInfoService: ModelInfoService,
+) {
+  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+    return true;
+  }
+  return await modelInfoService.isThinkingSupported(model);
 }
 
-export function isThinkingDefault(model: string) {
+export async function isThinkingDefault(
+  model: string,
+  modelInfoService: ModelInfoService,
+) {
   if (model.startsWith('gemini-2.5-flash-lite')) {
     return false;
   }
-  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
+  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+    return true;
+  }
+  return await modelInfoService.isThinkingSupported(model);
 }
 
 const MAX_TURNS = 100;
@@ -207,7 +220,7 @@ export class GeminiClient {
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
 
-      if (isThinkingSupported(model)) {
+      if (await isThinkingSupported(model, this.config.getModelInfoService())) {
         config.thinkingConfig = {
           includeThoughts: true,
           thinkingBudget: DEFAULT_THINKING_MODE,

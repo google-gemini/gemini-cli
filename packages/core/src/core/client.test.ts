@@ -47,6 +47,7 @@ import type {
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import type { ModelInfoService } from '../services/modelInfoService.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -139,36 +140,73 @@ async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
 }
 
 describe('isThinkingSupported', () => {
-  it('should return true for gemini-2.5', () => {
-    expect(isThinkingSupported('gemini-2.5')).toBe(true);
+  const mockModelInfoService = {
+    isThinkingSupported: vi.fn(),
+  } as unknown as ModelInfoService;
+
+  it('should return true for gemini-2.5', async () => {
+    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
+    expect(await isThinkingSupported('gemini-2.5', mockModelInfoService)).toBe(
+      true,
+    );
   });
 
-  it('should return true for gemini-2.5-pro', () => {
-    expect(isThinkingSupported('gemini-2.5-pro')).toBe(true);
+  it('should return true for gemini-2.5-pro', async () => {
+    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
+    expect(
+      await isThinkingSupported('gemini-2.5-pro', mockModelInfoService),
+    ).toBe(true);
   });
 
-  it('should return false for other models', () => {
-    expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
-    expect(isThinkingSupported('some-other-model')).toBe(false);
+  it('should return false for other models', async () => {
+    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(
+      false,
+    );
+    expect(
+      await isThinkingSupported('gemini-1.5-flash', mockModelInfoService),
+    ).toBe(false);
+    expect(
+      await isThinkingSupported('some-other-model', mockModelInfoService),
+    ).toBe(false);
   });
 });
 
 describe('isThinkingDefault', () => {
-  it('should return false for gemini-2.5-flash-lite', () => {
-    expect(isThinkingDefault('gemini-2.5-flash-lite')).toBe(false);
+  const mockModelInfoService = {
+    isThinkingSupported: vi.fn(),
+  } as unknown as ModelInfoService;
+
+  it('should return false for gemini-2.5-flash-lite', async () => {
+    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
+    expect(
+      await isThinkingDefault('gemini-2.5-flash-lite', mockModelInfoService),
+    ).toBe(false);
   });
 
-  it('should return true for gemini-2.5', () => {
-    expect(isThinkingDefault('gemini-2.5')).toBe(true);
+  it('should return true for gemini-2.5', async () => {
+    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
+    expect(await isThinkingDefault('gemini-2.5', mockModelInfoService)).toBe(
+      true,
+    );
   });
 
-  it('should return true for gemini-2.5-pro', () => {
-    expect(isThinkingDefault('gemini-2.5-pro')).toBe(true);
+  it('should return true for gemini-2.5-pro', async () => {
+    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
+    expect(
+      await isThinkingDefault('gemini-2.5-pro', mockModelInfoService),
+    ).toBe(true);
   });
 
-  it('should return false for other models', () => {
-    expect(isThinkingDefault('gemini-1.5-flash')).toBe(false);
-    expect(isThinkingDefault('some-other-model')).toBe(false);
+  it('should return false for other models', async () => {
+    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(
+      false,
+    );
+    expect(
+      await isThinkingDefault('gemini-1.5-flash', mockModelInfoService),
+    ).toBe(false);
+    expect(
+      await isThinkingDefault('some-other-model', mockModelInfoService),
+    ).toBe(false);
   });
 });
 
@@ -260,6 +298,9 @@ describe('Gemini Client (client.ts)', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
+      getModelInfoService: vi.fn().mockReturnValue({
+        isThinkingSupported: vi.fn().mockResolvedValue(true),
+      }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getBaseLlmClient: vi.fn().mockReturnValue({
         generateJson: vi.fn().mockResolvedValue({
