@@ -1,6 +1,6 @@
 # Multi File Read Tool (`read_many_files`)
 
-> **Deprecated:** This tool is deprecated and will be removed in v0.14.0. Please
+> **Deprecated:** This tool is deprecated and will be removed in v0.16.0. Please
 > use `read_file` instead. If you need to read multiple files, you can make
 > multiple parallel calls to `read_file`.
 
