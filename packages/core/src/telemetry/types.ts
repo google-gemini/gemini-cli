@@ -38,6 +38,7 @@ import {
   toOutputType,
   toSystemInstruction,
 } from './semantic.js';
+import { sanitizeHookName } from './sanitize.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -1783,14 +1784,35 @@ export class HookCallEvent implements BaseTelemetryEvent {
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
-      ...this,
       'event.name': EVENT_HOOK_CALL,
       'event.timestamp': this['event.timestamp'],
-      hook_input: safeJsonStringify(this.hook_input, 2),
-      hook_output: safeJsonStringify(this.hook_output, 2),
+      hook_event_name: this.hook_event_name,
+      hook_type: this.hook_type,
+      // Sanitize hook_name unless full logging is enabled
+      hook_name: config.getTelemetryLogPromptsEnabled()
+        ? this.hook_name
+        : sanitizeHookName(this.hook_name),
+      duration_ms: this.duration_ms,
+      success: this.success,
+      exit_code: this.exit_code,
     };
+
+    // Only include potentially sensitive data if telemetry logging of prompts is enabled
+    if (config.getTelemetryLogPromptsEnabled()) {
+      attributes['hook_input'] = safeJsonStringify(this.hook_input, 2);
+      attributes['hook_output'] = safeJsonStringify(this.hook_output, 2);
+      attributes['stdout'] = this.stdout;
+      attributes['stderr'] = this.stderr;
+    }
+
+    if (this.error) {
+      // Always log errors
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {

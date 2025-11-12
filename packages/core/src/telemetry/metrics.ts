@@ -16,6 +16,7 @@ import type {
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
+import { sanitizeHookName } from './sanitize.js';
 
 const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
@@ -1198,10 +1199,13 @@ export function recordHookCallMetrics(
   if (!hookCallCounter || !hookCallLatencyHistogram || !isMetricsInitialized)
     return;
 
+  // Always sanitize hook names in metrics (metrics are aggregated and exposed)
+  const sanitizedHookName = sanitizeHookName(hookName);
+
   const metricAttributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     hook_event_name: hookEventName,
-    hook_name: hookName,
+    hook_name: sanitizedHookName,
     success,
   };
 
