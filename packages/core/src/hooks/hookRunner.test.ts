@@ -272,7 +272,7 @@ console.log(JSON.stringify({ decision: 'allow' }));
 
     it('escapes cwd when expanding commands on POSIX platforms', () => {
       const cwdWithQuotes = "/tmp/project with 'quotes' && rm -rf /";
-      const runner = new HookRunner('linux');
+      const runner = new HookRunner({ platform: 'linux' });
       const expanded = (
         runner as unknown as {
           expandCommand(command: string, input: HookInput): string;
@@ -290,7 +290,7 @@ console.log(JSON.stringify({ decision: 'allow' }));
     it('escapes cwd when expanding commands on Windows', () => {
       const cwdWithQuotes =
         'C\\\\project with "quotes" && del C\\\\windows\\system32';
-      const runner = new HookRunner('win32');
+      const runner = new HookRunner({ platform: 'win32' });
       const expanded = (
         runner as unknown as {
           expandCommand(command: string, input: HookInput): string;
@@ -302,6 +302,30 @@ console.log(JSON.stringify({ decision: 'allow' }));
 
       expect(expanded).toBe(
         '"C\\\\project with ""quotes"" && del C\\\\windows\\system32"/cleanup.cmd',
+      );
+
+      const psRunner = new HookRunner({
+        platform: 'win32',
+        shell: 'powershell.exe',
+      });
+
+      const cwdWithSingleQuotes =
+        "C\\\\project with 'quotes' && del C\\\\windows\\system32";
+
+      const psExpanded = (
+        psRunner as unknown as {
+          expandCommand(command: string, input: HookInput): string;
+        }
+      ).expandCommand('$GEMINI_PROJECT_DIR/cleanup.cmd', {
+        ...baseInput,
+        cwd: cwdWithSingleQuotes,
+      });
+
+      expect((psRunner as Record<string, unknown>)['shellFlavor']).toBe(
+        'powershell',
+      );
+      expect(psExpanded).toBe(
+        "'C\\\\project with ''quotes'' && del C\\\\windows\\system32'/cleanup.cmd",
       );
     });
   });
