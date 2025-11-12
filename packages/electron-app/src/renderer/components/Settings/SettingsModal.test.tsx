@@ -195,6 +195,8 @@ describe('SettingsModal', () => {
 
     fireEvent.click(vimCheckbox);
 
+    fireEvent.click(screen.getByText('Close'));
+
     // We don't expect it to be checked immediately because it waits for refreshSettings
     // But we can check if set was called.
     await waitFor(() => {
@@ -217,6 +219,8 @@ describe('SettingsModal', () => {
 
     const editorInput = await screen.findByLabelText('Preferred Editor');
     fireEvent.change(editorInput, { target: { value: 'vim' } });
+
+    fireEvent.click(screen.getByText('Close'));
 
     await waitFor(() => {
       expect(mockSettingsSet).toHaveBeenCalledWith({
@@ -241,6 +245,8 @@ describe('SettingsModal', () => {
     const formatSelect = await screen.findByLabelText('Memory Import Format');
     fireEvent.change(formatSelect, { target: { value: 'flat' } });
 
+    fireEvent.click(screen.getByText('Close'));
+
     await waitFor(() => {
       expect(mockSettingsSet).toHaveBeenCalledWith({
         changes: { general: { memoryImportFormat: 'flat' } },
@@ -264,6 +270,8 @@ describe('SettingsModal', () => {
 
     fireEvent.click(screen.getByText('Update Servers'));
 
+    fireEvent.click(screen.getByText('Close'));
+
     await waitFor(() => {
       expect(mockSettingsSet).toHaveBeenCalledWith({
         changes: { mcpServers: { new: {} } },
@@ -286,6 +294,8 @@ describe('SettingsModal', () => {
 
     const cwdInput = await screen.findByLabelText('Terminal Working Directory');
     fireEvent.change(cwdInput, { target: { value: '/Users/test/new' } });
+
+    fireEvent.click(screen.getByText('Close'));
 
     await waitFor(() => {
       expect(mockSettingsSet).toHaveBeenCalledWith({

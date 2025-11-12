@@ -131,8 +131,8 @@ describe('PtyManager', () => {
   it('should start pty process', async () => {
     await ptyManager.start();
     expect(mockSpawn).toHaveBeenCalledWith(
-      '/mock/cli/path',
-      [],
+      expect.stringMatching(/node(\.exe)?$/),
+      ['/mock/cli/path'],
       expect.objectContaining({
         name: 'xterm-color',
         cols: 80,

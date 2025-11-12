@@ -109,7 +109,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [scope, setScope] = useState('User');
   const [activeCategory, setActiveCategory] = useState('General');
   const [envInput, setEnvInput] = useState('');
-  const envInitialized = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const envDirty = useRef(false);
+  const pendingChanges = useRef<Record<string, Record<string, unknown>>>({});
+  const overrides = useRef<Map<string, unknown>>(new Map());
 
   const flattenedSettings = useMemo(
     () => (schema ? flattenSchema(schema) : []),
@@ -129,66 +132,91 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     return sortedCats;
   }, [flattenedSettings]);
 
+  const prevIsOpen = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpen.current) {
       window.electron?.themes
         ?.get()
         .then(setAvailableThemes)
         .catch((err: Error) => console.error('Failed to get themes', err));
 
       refreshSettings();
+      pendingChanges.current = {};
+      overrides.current.clear();
+      envDirty.current = false;
     }
-  }, [isOpen, refreshSettings]);
+    prevIsOpen.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     if (fullSettings?.merged) {
-      setSettings(fullSettings.merged);
-      if (!envInitialized.current) {
+      const next = JSON.parse(JSON.stringify(fullSettings.merged)) as Record<
+        string,
+        unknown
+      >;
+      overrides.current.forEach((value, key) => {
+        set(next, key, value);
+      });
+      setSettings(next);
+
+      if (!envDirty.current) {
         setEnvInput(
           ((fullSettings.merged as Record<string, unknown>).env as string) ||
             '',
         );
-        envInitialized.current = true;
       }
     }
   }, [fullSettings]);
 
   const handleChange = useCallback(
-    async (
+    (
       field: string,
       value: string | boolean | number | Record<string, unknown>,
     ) => {
-      const newSettings = { ...settings };
-      set(newSettings as Record<string, unknown>, field, value);
-      setSettings(newSettings);
+      setSettings((prev) => {
+        const newSettings = JSON.parse(JSON.stringify(prev)) as Record<
+          string,
+          unknown
+        >;
+        set(newSettings, field, value);
+        return newSettings;
+      });
 
-      const changes = {};
-      set(changes, field, value);
+      overrides.current.set(field, value);
 
-      try {
-        await window.electron.settings.set({
-          changes,
-          scope,
-        });
-        await refreshSettings();
-      } catch (error) {
-        console.error('Failed to set settings:', error);
+      if (!pendingChanges.current[scope]) {
+        pendingChanges.current[scope] = {};
       }
+      set(pendingChanges.current[scope], field, value);
     },
-    [settings, scope, refreshSettings],
+    [scope],
   );
 
   const handleClose = async () => {
-    try {
-      await window.electron.settings.set({
-        changes: { env: envInput },
-        scope,
-      });
-      await window.electron.settings.restartTerminal();
-    } catch (error) {
-      console.error('Failed to restart terminal:', error);
+    setIsSaving(true);
+
+    if (envDirty.current) {
+      if (!pendingChanges.current[scope]) {
+        pendingChanges.current[scope] = {};
+      }
+      pendingChanges.current[scope].env = envInput;
     }
-    onClose();
+
+    try {
+      const promises = Object.entries(pendingChanges.current).map(
+        ([s, changes]) => window.electron.settings.set({ changes, scope: s }),
+      );
+      await Promise.all(promises);
+      await window.electron.settings.restartTerminal();
+      await refreshSettings();
+    } catch (error) {
+      console.error('Failed to save settings or restart terminal:', error);
+    } finally {
+      setIsSaving(false);
+      onClose();
+    }
   };
 
   const renderSetting = (config: FlattenedSetting) => {
@@ -284,8 +312,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </li>
           ))}
         </ul>
-        <button className="close-button" onClick={handleClose}>
-          Close
+        <button
+          className="close-button"
+          onClick={handleClose}
+          disabled={isSaving}
+        >
+          {isSaving ? 'Saving...' : 'Close'}
         </button>
       </div>
       <div className="settings-content">
@@ -343,7 +375,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <textarea
                   id="env"
                   value={envInput}
-                  onChange={(e) => setEnvInput(e.target.value)}
+                  onChange={(e) => {
+                    setEnvInput(e.target.value);
+                    envDirty.current = true;
+                  }}
                   placeholder="KEY=VALUE ANOTHER_KEY=VALUE"
                 />
               </div>

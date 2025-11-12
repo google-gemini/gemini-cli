@@ -97,7 +97,10 @@ export class PtyManager {
         throw new Error('Failed to load PTY implementation');
       }
 
-      const ptyProcess = ptyInfo.module.spawn(CLI_PATH, [], {
+      const command = process.platform === 'win32' ? 'node.exe' : 'node';
+      const args = [CLI_PATH];
+
+      const ptyProcess = ptyInfo.module.spawn(command, args, {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
@@ -123,12 +126,13 @@ export class PtyManager {
         if (this.ptyProcess === ptyProcess) {
           this.ptyProcess = null;
         }
-        log.info(
-          `[PTY] Process exited with code ${exitCode} and signal ${signal}`,
-        );
+        const signalMsg = signal ? ` and signal ${signal}` : '';
+        log.info(`[PTY] Process exited with code ${exitCode}${signalMsg}`);
 
         const output = outputBuffer.trim();
-        const baseMessage = `Exit Code: ${exitCode}, Signal: ${signal}`;
+        const baseMessage = `Exit Code: ${exitCode}${
+          signal ? `, Signal: ${signal}` : ''
+        }`;
         const fullMessage = output
           ? `${baseMessage}\n\nOutput:\n${output}`
           : baseMessage;
@@ -208,6 +212,8 @@ export class PtyManager {
     }
     if (this.ptyProcess) {
       this.ptyProcess.kill();
+      // Give the process a moment to actually die
+      await new Promise((resolve) => setTimeout(resolve, 100));
       this.ptyProcess = null;
     }
     if (this.fileWatcher) {
