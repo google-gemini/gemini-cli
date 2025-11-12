@@ -990,9 +990,9 @@
     },
     "useWriteTodos": {
       "title": "Use WriteTodos",
-      "description": "Enable the write_todos_list tool.",
-      "markdownDescription": "Enable the write_todos_list tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
-      "default": false,
+      "description": "Enable the write_todos tool.",
+      "markdownDescription": "Enable the write_todos tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+      "default": true,
       "type": "boolean"
     },
     "security": {
