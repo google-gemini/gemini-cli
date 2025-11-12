@@ -238,6 +238,43 @@ describe('CheckerRunner', () => {
       vi.useRealTimers();
     });
 
+    it('should send SIGKILL if process ignores SIGTERM', async () => {
+      vi.useFakeTimers();
+      const mockCheckerPath = '/mock/dist/python-checker';
+      vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);
+      vi.mocked(mockContextBuilder.buildFullContext).mockReturnValue({
+        environment: { cwd: '/tmp', workspaces: [] },
+      });
+
+      const mockChildProcess = {
+        stdin: { write: vi.fn(), end: vi.fn() },
+        stdout: { on: vi.fn() },
+        stderr: { on: vi.fn() },
+        on: vi.fn(), // Never calls 'close' automatically
+        kill: vi.fn(),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+
+      const runPromise = runner.runChecker(mockToolCall, mockExternalConfig);
+
+      // Trigger main timeout
+      vi.advanceTimersByTime(5001);
+
+      // Should have sent SIGTERM
+      expect(mockChildProcess.kill).toHaveBeenCalledWith('SIGTERM');
+
+      // Advance past cleanup timeout (5000ms)
+      vi.advanceTimersByTime(5000);
+
+      // Should have sent SIGKILL
+      expect(mockChildProcess.kill).toHaveBeenCalledWith('SIGKILL');
+
+      // Clean up promise
+      await runPromise;
+      vi.useRealTimers();
+    });
+
     it('should include checker name in non-zero exit code error message', async () => {
       const mockCheckerPath = '/mock/dist/python-checker';
       vi.mocked(mockRegistry.resolveExternal).mockReturnValue(mockCheckerPath);

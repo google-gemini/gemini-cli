@@ -154,6 +154,8 @@ export class CheckerRunner {
       let timeoutHandle: NodeJS.Timeout | null = null;
       let killed = false;
 
+      let exited = false;
+
       // Set up timeout
       timeoutHandle = setTimeout(() => {
         killed = true;
@@ -162,6 +164,13 @@ export class CheckerRunner {
           decision: SafetyCheckDecision.DENY,
           reason: `Safety checker "${checkerName}" timed out after ${this.timeout}ms`,
         });
+
+        // Fallback: if process doesn't exit after 5s, force kill
+        setTimeout(() => {
+          if (!exited) {
+            child.kill('SIGKILL');
+          }
+        }, 5000).unref();
       }, this.timeout);
 
       // Collect output
@@ -179,6 +188,7 @@ export class CheckerRunner {
 
       // Handle process completion
       child.on('close', (code: number | null) => {
+        exited = true;
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
