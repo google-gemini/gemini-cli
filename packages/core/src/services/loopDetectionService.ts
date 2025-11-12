@@ -63,6 +63,7 @@ const MAX_LLM_CHECK_INTERVAL = 15;
  * The confidence threshold above which the LLM is considered to have detected a loop.
  */
 const LLM_CONFIDENCE_THRESHOLD = 0.9;
+const DOUBLE_CHECK_MODEL_ALIAS = 'loop-detection-double-check';
 
 const LOOP_DETECTION_SYSTEM_PROMPT = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
@@ -455,13 +456,18 @@ export class LoopDetectionService {
       'unproductive_state_confidence'
     ] as number;
 
+    const doubleCheckModelName =
+      this.config.modelConfigService.getResolvedConfig({
+        model: DOUBLE_CHECK_MODEL_ALIAS,
+      }).model;
+
     if (flashConfidence < LLM_CONFIDENCE_THRESHOLD) {
       logLlmLoopCheck(
         this.config,
         new LlmLoopCheckEvent(
           this.promptId,
           flashConfidence,
-          'loop-detection-double-check',
+          doubleCheckModelName,
           -1,
         ),
       );
@@ -475,9 +481,8 @@ export class LoopDetectionService {
     }
 
     // Double check with configured model
-    const doubleCheckModel = 'loop-detection-double-check';
     const mainModelResult = await this.queryLoopDetectionModel(
-      doubleCheckModel,
+      DOUBLE_CHECK_MODEL_ALIAS,
       contents,
       schema,
       signal,
@@ -492,14 +497,14 @@ export class LoopDetectionService {
       new LlmLoopCheckEvent(
         this.promptId,
         flashConfidence,
-        doubleCheckModel,
+        doubleCheckModelName,
         mainModelConfidence,
       ),
     );
 
     if (this.isValidResult(mainModelResult)) {
       if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
-        this.handleConfirmedLoop(mainModelResult, doubleCheckModel);
+        this.handleConfirmedLoop(mainModelResult, doubleCheckModelName);
         return true;
       } else {
         this.updateCheckInterval(mainModelConfidence);
