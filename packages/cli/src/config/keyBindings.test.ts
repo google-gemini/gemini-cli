@@ -21,6 +21,7 @@ describe('keyBindings config', () => {
       for (const command of commands) {
         expect(defaultKeyBindings[command]).toBeDefined();
         expect(Array.isArray(defaultKeyBindings[command])).toBe(true);
+        expect(defaultKeyBindings[command]?.length).toBeGreaterThan(0);
       }
     });
 
