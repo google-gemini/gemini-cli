@@ -296,7 +296,6 @@ export class TestRig {
     mkdirSync(geminiDir, { recursive: true });
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
-    const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
 
     const settings = {
       general: {
@@ -308,7 +307,7 @@ export class TestRig {
         enabled: true,
         target: 'local',
         otlpEndpoint: '',
-        outfile: telemetryPath,
+        outfile: '../telemetry.log',
       },
       security: {
         auth: {
