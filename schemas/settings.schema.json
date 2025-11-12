@@ -271,8 +271,8 @@
         "useFullWidth": {
           "title": "Use Full Width",
           "description": "Use the entire width of the terminal for output.",
-          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "useAlternateBuffer": {
