@@ -76,6 +76,23 @@ Cognitive Loop: The assistant seems unable to determine the next logical step. I
 Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
 For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.`;
 
+const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    unproductive_state_analysis: {
+      type: 'string',
+      description:
+        'Your reasoning on if the conversation is looping without forward progress.',
+    },
+    unproductive_state_confidence: {
+      type: 'number',
+      description:
+        'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
+    },
+  },
+  required: ['unproductive_state_analysis', 'unproductive_state_confidence'],
+};
+
 /**
  * Service for detecting and preventing infinite loops in AI responses.
  * Monitors tool call repetitions and content sentence repetitions.
@@ -421,34 +438,14 @@ export class LoopDetectionService {
         parts: [{ text: 'Recent conversation history:' }],
       });
     }
-    const schema: Record<string, unknown> = {
-      type: 'object',
-      properties: {
-        unproductive_state_analysis: {
-          type: 'string',
-          description:
-            'Your reasoning on if the conversation is looping without forward progress.',
-        },
-        unproductive_state_confidence: {
-          type: 'number',
-          description:
-            'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
-        },
-      },
-      required: [
-        'unproductive_state_analysis',
-        'unproductive_state_confidence',
-      ],
-    };
 
     const flashResult = await this.queryLoopDetectionModel(
       'loop-detection',
       contents,
-      schema,
       signal,
     );
 
-    if (!this.isValidResult(flashResult)) {
+    if (!flashResult) {
       return false;
     }
 
@@ -487,11 +484,10 @@ export class LoopDetectionService {
     const mainModelResult = await this.queryLoopDetectionModel(
       DOUBLE_CHECK_MODEL_ALIAS,
       contents,
-      schema,
       signal,
     );
 
-    const mainModelConfidence = this.isValidResult(mainModelResult)
+    const mainModelConfidence = mainModelResult
       ? (mainModelResult['unproductive_state_confidence'] as number)
       : 0;
 
@@ -505,7 +501,7 @@ export class LoopDetectionService {
       ),
     );
 
-    if (this.isValidResult(mainModelResult)) {
+    if (mainModelResult) {
       if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
         this.handleConfirmedLoop(mainModelResult, doubleCheckModelName);
         return true;
@@ -517,30 +513,29 @@ export class LoopDetectionService {
     return false;
   }
 
-  private isValidResult(
-    result: Record<string, unknown> | null,
-  ): result is Record<string, unknown> {
-    return (
-      !!result && typeof result['unproductive_state_confidence'] === 'number'
-    );
-  }
-
   private async queryLoopDetectionModel(
     model: string,
     contents: Content[],
-    schema: Record<string, unknown>,
     signal: AbortSignal,
   ): Promise<Record<string, unknown> | null> {
     try {
-      return (await this.config.getBaseLlmClient().generateJson({
+      const result = (await this.config.getBaseLlmClient().generateJson({
         modelConfigKey: { model },
         contents,
-        schema,
+        schema: LOOP_DETECTION_SCHEMA,
         systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,
         abortSignal: signal,
         promptId: this.promptId,
         maxAttempts: 2,
       })) as Record<string, unknown>;
+
+      if (
+        result &&
+        typeof result['unproductive_state_confidence'] === 'number'
+      ) {
+        return result;
+      }
+      return null;
     } catch (e) {
       this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
       return null;
