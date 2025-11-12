@@ -144,6 +144,35 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
+  static readonly Schema = {
+    type: 'object',
+    description:
+      'The complete list of todos which will overwrite any existing list.',
+    properties: {
+      todos: {
+        type: 'array',
+        items: {
+          type: 'object',
+          description: 'A single task in the todo list.',
+          properties: {
+            description: {
+              type: 'string',
+              description: 'The description of the task.',
+            },
+            status: {
+              type: 'string',
+              enum: TODO_STATUSES,
+              description: 'The status of the task.',
+            },
+          },
+          required: ['description', 'status'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['todos'],
+    additionalProperties: false,
+  };
 
   constructor() {
     super(
@@ -151,30 +180,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       'Write Todos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
-      {
-        type: 'object',
-        properties: {
-          todos: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                description: {
-                  type: 'string',
-                },
-                status: {
-                  type: 'string',
-                  enum: TODO_STATUSES,
-                },
-              },
-              required: ['description', 'status'],
-              additionalProperties: false,
-            },
-          },
-        },
-        required: ['todos'],
-        additionalProperties: false,
-      },
+      WriteTodosTool.Schema,
     );
   }
 
@@ -183,30 +189,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       name: this.name,
       description: this.description,
       parametersJsonSchema: this.parameterSchema,
-      responseJsonSchema: {
-        type: 'object',
-        properties: {
-          todos: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                description: {
-                  type: 'string',
-                },
-                status: {
-                  type: 'string',
-                  enum: TODO_STATUSES,
-                },
-              },
-              required: ['description', 'status'],
-              additionalProperties: false,
-            },
-          },
-        },
-        required: ['todos'],
-        additionalProperties: false,
-      },
+      responseJsonSchema: WriteTodosTool.Schema,
     };
   }
 
