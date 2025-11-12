@@ -394,6 +394,15 @@ describe('ClearcutLogger', () => {
         },
         expected: 'devin',
       },
+      {
+        name: 'unidentified',
+        env: {
+          GITHUB_SHA: undefined,
+          TERM_PROGRAM: undefined,
+          SURFACE: undefined,
+        },
+        expected: 'SURFACE_NOT_SET',
+      },
     ])(
       'logs the current surface as $expected from $name',
       ({ env, expected }) => {
@@ -940,6 +949,33 @@ describe('ClearcutLogger', () => {
       expect(events[0]).not.toHaveMetadataKey(
         EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
       );
+    });
+  });
+
+  describe('flushIfNeeded', () => {
+    it('should not flush if the interval has not passed', () => {
+      const { logger } = setup();
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      logger!.flushIfNeeded();
+      expect(flushSpy).not.toHaveBeenCalled();
+    });
+
+    it('should flush if the interval has passed', async () => {
+      const { logger } = setup();
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      // Advance time by more than the flush interval
+      await vi.advanceTimersByTimeAsync(1000 * 60 * 2);
+
+      logger!.flushIfNeeded();
+      expect(flushSpy).toHaveBeenCalled();
     });
   });
 
