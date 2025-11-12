@@ -141,6 +141,13 @@
       "topP": 1
     }
   },
+  "loop-detection-double-check": {
+    "model": "gemini-2.5-pro",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
   "llm-edit-fixer": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
