@@ -480,8 +480,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `useWriteTodos`
 
 - **`useWriteTodos`** (boolean):
-  - **Description:** Enable the write_todos_list tool.
-  - **Default:** `false`
+  - **Description:** Enable the write_todos tool.
+  - **Default:** `true`
 
 #### `security`
 
