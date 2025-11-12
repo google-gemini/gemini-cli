@@ -40,6 +40,7 @@ export async function* performRestore(
         content: 'Restored project to the state before the tool call.',
       };
     } catch (e) {
+      console.error('Error restoring project from commit hash:', e);
       const error = e as Error;
       if (error.message.includes('unable to read tree')) {
         yield {
@@ -50,32 +51,6 @@ export async function* performRestore(
         return;
       }
       throw e;
-    }
-  }
-
-  if (toolCallData.toolCall) {
-    const { name, args } = toolCallData.toolCall;
-    if (name === 'replace') {
-      const replaceArgs = args as {
-        old_string: string;
-        new_string: string;
-        [key: string]: unknown;
-      };
-      yield {
-        type: 'tool',
-        toolName: name,
-        toolArgs: {
-          ...replaceArgs,
-          old_string: replaceArgs.new_string,
-          new_string: replaceArgs.old_string,
-        },
-      };
-    } else {
-      yield {
-        type: 'tool',
-        toolName: name,
-        toolArgs: args as Record<string, unknown>,
-      };
     }
   }
 }

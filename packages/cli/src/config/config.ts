@@ -536,8 +536,6 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
-  console.log('cocosheng debug', JSON.stringify(settings.general));
-
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,

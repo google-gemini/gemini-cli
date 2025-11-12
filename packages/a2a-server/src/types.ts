@@ -102,13 +102,13 @@ export interface TaskMetadata {
     tools: Array<{
       name: string;
       description: string;
-      parameterSchema: object | undefined;
+      parameterSchema: unknown;
     }>;
   }>;
   availableTools: Array<{
     name: string;
     description: string;
-    parameterSchema: object | undefined;
+    parameterSchema: unknown;
   }>;
   checkpointFile?: string;
 }

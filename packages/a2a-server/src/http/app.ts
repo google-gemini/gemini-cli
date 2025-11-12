@@ -199,7 +199,7 @@ export async function createApp() {
               if (tool) {
                 const abortController = new AbortController();
                 const signal = abortController.signal;
-                const shellExecutionConfig = {}; // Default empty config for now
+                const shellExecutionConfig = {};
                 const toolResult = await tool.buildAndExecute(
                   chunk.toolArgs,
                   signal,
@@ -238,6 +238,9 @@ export async function createApp() {
         ): CommandResponse | undefined => {
           const commandName = command.name;
           if (visited.includes(commandName)) {
+            console.warn(
+              `Command ${commandName} already inserted in the response, skipping`,
+            );
             return undefined;
           }
 
@@ -246,13 +249,11 @@ export async function createApp() {
             description: command.description,
             arguments: command.arguments ?? [],
             subCommands: (command.subCommands ?? [])
-              .map((subCommand: Command) =>
+              .map((subCommand) =>
                 transformCommand(subCommand, visited.concat(commandName)),
               )
               .filter(
-                (
-                  subCommand: CommandResponse | undefined,
-                ): subCommand is CommandResponse => !!subCommand,
+                (subCommand): subCommand is CommandResponse => !!subCommand,
               ),
           };
         };

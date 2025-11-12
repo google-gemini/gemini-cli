@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { v4 as uuidv4 } from 'uuid';
 import type {
   Config,
   GeminiClient,
@@ -12,8 +13,6 @@ import type {
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-
-const RESTORABLE_TOOLS = new Set(['replace', 'write_file']);
 
 export interface CheckpointInfo {
   messageId: string;
@@ -33,12 +32,7 @@ export async function saveRestorableToolCall(
   toolCall: ToolCallRequestInfo,
   config: Config,
   geminiClient: GeminiClient,
-  taskId: string,
 ): Promise<string | undefined> {
-  if (!RESTORABLE_TOOLS.has(toolCall.name)) {
-    return;
-  }
-
   const gitService = await config.getGitService();
   if (!gitService) {
     return;
@@ -61,7 +55,7 @@ export async function saveRestorableToolCall(
 
   const checkpointDirPath = getCheckpointDir(config);
   await fs.mkdir(checkpointDirPath, { recursive: true });
-  const fileName = `checkpoint-${taskId}.json`;
+  const fileName = `checkpoint-${uuidv4()}.json`;
   const filePath = path.join(checkpointDirPath, fileName);
   await fs.writeFile(filePath, JSON.stringify(toolCallData, null, 2));
   return fileName;

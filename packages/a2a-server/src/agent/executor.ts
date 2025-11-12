@@ -300,9 +300,7 @@ export class CoderAgentExecutor implements AgentExecutor {
     logger.info(
       `[CoderAgentExecutor] userMessage: ${JSON.stringify(userMessage)}`,
     );
-
     eventBus.on('event', (event: AgentExecutionEvent) =>
-      // only log metadata
       logger.info('[EventBus event]: ', event),
     );
 
@@ -555,18 +553,15 @@ export class CoderAgentExecutor implements AgentExecutor {
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
       };
-
-      // Add checkpoint info to the final message
-      console.log('checkpointFile', currentTask.checkpointFile);
       currentTask.setTaskStateAndPublishUpdate(
         'input-required',
         stateChange,
-        undefined, // No longer sending as a text message
+        undefined,
         undefined,
         true,
         undefined,
         undefined,
-        currentTask.checkpointFile, // Pass checkpointFile here
+        currentTask.checkpointFile,
       );
     } catch (error) {
       if (abortSignal.aborted) {

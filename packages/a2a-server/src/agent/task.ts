@@ -56,6 +56,13 @@ import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
+const RESTORABLE_TOOLS = new Set([
+  'replace',
+  'write_file',
+  'delete_file',
+  'edit',
+]);
+
 export class Task {
   id: string;
   contextId: string;
@@ -567,16 +574,18 @@ export class Task {
       return;
     }
 
-    for (const request of requests) {
-      const checkpointFile = await saveRestorableToolCall(
-        request,
-        this.config,
-        this.geminiClient,
-        this.id,
-      );
-      console.log('Checkpoint file:', checkpointFile);
-      if (checkpointFile) {
-        this.checkpointFile = checkpointFile;
+    // Set checkpoint file before any file modification tool executes
+    if (!this.checkpointFile) {
+      for (const request of requests) {
+        if (RESTORABLE_TOOLS.has(request.name)) {
+          const checkpointFile = await saveRestorableToolCall(
+            request,
+            this.config,
+            this.geminiClient,
+          );
+          this.checkpointFile = checkpointFile;
+          break;
+        }
       }
     }
 
@@ -884,14 +893,18 @@ export class Task {
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
     // TODO: Determine what it mean to have, then add a prompt ID.
-    const promptId = completedToolCalls[0]?.request.prompt_id || uuidv4();
-    yield* this.geminiClient.sendMessageStream(llmParts, aborted, promptId);
+    yield* this.geminiClient.sendMessageStream(
+      llmParts,
+      aborted,
+      /*prompt_id*/ '',
+    );
   }
 
   async *acceptUserMessage(
     requestContext: RequestContext,
     aborted: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    this.checkpointFile = undefined;
     const userMessage = requestContext.userMessage;
     const llmParts: PartUnion[] = [];
     let anyConfirmationHandled = false;
@@ -924,7 +937,7 @@ export class Task {
       yield* this.geminiClient.sendMessageStream(
         llmParts,
         aborted,
-        userMessage.messageId,
+        /*prompt_id*/ '',
       );
     } else if (anyConfirmationHandled) {
       logger.info(

@@ -16,6 +16,7 @@ import {
   getCheckpointInfoList,
   getFormattedCheckpointList,
 } from '../utils/checkpointUtils.js';
+import { logger } from '../utils/logger.js';
 
 export class RestoreCommand implements Command {
   readonly name = 'restore';
@@ -78,10 +79,15 @@ export class RestoreCommand implements Command {
       }
 
       const toolCallData = await readCheckpointData(config, selectedFile);
+      const restoreResult = await performRestore(toolCallData, gitService);
+
+      logger.info(
+        `Restore command for "${selectedFile}" completed successfully.`,
+      );
 
       return {
         name: this.name,
-        data: performRestore(toolCallData, gitService),
+        data: restoreResult,
       };
     } catch (error) {
       return {
