@@ -35,7 +35,7 @@ const NAME_RE = /^[A-Za-z_][A-Za-z0-9_.:-]{0,63}$/;
 function sanitizeName(name: unknown): string {
   let s = typeof name === 'string' ? name : String(name ?? '');
   // Replace illegal characters; ensure valid first char; enforce length
-  s = s.replace(/[^A-Za-z0-9_.:-]/g, '_').replace(/^[^A-Za-z_]+/, '_');
+  s = s.replace(/[^A-Za-z0-9_.:-]/g, '_').replace(/^[^A-Za-z_]/, '_');
   return s.length > 64 ? s.slice(0, 64) : s;
 }
 /* ----------------------------------------------------------- */
