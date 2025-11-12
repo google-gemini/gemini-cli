@@ -38,7 +38,7 @@ export class MessageBus extends EventEmitter {
     this.emit(message.type, message);
   }
 
-  publish(message: Message): void {
+  async publish(message: Message): Promise<void> {
     if (this.debug) {
       console.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
     }
@@ -50,7 +50,7 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const decision = this.policyEngine.check(
+        const { decision } = await this.policyEngine.check(
           message.toolCall,
           message.serverName,
         );

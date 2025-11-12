@@ -85,6 +85,7 @@ priority = 100
         decision: PolicyDecision.ALLOW,
         priority: 1.1, // tier 1 + 100/1000
       });
+      expect(result.checkers).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
     });
 
