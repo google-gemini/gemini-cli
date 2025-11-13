@@ -28,7 +28,6 @@ import { SmartEditTool } from '../tools/smart-edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
@@ -164,7 +163,6 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
-import { READ_MANY_FILES_TOOL_NAME } from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -632,32 +630,6 @@ export class Config {
     ]);
 
     await this.geminiClient.initialize();
-
-    this.checkDeprecatedTools();
-  }
-
-  private checkDeprecatedTools(): void {
-    const deprecatedTools = [
-      {
-        name: READ_MANY_FILES_TOOL_NAME,
-        alternateName: 'ReadManyFilesTool',
-      },
-    ];
-
-    const checkList = (list: string[] | undefined, listName: string) => {
-      if (!list) return;
-      for (const tool of deprecatedTools) {
-        if (list.includes(tool.name) || list.includes(tool.alternateName)) {
-          coreEvents.emitFeedback(
-            'warning',
-            `The tool '${tool.name}' (or '${tool.alternateName}') specified in '${listName}' is deprecated and will be removed in v0.16.0.`,
-          );
-        }
-      }
-    };
-
-    checkList(this.coreTools, 'tools.core');
-    checkList(this.allowedTools, 'tools.allowed');
   }
 
   getContentGenerator(): ContentGenerator {
@@ -1396,7 +1368,6 @@ export class Config {
     }
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
