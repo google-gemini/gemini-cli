@@ -129,6 +129,7 @@ export interface UIState {
     defaultText: string;
     warningText: string;
   };
+  bannerVisible: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

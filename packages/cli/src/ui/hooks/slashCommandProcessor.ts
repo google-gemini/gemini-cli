@@ -77,6 +77,7 @@ export const useSlashCommandProcessor = (
   actions: SlashCommandProcessorActions,
   extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
   isConfigInitialized: boolean,
+  setBannerVisible: (visible: boolean) => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
@@ -202,6 +203,7 @@ export const useSlashCommandProcessor = (
             console.clear();
           }
           refreshStatic();
+          setBannerVisible(false);
         },
         loadHistory,
         setDebugMessage: actions.setDebugMessage,
@@ -239,6 +241,7 @@ export const useSlashCommandProcessor = (
       sessionShellAllowlist,
       reloadCommands,
       extensionsUpdateState,
+      setBannerVisible,
     ],
   );
 

@@ -21,6 +21,7 @@ describe('<AppHeader />', () => {
         defaultText: 'This is the default banner',
         warningText: '',
       },
+      bannerVisible: true,
     };
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -40,6 +41,7 @@ describe('<AppHeader />', () => {
         defaultText: 'This is the default banner',
         warningText: 'There are capacity issues',
       },
+      bannerVisible: true,
     };
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -78,6 +80,7 @@ describe('<AppHeader />', () => {
         defaultText: 'This is the default banner',
         warningText: '',
       },
+      bannerVisible: true,
     };
 
     const { lastFrame, unmount } = renderWithProviders(

@@ -178,6 +178,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
+  const [bannerVisible, setBannerVisible] = useState(true);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
@@ -588,6 +589,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     slashCommandActions,
     extensionsUpdateStateInternal,
     isConfigInitialized,
+    setBannerVisible,
   );
 
   const performMemoryRefresh = useCallback(async () => {
@@ -1305,6 +1307,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       if (isMounted) {
         setDefaultBannerText(defaultBanner);
         setWarningBannerText(warningBanner);
+        setBannerVisible(true);
         refreshStatic();
       }
     };
@@ -1406,6 +1409,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         defaultText: defaultBannerText,
         warningText: warningBannerText,
       },
+      bannerVisible,
     }),
     [
       isThemeDialogOpen,
@@ -1494,6 +1498,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       warningMessage,
       defaultBannerText,
       warningBannerText,
+      bannerVisible,
     ],
   );
 
@@ -1530,6 +1535,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
+      setBannerVisible,
     }),
     [
       handleThemeSelect,
@@ -1558,6 +1564,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
+      setBannerVisible,
     ],
   );
 

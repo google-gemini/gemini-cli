@@ -21,7 +21,7 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, mainAreaWidth, bannerData } = useUIState();
+  const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
 
   const { defaultText, warningText } = bannerData;
 
@@ -36,7 +36,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
       {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
         <>
           <Header version={version} nightly={nightly} />
-          {bannerText && (
+          {bannerVisible && bannerText && (
             <Banner
               width={mainAreaWidth}
               bannerText={bannerText}
