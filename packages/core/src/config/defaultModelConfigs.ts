@@ -27,6 +27,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
             includeThoughts: true,
             thinkingBudget: -1,
           },
+          temperature: 1,
+          topP: 0.95,
+          topK: 64,
         },
       },
     },
@@ -114,7 +117,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
-    'web-search-tool': {
+    'web-search': {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {
         generateContentConfig: {
@@ -122,7 +125,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
-    'web-fetch-tool': {
+    'web-fetch': {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {
         generateContentConfig: {
@@ -130,9 +133,20 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
+    // TODO(joshualitt): During cleanup, make modelConfig optional.
+    'web-fetch-fallback': {
+      extends: 'gemini-2.5-flash-base',
+      modelConfig: {},
+    },
     'loop-detection': {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {},
+    },
+    'loop-detection-double-check': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-pro',
+      },
     },
     'llm-edit-fixer': {
       extends: 'gemini-2.5-flash-base',

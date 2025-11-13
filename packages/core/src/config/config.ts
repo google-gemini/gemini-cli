@@ -28,7 +28,6 @@ import { SmartEditTool } from '../tools/smart-edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
@@ -513,7 +512,7 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
@@ -742,12 +741,11 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    this.setFallbackMode(false);
-
-    if (this.model !== newModel) {
+    if (this.model !== newModel || this.inFallbackMode) {
       this.model = newModel;
       coreEvents.emitModelChanged(newModel);
     }
+    this.setFallbackMode(false);
   }
 
   isInFallbackMode(): boolean {
@@ -1370,7 +1368,6 @@ export class Config {
     }
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
