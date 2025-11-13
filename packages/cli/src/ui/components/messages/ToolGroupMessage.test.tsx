@@ -12,6 +12,7 @@ import { ToolCallStatus } from '../../types.js';
 import type { ToolCallConfirmationDetails } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
 import { Scrollable } from '../shared/Scrollable.js';
+import { Text } from 'ink';
 
 // Mock child components to isolate ToolGroupMessage behavior
 vi.mock('./ToolMessage.js', () => ({
