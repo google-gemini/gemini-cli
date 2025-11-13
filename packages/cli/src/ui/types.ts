@@ -190,12 +190,14 @@ export interface ToolDefinition {
   name: string;
   displayName: string;
   description?: string;
+  schema?: unknown;
 }
 
 export type HistoryItemToolsList = HistoryItemBase & {
   type: 'tools_list';
   tools: ToolDefinition[];
   showDescriptions: boolean;
+  showSchema: boolean;
 };
 
 // JSON-friendly types for using as a simple data model showing info about an

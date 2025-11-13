@@ -13,16 +13,20 @@ import { MessageType, type HistoryItemToolsList } from '../types.js';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'List available Gemini CLI tools. Usage: /tools [desc]',
+  description: 'List available Gemini CLI tools. Usage: /tools [desc|schema]',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args?: string): Promise<void> => {
-    const subCommand = args?.trim();
+    const lowerCaseArgs = (args || '')
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
 
-    // Default to NOT showing descriptions. The user must opt in with an argument.
-    let useShowDescriptions = false;
-    if (subCommand === 'desc' || subCommand === 'descriptions') {
-      useShowDescriptions = true;
-    }
+    const hasDesc =
+      lowerCaseArgs.includes('desc') || lowerCaseArgs.includes('descriptions');
+    const useShowSchema = lowerCaseArgs.includes('schema');
+
+    // Show descriptions if `desc` or `schema` is present
+    const useShowDescriptions = hasDesc || useShowSchema;
 
     const toolRegistry = context.services.config?.getToolRegistry();
     if (!toolRegistry) {
@@ -46,8 +50,10 @@ export const toolsCommand: SlashCommand = {
         name: tool.name,
         displayName: tool.displayName,
         description: tool.description,
+        schema: tool.schema,
       })),
       showDescriptions: useShowDescriptions,
+      showSchema: useShowSchema,
     };
 
     context.ui.addItem(toolsListItem, Date.now());
