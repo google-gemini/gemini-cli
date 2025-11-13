@@ -48,6 +48,7 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  LlmLoopCheckEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -441,7 +442,7 @@ export function logContentRetry(
     attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
-  recordContentRetry(config);
+  recordContentRetry(config, event.error_type);
 }
 
 export function logContentRetryFailure(
@@ -457,7 +458,7 @@ export function logContentRetryFailure(
     attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
-  recordContentRetryFailure(config);
+  recordContentRetryFailure(config, event.final_error_type);
 }
 
 export function logModelRouting(
@@ -645,6 +646,21 @@ export function logWebFetchFallbackAttempt(
   event: WebFetchFallbackAttemptEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logWebFetchFallbackAttemptEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+}
+
+export function logLlmLoopCheck(
+  config: Config,
+  event: LlmLoopCheckEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logLlmLoopCheckEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);

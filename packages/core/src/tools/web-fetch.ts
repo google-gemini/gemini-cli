@@ -19,9 +19,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
-
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
@@ -171,10 +169,9 @@ ${textContent}
 ---
 `;
       const result = await geminiClient.generateContent(
+        { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
-        {},
         signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -255,10 +252,9 @@ ${textContent}
 
     try {
       const response = await geminiClient.generateContent(
+        { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
-        { tools: [{ urlContext: {} }] },
         signal, // Pass signal
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       debugLogger.debug(
