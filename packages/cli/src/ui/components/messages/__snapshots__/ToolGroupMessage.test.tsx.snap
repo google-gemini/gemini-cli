@@ -30,7 +30,7 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when too
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  first-confirm A tool for testing ←                                        │
+│ ?  first-confirm A tool for testing                                        ← │
 │                                                                              │
 │ Test result                                                                  │
 │ Confirm first tool                                                           │
@@ -49,6 +49,19 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-1 Description 1. This is a long description that will need to be tr… │
+│──────────────────────────────────────────────────────────────────────────────│
+│ line5                                                                        │                                       █
+│                                                                              │                                       █
+│ ✓  tool-2 Description 2                                                      │                                       █
+│                                                                              │                                       █
+│ line1                                                                        │                                       █
+│ line2                                                                        │                                       █
+╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
+`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
@@ -98,22 +111,9 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful too
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`<ToolGroupMessage /> > Golden Snapshots > renders sticky header when scrolled 1`] = `
-"│                                                                              │
-│ ✓  tool-2 Description 2                                                      │
-│    Description 2                                                             │
-│    Description 2                                                             │
-│    Description 2                                                             │                                       ▄
-│    Description 2                                                             │                                       █
-│                                                                              │                                       █
-│                                                                              │                                       █
-│ Test result                                                                  │                                       █
-╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
-`;
-
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting confirmation 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  confirmation-tool This tool needs confirmation ←                          │
+│ ?  confirmation-tool This tool needs confirmation                          ← │
 │                                                                              │
 │ Test result                                                                  │
 │ Are you sure you want to proceed?                                            │
@@ -158,10 +158,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
 "╭──────────────────────────────────────╮
-│ ✓  very-long-tool-name-that-might-wr │
-│    ap This is a very long            │
-│    description that might cause      │
-│    wrapping issues                   │
+│ ✓  very-long-tool-name-that-might-w… │
 │                                      │
 │ Test result                          │
 ╰──────────────────────────────────────╯"

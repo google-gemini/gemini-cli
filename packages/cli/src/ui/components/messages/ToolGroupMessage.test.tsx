@@ -202,17 +202,20 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders sticky header when scrolled', () => {
+    it('renders header when scrolled', () => {
       const toolCalls = [
         createToolCall({
           callId: '1',
           name: 'tool-1',
-          description: 'Description 1\n'.repeat(5),
+          description:
+            'Description 1. This is a long description that will need to be truncated if the terminal width is small.',
+          resultDisplay: 'line1\nline2\nline3\nline4\nline5',
         }),
         createToolCall({
           callId: '2',
           name: 'tool-2',
-          description: 'Description 2\n'.repeat(5),
+          description: 'Description 2',
+          resultDisplay: 'line1\nline2',
         }),
       ];
       const { lastFrame, unmount } = renderWithProviders(
