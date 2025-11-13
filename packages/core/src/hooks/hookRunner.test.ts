@@ -64,7 +64,12 @@ describe('HookRunner', () => {
     writeFileSync(filePath, `#!/usr/bin/env node\n${body}`);
     chmodSync(filePath, 0o755);
     const rel = path.relative(dir, filePath).replace(/\\/g, '/');
-    return `./${rel}`;
+    const commandPath = `./${rel}`;
+    if (process.platform === 'win32') {
+      // PowerShell does not honor POSIX shebangs; invoke node explicitly.
+      return `node ${JSON.stringify(commandPath)}`;
+    }
+    return commandPath;
   };
 
   const readProjectFile = (relativePath: string, dir: string = projectDir) =>
