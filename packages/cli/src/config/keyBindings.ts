@@ -25,6 +25,14 @@ export enum Command {
   // Screen control
   CLEAR_SCREEN = 'clearScreen',
 
+  // Scrolling
+  SCROLL_UP = 'scrollUp',
+  SCROLL_DOWN = 'scrollDown',
+  SCROLL_HOME = 'scrollHome',
+  SCROLL_END = 'scrollEnd',
+  PAGE_UP = 'pageUp',
+  PAGE_DOWN = 'pageDown',
+
   // History navigation
   HISTORY_UP = 'historyUp',
   HISTORY_DOWN = 'historyDown',
@@ -119,6 +127,14 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // Screen control
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
+
+  // Scrolling
+  [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
+  [Command.SCROLL_DOWN]: [{ key: 'down', shift: true }],
+  [Command.SCROLL_HOME]: [{ key: 'home' }],
+  [Command.SCROLL_END]: [{ key: 'end' }],
+  [Command.PAGE_UP]: [{ key: 'pageup' }],
+  [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
 
   // History navigation
   [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
@@ -231,6 +247,17 @@ export const commandCategories: readonly CommandCategory[] = [
     commands: [Command.CLEAR_SCREEN],
   },
   {
+    title: 'Scrolling',
+    commands: [
+      Command.SCROLL_UP,
+      Command.SCROLL_DOWN,
+      Command.SCROLL_HOME,
+      Command.SCROLL_END,
+      Command.PAGE_UP,
+      Command.PAGE_DOWN,
+    ],
+  },
+  {
     title: 'History & Search',
     commands: [
       Command.HISTORY_UP,
@@ -298,6 +325,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.CLEAR_INPUT]: 'Clear all text in the input field.',
   [Command.DELETE_WORD_BACKWARD]: 'Delete the previous word.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.SCROLL_UP]: 'Scroll content up.',
+  [Command.SCROLL_DOWN]: 'Scroll content down.',
+  [Command.SCROLL_HOME]: 'Scroll to the top.',
+  [Command.SCROLL_END]: 'Scroll to the bottom.',
+  [Command.PAGE_UP]: 'Scroll up by one page.',
+  [Command.PAGE_DOWN]: 'Scroll down by one page.',
   [Command.HISTORY_UP]: 'Show the previous entry in history.',
   [Command.HISTORY_DOWN]: 'Show the next entry in history.',
   [Command.NAVIGATION_UP]: 'Move selection up in lists.',
