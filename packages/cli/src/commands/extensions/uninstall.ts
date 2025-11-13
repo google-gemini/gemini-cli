@@ -28,7 +28,7 @@ export async function handleUninstall(args: UninstallArgs) {
     await extensionManager.loadExtensions();
 
     const errors: Array<{ name: string; error: string }> = [];
-    for (const name of args.names) {
+    for (const name of [...new Set(args.names)]) {
       try {
         await extensionManager.uninstallExtension(name, false);
         debugLogger.log(`Extension "${name}" successfully uninstalled.`);
