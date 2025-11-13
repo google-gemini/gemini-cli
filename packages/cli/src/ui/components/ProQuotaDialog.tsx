@@ -11,11 +11,17 @@ import { theme } from '../semantic-colors.js';
 
 interface ProQuotaDialogProps {
   fallbackModel: string;
-  onChoice: (choice: 'retry_later' | 'retry') => void;
+  hasApiKey: boolean;
+  hasVertexAI: boolean;
+  onChoice: (
+    choice: 'retry_later' | 'retry' | 'gemini-api-key' | 'vertex-ai',
+  ) => void;
 }
 
 export function ProQuotaDialog({
   fallbackModel,
+  hasApiKey,
+  hasVertexAI,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
   const items = [
@@ -29,9 +35,29 @@ export function ProQuotaDialog({
       value: 'retry' as const,
       key: 'retry',
     },
+    ...(hasApiKey
+      ? [
+          {
+            label: 'Always fallback to Gemini API key',
+            value: 'gemini-api-key' as const,
+            key: 'gemini-api-key',
+          },
+        ]
+      : []),
+    ...(hasVertexAI
+      ? [
+          {
+            label: 'Always fallback to Vertex AI',
+            value: 'vertex-ai' as const,
+            key: 'vertex-ai',
+          },
+        ]
+      : []),
   ];
 
-  const handleSelect = (choice: 'retry_later' | 'retry') => {
+  const handleSelect = (
+    choice: 'retry_later' | 'retry' | 'gemini-api-key' | 'vertex-ai',
+  ) => {
     onChoice(choice);
   };
 

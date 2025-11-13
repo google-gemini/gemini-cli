@@ -269,6 +269,10 @@ export interface ConfigParameters {
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
+  autoFallback?: {
+    enabled: boolean;
+    type: 'gemini-api-key' | 'vertex-ai';
+  };
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
@@ -408,6 +412,10 @@ export class Config {
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
+  private readonly autoFallback: {
+    enabled: boolean;
+    type: 'gemini-api-key' | 'vertex-ai';
+  };
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
@@ -552,6 +560,10 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.autoFallback = params.autoFallback ?? {
+      enabled: false,
+      type: 'gemini-api-key',
+    };
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
@@ -921,6 +933,13 @@ export class Config {
       );
     }
     this.approvalMode = mode;
+  }
+
+  getAutoFallback(): {
+    enabled: boolean;
+    type: 'gemini-api-key' | 'vertex-ai';
+  } {
+    return this.autoFallback;
   }
 
   isYoloModeDisabled(): boolean {

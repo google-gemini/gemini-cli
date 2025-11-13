@@ -9,7 +9,7 @@ import type { CommandContext, SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
-import { IdeClient } from '@google/gemini-cli-core';
+import { AuthType, IdeClient } from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
   name: 'about',
@@ -27,8 +27,7 @@ export const aboutCommand: SlashCommand = {
     }
     const modelVersion = context.services.config?.getModel() || 'Unknown';
     const cliVersion = await getCliVersion();
-    const selectedAuthType =
-      context.services.settings.merged.security?.auth?.selectedType || '';
+    const selectedAuthType = formatAuthDisplay(context);
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient = await getIdeClientName(context);
 
@@ -53,4 +52,62 @@ async function getIdeClientName(context: CommandContext) {
   }
   const ideClient = await IdeClient.getInstance();
   return ideClient?.getDetectedIdeDisplayName() ?? '';
+}
+
+function formatAuthDisplay(context: CommandContext): string {
+  const settingsAuthType =
+    context.services.settings.merged.security?.auth?.selectedType ?? '';
+  const config = context.services.config;
+  const currentAuthType =
+    config?.getContentGeneratorConfig()?.authType ?? undefined;
+  const autoFallback = config?.getAutoFallback();
+
+  const parts: string[] = [];
+
+  if (settingsAuthType) {
+    parts.push(formatAuthLabel(settingsAuthType));
+  }
+
+  // Only show fallback info if persisted auth is OAuth (fallback system only applies to OAuth)
+  if (
+    autoFallback?.enabled &&
+    settingsAuthType === AuthType.LOGIN_WITH_GOOGLE
+  ) {
+    const fallbackAuthType =
+      autoFallback.type === 'gemini-api-key'
+        ? AuthType.USE_GEMINI
+        : AuthType.USE_VERTEX_AI;
+    const fallbackLabel = formatAuthLabel(fallbackAuthType);
+    const isActive = currentAuthType === fallbackAuthType;
+    parts.push(
+      `auto fallback → ${fallbackLabel}${isActive ? ' (active this session)' : ''}`,
+    );
+  } else if (
+    currentAuthType &&
+    currentAuthType !== settingsAuthType &&
+    settingsAuthType
+  ) {
+    parts.push(`session → ${formatAuthLabel(currentAuthType)}`);
+  }
+
+  if (!parts.length) {
+    return 'Not configured';
+  }
+
+  return parts.join(' | ');
+}
+
+function formatAuthLabel(authType: string | AuthType): string {
+  switch (authType) {
+    case AuthType.LOGIN_WITH_GOOGLE:
+      return 'OAuth';
+    case AuthType.USE_GEMINI:
+      return 'Gemini API Key';
+    case AuthType.USE_VERTEX_AI:
+      return 'Vertex AI';
+    case AuthType.CLOUD_SHELL:
+      return 'Cloud Shell';
+    default:
+      return authType;
+  }
 }

@@ -40,6 +40,9 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     isInFallbackMode: vi.fn(() => false),
     setFallbackMode: vi.fn(),
     fallbackHandler: undefined,
+    getContentGeneratorConfig: vi.fn(() => undefined),
+    getAutoFallback: vi.fn(() => ({ enabled: false, type: 'gemini-api-key' })),
+    refreshAuth: vi.fn(),
     isInteractive: vi.fn(() => false),
     ...overrides,
   }) as unknown as Config;
@@ -150,7 +153,7 @@ describe('handleFallback', () => {
     });
   });
 
-  it('should pass the correct context (failedModel, fallbackModel, error) to the handler', async () => {
+  it('should pass the correct context (failedModel, fallbackModel, error, autoFallbackStatus) to the handler', async () => {
     const mockError = new Error('Quota Exceeded');
     mockHandler.mockResolvedValue('retry');
 
@@ -160,6 +163,7 @@ describe('handleFallback', () => {
       MOCK_PRO_MODEL,
       FALLBACK_MODEL,
       mockError,
+      { status: 'not-attempted' },
     );
   });
 
@@ -200,5 +204,87 @@ describe('handleFallback', () => {
       handlerError,
     );
     expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
+  });
+
+  describe('automatic fallback', () => {
+    it('should automatically switch to Gemini API key when autoFallback is enabled with gemini-api-key type', async () => {
+      const mockRefreshAuth = vi.fn().mockResolvedValue(undefined);
+      const mockGetAutoFallback = vi.fn(() => ({
+        enabled: true,
+        type: 'gemini-api-key' as const,
+      }));
+      const mockGetContentGeneratorConfig = vi.fn(() => ({
+        authType: AUTH_OAUTH,
+      }));
+
+      const configWithAutoFallback = createMockConfig({
+        fallbackModelHandler: mockHandler,
+        getAutoFallback: mockGetAutoFallback,
+        getContentGeneratorConfig: mockGetContentGeneratorConfig,
+        refreshAuth: mockRefreshAuth,
+      });
+
+      const originalEnv = process.env['GEMINI_API_KEY'];
+      process.env['GEMINI_API_KEY'] = 'test-key';
+
+      mockHandler.mockResolvedValue('retry');
+
+      const result = await handleFallback(
+        configWithAutoFallback,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBe(true);
+      expect(mockRefreshAuth).toHaveBeenCalledWith(AUTH_API_KEY);
+      expect(mockHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        FALLBACK_MODEL,
+        undefined,
+        { status: 'success', authType: 'gemini-api-key' },
+      );
+
+      process.env['GEMINI_API_KEY'] = originalEnv;
+    });
+
+    it('should not auto-switch when autoFallback is enabled but no API key present', async () => {
+      const mockRefreshAuth = vi.fn();
+      const mockGetAutoFallback = vi.fn(() => ({
+        enabled: true,
+        type: 'gemini-api-key' as const,
+      }));
+      const mockGetContentGeneratorConfig = vi.fn(() => ({
+        authType: AUTH_OAUTH,
+      }));
+
+      const configWithAutoFallback = createMockConfig({
+        fallbackModelHandler: mockHandler,
+        getAutoFallback: mockGetAutoFallback,
+        getContentGeneratorConfig: mockGetContentGeneratorConfig,
+        refreshAuth: mockRefreshAuth,
+      });
+
+      const originalEnv = process.env['GEMINI_API_KEY'];
+      delete process.env['GEMINI_API_KEY'];
+
+      mockHandler.mockResolvedValue('retry');
+
+      const result = await handleFallback(
+        configWithAutoFallback,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBe(true);
+      expect(mockRefreshAuth).not.toHaveBeenCalled();
+      expect(mockHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        FALLBACK_MODEL,
+        undefined,
+        { status: 'missing-env-vars', authType: 'gemini-api-key' },
+      );
+
+      process.env['GEMINI_API_KEY'] = originalEnv;
+    });
   });
 });

@@ -100,9 +100,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Text>
       </Box>
       <Box>
-        <Text color={theme.text.primary}>
-          {selectedAuthType.startsWith('oauth') ? 'OAuth' : selectedAuthType}
-        </Text>
+        <Text color={theme.text.primary}>{selectedAuthType}</Text>
       </Box>
     </Box>
     {gcpProject && (

@@ -4,13 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  vi,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { aboutCommand } from './aboutCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
-import { IdeClient } from '@google/gemini-cli-core';
+import { AuthType, IdeClient } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -40,6 +48,13 @@ describe('aboutCommand', () => {
         config: {
           getModel: vi.fn(),
           getIdeMode: vi.fn().mockReturnValue(true),
+          getAutoFallback: vi.fn().mockReturnValue({
+            enabled: false,
+            type: 'gemini-api-key',
+          }),
+          getContentGeneratorConfig: vi.fn().mockReturnValue({
+            authType: 'test-auth',
+          }),
         },
         settings: {
           merged: {
@@ -64,6 +79,99 @@ describe('aboutCommand', () => {
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
     });
+  });
+
+  it('should display fallback auth information when configured', async () => {
+    process.env['SANDBOX'] = '';
+    mockContext.services.config = {
+      getModel: vi.fn().mockReturnValue('test-model'),
+      getIdeMode: vi.fn().mockReturnValue(false),
+      getAutoFallback: vi.fn().mockReturnValue({
+        enabled: true,
+        type: 'vertex-ai',
+      }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: AuthType.USE_VERTEX_AI,
+      }),
+    } as unknown as CommandContext['services']['config'];
+
+    mockContext.services.settings.merged.security = {
+      auth: {
+        selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      },
+    } as typeof mockContext.services.settings.merged.security;
+
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    const callArgs = (mockContext.ui.addItem as Mock).mock.calls[0][0];
+    expect(callArgs.selectedAuthType).toBe(
+      'OAuth | auto fallback → Vertex AI (active this session)',
+    );
+  });
+
+  it('should NOT display fallback info when persisted auth is not OAuth', async () => {
+    process.env['SANDBOX'] = '';
+    mockContext.services.config = {
+      getModel: vi.fn().mockReturnValue('test-model'),
+      getIdeMode: vi.fn().mockReturnValue(false),
+      getAutoFallback: vi.fn().mockReturnValue({
+        enabled: true,
+        type: 'vertex-ai',
+      }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: AuthType.USE_GEMINI,
+      }),
+    } as unknown as CommandContext['services']['config'];
+
+    mockContext.services.settings.merged.security = {
+      auth: {
+        selectedType: AuthType.USE_GEMINI,
+      },
+    } as typeof mockContext.services.settings.merged.security;
+
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    const callArgs = (mockContext.ui.addItem as Mock).mock.calls[0][0];
+    // Should only show the persisted auth type, not fallback info
+    expect(callArgs.selectedAuthType).toBe('Gemini API Key');
+  });
+
+  it('should display session-only auth change when different from selected type', async () => {
+    process.env['SANDBOX'] = '';
+    mockContext.services.config = {
+      getModel: vi.fn().mockReturnValue('test-model'),
+      getIdeMode: vi.fn().mockReturnValue(false),
+      getAutoFallback: vi.fn().mockReturnValue({
+        enabled: false,
+        type: 'vertex-ai',
+      }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: AuthType.USE_GEMINI,
+      }),
+    } as unknown as CommandContext['services']['config'];
+
+    mockContext.services.settings.merged.security = {
+      auth: {
+        selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      },
+    } as typeof mockContext.services.settings.merged.security;
+
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    const callArgs = (mockContext.ui.addItem as Mock).mock.calls[0][0];
+    expect(callArgs.selectedAuthType).toBe('OAuth | session → Gemini API Key');
   });
 
   afterEach(() => {
