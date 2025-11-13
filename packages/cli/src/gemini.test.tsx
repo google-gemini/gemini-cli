@@ -474,6 +474,8 @@ describe('startInteractiveUI', () => {
 
   vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
     detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve(true)),
+    isKittyProtocolSupported: vi.fn(() => true),
+    isKittyProtocolEnabled: vi.fn(() => true),
   }));
 
   vi.mock('./ui/utils/updateCheck.js', () => ({
@@ -531,6 +533,7 @@ describe('startInteractiveUI', () => {
     expect(options).toEqual({
       alternateBuffer: true,
       exitOnCtrlC: false,
+      incrementalRendering: true,
       isScreenReaderEnabled: false,
       onRender: expect.any(Function),
     });
