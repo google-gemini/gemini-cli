@@ -6,7 +6,6 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
-import { Text } from 'ink';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
@@ -252,20 +251,32 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
+<<<<<<< HEAD
     it('renders header when scrolled', () => {
+=======
+    it('renders sticky header when scrolled', () => {
+>>>>>>> ee7065f6 (Sticky headers where the top rounded border is sticky. (#12971))
       const toolCalls = [
         createToolCall({
           callId: '1',
           name: 'tool-1',
+<<<<<<< HEAD
           description:
             'Description 1. This is a long description that will need to be truncated if the terminal width is small.',
           resultDisplay: 'line1\nline2\nline3\nline4\nline5',
+=======
+          description: 'Description 1\n'.repeat(5),
+>>>>>>> ee7065f6 (Sticky headers where the top rounded border is sticky. (#12971))
         }),
         createToolCall({
           callId: '2',
           name: 'tool-2',
+<<<<<<< HEAD
           description: 'Description 2',
           resultDisplay: 'line1\nline2',
+=======
+          description: 'Description 2\n'.repeat(5),
+>>>>>>> ee7065f6 (Sticky headers where the top rounded border is sticky. (#12971))
         }),
       ];
       const { lastFrame, unmount } = renderWithProviders(
