@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-function flipAsciiArt(art: string): string {
-  return art.split('\n').reverse().join('\n');
-}
-
 export const shortAsciiLogo = `
    █████████  ██████████ ██████   ██████ █████ ██████   █████ █████
   ███░░░░░███░░███░░░░░█░░██████ ██████ ░░███ ░░██████ ░░███ ░░███
@@ -41,7 +37,7 @@ export const tinyAsciiLogo = `
 ░░░         ░░░░░░░░░  
 `;
 
-const rawShortAsciiLogoIde = `
+export const shortAsciiLogoIde = `
      ░░░░░░░░░  ░░░░░░░░░░ ░░░░░░   ░░░░░░ ░░░░░ ░░░░░░   ░░░░░ ░░░░░
     ░░░     ░░░ ░░░        ░░░░░░   ░░░░░░  ░░░  ░░░░░░   ░░░░░  ░░░
     ░░░         ░░░        ░░░ ░░░ ░░░ ░░░  ░░░  ░░░ ░░░  ░░░    ░░░
@@ -54,9 +50,7 @@ const rawShortAsciiLogoIde = `
    █████████  ██████████ ███         ███ █████ ███     █████  █████
 `;
 
-export const shortAsciiLogoIde = flipAsciiArt(rawShortAsciiLogoIde);
-
-const rawLongAsciiLogoIde = `
+export const longAsciiLogoIde = `
    ░░░            ░░░░░░░░░  ░░░░░░░░░░ ░░░░░░   ░░░░░░ ░░░░░ ░░░░░░   ░░░░░ ░░░░░
      ░░░         ░░░     ░░░ ░░░        ░░░░░░   ░░░░░░  ░░░  ░░░░░░   ░░░░░  ░░░
        ░░░      ░░░          ░░░        ░░░ ░░░ ░░░ ░░░  ░░░  ░░░ ░░░  ░░░    ░░░
@@ -69,9 +63,7 @@ const rawLongAsciiLogoIde = `
  ███            █████████  ██████████ ███         ███ █████ ███     █████  █████
 `;
 
-export const longAsciiLogoIde = flipAsciiArt(rawLongAsciiLogoIde);
-
-const rawTinyAsciiLogoIde = `
+export const tinyAsciiLogoIde = `
    ░░░         ░░░░░░░░░
      ░░░      ░░░     ░░░
        ░░░    ░░░
@@ -83,5 +75,3 @@ const rawTinyAsciiLogoIde = `
    ███      ███     ███
  ███         █████████ 
 `;
-
-export const tinyAsciiLogoIde = flipAsciiArt(rawTinyAsciiLogoIde);
