@@ -1,19 +1,23 @@
 /**
  * @license
  * Copyright 2025 Google LLC
+ * Modified for LM Studio integration
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
-export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
-export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
+// LM Studio model defaults
+export const DEFAULT_GEMINI_MODEL = 'local-model';
+export const DEFAULT_GEMINI_FLASH_MODEL = 'local-model';
+export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'local-model';
 
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto';
 
-export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
+export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'text-embedding-ada-002';
 
-// Cap the thinking at 8192 to prevent run-away thinking loops.
-export const DEFAULT_THINKING_MODE = 8192;
+// Extended thinking support for reasoning models (e.g., DeepSeek R1, QwQ)
+// Increased to 32768 to support models that do extensive reasoning
+export const DEFAULT_THINKING_MODE = 32768;
+export const MAX_THINKING_TOKENS = 65536; // Support for very thorough reasoning
 
 /**
  * Determines the effective model to use, applying fallback logic if necessary.
