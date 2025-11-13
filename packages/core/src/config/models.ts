@@ -34,7 +34,7 @@ export const DEFAULT_THINKING_MODE = 8192;
  */
 export function resolveModel(
   requestedModel: string,
-  previewFeaturesEnabled: boolean,
+  previewFeaturesEnabled: boolean | undefined,
 ): string {
   switch (requestedModel) {
     case DEFAULT_GEMINI_MODEL_AUTO:
@@ -72,7 +72,7 @@ export function resolveModel(
 export function getEffectiveModel(
   isInFallbackMode: boolean,
   requestedModel: string,
-  previewFeaturesEnabled: boolean,
+  previewFeaturesEnabled: boolean | undefined,
 ): string {
   const resolvedModel = resolveModel(requestedModel, previewFeaturesEnabled);
 
