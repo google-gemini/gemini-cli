@@ -35,6 +35,8 @@ describe('keyMatchers', () => {
     [Command.CLEAR_SCREEN]: (key: Key) => key.ctrl && key.name === 'l',
     [Command.SCROLL_UP]: (key: Key) => key.name === 'up' && !!key.shift,
     [Command.SCROLL_DOWN]: (key: Key) => key.name === 'down' && !!key.shift,
+    [Command.SCROLL_HOME]: (key: Key) => key.name === 'home',
+    [Command.SCROLL_END]: (key: Key) => key.name === 'end',
     [Command.PAGE_UP]: (key: Key) => key.name === 'pageup',
     [Command.PAGE_DOWN]: (key: Key) => key.name === 'pagedown',
     [Command.HISTORY_UP]: (key: Key) => key.ctrl && key.name === 'p',
@@ -155,6 +157,16 @@ describe('keyMatchers', () => {
       command: Command.SCROLL_DOWN,
       positive: [createKey('down', { shift: true })],
       negative: [createKey('down'), createKey('down', { ctrl: true })],
+    },
+    {
+      command: Command.SCROLL_HOME,
+      positive: [createKey('home')],
+      negative: [createKey('end')],
+    },
+    {
+      command: Command.SCROLL_END,
+      positive: [createKey('end')],
+      negative: [createKey('home')],
     },
     {
       command: Command.PAGE_UP,

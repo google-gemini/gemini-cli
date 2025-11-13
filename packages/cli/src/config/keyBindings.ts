@@ -28,6 +28,8 @@ export enum Command {
   // Scrolling
   SCROLL_UP = 'scrollUp',
   SCROLL_DOWN = 'scrollDown',
+  SCROLL_HOME = 'scrollHome',
+  SCROLL_END = 'scrollEnd',
   PAGE_UP = 'pageUp',
   PAGE_DOWN = 'pageDown',
 
@@ -129,6 +131,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
   [Command.SCROLL_DOWN]: [{ key: 'down', shift: true }],
+  [Command.SCROLL_HOME]: [{ key: 'home' }],
+  [Command.SCROLL_END]: [{ key: 'end' }],
   [Command.PAGE_UP]: [{ key: 'pageup' }],
   [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
 
@@ -247,6 +251,8 @@ export const commandCategories: readonly CommandCategory[] = [
     commands: [
       Command.SCROLL_UP,
       Command.SCROLL_DOWN,
+      Command.SCROLL_HOME,
+      Command.SCROLL_END,
       Command.PAGE_UP,
       Command.PAGE_DOWN,
     ],
@@ -321,6 +327,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.SCROLL_UP]: 'Scroll content up.',
   [Command.SCROLL_DOWN]: 'Scroll content down.',
+  [Command.SCROLL_HOME]: 'Scroll to the top.',
+  [Command.SCROLL_END]: 'Scroll to the bottom.',
   [Command.PAGE_UP]: 'Scroll up by one page.',
   [Command.PAGE_DOWN]: 'Scroll down by one page.',
   [Command.HISTORY_UP]: 'Show the previous entry in history.',

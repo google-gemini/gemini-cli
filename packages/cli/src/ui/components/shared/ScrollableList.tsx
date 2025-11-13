@@ -189,9 +189,9 @@ function ScrollableList<T>(
           : scrollState.scrollTop;
         const innerHeight = scrollState.innerHeight;
         smoothScrollTo(current + direction * innerHeight);
-      } else if (keyMatchers[Command.HOME](key)) {
+      } else if (keyMatchers[Command.SCROLL_HOME](key)) {
         smoothScrollTo(0);
-      } else if (keyMatchers[Command.END](key)) {
+      } else if (keyMatchers[Command.SCROLL_END](key)) {
         smoothScrollTo(SCROLL_TO_ITEM_END);
       }
     },

@@ -41,6 +41,8 @@ available combinations.
 | ------------------------ | -------------------- |
 | Scroll content up.       | `Shift + Up Arrow`   |
 | Scroll content down.     | `Shift + Down Arrow` |
+| Scroll to the top.       | `Home`               |
+| Scroll to the bottom.    | `End`                |
 | Scroll up by one page.   | `Page Up`            |
 | Scroll down by one page. | `Page Down`          |
 
