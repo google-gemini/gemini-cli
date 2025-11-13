@@ -1062,22 +1062,56 @@ describe('E2E Tests', () => {
       expect(response.body.data).toBe('success');
     });
 
+    it('should include agentExecutor in context', async () => {
+      const mockCommand = {
+        name: 'context-check-command',
+        description: 'checks context',
+        execute: vi.fn(async (context: CommandContext) => {
+          if (!context.agentExecutor) {
+            throw new Error('agentExecutor missing');
+          }
+          return { name: 'context-check-command', data: 'success' };
+        }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
+
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'context-check-command', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      expect(res.body.data).toBe('success');
+    });
+
     describe('/executeCommand streaming', () => {
       it('should execute a streaming command and stream back events', (done: (
         err?: unknown,
       ) => void) => {
-        const executeStreamSpy = vi.fn((context, args, eventBus) => {
-          eventBus.publish({ kind: 'test-event-1' });
-          eventBus.publish({ kind: 'test-event-2' });
-          eventBus.finished();
-          return Promise.resolve({ name: 'stream-test', data: 'done' });
+        const executeSpy = vi.fn(async (context: CommandContext) => {
+          context.eventBus?.publish({
+            kind: 'status-update',
+            status: { state: 'working' },
+            taskId: 'test-task',
+            contextId: 'test-context',
+            final: false,
+          });
+          context.eventBus?.publish({
+            kind: 'status-update',
+            status: { state: 'completed' },
+            taskId: 'test-task',
+            contextId: 'test-context',
+            final: true,
+          });
+          return { name: 'stream-test', data: 'done' };
         });
 
         const mockStreamCommand = {
           name: 'stream-test',
           description: 'A test streaming command',
-          execute: vi.fn(),
-          executeStream: executeStreamSpy,
+          streaming: true,
+          execute: executeSpy,
         };
         vi.spyOn(commandRegistry, 'get').mockReturnValue(mockStreamCommand);
 
@@ -1086,6 +1120,7 @@ describe('E2E Tests', () => {
           .post('/executeCommand')
           .send({ command: 'stream-test', args: [] })
           .set('Content-Type', 'application/json')
+          .set('Accept', 'text/event-stream')
           .on('response', (res) => {
             let data = '';
             res.on('data', (chunk: Buffer) => {
@@ -1095,53 +1130,21 @@ describe('E2E Tests', () => {
               try {
                 const events = streamToSSEEvents(data);
                 expect(events.length).toBe(2);
-                expect(events[0].result).toEqual({ kind: 'test-event-1' });
-                expect(events[1].result).toEqual({ kind: 'test-event-2' });
-                expect(executeStreamSpy).toHaveBeenCalled();
-                done();
-              } catch (e) {
-                done(e);
-              }
-            });
-          })
-          .end();
-      });
-
-      it('should pass autoExecute=true to executeStream if configured on command', (done: (
-        err?: unknown,
-      ) => void) => {
-        const executeStreamSpy = vi.fn(
-          (context, args, eventBus, autoExecute) => {
-            eventBus.finished();
-            return Promise.resolve({
-              name: 'auto-execute-test',
-              data: autoExecute,
-            });
-          },
-        );
-
-        const mockAutoExecuteCommand = {
-          name: 'auto-execute-test',
-          description: 'A test auto-execute command',
-          autoExecute: true,
-          execute: vi.fn(),
-          executeStream: executeStreamSpy,
-        };
-        vi.spyOn(commandRegistry, 'get').mockReturnValue(
-          mockAutoExecuteCommand,
-        );
-
-        const agent = request.agent(app);
-        agent
-          .post('/executeCommand')
-          .send({ command: 'auto-execute-test', args: [] })
-          .set('Content-Type', 'application/json')
-          .on('response', (res) => {
-            res.on('data', () => {}); // Consume stream
-            res.on('end', () => {
-              try {
-                // Verify the 4th argument (autoExecute) was true
-                expect(executeStreamSpy.mock.calls[0][3]).toBe(true);
+                expect(events[0].result).toEqual({
+                  kind: 'status-update',
+                  status: { state: 'working' },
+                  taskId: 'test-task',
+                  contextId: 'test-context',
+                  final: false,
+                });
+                expect(events[1].result).toEqual({
+                  kind: 'status-update',
+                  status: { state: 'completed' },
+                  taskId: 'test-task',
+                  contextId: 'test-context',
+                  final: true,
+                });
+                expect(executeSpy).toHaveBeenCalled();
                 done();
               } catch (e) {
                 done(e);

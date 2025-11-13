@@ -6,7 +6,7 @@
 
 import express from 'express';
 
-import type { AgentCard } from '@a2a-js/sdk';
+import type { AgentCard, Message } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
 import {
   DefaultRequestHandler,
@@ -78,6 +78,76 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
+async function handleExecuteCommand(
+  req: express.Request,
+  res: express.Response,
+  context: {
+    config: Awaited<ReturnType<typeof loadConfig>>;
+    git: GitService | undefined;
+    agentExecutor: CoderAgentExecutor;
+  },
+) {
+  logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
+  const { command, args } = req.body;
+  try {
+    if (typeof command !== 'string') {
+      return res.status(400).json({ error: 'Invalid "command" field.' });
+    }
+
+    if (args && !Array.isArray(args)) {
+      return res.status(400).json({ error: '"args" field must be an array.' });
+    }
+
+    const commandToExecute = commandRegistry.get(command);
+
+    if (commandToExecute?.requiresWorkspace) {
+      if (!process.env['CODER_AGENT_WORKSPACE_PATH']) {
+        return res.status(400).json({
+          error: `Command "${command}" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.`,
+        });
+      }
+    }
+
+    if (!commandToExecute) {
+      return res.status(404).json({ error: `Command not found: ${command}` });
+    }
+
+    if (commandToExecute.streaming) {
+      const eventBus = new DefaultExecutionEventBus();
+      res.setHeader('Content-Type', 'text/event-stream');
+      const eventHandler = (event: AgentExecutionEvent) => {
+        const jsonRpcResponse = {
+          jsonrpc: '2.0',
+          id: 'taskId' in event ? event.taskId : (event as Message).messageId,
+          result: event,
+        };
+        res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n`);
+      };
+      eventBus.on('event', eventHandler);
+
+      await commandToExecute.execute({ ...context, eventBus }, args ?? []);
+
+      eventBus.off('event', eventHandler);
+      eventBus.finished();
+      return res.end(); // Explicit return for streaming path
+    } else {
+      const result = await commandToExecute.execute(context, args ?? []);
+      logger.info('[CoreAgent] Sending /executeCommand response: ', result);
+      return res.status(200).json(result);
+    }
+  } catch (e) {
+    logger.error(
+      `Error executing /executeCommand: ${command} with args: ${JSON.stringify(
+        args,
+      )}`,
+      e,
+    );
+    const errorMessage =
+      e instanceof Error ? e.message : 'Unknown error executing command';
+    return res.status(500).json({ error: errorMessage });
+  }
+}
+
 export async function createApp() {
   try {
     // Load the server configuration once on startup.
@@ -97,8 +167,6 @@ export async function createApp() {
       await git.initialize();
     }
 
-    const context = { config, git };
-
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
     let taskStoreForExecutor: TaskStore;
@@ -117,6 +185,8 @@ export async function createApp() {
     }
 
     const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor);
+
+    const context = { config, git, agentExecutor };
 
     const requestHandler = new DefaultRequestHandler(
       coderAgentCard,
@@ -157,72 +227,8 @@ export async function createApp() {
       }
     });
 
-    expressApp.post('/executeCommand', async (req, res) => {
-      logger.info('[CoreAgent] Received /executeCommand request: ', req.body);
-      try {
-        const { command, args } = req.body;
-
-        if (typeof command !== 'string') {
-          return res.status(400).json({ error: 'Invalid "command" field.' });
-        }
-
-        if (args && !Array.isArray(args)) {
-          return res
-            .status(400)
-            .json({ error: '"args" field must be an array.' });
-        }
-
-        const commandToExecute = commandRegistry.get(command);
-
-        if (commandToExecute?.requiresWorkspace) {
-          if (!process.env['CODER_AGENT_WORKSPACE_PATH']) {
-            return res.status(400).json({
-              error: `Command "${command}" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.`,
-            });
-          }
-        }
-
-        if (!commandToExecute) {
-          return res
-            .status(404)
-            .json({ error: `Command not found: ${command}` });
-        }
-
-        if (commandToExecute.executeStream) {
-          const eventBus = new DefaultExecutionEventBus();
-          res.setHeader('Content-Type', 'application/json');
-          const eventHandler = (event: AgentExecutionEvent) => {
-            const jsonRpcResponse = {
-              jsonrpc: '2.0',
-              id: null,
-              result: event,
-            };
-            res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n`);
-          };
-          eventBus.on('event', eventHandler);
-
-          await commandToExecute.executeStream(
-            context,
-            args ?? [],
-            eventBus,
-            commandToExecute.autoExecute,
-          );
-
-          eventBus.off('event', eventHandler);
-          eventBus.finished();
-          return res.end(); // Explicit return for streaming path
-        } else if (commandToExecute.execute) {
-          const result = await commandToExecute.execute(context, args ?? []);
-          logger.info('[CoreAgent] Sending /executeCommand response: ', result);
-          return res.status(200).json(result);
-        }
-        return res.status(200).json({});
-      } catch (e) {
-        logger.error('Error executing /executeCommand:', e);
-        const errorMessage =
-          e instanceof Error ? e.message : 'Unknown error executing command';
-        return res.status(500).json({ error: errorMessage });
-      }
+    expressApp.post('/executeCommand', (req, res) => {
+      void handleExecuteCommand(req, res, context);
     });
 
     expressApp.get('/listCommands', (req, res) => {

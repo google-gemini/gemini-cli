@@ -492,6 +492,7 @@ describe('Task', () => {
 
       it('should auto-approve tool calls when approval mode is YOLO', () => {
         (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+        task.autoExecute = false;
         const onConfirmSpy = vi.fn();
         const toolCalls = [
           {

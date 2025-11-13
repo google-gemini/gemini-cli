@@ -8,12 +8,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InitCommand } from './init.js';
 import { performInit } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { CoderAgentEvent } from '../types.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { CommandContext } from './types.js';
-import type { CommandActionReturn } from '@google/gemini-cli-core';
+import type { CommandActionReturn, Config } from '@google/gemini-cli-core';
 import { logger } from '../utils/logger.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -49,9 +50,10 @@ describe('InitCommand', () => {
   let context: CommandContext;
   let publishSpy: ReturnType<typeof vi.spyOn>;
   let mockExecute: ReturnType<typeof vi.fn>;
+  const mockWorkspacePath = path.resolve('/tmp');
 
   beforeEach(() => {
-    process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp';
+    process.env['CODER_AGENT_WORKSPACE_PATH'] = mockWorkspacePath;
     eventBus = {
       publish: vi.fn(),
     } as unknown as ExecutionEventBus;
@@ -59,17 +61,15 @@ describe('InitCommand', () => {
     const mockConfig = createMockConfig({
       getModel: () => 'gemini-pro',
     });
+    const mockExecutorInstance = new CoderAgentExecutor();
     context = {
-      config: mockConfig,
+      config: mockConfig as unknown as Config,
+      agentExecutor: mockExecutorInstance,
+      eventBus,
     } as CommandContext;
     publishSpy = vi.spyOn(eventBus, 'publish');
     mockExecute = vi.fn();
-    vi.mocked(CoderAgentExecutor).mockImplementation(
-      () =>
-        ({
-          execute: mockExecute,
-        }) as unknown as CoderAgentExecutor,
-    );
+    vi.spyOn(mockExecutorInstance, 'execute').mockImplementation(mockExecute);
     vi.clearAllMocks();
   });
 
@@ -77,21 +77,7 @@ describe('InitCommand', () => {
     expect(command.requiresWorkspace).toBe(true);
   });
 
-  it('has autoExecute set to true', () => {
-    expect(command.autoExecute).toBe(true);
-  });
-
   describe('execute', () => {
-    it('returns a message indicating to use executeStream', async () => {
-      const result = await command.execute(context, []);
-      expect(result).toEqual({
-        name: 'init',
-        data: 'Use executeStream to get streaming results.',
-      });
-    });
-  });
-
-  describe('executeStream', () => {
     it('handles info from performInit', async () => {
       vi.mocked(performInit).mockReturnValue({
         type: 'message',
@@ -99,7 +85,7 @@ describe('InitCommand', () => {
         content: 'GEMINI.md already exists.',
       } as CommandActionReturn);
 
-      await command.executeStream(context, [], eventBus);
+      await command.execute(context, []);
 
       expect(logger.info).toHaveBeenCalledWith(
         '[EventBus event]: ',
@@ -134,7 +120,7 @@ describe('InitCommand', () => {
         content: 'An error occurred.',
       } as CommandActionReturn);
 
-      await command.executeStream(context, [], eventBus);
+      await command.execute(context, []);
 
       expect(publishSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -149,7 +135,7 @@ describe('InitCommand', () => {
       );
     });
 
-    describe('when handling submit_prompt (previously new_file)', () => {
+    describe('when handling submit_prompt', () => {
       beforeEach(() => {
         vi.mocked(performInit).mockReturnValue({
           type: 'submit_prompt',
@@ -158,19 +144,18 @@ describe('InitCommand', () => {
       });
 
       it('writes the file and executes the agent', async () => {
-        await command.executeStream(context, [], eventBus);
+        await command.execute(context, []);
 
         expect(fs.writeFileSync).toHaveBeenCalledWith(
-          '/tmp/GEMINI.md',
+          path.join(mockWorkspacePath, 'GEMINI.md'),
           '',
           'utf8',
         );
-        expect(CoderAgentExecutor).toHaveBeenCalled();
         expect(mockExecute).toHaveBeenCalled();
       });
 
-      it('passes autoExecute=false to the agent executor', async () => {
-        await command.executeStream(context, [], eventBus, false);
+      it('passes autoExecute to the agent executor', async () => {
+        await command.execute(context, []);
 
         expect(mockExecute).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -183,8 +168,8 @@ describe('InitCommand', () => {
               metadata: {
                 coderAgent: {
                   kind: CoderAgentEvent.StateAgentSettingsEvent,
-                  workspacePath: '/tmp',
-                  autoExecute: false,
+                  workspacePath: mockWorkspacePath,
+                  autoExecute: true,
                 },
               },
             }),
