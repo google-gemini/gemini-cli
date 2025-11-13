@@ -424,7 +424,10 @@ describe('InputPrompt', () => {
   describe('clipboard image paste', () => {
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+        filePath: null,
+        error: 'No image in clipboard',
+      });
       vi.mocked(clipboardUtils.cleanupOldClipboardImages).mockResolvedValue(
         undefined,
       );
@@ -432,9 +435,10 @@ describe('InputPrompt', () => {
 
     it('should handle Ctrl+V when clipboard has an image', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
-        '/test/.gemini-clipboard/clipboard-123.png',
-      );
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+        filePath: '/test/.gemini-clipboard/clipboard-123.png',
+        error: undefined,
+      });
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -477,7 +481,10 @@ describe('InputPrompt', () => {
 
     it('should handle image save failure gracefully', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+        filePath: null,
+        error: 'Failed to save image',
+      });
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -500,7 +507,10 @@ describe('InputPrompt', () => {
         'clipboard-456.png',
       );
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(imagePath);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+        filePath: imagePath,
+        error: undefined,
+      });
 
       // Set initial text and cursor position
       mockBuffer.text = 'Hello world';
@@ -525,9 +535,11 @@ describe('InputPrompt', () => {
         .calls[0];
       expect(actualCall[0]).toBe(5); // start offset
       expect(actualCall[1]).toBe(5); // end offset
-      expect(actualCall[2]).toBe(
-        ' @' + path.relative(path.join('test', 'project', 'src'), imagePath),
+      const expectedPath = path.relative(
+        path.join('test', 'project', 'src'),
+        imagePath,
       );
+      expect(actualCall[2]).toBe(`[screenshot](@${expectedPath})`);
       unmount();
     });
 
