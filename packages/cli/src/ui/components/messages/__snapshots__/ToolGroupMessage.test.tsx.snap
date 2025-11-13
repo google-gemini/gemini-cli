@@ -22,8 +22,12 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when too
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
+<<<<<<< HEAD
 │MockTool[tool-1]: ? first-confirm - A tool for testing (high)                 │
 │MockConfirmation: Confirm first tool                                          │
+=======
+│ ?  first-confirm A tool for testing                                        ← │
+>>>>>>> fb99b953 (Switch back to truncating headers. Unfortunately we have too many headers that are 10+ lines for no good reason so we need to add back this truncation until we fix them. (#13018))
 │                                                                              │
 │MockTool[tool-2]: ? second-confirm - A tool for testing (low)                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
@@ -32,6 +36,19 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 ╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-1 Description 1. This is a long description that will need to be tr… │
+│──────────────────────────────────────────────────────────────────────────────│
+│ line5                                                                        │                                       █
+│                                                                              │                                       █
+│ ✓  tool-2 Description 2                                                      │                                       █
+│                                                                              │                                       █
+│ line1                                                                        │                                       █
+│ line2                                                                        │                                       █
+╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
@@ -68,9 +85,32 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful too
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting confirmation 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
+<<<<<<< HEAD
 │MockTool[tool-confirm]: ? confirmation-tool - This tool needs confirmation    │
 │(high)                                                                        │
 │MockConfirmation: Are you sure you want to proceed?                           │
+=======
+│ ?  confirmation-tool This tool needs confirmation                          ← │
+│                                                                              │
+│ Test result                                                                  │
+│ Are you sure you want to proceed?                                            │
+│                                                                              │
+│ Do you want to proceed?                                                      │
+│                                                                              │
+│ ● 1. Yes, allow once                                                         │
+│   2. Yes, allow always                                                       │
+│   3. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with outputFile 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-with-file Tool that saved output to file                             │
+│                                                                              │
+│ Test result                                                                  │
+│ Output too long and was saved to: /path/to/output.txt                        │
+>>>>>>> fb99b953 (Switch back to truncating headers. Unfortunately we have too many headers that are 10+ lines for no good reason so we need to add back this truncation until we fix them. (#13018))
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -90,11 +130,17 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
 "╭──────────────────────────────────────╮
+<<<<<<< HEAD
 │MockTool[tool-123]: ✓                 │
 │very-long-tool-name-that-might-wrap   │
 │- This is a very long description     │
 │that might cause wrapping issues      │
 │(medium)                              │
+=======
+│ ✓  very-long-tool-name-that-might-w… │
+│                                      │
+│ Test result                          │
+>>>>>>> fb99b953 (Switch back to truncating headers. Unfortunately we have too many headers that are 10+ lines for no good reason so we need to add back this truncation until we fix them. (#13018))
 ╰──────────────────────────────────────╯"
 `;
 

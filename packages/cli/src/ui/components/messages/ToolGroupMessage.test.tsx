@@ -250,6 +250,51 @@ describe('<ToolGroupMessage />', () => {
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
+<<<<<<< HEAD
+=======
+
+    it('renders header when scrolled', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: '1',
+          name: 'tool-1',
+          description:
+            'Description 1. This is a long description that will need to be truncated if the terminal width is small.',
+          resultDisplay: 'line1\nline2\nline3\nline4\nline5',
+        }),
+        createToolCall({
+          callId: '2',
+          name: 'tool-2',
+          description: 'Description 2',
+          resultDisplay: 'line1\nline2',
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />
+        </Scrollable>,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders tool call with outputFile', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-output-file',
+          name: 'tool-with-file',
+          description: 'Tool that saved output to file',
+          status: ToolCallStatus.Success,
+          outputFile: '/path/to/output.txt',
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+>>>>>>> fb99b953 (Switch back to truncating headers. Unfortunately we have too many headers that are 10+ lines for no good reason so we need to add back this truncation until we fix them. (#13018))
   });
 
   describe('Border Color Logic', () => {
