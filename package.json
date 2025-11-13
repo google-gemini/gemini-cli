@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.16.0-nightly.20251112.c961f274",
+  "version": "0.16.0-nightly.20251113.ad1f0d99",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.16.0-nightly.20251112.c961f274"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.16.0-nightly.20251113.ad1f0d99"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -30,6 +30,7 @@
     "predocs:settings": "npm run build --workspace @google/gemini-cli-core",
     "schema:settings": "tsx ./scripts/generate-settings-schema.ts",
     "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
+    "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
     "build": "node scripts/build.js",
     "build-and-start": "npm run build && npm run start",
     "build:vscode": "node scripts/build_vscode_companion.js",

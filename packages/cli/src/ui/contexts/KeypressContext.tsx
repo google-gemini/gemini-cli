@@ -593,16 +593,8 @@ export function KeypressProvider({
     }
 
     stdin.on('data', dataListener);
-
     return () => {
-      // flush buffers by sending null key
-      backslashBufferer(null);
-      pasteBufferer(null);
-      // flush by sending empty string to the data listener
-      dataListener('');
       stdin.removeListener('data', dataListener);
-
-      // Restore the terminal to its original state.
       if (wasRaw === false) {
         setRawMode(false);
       }
