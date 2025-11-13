@@ -37,6 +37,19 @@ vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
 
+vi.mock('../mcp/google-auth-provider.js', () => {
+  const mockGetRequestHeaders = vi.fn().mockResolvedValue({});
+  const mockTokens = vi.fn().mockResolvedValue({ access_token: 'test-token' });
+
+  const MockGoogleCredentialProvider = vi.fn().mockImplementation(() => ({
+    getRequestHeaders: mockGetRequestHeaders,
+    tokens: mockTokens,
+  }));
+
+  return {
+    GoogleCredentialProvider: MockGoogleCredentialProvider,
+  };
+});
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
