@@ -19,7 +19,6 @@ import type { CommandContext } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
 import type { ToolActionReturn } from '@google/gemini-cli-core';
 import { debugLogger } from '@google/gemini-cli-core';
-import type { ToolActionReturn } from '@google/gemini-cli-core';
 
 vi.mock('child_process');
 

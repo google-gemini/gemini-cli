@@ -37,6 +37,7 @@ export function createMockConfig(
       isPathWithinWorkspace: () => true,
     }),
     getTargetDir: () => '/test',
+    getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     storage: {
       getProjectTempDir: () => '/tmp',
     } as Storage,

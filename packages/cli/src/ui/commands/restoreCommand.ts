@@ -13,11 +13,6 @@ import {
   type ToolCallData,
 } from '@google/gemini-cli-core';
 import {
-  type Config,
-  performRestore,
-  type ToolCallData,
-} from '@google/gemini-cli-core';
-import {
   type CommandContext,
   type SlashCommand,
   type SlashCommandActionReturn,
@@ -153,7 +148,7 @@ async function restoreAction(
     return {
       type: 'tool',
       toolName: toolCallData.toolCall.name,
-      toolArgs: toolCallData.toolCall.args as Record<string, unknown>,
+      toolArgs: toolCallData.toolCall.args,
     };
   } catch (error) {
     return {
