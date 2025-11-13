@@ -22,6 +22,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
+import { LMStudioContentGenerator } from './lmStudioClient.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -49,6 +50,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_LM_STUDIO = 'lm-studio',
 }
 
 export type ContentGeneratorConfig = {
@@ -56,6 +58,8 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  lmStudioBaseURL?: string;
+  lmStudioModel?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -71,10 +75,24 @@ export async function createContentGeneratorConfig(
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
+  // LM Studio configuration
+  const lmStudioApiKey = process.env['LM_STUDIO_API_KEY'] || 'lm-studio';
+  const lmStudioBaseURL = process.env['LM_STUDIO_BASE_URL'] || 'http://localhost:1234/v1';
+  const lmStudioModel = process.env['LM_STUDIO_MODEL'] || 'local-model';
+
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    lmStudioBaseURL,
+    lmStudioModel,
   };
+
+  // If we are using LM Studio (default), configure it
+  if (authType === AuthType.USE_LM_STUDIO || authType === undefined) {
+    contentGeneratorConfig.apiKey = lmStudioApiKey;
+    contentGeneratorConfig.authType = AuthType.USE_LM_STUDIO;
+    return contentGeneratorConfig;
+  }
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
   if (
@@ -118,6 +136,16 @@ export async function createContentGenerator(
     const baseHeaders: Record<string, string> = {
       'User-Agent': userAgent,
     };
+    // LM Studio - default auth method
+    if (config.authType === AuthType.USE_LM_STUDIO) {
+      const lmStudioClient = new LMStudioContentGenerator({
+        baseURL: config.lmStudioBaseURL || 'http://localhost:1234/v1',
+        apiKey: config.apiKey || 'lm-studio',
+        model: config.lmStudioModel || 'local-model',
+      });
+      return new LoggingContentGenerator(lmStudioClient, gcConfig);
+    }
+
     if (
       config.authType === AuthType.LOGIN_WITH_GOOGLE ||
       config.authType === AuthType.CLOUD_SHELL

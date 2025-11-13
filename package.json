@@ -1,6 +1,7 @@
 {
-  "name": "@google/gemini-cli",
-  "version": "0.16.0-nightly.20251113.ad1f0d99",
+  "name": "@lm-studio/cli",
+  "version": "1.0.0-lmstudio",
+  "description": "LM Studio CLI - AI Coding Agent for local LLMs",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -11,7 +12,7 @@
   "private": "true",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/yourusername/LM-studio-CLI.git"
   },
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.16.0-nightly.20251113.ad1f0d99"
@@ -69,7 +70,9 @@
     }
   },
   "bin": {
-    "gemini": "bundle/gemini.js"
+    "gemini": "bundle/gemini.js",
+    "lm-studio-cli": "bundle/gemini.js",
+    "lmstudio": "bundle/gemini.js"
   },
   "files": [
     "bundle/",

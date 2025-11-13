@@ -1,129 +1,142 @@
-# Gemini CLI
+# LM Studio CLI - AI Coding Agent 🤖🚀
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
-[![Gemini CLI E2E](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml)
-[![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 
-![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
-
-Gemini CLI is an open-source AI agent that brings the power of Gemini directly
-into your terminal. It provides lightweight access to Gemini, giving you the
-most direct path from your prompt to our model.
-
-Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
-
-## 🚀 Why Gemini CLI?
-
-- **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
-  account.
-- **🧠 Powerful Gemini 2.5 Pro**: Access to 1M token context window.
-- **🔧 Built-in tools**: Google Search grounding, file operations, shell
-  commands, web fetching.
-- **🔌 Extensible**: MCP (Model Context Protocol) support for custom
-  integrations.
-- **💻 Terminal-first**: Designed for developers who live in the command line.
-- **🛡️ Open source**: Apache 2.0 licensed.
-
-## 📦 Installation
-
-### Pre-requisites before installation
-
-- Node.js version 20 or higher
-- macOS, Linux, or Windows
-
-### Quick Install
-
-#### Run instantly with npx
-
-```bash
-# Using npx (no installation required)
-npx https://github.com/google-gemini/gemini-cli
+```
+ ██╗     ███╗   ███╗    ███████╗████████╗██╗   ██╗██████╗ ██╗ ██████╗
+ ██║     ████╗ ████║    ██╔════╝╚══██╔══╝██║   ██║██╔══██╗██║██╔═══██╗
+ ██║     ██╔████╔██║    ███████╗   ██║   ██║   ██║██║  ██║██║██║   ██║
+ ██║     ██║╚██╔╝██║    ╚════██║   ██║   ██║   ██║██║  ██║██║██║   ██║
+ ███████╗██║ ╚═╝ ██║    ███████║   ██║   ╚██████╔╝██████╔╝██║╚██████╔╝
+ ╚══════╝╚═╝     ╚═╝    ╚══════╝   ╚═╝    ╚═════╝ ╚═════╝ ╚═╝ ╚═════╝
+                    🤖 AI Coding Agent 🚀
 ```
 
-#### Install globally with npm
+**LM Studio CLI** is a powerful AI coding agent that brings local LLM capabilities directly
+into your terminal. Built on the excellent foundation of Gemini CLI, it's been adapted
+to work seamlessly with LM Studio, giving you privacy-focused, local AI assistance with
+full tool-use capabilities.
+
+## 🚀 Why LM Studio CLI?
+
+- **🏠 100% Local**: Run completely offline with LM Studio - your code never leaves your machine
+- **🧠 Extended Reasoning**: Built-in support for thinking models like DeepSeek R1, QwQ, and more
+- **🔧 Built-in tools**: File operations, shell commands, web fetching, and more
+- **🔌 Extensible**: MCP (Model Context Protocol) support for custom integrations
+- **💻 Terminal-first**: Designed for developers who live in the command line
+- **🛡️ Open source**: Apache 2.0 licensed
+- **⚡ Fast**: Direct connection to your local LM Studio instance
+- **🎯 Tool-Use Ready**: Works with any tool-use capable model
+
+## 📦 Installation & Setup
+
+### Pre-requisites
+
+1. **Node.js version 20 or higher**
+2. **LM Studio** installed and running ([Download here](https://lmstudio.ai/))
+3. **macOS, Linux, or Windows**
+
+### Step 1: Install LM Studio CLI
+
+#### From source (recommended)
 
 ```bash
-npm install -g @google/gemini-cli
+# Clone this repository
+git clone https://github.com/yourusername/LM-studio-CLI.git
+cd LM-studio-CLI
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Link globally
+npm link
 ```
 
-#### Install globally with Homebrew (macOS/Linux)
+### Step 2: Set up LM Studio
+
+1. **Download and start LM Studio**
+2. **Load a model** with tool-use capabilities (recommended models):
+   - Hermes 2 Pro (Mistral/Llama)
+   - Qwen 2.5
+   - DeepSeek R1 (for extended reasoning)
+   - QwQ (for complex reasoning tasks)
+   - Any other tool-use capable model
+
+3. **Start the local server**:
+   - In LM Studio, go to the "Local Server" tab
+   - Click "Start Server"
+   - Default: `http://localhost:1234`
+
+### Step 3: Configure Environment (Optional)
+
+Create a `.env` file in your project or set environment variables:
 
 ```bash
-brew install gemini-cli
+# Optional: Customize LM Studio connection
+export LM_STUDIO_BASE_URL="http://localhost:1234/v1"
+export LM_STUDIO_MODEL="local-model"
+export LM_STUDIO_API_KEY="lm-studio"  # Default, can be anything
 ```
 
-## Release Cadence and Tags
-
-See [Releases](./docs/releases.md) for more details.
-
-### Preview
-
-New preview releases will be published each week at UTC 2359 on Tuesdays. These
-releases will not have been fully vetted and may contain regressions or other
-outstanding issues. Please help us test and install with `preview` tag.
+### Step 4: Run!
 
 ```bash
-npm install -g @google/gemini-cli@preview
-```
+# Start the CLI
+gemini
 
-### Stable
-
-- New stable releases will be published each week at UTC 2000 on Tuesdays, this
-  will be the full promotion of last week's `preview` release + any bug fixes
-  and validations. Use `latest` tag.
-
-```bash
-npm install -g @google/gemini-cli@latest
-```
-
-### Nightly
-
-- New releases will be published each week at UTC 0000 each day, This will be
-  all changes from the main branch as represented at time of release. It should
-  be assumed there are pending validations and issues. Use `nightly` tag.
-
-```bash
-npm install -g @google/gemini-cli@nightly
+# Or run directly
+npm start
 ```
 
 ## 📋 Key Features
 
-### Code Understanding & Generation
+### 🤖 Code Understanding & Generation
 
-- Query and edit large codebases
-- Generate new apps from PDFs, images, or sketches using multimodal capabilities
-- Debug issues and troubleshoot with natural language
+- Query and edit large codebases with context-aware assistance
+- Generate new functionality with natural language descriptions
+- Debug issues and troubleshoot with AI-powered insights
+- Refactor code with intelligent suggestions
 
-### Automation & Integration
+### 🔧 Built-in Tool System
 
-- Automate operational tasks like querying pull requests or handling complex
-  rebases
-- Use MCP servers to connect new capabilities, including
-  [media generation with Imagen, Veo or Lyria](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia)
-- Run non-interactively in scripts for workflow automation
+All tools work seamlessly with any tool-use capable model:
 
-### Advanced Capabilities
+- **File Operations**: Read, write, edit files
+- **Shell Commands**: Execute terminal commands safely
+- **Web Fetching**: Retrieve web content for context
+- **Code Search**: Find and analyze code patterns
+- **Git Integration**: Manage version control
 
-- Ground your queries with built-in
-  [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time
-  information
-- Conversation checkpointing to save and resume complex sessions
-- Custom context files (GEMINI.md) to tailor behavior for your projects
+### 🧠 Extended Reasoning Support
 
-### GitHub Integration
+Perfect for models that need to "think":
 
-Integrate Gemini CLI directly into your GitHub workflows with
-[**Gemini CLI GitHub Action**](https://github.com/google-github-actions/run-gemini-cli):
+- **Up to 65K tokens** for reasoning (configurable)
+- Optimized for models like **DeepSeek R1** and **QwQ**
+- Automatic detection of reasoning-capable models
+- Streaming support for long-running thoughts
 
-- **Pull Request Reviews**: Automated code review with contextual feedback and
-  suggestions
-- **Issue Triage**: Automated labeling and prioritization of GitHub issues based
-  on content analysis
-- **On-demand Assistance**: Mention `@gemini-cli` in issues and pull requests
-  for help with debugging, explanations, or task delegation
-- **Custom Workflows**: Build automated, scheduled and on-demand workflows
-  tailored to your team's needs
+### 🔌 MCP Protocol Support
+
+- Connect custom MCP servers for extended capabilities
+- Build your own integrations
+- Use community MCP servers
+
+### 💾 Session Management
+
+- Save and resume conversations
+- Checkpoint complex sessions
+- Review conversation history
+
+### 🎯 Privacy-First
+
+- **100% local** - your code never leaves your machine
+- No API keys required (beyond local auth)
+- No telemetry by default
+- Complete control over your data
 
 ## 🔐 Authentication Options
 

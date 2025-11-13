@@ -56,15 +56,25 @@ import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 
-export function isThinkingSupported(model: string) {
-  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
+export function isThinkingSupported() {
+  // Support thinking for all models in LM Studio
+  // This includes DeepSeek R1, QwQ, and other reasoning models
+  return true;
 }
 
 export function isThinkingDefault(model: string) {
-  if (model.startsWith('gemini-2.5-flash-lite')) {
-    return false;
+  // Enable thinking by default for models that commonly have reasoning capabilities
+  const lowerModel = model.toLowerCase();
+  const reasoningKeywords = ['deepseek', 'r1', 'qwq', 'reason', 'thinking', 'cot'];
+
+  for (const keyword of reasoningKeywords) {
+    if (lowerModel.includes(keyword)) {
+      return true;
+    }
   }
-  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
+
+  // Default to false for other models to avoid overhead
+  return false;
 }
 
 const MAX_TURNS = 100;
