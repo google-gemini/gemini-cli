@@ -12,6 +12,10 @@ import { Text } from 'ink';
 import { renderWithProviders } from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
 
+vi.mock('../utils/terminalSetup.js', () => ({
+  getTerminalProgram: () => null,
+}));
+
 vi.mock('../contexts/AppContext.js', () => ({
   useAppContext: () => ({
     version: '0.10.0',

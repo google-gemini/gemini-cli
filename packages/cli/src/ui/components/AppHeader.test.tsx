@@ -6,8 +6,12 @@
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { AppHeader } from './AppHeader.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
+
+vi.mock('../utils/terminalSetup.js', () => ({
+  getTerminalProgram: () => null,
+}));
 
 describe('<AppHeader />', () => {
   it('should render the banner with default text', () => {
