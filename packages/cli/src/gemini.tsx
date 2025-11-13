@@ -158,32 +158,19 @@ export async function startInteractiveUI(
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
 ) {
-  // When not in screen reader mode, disable line wrapping.
-  // We rely on Ink to manage all line wrapping by forcing all content to be
-  // narrower than the terminal width so there is no need for the terminal to
-  // also attempt line wrapping.
-  // Disabling line wrapping reduces Ink rendering artifacts particularly when
-  // the terminal is resized on terminals that full respect this escape code
-  // such as Ghostty. Some terminals such as Iterm2 only respect line wrapping
-  // when using the alternate buffer, which Gemini CLI does not use because we
-  // do not yet have support for scrolling in that mode.
-  if (!config.getScreenReader()) {
-    process.stdout.write('\x1b[?7l');
-  }
-
-  const useAlternateBuffer = isAlternateBufferEnabled(settings);
+  // Never enter Ink alternate buffer mode when screen reader mode is enabled
+  // as there is no benefit of alternate buffer mode when using a screen reader
+  // and the Ink alternate buffer mode requires line wrapping harmful to
+  // screen readers.
+  const useAlternateBuffer =
+    isAlternateBufferEnabled(settings) && !config.getScreenReader();
   const mouseEventsEnabled = useAlternateBuffer;
   if (mouseEventsEnabled) {
     enableMouseEvents();
-  }
-
-  registerCleanup(() => {
-    // Re-enable line wrapping on exit.
-    process.stdout.write('\x1b[?7h');
-    if (mouseEventsEnabled) {
+    registerCleanup(() => {
       disableMouseEvents();
-    }
-  });
+    });
+  }
 
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -239,6 +226,9 @@ export async function startInteractiveUI(
         }
       },
       alternateBuffer: useAlternateBuffer,
+      incrementalRendering:
+        settings.merged.ui?.incrementalRendering !== false &&
+        useAlternateBuffer,
     },
   );
 
