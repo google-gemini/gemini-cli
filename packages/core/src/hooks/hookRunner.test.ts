@@ -309,7 +309,7 @@ console.log(JSON.stringify({ decision: 'allow' }));
       });
 
       expect(expanded).toBe(
-        '\'C\\\\project with "quotes" && del C\\\\windows\\system32\'/cleanup.cmd',
+        '& \'C\\project with "quotes" && del C\\windows\\system32\\cleanup.cmd\'',
       );
 
       const psRunner = new HookRunner({ platformOverride: 'win32' });
@@ -327,7 +327,7 @@ console.log(JSON.stringify({ decision: 'allow' }));
       });
 
       expect(psExpanded).toBe(
-        "'C\\\\project with ''quotes'' && del C\\\\windows\\system32'/cleanup.cmd",
+        "& 'C\\project with ''quotes'' && del C\\windows\\system32\\cleanup.cmd'",
       );
     });
   });

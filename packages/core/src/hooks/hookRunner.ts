@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import path from 'node:path';
 import type { HookConfig } from './types.js';
 import { HookEventName } from './types.js';
 import type {
@@ -214,10 +215,6 @@ export class HookRunner {
       let stderr = '';
       let timedOut = false;
       const command = this.expandCommand(hookConfig.command, input);
-      const shellCommand =
-        this.shellFlavor === 'powershell'
-          ? this.wrapCommandForPowerShell(command)
-          : command;
 
       // Set up environment variables
       const env = {
@@ -226,22 +223,30 @@ export class HookRunner {
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
       };
 
-      const child = spawn(shellCommand, {
+      const child = spawn(command, {
         env,
         cwd: input.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true,
+        shell: this.shellFlavor === 'powershell' ? 'powershell.exe' : true,
       });
 
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          // Ignore
+        }
 
-        // Force kill after 5 seconds
+        // Force kill after 5 seconds if the process is still running
         setTimeout(() => {
-          if (!child.killed) {
-            child.kill('SIGKILL');
+          if (child.exitCode === null && child.signalCode === null) {
+            try {
+              child.kill('SIGKILL');
+            } catch {
+              // Ignore
+            }
           }
         }, 5000);
       }, timeout);
@@ -339,11 +344,49 @@ export class HookRunner {
    * Expand command with environment variables and input context
    */
   private expandCommand(command: string, input: HookInput): string {
+    if (this.shellFlavor === 'powershell') {
+      return this.expandCommandForPowerShell(command, input);
+    }
+
     const escapedCwd = this.escapeShellArg(input.cwd);
 
     return command
       .replace(/\$GEMINI_PROJECT_DIR/g, escapedCwd)
       .replace(/\$CLAUDE_PROJECT_DIR/g, escapedCwd); // For compatibility
+  }
+
+  private expandCommandForPowerShell(
+    command: string,
+    input: HookInput,
+  ): string {
+    const replacePlaceholder = (baseDir: string, rest?: string): string => {
+      const sanitizedRest = rest
+        ? rest
+            .replace(/^[\\/]/, '')
+            .replace(/\\/g, path.win32.sep)
+            .replace(/\//g, path.win32.sep)
+        : '';
+      const fullPath = sanitizedRest
+        ? path.win32.join(baseDir, sanitizedRest)
+        : baseDir;
+      return `'${fullPath.replace(/'/g, "''")}'`;
+    };
+
+    let expanded = command
+      .replace(/\$GEMINI_PROJECT_DIR([\\/][^\s'"&|;]*)?/g, (_match, rest) =>
+        replacePlaceholder(input.cwd, rest as string | undefined),
+      )
+      .replace(/\$CLAUDE_PROJECT_DIR([\\/][^\s'"&|;]*)?/g, (_match, rest) =>
+        replacePlaceholder(input.cwd, rest as string | undefined),
+      );
+
+    // If the command is just a path, prefix with the call operator so PowerShell executes it.
+    expanded = expanded.replace(
+      /^(\s*)('.*?')(\s|$)/,
+      (_full, leading, literal, trailing) => `${leading}& ${literal}${trailing}`,
+    );
+
+    return expanded;
   }
 
   /**
@@ -366,11 +409,6 @@ export class HookRunner {
     // Single quotes in PowerShell behave like literal strings.
     // Escape embedded single quotes by doubling them up.
     return `'${value.replace(/'/g, "''")}'`;
-  }
-
-  private wrapCommandForPowerShell(command: string): string {
-    const escapedCommand = command.replace(/"/g, '`"');
-    return `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& { ${escapedCommand}; exit $LASTEXITCODE }"`;
   }
 
   /**
