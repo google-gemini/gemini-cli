@@ -13,6 +13,8 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { Banner } from './Banner.js';
 import { theme } from '../semantic-colors.js';
 import { Colors } from '../colors.js';
+import { persistentState } from '../../utils/persistentState.js';
+import { useState, useEffect, useRef } from 'react';
 
 interface AppHeaderProps {
   version: string;
@@ -23,13 +25,29 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const config = useConfig();
   const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
 
+  const [defaultBannerShownCount] = useState(
+    () => persistentState.get('defaultBannerShownCount') || 0,
+  );
+
   const { defaultText, warningText } = bannerData;
 
-  const showDefaultBanner = warningText === '' && !config.getPreviewFeatures();
+  const showDefaultBanner =
+    warningText === '' &&
+    !config.getPreviewFeatures() &&
+    defaultBannerShownCount < 5;
   const bannerText = showDefaultBanner ? defaultText : warningText;
 
   const defaultColor = Colors.AccentBlue;
   const fontColor = warningText === '' ? defaultColor : theme.status.warning;
+
+  const hasIncrementedRef = useRef(false);
+  useEffect(() => {
+    if (showDefaultBanner && defaultText && !hasIncrementedRef.current) {
+      hasIncrementedRef.current = true;
+      const current = persistentState.get('defaultBannerShownCount') || 0;
+      persistentState.set('defaultBannerShownCount', current + 1);
+    }
+  }, [showDefaultBanner, defaultText]);
 
   return (
     <Box flexDirection="column">
