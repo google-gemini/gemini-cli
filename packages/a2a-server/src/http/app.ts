@@ -8,7 +8,12 @@ import express from 'express';
 
 import type { AgentCard } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
-import { DefaultRequestHandler, InMemoryTaskStore } from '@a2a-js/sdk/server';
+import {
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  DefaultExecutionEventBus,
+  type AgentExecutionEvent,
+} from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
@@ -183,9 +188,35 @@ export async function createApp() {
             .json({ error: `Command not found: ${command}` });
         }
 
-        const result = await commandToExecute.execute(context, args ?? []);
-        logger.info('[CoreAgent] Sending /executeCommand response: ', result);
-        return res.status(200).json(result);
+        if (commandToExecute.executeStream) {
+          const eventBus = new DefaultExecutionEventBus();
+          res.setHeader('Content-Type', 'application/json');
+          const eventHandler = (event: AgentExecutionEvent) => {
+            const jsonRpcResponse = {
+              jsonrpc: '2.0',
+              id: null,
+              result: event,
+            };
+            res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n`);
+          };
+          eventBus.on('event', eventHandler);
+
+          await commandToExecute.executeStream(
+            context,
+            args ?? [],
+            eventBus,
+            commandToExecute.autoExecute,
+          );
+
+          eventBus.off('event', eventHandler);
+          eventBus.finished();
+          return res.end(); // Explicit return for streaming path
+        } else if (commandToExecute.execute) {
+          const result = await commandToExecute.execute(context, args ?? []);
+          logger.info('[CoreAgent] Sending /executeCommand response: ', result);
+          return res.status(200).json(result);
+        }
+        return res.status(200).json({});
       } catch (e) {
         logger.error('Error executing /executeCommand:', e);
         const errorMessage =

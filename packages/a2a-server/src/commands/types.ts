@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 import type { Config, GitService } from '@google/gemini-cli-core';
 
 export interface CommandContext {
@@ -24,10 +25,18 @@ export interface Command {
   readonly subCommands?: Command[];
   readonly topLevel?: boolean;
   readonly requiresWorkspace?: boolean;
+  readonly autoExecute?: boolean;
 
   execute(
     config: CommandContext,
     args: string[],
+  ): Promise<CommandExecutionResponse>;
+
+  executeStream?(
+    config: CommandContext,
+    args: string[],
+    eventBus: ExecutionEventBus,
+    autoExecute?: boolean,
   ): Promise<CommandExecutionResponse>;
 }
 
