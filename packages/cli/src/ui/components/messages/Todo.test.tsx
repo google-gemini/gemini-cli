@@ -20,7 +20,7 @@ const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
     id: '1',
     tools: [
       {
-        name: 'write_todos_list',
+        name: 'write_todos',
         callId: 'tool-1',
         status: ToolCallStatus.Success,
         resultDisplay: {
