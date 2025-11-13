@@ -133,6 +133,16 @@ function ScrollableList<T>(
         Math.min(maxScrollTop, effectiveTarget),
       );
 
+      if (duration === 0) {
+        if (targetScrollTop === SCROLL_TO_ITEM_END) {
+          virtualizedListRef.current?.scrollTo(SCROLL_TO_ITEM_END);
+        } else {
+          virtualizedListRef.current?.scrollTo(Math.round(clampedTarget));
+        }
+        flashScrollbar();
+        return;
+      }
+
       smoothScrollState.current = {
         active: true,
         start: Date.now(),

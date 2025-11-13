@@ -312,4 +312,120 @@ describe('ScrollProvider', () => {
     expect(scrollBy).toHaveBeenCalledTimes(1);
     expect(scrollBy).toHaveBeenCalledWith(1);
   });
+
+  it('calls scrollTo when dragging scrollbar thumb if available', async () => {
+    const scrollBy = vi.fn();
+    const scrollTo = vi.fn();
+    const getScrollState = vi.fn(() => ({
+      scrollTop: 0,
+      scrollHeight: 100,
+      innerHeight: 10,
+    }));
+
+    render(
+      <ScrollProvider>
+        <TestScrollable
+          id="test-scrollable"
+          scrollBy={scrollBy}
+          scrollTo={scrollTo}
+          getScrollState={getScrollState}
+        />
+      </ScrollProvider>,
+    );
+
+    // Start drag on thumb
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-press',
+        col: 10,
+        row: 0,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Move mouse down
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'move',
+        col: 10,
+        row: 5, // Move down 5 units
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Release
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-release',
+        col: 10,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    expect(scrollTo).toHaveBeenCalled();
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it('calls scrollBy when dragging scrollbar thumb if scrollTo is not available', async () => {
+    const scrollBy = vi.fn();
+    const getScrollState = vi.fn(() => ({
+      scrollTop: 0,
+      scrollHeight: 100,
+      innerHeight: 10,
+    }));
+
+    render(
+      <ScrollProvider>
+        <TestScrollable
+          id="test-scrollable"
+          scrollBy={scrollBy}
+          getScrollState={getScrollState}
+        />
+      </ScrollProvider>,
+    );
+
+    // Start drag on thumb
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-press',
+        col: 10,
+        row: 0,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Move mouse down
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'move',
+        col: 10,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-release',
+        col: 10,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    expect(scrollBy).toHaveBeenCalled();
+  });
 });

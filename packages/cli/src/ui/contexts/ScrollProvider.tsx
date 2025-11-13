@@ -28,7 +28,7 @@ export interface ScrollableEntry {
   ref: React.RefObject<DOMElement>;
   getScrollState: () => ScrollState;
   scrollBy: (delta: number) => void;
-  scrollTo?: (scrollTop: number) => void;
+  scrollTo?: (scrollTop: number, duration?: number) => void;
   hasFocus: () => boolean;
   flashScrollbar: () => void;
 }
@@ -290,7 +290,11 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       (targetThumbY / maxThumbY) * maxScrollTop,
     );
 
-    entry.scrollBy(targetScrollTop - scrollTop);
+    if (entry.scrollTo) {
+      entry.scrollTo(targetScrollTop, 0);
+    } else {
+      entry.scrollBy(targetScrollTop - scrollTop);
+    }
   };
 
   const handleLeftRelease = () => {

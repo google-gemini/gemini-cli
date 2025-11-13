@@ -348,4 +348,85 @@ describe('ScrollProvider Drag', () => {
     // Scroll to bottom (delta = 90 - 0 = 90)
     expect(scrollBy).toHaveBeenCalledWith(90);
   });
+
+  it('uses scrollTo with 0 duration if provided', async () => {
+    const scrollBy = vi.fn();
+    const scrollTo = vi.fn();
+    const getScrollState = vi.fn(() => ({
+      scrollTop: 0,
+      scrollHeight: 100,
+      innerHeight: 10,
+    }));
+
+    // Custom component that provides scrollTo
+    const TestScrollableWithScrollTo = forwardRef(
+      (
+        props: {
+          id: string;
+          scrollBy: (delta: number) => void;
+          scrollTo: (scrollTop: number, duration?: number) => void;
+          getScrollState: () => ScrollState;
+        },
+        ref,
+      ) => {
+        const elementRef = useRef<DOMElement>(null);
+        useImperativeHandle(ref, () => elementRef.current);
+        useScrollable(
+          {
+            ref: elementRef as RefObject<DOMElement>,
+            getScrollState: props.getScrollState,
+            scrollBy: props.scrollBy,
+            scrollTo: props.scrollTo,
+            hasFocus: () => true,
+            flashScrollbar: () => {},
+          },
+          true,
+        );
+        return <Box ref={elementRef} />;
+      },
+    );
+    TestScrollableWithScrollTo.displayName = 'TestScrollableWithScrollTo';
+
+    render(
+      <ScrollProvider>
+        <TestScrollableWithScrollTo
+          id="test-scrollable-scrollto"
+          scrollBy={scrollBy}
+          scrollTo={scrollTo}
+          getScrollState={getScrollState}
+        />
+      </ScrollProvider>,
+    );
+
+    // Click on track (jump)
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-press',
+        col: 10,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Expect scrollTo to be called with target (and undefined/default duration)
+    expect(scrollTo).toHaveBeenCalledWith(50);
+
+    scrollTo.mockClear();
+
+    // Move mouse (drag)
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'move',
+        col: 10,
+        row: 6,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+    // Expect scrollTo to be called with target and duration 0
+    expect(scrollTo).toHaveBeenCalledWith(60, 0);
+  });
 });
