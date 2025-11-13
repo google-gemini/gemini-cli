@@ -214,6 +214,10 @@ export class HookRunner {
       let stderr = '';
       let timedOut = false;
       const command = this.expandCommand(hookConfig.command, input);
+      const shellCommand =
+        this.shellFlavor === 'powershell'
+          ? this.wrapCommandForPowerShell(command)
+          : command;
 
       // Set up environment variables
       const env = {
@@ -222,11 +226,11 @@ export class HookRunner {
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
       };
 
-      const child = spawn(command, {
+      const child = spawn(shellCommand, {
         env,
         cwd: input.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: this.shellFlavor === 'powershell' ? 'powershell.exe' : true,
+        shell: true,
       });
 
       // Set up timeout
@@ -362,6 +366,11 @@ export class HookRunner {
     // Single quotes in PowerShell behave like literal strings.
     // Escape embedded single quotes by doubling them up.
     return `'${value.replace(/'/g, "''")}'`;
+  }
+
+  private wrapCommandForPowerShell(command: string): string {
+    const escapedCommand = command.replace(/"/g, '`"');
+    return `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "& { ${escapedCommand}; exit $LASTEXITCODE }"`;
   }
 
   /**
