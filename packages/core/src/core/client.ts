@@ -698,10 +698,10 @@ export class GeminiClient {
 
     if (
       info.compressionStatus ===
-        CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT &&
-      !force // Only set on non-forced failure
+      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
     ) {
-      this.hasFailedCompressionAttempt = true; // Latch the flag
+      this.hasFailedCompressionAttempt =
+        this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
         this.chat = await this.startChat(newHistory);
