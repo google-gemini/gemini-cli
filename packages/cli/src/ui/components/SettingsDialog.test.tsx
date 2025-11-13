@@ -342,7 +342,7 @@ describe('SettingsDialog', () => {
 
       await wait();
 
-      expect(lastFrame()).toContain('● Use Model Router');
+      expect(lastFrame()).toContain('● Codebase Investigator Max Num Turns');
 
       unmount();
     });

@@ -15,6 +15,7 @@ import type {
   FileFilteringOptions,
   MCPServerConfig,
   OutputFormat,
+  GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
@@ -30,14 +31,13 @@ import {
   FileDiscoveryService,
   ShellTool,
   EditTool,
-  WriteFileTool,
+  WRITE_FILE_TOOL_NAME,
   SHELL_TOOL_NAMES,
   resolveTelemetrySettings,
   FatalConfigError,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
-import type { Extension } from './extension.js';
 import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -66,7 +66,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
-  allFiles: boolean | undefined;
+
   showMemoryUsage: boolean | undefined;
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -105,17 +105,20 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     })
     .option('telemetry-target', {
       type: 'string',
+      nargs: 1,
       choices: ['local', 'gcp'],
       description:
         'Set the telemetry target (local or gcp). Overrides settings files.',
     })
     .option('telemetry-otlp-endpoint', {
       type: 'string',
+      nargs: 1,
       description:
         'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
     })
     .option('telemetry-otlp-protocol', {
       type: 'string',
+      nargs: 1,
       choices: ['grpc', 'http'],
       description:
         'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
@@ -127,6 +130,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     })
     .option('telemetry-outfile', {
       type: 'string',
+      nargs: 1,
       description: 'Redirect all telemetry output to the specified file.',
     })
     .deprecateOption(
@@ -161,6 +165,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     })
     .option('proxy', {
       type: 'string',
+      nargs: 1,
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
     })
@@ -177,16 +182,19 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('model', {
           alias: 'm',
           type: 'string',
+          nargs: 1,
           description: `Model`,
         })
         .option('prompt', {
           alias: 'p',
           type: 'string',
+          nargs: 1,
           description: 'Prompt. Appended to input on stdin (if any).',
         })
         .option('prompt-interactive', {
           alias: 'i',
           type: 'string',
+          nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
         })
@@ -197,14 +205,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         })
         .option('sandbox-image', {
           type: 'string',
+          nargs: 1,
           description: 'Sandbox image URI.',
         })
-        .option('all-files', {
-          alias: ['a'],
-          type: 'boolean',
-          description: 'Include ALL files in context?',
-          default: false,
-        })
+
         .option('show-memory-usage', {
           type: 'boolean',
           description: 'Show memory usage in status bar',
@@ -219,6 +223,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         })
         .option('approval-mode', {
           type: 'string',
+          nargs: 1,
           choices: ['default', 'auto_edit', 'yolo'],
           description:
             'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
@@ -236,6 +241,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('allowed-mcp-server-names', {
           type: 'array',
           string: true,
+          nargs: 1,
           description: 'Allowed MCP server names',
           coerce: (mcpServerNames: string[]) =>
             // Handle comma-separated values
@@ -246,6 +252,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('allowed-tools', {
           type: 'array',
           string: true,
+          nargs: 1,
           description: 'Tools that are allowed to run without confirmation',
           coerce: (tools: string[]) =>
             // Handle comma-separated values
@@ -255,6 +262,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'e',
           type: 'array',
           string: true,
+          nargs: 1,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
           coerce: (extensions: string[]) =>
@@ -271,6 +279,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('include-directories', {
           type: 'array',
           string: true,
+          nargs: 1,
           description:
             'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
           coerce: (dirs: string[]) =>
@@ -284,8 +293,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('output-format', {
           alias: 'o',
           type: 'string',
+          nargs: 1,
           description: 'The format of the CLI output.',
-          choices: ['text', 'json'],
+          choices: ['text', 'json', 'stream-json'],
         })
         .deprecateOption(
           'show-memory-usage',
@@ -299,10 +309,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           'checkpointing',
           'Use the "general.checkpointing.enabled" setting in settings.json instead. This flag will be removed in a future version.',
         )
-        .deprecateOption(
-          'all-files',
-          'Use @ includes in the application instead. This flag will be removed in a future version.',
-        )
+
         .deprecateOption(
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
@@ -472,7 +479,7 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export async function loadCliConfig(
   settings: Settings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   extensionEnablementManager: ExtensionEnablementManager,
   sessionId: string,
   argv: CliArgs,
@@ -604,7 +611,11 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
-    const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+    const defaultExcludes = [
+      ShellTool.Name,
+      EditTool.Name,
+      WRITE_FILE_TOOL_NAME,
+    ];
     const autoEditExcludes = [ShellTool.Name];
 
     const toolExclusionFilter = createToolExclusionFilter(
@@ -664,7 +675,7 @@ export async function loadCliConfig(
     );
   }
 
-  const useModelRouter = settings.experimental?.useModelRouter ?? false;
+  const useModelRouter = settings.experimental?.useModelRouter ?? true;
   const defaultModel = useModelRouter
     ? DEFAULT_GEMINI_MODEL_AUTO
     : DEFAULT_GEMINI_MODEL;
@@ -689,7 +700,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
-    fullContext: argv.allFiles || false,
+
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
@@ -710,7 +721,7 @@ export async function loadCliConfig(
     },
     telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
-    fileFiltering: settings.context?.fileFiltering,
+    fileFiltering,
     checkpointing:
       argv.checkpointing || settings.general?.checkpointing?.enabled,
     proxy:
@@ -737,7 +748,8 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useRipgrep: settings.tools?.useRipgrep,
-    shouldUseNodePtyShell: settings.tools?.shell?.enableInteractiveShell,
+    enableInteractiveShell:
+      settings.tools?.shell?.enableInteractiveShell ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
@@ -752,7 +764,9 @@ export async function loadCliConfig(
     useModelRouter,
     enableMessageBusIntegration:
       settings.tools?.enableMessageBusIntegration ?? false,
-    enableSubagents: settings.experimental?.enableSubagents ?? false,
+    codebaseInvestigatorSettings:
+      settings.experimental?.codebaseInvestigatorSettings,
+    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
   });
 }
 
@@ -787,30 +801,28 @@ function allowedMcpServers(
   return mcpServers;
 }
 
-function mergeMcpServers(settings: Settings, extensions: Extension[]) {
+function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
   const mcpServers = { ...(settings.mcpServers || {}) };
   for (const extension of extensions) {
-    Object.entries(extension.config.mcpServers || {}).forEach(
-      ([key, server]) => {
-        if (mcpServers[key]) {
-          logger.warn(
-            `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-          );
-          return;
-        }
-        mcpServers[key] = {
-          ...server,
-          extensionName: extension.config.name,
-        };
-      },
-    );
+    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
+      if (mcpServers[key]) {
+        logger.warn(
+          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
+        );
+        return;
+      }
+      mcpServers[key] = {
+        ...server,
+        extensionName: extension.name,
+      };
+    });
   }
   return mcpServers;
 }
 
 function mergeExcludeTools(
   settings: Settings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   extraExcludes?: string[] | undefined,
 ): string[] {
   const allExcludeTools = new Set([
@@ -818,7 +830,7 @@ function mergeExcludeTools(
     ...(extraExcludes || []),
   ]);
   for (const extension of extensions) {
-    for (const tool of extension.config.excludeTools || []) {
+    for (const tool of extension.excludeTools || []) {
       allExcludeTools.add(tool);
     }
   }

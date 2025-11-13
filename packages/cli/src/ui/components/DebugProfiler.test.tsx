@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { appEvents, AppEvent } from '../../utils/events.js';
 import {
   profiler,
   ACTION_TIMESTAMP_CAPACITY,
@@ -155,6 +156,18 @@ describe('DebugProfiler', () => {
     profiler.checkForIdleFrames();
 
     expect(profiler.totalIdleFrames).toBe(3);
+  });
+
+  it('should report flicker frames', () => {
+    const reportActionSpy = vi.spyOn(profiler, 'reportAction');
+    const cleanup = profiler.registerFlickerHandler(true);
+
+    appEvents.emit(AppEvent.Flicker);
+
+    expect(profiler.totalFlickerFrames).toBe(1);
+    expect(reportActionSpy).toHaveBeenCalled();
+
+    cleanup();
   });
 
   it('should not report idle frames when actions are interleaved', async () => {

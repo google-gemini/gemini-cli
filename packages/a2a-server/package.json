@@ -1,7 +1,6 @@
 {
   "name": "@google/gemini-cli-a2a-server",
-  "version": "0.9.0-nightly.20251001.163dba7e",
-  "private": true,
+  "version": "0.11.0-nightly.20251015.203bad7c",
   "description": "Gemini CLI A2A Server",
   "repository": {
     "type": "git",
@@ -9,10 +8,13 @@
     "directory": "packages/a2a-server"
   },
   "type": "module",
-  "main": "dist/server.js",
+  "main": "dist/index.js",
+  "bin": {
+    "gemini-cli-a2a-server": "dist/a2a-server.mjs"
+  },
   "scripts": {
-    "start": "node dist/src/http/server.js",
     "build": "node ../../scripts/build_package.js",
+    "start": "node dist/src/http/server.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",

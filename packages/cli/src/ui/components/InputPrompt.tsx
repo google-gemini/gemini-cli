@@ -37,6 +37,9 @@ import {
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { StreamingState } from '../types.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -70,28 +73,21 @@ export interface InputPromptProps {
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
   isEmbeddedShellFocused?: boolean;
+  setQueueErrorMessage: (message: string | null) => void;
+  streamingState: StreamingState;
 }
 
 // The input content, input container, and input suggestions list may have different widths
-export const calculatePromptWidths = (terminalWidth: number) => {
-  const widthFraction = 0.9;
+export const calculatePromptWidths = (mainContentWidth: number) => {
   const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
   const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
-  const MIN_CONTENT_WIDTH = 2;
 
-  const innerContentWidth =
-    Math.floor(terminalWidth * widthFraction) -
-    FRAME_PADDING_AND_BORDER -
-    PROMPT_PREFIX_WIDTH;
-
-  const inputWidth = Math.max(MIN_CONTENT_WIDTH, innerContentWidth);
   const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
-  const containerWidth = inputWidth + FRAME_OVERHEAD;
-  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
+  const suggestionsWidth = Math.max(20, mainContentWidth);
 
   return {
-    inputWidth,
-    containerWidth,
+    inputWidth: Math.max(mainContentWidth - FRAME_OVERHEAD, 1),
+    containerWidth: mainContentWidth,
     suggestionsWidth,
     frameOverhead: FRAME_OVERHEAD,
   } as const;
@@ -115,9 +111,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onEscapePromptChange,
   vimHandleInput,
   isEmbeddedShellFocused,
+  setQueueErrorMessage,
+  streamingState,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
+  const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -225,6 +224,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+    ],
+  );
+
+  const handleSubmit = useCallback(
+    (submittedValue: string) => {
+      const trimmedMessage = submittedValue.trim();
+      const isSlash = isSlashCommand(trimmedMessage);
+
+      const isShell = shellModeActive;
+      if (
+        (isSlash || isShell) &&
+        streamingState === StreamingState.Responding
+      ) {
+        setQueueErrorMessage(
+          `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
+        );
+        return;
+      }
+      handleSubmitAndClear(trimmedMessage);
+    },
+    [
+      handleSubmitAndClear,
+      shellModeActive,
+      streamingState,
+      setQueueErrorMessage,
     ],
   );
 
@@ -521,7 +545,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // If the command is a perfect match, pressing enter should execute it.
       if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
-        handleSubmitAndClear(buffer.text);
+        handleSubmit(buffer.text);
         return;
       }
 
@@ -632,7 +656,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            handleSubmit(buffer.text);
           }
         }
         return;
@@ -713,6 +737,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onClearScreen,
       inputHistory,
       handleSubmitAndClear,
+      handleSubmit,
       shellHistory,
       reverseSearchCompletion,
       handleClipboardImage,
@@ -887,6 +912,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             : theme.border.default
         }
         paddingX={1}
+        width={mainAreaWidth}
+        flexDirection="row"
+        alignItems="flex-start"
+        minHeight={3}
       >
         <Text
           color={statusColor ?? theme.text.accent}

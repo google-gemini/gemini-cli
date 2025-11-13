@@ -26,7 +26,7 @@ interface AuthDialogProps {
   settings: LoadedSettings;
   setAuthState: (state: AuthState) => void;
   authError: string | null;
-  onAuthError: (error: string) => void;
+  onAuthError: (error: string | null) => void;
 }
 
 export function AuthDialog({
@@ -174,6 +174,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
           items={items}
           initialIndex={initialAuthIndex}
           onSelect={handleAuthSelect}
+          onHighlight={() => {
+            onAuthError(null);
+          }}
         />
       </Box>
       {authError && (

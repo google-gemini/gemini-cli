@@ -153,7 +153,7 @@ describe('ShellExecutionService', () => {
     simulation: (
       ptyProcess: typeof mockPtyProcess,
       ac: AbortController,
-    ) => void,
+    ) => void | Promise<void>,
     config = shellExecutionConfig,
   ) => {
     const abortController = new AbortController();
@@ -167,7 +167,7 @@ describe('ShellExecutionService', () => {
     );
 
     await new Promise((resolve) => process.nextTick(resolve));
-    simulation(mockPtyProcess, abortController);
+    await simulation(mockPtyProcess, abortController);
     const result = await handle.result;
     return { result, handle, abortController };
   };
@@ -355,6 +355,63 @@ describe('ShellExecutionService', () => {
 
       expect(result.aborted).toBe(true);
       // The process kill is mocked, so we just check that the flag is set.
+    });
+
+    it('should send SIGTERM and then SIGKILL on abort', async () => {
+      const sigkillPromise = new Promise<void>((resolve) => {
+        mockProcessKill.mockImplementation((pid, signal) => {
+          if (signal === 'SIGKILL' && pid === -mockPtyProcess.pid) {
+            resolve();
+          }
+          return true;
+        });
+      });
+
+      const { result } = await simulateExecution(
+        'long-running-process',
+        async (pty, abortController) => {
+          abortController.abort();
+          await sigkillPromise; // Wait for SIGKILL to be sent before exiting.
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: 9 });
+        },
+      );
+
+      expect(result.aborted).toBe(true);
+
+      // Verify the calls were made in the correct order.
+      const killCalls = mockProcessKill.mock.calls;
+      const sigtermCallIndex = killCalls.findIndex(
+        (call) => call[0] === -mockPtyProcess.pid && call[1] === 'SIGTERM',
+      );
+      const sigkillCallIndex = killCalls.findIndex(
+        (call) => call[0] === -mockPtyProcess.pid && call[1] === 'SIGKILL',
+      );
+
+      expect(sigtermCallIndex).toBe(0);
+      expect(sigkillCallIndex).toBe(1);
+      expect(sigtermCallIndex).toBeLessThan(sigkillCallIndex);
+
+      expect(result.signal).toBe(9);
+    });
+
+    it('should resolve without waiting for the processing chain on abort', async () => {
+      const { result } = await simulateExecution(
+        'long-output',
+        (pty, abortController) => {
+          // Simulate a lot of data being in the queue to be processed
+          for (let i = 0; i < 1000; i++) {
+            pty.onData.mock.calls[0][0]('some data');
+          }
+          abortController.abort();
+          pty.onExit.mock.calls[0][0]({ exitCode: 1, signal: null });
+        },
+      );
+
+      // The main assertion here is implicit: the `await` for the result above
+      // should complete without timing out. This proves that the resolution
+      // was not blocked by the long chain of data processing promises,
+      // which is the desired behavior on abort.
+      expect(result.aborted).toBe(true);
     });
   });
 
@@ -633,6 +690,36 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(result.output.trim()).toBe('');
       expect(onOutputEventMock).not.toHaveBeenCalled();
     });
+
+    it('should truncate stdout using a sliding window and show a warning', async () => {
+      const MAX_SIZE = 16 * 1024 * 1024;
+      const chunk1 = 'a'.repeat(MAX_SIZE / 2 - 5);
+      const chunk2 = 'b'.repeat(MAX_SIZE / 2 - 5);
+      const chunk3 = 'c'.repeat(20);
+
+      const { result } = await simulateExecution('large-output', (cp) => {
+        cp.stdout?.emit('data', Buffer.from(chunk1));
+        cp.stdout?.emit('data', Buffer.from(chunk2));
+        cp.stdout?.emit('data', Buffer.from(chunk3));
+        cp.emit('exit', 0, null);
+      });
+
+      const truncationMessage =
+        '[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to 16MB.]';
+      expect(result.output).toContain(truncationMessage);
+
+      const outputWithoutMessage = result.output
+        .substring(0, result.output.indexOf(truncationMessage))
+        .trimEnd();
+
+      expect(outputWithoutMessage.length).toBe(MAX_SIZE);
+
+      const expectedStart = (chunk1 + chunk2 + chunk3).slice(-MAX_SIZE);
+      expect(
+        outputWithoutMessage.startsWith(expectedStart.substring(0, 10)),
+      ).toBe(true);
+      expect(outputWithoutMessage.endsWith('c'.repeat(20))).toBe(true);
+    }, 20000);
   });
 
   describe('Failed Execution', () => {

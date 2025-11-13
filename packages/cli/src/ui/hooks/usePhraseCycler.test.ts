@@ -22,6 +22,7 @@ describe('usePhraseCycler', () => {
   });
 
   it('should initialize with a witty phrase when not active and not waiting', () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderHook(() => usePhraseCycler(false, false));
     expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
@@ -45,6 +46,7 @@ describe('usePhraseCycler', () => {
   });
 
   it('should cycle through witty phrases when isActive is true and not waiting', () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderHook(() => usePhraseCycler(true, false));
     // Initial phrase should be one of the witty phrases
     expect(WITTY_LOADING_PHRASES).toContain(result.current);
@@ -70,12 +72,19 @@ describe('usePhraseCycler', () => {
     }
 
     // Mock Math.random to make the test deterministic.
-    let callCount = 0;
+    const mockRandomValues = [
+      0.5, // -> witty
+      0, // -> index 0
+      0.5, // -> witty
+      1 / WITTY_LOADING_PHRASES.length, // -> index 1
+      0.5, // -> witty
+      0, // -> index 0
+    ];
+    let randomCallCount = 0;
     vi.spyOn(Math, 'random').mockImplementation(() => {
-      // Cycle through 0, 1, 0, 1, ...
-      const val = callCount % 2;
-      callCount++;
-      return val / WITTY_LOADING_PHRASES.length;
+      const val = mockRandomValues[randomCallCount % mockRandomValues.length];
+      randomCallCount++;
+      return val;
     });
 
     const { result, rerender } = renderHook(
@@ -120,7 +129,7 @@ describe('usePhraseCycler', () => {
   it('should use custom phrases when provided', () => {
     const customPhrases = ['Custom Phrase 1', 'Custom Phrase 2'];
     let callCount = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => {
+    const randomMock = vi.spyOn(Math, 'random').mockImplementation(() => {
       const val = callCount % 2;
       callCount++;
       return val / customPhrases.length;
@@ -146,12 +155,17 @@ describe('usePhraseCycler', () => {
 
     expect(result.current).toBe(customPhrases[1]);
 
+    // Test fallback to default phrases.
+    randomMock.mockRestore();
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
+
     rerender({ isActive: true, isWaiting: false, customPhrases: undefined });
 
     expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
 
   it('should fall back to witty phrases if custom phrases are an empty array', () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderHook(
       ({ isActive, isWaiting, customPhrases: phrases }) =>
         usePhraseCycler(isActive, isWaiting, phrases),
@@ -168,6 +182,7 @@ describe('usePhraseCycler', () => {
   });
 
   it('should reset to a witty phrase when transitioning from waiting to active', () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = renderHook(
       ({ isActive, isWaiting }) => usePhraseCycler(isActive, isWaiting),
       { initialProps: { isActive: true, isWaiting: false } },

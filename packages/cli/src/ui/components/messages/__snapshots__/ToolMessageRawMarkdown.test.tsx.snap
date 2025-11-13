@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=false '(raw markdown with syntax highlightin…' 1`] = `
+" ✓  test-tool A tool for testing
+
+     Test **bold** and \`code\` markdown"
+`;
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true '(default)' 1`] = `
+" ✓  test-tool A tool for testing
+
+    Test bold and code markdown"
+`;

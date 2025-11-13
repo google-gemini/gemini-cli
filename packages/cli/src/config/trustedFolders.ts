@@ -12,13 +12,13 @@ import {
   getErrorMessage,
   isWithinRoot,
   ideContextStore,
+  GEMINI_DIR,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
-export const SETTINGS_DIRECTORY_NAME = '.gemini';
-export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
+export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
 
 export function getTrustedFoldersPath(): string {
   if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {

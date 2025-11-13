@@ -7,7 +7,11 @@
 import { describe, it, expect } from 'vitest';
 import { createPolicyEngineConfig } from './policy.js';
 import type { Settings } from './settings.js';
-import { ApprovalMode, PolicyDecision } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  PolicyDecision,
+  WEB_FETCH_TOOL_NAME,
+} from '@google/gemini-cli-core';
 
 describe('createPolicyEngineConfig', () => {
   it('should return ASK_USER for all tools by default', () => {
@@ -19,7 +23,7 @@ describe('createPolicyEngineConfig', () => {
       { toolName: 'save_memory', decision: 'ask_user', priority: 10 },
       { toolName: 'run_shell_command', decision: 'ask_user', priority: 10 },
       { toolName: 'write_file', decision: 'ask_user', priority: 10 },
-      { toolName: 'web_fetch', decision: 'ask_user', priority: 10 },
+      { toolName: WEB_FETCH_TOOL_NAME, decision: 'ask_user', priority: 10 },
     ]);
   });
 
@@ -366,7 +370,7 @@ describe('createPolicyEngineConfig', () => {
           'save_memory',
           'run_shell_command',
           'write_file',
-          'web_fetch',
+          WEB_FETCH_TOOL_NAME,
         ].includes(r.toolName || '') && r.decision === PolicyDecision.ASK_USER,
     );
     expect(writeToolRules).toHaveLength(0);
