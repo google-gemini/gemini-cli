@@ -126,6 +126,10 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   warningMessage: string | null;
+  bannerData: {
+    defaultText: string;
+    warningText: string;
+  };
   customDialog: React.ReactNode | null;
 }
 

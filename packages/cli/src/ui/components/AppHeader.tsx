@@ -5,14 +5,12 @@
  */
 
 import { Box } from 'ink';
-import { useState } from 'react';
 import { Header } from './Header.js';
 import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { Banner } from './Banner.js';
-import type { Flag } from '@google/gemini-cli-core/src/code_assist/experiments/types.js';
 import { theme } from '../semantic-colors.js';
 import { Colors } from '../colors.js';
 
@@ -23,16 +21,9 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, mainAreaWidth } = useUIState();
-  const [flags] = useState<Record<string, Flag>>(() => {
-    const initial = config.getExperiments();
-    return initial?.flags ?? {};
-  });
+  const { nightly, mainAreaWidth, bannerData } = useUIState();
 
-  const defaultText =
-    flags['GeminiCLIBannerText__no_capacity_issues']?.stringValue ?? '';
-  const warningText =
-    flags['GeminiCLIBannerText__capacity_issues']?.stringValue ?? '';
+  const { defaultText, warningText } = bannerData;
 
   const showDefaultBanner = warningText === '' && !config.getPreviewFeatures();
   const bannerText = showDefaultBanner ? defaultText : warningText;

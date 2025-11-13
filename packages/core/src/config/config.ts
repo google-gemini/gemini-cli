@@ -1199,6 +1199,22 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
+  async getBannerTextNoCapacityIssues(): Promise<string> {
+    await this.ensureExperimentsLoaded();
+    return (
+      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES]
+        ?.stringValue ?? ''
+    );
+  }
+
+  async getBannerTextCapacityIssues(): Promise<string> {
+    await this.ensureExperimentsLoaded();
+    return (
+      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
+        ?.stringValue ?? ''
+    );
+  }
+
   private async ensureExperimentsLoaded(): Promise<void> {
     if (!this.experimentsPromise) {
       return;

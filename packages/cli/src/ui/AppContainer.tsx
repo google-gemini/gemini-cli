@@ -181,6 +181,9 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
+  const [defaultBannerText, setDefaultBannerText] = useState('');
+  const [warningBannerText, setWarningBannerText] = useState('');
+
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
   extensionManager.setRequestConsent((description) =>
@@ -1305,6 +1308,28 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchBannerTexts = async () => {
+      const [defaultBanner, warningBanner] = await Promise.all([
+        config.getBannerTextNoCapacityIssues(),
+        config.getBannerTextCapacityIssues(),
+      ]);
+
+      if (isMounted) {
+        setDefaultBannerText(defaultBanner);
+        setWarningBannerText(warningBanner);
+        refreshStatic();
+      }
+    };
+    fetchBannerTexts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [config, refreshStatic]);
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
@@ -1394,6 +1419,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       warningMessage,
+      bannerData: {
+        defaultText: defaultBannerText,
+        warningText: warningBannerText,
+      },
     }),
     [
       isThemeDialogOpen,
@@ -1482,6 +1511,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       authState,
       copyModeEnabled,
       warningMessage,
+      defaultBannerText,
+      warningBannerText,
     ],
   );
 
