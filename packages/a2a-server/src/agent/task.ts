@@ -76,6 +76,7 @@ export class Task {
   checkpoint?: string;
   skipFinalTrueAfterInlineEdit = false;
   modelInfo?: string;
+  autoConfirm: boolean;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -90,6 +91,7 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoConfirm = false,
   ) {
     this.id = id;
     this.contextId = contextId;
@@ -101,6 +103,7 @@ export class Task {
     this.eventBus = eventBus;
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
+    this.autoConfirm = autoConfirm;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
       // for future requests without retrying the current one. The 'stop'
@@ -114,8 +117,9 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoConfirm?: boolean,
   ): Promise<Task> {
-    return new Task(id, contextId, config, eventBus);
+    return new Task(id, contextId, config, eventBus, autoConfirm);
   }
 
   // Note: `getAllMCPServerStatuses` retrieves the status of all MCP servers for the entire
@@ -411,8 +415,15 @@ export class Task {
       }
     });
 
-    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
-      logger.info('[Task] YOLO mode enabled. Auto-approving all tool calls.');
+    if (
+      this.autoConfirm ||
+      this.config.getApprovalMode() === ApprovalMode.YOLO
+    ) {
+      logger.info(
+        '[Task] ' +
+          (this.autoConfirm ? '' : 'YOLO mode enabled. ') +
+          'Auto-approving all tool calls.',
+      );
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
           tc.confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);

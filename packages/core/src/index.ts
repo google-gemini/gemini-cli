@@ -21,6 +21,7 @@ export * from './confirmation-bus/message-bus.js';
 // Export Commands logic
 export * from './commands/extensions.js';
 export * from './commands/restore.js';
+export * from './commands/init.js';
 export * from './commands/types.js';
 
 // Export Core Logic
@@ -78,6 +79,7 @@ export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
+export * from './utils/checks.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

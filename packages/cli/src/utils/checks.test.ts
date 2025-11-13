@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { checkExhaustive, assumeExhaustive } from './checks.js';
+import { checkExhaustive, assumeExhaustive } from '@google/gemini-cli-core';
 
 describe('checks', () => {
   describe('checkExhaustive', () => {
