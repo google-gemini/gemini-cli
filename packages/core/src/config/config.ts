@@ -358,7 +358,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
-  private readonly previewFeatures: boolean;
+  private previewFeatures: boolean | undefined;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -480,7 +480,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
-    this.previewFeatures = params.previewFeatures ?? false;
+    this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -676,11 +676,23 @@ export class Config {
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
+    const previewFeatures = this.getPreviewFeatures();
+
     const codeAssistServer = getCodeAssistServer(this);
     if (codeAssistServer) {
       this.experimentsPromise = getExperiments(codeAssistServer)
         .then((experiments) => {
           this.setExperiments(experiments);
+
+          // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
+          if (previewFeatures === undefined) {
+            const remotePreviewFeatures =
+              experiments.flags['GeminiCLIPreviewAvailable__enable_preview']
+                ?.boolValue;
+            if (remotePreviewFeatures === true) {
+              this.setPreviewFeatures(remotePreviewFeatures);
+            }
+          }
         })
         .catch((e) => {
           debugLogger.error('Failed to fetch experiments', e);
@@ -848,8 +860,12 @@ export class Config {
     return this.question;
   }
 
-  getPreviewFeatures(): boolean {
+  getPreviewFeatures(): boolean | undefined {
     return this.previewFeatures;
+  }
+
+  setPreviewFeatures(previewFeatures: boolean) {
+    this.previewFeatures = previewFeatures;
   }
 
   getCoreTools(): string[] | undefined {
