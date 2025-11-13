@@ -136,13 +136,17 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts retries due to content errors (e.g., empty stream).',
     valueType: ValueType.INT,
     assign: (c: Counter) => (contentRetryCounter = c),
-    attributes: {} as Record<string, never>,
+    attributes: {} as {
+      error_type: string;
+    },
   },
   [CONTENT_RETRY_FAILURE_COUNT]: {
     description: 'Counts occurrences of all content retries failing.',
     valueType: ValueType.INT,
     assign: (c: Counter) => (contentRetryFailureCounter = c),
-    attributes: {} as Record<string, never>,
+    attributes: {} as {
+      error_type: string;
+    },
   },
   [MODEL_ROUTING_FAILURE_COUNT]: {
     description: 'Counts model routing failures.',
@@ -715,20 +719,26 @@ export function recordInvalidChunk(config: Config): void {
 /**
  * Records a metric for when a retry is triggered due to a content error.
  */
-export function recordContentRetry(config: Config): void {
+export function recordContentRetry(config: Config, errorType: string): void {
   if (!contentRetryCounter || !isMetricsInitialized) return;
-  contentRetryCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+  contentRetryCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    error_type: errorType,
+  });
 }
 
 /**
  * Records a metric for when all content error retries have failed for a request.
  */
-export function recordContentRetryFailure(config: Config): void {
+export function recordContentRetryFailure(
+  config: Config,
+  errorType: string,
+): void {
   if (!contentRetryFailureCounter || !isMetricsInitialized) return;
-  contentRetryFailureCounter.add(
-    1,
-    baseMetricDefinition.getCommonAttributes(config),
-  );
+  contentRetryFailureCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    error_type: errorType,
+  });
 }
 
 export function recordModelSlashCommand(

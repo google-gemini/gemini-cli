@@ -96,6 +96,8 @@ describe('Telemetry Metrics', () => {
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
   let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
   let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
+  let recordContentRetryModule: typeof import('./metrics.js').recordContentRetry;
+  let recordContentRetryFailureModule: typeof import('./metrics.js').recordContentRetryFailure;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -140,6 +142,8 @@ describe('Telemetry Metrics', () => {
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
     recordLinesChangedModule = metricsJsModule.recordLinesChanged;
     recordSlowRenderModule = metricsJsModule.recordSlowRender;
+    recordContentRetryModule = metricsJsModule.recordContentRetry;
+    recordContentRetryFailureModule = metricsJsModule.recordContentRetryFailure;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -1340,6 +1344,52 @@ describe('Telemetry Metrics', () => {
           'Baseline value is zero, skipping comparison.',
         );
         expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('recordContentRetry', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordContentRetryModule(config, 'NO_FINISH_REASON');
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a content retry event with error type when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      mockCounterAddFn.mockClear(); // Clear the session start call
+
+      recordContentRetryModule(config, 'MALFORMED_FUNCTION_CALL');
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        error_type: 'MALFORMED_FUNCTION_CALL',
+      });
+    });
+  });
+
+  describe('recordContentRetryFailure', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordContentRetryFailureModule(config, 'NO_RESPONSE_TEXT');
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a content retry failure event with error type when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      mockCounterAddFn.mockClear(); // Clear the session start call
+
+      recordContentRetryFailureModule(config, 'MALFORMED_FUNCTION_CALL');
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        error_type: 'MALFORMED_FUNCTION_CALL',
       });
     });
   });

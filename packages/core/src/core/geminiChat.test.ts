@@ -680,6 +680,102 @@ describe('GeminiChat', () => {
       ).resolves.not.toThrow();
     });
 
+    it('should throw InvalidStreamError when finishReason is MALFORMED_FUNCTION_CALL', async () => {
+      // Setup: Stream with MALFORMED_FUNCTION_CALL finish reason and empty response
+      const streamWithMalformedFunctionCall = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [], // Empty parts
+              },
+              finishReason: 'MALFORMED_FUNCTION_CALL',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithMalformedFunctionCall,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-malformed',
+      );
+
+      // Should throw an error
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+    });
+
+    it('should retry when finishReason is MALFORMED_FUNCTION_CALL', async () => {
+      // 1. Mock the API to fail once with MALFORMED_FUNCTION_CALL, then succeed.
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [], role: 'model' },
+                  finishReason: 'MALFORMED_FUNCTION_CALL',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          // Second attempt succeeds
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Success after retry' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      // 2. Send a message
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test retry' },
+        'prompt-id-retry-malformed',
+      );
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // 3. Assertions
+      // Should be called twice (initial + retry)
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      // Check for a retry event
+      expect(events.some((e) => e.type === StreamEventType.RETRY)).toBe(true);
+
+      // Check for the successful content chunk
+      expect(
+        events.some(
+          (e) =>
+            e.type === StreamEventType.CHUNK &&
+            e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+              'Success after retry',
+        ),
+      ).toBe(true);
+    });
+
     it('should call generateContentStream with the correct parameters', async () => {
       const response = (async function* () {
         yield {
