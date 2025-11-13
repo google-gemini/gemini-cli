@@ -137,6 +137,7 @@ export const WITTY_LOADING_PHRASES = [
   'Constructing additional pylons...',
   'New line? That’s Ctrl+J.',
   'Releasing the HypnoDrones...',
+  'Calculating story points... warning: Fibonacci sequence overload detected...',
 ];
 
 export const INFORMATIVE_TIPS = [
