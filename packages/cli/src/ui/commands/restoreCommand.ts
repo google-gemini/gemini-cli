@@ -7,12 +7,18 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  type Config,
+  performRestore,
+  type ToolCallData,
+} from '@google/gemini-cli-core';
+import {
   type CommandContext,
   type SlashCommand,
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { HistoryItem } from '../types.js';
+import type { Content } from '@google/genai';
 
 async function restoreAction(
   context: CommandContext,
@@ -74,39 +80,33 @@ async function restoreAction(
 
     const filePath = path.join(checkpointDir, selectedFile);
     const data = await fs.readFile(filePath, 'utf-8');
-    const toolCallData = JSON.parse(data);
+    const toolCallData = JSON.parse(data) as ToolCallData;
 
-    if (toolCallData.history) {
-      if (!loadHistory) {
-        // This should not happen
-        return {
-          type: 'message',
-          messageType: 'error',
-          content: 'loadHistory function is not available.',
-        };
+    const actionStream = performRestore(toolCallData, gitService);
+
+    for await (const action of actionStream) {
+      if (action.type === 'message') {
+        addItem(
+          {
+            type: action.messageType,
+            text: action.content,
+          },
+          Date.now(),
+        );
+      } else if (action.type === 'load_history' && loadHistory) {
+        loadHistory(action.history as HistoryItem[]);
+        if (action.clientHistory) {
+          await config
+            ?.getGeminiClient()
+            ?.setHistory(action.clientHistory as Content[]);
+        }
       }
-      loadHistory(toolCallData.history);
-    }
-
-    if (toolCallData.clientHistory) {
-      await config?.getGeminiClient()?.setHistory(toolCallData.clientHistory);
-    }
-
-    if (toolCallData.commitHash) {
-      await gitService?.restoreProjectFromSnapshot(toolCallData.commitHash);
-      addItem(
-        {
-          type: 'info',
-          text: 'Restored project to the state before the tool call.',
-        },
-        Date.now(),
-      );
     }
 
     return {
       type: 'tool',
       toolName: toolCallData.toolCall.name,
-      toolArgs: toolCallData.toolCall.args,
+      toolArgs: toolCallData.toolCall.args as Record<string, unknown>,
     };
   } catch (error) {
     return {

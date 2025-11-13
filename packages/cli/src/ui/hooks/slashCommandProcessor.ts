@@ -427,7 +427,7 @@ export const useSlashCommandProcessor = (
                 case 'load_history': {
                   config?.getGeminiClient()?.setHistory(result.clientHistory);
                   fullCommandContext.ui.clear();
-                  result.history.forEach((item, index) => {
+                  (result.history as HistoryItem[]).forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
                   });
                   return { type: 'handled' };
