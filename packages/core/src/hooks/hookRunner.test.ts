@@ -14,6 +14,7 @@ import {
   chmodSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
 } from 'node:fs';
 import { HookRunner } from './hookRunner.js';
 import {
@@ -265,9 +266,11 @@ console.log(JSON.stringify({ decision: 'allow' }));
 
       expect(result.success).toBe(true);
       const envData = JSON.parse(readProjectFile(envCaptureFile));
-      expect(envData.gemini).toBe(projectDir);
-      expect(envData.claude).toBe(projectDir);
-      expect(envData.cwd).toBe(projectDir);
+      const normalize = (value: string): string => realpathSync(value);
+      const projectDirReal = realpathSync(projectDir);
+      expect(normalize(envData.gemini)).toBe(projectDirReal);
+      expect(normalize(envData.claude)).toBe(projectDirReal);
+      expect(normalize(envData.cwd)).toBe(projectDirReal);
     });
 
     it('escapes cwd when expanding commands on POSIX platforms', () => {
