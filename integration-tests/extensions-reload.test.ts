@@ -87,6 +87,8 @@ describe('extension reloading', () => {
       await run.sendKeys('/extensions update test-extension');
       await run.expectText('/extensions update test-extension');
       await run.sendKeys('\r');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await run.sendKeys('\r');
       await run.expectText(
         ` * test-server (remote): http://localhost:${portB}/mcp`,
       );
