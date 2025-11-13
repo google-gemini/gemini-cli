@@ -74,6 +74,19 @@ This document lists the available keyboard shortcuts within Gemini CLI.
 | -------- | --------------------------------- |
 | `Ctrl+G` | See context CLI received from IDE |
 
+#### Scrolling
+
+| Action                   | Keys                 |
+| ------------------------ | -------------------- |
+| Scroll content up.       | `Shift + Up Arrow`   |
+| Scroll content down.     | `Shift + Down Arrow` |
+| Scroll to the top.       | `Home`               |
+| Scroll to the bottom.    | `End`                |
+| Scroll up by one page.   | `Page Up`            |
+| Scroll down by one page. | `Page Down`          |
+
+#### History & Search
+
 ## Meta+key combos on mac
 
 On Mac, all Meta+char combos should work normally except for these three which
