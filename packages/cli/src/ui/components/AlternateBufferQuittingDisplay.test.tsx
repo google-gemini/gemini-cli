@@ -11,7 +11,6 @@ import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { Text } from 'ink';
 import { renderWithProviders } from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
-import type { ToolMessageProps } from './messages/ToolMessage.js';
 
 vi.mock('../contexts/AppContext.js', () => ({
   useAppContext: () => ({
@@ -30,14 +29,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('../GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: () => <Text>Spinner</Text>,
-}));
-
-vi.mock('./messages/ToolMessage.js', () => ({
-  ToolMessage: (props: ToolMessageProps) => (
-    <Text>
-      ToolMessage: {props.name} - {props.status}
-    </Text>
-  ),
 }));
 
 const mockHistory: HistoryItem[] = [

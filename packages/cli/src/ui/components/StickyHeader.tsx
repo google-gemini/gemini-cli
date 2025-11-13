@@ -11,11 +11,17 @@ import { theme } from '../semantic-colors.js';
 export interface StickyHeaderProps {
   children: React.ReactNode;
   width: number;
+  isFirst: boolean;
+  borderColor: string;
+  borderDimColor: boolean;
 }
 
 export const StickyHeader: React.FC<StickyHeaderProps> = ({
   children,
   width,
+  isFirst,
+  borderColor,
+  borderDimColor,
 }) => (
   <Box
     sticky
@@ -24,20 +30,43 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
     width={width}
     stickyChildren={
       <Box
-        borderStyle="single"
+        borderStyle="round"
+        flexDirection="column"
         width={width}
         opaque
-        borderColor={theme.ui.dark}
-        borderTop={false}
-        borderLeft={false}
-        borderRight={false}
-        paddingX={1}
+        borderColor={borderColor}
+        borderDimColor={borderDimColor}
+        borderBottom={false}
+        borderTop={isFirst}
+        paddingTop={isFirst ? 0 : 1}
       >
-        {children}
+        <Box paddingX={1}>{children}</Box>
+        {/* Dark border to separate header from content. */}
+        <Box
+          width={width - 2}
+          borderColor={theme.ui.dark}
+          borderStyle="single"
+          borderTop={false}
+          borderBottom={true}
+          borderLeft={false}
+          borderRight={false}
+        ></Box>
       </Box>
     }
   >
-    <Box paddingX={1} width={width}>
+    <Box
+      borderStyle="round"
+      width={width}
+      borderColor={borderColor}
+      borderDimColor={borderDimColor}
+      borderBottom={false}
+      borderTop={isFirst}
+      borderLeft={true}
+      borderRight={true}
+      paddingX={1}
+      paddingBottom={1}
+      paddingTop={isFirst ? 0 : 1}
+    >
       {children}
     </Box>
   </Box>

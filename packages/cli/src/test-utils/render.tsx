@@ -19,6 +19,7 @@ import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
+import { StreamingContext } from '../ui/contexts/StreamingContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
 
@@ -69,6 +70,9 @@ const mockConfig = {
   getTargetDir: () =>
     '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
   getDebugMode: () => false,
+  isTrustedFolder: () => true,
+  getIdeMode: () => false,
+  getEnableInteractiveShell: () => true,
 };
 
 const configProxy = new Proxy(mockConfig, {
@@ -177,20 +181,22 @@ export const renderWithProviders = (
         <UIStateContext.Provider value={finalUiState}>
           <VimModeProvider settings={finalSettings}>
             <ShellFocusContext.Provider value={shellFocus}>
-              <KeypressProvider>
-                <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                  <ScrollProvider>
-                    <Box
-                      width={terminalWidth}
-                      flexShrink={0}
-                      flexGrow={0}
-                      flexDirection="column"
-                    >
-                      {component}
-                    </Box>
-                  </ScrollProvider>
-                </MouseProvider>
-              </KeypressProvider>
+              <StreamingContext.Provider value={finalUiState.streamingState}>
+                <KeypressProvider>
+                  <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                    <ScrollProvider>
+                      <Box
+                        width={terminalWidth}
+                        flexShrink={0}
+                        flexGrow={0}
+                        flexDirection="column"
+                      >
+                        {component}
+                      </Box>
+                    </ScrollProvider>
+                  </MouseProvider>
+                </KeypressProvider>
+              </StreamingContext.Provider>
             </ShellFocusContext.Provider>
           </VimModeProvider>
         </UIStateContext.Provider>
