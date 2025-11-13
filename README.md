@@ -50,7 +50,7 @@ npm install -g @google/gemini-cli
 #### Install globally with Homebrew (macOS/Linux)
 
 ```bash
-brew install gemini-cli
+brew install --cask gemini
 ```
 
 ## Release Cadence and Tags
