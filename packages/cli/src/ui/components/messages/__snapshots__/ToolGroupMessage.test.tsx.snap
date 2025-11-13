@@ -136,6 +136,15 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with output
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
+"╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-2 Description 2                                                      │
+│                                                                              │                                       ▄
+│ line1                                                                        │                                       █
+╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
+`;
+
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
