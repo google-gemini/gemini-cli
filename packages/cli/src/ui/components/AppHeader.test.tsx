@@ -6,14 +6,28 @@
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { AppHeader } from './AppHeader.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
+
+const persistentStateMock = vi.hoisted(() => ({
+  get: vi.fn(),
+  set: vi.fn(),
+}));
+
+vi.mock('../../utils/persistentState.js', () => ({
+  persistentState: persistentStateMock,
+}));
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
 
 describe('<AppHeader />', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistentStateMock.get.mockReturnValue(0);
+  });
+
   it('should render the banner with default text', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
@@ -109,6 +123,48 @@ describe('<AppHeader />', () => {
 
     expect(lastFrame()).not.toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should not render the default banner if shown count is 5 or more', () => {
+    persistentStateMock.get.mockReturnValue(5);
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      bannerData: {
+        defaultText: 'This is the default banner',
+        warningText: '',
+      },
+    };
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig, uiState },
+    );
+
+    expect(lastFrame()).not.toContain('This is the default banner');
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should increment the shown count when default banner is displayed', () => {
+    persistentStateMock.get.mockReturnValue(0);
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      bannerData: {
+        defaultText: 'This is the default banner',
+        warningText: '',
+      },
+    };
+
+    const { unmount } = renderWithProviders(<AppHeader version="1.0.0" />, {
+      config: mockConfig,
+      uiState,
+    });
+
+    expect(persistentStateMock.set).toHaveBeenCalledWith(
+      'defaultBannerShownCount',
+      1,
+    );
     unmount();
   });
 });
