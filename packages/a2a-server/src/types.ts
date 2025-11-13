@@ -110,6 +110,7 @@ export interface TaskMetadata {
     description: string;
     parameterSchema: unknown;
   }>;
+  checkpoint?: string;
 }
 
 export interface PersistedStateMetadata {
