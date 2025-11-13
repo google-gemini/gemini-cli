@@ -1240,50 +1240,51 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
-    // Check if we have OAuth configuration or stored tokens
-    let accessToken: string | null = null;
-    let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
-
-    if (hasOAuthConfig && mcpServerConfig.oauth) {
-      const tokenStorage = new MCPOAuthTokenStorage();
-      const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
-      accessToken = await mcpAuthProvider.getValidToken(
-        mcpServerName,
-        mcpServerConfig.oauth,
-      );
-
-      if (!accessToken) {
-        throw new Error(
-          `MCP server '${mcpServerName}' requires OAuth authentication. ` +
-            `Please authenticate using the /mcp auth command.`,
-        );
-      }
-    } else {
-      // Check if we have stored OAuth tokens for this server (from previous authentication)
-      const tokenStorage = new MCPOAuthTokenStorage();
-      const credentials = await tokenStorage.getCredentials(mcpServerName);
-      if (credentials) {
-        const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
-        accessToken = await mcpAuthProvider.getValidToken(mcpServerName, {
-          // Pass client ID if available
-          clientId: credentials.clientId,
-        });
-
-        if (accessToken) {
-          hasOAuthConfig = true;
-          debugLogger.log(
-            `Found stored OAuth token for server '${mcpServerName}'`,
-          );
-        }
-      }
-    }
-
     const authProvider = createAuthProvider(mcpServerConfig);
 
     const headers: Record<string, string> = {};
-    if (hasOAuthConfig && accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
+    if (authProvider === undefined) {
+      // Check if we have OAuth configuration or stored tokens
+      let accessToken: string | null = null;
+      let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
+      if (hasOAuthConfig && mcpServerConfig.oauth) {
+        const tokenStorage = new MCPOAuthTokenStorage();
+        const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
+        accessToken = await mcpAuthProvider.getValidToken(
+          mcpServerName,
+          mcpServerConfig.oauth,
+        );
+
+        if (!accessToken) {
+          throw new Error(
+            `MCP server '${mcpServerName}' requires OAuth authentication. ` +
+              `Please authenticate using the /mcp auth command.`,
+          );
+        }
+      } else {
+        // Check if we have stored OAuth tokens for this server (from previous authentication)
+        const tokenStorage = new MCPOAuthTokenStorage();
+        const credentials = await tokenStorage.getCredentials(mcpServerName);
+        if (credentials) {
+          const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
+          accessToken = await mcpAuthProvider.getValidToken(mcpServerName, {
+            // Pass client ID if available
+            clientId: credentials.clientId,
+          });
+
+          if (accessToken) {
+            hasOAuthConfig = true;
+            debugLogger.log(
+              `Found stored OAuth token for server '${mcpServerName}'`,
+            );
+          }
+        }
+      }
+      if (hasOAuthConfig && accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
     }
+
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
