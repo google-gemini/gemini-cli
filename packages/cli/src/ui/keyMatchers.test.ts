@@ -33,6 +33,12 @@ describe('keyMatchers', () => {
     [Command.DELETE_WORD_BACKWARD]: (key: Key) =>
       (key.ctrl || key.meta) && key.name === 'backspace',
     [Command.CLEAR_SCREEN]: (key: Key) => key.ctrl && key.name === 'l',
+    [Command.SCROLL_UP]: (key: Key) => key.name === 'up' && !!key.shift,
+    [Command.SCROLL_DOWN]: (key: Key) => key.name === 'down' && !!key.shift,
+    [Command.SCROLL_HOME]: (key: Key) => key.name === 'home',
+    [Command.SCROLL_END]: (key: Key) => key.name === 'end',
+    [Command.PAGE_UP]: (key: Key) => key.name === 'pageup',
+    [Command.PAGE_DOWN]: (key: Key) => key.name === 'pagedown',
     [Command.HISTORY_UP]: (key: Key) => key.ctrl && key.name === 'p',
     [Command.HISTORY_DOWN]: (key: Key) => key.ctrl && key.name === 'n',
     [Command.NAVIGATION_UP]: (key: Key) => key.name === 'up',
@@ -139,6 +145,38 @@ describe('keyMatchers', () => {
       command: Command.CLEAR_SCREEN,
       positive: [createKey('l', { ctrl: true })],
       negative: [createKey('l'), createKey('k', { ctrl: true })],
+    },
+
+    // Scrolling
+    {
+      command: Command.SCROLL_UP,
+      positive: [createKey('up', { shift: true })],
+      negative: [createKey('up'), createKey('up', { ctrl: true })],
+    },
+    {
+      command: Command.SCROLL_DOWN,
+      positive: [createKey('down', { shift: true })],
+      negative: [createKey('down'), createKey('down', { ctrl: true })],
+    },
+    {
+      command: Command.SCROLL_HOME,
+      positive: [createKey('home')],
+      negative: [createKey('end')],
+    },
+    {
+      command: Command.SCROLL_END,
+      positive: [createKey('end')],
+      negative: [createKey('home')],
+    },
+    {
+      command: Command.PAGE_UP,
+      positive: [createKey('pageup'), createKey('pageup', { shift: true })],
+      negative: [createKey('pagedown'), createKey('up')],
+    },
+    {
+      command: Command.PAGE_DOWN,
+      positive: [createKey('pagedown'), createKey('pagedown', { ctrl: true })],
+      negative: [createKey('pageup'), createKey('down')],
     },
 
     // History navigation
