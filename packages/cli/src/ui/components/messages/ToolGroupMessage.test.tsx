@@ -243,6 +243,34 @@ describe('<ToolGroupMessage />', () => {
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
+
+    it('renders two tool groups where only the last line of the previous group is visible', () => {
+      const toolCalls1 = [
+        createToolCall({
+          callId: '1',
+          name: 'tool-1',
+          description: 'Description 1',
+          resultDisplay: 'line1\nline2\nline3\nline4\nline5',
+        }),
+      ];
+      const toolCalls2 = [
+        createToolCall({
+          callId: '2',
+          name: 'tool-2',
+          description: 'Description 2',
+          resultDisplay: 'line1',
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <Scrollable height={6} hasFocus={true} scrollToBottom={true}>
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls1} />
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls2} />
+        </Scrollable>,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
   });
 
   describe('Border Color Logic', () => {
