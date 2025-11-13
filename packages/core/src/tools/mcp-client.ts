@@ -433,9 +433,10 @@ function createAuthProvider(mcpServerConfig: MCPServerConfig) {
 }
 
 /**
- * Create an AuthProvider for the MCP Transport.
+ * Create a transport for URL based servers (remote servers).
  *
  * @param mcpServerConfig The MCP server configuration
+ * @param transportOptions The transport options
  */
 function createUrlTransport(
   mcpServerConfig: MCPServerConfig,
@@ -481,20 +482,7 @@ async function createTransportWithOAuth(
       requestInit: createTransportRequestInit(mcpServerConfig, headers),
     };
 
-    if (mcpServerConfig.httpUrl) {
-      return new StreamableHTTPClientTransport(
-        new URL(mcpServerConfig.httpUrl),
-        transportOptions,
-      );
-    } else if (mcpServerConfig.url) {
-      // Create SSE transport with OAuth token in Authorization header
-      return new SSEClientTransport(
-        new URL(mcpServerConfig.url),
-        transportOptions,
-      );
-    }
-
-    return null;
+    return createUrlTransport(mcpServerConfig, transportOptions);
   } catch (error) {
     coreEvents.emitFeedback(
       'error',
