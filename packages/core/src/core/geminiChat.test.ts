@@ -830,7 +830,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.5-pro',
         { message: 'test' },
         'prompt-id-malformed',
       );
@@ -876,7 +876,7 @@ describe('GeminiChat', () => {
 
       // 2. Send a message
       const stream = await chat.sendMessageStream(
-        'test-model',
+        'gemini-2.5-pro',
         { message: 'test retry' },
         'prompt-id-retry-malformed',
       );
