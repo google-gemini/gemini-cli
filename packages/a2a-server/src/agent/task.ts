@@ -51,9 +51,17 @@ import type {
   ThoughtSummary,
   Citation,
 } from '../types.js';
+import { saveRestorableToolCall } from '../utils/checkpoint_utils.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
+
+const RESTORABLE_TOOLS = new Set([
+  'replace',
+  'write_file',
+  'delete_file',
+  'edit',
+]);
 
 export class Task {
   id: string;
@@ -65,6 +73,7 @@ export class Task {
   taskState: TaskState;
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
+  checkpoint?: string;
   skipFinalTrueAfterInlineEdit = false;
   modelInfo?: string;
 
@@ -222,6 +231,7 @@ export class Task {
     timestamp?: string,
     metadataError?: string,
     traceId?: string,
+    checkpoint?: string,
   ): TaskStatusUpdateEvent {
     const metadata: {
       coderAgent: CoderAgentMessage;
@@ -229,6 +239,7 @@ export class Task {
       userTier?: UserTierId;
       error?: string;
       traceId?: string;
+      checkpoint?: string;
     } = {
       coderAgent: coderAgentMessage,
       model: this.modelInfo || this.config.getModel(),
@@ -241,6 +252,10 @@ export class Task {
 
     if (traceId) {
       metadata.traceId = traceId;
+    }
+
+    if (checkpoint) {
+      metadata.checkpoint = checkpoint;
     }
 
     return {
@@ -265,6 +280,7 @@ export class Task {
     final = false,
     metadataError?: string,
     traceId?: string,
+    checkpoint?: string,
   ): void {
     this.taskState = newState;
     let message: Message | undefined;
@@ -290,6 +306,7 @@ export class Task {
       undefined,
       metadataError,
       traceId,
+      checkpoint,
     );
     this.eventBus?.publish(event);
   }
@@ -385,6 +402,10 @@ export class Task {
           coderAgentMessage,
           message,
           false, // Always false for these continuous updates
+          undefined,
+          undefined,
+          undefined,
+          this.checkpoint,
         );
         this.eventBus?.publish(event);
       }
@@ -426,6 +447,9 @@ export class Task {
         undefined,
         undefined,
         /*final*/ true,
+        undefined,
+        undefined,
+        this.checkpoint,
       );
     }
   }
@@ -548,6 +572,21 @@ export class Task {
   ): Promise<void> {
     if (requests.length === 0) {
       return;
+    }
+
+    // Set checkpoint file before any file modification tool executes
+    if (!this.checkpoint) {
+      for (const request of requests) {
+        if (RESTORABLE_TOOLS.has(request.name)) {
+          const currentCheckpoint = await saveRestorableToolCall(
+            request,
+            this.config,
+            this.geminiClient,
+          );
+          this.checkpoint = currentCheckpoint;
+          break;
+        }
+      }
     }
 
     const updatedRequests = await Promise.all(
@@ -868,6 +907,7 @@ export class Task {
     requestContext: RequestContext,
     aborted: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
+    this.checkpoint = undefined;
     const userMessage = requestContext.userMessage;
     const llmParts: PartUnion[] = [];
     let anyConfirmationHandled = false;
