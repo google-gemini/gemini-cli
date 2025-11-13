@@ -226,9 +226,6 @@ export async function startInteractiveUI(
         }
       },
       alternateBuffer: useAlternateBuffer,
-      incrementalRendering:
-        settings.merged.ui?.incrementalRendering !== false &&
-        useAlternateBuffer,
     },
   );
 
