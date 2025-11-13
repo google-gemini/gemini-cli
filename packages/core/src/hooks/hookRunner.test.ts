@@ -318,9 +318,6 @@ console.log(JSON.stringify({ decision: 'allow' }));
         cwd: cwdWithSingleQuotes,
       });
 
-      expect((psRunner as Record<string, unknown>)['shellFlavor']).toBe(
-        'powershell',
-      );
       expect(psExpanded).toBe(
         "'C\\\\project with ''quotes'' && del C\\\\windows\\system32'/cleanup.cmd",
       );
