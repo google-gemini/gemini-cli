@@ -670,16 +670,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
-      const chat = new GeminiChat(
+      return new GeminiChat(
         this.runtimeContext,
         systemInstruction,
         [], // set in `callModel`,
         startHistory,
       );
-      if (systemInstruction) {
-        chat.setSystemInstruction(systemInstruction);
-      }
-      return chat;
     } catch (error) {
       await reportError(
         error,

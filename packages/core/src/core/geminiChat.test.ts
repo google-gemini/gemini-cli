@@ -508,9 +508,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        PREVIEW_GEMINI_MODEL,
-        { message: 'test' },
+        { model: PREVIEW_GEMINI_MODEL },
+        'test',
         'prompt-id-fast-retry',
+        new AbortController().signal,
       );
       for await (const _ of stream) {
         // consume stream
@@ -540,9 +541,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        DEFAULT_GEMINI_FLASH_MODEL,
-        { message: 'test' },
+        { model: DEFAULT_GEMINI_FLASH_MODEL },
+        'test',
         'prompt-id-normal-retry',
+        new AbortController().signal,
       );
       for await (const _ of stream) {
         // consume stream
@@ -586,9 +588,10 @@ describe('GeminiChat', () => {
       // ACT
       const consumeStream = async () => {
         const stream = await chat.sendMessageStream(
-          PREVIEW_GEMINI_MODEL,
-          { message: 'test' },
+          { model: PREVIEW_GEMINI_MODEL },
+          'test',
           'prompt-id-bypass',
+          new AbortController().signal,
         );
         // Consume the stream to trigger execution
         for await (const _ of stream) {
@@ -843,9 +846,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'gemini-2.5-pro',
-        { message: 'test' },
+        { model: 'gemini-2.5-pro' },
+        'test',
         'prompt-id-malformed',
+        new AbortController().signal,
       );
 
       // Should throw an error
@@ -889,9 +893,10 @@ describe('GeminiChat', () => {
 
       // 2. Send a message
       const stream = await chat.sendMessageStream(
-        'gemini-2.5-pro',
-        { message: 'test retry' },
+        { model: 'gemini-2.5-pro' },
+        'test retry',
         'prompt-id-retry-malformed',
+        new AbortController().signal,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -1018,9 +1023,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'gemini-1.5-pro',
-        { message: 'test' },
+        { model: 'gemini-1.5-pro' },
+        'test',
         'prompt-id-no-retry',
+        new AbortController().signal,
       );
 
       await expect(
@@ -1999,9 +2005,10 @@ describe('GeminiChat', () => {
       );
 
       await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test',
         'prompt-id-preview-model-reset',
+        new AbortController().signal,
       );
 
       expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(false);
@@ -2023,9 +2030,10 @@ describe('GeminiChat', () => {
       );
 
       const resultStream = await chat.sendMessageStream(
-        PREVIEW_GEMINI_MODEL,
-        { message: 'test' },
+        { model: PREVIEW_GEMINI_MODEL },
+        'test',
         'prompt-id-preview-model-healing',
+        new AbortController().signal,
       );
       for await (const _ of resultStream) {
         // consume stream
@@ -2053,9 +2061,10 @@ describe('GeminiChat', () => {
       vi.mocked(mockConfig.isPreviewModelBypassMode).mockReturnValue(true);
 
       const resultStream = await chat.sendMessageStream(
-        PREVIEW_GEMINI_MODEL,
-        { message: 'test' },
+        { model: PREVIEW_GEMINI_MODEL },
+        'test',
         'prompt-id-bypass-no-healing',
+        new AbortController().signal,
       );
       for await (const _ of resultStream) {
         // consume stream
@@ -2067,7 +2076,7 @@ describe('GeminiChat', () => {
 
   describe('ensureActiveLoopHasThoughtSignatures', () => {
     it('should add thoughtSignature to the first functionCall in each model turn of the active loop', () => {
-      const chat = new GeminiChat(mockConfig, {}, []);
+      const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'Old message' }] },
         {
@@ -2124,7 +2133,7 @@ describe('GeminiChat', () => {
     });
 
     it('should not modify contents if there is no user text message', () => {
-      const chat = new GeminiChat(mockConfig, {}, []);
+      const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         {
           role: 'user',
@@ -2141,14 +2150,14 @@ describe('GeminiChat', () => {
     });
 
     it('should handle an empty history', () => {
-      const chat = new GeminiChat(mockConfig, {}, []);
+      const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual([]);
     });
 
     it('should handle history with only a user message', () => {
-      const chat = new GeminiChat(mockConfig, {}, []);
+      const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual(history);

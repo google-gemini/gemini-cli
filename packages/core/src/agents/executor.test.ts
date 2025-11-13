@@ -476,7 +476,7 @@ describe('AgentExecutor', () => {
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
 
-      const systemInstruction = mockSetSystemInstruction.mock.calls[0][0];
+      const systemInstruction = MockedGeminiChat.mock.calls[0][1];
       expect(systemInstruction).toContain(
         `MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool`,
       );
