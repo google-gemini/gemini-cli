@@ -12,6 +12,7 @@ import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import type { ToolCallConfirmationDetails } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
+import { Scrollable } from '../shared/Scrollable.js';
 
 // Mock child components to isolate ToolGroupMessage behavior
 vi.mock('./ToolMessage.js', () => ({
@@ -250,8 +251,6 @@ describe('<ToolGroupMessage />', () => {
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
-<<<<<<< HEAD
-=======
 
     it('renders header when scrolled', () => {
       const toolCalls = [
@@ -294,7 +293,6 @@ describe('<ToolGroupMessage />', () => {
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
->>>>>>> fb99b953 (Switch back to truncating headers. Unfortunately we have too many headers that are 10+ lines for no good reason so we need to add back this truncation until we fix them. (#13018))
   });
 
   describe('Border Color Logic', () => {
