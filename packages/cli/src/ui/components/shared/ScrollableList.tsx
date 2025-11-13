@@ -205,10 +205,17 @@ function ScrollableList<T>(
       ref: containerRef as React.RefObject<DOMElement>,
       getScrollState,
       scrollBy: scrollByWithAnimation,
+      scrollTo: smoothScrollTo,
       hasFocus: hasFocusCallback,
       flashScrollbar,
     }),
-    [getScrollState, hasFocusCallback, flashScrollbar, scrollByWithAnimation],
+    [
+      getScrollState,
+      hasFocusCallback,
+      flashScrollbar,
+      scrollByWithAnimation,
+      smoothScrollTo,
+    ],
   );
 
   useScrollable(scrollableEntry, hasFocus);
