@@ -14,7 +14,6 @@ import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -48,7 +47,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const config = useConfig();
-  const isAlternateBuffer = useAlternateBuffer();
   const isShellCommand = toolCalls.some(
     (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
@@ -59,10 +57,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         ? theme.status.warning
         : theme.border.default;
 
+  const borderDimColor =
+    hasPending && (!isShellCommand || !isEmbeddedShellFocused);
+
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
-  // This is a bit of a magic number, but it accounts for the border and
-  // marginLeft in regular mode and just the border in alternate buffer mode.
-  const innerWidth = isAlternateBuffer ? terminalWidth - 3 : terminalWidth - 4;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
   // note, after the CTA, this automatically moves over to the next 'confirming' tool
@@ -89,9 +87,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     : undefined;
 
   return (
+    // This box doesn't have a border even though it conceptually does because
+    // we need to allow the sticky headers to render the borders themselves so
+    // that the top border can be sticky.
     <Box
       flexDirection="column"
-      borderStyle="round"
       /*
         This width constraint is highly important and protects us from an Ink rendering bug.
         Since the ToolGroup can typically change rendering states frequently, it can cause
@@ -99,52 +99,65 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         cause tearing.
       */
       width={terminalWidth}
-      borderDimColor={
-        hasPending && (!isShellCommand || !isEmbeddedShellFocused)
-      }
-      borderColor={borderColor}
-      gap={1}
     >
-      {toolCalls.map((tool) => {
+      {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
+        const isFirst = index === 0;
+        const isLast = index === toolCalls.length - 1;
         return (
           <Box
             key={tool.callId}
             flexDirection="column"
             minHeight={1}
-            width={innerWidth}
+            width={terminalWidth}
           >
             <ToolMessage
               {...tool}
               availableTerminalHeight={availableTerminalHeightPerToolMessage}
-              terminalWidth={innerWidth}
+              terminalWidth={terminalWidth}
               emphasis={
                 isConfirming ? 'high' : toolAwaitingApproval ? 'low' : 'medium'
               }
               activeShellPtyId={activeShellPtyId}
               embeddedShellFocused={embeddedShellFocused}
               config={config}
+              isFirst={isFirst}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
             />
-            {tool.status === ToolCallStatus.Confirming &&
-              isConfirming &&
-              tool.confirmationDetails && (
-                <ToolConfirmationMessage
-                  confirmationDetails={tool.confirmationDetails}
-                  config={config}
-                  isFocused={isFocused}
-                  availableTerminalHeight={
-                    availableTerminalHeightPerToolMessage
-                  }
-                  terminalWidth={innerWidth}
-                />
+            <Box
+              borderLeft={true}
+              borderRight={true}
+              borderTop={false}
+              borderBottom={isLast}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+              flexDirection="column"
+              borderStyle="round"
+              paddingLeft={1}
+              paddingRight={1}
+            >
+              {tool.status === ToolCallStatus.Confirming &&
+                isConfirming &&
+                tool.confirmationDetails && (
+                  <ToolConfirmationMessage
+                    confirmationDetails={tool.confirmationDetails}
+                    config={config}
+                    isFocused={isFocused}
+                    availableTerminalHeight={
+                      availableTerminalHeightPerToolMessage
+                    }
+                    terminalWidth={terminalWidth - 4}
+                  />
+                )}
+              {tool.outputFile && (
+                <Box>
+                  <Text color={theme.text.primary}>
+                    Output too long and was saved to: {tool.outputFile}
+                  </Text>
+                </Box>
               )}
-            {tool.outputFile && (
-              <Box marginX={1}>
-                <Text color={theme.text.primary}>
-                  Output too long and was saved to: {tool.outputFile}
-                </Text>
-              </Box>
-            )}
+            </Box>
           </Box>
         );
       })}
