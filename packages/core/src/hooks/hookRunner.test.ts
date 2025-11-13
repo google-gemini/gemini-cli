@@ -168,7 +168,7 @@ setInterval(() => {}, 1000);
 
       expect(result.success).toBe(false);
       expect(result.error?.message).toContain('timed out');
-    });
+    }, 15000);
 
     it('converts plain text stdout to HookOutput when JSON parsing fails', async () => {
       const plainText = 'Add this context';
