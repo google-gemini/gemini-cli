@@ -28,6 +28,7 @@ export interface ScrollableEntry {
   ref: React.RefObject<DOMElement>;
   getScrollState: () => ScrollState;
   scrollBy: (delta: number) => void;
+  scrollTo?: (scrollTop: number, duration?: number) => void;
   hasFocus: () => boolean;
   flashScrollbar: () => void;
 }
@@ -98,6 +99,16 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   const pendingScrollsRef = useRef(new Map<string, number>());
   const flushScheduledRef = useRef(false);
 
+  const dragStateRef = useRef<{
+    active: boolean;
+    id: string | null;
+    offset: number;
+  }>({
+    active: false,
+    id: null,
+    offset: 0,
+  });
+
   const scheduleFlush = useCallback(() => {
     if (!flushScheduledRef.current) {
       flushScheduledRef.current = true;
@@ -146,7 +157,91 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const handleClick = (mouseEvent: MouseEvent) => {
+  const handleLeftPress = (mouseEvent: MouseEvent) => {
+    // Check for scrollbar interaction first
+    for (const entry of scrollablesRef.current.values()) {
+      if (!entry.ref.current || !entry.hasFocus()) {
+        continue;
+      }
+
+      const boundingBox = getBoundingBox(entry.ref.current);
+      if (!boundingBox) continue;
+
+      const { x, y, width, height } = boundingBox;
+
+      // Check if click is on the scrollbar column (x + width)
+      // The findScrollableCandidates logic implies scrollbar is at x + width.
+      if (
+        mouseEvent.col === x + width &&
+        mouseEvent.row >= y &&
+        mouseEvent.row < y + height
+      ) {
+        const { scrollTop, scrollHeight, innerHeight } = entry.getScrollState();
+
+        if (scrollHeight <= innerHeight) continue;
+
+        const thumbHeight = Math.max(
+          1,
+          Math.floor((innerHeight / scrollHeight) * innerHeight),
+        );
+        const maxScrollTop = scrollHeight - innerHeight;
+        const maxThumbY = innerHeight - thumbHeight;
+
+        if (maxThumbY <= 0) continue;
+
+        const currentThumbY = Math.round(
+          (scrollTop / maxScrollTop) * maxThumbY,
+        );
+
+        const absoluteThumbTop = y + currentThumbY;
+        const absoluteThumbBottom = absoluteThumbTop + thumbHeight;
+
+        const isTop = mouseEvent.row === y;
+        const isBottom = mouseEvent.row === y + height - 1;
+
+        const hitTop = isTop ? absoluteThumbTop : absoluteThumbTop - 1;
+        const hitBottom = isBottom
+          ? absoluteThumbBottom
+          : absoluteThumbBottom + 1;
+
+        const isThumbClick =
+          mouseEvent.row >= hitTop && mouseEvent.row < hitBottom;
+
+        let offset = 0;
+        const relativeMouseY = mouseEvent.row - y;
+
+        if (isThumbClick) {
+          offset = relativeMouseY - currentThumbY;
+        } else {
+          // Track click - Jump to position
+          // Center the thumb on the mouse click
+          const targetThumbY = Math.max(
+            0,
+            Math.min(maxThumbY, relativeMouseY - Math.floor(thumbHeight / 2)),
+          );
+
+          const newScrollTop = Math.round(
+            (targetThumbY / maxThumbY) * maxScrollTop,
+          );
+          if (entry.scrollTo) {
+            entry.scrollTo(newScrollTop);
+          } else {
+            entry.scrollBy(newScrollTop - scrollTop);
+          }
+
+          offset = relativeMouseY - targetThumbY;
+        }
+
+        // Start drag (for both thumb and track clicks)
+        dragStateRef.current = {
+          active: true,
+          id: entry.id,
+          offset,
+        };
+        return;
+      }
+    }
+
     const candidates = findScrollableCandidates(
       mouseEvent,
       scrollablesRef.current,
@@ -158,6 +253,60 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const handleMove = (mouseEvent: MouseEvent) => {
+    const state = dragStateRef.current;
+    if (!state.active || !state.id) return;
+
+    const entry = scrollablesRef.current.get(state.id);
+    if (!entry || !entry.ref.current) {
+      state.active = false;
+      return;
+    }
+
+    const boundingBox = getBoundingBox(entry.ref.current);
+    if (!boundingBox) return;
+
+    const { y } = boundingBox;
+    const { scrollTop, scrollHeight, innerHeight } = entry.getScrollState();
+
+    const thumbHeight = Math.max(
+      1,
+      Math.floor((innerHeight / scrollHeight) * innerHeight),
+    );
+    const maxScrollTop = scrollHeight - innerHeight;
+    const maxThumbY = innerHeight - thumbHeight;
+
+    if (maxThumbY <= 0) return;
+
+    const relativeMouseY = mouseEvent.row - y;
+    // Calculate the target thumb position based on the mouse position and the offset.
+    // We clamp it to the valid range [0, maxThumbY].
+    const targetThumbY = Math.max(
+      0,
+      Math.min(maxThumbY, relativeMouseY - state.offset),
+    );
+
+    const targetScrollTop = Math.round(
+      (targetThumbY / maxThumbY) * maxScrollTop,
+    );
+
+    if (entry.scrollTo) {
+      entry.scrollTo(targetScrollTop, 0);
+    } else {
+      entry.scrollBy(targetScrollTop - scrollTop);
+    }
+  };
+
+  const handleLeftRelease = () => {
+    if (dragStateRef.current.active) {
+      dragStateRef.current = {
+        active: false,
+        id: null,
+        offset: 0,
+      };
+    }
+  };
+
   useMouse(
     (event: MouseEvent) => {
       if (event.name === 'scroll-up') {
@@ -165,7 +314,11 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       } else if (event.name === 'scroll-down') {
         handleScroll('down', event);
       } else if (event.name === 'left-press') {
-        handleClick(event);
+        handleLeftPress(event);
+      } else if (event.name === 'move') {
+        handleMove(event);
+      } else if (event.name === 'left-release') {
+        handleLeftRelease();
       }
     },
     { isActive: true },

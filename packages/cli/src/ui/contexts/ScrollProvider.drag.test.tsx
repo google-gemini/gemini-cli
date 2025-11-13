@@ -46,7 +46,6 @@ const TestScrollable = forwardRef(
     props: {
       id: string;
       scrollBy: (delta: number) => void;
-      scrollTo?: (scrollTop: number) => void;
       getScrollState: () => ScrollState;
     },
     ref,
@@ -59,7 +58,6 @@ const TestScrollable = forwardRef(
         ref: elementRef as RefObject<DOMElement>,
         getScrollState: props.getScrollState,
         scrollBy: props.scrollBy,
-        scrollTo: props.scrollTo,
         hasFocus: () => true,
         flashScrollbar: () => {},
       },
@@ -71,7 +69,7 @@ const TestScrollable = forwardRef(
 );
 TestScrollable.displayName = 'TestScrollable';
 
-describe('ScrollProvider', () => {
+describe('ScrollProvider Drag', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockUseMouseCallbacks.clear();
@@ -81,51 +79,7 @@ describe('ScrollProvider', () => {
     vi.useRealTimers();
   });
 
-  it('calls scrollTo when clicking scrollbar track if available', async () => {
-    const scrollBy = vi.fn();
-    const scrollTo = vi.fn();
-    const getScrollState = vi.fn(() => ({
-      scrollTop: 0,
-      scrollHeight: 100,
-      innerHeight: 10,
-    }));
-
-    render(
-      <ScrollProvider>
-        <TestScrollable
-          id="test-scrollable"
-          scrollBy={scrollBy}
-          scrollTo={scrollTo}
-          getScrollState={getScrollState}
-        />
-      </ScrollProvider>,
-    );
-
-    // Scrollbar is at x + width = 0 + 10 = 10.
-    // Height is 10. y is 0.
-    // Click at col 10, row 5.
-    // Thumb height = 10/100 * 10 = 1.
-    // Max thumb Y = 10 - 1 = 9.
-    // Current thumb Y = 0.
-    // Click at row 5 (relative Y = 5). This is outside the thumb (0).
-    // It's a track click.
-
-    for (const callback of mockUseMouseCallbacks) {
-      callback({
-        name: 'left-press',
-        col: 10,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-    }
-
-    expect(scrollTo).toHaveBeenCalled();
-    expect(scrollBy).not.toHaveBeenCalled();
-  });
-
-  it('calls scrollBy when clicking scrollbar track if scrollTo is not available', async () => {
+  it('drags the scrollbar thumb', async () => {
     const scrollBy = vi.fn();
     const getScrollState = vi.fn(() => ({
       scrollTop: 0,
@@ -143,197 +97,14 @@ describe('ScrollProvider', () => {
       </ScrollProvider>,
     );
 
-    for (const callback of mockUseMouseCallbacks) {
-      callback({
-        name: 'left-press',
-        col: 10,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-    }
+    // Scrollbar at x + width = 10.
+    // Height 10.
+    // scrollHeight 100, innerHeight 10.
+    // thumbHeight = 1.
+    // maxScrollTop = 90. maxThumbY = 9. Ratio = 10.
+    // Thumb at 0.
 
-    expect(scrollBy).toHaveBeenCalled();
-  });
-
-  it('batches multiple scroll events into a single update', async () => {
-    const scrollBy = vi.fn();
-    const getScrollState = vi.fn(() => ({
-      scrollTop: 0,
-      scrollHeight: 100,
-      innerHeight: 10,
-    }));
-
-    render(
-      <ScrollProvider>
-        <TestScrollable
-          id="test-scrollable"
-          scrollBy={scrollBy}
-          getScrollState={getScrollState}
-        />
-      </ScrollProvider>,
-    );
-
-    // Simulate multiple scroll events
-    const mouseEvent: MouseEvent = {
-      name: 'scroll-down',
-      col: 5,
-      row: 5,
-      shift: false,
-      ctrl: false,
-      meta: false,
-    };
-    for (const callback of mockUseMouseCallbacks) {
-      callback(mouseEvent);
-      callback(mouseEvent);
-      callback(mouseEvent);
-    }
-
-    // Should not have called scrollBy yet
-    expect(scrollBy).not.toHaveBeenCalled();
-
-    // Advance timers to trigger the batched update
-    await vi.runAllTimersAsync();
-
-    // Should have called scrollBy once with accumulated delta (3)
-    expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(3);
-  });
-
-  it('handles mixed direction scroll events in batch', async () => {
-    const scrollBy = vi.fn();
-    const getScrollState = vi.fn(() => ({
-      scrollTop: 10,
-      scrollHeight: 100,
-      innerHeight: 10,
-    }));
-
-    render(
-      <ScrollProvider>
-        <TestScrollable
-          id="test-scrollable"
-          scrollBy={scrollBy}
-          getScrollState={getScrollState}
-        />
-      </ScrollProvider>,
-    );
-
-    // Simulate mixed scroll events: down (1), down (1), up (-1)
-    for (const callback of mockUseMouseCallbacks) {
-      callback({
-        name: 'scroll-down',
-        col: 5,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-      callback({
-        name: 'scroll-down',
-        col: 5,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-      callback({
-        name: 'scroll-up',
-        col: 5,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-    }
-
-    expect(scrollBy).not.toHaveBeenCalled();
-
-    await vi.runAllTimersAsync();
-
-    expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(1); // 1 + 1 - 1 = 1
-  });
-
-  it('respects scroll limits during batching', async () => {
-    const scrollBy = vi.fn();
-    // Start near bottom
-    const getScrollState = vi.fn(() => ({
-      scrollTop: 89,
-      scrollHeight: 100,
-      innerHeight: 10,
-    }));
-
-    render(
-      <ScrollProvider>
-        <TestScrollable
-          id="test-scrollable"
-          scrollBy={scrollBy}
-          getScrollState={getScrollState}
-        />
-      </ScrollProvider>,
-    );
-
-    // Try to scroll down 3 times, but only 1 is allowed before hitting bottom
-    for (const callback of mockUseMouseCallbacks) {
-      callback({
-        name: 'scroll-down',
-        col: 5,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-      callback({
-        name: 'scroll-down',
-        col: 5,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-      callback({
-        name: 'scroll-down',
-        col: 5,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-    }
-
-    await vi.runAllTimersAsync();
-
-    // Should have accumulated only 1, because subsequent scrolls would be blocked
-    // Actually, the logic in ScrollProvider uses effectiveScrollTop to check bounds.
-    // scrollTop=89, max=90.
-    // 1st scroll: pending=1, effective=90. Allowed.
-    // 2nd scroll: pending=1, effective=90. canScrollDown checks effective < 90. 90 < 90 is false. Blocked.
-    expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(1);
-  });
-
-  it('calls scrollTo when dragging scrollbar thumb if available', async () => {
-    const scrollBy = vi.fn();
-    const scrollTo = vi.fn();
-    const getScrollState = vi.fn(() => ({
-      scrollTop: 0,
-      scrollHeight: 100,
-      innerHeight: 10,
-    }));
-
-    render(
-      <ScrollProvider>
-        <TestScrollable
-          id="test-scrollable"
-          scrollBy={scrollBy}
-          scrollTo={scrollTo}
-          getScrollState={getScrollState}
-        />
-      </ScrollProvider>,
-    );
-
-    // Start drag on thumb
+    // 1. Click on thumb (row 0)
     for (const callback of mockUseMouseCallbacks) {
       callback({
         name: 'left-press',
@@ -345,35 +116,68 @@ describe('ScrollProvider', () => {
       });
     }
 
-    // Move mouse down
+    // 2. Move mouse to row 1
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'move',
+        col: 10, // col doesn't matter for move if dragging
+        row: 1,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Delta row = 1. Delta scroll = 10.
+    // scrollBy called with 10.
+    expect(scrollBy).toHaveBeenCalledWith(10);
+
+    // 3. Move mouse to row 2
+    scrollBy.mockClear();
     for (const callback of mockUseMouseCallbacks) {
       callback({
         name: 'move',
         col: 10,
-        row: 5, // Move down 5 units
+        row: 2,
         shift: false,
         ctrl: false,
         meta: false,
       });
     }
 
-    // Release
+    // Delta row from start (0) is 2. Delta scroll = 20.
+    // startScrollTop was 0. target 20.
+    // scrollBy called with (20 - scrollTop). scrollTop is still 0 in mock.
+    expect(scrollBy).toHaveBeenCalledWith(20);
+
+    // 4. Release
     for (const callback of mockUseMouseCallbacks) {
       callback({
         name: 'left-release',
         col: 10,
-        row: 5,
+        row: 2,
         shift: false,
         ctrl: false,
         meta: false,
       });
     }
 
-    expect(scrollTo).toHaveBeenCalled();
+    // 5. Move again - should not scroll
+    scrollBy.mockClear();
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'move',
+        col: 10,
+        row: 3,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
     expect(scrollBy).not.toHaveBeenCalled();
   });
 
-  it('calls scrollBy when dragging scrollbar thumb if scrollTo is not available', async () => {
+  it('jumps to position and starts drag when clicking track below thumb', async () => {
     const scrollBy = vi.fn();
     const getScrollState = vi.fn(() => ({
       scrollTop: 0,
@@ -391,7 +195,108 @@ describe('ScrollProvider', () => {
       </ScrollProvider>,
     );
 
-    // Start drag on thumb
+    // Thumb at 0. Click at 5.
+    // thumbHeight 1.
+    // targetThumbY = 5.
+    // targetScrollTop = 50.
+
+    // 1. Click on track below thumb
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-press',
+        col: 10,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Should jump to 50 (delta 50)
+    expect(scrollBy).toHaveBeenCalledWith(50);
+    scrollBy.mockClear();
+
+    // 2. Move mouse to 6 - should drag
+    // Start drag captured at row 5, startScrollTop 50.
+    // Move to 6. Delta row 1. Delta scroll 10.
+    // Target = 60.
+    // scrollBy called with 60 - 0 (current state still 0).
+    // Note: In real app, state would update, but here getScrollState is static mock 0.
+
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'move',
+        col: 10,
+        row: 6,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    expect(scrollBy).toHaveBeenCalledWith(60);
+  });
+
+  it('jumps to position when clicking track above thumb', async () => {
+    const scrollBy = vi.fn();
+    // Start scrolled down
+    const getScrollState = vi.fn(() => ({
+      scrollTop: 50,
+      scrollHeight: 100,
+      innerHeight: 10,
+    }));
+
+    render(
+      <ScrollProvider>
+        <TestScrollable
+          id="test-scrollable"
+          scrollBy={scrollBy}
+          getScrollState={getScrollState}
+        />
+      </ScrollProvider>,
+    );
+
+    // Thumb at 5. Click at 2.
+    // targetThumbY = 2.
+    // targetScrollTop = 20.
+
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-press',
+        col: 10,
+        row: 2,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Jump to 20 (delta = 20 - 50 = -30)
+    expect(scrollBy).toHaveBeenCalledWith(-30);
+  });
+
+  it('jumps to top when clicking very top of track', async () => {
+    const scrollBy = vi.fn();
+    const getScrollState = vi.fn(() => ({
+      scrollTop: 50,
+      scrollHeight: 100,
+      innerHeight: 10,
+    }));
+
+    render(
+      <ScrollProvider>
+        <TestScrollable
+          id="test-scrollable"
+          scrollBy={scrollBy}
+          getScrollState={getScrollState}
+        />
+      </ScrollProvider>,
+    );
+
+    // Thumb at 5. Click at 0.
+    // targetThumbY = 0.
+    // targetScrollTop = 0.
+
     for (const callback of mockUseMouseCallbacks) {
       callback({
         name: 'left-press',
@@ -403,29 +308,125 @@ describe('ScrollProvider', () => {
       });
     }
 
-    // Move mouse down
+    // Scroll to top (delta = 0 - 50 = -50)
+    expect(scrollBy).toHaveBeenCalledWith(-50);
+  });
+
+  it('jumps to bottom when clicking very bottom of track', async () => {
+    const scrollBy = vi.fn();
+    const getScrollState = vi.fn(() => ({
+      scrollTop: 0,
+      scrollHeight: 100,
+      innerHeight: 10,
+    }));
+
+    render(
+      <ScrollProvider>
+        <TestScrollable
+          id="test-scrollable"
+          scrollBy={scrollBy}
+          getScrollState={getScrollState}
+        />
+      </ScrollProvider>,
+    );
+
+    // Thumb at 0. Click at 9.
+    // targetThumbY = 9.
+    // targetScrollTop = 90.
+
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-press',
+        col: 10,
+        row: 9,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Scroll to bottom (delta = 90 - 0 = 90)
+    expect(scrollBy).toHaveBeenCalledWith(90);
+  });
+
+  it('uses scrollTo with 0 duration if provided', async () => {
+    const scrollBy = vi.fn();
+    const scrollTo = vi.fn();
+    const getScrollState = vi.fn(() => ({
+      scrollTop: 0,
+      scrollHeight: 100,
+      innerHeight: 10,
+    }));
+
+    // Custom component that provides scrollTo
+    const TestScrollableWithScrollTo = forwardRef(
+      (
+        props: {
+          id: string;
+          scrollBy: (delta: number) => void;
+          scrollTo: (scrollTop: number, duration?: number) => void;
+          getScrollState: () => ScrollState;
+        },
+        ref,
+      ) => {
+        const elementRef = useRef<DOMElement>(null);
+        useImperativeHandle(ref, () => elementRef.current);
+        useScrollable(
+          {
+            ref: elementRef as RefObject<DOMElement>,
+            getScrollState: props.getScrollState,
+            scrollBy: props.scrollBy,
+            scrollTo: props.scrollTo,
+            hasFocus: () => true,
+            flashScrollbar: () => {},
+          },
+          true,
+        );
+        return <Box ref={elementRef} />;
+      },
+    );
+    TestScrollableWithScrollTo.displayName = 'TestScrollableWithScrollTo';
+
+    render(
+      <ScrollProvider>
+        <TestScrollableWithScrollTo
+          id="test-scrollable-scrollto"
+          scrollBy={scrollBy}
+          scrollTo={scrollTo}
+          getScrollState={getScrollState}
+        />
+      </ScrollProvider>,
+    );
+
+    // Click on track (jump)
+    for (const callback of mockUseMouseCallbacks) {
+      callback({
+        name: 'left-press',
+        col: 10,
+        row: 5,
+        shift: false,
+        ctrl: false,
+        meta: false,
+      });
+    }
+
+    // Expect scrollTo to be called with target (and undefined/default duration)
+    expect(scrollTo).toHaveBeenCalledWith(50);
+
+    scrollTo.mockClear();
+
+    // Move mouse (drag)
     for (const callback of mockUseMouseCallbacks) {
       callback({
         name: 'move',
         col: 10,
-        row: 5,
+        row: 6,
         shift: false,
         ctrl: false,
         meta: false,
       });
     }
-
-    for (const callback of mockUseMouseCallbacks) {
-      callback({
-        name: 'left-release',
-        col: 10,
-        row: 5,
-        shift: false,
-        ctrl: false,
-        meta: false,
-      });
-    }
-
-    expect(scrollBy).toHaveBeenCalled();
+    // Expect scrollTo to be called with target and duration 0
+    expect(scrollTo).toHaveBeenCalledWith(60, 0);
   });
 });
