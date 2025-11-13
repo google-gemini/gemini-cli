@@ -235,6 +235,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.incrementalRendering`** (boolean):
+  - **Description:** Enable incremental rendering for the UI. This option will
+    reduce flickering but may cause rendering artifacts. Only supported when
+    useAlternateBuffer is enabled.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
