@@ -130,6 +130,7 @@ export interface UIState {
     defaultText: string;
     warningText: string;
   };
+  bannerVisible: boolean;
   customDialog: React.ReactNode | null;
 }
 
