@@ -192,7 +192,12 @@ export class InteractiveRun {
       timeout,
       200,
     );
-    expect(found, `Did not find expected text: "${text}"`).toBe(true);
+    expect(
+      found,
+      `Did not find expected text: "${text}". Output was:\n${stripAnsi(
+        this.output,
+      )}`,
+    ).toBe(true);
   }
 
   // This types slowly to make sure command is correct, but only work for short
@@ -1004,7 +1009,7 @@ export class TestRig {
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
-      rows: 24,
+      rows: 80,
       cwd: this.testDir!,
       env: Object.fromEntries(
         Object.entries(env).filter(([, v]) => v !== undefined),
