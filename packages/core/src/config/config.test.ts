@@ -1509,6 +1509,37 @@ describe('Config getHooks', () => {
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
     });
+
+    it('should allow setting auto model from non-auto model and disable fallback mode', () => {
+      const config = new Config(baseParams);
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      config.setModel('auto');
+
+      expect(config.getModel()).toBe('auto');
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+    });
+
+    it('should allow setting auto model from auto model if it is in the fallback mode', () => {
+      const config = new Config({
+        cwd: '/tmp',
+        targetDir: '/path/to/target',
+        debugMode: false,
+        sessionId: 'test-session-id',
+        model: 'auto',
+        usageStatisticsEnabled: false,
+      });
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      config.setModel('auto');
+
+      expect(config.getModel()).toBe('auto');
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+    });
   });
 });
 
