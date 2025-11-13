@@ -77,12 +77,12 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with output
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
-"╰──────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-2 Description 2                                                      │
-│                                                                              │                                       ▄
-│ line1                                                                        │                                       █
-╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
+"MockTool[1]: ✓ tool-1 - Description 1 (medium)
+╰──────────────────────────────────────────────────────────────────────────────╯
+MockTool[2]: ✓ tool-2 - Description 2 (medium)
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] = `
