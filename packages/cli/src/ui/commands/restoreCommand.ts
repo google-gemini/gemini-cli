@@ -18,6 +18,7 @@ import {
   CommandKind,
 } from './types.js';
 import type { HistoryItem } from '../types.js';
+import type { Content } from '@google/genai';
 
 async function restoreAction(
   context: CommandContext,
@@ -82,28 +83,31 @@ async function restoreAction(
     const toolCallData = JSON.parse(data) as ToolCallData;
 
     const actionStream = performRestore(toolCallData, gitService);
-    let previousAction: SlashCommandActionReturn | undefined;
 
-    for await (const currentAction of actionStream) {
-      if (previousAction) {
-        // This was not the last action, so process it now.
-        if (previousAction.type === 'message') {
-          addItem(
-            {
-              type: previousAction.messageType,
-              text: previousAction.content,
-            },
-            Date.now(),
-          );
-        } else if (previousAction.type === 'load_history' && loadHistory) {
-          loadHistory(previousAction.history as HistoryItem[]);
+    for await (const action of actionStream) {
+      if (action.type === 'message') {
+        addItem(
+          {
+            type: action.messageType,
+            text: action.content,
+          },
+          Date.now(),
+        );
+      } else if (action.type === 'load_history' && loadHistory) {
+        loadHistory(action.history as HistoryItem[]);
+        if (action.clientHistory) {
+          await config
+            ?.getGeminiClient()
+            ?.setHistory(action.clientHistory as Content[]);
         }
       }
-      previousAction = currentAction;
     }
 
-    // After the loop, previousAction holds the last action, which we return.
-    return previousAction;
+    return {
+      type: 'tool',
+      toolName: toolCallData.toolCall.name,
+      toolArgs: toolCallData.toolCall.args as Record<string, unknown>,
+    };
   } catch (error) {
     return {
       type: 'message',

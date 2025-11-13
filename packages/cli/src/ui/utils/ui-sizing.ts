@@ -6,6 +6,7 @@
 
 import { lerp } from '../../utils/math.js';
 import { type LoadedSettings } from '../../config/settings.js';
+import { isAlternateBufferEnabled } from '../hooks/useAlternateBuffer.js';
 
 const getMainAreaWidthInternal = (terminalWidth: number): number => {
   if (terminalWidth <= 80) {
@@ -27,7 +28,7 @@ export const calculateMainAreaWidth = (
   settings: LoadedSettings,
 ): number => {
   if (settings.merged.ui?.useFullWidth !== false) {
-    if (settings.merged.ui?.useAlternateBuffer) {
+    if (isAlternateBufferEnabled(settings)) {
       return terminalWidth - 1;
     }
     return terminalWidth;

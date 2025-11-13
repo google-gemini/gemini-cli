@@ -7,45 +7,49 @@
   },
   "chat-base": {
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": -1
-      }
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-pro": {
     "model": "gemini-2.5-pro",
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": -1
-      }
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-flash": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": -1
-      }
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-flash-lite": {
     "model": "gemini-2.5-flash-lite",
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": -1
-      }
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-flash-base": {
