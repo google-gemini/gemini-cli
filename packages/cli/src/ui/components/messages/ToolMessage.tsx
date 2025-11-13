@@ -122,7 +122,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   if (availableHeight && !isAlternateBuffer) {
     renderOutputAsMarkdown = false;
   }
-  const childWidth = terminalWidth - 4;
+  const combinedPaddingAndBorderWidth = 4;
+  const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
 
   const truncatedResultDisplay = React.useMemo(() => {
     if (typeof resultDisplay === 'string') {
