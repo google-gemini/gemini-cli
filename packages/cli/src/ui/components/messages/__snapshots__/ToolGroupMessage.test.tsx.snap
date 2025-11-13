@@ -34,6 +34,19 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls arra
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│MockTool[1]: ✓ tool-1 - Description 1. This is a long description that will   │
+│need to be truncated if the terminal width is small. (medium)                 │
+│                                                                              │
+│MockTool[2]: ✓ tool-2 - Description 2 (medium)                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+
+
+"
+`;
+
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │MockTool[tool-1]: ✓ read_file - Read a file (medium)                          │
@@ -71,6 +84,14 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting co
 │MockTool[tool-confirm]: ? confirmation-tool - This tool needs confirmation    │
 │(high)                                                                        │
 │MockConfirmation: Are you sure you want to proceed?                           │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with outputFile 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│MockTool[tool-output-file]: ✓ tool-with-file - Tool that saved output to      │
+│file (medium)                                                                 │
+│ Output too long and was saved to: /path/to/output.txt                        │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 

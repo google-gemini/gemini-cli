@@ -301,8 +301,8 @@ const ToolInfo: React.FC<ToolInfo> = ({
     }
   }, [emphasis]);
   return (
-    <Box>
-      <Text strikethrough={status === ToolCallStatus.Canceled}>
+    <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
+      <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}
