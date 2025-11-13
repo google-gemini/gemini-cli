@@ -43,6 +43,7 @@ const renderComponent = (
         // --- Functions used by ModelDialog ---
         getModel: vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO),
         setModel: vi.fn(),
+        getPreviewFeatures: vi.fn(() => false),
 
         // --- Functions used by ClearcutLogger ---
         getUsageStatisticsEnabled: vi.fn(() => true),
@@ -86,7 +87,7 @@ describe('<ModelDialog />', () => {
     expect(lastFrame()).toContain('Select Model');
     expect(lastFrame()).toContain('(Press Esc to close)');
     expect(lastFrame()).toContain(
-      '> To use a specific Gemini model on startup, use the --model flag.',
+      'To use a specific Gemini model on startup, use the --model flag.',
     );
     unmount();
   });
@@ -209,10 +210,12 @@ describe('<ModelDialog />', () => {
 
   it('updates initialIndex when config context changes', () => {
     const mockGetModel = vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO);
+    const oldMockConfig = {
+      getModel: mockGetModel,
+      getPreviewFeatures: vi.fn(() => false),
+    } as unknown as Config;
     const { rerender, unmount } = render(
-      <ConfigContext.Provider
-        value={{ getModel: mockGetModel } as unknown as Config}
-      >
+      <ConfigContext.Provider value={oldMockConfig}>
         <ModelDialog onClose={vi.fn()} />
       </ConfigContext.Provider>,
     );
@@ -220,7 +223,10 @@ describe('<ModelDialog />', () => {
     expect(mockedSelect.mock.calls[0][0].initialIndex).toBe(0);
 
     mockGetModel.mockReturnValue(GEMINI_MODEL_ALIAS_FLASH_LITE);
-    const newMockConfig = { getModel: mockGetModel } as unknown as Config;
+    const newMockConfig = {
+      getModel: mockGetModel,
+      getPreviewFeatures: vi.fn(() => false),
+    } as unknown as Config;
 
     rerender(
       <ConfigContext.Provider value={newMockConfig}>

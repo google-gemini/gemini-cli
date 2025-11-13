@@ -98,6 +98,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
+- **`general.previewFeatures`** (boolean):
+  - **Description:** Enable preview features (e.g., preview models).
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in.
   - **Default:** `undefined`
@@ -129,11 +134,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
   - **Default:** `false`
-
-- **`general.previewFeatures`** (boolean):
-  - **Description:** Enable preview features (e.g., preview models).
-  - **Default:** `undefined`
-  - **Requires restart:** Yes
 
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
