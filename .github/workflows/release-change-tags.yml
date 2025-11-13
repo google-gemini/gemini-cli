@@ -33,7 +33,7 @@ on:
 jobs:
   change-tags:
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       packages: 'write'
       issues: 'write'

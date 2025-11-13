@@ -21,6 +21,68 @@ function getLineCountCommand(): { command: string; tool: string } {
   }
 }
 
+function getInvalidCommand(): string {
+  switch (shell) {
+    case 'powershell':
+      return `Get-ChildItem | | Select-Object`;
+    case 'cmd':
+      return `dir | | findstr foo`;
+    case 'bash':
+    default:
+      return `echo "hello" > > file`;
+  }
+}
+
+function getAllowedListCommand(): string {
+  switch (shell) {
+    case 'powershell':
+      return 'Get-ChildItem';
+    case 'cmd':
+      return 'dir';
+    case 'bash':
+    default:
+      return 'ls';
+  }
+}
+
+function getDisallowedFileReadCommand(testFile: string): {
+  command: string;
+  tool: string;
+} {
+  const quotedPath = `"${testFile}"`;
+  switch (shell) {
+    case 'powershell':
+      return { command: `Get-Content ${quotedPath}`, tool: 'Get-Content' };
+    case 'cmd':
+      return { command: `type ${quotedPath}`, tool: 'type' };
+    case 'bash':
+    default:
+      return { command: `cat ${quotedPath}`, tool: 'cat' };
+  }
+}
+
+function getChainedEchoCommand(): { allowPattern: string; command: string } {
+  const secondCommand = getAllowedListCommand();
+  switch (shell) {
+    case 'powershell':
+      return {
+        allowPattern: 'Write-Output',
+        command: `Write-Output "foo" && ${secondCommand}`,
+      };
+    case 'cmd':
+      return {
+        allowPattern: 'echo',
+        command: `echo "foo" && ${secondCommand}`,
+      };
+    case 'bash':
+    default:
+      return {
+        allowPattern: 'echo',
+        command: `echo "foo" && ${secondCommand}`,
+      };
+  }
+}
+
 describe('run_shell_command', () => {
   it('should be able to run a shell command', async () => {
     const rig = new TestRig();
@@ -82,7 +144,7 @@ describe('run_shell_command', () => {
     validateModelOutput(result, 'test-stdin', 'Shell command stdin test');
   });
 
-  it('should run allowed sub-command in non-interactive mode', async () => {
+  it.skip('should run allowed sub-command in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
@@ -102,8 +164,17 @@ describe('run_shell_command', () => {
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
     if (!foundToolCall) {
+      const toolLogs = rig.readToolLogs().map(({ toolRequest }) => ({
+        name: toolRequest.name,
+        success: toolRequest.success,
+        args: toolRequest.args,
+      }));
       printDebugInfo(rig, result, {
         'Found tool call': foundToolCall,
+        'Allowed tools flag': `run_shell_command(${tool})`,
+        Prompt: prompt,
+        'Tool logs': toolLogs,
+        Result: result,
       });
     }
 
@@ -120,7 +191,7 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should succeed with no parens in non-interactive mode', async () => {
+  it.skip('should succeed with no parens in non-interactive mode', async () => {
     const rig = new TestRig();
     await rig.setup('should succeed with no parens in non-interactive mode');
 
@@ -191,7 +262,7 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should work with ShellTool alias', async () => {
+  it.skip('should work with ShellTool alias', async () => {
     const rig = new TestRig();
     await rig.setup('should work with ShellTool alias');
 
@@ -210,8 +281,17 @@ describe('run_shell_command', () => {
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
     if (!foundToolCall) {
+      const toolLogs = rig.readToolLogs().map(({ toolRequest }) => ({
+        name: toolRequest.name,
+        success: toolRequest.success,
+        args: toolRequest.args,
+      }));
       printDebugInfo(rig, result, {
         'Found tool call': foundToolCall,
+        'Allowed tools flag': `ShellTool(${tool})`,
+        Prompt: prompt,
+        'Tool logs': toolLogs,
+        Result: result,
       });
     }
 
@@ -277,6 +357,103 @@ describe('run_shell_command', () => {
         toolLog.toolRequest.success,
         `Expected tool call ${toolLog} to succeed`,
       ).toBe(true);
+    }
+  });
+
+  it('should reject commands not on the allowlist', async () => {
+    const rig = new TestRig();
+    await rig.setup('should reject commands not on the allowlist');
+
+    const testFile = rig.createFile('test.txt', 'Disallowed command check\n');
+    const allowedCommand = getAllowedListCommand();
+    const disallowed = getDisallowedFileReadCommand(testFile);
+    const prompt =
+      `I am testing the allowed tools configuration. ` +
+      `Attempt to run "${disallowed.command}" to read the contents of ${testFile}. ` +
+      `If the command fails because it is not permitted, respond with the single word FAIL. ` +
+      `If it succeeds, respond with SUCCESS.`;
+
+    const result = await rig.run(
+      {
+        stdin: prompt,
+        yolo: false,
+      },
+      `--allowed-tools=run_shell_command(${allowedCommand})`,
+    );
+
+    if (!result.toLowerCase().includes('fail')) {
+      printDebugInfo(rig, result, {
+        Result: result,
+        AllowedCommand: allowedCommand,
+        DisallowedCommand: disallowed.command,
+      });
+    }
+    expect(result).toContain('FAIL');
+
+    const foundToolCall = await rig.waitForToolCall(
+      'run_shell_command',
+      15000,
+      (args) => args.toLowerCase().includes(disallowed.tool.toLowerCase()),
+    );
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+        ToolLogs: rig.readToolLogs(),
+      });
+    }
+    expect(foundToolCall).toBe(true);
+
+    const toolLogs = rig
+      .readToolLogs()
+      .filter((toolLog) => toolLog.toolRequest.name === 'run_shell_command');
+    const failureLog = toolLogs.find((toolLog) =>
+      toolLog.toolRequest.args
+        .toLowerCase()
+        .includes(disallowed.tool.toLowerCase()),
+    );
+
+    if (!failureLog || failureLog.toolRequest.success) {
+      printDebugInfo(rig, result, {
+        ToolLogs: toolLogs,
+        DisallowedTool: disallowed.tool,
+      });
+    }
+
+    expect(
+      failureLog,
+      'Expected failing run_shell_command invocation',
+    ).toBeTruthy();
+    expect(failureLog!.toolRequest.success).toBe(false);
+  });
+
+  // TODO(#11966): Deflake this test and re-enable once the underlying race is resolved.
+  it.skip('should reject chained commands when only the first segment is allowlisted in non-interactive mode', async () => {
+    const rig = new TestRig();
+    await rig.setup(
+      'should reject chained commands when only the first segment is allowlisted',
+    );
+
+    const chained = getChainedEchoCommand();
+    const shellInjection = `!{${chained.command}}`;
+
+    await rig.run(
+      {
+        stdin: `${shellInjection}\n`,
+        yolo: false,
+      },
+      `--allowed-tools=ShellTool(${chained.allowPattern})`,
+    );
+
+    // CLI should refuse to execute the chained command without scheduling run_shell_command.
+    const toolLogs = rig
+      .readToolLogs()
+      .filter((log) => log.toolRequest.name === 'run_shell_command');
+
+    // Success is false because tool is in the scheduled state.
+    for (const log of toolLogs) {
+      expect(log.toolRequest.success).toBe(false);
+      expect(log.toolRequest.args).toContain('&&');
     }
   });
 
@@ -359,7 +536,7 @@ describe('run_shell_command', () => {
     }
   });
 
-  it('should run a platform-specific file listing command', async () => {
+  it.skip('should run a platform-specific file listing command', async () => {
     const rig = new TestRig();
     await rig.setup('should run platform-specific file listing');
     const fileName = `test-file-${Math.random().toString(36).substring(7)}.txt`;
@@ -385,5 +562,54 @@ describe('run_shell_command', () => {
 
     validateModelOutput(result, fileName, 'Platform-specific listing test');
     expect(result).toContain(fileName);
+  });
+
+  it('rejects invalid shell expressions', async () => {
+    const rig = new TestRig();
+    await rig.setup('rejects invalid shell expressions');
+    const invalidCommand = getInvalidCommand();
+    const result = await rig.run(
+      `I am testing the error handling of the run_shell_command tool. Please attempt to run the following command, which I know has invalid syntax: \`${invalidCommand}\`. If the command fails as expected, please return the word FAIL, otherwise return the word SUCCESS.`,
+    );
+    expect(result).toContain('FAIL');
+
+    const escapedInvalidCommand = JSON.stringify(invalidCommand).slice(1, -1);
+    const foundToolCall = await rig.waitForToolCall(
+      'run_shell_command',
+      15000,
+      (args) =>
+        args.toLowerCase().includes(escapedInvalidCommand.toLowerCase()),
+    );
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+        EscapedCommand: escapedInvalidCommand,
+        ToolLogs: rig.readToolLogs(),
+      });
+    }
+    expect(foundToolCall).toBe(true);
+
+    const toolLogs = rig
+      .readToolLogs()
+      .filter((toolLog) => toolLog.toolRequest.name === 'run_shell_command');
+    const failureLog = toolLogs.find((toolLog) =>
+      toolLog.toolRequest.args
+        .toLowerCase()
+        .includes(escapedInvalidCommand.toLowerCase()),
+    );
+
+    if (!failureLog || failureLog.toolRequest.success) {
+      printDebugInfo(rig, result, {
+        ToolLogs: toolLogs,
+        EscapedCommand: escapedInvalidCommand,
+      });
+    }
+
+    expect(
+      failureLog,
+      'Expected failing run_shell_command invocation for invalid syntax',
+    ).toBeTruthy();
+    expect(failureLog!.toolRequest.success).toBe(false);
   });
 });

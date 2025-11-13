@@ -9,6 +9,10 @@
       {
         "label": "Architecture Overview",
         "slug": "docs/architecture"
+      },
+      {
+        "label": "Contribution Guide",
+        "slug": "docs/contributing"
       }
     ]
   },
@@ -69,6 +73,10 @@
         "slug": "docs/cli/keyboard-shortcuts"
       },
       {
+        "label": "Model Selection",
+        "slug": "docs/cli/model"
+      },
+      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
       },
@@ -112,6 +120,10 @@
       {
         "label": "Memory Import Processor",
         "slug": "docs/core/memport"
+      },
+      {
+        "label": "Policy Engine",
+        "slug": "docs/core/policy-engine"
       }
     ]
   },
@@ -125,10 +137,6 @@
       {
         "label": "File System",
         "slug": "docs/tools/file-system"
-      },
-      {
-        "label": "Multi-File Read",
-        "slug": "docs/tools/multi-file"
       },
       {
         "label": "Shell",
@@ -145,6 +153,10 @@
       {
         "label": "Memory",
         "slug": "docs/tools/memory"
+      },
+      {
+        "label": "Todos",
+        "slug": "docs/tools/todos"
       },
       {
         "label": "MCP Servers",

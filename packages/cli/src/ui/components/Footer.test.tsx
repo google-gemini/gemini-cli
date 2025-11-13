@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect, vi } from 'vitest';
 import {
   renderWithProviders,
   createMockSettings,
 } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
-import { tildeifyPath } from '@google/gemini-cli-core';
+import { tildeifyPath, ToolCallDecision } from '@google/gemini-cli-core';
+import type { SessionStatsState } from '../contexts/SessionContext.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -32,15 +34,41 @@ const defaultProps = {
   branchName: 'main',
 };
 
-const sessionStats = {
-  sessionStats: { lastPromptTokenCount: 0, lastResponseTokenCount: 0 },
+const mockSessionStats: SessionStatsState = {
+  sessionId: 'test-session',
+  sessionStartTime: new Date(),
+  lastPromptTokenCount: 0,
+  promptCount: 0,
+  metrics: {
+    models: {},
+    tools: {
+      totalCalls: 0,
+      totalSuccess: 0,
+      totalFail: 0,
+      totalDurationMs: 0,
+      totalDecisions: {
+        accept: 0,
+        reject: 0,
+        modify: 0,
+        [ToolCallDecision.AUTO_ACCEPT]: 0,
+      },
+      byName: {},
+    },
+    files: {
+      totalLinesAdded: 0,
+      totalLinesRemoved: 0,
+    },
+  },
 };
 
 describe('<Footer />', () => {
   it('renders the component', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
-      uiState: { branchName: defaultProps.branchName, ...sessionStats },
+      uiState: {
+        branchName: defaultProps.branchName,
+        sessionStats: mockSessionStats,
+      },
     });
     expect(lastFrame()).toBeDefined();
   });
@@ -49,7 +77,7 @@ describe('<Footer />', () => {
     it('should display a shortened path on a narrow terminal', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 79,
-        uiState: { ...sessionStats },
+        uiState: { sessionStats: mockSessionStats },
       });
       const tildePath = tildeifyPath(defaultProps.targetDir);
       const pathLength = Math.max(20, Math.floor(79 * 0.25));
@@ -61,7 +89,7 @@ describe('<Footer />', () => {
     it('should use wide layout at 80 columns', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 80,
-        uiState: { ...sessionStats },
+        uiState: { sessionStats: mockSessionStats },
       });
       const tildePath = tildeifyPath(defaultProps.targetDir);
       const expectedPath =
@@ -73,7 +101,10 @@ describe('<Footer />', () => {
   it('displays the branch name when provided', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
-      uiState: { branchName: defaultProps.branchName, ...sessionStats },
+      uiState: {
+        branchName: defaultProps.branchName,
+        sessionStats: mockSessionStats,
+      },
     });
     expect(lastFrame()).toContain(`(${defaultProps.branchName}*)`);
   });
@@ -81,7 +112,7 @@ describe('<Footer />', () => {
   it('does not display the branch name when not provided', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
-      uiState: { branchName: undefined, ...sessionStats },
+      uiState: { branchName: undefined, sessionStats: mockSessionStats },
     });
     expect(lastFrame()).not.toContain(`(${defaultProps.branchName}*)`);
   });
@@ -89,7 +120,14 @@ describe('<Footer />', () => {
   it('displays the model name and context percentage', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
-      uiState: { ...sessionStats },
+      uiState: { sessionStats: mockSessionStats },
+      settings: createMockSettings({
+        ui: {
+          footer: {
+            hideContextPercentage: false,
+          },
+        },
+      }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\(\d+% context left\)/);
@@ -98,7 +136,14 @@ describe('<Footer />', () => {
   it('displays the model name and abbreviated context percentage', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 99,
-      uiState: { ...sessionStats },
+      uiState: { sessionStats: mockSessionStats },
+      settings: createMockSettings({
+        ui: {
+          footer: {
+            hideContextPercentage: false,
+          },
+        },
+      }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\(\d+%\)/);
@@ -108,7 +153,7 @@ describe('<Footer />', () => {
     it('should display untrusted when isTrustedFolder is false', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { isTrustedFolder: false, ...sessionStats },
+        uiState: { isTrustedFolder: false, sessionStats: mockSessionStats },
       });
       expect(lastFrame()).toContain('untrusted');
     });
@@ -117,7 +162,7 @@ describe('<Footer />', () => {
       vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { isTrustedFolder: undefined, ...sessionStats },
+        uiState: { isTrustedFolder: undefined, sessionStats: mockSessionStats },
       });
       expect(lastFrame()).toContain('test');
       vi.unstubAllEnvs();
@@ -128,7 +173,7 @@ describe('<Footer />', () => {
       vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { isTrustedFolder: true, ...sessionStats },
+        uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
       expect(lastFrame()).toMatch(/macOS Seatbelt.*\(test-profile\)/s);
       vi.unstubAllEnvs();
@@ -139,7 +184,7 @@ describe('<Footer />', () => {
       vi.stubEnv('SANDBOX', '');
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { isTrustedFolder: true, ...sessionStats },
+        uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
       });
       expect(lastFrame()).toContain('no sandbox');
       vi.unstubAllEnvs();
@@ -149,7 +194,7 @@ describe('<Footer />', () => {
       vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { isTrustedFolder: false, ...sessionStats },
+        uiState: { isTrustedFolder: false, sessionStats: mockSessionStats },
       });
       expect(lastFrame()).toContain('untrusted');
       expect(lastFrame()).not.toMatch(/test-sandbox/s);
@@ -161,7 +206,14 @@ describe('<Footer />', () => {
     it('renders complete footer with all sections visible (baseline)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { ...sessionStats },
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
       });
       expect(lastFrame()).toMatchSnapshot('complete-footer-wide');
     });
@@ -169,7 +221,7 @@ describe('<Footer />', () => {
     it('renders footer with all optional sections hidden (minimal footer)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { ...sessionStats },
+        uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
           ui: {
             footer: {
@@ -186,7 +238,7 @@ describe('<Footer />', () => {
     it('renders footer with only model info hidden (partial filtering)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { ...sessionStats },
+        uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
           ui: {
             footer: {
@@ -203,7 +255,7 @@ describe('<Footer />', () => {
     it('renders footer with CWD and model info hidden to test alignment (only sandbox visible)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
-        uiState: { ...sessionStats },
+        uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
           ui: {
             footer: {
@@ -217,12 +269,79 @@ describe('<Footer />', () => {
       expect(lastFrame()).toMatchSnapshot('footer-only-sandbox');
     });
 
+    it('hides the context percentage when hideContextPercentage is true', () => {
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: true,
+            },
+          },
+        }),
+      });
+      expect(lastFrame()).toContain(defaultProps.model);
+      expect(lastFrame()).not.toMatch(/\(\d+% context left\)/);
+    });
+
+    it('shows the context percentage when hideContextPercentage is false', () => {
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
+      });
+      expect(lastFrame()).toContain(defaultProps.model);
+      expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+    });
+
     it('renders complete footer in narrow terminal (baseline narrow)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 79,
-        uiState: { ...sessionStats },
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
       });
       expect(lastFrame()).toMatchSnapshot('complete-footer-narrow');
     });
+  });
+});
+
+describe('fallback mode display', () => {
+  it('should display Flash model when in fallback mode, not the configured Pro model', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        currentModel: 'gemini-2.5-flash', // Fallback active, showing Flash
+      },
+    });
+
+    // Footer should show the effective model (Flash), not the config model (Pro)
+    expect(lastFrame()).toContain('gemini-2.5-flash');
+    expect(lastFrame()).not.toContain('gemini-2.5-pro');
+  });
+
+  it('should display Pro model when NOT in fallback mode', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        currentModel: 'gemini-2.5-pro', // Normal mode, showing Pro
+      },
+    });
+
+    expect(lastFrame()).toContain('gemini-2.5-pro');
   });
 });

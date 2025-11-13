@@ -19,7 +19,7 @@ import { IdeClient, sessionId } from '@google/gemini-cli-core';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
-  description: 'submit a bug report',
+  description: 'Submit a bug report',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const bugDescription = (args || '').trim();

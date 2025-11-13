@@ -8,7 +8,7 @@ exports[`ThemeDialog Snapshots > should render correctly in scope selector mode 
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
 │                                                                                                  │
-│ (Use Enter to apply scope, Tab to select theme)                                                  │
+│ (Use Enter to apply scope, Tab to select theme, Esc to close)                                    │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -32,7 +32,7 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │   12. Google Code Light                      └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
 │                                                                                                  │
-│ (Use Enter to select, Tab to configure scope)                                                    │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

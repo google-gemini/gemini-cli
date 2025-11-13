@@ -55,6 +55,22 @@ describe('<HistoryItemDisplay />', () => {
     expect(lastFrame()).toContain('/theme');
   });
 
+  it.each([true, false])(
+    'renders InfoMessage for "info" type with multi-line text (alternateBuffer=%s)',
+    (useAlternateBuffer) => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: MessageType.INFO,
+        text: '⚡ Line 1\n⚡ Line 2\n⚡ Line 3',
+      };
+      const { lastFrame } = renderWithProviders(
+        <HistoryItemDisplay {...baseItem} item={item} />,
+        { useAlternateBuffer },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
+
   it('renders StatsDisplay for "stats" type', () => {
     const item: HistoryItem = {
       ...baseItem,
@@ -191,83 +207,92 @@ describe('<HistoryItemDisplay />', () => {
     );
   });
 
-  const longCode =
-    '# Example code block:\n' +
-    '```python\n' +
-    Array.from({ length: 50 }, (_, i) => `Line ${i + 1}`).join('\n') +
-    '\n```';
+  describe.each([true, false])(
+    'gemini items (alternateBuffer=%s)',
+    (useAlternateBuffer) => {
+      const longCode =
+        '# Example code block:\n' +
+        '```python\n' +
+        Array.from({ length: 50 }, (_, i) => `Line ${i + 1}`).join('\n') +
+        '\n```';
 
-  it('should render a truncated gemini item', () => {
-    const item: HistoryItem = {
-      id: 1,
-      type: 'gemini',
-      text: longCode,
-    };
-    const { lastFrame } = renderWithProviders(
-      <HistoryItemDisplay
-        item={item}
-        isPending={false}
-        terminalWidth={80}
-        availableTerminalHeight={10}
-      />,
-    );
+      it('should render a truncated gemini item', () => {
+        const item: HistoryItem = {
+          id: 1,
+          type: 'gemini',
+          text: longCode,
+        };
+        const { lastFrame } = renderWithProviders(
+          <HistoryItemDisplay
+            item={item}
+            isPending={false}
+            terminalWidth={80}
+            availableTerminalHeight={10}
+          />,
+          { useAlternateBuffer },
+        );
 
-    expect(lastFrame()).toMatchSnapshot();
-  });
+        expect(lastFrame()).toMatchSnapshot();
+      });
 
-  it('should render a full gemini item when using availableTerminalHeightGemini', () => {
-    const item: HistoryItem = {
-      id: 1,
-      type: 'gemini',
-      text: longCode,
-    };
-    const { lastFrame } = renderWithProviders(
-      <HistoryItemDisplay
-        item={item}
-        isPending={false}
-        terminalWidth={80}
-        availableTerminalHeight={10}
-        availableTerminalHeightGemini={Number.MAX_SAFE_INTEGER}
-      />,
-    );
+      it('should render a full gemini item when using availableTerminalHeightGemini', () => {
+        const item: HistoryItem = {
+          id: 1,
+          type: 'gemini',
+          text: longCode,
+        };
+        const { lastFrame } = renderWithProviders(
+          <HistoryItemDisplay
+            item={item}
+            isPending={false}
+            terminalWidth={80}
+            availableTerminalHeight={10}
+            availableTerminalHeightGemini={Number.MAX_SAFE_INTEGER}
+          />,
+          { useAlternateBuffer },
+        );
 
-    expect(lastFrame()).toMatchSnapshot();
-  });
+        expect(lastFrame()).toMatchSnapshot();
+      });
 
-  it('should render a truncated gemini_content item', () => {
-    const item: HistoryItem = {
-      id: 1,
-      type: 'gemini_content',
-      text: longCode,
-    };
-    const { lastFrame } = renderWithProviders(
-      <HistoryItemDisplay
-        item={item}
-        isPending={false}
-        terminalWidth={80}
-        availableTerminalHeight={10}
-      />,
-    );
+      it('should render a truncated gemini_content item', () => {
+        const item: HistoryItem = {
+          id: 1,
+          type: 'gemini_content',
+          text: longCode,
+        };
+        const { lastFrame } = renderWithProviders(
+          <HistoryItemDisplay
+            item={item}
+            isPending={false}
+            terminalWidth={80}
+            availableTerminalHeight={10}
+          />,
+          { useAlternateBuffer },
+        );
 
-    expect(lastFrame()).toMatchSnapshot();
-  });
+        expect(lastFrame()).toMatchSnapshot();
+      });
 
-  it('should render a full gemini_content item when using availableTerminalHeightGemini', () => {
-    const item: HistoryItem = {
-      id: 1,
-      type: 'gemini_content',
-      text: longCode,
-    };
-    const { lastFrame } = renderWithProviders(
-      <HistoryItemDisplay
-        item={item}
-        isPending={false}
-        terminalWidth={80}
-        availableTerminalHeight={10}
-        availableTerminalHeightGemini={Number.MAX_SAFE_INTEGER}
-      />,
-    );
+      it('should render a full gemini_content item when using availableTerminalHeightGemini', () => {
+        const item: HistoryItem = {
+          id: 1,
+          type: 'gemini_content',
+          text: longCode,
+        };
+        const { lastFrame } = renderWithProviders(
+          <HistoryItemDisplay
+            item={item}
+            isPending={false}
+            terminalWidth={80}
+            availableTerminalHeight={10}
+            availableTerminalHeightGemini={Number.MAX_SAFE_INTEGER}
+          />,
+          { useAlternateBuffer },
+        );
 
-    expect(lastFrame()).toMatchSnapshot();
-  });
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    },
+  );
 });

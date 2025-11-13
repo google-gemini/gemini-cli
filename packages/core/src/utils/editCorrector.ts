@@ -4,30 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content, GenerateContentConfig } from '@google/genai';
+import type { Content } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { EditToolParams } from '../tools/edit.js';
-import { EditTool } from '../tools/edit.js';
-import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { GrepTool } from '../tools/grep.js';
+import {
+  EDIT_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import {
   isFunctionResponse,
   isFunctionCall,
 } from '../utils/messageInspectors.js';
 import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
-
-const EDIT_MODEL = DEFAULT_GEMINI_FLASH_LITE_MODEL;
-const EDIT_CONFIG: GenerateContentConfig = {
-  thinkingConfig: {
-    thinkingBudget: 0,
-  },
-};
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -101,12 +95,12 @@ async function findLastEditTimestamp(
   // Tools that may reference the file path in their FunctionResponse `output`.
   const toolsInResp = new Set([
     WRITE_FILE_TOOL_NAME,
-    EditTool.Name,
-    ReadManyFilesTool.Name,
-    GrepTool.Name,
+    EDIT_TOOL_NAME,
+    READ_MANY_FILES_TOOL_NAME,
+    GREP_TOOL_NAME,
   ]);
   // Tools that may reference the file path in their FunctionCall `args`.
-  const toolsInCall = new Set([...toolsInResp, ReadFileTool.Name]);
+  const toolsInCall = new Set([...toolsInResp, READ_FILE_TOOL_NAME]);
 
   // Iterate backwards to find the most recent relevant action.
   for (const entry of history.slice().reverse()) {
@@ -418,11 +412,10 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
 
   try {
     const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
       schema: OLD_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });
@@ -508,11 +501,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
   try {
     const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
       schema: NEW_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });
@@ -579,11 +571,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
   try {
     const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
       schema: CORRECT_NEW_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });
@@ -647,11 +638,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
   try {
     const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
       schema: CORRECT_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      model: EDIT_MODEL,
-      config: EDIT_CONFIG,
       systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
       promptId: getPromptId(),
     });

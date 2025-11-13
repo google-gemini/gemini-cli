@@ -27,6 +27,11 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
+### Pre-requisites before installation
+
+- Node.js version 20 or higher
+- macOS, Linux, or Windows
+
 ### Quick Install
 
 #### Run instantly with npx
@@ -53,11 +58,6 @@ brew install gemini-cli
 ```bash
 sudo port install gemini-cli
 ```
-
-#### System Requirements
-
-- Node.js version 20 or higher
-- macOS, Linux, or Windows
 
 ## Release Cadence and Tags
 
@@ -312,6 +312,8 @@ gemini
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
 - [**Tools API Development**](./docs/core/tools-api.md) - Create custom tools.
+- [**Local development**](./docs/local-development.md) - Local development
+  tooling.
 
 ### Troubleshooting & Support
 

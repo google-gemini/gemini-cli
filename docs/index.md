@@ -50,6 +50,8 @@ This documentation is organized into the following sections:
 - **[Memport](./core/memport.md):** Using the Memory Import Processor.
 - **[Tools API](./core/tools-api.md):** Information on how the core manages and
   exposes tools.
+- **[Policy Engine](./core/policy-engine.md):** Use the Policy Engine for
+  fine-grained control over tool execution.
 
 ### Tools
 
@@ -58,8 +60,6 @@ This documentation is organized into the following sections:
 - **[File System Tools](./tools/file-system.md):** Documentation for the
   `read_file` and `write_file` tools.
 - **[MCP servers](./tools/mcp-server.md):** Using MCP servers with Gemini CLI.
-- **[Multi-File Read Tool](./tools/multi-file.md):** Documentation for the
-  `read_many_files` tool.
 - **[Shell Tool](./tools/shell.md):** Documentation for the `run_shell_command`
   tool.
 - **[Web Fetch Tool](./tools/web-fetch.md):** Documentation for the `web_fetch`
@@ -68,6 +68,7 @@ This documentation is organized into the following sections:
   `google_web_search` tool.
 - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory`
   tool.
+- **[Todo Tool](./tools/todos.md):** Documentation for the `write_todos` tool.
 
 ### Extensions
 

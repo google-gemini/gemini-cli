@@ -7,7 +7,6 @@
 import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Content } from '@google/genai';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import type { Config } from '../config/config.js';
@@ -54,12 +53,19 @@ describe('checkNextSpeaker', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    const mockResolvedConfig = {
+      model: 'next-speaker-v1',
+      generateContentConfig: {},
+    };
     mockConfig = {
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getModel: () => 'test-model',
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+      },
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
     } as unknown as Config;
 
@@ -265,8 +271,8 @@ describe('checkNextSpeaker', () => {
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
     const generateJsonCall = (mockBaseLlmClient.generateJson as Mock).mock
-      .calls[0];
-    expect(generateJsonCall[0].model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    expect(generateJsonCall[0].promptId).toBe(promptId);
+      .calls[0][0];
+    expect(generateJsonCall.modelConfigKey.model).toBe('next-speaker-checker');
+    expect(generateJsonCall.promptId).toBe(promptId);
   });
 });
