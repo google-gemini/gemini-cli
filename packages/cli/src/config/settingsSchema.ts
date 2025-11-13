@@ -502,6 +502,25 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      scrollAccelerationDuration: {
+        type: 'number',
+        label: 'Scroll Acceleration Duration',
+        category: 'UI',
+        requiresRestart: false,
+        default: 1000,
+        description: 'Time in milliseconds to reach max scroll speed.',
+        showInDialog: false,
+      },
+      maxScrollSpeedFraction: {
+        type: 'number',
+        label: 'Max Scroll Speed Fraction',
+        category: 'UI',
+        requiresRestart: false,
+        default: 0.4 as number,
+        description:
+          'Fraction of the total scrollable height traversed in 1 second at max speed.',
+        showInDialog: false,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',

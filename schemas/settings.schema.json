@@ -282,6 +282,20 @@
           "default": false,
           "type": "boolean"
         },
+        "scrollAccelerationDuration": {
+          "title": "Scroll Acceleration Duration",
+          "description": "Time in milliseconds to reach max scroll speed.",
+          "markdownDescription": "Time in milliseconds to reach max scroll speed.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `1000`",
+          "default": 1000,
+          "type": "number"
+        },
+        "maxScrollSpeedFraction": {
+          "title": "Max Scroll Speed Fraction",
+          "description": "Fraction of the total scrollable height traversed in 1 second at max speed.",
+          "markdownDescription": "Fraction of the total scrollable height traversed in 1 second at max speed.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `0.2`",
+          "default": 0.2,
+          "type": "number"
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",

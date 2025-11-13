@@ -11,8 +11,11 @@ import { ScrollableList, type ScrollableListRef } from './ScrollableList.js';
 import { ScrollProvider } from '../../contexts/ScrollProvider.js';
 import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { MouseProvider } from '../../contexts/MouseContext.js';
+import { SettingsContext } from '../../contexts/SettingsContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { waitFor } from '../../../test-utils/async.js';
+import { LoadedSettings } from '../../../config/settings.js';
+import type { Settings } from '../../../config/settingsSchema.js';
 
 // Mock useStdout to provide a fixed size for testing
 vi.mock('ink', async (importOriginal) => {
@@ -41,6 +44,27 @@ const getLorem = (index: number) =>
     .fill(null)
     .map(() => 'lorem ipsum '.repeat((index % 3) + 1).trim())
     .join('\n');
+
+const emptySettingsFile = { settings: {}, originalSettings: {}, path: '' };
+const userSettingsFile = {
+  settings: {
+    ui: {
+      scrollAccelerationDuration: 1000,
+      maxScrollSpeedFraction: 0.4,
+    },
+  } as Settings,
+  originalSettings: {},
+  path: '',
+};
+
+const mockSettings = new LoadedSettings(
+  emptySettingsFile,
+  emptySettingsFile,
+  userSettingsFile,
+  emptySettingsFile,
+  true,
+  new Set(),
+);
 
 const TestComponent = ({
   initialItems = 1000,
@@ -79,51 +103,53 @@ const TestComponent = ({
   }, [onRef]);
 
   return (
-    <MouseProvider mouseEventsEnabled={false}>
-      <KeypressProvider>
-        <ScrollProvider>
-          <Box flexDirection="column" width={80} height={24} padding={1}>
-            <Box flexGrow={1} borderStyle="round" borderColor="cyan">
-              <ScrollableList
-                ref={listRef}
-                data={items}
-                renderItem={({ item, index }) => (
-                  <Box flexDirection="column" paddingBottom={2}>
-                    <Box
-                      sticky
-                      flexDirection="column"
-                      width={78}
-                      opaque
-                      stickyChildren={
-                        <Box flexDirection="column" width={78} opaque>
-                          <Text>{item.title}</Text>
-                          <Box
-                            borderStyle="single"
-                            borderTop={true}
-                            borderBottom={false}
-                            borderLeft={false}
-                            borderRight={false}
-                            borderColor="gray"
-                          />
-                        </Box>
-                      }
-                    >
-                      <Text>{item.title}</Text>
+    <SettingsContext.Provider value={mockSettings}>
+      <MouseProvider mouseEventsEnabled={false}>
+        <KeypressProvider>
+          <ScrollProvider>
+            <Box flexDirection="column" width={80} height={24} padding={1}>
+              <Box flexGrow={1} borderStyle="round" borderColor="cyan">
+                <ScrollableList
+                  ref={listRef}
+                  data={items}
+                  renderItem={({ item, index }) => (
+                    <Box flexDirection="column" paddingBottom={2}>
+                      <Box
+                        sticky
+                        flexDirection="column"
+                        width={78}
+                        opaque
+                        stickyChildren={
+                          <Box flexDirection="column" width={78} opaque>
+                            <Text>{item.title}</Text>
+                            <Box
+                              borderStyle="single"
+                              borderTop={true}
+                              borderBottom={false}
+                              borderLeft={false}
+                              borderRight={false}
+                              borderColor="gray"
+                            />
+                          </Box>
+                        }
+                      >
+                        <Text>{item.title}</Text>
+                      </Box>
+                      <Text color="gray">{getLorem(index)}</Text>
                     </Box>
-                    <Text color="gray">{getLorem(index)}</Text>
-                  </Box>
-                )}
-                estimatedItemHeight={() => 14}
-                keyExtractor={(item) => item.id}
-                hasFocus={true}
-                initialScrollIndex={Number.MAX_SAFE_INTEGER}
-              />
+                  )}
+                  estimatedItemHeight={() => 14}
+                  keyExtractor={(item) => item.id}
+                  hasFocus={true}
+                  initialScrollIndex={Number.MAX_SAFE_INTEGER}
+                />
+              </Box>
+              <Text>Count: {items.length}</Text>
             </Box>
-            <Text>Count: {items.length}</Text>
-          </Box>
-        </ScrollProvider>
-      </KeypressProvider>
-    </MouseProvider>
+          </ScrollProvider>
+        </KeypressProvider>
+      </MouseProvider>
+    </SettingsContext.Provider>
   );
 };
 describe('ScrollableList Demo Behavior', () => {
@@ -202,37 +228,39 @@ describe('ScrollableList Demo Behavior', () => {
       }, []);
 
       return (
-        <MouseProvider mouseEventsEnabled={false}>
-          <KeypressProvider>
-            <ScrollProvider>
-              <Box flexDirection="column" width={80} height={10}>
-                <ScrollableList
-                  ref={ref}
-                  data={items}
-                  renderItem={({ item, index }) => (
-                    <Box flexDirection="column" height={3}>
-                      {index === 0 ? (
-                        <Box
-                          sticky
-                          stickyChildren={<Text>[STICKY] {item.title}</Text>}
-                        >
+        <SettingsContext.Provider value={mockSettings}>
+          <MouseProvider mouseEventsEnabled={false}>
+            <KeypressProvider>
+              <ScrollProvider>
+                <Box flexDirection="column" width={80} height={10}>
+                  <ScrollableList
+                    ref={ref}
+                    data={items}
+                    renderItem={({ item, index }) => (
+                      <Box flexDirection="column" height={3}>
+                        {index === 0 ? (
+                          <Box
+                            sticky
+                            stickyChildren={<Text>[STICKY] {item.title}</Text>}
+                          >
+                            <Text>[Normal] {item.title}</Text>
+                          </Box>
+                        ) : (
                           <Text>[Normal] {item.title}</Text>
-                        </Box>
-                      ) : (
-                        <Text>[Normal] {item.title}</Text>
-                      )}
-                      <Text>Content for {item.title}</Text>
-                      <Text>More content for {item.title}</Text>
-                    </Box>
-                  )}
-                  estimatedItemHeight={() => 3}
-                  keyExtractor={(item) => item.id}
-                  hasFocus={true}
-                />
-              </Box>
-            </ScrollProvider>
-          </KeypressProvider>
-        </MouseProvider>
+                        )}
+                        <Text>Content for {item.title}</Text>
+                        <Text>More content for {item.title}</Text>
+                      </Box>
+                    )}
+                    estimatedItemHeight={() => 3}
+                    keyExtractor={(item) => item.id}
+                    hasFocus={true}
+                  />
+                </Box>
+              </ScrollProvider>
+            </KeypressProvider>
+          </MouseProvider>
+        </SettingsContext.Provider>
       );
     };
 
