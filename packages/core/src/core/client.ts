@@ -56,14 +56,11 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 
 export function isThinkingSupported(model: string) {
-  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
-}
-
-export function isThinkingDefault(model: string) {
-  if (model.startsWith('gemini-2.5-flash-lite')) {
-    return false;
-  }
-  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
+  return (
+    model.startsWith('gemini-2.5') ||
+    model.startsWith('gemini-3') ||
+    model === DEFAULT_GEMINI_MODEL_AUTO
+  );
 }
 
 const MAX_TURNS = 100;
