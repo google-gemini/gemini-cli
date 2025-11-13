@@ -20,6 +20,9 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
+    isFirst: true,
+    borderColor: 'green',
+    borderDimColor: false,
   };
 
   it.each([
