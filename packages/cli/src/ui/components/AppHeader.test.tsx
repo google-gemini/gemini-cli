@@ -12,18 +12,16 @@ import { makeFakeConfig } from '@google/gemini-cli-core';
 describe('<AppHeader />', () => {
   it('should render the banner with default text', () => {
     const mockConfig = makeFakeConfig();
-    mockConfig.getExperiments = () => ({
-      flags: {
-        GeminiCLIBannerText__no_capacity_issues: {
-          stringValue: 'This is the default banner',
-        },
+    const uiState = {
+      bannerData: {
+        defaultText: 'This is the default banner',
+        warningText: '',
       },
-      experimentIds: [],
-    });
+    };
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig },
+      { config: mockConfig, uiState },
     );
 
     expect(lastFrame()).toContain('This is the default banner');
@@ -33,21 +31,16 @@ describe('<AppHeader />', () => {
 
   it('should render the banner with warning text', () => {
     const mockConfig = makeFakeConfig();
-    mockConfig.getExperiments = () => ({
-      flags: {
-        GeminiCLIBannerText__no_capacity_issues: {
-          stringValue: 'This is the default banner',
-        },
-        GeminiCLIBannerText__capacity_issues: {
-          stringValue: 'There are capacity issues',
-        },
+    const uiState = {
+      bannerData: {
+        defaultText: 'This is the default banner',
+        warningText: 'There are capacity issues',
       },
-      experimentIds: [],
-    });
+    };
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig },
+      { config: mockConfig, uiState },
     );
 
     expect(lastFrame()).toContain('There are capacity issues');
@@ -57,14 +50,16 @@ describe('<AppHeader />', () => {
 
   it('should not render the banner when no flags are set', () => {
     const mockConfig = makeFakeConfig();
-    mockConfig.getExperiments = () => ({
-      flags: {},
-      experimentIds: [],
-    });
+    const uiState = {
+      bannerData: {
+        defaultText: '',
+        warningText: '',
+      },
+    };
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig },
+      { config: mockConfig, uiState },
     );
 
     expect(lastFrame()).not.toContain('Banner');
@@ -74,18 +69,16 @@ describe('<AppHeader />', () => {
 
   it('should render the banner when previewFeatures is disabled', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: false });
-    mockConfig.getExperiments = () => ({
-      flags: {
-        GeminiCLIBannerText__no_capacity_issues: {
-          stringValue: 'This is the default banner',
-        },
+    const uiState = {
+      bannerData: {
+        defaultText: 'This is the default banner',
+        warningText: '',
       },
-      experimentIds: [],
-    });
+    };
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig },
+      { config: mockConfig, uiState },
     );
 
     expect(lastFrame()).toContain('This is the default banner');
@@ -95,18 +88,16 @@ describe('<AppHeader />', () => {
 
   it('should not render the banner when previewFeatures is enabled', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: true });
-    mockConfig.getExperiments = () => ({
-      flags: {
-        GeminiCLIBannerText__no_capacity_issues: {
-          stringValue: 'This is the default banner',
-        },
+    const uiState = {
+      bannerData: {
+        defaultText: 'This is the default banner',
+        warningText: '',
       },
-      experimentIds: [],
-    });
+    };
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig },
+      { config: mockConfig, uiState },
     );
 
     expect(lastFrame()).not.toContain('This is the default banner');

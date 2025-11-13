@@ -125,6 +125,10 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   warningMessage: string | null;
+  bannerData: {
+    defaultText: string;
+    warningText: string;
+  };
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
