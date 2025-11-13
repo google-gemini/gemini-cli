@@ -160,21 +160,25 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           </Box>
         );
       })}
-      {/*
+      {
+        /*
               We have to keep the bottom border separate so it doesn't get
               drawn over by the sticky header directly inside it.
-             */}
-      <Box
-        height={0}
-        width={terminalWidth}
-        borderLeft={true}
-        borderRight={true}
-        borderTop={false}
-        borderBottom={true}
-        borderColor={borderColor}
-        borderDimColor={borderDimColor}
-        borderStyle="round"
-      />
+             */
+        toolCalls.length > 0 && (
+          <Box
+            height={0}
+            width={terminalWidth}
+            borderLeft={true}
+            borderRight={true}
+            borderTop={false}
+            borderBottom={true}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
+            borderStyle="round"
+          />
+        )
+      }
     </Box>
   );
 };
