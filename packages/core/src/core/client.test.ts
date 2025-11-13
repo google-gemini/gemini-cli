@@ -15,11 +15,7 @@ import {
 } from 'vitest';
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
-import {
-  isThinkingDefault,
-  isThinkingSupported,
-  GeminiClient,
-} from './client.js';
+import { isThinkingSupported, GeminiClient } from './client.js';
 import {
   AuthType,
   type ContentGenerator,
@@ -167,45 +163,6 @@ describe('isThinkingSupported', () => {
     ).toBe(false);
     expect(
       await isThinkingSupported('some-other-model', mockModelInfoService),
-    ).toBe(false);
-  });
-});
-
-describe('isThinkingDefault', () => {
-  const mockModelInfoService = {
-    isThinkingSupported: vi.fn(),
-  } as unknown as ModelInfoService;
-
-  it('should return false for gemini-2.5-flash-lite', async () => {
-    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
-    expect(
-      await isThinkingDefault('gemini-2.5-flash-lite', mockModelInfoService),
-    ).toBe(false);
-  });
-
-  it('should return true for gemini-2.5', async () => {
-    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
-    expect(await isThinkingDefault('gemini-2.5', mockModelInfoService)).toBe(
-      true,
-    );
-  });
-
-  it('should return true for gemini-2.5-pro', async () => {
-    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(true);
-    expect(
-      await isThinkingDefault('gemini-2.5-pro', mockModelInfoService),
-    ).toBe(true);
-  });
-
-  it('should return false for other models', async () => {
-    vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(
-      false,
-    );
-    expect(
-      await isThinkingDefault('gemini-1.5-flash', mockModelInfoService),
-    ).toBe(false);
-    expect(
-      await isThinkingDefault('some-other-model', mockModelInfoService),
     ).toBe(false);
   });
 });

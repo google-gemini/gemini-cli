@@ -61,22 +61,10 @@ export async function isThinkingSupported(
   model: string,
   modelInfoService: ModelInfoService,
 ) {
-  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
-    return true;
-  }
-  return await modelInfoService.isThinkingSupported(model);
-}
-
-export async function isThinkingDefault(
-  model: string,
-  modelInfoService: ModelInfoService,
-) {
-  if (model.startsWith('gemini-2.5-flash-lite')) {
-    return false;
-  }
-  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
-    return true;
-  }
+  // if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+  //   return true;
+  // }
+  console.log('asdf : async function isThinkingSupported');
   return await modelInfoService.isThinkingSupported(model);
 }
 
