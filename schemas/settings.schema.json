@@ -23,6 +23,12 @@
       "default": {},
       "type": "object",
       "properties": {
+        "previewFeatures": {
+          "title": "Preview Features (e.g., models)",
+          "description": "Enable preview features (e.g., preview models).",
+          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `yes`",
+          "type": "boolean"
+        },
         "preferredEditor": {
           "title": "Preferred Editor",
           "description": "The preferred editor to open files in.",
@@ -79,12 +85,6 @@
           "description": "Retry on \"exception TypeError: fetch failed sending request\" errors.",
           "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
-          "type": "boolean"
-        },
-        "previewFeatures": {
-          "title": "Preview Features (e.g., models)",
-          "description": "Enable preview features (e.g., preview models).",
-          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `yes`",
           "type": "boolean"
         },
         "debugKeystrokeLogging": {

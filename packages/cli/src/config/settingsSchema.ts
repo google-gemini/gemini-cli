@@ -160,6 +160,15 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
+      previewFeatures: {
+        type: 'boolean',
+        label: 'Preview Features (e.g., models)',
+        category: 'General',
+        requiresRestart: true,
+        default: undefined as boolean | undefined,
+        description: 'Enable preview features (e.g., preview models).',
+        showInDialog: true,
+      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -235,15 +244,6 @@ const SETTINGS_SCHEMA = {
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
-      },
-      previewFeatures: {
-        type: 'boolean',
-        label: 'Preview Features (e.g., models)',
-        category: 'General',
-        requiresRestart: true,
-        default: undefined as boolean | undefined,
-        description: 'Enable preview features (e.g., preview models).',
-        showInDialog: true,
       },
       debugKeystrokeLogging: {
         type: 'boolean',

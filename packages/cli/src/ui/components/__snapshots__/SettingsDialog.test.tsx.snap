@@ -6,13 +6,13 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             false                                     │
 │                                                                                                  │
 │   Disable Auto Update                                  false                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
@@ -41,13 +41,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             true*                                     │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             true*                                     │
 │                                                                                                  │
 │   Disable Auto Update                                  false                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
@@ -76,13 +76,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             false*                                    │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             false*                                    │
 │                                                                                                  │
 │   Disable Auto Update                                  false*                                    │
 │                                                                                                  │
 │   Enable Prompt Completion                             false*                                    │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false*                                    │
 │                                                                                                  │
@@ -111,13 +111,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             false                                     │
 │                                                                                                  │
 │   Disable Auto Update                                  false                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
@@ -146,13 +146,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             false                                     │
 │                                                                                                  │
 │   Disable Auto Update                                  false                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
@@ -181,13 +181,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │   Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
+│   Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
 │   Disable Auto Update                                  false                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
@@ -216,13 +216,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             false*                                    │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             false*                                    │
 │                                                                                                  │
 │   Disable Auto Update                                  true*                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
@@ -251,13 +251,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             false                                     │
 │                                                                                                  │
 │   Disable Auto Update                                  false                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
@@ -286,13 +286,13 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Vim Mode                                             true*                                     │
+│ ● Preview Features (e.g., models)                      undefined                                 │
+│                                                                                                  │
+│   Vim Mode                                             true*                                     │
 │                                                                                                  │
 │   Disable Auto Update                                  true*                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             true*                                     │
-│                                                                                                  │
-│   Preview Features (e.g., models)                      undefined                                 │
 │                                                                                                  │
 │   Debug Keystroke Logging                              true*                                     │
 │                                                                                                  │
