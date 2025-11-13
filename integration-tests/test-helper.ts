@@ -1004,7 +1004,7 @@ export class TestRig {
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
-      rows: 24,
+      rows: 80,
       cwd: this.testDir!,
       env: Object.fromEntries(
         Object.entries(env).filter(([, v]) => v !== undefined),
