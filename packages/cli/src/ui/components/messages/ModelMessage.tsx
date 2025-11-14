@@ -13,9 +13,9 @@ interface ModelMessageProps {
 }
 
 export const ModelMessage: React.FC<ModelMessageProps> = ({ model }) => (
-  <Box marginLeft={3}>
+  <Box marginLeft={2}>
     <Text color={theme.ui.comment} italic>
-      responding with {model}
+      Responding with {model}
     </Text>
   </Box>
 );
