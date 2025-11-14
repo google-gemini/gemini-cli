@@ -33,6 +33,7 @@ export interface MouseEvent {
   shift: boolean;
   meta: boolean;
   ctrl: boolean;
+  button: 'left' | 'middle' | 'right' | 'none';
 }
 
 export type MouseHandler = (event: MouseEvent) => void | boolean;
@@ -71,6 +72,20 @@ export function getMouseEventName(
   }
 }
 
+function getButtonFromCode(code: number): MouseEvent['button'] {
+  const button = code & 3;
+  switch (button) {
+    case 0:
+      return 'left';
+    case 1:
+      return 'middle';
+    case 2:
+      return 'right';
+    default:
+      return 'none';
+  }
+}
+
 export function parseSGRMouseEvent(
   buffer: string,
 ): { event: MouseEvent; length: number } | null {
@@ -98,6 +113,7 @@ export function parseSGRMouseEvent(
           shift,
           col,
           row,
+          button: getButtonFromCode(buttonCode),
         },
         length: match[0].length,
       };
@@ -165,8 +181,21 @@ export function parseX11MouseEvent(
   }
 
   if (name) {
+    let button = getButtonFromCode(b);
+    if (name === 'left-release' && button === 'none') {
+      button = 'left';
+    }
+
     return {
-      event: { name, ctrl, meta, shift, col, row },
+      event: {
+        name,
+        ctrl,
+        meta,
+        shift,
+        col,
+        row,
+        button,
+      },
       length: match[0].length,
     };
   }

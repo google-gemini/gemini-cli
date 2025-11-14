@@ -110,6 +110,7 @@ describe('ScrollProvider', () => {
             shift: false,
             ctrl: false,
             meta: false,
+            button: 'none',
           }) === true
         ) {
           handled = true;
@@ -147,6 +148,7 @@ describe('ScrollProvider', () => {
             shift: false,
             ctrl: false,
             meta: false,
+            button: 'none',
           }) === true
         ) {
           handled = true;
@@ -193,6 +195,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -226,6 +229,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -258,6 +262,7 @@ describe('ScrollProvider', () => {
       shift: false,
       ctrl: false,
       meta: false,
+      button: 'none',
     };
     for (const callback of mockUseMouseCallbacks) {
       callback(mouseEvent);
@@ -303,6 +308,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'none',
       });
       callback({
         name: 'scroll-down',
@@ -311,6 +317,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'none',
       });
       callback({
         name: 'scroll-up',
@@ -319,6 +326,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'none',
       });
     }
 
@@ -358,6 +366,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'none',
       });
       callback({
         name: 'scroll-down',
@@ -366,6 +375,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'none',
       });
       callback({
         name: 'scroll-down',
@@ -374,6 +384,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'none',
       });
     }
 
@@ -417,6 +428,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -429,6 +441,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -441,6 +454,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -475,6 +489,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -487,6 +502,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -498,6 +514,7 @@ describe('ScrollProvider', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
