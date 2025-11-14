@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text, useIsScreenReaderEnabled } from 'ink';
+import { Text, useIsScreenReaderEnabled } from '@jrichman/ink';
 import { CliSpinner } from './CliSpinner.js';
 import type { SpinnerName } from 'cli-spinners';
 import { useStreamingContext } from '../contexts/StreamingContext.js';

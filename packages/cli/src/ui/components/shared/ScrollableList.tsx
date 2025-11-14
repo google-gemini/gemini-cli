@@ -19,7 +19,7 @@ import {
   SCROLL_TO_ITEM_END,
 } from './VirtualizedList.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
-import { Box, type DOMElement } from 'ink';
+import { Box, type DOMElement } from '@jrichman/ink';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';

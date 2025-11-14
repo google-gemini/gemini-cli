@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { AlternateBufferQuittingDisplay } from './AlternateBufferQuittingDisplay.js';
 import { ToolCallStatus } from '../types.js';
 import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { renderWithProviders } from '../../test-utils/render.js';
 import type { Config } from '@llmcli/core';
 

@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';

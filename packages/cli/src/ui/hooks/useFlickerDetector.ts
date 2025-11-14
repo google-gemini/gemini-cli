@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type DOMElement, measureElement } from 'ink';
+import { type DOMElement, measureElement } from '@jrichman/ink';
 import { useEffect } from 'react';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { recordFlickerFrame } from '@llmcli/core';

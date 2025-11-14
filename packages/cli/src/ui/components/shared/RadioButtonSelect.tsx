@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { theme } from '../../semantic-colors.js';
 import { BaseSelectionList } from './BaseSelectionList.js';
 import type { SelectionListItem } from '../../hooks/useSelectionList.js';

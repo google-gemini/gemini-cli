@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { CliSpinner } from '../components/CliSpinner.js';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';

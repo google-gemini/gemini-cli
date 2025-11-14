@@ -5,7 +5,7 @@
  */
 
 import { render as inkRender } from 'ink-testing-library';
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import type React from 'react';
 import { act } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';

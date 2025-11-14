@@ -12,7 +12,12 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { Box, getInnerHeight, getScrollHeight, type DOMElement } from 'ink';
+import {
+  Box,
+  getInnerHeight,
+  getScrollHeight,
+  type DOMElement,
+} from '@jrichman/ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
 import { TableRenderer } from './TableRenderer.js';

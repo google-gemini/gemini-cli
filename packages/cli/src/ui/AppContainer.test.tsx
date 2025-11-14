@@ -135,7 +135,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
-import { measureElement } from 'ink';
+import { measureElement } from '@jrichman/ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@llmcli/core';
 import { type ExtensionManager } from '../config/extension-manager.js';

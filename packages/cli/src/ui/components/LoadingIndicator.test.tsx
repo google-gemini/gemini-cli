@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { render } from '../../test-utils/render.js';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';

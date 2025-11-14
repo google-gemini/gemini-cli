@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import { Notifications } from '../components/Notifications.js';
 import { MainContent } from '../components/MainContent.js';
 import { DialogManager } from '../components/DialogManager.js';

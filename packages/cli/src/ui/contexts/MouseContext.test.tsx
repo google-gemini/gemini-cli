@@ -9,7 +9,7 @@ import { act } from 'react';
 import { MouseProvider, useMouseContext, useMouse } from './MouseContext.js';
 import { vi, type Mock } from 'vitest';
 import type React from 'react';
-import { useStdin } from 'ink';
+import { useStdin } from '@jrichman/ink';
 import { EventEmitter } from 'node:events';
 
 // Mock the 'ink' module to control stdin

@@ -5,7 +5,7 @@
  */
 
 import { debugLogger, type Config } from '@llmcli/core';
-import { useStdin } from 'ink';
+import { useStdin } from '@jrichman/ink';
 import type React from 'react';
 import {
   createContext,

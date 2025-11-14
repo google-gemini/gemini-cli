@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@llmcli/core';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';

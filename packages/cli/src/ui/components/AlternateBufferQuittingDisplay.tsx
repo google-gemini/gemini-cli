@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { AppHeader } from './AppHeader.js';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';

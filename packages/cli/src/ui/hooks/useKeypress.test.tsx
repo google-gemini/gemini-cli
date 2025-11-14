@@ -8,7 +8,7 @@ import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useKeypress } from './useKeypress.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
-import { useStdin } from 'ink';
+import { useStdin } from '@jrichman/ink';
 import { EventEmitter } from 'node:events';
 import type { Mock } from 'vitest';
 

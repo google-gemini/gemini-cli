@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
+import { Box, Text, getBoundingBox, type DOMElement } from '@jrichman/ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';

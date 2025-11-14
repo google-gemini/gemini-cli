@@ -11,7 +11,7 @@ import * as useTerminalSize from '../hooks/useTerminalSize.js';
 import { longAsciiLogo, longAsciiLogoIde } from './AsciiArt.js';
 import * as semanticColors from '../semantic-colors.js';
 import * as terminalSetup from '../utils/terminalSetup.js';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import type React from 'react';
 
 vi.mock('../hooks/useTerminalSize.js');

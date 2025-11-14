@@ -10,7 +10,7 @@ import { useFlickerDetector } from './useFlickerDetector.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { recordFlickerFrame } from '@llmcli/core';
 import { type Config } from '@llmcli/core';
-import { type DOMElement, measureElement } from 'ink';
+import { type DOMElement, measureElement } from '@jrichman/ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 

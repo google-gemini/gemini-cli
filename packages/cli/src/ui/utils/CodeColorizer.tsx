@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box } from '@jrichman/ink';
 import { common, createLowlight } from 'lowlight';
 import type {
   Root,

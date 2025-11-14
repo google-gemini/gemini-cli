@@ -6,7 +6,7 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { Scrollable } from './Scrollable.js';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ScrollProviderModule from '../../contexts/ScrollProvider.js';
 import { act } from 'react';

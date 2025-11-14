@@ -16,7 +16,7 @@ import {
   useKeypressContext,
   ESC_TIMEOUT,
 } from './KeypressContext.js';
-import { useStdin } from 'ink';
+import { useStdin } from '@jrichman/ink';
 import { EventEmitter } from 'node:events';
 
 // Mock the 'ink' module to control stdin

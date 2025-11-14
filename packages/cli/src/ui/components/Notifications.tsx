@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from '@jrichman/ink';
 import { useEffect, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';

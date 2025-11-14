@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, type Mock } from 'vitest';
 import { render } from '../test-utils/render.js';
-import { Text, useIsScreenReaderEnabled } from 'ink';
+import { Text, useIsScreenReaderEnabled } from '@jrichman/ink';
 import { makeFakeConfig } from '@llmcli/core';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';

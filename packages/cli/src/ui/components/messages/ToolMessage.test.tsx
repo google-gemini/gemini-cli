@@ -8,7 +8,7 @@ import React from 'react';
 import type { ToolMessageProps } from './ToolMessage.js';
 import { ToolMessage } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import type { AnsiOutput } from '@llmcli/core';
 import { renderWithProviders } from '../../../test-utils/render.js';

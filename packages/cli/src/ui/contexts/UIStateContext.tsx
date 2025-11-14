@@ -24,7 +24,7 @@ import type {
   IdeInfo,
   FallbackIntent,
 } from '@llmcli/core';
-import type { DOMElement } from 'ink';
+import type { DOMElement } from '@jrichman/ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 import type { UpdateObject } from '../utils/updateCheck.js';

@@ -13,7 +13,7 @@ import {
   type RenderItemContext,
 } from './BaseSelectionList.js';
 import { useSelectionList } from '../../hooks/useSelectionList.js';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import type { theme } from '../../semantic-colors.js';
 
 vi.mock('../../hooks/useSelectionList.js');

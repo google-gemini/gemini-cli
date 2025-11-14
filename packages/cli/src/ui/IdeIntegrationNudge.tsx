@@ -5,7 +5,7 @@
  */
 
 import type { IdeInfo } from '@llmcli/core';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import type { RadioSelectItem } from './components/shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { useKeypress } from './hooks/useKeypress.js';

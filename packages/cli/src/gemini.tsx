@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render } from '@jrichman/ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';

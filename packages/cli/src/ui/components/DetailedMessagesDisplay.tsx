@@ -6,7 +6,7 @@
 
 import { useRef, useCallback } from 'react';
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import type { ConsoleMessageItem } from '../types.js';
 import {

@@ -12,7 +12,7 @@ import {
   useRef,
   useLayoutEffect,
 } from 'react';
-import { type DOMElement, measureElement } from 'ink';
+import { type DOMElement, measureElement } from '@jrichman/ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -68,7 +68,7 @@ import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
-import { useStdout, useStdin } from 'ink';
+import { useStdout, useStdin } from '@jrichman/ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';

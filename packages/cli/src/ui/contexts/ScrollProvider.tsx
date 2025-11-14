@@ -14,7 +14,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { getBoundingBox, type DOMElement } from 'ink';
+import { getBoundingBox, type DOMElement } from '@jrichman/ink';
 import { useMouse, type MouseEvent } from '../hooks/useMouse.js';
 
 export interface ScrollState {

@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import {
   EDITOR_DISPLAY_NAMES,

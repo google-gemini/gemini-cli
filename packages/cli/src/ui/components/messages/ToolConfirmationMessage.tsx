@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useEffect, useState, useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type {

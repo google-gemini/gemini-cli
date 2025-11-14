@@ -24,7 +24,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { clearCachedCredentialFile } from '@llmcli/core';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 
 // Mocks
 vi.mock('@llmcli/core', async (importOriginal) => {

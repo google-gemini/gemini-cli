@@ -6,7 +6,7 @@
 
 import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import { TodoTray } from './Todo.js';
 import type { Todo } from '@llmcli/core';
 import type { UIState } from '../../contexts/UIStateContext.js';

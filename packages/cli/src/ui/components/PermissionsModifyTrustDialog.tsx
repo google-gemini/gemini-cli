@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import type React from 'react';
 import * as process from 'node:process';
 import * as path from 'node:path';
