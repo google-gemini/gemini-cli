@@ -47,11 +47,13 @@ describe('BaseToolInvocation', () => {
     );
 
     let capturedRequest: ToolConfirmationRequest | undefined;
-    vi.mocked(messageBus.publish).mockImplementation((request: Message) => {
-      if (request.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        capturedRequest = request;
-      }
-    });
+    vi.mocked(messageBus.publish).mockImplementation(
+      async (request: Message) => {
+        if (request.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
+          capturedRequest = request;
+        }
+      },
+    );
 
     let responseHandler:
       | ((response: ToolConfirmationResponse) => void)
@@ -102,11 +104,13 @@ describe('BaseToolInvocation', () => {
     );
 
     let capturedRequest: ToolConfirmationRequest | undefined;
-    vi.mocked(messageBus.publish).mockImplementation((request: Message) => {
-      if (request.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        capturedRequest = request;
-      }
-    });
+    vi.mocked(messageBus.publish).mockImplementation(
+      async (request: Message) => {
+        if (request.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
+          capturedRequest = request;
+        }
+      },
+    );
 
     // We need to mock subscribe to avoid hanging if we want to await the promise,
     // but for this test we just need to check publish.
