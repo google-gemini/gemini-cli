@@ -62,7 +62,7 @@ describe('experiments', () => {
       flagId: 234,
       boolValue: true,
     });
-    expect(experiments.flags['flag2']).toEqual({
+    expect(experiments.flags[345]).toEqual({
       flagId: 345,
       stringValue: 'value',
     });
