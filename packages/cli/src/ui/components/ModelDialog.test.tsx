@@ -52,6 +52,7 @@ const renderComponent = (
         getUseSmartEdit: vi.fn(() => false),
         getUseModelRouter: vi.fn(() => false),
         getProxy: vi.fn(() => undefined),
+        isInteractive: vi.fn(() => false),
 
         // --- Spread test-specific overrides ---
         ...contextValue,
@@ -188,6 +189,7 @@ describe('<ModelDialog />', () => {
       meta: false,
       shift: false,
       paste: false,
+      insertable: false,
       sequence: '',
     });
     expect(props.onClose).toHaveBeenCalledTimes(1);
@@ -198,6 +200,7 @@ describe('<ModelDialog />', () => {
       meta: false,
       shift: false,
       paste: false,
+      insertable: true,
       sequence: '',
     });
     expect(props.onClose).toHaveBeenCalledTimes(1);

@@ -30,20 +30,24 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // Allowed tool should be allowed
-      expect(engine.check({ name: 'run_shell_command' })).toBe(
-        PolicyDecision.ALLOW,
-      );
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // Excluded tool should be denied
-      expect(engine.check({ name: 'write_file' })).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
 
       // Other write tools should ask user
-      expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.ASK_USER);
+      expect(
+        (await engine.check({ name: 'replace' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
 
       // Unknown tools should use default
-      expect(engine.check({ name: 'unknown_tool' })).toBe(
-        PolicyDecision.ASK_USER,
-      );
+      expect(
+        (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should handle MCP server wildcard patterns correctly', async () => {
@@ -68,33 +72,49 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // Tools from allowed server should be allowed
-      expect(engine.check({ name: 'allowed-server__tool1' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect(engine.check({ name: 'allowed-server__another_tool' })).toBe(
-        PolicyDecision.ALLOW,
-      );
+      // Tools from allowed server should be allowed
+      expect(
+        (await engine.check({ name: 'allowed-server__tool1' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (
+          await engine.check(
+            { name: 'allowed-server__another_tool' },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // Tools from trusted server should be allowed
-      expect(engine.check({ name: 'trusted-server__tool1' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect(engine.check({ name: 'trusted-server__special_tool' })).toBe(
-        PolicyDecision.ALLOW,
-      );
+      expect(
+        (await engine.check({ name: 'trusted-server__tool1' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (
+          await engine.check(
+            { name: 'trusted-server__special_tool' },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // Tools from blocked server should be denied
-      expect(engine.check({ name: 'blocked-server__tool1' })).toBe(
-        PolicyDecision.DENY,
-      );
-      expect(engine.check({ name: 'blocked-server__any_tool' })).toBe(
-        PolicyDecision.DENY,
-      );
+      expect(
+        (await engine.check({ name: 'blocked-server__tool1' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'blocked-server__any_tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
 
       // Tools from unknown servers should use default
-      expect(engine.check({ name: 'unknown-server__tool' })).toBe(
-        PolicyDecision.ASK_USER,
-      );
+      expect(
+        (await engine.check({ name: 'unknown-server__tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should correctly prioritize specific tool excludes over MCP server wildcards', async () => {
@@ -114,13 +134,16 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // MCP server allowed (priority 2.1) provides general allow for server
-      expect(engine.check({ name: 'my-server__safe-tool' })).toBe(
-        PolicyDecision.ALLOW,
-      );
+      // MCP server allowed (priority 2.1) provides general allow for server
+      expect(
+        (await engine.check({ name: 'my-server__safe-tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
       // But specific tool exclude (priority 2.4) wins over server allow
-      expect(engine.check({ name: 'my-server__dangerous-tool' })).toBe(
-        PolicyDecision.DENY,
-      );
+      expect(
+        (await engine.check({ name: 'my-server__dangerous-tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
     });
 
     it('should handle complex mixed configurations', async () => {
@@ -150,38 +173,50 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // Read-only tools should be allowed (autoAccept)
-      expect(engine.check({ name: 'read_file' })).toBe(PolicyDecision.ALLOW);
-      expect(engine.check({ name: 'list_directory' })).toBe(
-        PolicyDecision.ALLOW,
-      );
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'list_directory' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // But glob is explicitly excluded, so it should be denied
-      expect(engine.check({ name: 'glob' })).toBe(PolicyDecision.DENY);
-
-      // Replace should ask user (normal write tool behavior)
-      expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.ASK_USER);
-
-      // Explicitly allowed tools
-      expect(engine.check({ name: 'custom-tool' })).toBe(PolicyDecision.ALLOW);
-      expect(engine.check({ name: 'my-server__special-tool' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-
-      // MCP server tools
-      expect(engine.check({ name: 'allowed-server__tool' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect(engine.check({ name: 'trusted-server__tool' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect(engine.check({ name: 'blocked-server__tool' })).toBe(
+      expect((await engine.check({ name: 'glob' }, undefined)).decision).toBe(
         PolicyDecision.DENY,
       );
 
+      // Replace should ask user (normal write tool behavior)
+      expect(
+        (await engine.check({ name: 'replace' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+
+      // Explicitly allowed tools
+      expect(
+        (await engine.check({ name: 'custom-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'my-server__special-tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // MCP server tools
+      expect(
+        (await engine.check({ name: 'allowed-server__tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'trusted-server__tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'blocked-server__tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+
       // Write tools should ask by default
-      expect(engine.check({ name: 'write_file' })).toBe(
-        PolicyDecision.ASK_USER,
-      );
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should handle YOLO mode correctly', async () => {
@@ -198,16 +233,20 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // Most tools should be allowed in YOLO mode
-      expect(engine.check({ name: 'run_shell_command' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect(engine.check({ name: 'write_file' })).toBe(PolicyDecision.ALLOW);
-      expect(engine.check({ name: 'unknown_tool' })).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // But explicitly excluded tools should still be denied
-      expect(engine.check({ name: 'dangerous-tool' })).toBe(
-        PolicyDecision.DENY,
-      );
+      expect(
+        (await engine.check({ name: 'dangerous-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
     });
 
     it('should handle AUTO_EDIT mode correctly', async () => {
@@ -220,13 +259,17 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // Edit tools should be allowed in AUTO_EDIT mode
-      expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.ALLOW);
-      expect(engine.check({ name: 'write_file' })).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'replace' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // Other tools should follow normal rules
-      expect(engine.check({ name: 'run_shell_command' })).toBe(
-        PolicyDecision.ASK_USER,
-      );
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should verify priority ordering works correctly in practice', async () => {
@@ -285,20 +328,26 @@ describe('Policy Engine Integration Tests', () => {
       expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
 
       // Verify the engine applies these priorities correctly
-      expect(engine.check({ name: 'blocked-tool' })).toBe(PolicyDecision.DENY);
-      expect(engine.check({ name: 'blocked-server__any' })).toBe(
-        PolicyDecision.DENY,
-      );
-      expect(engine.check({ name: 'specific-tool' })).toBe(
+      expect(
+        (await engine.check({ name: 'blocked-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'blocked-server__any' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'specific-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'trusted-server__any' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'mcp-server__any' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect((await engine.check({ name: 'glob' }, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
       );
-      expect(engine.check({ name: 'trusted-server__any' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect(engine.check({ name: 'mcp-server__any' })).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect(engine.check({ name: 'glob' })).toBe(PolicyDecision.ALLOW);
     });
 
     it('should handle edge case: MCP server with both trust and exclusion', async () => {
@@ -322,9 +371,10 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // Exclusion (195) should win over trust (90)
-      expect(engine.check({ name: 'conflicted-server__tool' })).toBe(
-        PolicyDecision.DENY,
-      );
+      expect(
+        (await engine.check({ name: 'conflicted-server__tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
     });
 
     it('should handle edge case: specific tool allowed but server excluded', async () => {
@@ -345,12 +395,14 @@ describe('Policy Engine Integration Tests', () => {
 
       // Server exclusion (195) wins over specific tool allow (100)
       // This might be counterintuitive but follows the priority system
-      expect(engine.check({ name: 'my-server__special-tool' })).toBe(
-        PolicyDecision.DENY,
-      );
-      expect(engine.check({ name: 'my-server__other-tool' })).toBe(
-        PolicyDecision.DENY,
-      );
+      expect(
+        (await engine.check({ name: 'my-server__special-tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'my-server__other-tool' }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
     });
 
     it('should verify non-interactive mode transformation', async () => {
@@ -365,10 +417,12 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(engineConfig);
 
       // ASK_USER should become DENY in non-interactive mode
-      expect(engine.check({ name: 'unknown_tool' })).toBe(PolicyDecision.DENY);
-      expect(engine.check({ name: 'run_shell_command' })).toBe(
-        PolicyDecision.DENY,
-      );
+      expect(
+        (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
     });
 
     it('should handle empty settings gracefully', async () => {
@@ -381,13 +435,17 @@ describe('Policy Engine Integration Tests', () => {
       const engine = new PolicyEngine(config);
 
       // Should have default rules for write tools
-      expect(engine.check({ name: 'write_file' })).toBe(
-        PolicyDecision.ASK_USER,
-      );
-      expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.ASK_USER);
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+      expect(
+        (await engine.check({ name: 'replace' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
 
       // Unknown tools should use default
-      expect(engine.check({ name: 'unknown' })).toBe(PolicyDecision.ASK_USER);
+      expect(
+        (await engine.check({ name: 'unknown' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should verify rules are created with correct priorities', async () => {

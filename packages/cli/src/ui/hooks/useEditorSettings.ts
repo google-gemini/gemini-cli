@@ -5,7 +5,10 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { type HistoryItem, MessageType } from '../types.js';
 import type { EditorType } from '@google/gemini-cli-core';
 import {
@@ -13,12 +16,14 @@ import {
   checkHasEditorType,
 } from '@google/gemini-cli-core';
 
+import { SettingPaths } from '../../config/settingPaths.js';
+
 interface UseEditorSettingsReturn {
   isEditorDialogOpen: boolean;
   openEditorDialog: () => void;
   handleEditorSelect: (
     editorType: EditorType | undefined,
-    scope: SettingScope,
+    scope: LoadableSettingScope,
   ) => void;
   exitEditorDialog: () => void;
 }
@@ -35,7 +40,7 @@ export const useEditorSettings = (
   }, []);
 
   const handleEditorSelect = useCallback(
-    (editorType: EditorType | undefined, scope: SettingScope) => {
+    (editorType: EditorType | undefined, scope: LoadableSettingScope) => {
       if (
         editorType &&
         (!checkHasEditorType(editorType) ||
@@ -45,7 +50,11 @@ export const useEditorSettings = (
       }
 
       try {
-        loadedSettings.setValue(scope, 'preferredEditor', editorType);
+        loadedSettings.setValue(
+          scope,
+          SettingPaths.General.PreferredEditor,
+          editorType,
+        );
         addItem(
           {
             type: MessageType.INFO,

@@ -16,7 +16,10 @@ import {
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useEditorSettings } from './useEditorSettings.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { MessageType, type HistoryItem } from '../types.js';
 import {
@@ -24,6 +27,8 @@ import {
   checkHasEditorType,
   allowEditorTypeInSandbox,
 } from '@google/gemini-cli-core';
+
+import { SettingPaths } from '../../config/settingPaths.js';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -111,7 +116,7 @@ describe('useEditorSettings', () => {
 
     expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
       scope,
-      'preferredEditor',
+      SettingPaths.General.PreferredEditor,
       editorType,
     );
 
@@ -139,7 +144,7 @@ describe('useEditorSettings', () => {
 
     expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
       scope,
-      'preferredEditor',
+      SettingPaths.General.PreferredEditor,
       undefined,
     );
 
@@ -168,7 +173,7 @@ describe('useEditorSettings', () => {
 
       expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
         scope,
-        'preferredEditor',
+        SettingPaths.General.PreferredEditor,
         editorType,
       );
 
@@ -186,7 +191,10 @@ describe('useEditorSettings', () => {
     render(<TestComponent />);
 
     const editorType: EditorType = 'vscode';
-    const scopes = [SettingScope.User, SettingScope.Workspace];
+    const scopes: LoadableSettingScope[] = [
+      SettingScope.User,
+      SettingScope.Workspace,
+    ];
 
     scopes.forEach((scope) => {
       act(() => {
@@ -195,7 +203,7 @@ describe('useEditorSettings', () => {
 
       expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
         scope,
-        'preferredEditor',
+        SettingPaths.General.PreferredEditor,
         editorType,
       );
 

@@ -37,6 +37,7 @@ import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 interface CommandDirectory {
   path: string;
   extensionName?: string;
+  extensionId?: string;
 }
 
 /**
@@ -84,6 +85,10 @@ export class FileCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of all loaded SlashCommands.
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
+    if (this.folderTrustEnabled && !this.isTrustedFolder) {
+      return [];
+    }
+
     const allCommands: SlashCommand[] = [];
     const globOptions = {
       nodir: true,
@@ -101,15 +106,12 @@ export class FileCommandLoader implements ICommandLoader {
           cwd: dirInfo.path,
         });
 
-        if (this.folderTrustEnabled && !this.isTrustedFolder) {
-          return [];
-        }
-
         const commandPromises = files.map((file) =>
           this.parseAndAdaptFile(
             path.join(dirInfo.path, file),
             dirInfo.path,
             dirInfo.extensionName,
+            dirInfo.extensionId,
           ),
         );
 
@@ -120,7 +122,10 @@ export class FileCommandLoader implements ICommandLoader {
         // Add all commands without deduplication
         allCommands.push(...commands);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        if (
+          !signal.aborted &&
+          (error as { code?: string })?.code !== 'ENOENT'
+        ) {
           console.error(
             `[FileCommandLoader] Error loading commands from ${dirInfo.path}:`,
             error,
@@ -158,6 +163,7 @@ export class FileCommandLoader implements ICommandLoader {
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
         extensionName: ext.name,
+        extensionId: ext.id,
       }));
 
       dirs.push(...extensionCommandDirs);
@@ -177,6 +183,7 @@ export class FileCommandLoader implements ICommandLoader {
     filePath: string,
     baseDir: string,
     extensionName?: string,
+    extensionId?: string,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -265,6 +272,7 @@ export class FileCommandLoader implements ICommandLoader {
       description,
       kind: CommandKind.FILE,
       extensionName,
+      extensionId,
       action: async (
         context: CommandContext,
         _args: string,

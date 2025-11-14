@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/defaultModelConfigs.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
@@ -138,3 +139,6 @@ export { Storage } from './config/storage.js';
 
 // Export test utils
 export * from './test-utils/index.js';
+
+// Export hook types
+export * from './hooks/types.js';

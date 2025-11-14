@@ -21,6 +21,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_MODEL_CONFIGS,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -482,12 +483,21 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      showModelInfoInChat: {
+        type: 'boolean',
+        label: 'Show Model Info In Chat',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show the model name in the chat for each model turn.',
+        showInDialog: true,
+      },
       useFullWidth: {
         type: 'boolean',
         label: 'Use Full Width',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Use the entire width of the terminal for output.',
         showInDialog: true,
       },
@@ -496,9 +506,19 @@ const SETTINGS_SCHEMA = {
         label: 'Use Alternate Screen Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
+      incrementalRendering: {
+        type: 'boolean',
+        label: 'Incremental Rendering',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
       customWittyPhrases: {
@@ -676,6 +696,38 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Skip the next speaker check.',
         showInDialog: true,
+      },
+    },
+  },
+
+  modelConfigs: {
+    type: 'object',
+    label: 'Model Configs',
+    category: 'Model',
+    requiresRestart: false,
+    default: DEFAULT_MODEL_CONFIGS,
+    description: 'Model configurations.',
+    showInDialog: false,
+    properties: {
+      aliases: {
+        type: 'object',
+        label: 'Model Config Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: DEFAULT_MODEL_CONFIGS.aliases,
+        description:
+          'Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
+        showInDialog: false,
+      },
+      overrides: {
+        type: 'array',
+        label: 'Model Config Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.',
+        showInDialog: false,
       },
     },
   },
@@ -1044,11 +1096,11 @@ const SETTINGS_SCHEMA = {
   },
   useWriteTodos: {
     type: 'boolean',
-    label: 'Use Write Todos',
+    label: 'Use WriteTodos',
     category: 'Advanced',
     requiresRestart: false,
     default: true,
-    description: 'Enable the write_todos_list tool.',
+    description: 'Enable the write_todos tool.',
     showInDialog: false,
   },
   security: {
@@ -1067,6 +1119,15 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
+      blockGitExtensions: {
+        type: 'boolean',
+        label: 'Blocks extensions from Git',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
       },
       folderTrust: {
@@ -1234,7 +1295,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Codebase Investigator',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Enable the Codebase Investigator agent.',
             showInDialog: true,
           },
@@ -1243,7 +1304,7 @@ const SETTINGS_SCHEMA = {
             label: 'Codebase Investigator Max Num Turns',
             category: 'Experimental',
             requiresRestart: true,
-            default: 15,
+            default: 10,
             description:
               'Maximum number of turns for the Codebase Investigator agent.',
             showInDialog: true,
@@ -1253,7 +1314,7 @@ const SETTINGS_SCHEMA = {
             label: 'Max Time (Minutes)',
             category: 'Experimental',
             requiresRestart: true,
-            default: 5,
+            default: 3,
             description:
               'Maximum time for the Codebase Investigator agent (in minutes).',
             showInDialog: false,

@@ -29,8 +29,10 @@ import * as path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
-import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
+
 import { debugLogger } from '@google/gemini-cli-core';
+
+export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
 const execAsync = promisify(exec);
 
@@ -51,8 +53,7 @@ export interface TerminalSetupResult {
 
 type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf';
 
-// Terminal detection
-async function detectTerminal(): Promise<SupportedTerminal | null> {
+export function getTerminalProgram(): SupportedTerminal | null {
   const termProgram = process.env['TERM_PROGRAM'];
 
   // Check VS Code and its forks - check forks first to avoid false positives
@@ -72,6 +73,15 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
   // Check VS Code last since forks may also set VSCODE env vars
   if (termProgram === 'vscode' || process.env['VSCODE_GIT_IPC_HANDLE']) {
     return 'vscode';
+  }
+  return null;
+}
+
+// Terminal detection
+async function detectTerminal(): Promise<SupportedTerminal | null> {
+  const envTerminal = getTerminalProgram();
+  if (envTerminal) {
+    return envTerminal;
   }
 
   // Check parent process name

@@ -36,7 +36,7 @@ export interface GrepToolParams {
   /**
    * The directory to search in (optional, defaults to current directory relative to root)
    */
-  path?: string;
+  dir_path?: string;
 
   /**
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
@@ -114,8 +114,8 @@ class GrepToolInvocation extends BaseToolInvocation<
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
-      const searchDirAbs = this.resolveAndValidatePath(this.params.path);
-      const searchDirDisplay = this.params.path || '.';
+      const searchDirAbs = this.resolveAndValidatePath(this.params.dir_path);
+      const searchDirDisplay = this.params.dir_path || '.';
 
       // Determine which directories to search
       let searchDirectories: readonly string[];
@@ -299,14 +299,14 @@ class GrepToolInvocation extends BaseToolInvocation<
     if (this.params.include) {
       description += ` in ${this.params.include}`;
     }
-    if (this.params.path) {
+    if (this.params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
-        this.params.path,
+        this.params.dir_path,
       );
       if (
         resolvedPath === this.config.getTargetDir() ||
-        this.params.path === '.'
+        this.params.dir_path === '.'
       ) {
         description += ` within ./`;
       } else {
@@ -585,7 +585,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
               "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
             type: 'string',
           },
-          path: {
+          dir_path: {
             description:
               'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
             type: 'string',
@@ -660,10 +660,10 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
     }
 
-    // Only validate path if one is provided
-    if (params.path) {
+    // Only validate dir_path if one is provided
+    if (params.dir_path) {
       try {
-        this.resolveAndValidatePath(params.path);
+        this.resolveAndValidatePath(params.dir_path);
       } catch (error) {
         return getErrorMessage(error);
       }

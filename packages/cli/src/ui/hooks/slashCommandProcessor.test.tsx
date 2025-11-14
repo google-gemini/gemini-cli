@@ -26,6 +26,7 @@ import {
   ToolConfirmationOutcome,
   makeFakeConfig,
 } from '@google/gemini-cli-core';
+import { appEvents } from '../../utils/events.js';
 
 const { logSlashCommand } = vi.hoisted(() => ({
   logSlashCommand: vi.fn(),
@@ -163,7 +164,6 @@ describe('useSlashCommandProcessor', () => {
           vi.fn(), // refreshStatic
           vi.fn(), // toggleVimEnabled
           setIsProcessing,
-          vi.fn(), // setGeminiMdFileCount
           {
             openAuthDialog: mockOpenAuthDialog,
             openThemeDialog: mockOpenThemeDialog,
@@ -493,39 +493,6 @@ describe('useSlashCommandProcessor', () => {
         { type: 'user', text: 'old prompt' },
         expect.any(Number),
       );
-    });
-
-    it('should strip thoughts when handling "load_history" action', async () => {
-      const mockClient = {
-        setHistory: vi.fn(),
-        stripThoughtsFromHistory: vi.fn(),
-      } as unknown as GeminiClient;
-      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
-
-      const historyWithThoughts = [
-        {
-          role: 'model',
-          parts: [{ text: 'response', thoughtSignature: 'CikB...' }],
-        },
-      ];
-      const command = createTestCommand({
-        name: 'loadwiththoughts',
-        action: vi.fn().mockResolvedValue({
-          type: 'load_history',
-          history: [{ type: MessageType.GEMINI, text: 'response' }],
-          clientHistory: historyWithThoughts,
-        }),
-      });
-
-      const result = await setupProcessorHook([command]);
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
-
-      await act(async () => {
-        await result.current.handleSlashCommand('/loadwiththoughts');
-      });
-
-      expect(mockClient.setHistory).toHaveBeenCalledTimes(1);
-      expect(mockClient.stripThoughtsFromHistory).toHaveBeenCalledWith();
     });
 
     it('should handle a "quit" action', async () => {
@@ -1075,5 +1042,27 @@ describe('useSlashCommandProcessor', () => {
 
       expect(logSlashCommand).not.toHaveBeenCalled();
     });
+  });
+
+  it('should reload commands on extension events', async () => {
+    const result = await setupProcessorHook();
+    await waitFor(() => expect(result.current.slashCommands).toEqual([]));
+
+    // Create a new command and make that the result of the fileLoadCommands
+    // (which is where extension commands come from)
+    const newCommand = createTestCommand({
+      name: 'someNewCommand',
+      action: vi.fn(),
+    });
+    mockFileLoadCommands.mockResolvedValue([newCommand]);
+
+    // We should not see a change until we fire an event.
+    await waitFor(() => expect(result.current.slashCommands).toEqual([]));
+    await act(() => {
+      appEvents.emit('extensionsStarting');
+    });
+    await waitFor(() =>
+      expect(result.current.slashCommands).toEqual([newCommand]),
+    );
   });
 });

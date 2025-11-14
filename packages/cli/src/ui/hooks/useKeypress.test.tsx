@@ -38,7 +38,7 @@ class MockStdin extends EventEmitter {
   }
 }
 
-describe('useKeypress', () => {
+describe(`useKeypress`, () => {
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
@@ -50,7 +50,7 @@ describe('useKeypress', () => {
       return null;
     }
     return render(
-      <KeypressProvider kittyProtocolEnabled={false}>
+      <KeypressProvider>
         <TestComponent />
       </KeypressProvider>,
     );
@@ -58,6 +58,7 @@ describe('useKeypress', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
     stdin = new MockStdin();
     (useStdin as Mock).mockReturnValue({
       stdin,
@@ -87,6 +88,7 @@ describe('useKeypress', () => {
     { key: { name: 'right', sequence: '\x1b[C' } },
     { key: { name: 'up', sequence: '\x1b[A' } },
     { key: { name: 'down', sequence: '\x1b[B' } },
+    { key: { name: 'tab', sequence: '\x1b[Z', shift: true } },
   ])('should listen for keypress when active for key $key.name', ({ key }) => {
     renderKeypressHook(true);
     act(() => stdin.write(key.sequence));
@@ -142,6 +144,7 @@ describe('useKeypress', () => {
         meta: false,
         shift: false,
         paste: true,
+        insertable: true,
         sequence: pasteText,
       });
     });
@@ -186,20 +189,20 @@ describe('useKeypress', () => {
       expect(onKeypress).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle paste false alarm', () => {
+    it('should handle paste false alarm', async () => {
       renderKeypressHook(true);
 
       act(() => {
         stdin.write(PASTE_START.slice(0, 5));
         stdin.write('do');
       });
+
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ sequence: '\x1B[200d' }),
       );
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ sequence: 'o' }),
       );
-
       expect(onKeypress).toHaveBeenCalledTimes(2);
     });
 
@@ -240,11 +243,11 @@ describe('useKeypress', () => {
       const pasteText = 'pasted';
       await act(async () => {
         stdin.write(PASTE_START.slice(0, 3));
-        await new Promise((r) => setTimeout(r, 50));
+        vi.advanceTimersByTime(40);
         stdin.write(PASTE_START.slice(3) + pasteText.slice(0, 3));
-        await new Promise((r) => setTimeout(r, 50));
+        vi.advanceTimersByTime(40);
         stdin.write(pasteText.slice(3) + PASTE_END.slice(0, 3));
-        await new Promise((r) => setTimeout(r, 50));
+        vi.advanceTimersByTime(40);
         stdin.write(PASTE_END.slice(3));
       });
       expect(onKeypress).toHaveBeenCalledWith(
@@ -258,29 +261,6 @@ describe('useKeypress', () => {
       );
 
       expect(onKeypress).toHaveBeenCalledTimes(3);
-    });
-
-    it('should emit partial paste content if unmounted mid-paste', () => {
-      const { unmount } = renderKeypressHook(true);
-      const pasteText = 'incomplete paste';
-
-      act(() => stdin.write(PASTE_START + pasteText));
-
-      // No event should be fired yet.
-      expect(onKeypress).not.toHaveBeenCalled();
-
-      // Unmounting should trigger the flush.
-      unmount();
-
-      expect(onKeypress).toHaveBeenCalledTimes(1);
-      expect(onKeypress).toHaveBeenCalledWith({
-        name: '',
-        ctrl: false,
-        meta: false,
-        shift: false,
-        paste: true,
-        sequence: pasteText,
-      });
     });
   });
 });
