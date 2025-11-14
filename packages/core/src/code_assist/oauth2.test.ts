@@ -351,7 +351,7 @@ describe('oauth2', () => {
         await expect(
           getOauthClient(AuthType.COMPUTE_ADC, mockConfig),
         ).rejects.toThrow(
-          'Could not authenticate using application default credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ADC Failed',
+          'Could not authenticate using metadata server application default credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ADC Failed',
         );
       });
     });

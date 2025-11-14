@@ -114,23 +114,23 @@ describe('AuthDialog', () => {
     });
   });
 
-  it('does not show application default credentials option in Cloud Shell environment', () => {
+  it('does not show metadata server application default credentials option in Cloud Shell environment', () => {
     process.env['CLOUD_SHELL'] = 'true';
     renderWithProviders(<AuthDialog {...props} />);
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items).not.toContainEqual({
-      label: 'Use application default credentials',
+      label: 'Use metadata server application default credentials',
       value: AuthType.COMPUTE_ADC,
       key: AuthType.COMPUTE_ADC,
     });
   });
 
-  it('shows application default credentials option when GEMINI_CLI_USE_COMPUTE_ADC env var is true', () => {
+  it('shows metadata server application default credentials option when GEMINI_CLI_USE_COMPUTE_ADC env var is true', () => {
     process.env['GEMINI_CLI_USE_COMPUTE_ADC'] = 'true';
     renderWithProviders(<AuthDialog {...props} />);
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items).toContainEqual({
-      label: 'Use application default credentials',
+      label: 'Use metadata server application default credentials',
       value: AuthType.COMPUTE_ADC,
       key: AuthType.COMPUTE_ADC,
     });

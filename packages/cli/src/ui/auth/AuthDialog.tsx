@@ -57,7 +57,7 @@ export function AuthDialog({
       : process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
         ? [
             {
-              label: 'Use application default credentials',
+              label: 'Use metadata server application default credentials',
               value: AuthType.COMPUTE_ADC,
               key: AuthType.COMPUTE_ADC,
             },

@@ -161,7 +161,7 @@ async function initOauthClient(
   if (authType === AuthType.COMPUTE_ADC) {
     try {
       debugLogger.log(
-        'Attempting to authenticate via application default credentials.',
+        'Attempting to authenticate via metadata server application default credentials.',
       );
 
       const computeClient = new Compute({
@@ -175,7 +175,7 @@ async function initOauthClient(
       return computeClient;
     } catch (e) {
       throw new Error(
-        `Could not authenticate using application default credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
+        `Could not authenticate using metadata server application default credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
           e,
         )}`,
       );
