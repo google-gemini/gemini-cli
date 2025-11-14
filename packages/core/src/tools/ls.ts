@@ -7,6 +7,7 @@
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { minimatch } from 'minimatch';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -91,13 +92,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       return false;
     }
     for (const pattern of patterns) {
-      // Convert glob pattern to RegExp
-      const regexPattern = pattern
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*/g, '.*')
-        .replace(/\?/g, '.');
-      const regex = new RegExp(`^${regexPattern}$`);
-      if (regex.test(filename)) {
+      if (minimatch(filename, pattern, { dot: true })) {
         return true;
       }
     }
