@@ -44,6 +44,7 @@ import {
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
 import { appEvents } from '../../utils/events.js';
+import { useAlternateBuffer } from './useAlternateBuffer.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -81,6 +82,7 @@ export const useSlashCommandProcessor = (
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
+  const alternateBuffer = useAlternateBuffer();
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
@@ -196,7 +198,9 @@ export const useSlashCommandProcessor = (
         addItem,
         clear: () => {
           clearItems();
-          console.clear();
+          if (!alternateBuffer) {
+            console.clear();
+          }
           refreshStatic();
         },
         loadHistory,
@@ -218,6 +222,7 @@ export const useSlashCommandProcessor = (
       },
     }),
     [
+      alternateBuffer,
       config,
       settings,
       gitService,
