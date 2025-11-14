@@ -16,6 +16,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { MessageType } from '../types.js';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { coreEvents } from '@google/gemini-cli-core';
 
 interface TrustState {
   currentTrustLevel: TrustLevel | undefined;
@@ -101,7 +102,14 @@ export const usePermissionsModifyTrust = (
         setNeedsRestart(true);
       } else {
         const folders = loadTrustedFolders();
-        folders.setValue(cwd, trustLevel);
+        try {
+          folders.setValue(cwd, trustLevel);
+        } catch (_e) {
+          coreEvents.emitFeedback(
+            'error',
+            'Failed to save trust settings. Your changes may not persist.',
+          );
+        }
         onExit();
       }
     },
@@ -111,8 +119,20 @@ export const usePermissionsModifyTrust = (
   const commitTrustLevelChange = useCallback(() => {
     if (pendingTrustLevel) {
       const folders = loadTrustedFolders();
-      folders.setValue(cwd, pendingTrustLevel);
+      try {
+        folders.setValue(cwd, pendingTrustLevel);
+        return true;
+      } catch (_e) {
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to save trust settings. Your changes may not persist.',
+        );
+        setNeedsRestart(false);
+        setPendingTrustLevel(undefined);
+        return false;
+      }
     }
+    return true;
   }, [cwd, pendingTrustLevel]);
 
   return {

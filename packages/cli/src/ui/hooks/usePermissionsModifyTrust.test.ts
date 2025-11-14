@@ -19,6 +19,7 @@ import { usePermissionsModifyTrust } from './usePermissionsModifyTrust.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
+import { coreEvents } from '@google/gemini-cli-core';
 
 // Hoist mocks
 const mockedCwd = vi.hoisted(() => vi.fn());
@@ -258,5 +259,71 @@ describe('usePermissionsModifyTrust', () => {
       },
       expect.any(Number),
     );
+  });
+
+  it('should emit feedback when setValue throws in updateTrustLevel', () => {
+    const mockSetValue = vi.fn().mockImplementation(() => {
+      throw new Error('test error');
+    });
+    mockedLoadTrustedFolders.mockReturnValue({
+      user: { config: {} },
+      setValue: mockSetValue,
+    } as unknown as LoadedTrustedFolders);
+
+    mockedIsWorkspaceTrusted.mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    const { result } = renderHook(() =>
+      usePermissionsModifyTrust(mockOnExit, mockAddItem),
+    );
+
+    act(() => {
+      result.current.updateTrustLevel(TrustLevel.TRUST_PARENT);
+    });
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      'Failed to save trust settings. Your changes may not persist.',
+    );
+    expect(mockOnExit).toHaveBeenCalled();
+  });
+
+  it('should emit feedback when setValue throws in commitTrustLevelChange', () => {
+    const mockSetValue = vi.fn().mockImplementation(() => {
+      throw new Error('test error');
+    });
+    mockedLoadTrustedFolders.mockReturnValue({
+      user: { config: {} },
+      setValue: mockSetValue,
+    } as unknown as LoadedTrustedFolders);
+
+    mockedIsWorkspaceTrusted
+      .mockReturnValueOnce({ isTrusted: false, source: 'file' })
+      .mockReturnValueOnce({ isTrusted: true, source: 'file' });
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    const { result } = renderHook(() =>
+      usePermissionsModifyTrust(mockOnExit, mockAddItem),
+    );
+
+    act(() => {
+      result.current.updateTrustLevel(TrustLevel.TRUST_FOLDER);
+    });
+
+    act(() => {
+      const success = result.current.commitTrustLevelChange();
+      expect(success).toBe(false);
+    });
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      'Failed to save trust settings. Your changes may not persist.',
+    );
+    expect(result.current.needsRestart).toBe(false);
   });
 });
