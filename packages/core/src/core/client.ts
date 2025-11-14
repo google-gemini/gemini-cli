@@ -207,7 +207,11 @@ export class GeminiClient {
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
 
-      if (await isThinkingSupported(model, this.config.getModelInfoService())) {
+      const modelInfoService = this.config.getModelInfoService();
+      if (
+        modelInfoService &&
+        (await isThinkingSupported(model, modelInfoService))
+      ) {
         config.thinkingConfig = {
           includeThoughts: true,
           thinkingBudget: DEFAULT_THINKING_MODE,

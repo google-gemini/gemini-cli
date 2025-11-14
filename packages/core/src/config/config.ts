@@ -638,15 +638,8 @@ export class Config {
     return this.contentGenerator;
   }
 
-  getModelInfoService(): ModelInfoService {
-    if (this.modelInfoService) {
-      return this.modelInfoService;
-    } else {
-      // We hit this path only if this.contentGenerator doesn't exist.
-      throw new Error(
-        'ModelInfoService not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
-      );
-    }
+  getModelInfoService(): ModelInfoService | undefined {
+    return this.modelInfoService;
   }
 
   async refreshAuth(authMethod: AuthType) {
