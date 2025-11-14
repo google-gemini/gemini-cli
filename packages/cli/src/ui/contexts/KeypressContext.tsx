@@ -22,7 +22,7 @@ import { appEvents, AppEvent } from '../../utils/events.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
-export const PASTE_TIMEOUT = 3000;
+export const PASTE_TIMEOUT = 10000;
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -127,151 +127,243 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00B5': 'm', // "µ" toggle markup view
 };
 
-function nonKeyboardEventFilter(
-  keypressHandler: KeypressHandler,
-): KeypressHandler {
-  return (key: Key) => {
-    if (
-      !parseMouseEvent(key.sequence) &&
-      key.sequence !== FOCUS_IN &&
-      key.sequence !== FOCUS_OUT
-    ) {
-      keypressHandler(key);
+/**
+ * Helper class to manage an async iterator with timeout capabilities.
+ * Allows "peeking" or waiting for the next value with a timeout,
+ * without consuming the value if the timeout occurs.
+ */
+class AsyncStream<T> {
+  private iterator: AsyncIterator<T>;
+  private pending: Promise<IteratorResult<T>> | null = null;
+
+  constructor(iterable: AsyncIterable<T>) {
+    this.iterator = iterable[Symbol.asyncIterator]();
+  }
+
+  /**
+   * Gets the next value from the stream.
+   */
+  async next(): Promise<IteratorResult<T>> {
+    if (this.pending) {
+      const p = this.pending;
+      this.pending = null;
+      return p;
+    }
+    return this.iterator.next();
+  }
+
+  /**
+   * Waits for the next value or a timeout.
+   * If the timeout occurs, the next value is NOT consumed and will be returned
+   * by the next call to `next()` or `nextOrTimeout()`.
+   */
+  async nextOrTimeout<U>(
+    ms: number,
+    timeoutValue: U,
+  ): Promise<IteratorResult<T> | { timeout: true; value: U }> {
+    if (!this.pending) {
+      this.pending = this.iterator.next();
+    }
+
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<{ timeout: true; value: U }>(
+      (resolve) => {
+        timer = setTimeout(
+          () => resolve({ timeout: true, value: timeoutValue }),
+          ms,
+        );
+      },
+    );
+
+    const result = await Promise.race([this.pending, timeoutPromise]);
+
+    clearTimeout(timer!);
+
+    if ('timeout' in result && result.timeout) {
+      return result;
+    } else {
+      this.pending = null;
+      return result as IteratorResult<T>;
+    }
+  }
+}
+
+/**
+ * Converts stdin data events into an async iterable of characters.
+ */
+async function* stdinToAsyncIterator(
+  stdin: NodeJS.ReadStream,
+): AsyncGenerator<string> {
+  const queue: string[] = [];
+  let resolve: (() => void) | null = null;
+  let error: Error | null = null;
+  let done = false;
+
+  const onData = (data: Buffer | string) => {
+    const str = data.toString();
+    for (const char of str) {
+      queue.push(char);
+    }
+    if (resolve) {
+      const r = resolve;
+      resolve = null;
+      r();
     }
   };
+
+  const onEnd = () => {
+    done = true;
+    if (resolve) {
+      const r = resolve;
+      resolve = null;
+      r();
+    }
+  };
+
+  const onError = (err: Error) => {
+    error = err;
+    if (resolve) {
+      const r = resolve;
+      resolve = null;
+      r();
+    }
+  };
+
+  stdin.on('data', onData);
+  stdin.on('end', onEnd);
+  stdin.on('error', onError);
+
+  try {
+    while (true) {
+      if (queue.length > 0) {
+        yield queue.shift()!;
+        continue;
+      }
+
+      if (error) throw error;
+      if (done) return;
+
+      await new Promise<void>((r) => (resolve = r));
+    }
+  } finally {
+    stdin.off('data', onData);
+    stdin.off('end', onEnd);
+    stdin.off('error', onError);
+  }
 }
 
 /**
  * Buffers "/" keys to see if they are followed return.
- * Will flush the buffer if no data is received for DRAG_COMPLETION_TIMEOUT_MS
- * or when a null key is received.
  */
-function bufferBackslashEnter(
-  keypressHandler: KeypressHandler,
-): (key: Key | null) => void {
-  const bufferer = (function* (): Generator<void, void, Key | null> {
-    while (true) {
-      const key = yield;
+async function* bufferBackslashEnter(
+  keyStream: AsyncIterable<Key>,
+): AsyncGenerator<Key> {
+  const stream = new AsyncStream(keyStream);
 
-      if (key == null) {
-        continue;
-      } else if (key.sequence !== '\\') {
-        keypressHandler(key);
-        continue;
-      }
+  while (true) {
+    const result = await stream.next();
+    if (result.done) break;
+    const key = result.value;
 
-      const timeoutId = setTimeout(
-        () => bufferer.next(null),
-        BACKSLASH_ENTER_TIMEOUT,
-      );
-      const nextKey = yield;
-      clearTimeout(timeoutId);
+    if (key.sequence !== '\\') {
+      yield key;
+      continue;
+    }
 
-      if (nextKey === null) {
-        keypressHandler(key);
-      } else if (nextKey.name === 'return') {
-        keypressHandler({
+    // We got backslash. Wait for next key or timeout.
+    const nextResult = await stream.nextOrTimeout(
+      BACKSLASH_ENTER_TIMEOUT,
+      null,
+    );
+
+    if ('timeout' in nextResult) {
+      // Timeout occurred, yield the original backslash
+      yield key;
+    } else if (nextResult.done) {
+      yield key;
+      break;
+    } else {
+      const nextKey = nextResult.value;
+      if (nextKey.name === 'return') {
+        yield {
           ...nextKey,
           shift: true,
           sequence: '\r', // Corrected escaping for newline
-        });
+        };
       } else {
-        keypressHandler(key);
-        keypressHandler(nextKey);
+        yield key;
+        yield nextKey;
       }
     }
-  })();
-
-  bufferer.next(); // prime the generator so it starts listening.
-
-  return (key: Key | null) => bufferer.next(key);
+  }
 }
 
 /**
  * Buffers paste events between paste-start and paste-end sequences.
- * Will flush the buffer if no data is received for PASTE_TIMEOUT ms or
- * when a null key is received.
  */
-function bufferPaste(
-  keypressHandler: KeypressHandler,
-): (key: Key | null) => void {
-  const bufferer = (function* (): Generator<void, void, Key | null> {
+async function* bufferPaste(
+  keyStream: AsyncIterable<Key>,
+): AsyncGenerator<Key> {
+  const stream = new AsyncStream(keyStream);
+
+  while (true) {
+    const result = await stream.next();
+    if (result.done) break;
+    let key = result.value;
+
+    if (key.name !== 'paste-start') {
+      yield key;
+      continue;
+    }
+
+    let buffer = '';
     while (true) {
-      let key = yield;
+      const nextResult = await stream.nextOrTimeout(PASTE_TIMEOUT, null);
 
-      if (key === null) {
-        continue;
-      } else if (key.name !== 'paste-start') {
-        keypressHandler(key);
-        continue;
+      if ('timeout' in nextResult) {
+        appEvents.emit(AppEvent.PasteTimeout);
+        break;
       }
 
-      let buffer = '';
-      while (true) {
-        const timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
-        key = yield;
-        clearTimeout(timeoutId);
-
-        if (key === null) {
-          appEvents.emit(AppEvent.PasteTimeout);
-          break;
-        }
-
-        if (key.name === 'paste-end') {
-          break;
-        }
-        buffer += key.sequence;
+      if (nextResult.done) {
+        break;
       }
 
-      if (buffer.length > 0) {
-        keypressHandler({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: true,
-          insertable: true,
-          sequence: buffer,
-        });
+      key = nextResult.value;
+
+      if (key.name === 'paste-end') {
+        break;
       }
+      buffer += key.sequence;
     }
-  })();
-  bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key | null) => bufferer.next(key);
-}
-
-/**
- * Turns raw data strings into keypress events sent to the provided handler.
- * Buffers escape sequences until a full sequence is received or
- * until a timeout occurs.
- */
-function createDataListener(keypressHandler: KeypressHandler) {
-  const parser = emitKeys(keypressHandler);
-  parser.next(); // prime the generator so it starts listening.
-
-  let timeoutId: NodeJS.Timeout;
-  return (data: string) => {
-    clearTimeout(timeoutId);
-    for (const char of data) {
-      parser.next(char);
+    if (buffer.length > 0) {
+      yield {
+        name: '',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: true,
+        insertable: true,
+        sequence: buffer,
+      };
     }
-    if (data.length !== 0) {
-      timeoutId = setTimeout(() => parser.next(''), ESC_TIMEOUT);
-    }
-  };
+  }
 }
 
 /**
  * Translates raw keypress characters into key events.
- * Buffers escape sequences until a full sequence is received or
- * until an empty string is sent to indicate a timeout.
  */
-function* emitKeys(
-  keypressHandler: KeypressHandler,
-): Generator<void, void, string> {
+async function* emitKeys(
+  charStream: AsyncIterable<string>,
+): AsyncGenerator<Key> {
+  const stream = new AsyncStream(charStream);
+
   while (true) {
-    let ch = yield;
+    const result = await stream.next();
+    if (result.done) break;
+
+    let ch = result.value;
     let sequence = ch;
     let escaped = false;
 
@@ -284,11 +376,25 @@ function* emitKeys(
 
     if (ch === ESC) {
       escaped = true;
-      ch = yield;
+      const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+      if ('timeout' in next) {
+        ch = '';
+      } else if (next.done) {
+        ch = '';
+      } else {
+        ch = next.value;
+      }
       sequence += ch;
 
       if (ch === ESC) {
-        ch = yield;
+        const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+        if ('timeout' in next) {
+          ch = '';
+        } else if (next.done) {
+          ch = '';
+        } else {
+          ch = next.value;
+        }
         sequence += ch;
       }
     }
@@ -301,12 +407,26 @@ function* emitKeys(
       if (ch === 'O') {
         // ESC O letter
         // ESC O modifier letter
-        ch = yield;
+        const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+        if ('timeout' in next) {
+          ch = '';
+        } else if (next.done) {
+          ch = '';
+        } else {
+          ch = next.value;
+        }
         sequence += ch;
 
         if (ch >= '0' && ch <= '9') {
           modifier = parseInt(ch, 10) - 1;
-          ch = yield;
+          const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next) {
+            ch = '';
+          } else if (next.done) {
+            ch = '';
+          } else {
+            ch = next.value;
+          }
           sequence += ch;
         }
 
@@ -316,81 +436,124 @@ function* emitKeys(
         // ESC [ modifier letter
         // ESC [ [ modifier letter
         // ESC [ [ num char
-        ch = yield;
+        const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+        if ('timeout' in next) {
+          ch = '';
+        } else if (next.done) {
+          ch = '';
+        } else {
+          ch = next.value;
+        }
         sequence += ch;
 
         if (ch === '[') {
           // \x1b[[A
           //      ^--- escape codes might have a second bracket
           code += ch;
-          ch = yield;
+          const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next) {
+            ch = '';
+          } else if (next.done) {
+            ch = '';
+          } else {
+            ch = next.value;
+          }
           sequence += ch;
         }
 
-        /*
-         * Here and later we try to buffer just enough data to get
-         * a complete ascii sequence.
-         *
-         * We have basically two classes of ascii characters to process:
-         *
-         *
-         * 1. `\x1b[24;5~` should be parsed as { code: '[24~', modifier: 5 }
-         *
-         * This particular example is featuring Ctrl+F12 in xterm.
-         *
-         *  - `;5` part is optional, e.g. it could be `\x1b[24~`
-         *  - first part can contain one or two digits
-         *  - there is also special case when there can be 3 digits
-         *    but without modifier. They are the case of paste bracket mode
-         *
-         * So the generic regexp is like /^(?:\d\d?(;\d)?[~^$]|\d{3}~)$/
-         *
-         *
-         * 2. `\x1b[1;5H` should be parsed as { code: '[H', modifier: 5 }
-         *
-         * This particular example is featuring Ctrl+Home in xterm.
-         *
-         *  - `1;5` part is optional, e.g. it could be `\x1b[H`
-         *  - `1;` part is optional, e.g. it could be `\x1b[5H`
-         *
-         * So the generic regexp is like /^((\d;)?\d)?[A-Za-z]$/
-         *
-         */
         const cmdStart = sequence.length - 1;
 
         // collect as many digits as possible
         while (ch >= '0' && ch <= '9') {
-          ch = yield;
+          const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next) {
+            ch = '';
+          } else if (next.done) {
+            ch = '';
+          } else {
+            ch = next.value;
+          }
           sequence += ch;
         }
 
         // skip modifier
         if (ch === ';') {
-          ch = yield;
+          const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next) {
+            ch = '';
+          } else if (next.done) {
+            ch = '';
+          } else {
+            ch = next.value;
+          }
           sequence += ch;
 
           // collect as many digits as possible
           while (ch >= '0' && ch <= '9') {
-            ch = yield;
+            const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+            if ('timeout' in next) {
+              ch = '';
+            } else if (next.done) {
+              ch = '';
+            } else {
+              ch = next.value;
+            }
             sequence += ch;
           }
         } else if (ch === '<') {
           // SGR mouse mode
-          ch = yield;
+          const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next) {
+            ch = '';
+          } else if (next.done) {
+            ch = '';
+          } else {
+            ch = next.value;
+          }
           sequence += ch;
           // Don't skip on empty string here to avoid timeouts on slow events.
           while (ch === '' || ch === ';' || (ch >= '0' && ch <= '9')) {
-            ch = yield;
+            const next = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+            if ('timeout' in next) {
+              ch = '';
+            } else if (next.done) {
+              ch = '';
+            } else {
+              ch = next.value;
+            }
             sequence += ch;
           }
         } else if (ch === 'M') {
           // X11 mouse mode
           // three characters after 'M'
-          ch = yield;
+          const next1 = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next1) {
+            ch = '';
+          } else if (next1.done) {
+            ch = '';
+          } else {
+            ch = next1.value;
+          }
           sequence += ch;
-          ch = yield;
+
+          const next2 = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next2) {
+            ch = '';
+          } else if (next2.done) {
+            ch = '';
+          } else {
+            ch = next2.value;
+          }
           sequence += ch;
-          ch = yield;
+
+          const next3 = await stream.nextOrTimeout(ESC_TIMEOUT, '');
+          if ('timeout' in next3) {
+            ch = '';
+          } else if (next3.done) {
+            ch = '';
+          } else {
+            ch = next3.value;
+          }
           sequence += ch;
         }
 
@@ -483,7 +646,7 @@ function* emitKeys(
       meta = true;
 
       // Emit first escape key here, then continue processing
-      keypressHandler({
+      yield {
         name: 'escape',
         ctrl,
         meta,
@@ -491,7 +654,7 @@ function* emitKeys(
         paste: false,
         insertable: false,
         sequence: ESC,
-      });
+      };
     } else if (escaped) {
       // Escape sequence timeout
       name = ch.length ? undefined : 'escape';
@@ -505,7 +668,7 @@ function* emitKeys(
       (sequence.length !== 0 && (name !== undefined || escaped)) ||
       charLengthAt(sequence, 0) === sequence.length
     ) {
-      keypressHandler({
+      yield {
         name: name || '',
         ctrl,
         meta,
@@ -513,7 +676,7 @@ function* emitKeys(
         paste: false,
         insertable,
         sequence,
-      });
+      };
     }
     // Unrecognized or broken escape sequence, don't emit anything
   }
@@ -583,24 +746,47 @@ export function KeypressProvider({
 
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
-    const mouseFilterer = nonKeyboardEventFilter(broadcast);
-    const backslashBufferer = bufferBackslashEnter(mouseFilterer);
-    const pasteBufferer = bufferPaste(backslashBufferer);
-    let dataListener = createDataListener(pasteBufferer);
+    const abortController = new AbortController();
 
-    if (debugKeystrokeLogging) {
-      const old = dataListener;
-      dataListener = (data: string) => {
-        if (data.length > 0) {
-          debugLogger.log(`[DEBUG] Raw StdIn: ${JSON.stringify(data)}`);
+    const run = async () => {
+      let charIterator: AsyncIterable<string> = stdinToAsyncIterator(stdin);
+
+      if (debugKeystrokeLogging) {
+        const originalIterator = charIterator;
+        charIterator = (async function* () {
+          for await (const char of originalIterator) {
+            debugLogger.log(`[DEBUG] Raw StdIn: ${JSON.stringify(char)}`);
+            yield char;
+          }
+        })();
+      }
+
+      const keyStream = emitKeys(charIterator);
+      const pasteStream = bufferPaste(keyStream);
+      const finalStream = bufferBackslashEnter(pasteStream);
+
+      try {
+        for await (const key of finalStream) {
+          if (abortController.signal.aborted) break;
+
+          if (
+            !parseMouseEvent(key.sequence) &&
+            key.sequence !== FOCUS_IN &&
+            key.sequence !== FOCUS_OUT
+          ) {
+            broadcast(key);
+          }
         }
-        old(data);
-      };
-    }
+      } catch (err) {
+        // Handle stream errors if necessary
+        console.error('Keypress stream error:', err);
+      }
+    };
 
-    stdin.on('data', dataListener);
+    run();
+
     return () => {
-      stdin.removeListener('data', dataListener);
+      abortController.abort();
       if (wasRaw === false) {
         setRawMode(false);
       }
