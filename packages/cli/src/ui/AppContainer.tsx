@@ -108,6 +108,7 @@ import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
+import { handleCopyKeyPress, cancelCopyHandler } from './utils/nativeSelection.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -254,6 +255,8 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
     })();
     registerCleanup(async () => {
+      // Cancel any pending copy handler
+      cancelCopyHandler();
       // Turn off mouse scroll.
       disableMouseEvents();
       const ideClient = await IdeClient.getInstance();
@@ -1049,8 +1052,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.QUIT](key)) {
-        // If the user presses Ctrl+C, we want to cancel any ongoing requests.
-        // This should happen regardless of the count.
+        // In alternate buffer mode, first Ctrl+C enables native copy
+        // by temporarily disabling mouse events. Subsequent presses act as cancel.
+        if (isAlternateBuffer && !copyModeEnabled && ctrlCPressCount === 0) {
+          // Temporarily disable mouse events to allow terminal's native
+          // text selection and copy with Ctrl+C/Cmd+C
+          const copyHandled = handleCopyKeyPress();
+          if (copyHandled) {
+            // Start a timer so the next Ctrl+C within the window will cancel
+            setCtrlCPressCount(1);
+            return;
+          }
+        }
+
+        // If the user presses Ctrl+C (again), cancel any ongoing requests.
         cancelOngoingRequest?.();
 
         setCtrlCPressCount((prev) => prev + 1);
@@ -1104,6 +1119,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       config,
       ideContextState,
       setCtrlCPressCount,
+      ctrlCPressCount,
       buffer.text.length,
       setCtrlDPressCount,
       handleSlashCommand,
