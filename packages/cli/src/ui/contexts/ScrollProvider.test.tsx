@@ -12,7 +12,7 @@ import {
 } from './ScrollProvider.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useRef, useImperativeHandle, forwardRef, type RefObject } from 'react';
-import { Box, type DOMElement } from 'ink';
+import { Box, type DOMElement } from '@jrichman/ink';
 import type { MouseEvent } from '../hooks/useMouse.js';
 
 // Mock useMouse hook

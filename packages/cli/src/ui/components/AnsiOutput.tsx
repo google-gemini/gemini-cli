@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
-import type { AnsiLine, AnsiOutput, AnsiToken } from '@google/gemini-cli-core';
+import { Box, Text } from '@jrichman/ink';
+import type { AnsiLine, AnsiOutput, AnsiToken } from '@llmcli/core';
 
 const DEFAULT_HEIGHT = 24;
 

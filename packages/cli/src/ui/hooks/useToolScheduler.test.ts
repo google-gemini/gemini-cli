@@ -25,19 +25,19 @@ import type {
   Status as ToolCallStatusType,
   AnyDeclarativeTool,
   AnyToolInvocation,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolConfirmationOutcome,
   ApprovalMode,
   MockTool,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { ToolCallStatus } from '../types.js';
 
 // Mocks
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual<any>('@google/gemini-cli-core');
+vi.mock('@llmcli/core', async () => {
+  const actual = await vi.importActual<any>('@llmcli/core');
   // Patch CoreToolScheduler to have cancelAll if it's missing in the test environment
   if (
     actual.CoreToolScheduler &&

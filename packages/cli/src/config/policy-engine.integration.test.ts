@@ -5,11 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  ApprovalMode,
-  PolicyDecision,
-  PolicyEngine,
-} from '@google/gemini-cli-core';
+import { ApprovalMode, PolicyDecision, PolicyEngine } from '@llmcli/core';
 import { createPolicyEngineConfig } from './policy.js';
 import type { Settings } from './settings.js';
 

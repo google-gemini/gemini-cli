@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Static } from 'ink';
+import { Box, Static } from '@jrichman/ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';

@@ -11,7 +11,7 @@ import type {
   MessageActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
+import type { DiscoveredMCPPrompt } from '@llmcli/core';
 import {
   DiscoveredMCPTool,
   getMCPDiscoveryState,
@@ -20,7 +20,7 @@ import {
   MCPServerStatus,
   getErrorMessage,
   MCPOAuthTokenStorage,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
 
@@ -94,7 +94,7 @@ const authCommand: SlashCommand = {
       );
 
       // Import dynamically to avoid circular dependencies
-      const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
+      const { MCPOAuthProvider } = await import('@llmcli/core');
 
       let oauthConfig = server.oauth;
       if (!oauthConfig) {
@@ -131,9 +131,9 @@ const authCommand: SlashCommand = {
         await mcpClientManager.restartServer(serverName);
       }
       // Update the client with the new tools
-      const geminiClient = config.getGeminiClient();
-      if (geminiClient?.isInitialized()) {
-        await geminiClient.setTools();
+      const llmcliClient = config.getGeminiClient();
+      if (llmcliClient?.isInitialized()) {
+        await llmcliClient.setTools();
       }
 
       // Reload the slash commands to reflect the changes.
@@ -320,9 +320,9 @@ const refreshCommand: SlashCommand = {
     await mcpClientManager.restart();
 
     // Update the client with the new tools
-    const geminiClient = config.getGeminiClient();
-    if (geminiClient?.isInitialized()) {
-      await geminiClient.setTools();
+    const llmcliClient = config.getGeminiClient();
+    if (llmcliClient?.isInitialized()) {
+      await llmcliClient.setTools();
     }
 
     // Reload the slash commands to reflect the changes.

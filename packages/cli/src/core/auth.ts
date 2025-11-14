@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  type AuthType,
-  type Config,
-  getErrorMessage,
-} from '@google/gemini-cli-core';
+import { type AuthType, type Config, getErrorMessage } from '@llmcli/core';
 
 /**
  * Handles the initial authentication flow.

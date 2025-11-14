@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import { TextInput } from '../components/shared/TextInput.js';
 import { useTextBuffer } from '../components/shared/text-buffer.js';

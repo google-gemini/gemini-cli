@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { listExtensions, type Config } from '@google/gemini-cli-core';
+import { listExtensions, type Config } from '@llmcli/core';
 import type { Command, CommandExecutionResponse } from './types.js';
 
 export class ExtensionsCommand implements Command {

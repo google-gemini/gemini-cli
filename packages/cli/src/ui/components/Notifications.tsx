@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from '@jrichman/ink';
 import { useEffect, useState } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -12,13 +12,13 @@ import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
-import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
+import { LLM_DIR, Storage } from '@llmcli/core';
 
 import * as fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-const settingsPath = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
+const settingsPath = path.join(os.homedir(), LLM_DIR, 'settings.json');
 
 const screenReaderNudgeFilePath = path.join(
   Storage.getGlobalTempDir(),

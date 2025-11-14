@@ -7,7 +7,7 @@
 import { render } from '../../../test-utils/render.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { MaxSizedBox, setMaxSizedBoxDebugging } from './MaxSizedBox.js';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { describe, it, expect } from 'vitest';
 
 describe('<MaxSizedBox />', () => {

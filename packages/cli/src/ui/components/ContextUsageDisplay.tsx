@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
-import { tokenLimit } from '@google/gemini-cli-core';
+import { tokenLimit } from '@llmcli/core';
 
 export const ContextUsageDisplay = ({
   promptTokenCount,

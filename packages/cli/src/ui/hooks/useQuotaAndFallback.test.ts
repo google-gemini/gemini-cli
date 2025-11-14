@@ -25,7 +25,7 @@ import {
   makeFakeConfig,
   type GoogleApiError,
   RetryableQuotaError,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';

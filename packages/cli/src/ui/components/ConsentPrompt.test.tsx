@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { act } from 'react';

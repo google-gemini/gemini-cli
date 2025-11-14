@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from '@jrichman/ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
@@ -25,7 +25,7 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@llmcli/core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
@@ -112,7 +112,7 @@ export const Composer = () => {
             !hideContextSummary && (
               <ContextSummaryDisplay
                 ideContext={uiState.ideContextState}
-                geminiMdFileCount={uiState.geminiMdFileCount}
+                llmcliMdFileCount={uiState.llmcliMdFileCount}
                 contextFileNames={contextFileNames}
                 mcpServers={config.getMcpClientManager()?.getMcpServers() ?? {}}
                 blockedMcpServers={

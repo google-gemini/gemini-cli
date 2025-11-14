@@ -1,10 +1,10 @@
 {
-  "name": "@google/gemini-cli-core",
+  "name": "@llmcli/core",
   "version": "0.17.0-nightly.20251114.0fcbff506",
-  "description": "Gemini CLI Core",
+  "description": "LLM CLI Core",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/Root1856/LLM-cli.git"
   },
   "type": "module",
   "main": "dist/index.js",
@@ -58,6 +58,7 @@
     "mime": "4.0.7",
     "mnemonist": "^0.40.3",
     "open": "^10.1.2",
+    "openai": "^6.9.0",
     "picomatch": "^4.0.1",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
@@ -79,7 +80,7 @@
     "node-pty": "^1.0.0"
   },
   "devDependencies": {
-    "@google/gemini-cli-test-utils": "file:../test-utils",
+    "@llmcli/test-utils": "file:../test-utils",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
     "@types/fast-levenshtein": "^0.0.4",

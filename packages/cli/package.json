@@ -1,15 +1,15 @@
 {
-  "name": "@google/gemini-cli",
+  "name": "@llmcli/cli",
   "version": "0.17.0-nightly.20251114.0fcbff506",
-  "description": "Gemini CLI",
+  "description": "LLM CLI",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/Root1856/LLM-cli.git"
   },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini": "dist/index.js"
+    "llm": "dist/index.js"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
@@ -25,10 +25,10 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.17.0-nightly.20251114.0fcbff506"
+    "sandboxImageUri": "us-docker.pkg.dev/llmcli-dev/llm-cli/sandbox:0.17.0-nightly.20251114.0fcbff506"
   },
   "dependencies": {
-    "@google/gemini-cli-core": "file:../core",
+    "@llmcli/core": "file:../core",
     "@google/genai": "1.16.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.15.1",
@@ -42,7 +42,7 @@
     "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "highlight.js": "^11.11.1",
-    "ink": "npm:@jrichman/ink@6.4.3",
+    "@jrichman/ink": "6.4.3",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "latest-version": "^9.0.0",
@@ -66,7 +66,7 @@
   },
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
-    "@google/gemini-cli-test-utils": "file:../test-utils",
+    "@llmcli/test-utils": "file:../test-utils",
     "@types/archiver": "^6.0.3",
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",

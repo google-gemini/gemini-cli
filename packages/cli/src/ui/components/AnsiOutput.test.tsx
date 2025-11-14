@@ -6,7 +6,7 @@
 
 import { render } from '../../test-utils/render.js';
 import { AnsiOutputText } from './AnsiOutput.js';
-import type { AnsiOutput, AnsiToken } from '@google/gemini-cli-core';
+import type { AnsiOutput, AnsiToken } from '@llmcli/core';
 
 // Helper to create a valid AnsiToken with default values
 const createAnsiToken = (overrides: Partial<AnsiToken>): AnsiToken => ({

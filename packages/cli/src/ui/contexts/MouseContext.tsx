@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useStdin } from 'ink';
+import { useStdin } from '@jrichman/ink';
 import type React from 'react';
 import {
   createContext,
@@ -14,7 +14,7 @@ import {
   useRef,
 } from 'react';
 import { ESC } from '../utils/input.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger } from '@llmcli/core';
 import {
   isIncompleteMouseSequence,
   parseMouseEvent,

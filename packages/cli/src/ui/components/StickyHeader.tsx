@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 
 export interface StickyHeaderProps {

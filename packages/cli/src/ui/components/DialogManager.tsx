@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';

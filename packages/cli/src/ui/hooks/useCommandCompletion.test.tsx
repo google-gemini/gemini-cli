@@ -18,7 +18,7 @@ import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useCommandCompletion } from './useCommandCompletion.js';
 import type { CommandContext } from '../commands/types.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config } from '@llmcli/core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { UseAtCompletionProps } from './useAtCompletion.js';

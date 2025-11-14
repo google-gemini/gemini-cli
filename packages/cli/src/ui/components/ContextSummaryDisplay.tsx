@@ -5,14 +5,14 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
-import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
+import { type IdeContext, type MCPServerConfig } from '@llmcli/core';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 interface ContextSummaryDisplayProps {
-  geminiMdFileCount: number;
+  llmcliMdFileCount: number;
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
@@ -20,7 +20,7 @@ interface ContextSummaryDisplayProps {
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
-  geminiMdFileCount,
+  llmcliMdFileCount,
   contextFileNames,
   mcpServers,
   blockedMcpServers,
@@ -33,7 +33,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
 
   if (
-    geminiMdFileCount === 0 &&
+    llmcliMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
     openFileCount === 0
@@ -51,13 +51,13 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   })();
 
   const geminiMdText = (() => {
-    if (geminiMdFileCount === 0) {
+    if (llmcliMdFileCount === 0) {
       return '';
     }
     const allNamesTheSame = new Set(contextFileNames).size < 2;
     const name = allNamesTheSame ? contextFileNames[0] : 'context';
-    return `${geminiMdFileCount} ${name} file${
-      geminiMdFileCount > 1 ? 's' : ''
+    return `${llmcliMdFileCount} ${name} file${
+      llmcliMdFileCount > 1 ? 's' : ''
     }`;
   })();
 

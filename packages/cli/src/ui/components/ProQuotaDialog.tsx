@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 

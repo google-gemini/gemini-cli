@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import {
@@ -22,7 +22,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
     vimMode: 'NORMAL',
   })),
 }));
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@llmcli/core';
 import { StreamingState } from '../types.js';
 
 // Mock child components
@@ -110,7 +110,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
     ideContextState: null,
-    geminiMdFileCount: 0,
+    llmcliMdFileCount: 0,
     renderMarkdown: true,
     filteredConsoleMessages: [],
     history: [],

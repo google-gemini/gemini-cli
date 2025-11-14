@@ -233,8 +233,8 @@ export interface ConfigParameters {
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   userMemory?: string;
-  geminiMdFileCount?: number;
-  geminiMdFilePaths?: string[];
+  llmcliMdFileCount?: number;
+  llmcliMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
@@ -305,6 +305,9 @@ export interface ConfigParameters {
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
+  localLLMBaseURL?: string;
+  localLLMApiKey?: string;
+  localLLMModel?: string;
 }
 
 export class Config {
@@ -334,14 +337,14 @@ export class Config {
   private readonly mcpServerCommand: string | undefined;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
-  private geminiMdFileCount: number;
-  private geminiMdFilePaths: string[];
+  private llmcliMdFileCount: number;
+  private llmcliMdFilePaths: string[];
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
-  private geminiClient!: GeminiClient;
+  private llmcliClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
   private modelRouterService: ModelRouterService;
   private readonly fileFiltering: {
@@ -397,6 +400,9 @@ export class Config {
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
   private readonly useWriteTodos: boolean;
+  private readonly localLLMBaseURL: string | undefined;
+  private readonly localLLMApiKey: string | undefined;
+  private readonly localLLMModel: string | undefined;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
@@ -442,8 +448,8 @@ export class Config {
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.userMemory = params.userMemory ?? '';
-    this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
-    this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
+    this.llmcliMdFileCount = params.llmcliMdFileCount ?? 0;
+    this.llmcliMdFilePaths = params.llmcliMdFilePaths ?? [];
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
@@ -513,6 +519,9 @@ export class Config {
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
+    this.localLLMBaseURL = params.localLLMBaseURL;
+    this.localLLMApiKey = params.localLLMApiKey;
+    this.localLLMModel = params.localLLMModel;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
@@ -576,7 +585,7 @@ export class Config {
         );
       }
     }
-    this.geminiClient = new GeminiClient(this);
+    this.llmcliClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
 
     // HACK: The settings loading logic doesn't currently merge the default
@@ -629,7 +638,7 @@ export class Config {
       await this.getExtensionLoader().start(this),
     ]);
 
-    await this.geminiClient.initialize();
+    await this.llmcliClient.initialize();
   }
 
   getContentGenerator(): ContentGenerator {
@@ -652,7 +661,7 @@ export class Config {
       authMethod === AuthType.LOGIN_WITH_GOOGLE
     ) {
       // Restore the conversation history to the new client
-      this.geminiClient.stripThoughtsFromHistory();
+      this.llmcliClient.stripThoughtsFromHistory();
     }
 
     const newContentGeneratorConfig = await createContentGeneratorConfig(
@@ -895,19 +904,19 @@ export class Config {
   }
 
   getGeminiMdFileCount(): number {
-    return this.geminiMdFileCount;
+    return this.llmcliMdFileCount;
   }
 
   setGeminiMdFileCount(count: number): void {
-    this.geminiMdFileCount = count;
+    this.llmcliMdFileCount = count;
   }
 
   getGeminiMdFilePaths(): string[] {
-    return this.geminiMdFilePaths;
+    return this.llmcliMdFilePaths;
   }
 
   setGeminiMdFilePaths(paths: string[]): void {
-    this.geminiMdFilePaths = paths;
+    this.llmcliMdFilePaths = paths;
   }
 
   getApprovalMode(): ApprovalMode {
@@ -964,7 +973,7 @@ export class Config {
   }
 
   getGeminiClient(): GeminiClient {
-    return this.geminiClient;
+    return this.llmcliClient;
   }
 
   getModelRouterService(): ModelRouterService {
@@ -1014,6 +1023,18 @@ export class Config {
 
   getProxy(): string | undefined {
     return this.proxy;
+  }
+
+  getLocalLLMBaseURL(): string | undefined {
+    return this.localLLMBaseURL;
+  }
+
+  getLocalLLMApiKey(): string | undefined {
+    return this.localLLMApiKey;
+  }
+
+  getLocalLLMModel(): string | undefined {
+    return this.localLLMModel;
   }
 
   getWorkingDir(): string {

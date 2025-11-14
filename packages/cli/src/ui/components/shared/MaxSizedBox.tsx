@@ -5,7 +5,7 @@
  */
 
 import React, { Fragment, useEffect, useId } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import stringWidth from 'string-width';
 import { theme } from '../../semantic-colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';

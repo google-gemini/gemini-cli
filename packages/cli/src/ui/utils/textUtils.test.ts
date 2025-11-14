@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { escapeAnsiCtrlCodes, stripUnsafeCharacters } from './textUtils.js';
 
 describe('textUtils', () => {

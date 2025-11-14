@@ -13,13 +13,13 @@ import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
 import { USER_SETTINGS_DIR } from '../config/settings.js';
 import { promisify } from 'node:util';
-import type { Config, SandboxConfig } from '@google/gemini-cli-core';
+import type { Config, SandboxConfig } from '@llmcli/core';
 import {
   coreEvents,
   debugLogger,
   FatalSandboxError,
-  GEMINI_DIR,
-} from '@google/gemini-cli-core';
+  LLM_DIR,
+} from '@llmcli/core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
 
@@ -157,7 +157,7 @@ function entrypoint(workdir: string, cliArgs: string[]): string[] {
     shellCmds.push(`export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}";`);
   }
 
-  const projectSandboxBashrc = path.join(GEMINI_DIR, 'sandbox.bashrc');
+  const projectSandboxBashrc = path.join(LLM_DIR, 'sandbox.bashrc');
   if (fs.existsSync(projectSandboxBashrc)) {
     shellCmds.push(`source ${getContainerPath(projectSandboxBashrc)};`);
   }
@@ -209,7 +209,7 @@ export async function start_sandbox(
       );
       // if profile name is not recognized, then look for file under project settings directory
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
-        profileFile = path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`);
+        profileFile = path.join(LLM_DIR, `sandbox-macos-${profile}.sb`);
       }
       if (!fs.existsSync(profileFile)) {
         throw new FatalSandboxError(
@@ -352,10 +352,7 @@ export async function start_sandbox(
     // determine full path for gemini-cli to distinguish linked vs installed setting
     const gcPath = fs.realpathSync(process.argv[1]);
 
-    const projectSandboxDockerfile = path.join(
-      GEMINI_DIR,
-      'sandbox.Dockerfile',
-    );
+    const projectSandboxDockerfile = path.join(LLM_DIR, 'sandbox.Dockerfile');
     const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
 
     const image = config.image;
@@ -377,7 +374,7 @@ export async function start_sandbox(
         // if project folder has sandbox.Dockerfile under project settings folder, use that
         let buildArgs = '';
         const projectSandboxDockerfile = path.join(
-          GEMINI_DIR,
+          LLM_DIR,
           'sandbox.Dockerfile',
         );
         if (isCustomProjectSandbox) {
@@ -434,9 +431,7 @@ export async function start_sandbox(
     // mount user settings directory inside container, after creating if missing
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
     const userSettingsDirOnHost = USER_SETTINGS_DIR;
-    const userSettingsDirInSandbox = getContainerPath(
-      `/home/node/${GEMINI_DIR}`,
-    );
+    const userSettingsDirInSandbox = getContainerPath(`/home/node/${LLM_DIR}`);
     if (!fs.existsSync(userSettingsDirOnHost)) {
       fs.mkdirSync(userSettingsDirOnHost);
     }
@@ -659,7 +654,7 @@ export async function start_sandbox(
         ?.toLowerCase()
         .startsWith(workdir.toLowerCase())
     ) {
-      const sandboxVenvPath = path.resolve(GEMINI_DIR, 'sandbox.venv');
+      const sandboxVenvPath = path.resolve(LLM_DIR, 'sandbox.venv');
       if (!fs.existsSync(sandboxVenvPath)) {
         fs.mkdirSync(sandboxVenvPath, { recursive: true });
       }

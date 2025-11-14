@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
@@ -16,7 +16,7 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
 } from '../utils/displayUtils.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import type { ToolCallStats } from '@google/gemini-cli-core';
+import type { ToolCallStats } from '@llmcli/core';
 
 const TOOL_NAME_COL_WIDTH = 25;
 const CALLS_COL_WIDTH = 8;

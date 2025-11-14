@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useContext, useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -14,7 +14,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   ModelSlashCommandEvent,
   logModelSlashCommand,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';

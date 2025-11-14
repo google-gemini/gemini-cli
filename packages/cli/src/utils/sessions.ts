@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ChatRecordingService, type Config } from '@google/gemini-cli-core';
+import { ChatRecordingService, type Config } from '@llmcli/core';
 import {
   formatRelativeTime,
   SessionSelector,

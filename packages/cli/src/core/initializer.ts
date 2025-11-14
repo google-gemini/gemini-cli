@@ -12,7 +12,7 @@ import {
   type Config,
   StartSessionEvent,
   logCliConfiguration,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
 import { validateTheme } from './theme.js';
@@ -21,7 +21,7 @@ export interface InitializationResult {
   authError: string | null;
   themeError: string | null;
   shouldOpenAuthDialog: boolean;
-  geminiMdFileCount: number;
+  llmcliMdFileCount: number;
 }
 
 /**
@@ -59,6 +59,6 @@ export async function initializeApp(
     authError,
     themeError,
     shouldOpenAuthDialog,
-    geminiMdFileCount: config.getGeminiMdFileCount(),
+    llmcliMdFileCount: config.getGeminiMdFileCount(),
   };
 }

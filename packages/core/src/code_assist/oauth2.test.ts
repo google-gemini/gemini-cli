@@ -25,7 +25,7 @@ import { AuthType } from '../core/contentGenerator.js';
 import type { Config } from '../config/config.js';
 import readline from 'node:readline';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { LLM_DIR } from '../utils/paths.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -183,7 +183,7 @@ describe('oauth2', () => {
       // Verify Google Account was cached
       const googleAccountPath = path.join(
         tempHomeDir,
-        GEMINI_DIR,
+        LLM_DIR,
         'google_accounts.json',
       );
       expect(fs.existsSync(googleAccountPath)).toBe(true);
@@ -291,7 +291,7 @@ describe('oauth2', () => {
         const cachedCreds = { refresh_token: 'cached-token' };
         const credsPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'oauth_creds.json',
         );
         await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
@@ -333,7 +333,7 @@ describe('oauth2', () => {
 
         const credsPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'oauth_creds.json',
         );
         expect(fs.existsSync(credsPath)).toBe(false);
@@ -362,7 +362,7 @@ describe('oauth2', () => {
         const defaultCreds = { refresh_token: 'default-cached-token' };
         const defaultCredsPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'oauth_creds.json',
         );
         await fs.promises.mkdir(path.dirname(defaultCredsPath), {
@@ -515,7 +515,7 @@ describe('oauth2', () => {
         // Verify Google Account was cached
         const googleAccountPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'google_accounts.json',
         );
         const cachedContent = fs.readFileSync(googleAccountPath, 'utf-8');
@@ -545,7 +545,7 @@ describe('oauth2', () => {
         const cachedCreds = { refresh_token: 'cached-token' };
         const credsPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'oauth_creds.json',
         );
         await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
@@ -578,7 +578,7 @@ describe('oauth2', () => {
         const cachedCreds = { refresh_token: 'cached-token' };
         const credsPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'oauth_creds.json',
         );
         await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
@@ -960,7 +960,7 @@ describe('oauth2', () => {
         const cachedCreds = { refresh_token: 'test-token' };
         const credsPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'oauth_creds.json',
         );
         await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
@@ -968,7 +968,7 @@ describe('oauth2', () => {
 
         const googleAccountPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'google_accounts.json',
         );
         const accountData = { active: 'test@example.com', old: [] };
@@ -1011,7 +1011,7 @@ describe('oauth2', () => {
         // Pre-populate credentials to make getOauthClient resolve quickly
         const credsPath = path.join(
           tempHomeDir,
-          GEMINI_DIR,
+          LLM_DIR,
           'oauth_creds.json',
         );
         await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
@@ -1152,7 +1152,7 @@ describe('oauth2', () => {
       expect(
         OAuthCredentialStorage.saveCredentials as Mock,
       ).toHaveBeenCalledWith(mockTokens);
-      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      const credsPath = path.join(tempHomeDir, LLM_DIR, 'oauth_creds.json');
       expect(fs.existsSync(credsPath)).toBe(false);
     });
 
@@ -1168,7 +1168,7 @@ describe('oauth2', () => {
       // Create a dummy unencrypted credential file.
       // If the logic is correct, this file should be ignored.
       const unencryptedCreds = { refresh_token: 'unencrypted-token' };
-      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      const credsPath = path.join(tempHomeDir, LLM_DIR, 'oauth_creds.json');
       await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
       await fs.promises.writeFile(credsPath, JSON.stringify(unencryptedCreds));
 
@@ -1198,7 +1198,7 @@ describe('oauth2', () => {
       );
 
       // Create a dummy unencrypted credential file. It should not be deleted.
-      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      const credsPath = path.join(tempHomeDir, LLM_DIR, 'oauth_creds.json');
       await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
       await fs.promises.writeFile(credsPath, '{}');
 

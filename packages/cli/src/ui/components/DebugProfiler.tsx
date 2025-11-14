@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { useEffect, useState } from 'react';
 import { FixedDeque } from 'mnemonist';
 import { theme } from '../semantic-colors.js';

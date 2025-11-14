@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ExtensionEvents, McpClient } from '@google/gemini-cli-core';
+import type { ExtensionEvents, McpClient } from '@llmcli/core';
 import { EventEmitter } from 'node:events';
 
 export enum AppEvent {

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { useState, useEffect } from 'react';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { renderHook, render } from './render.js';
 import { waitFor } from './async.js';
 

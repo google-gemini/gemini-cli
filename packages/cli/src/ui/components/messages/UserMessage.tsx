@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box } from '@jrichman/ink';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
 import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.js';

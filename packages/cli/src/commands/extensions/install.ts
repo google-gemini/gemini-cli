@@ -5,10 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
-import {
-  debugLogger,
-  type ExtensionInstallMetadata,
-} from '@google/gemini-cli-core';
+import { debugLogger, type ExtensionInstallMetadata } from '@llmcli/core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { stat } from 'node:fs/promises';
 import {

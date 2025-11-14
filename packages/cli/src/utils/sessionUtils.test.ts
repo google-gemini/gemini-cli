@@ -10,8 +10,8 @@ import {
   extractFirstUserMessage,
   formatRelativeTime,
 } from './sessionUtils.js';
-import type { Config, MessageRecord } from '@google/gemini-cli-core';
-import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
+import type { Config, MessageRecord } from '@llmcli/core';
+import { SESSION_FILE_PREFIX } from '@llmcli/core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';

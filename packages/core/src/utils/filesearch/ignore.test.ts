@@ -6,7 +6,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { Ignore, loadIgnoreRules } from './ignore.js';
-import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
+import { createTmpDir, cleanupTmpDir } from '@llmcli/test-utils';
 
 describe('Ignore', () => {
   describe('getDirectoryFilter', () => {
@@ -89,9 +89,9 @@ describe('loadIgnoreRules', () => {
     expect(fileFilter('test.txt')).toBe(false);
   });
 
-  it('should load rules from .geminiignore', async () => {
+  it('should load rules from .llmcliignore', async () => {
     tmpDir = await createTmpDir({
-      '.geminiignore': '*.log',
+      '.llmcliignore': '*.log',
     });
     const ignore = loadIgnoreRules({
       projectRoot: tmpDir,
@@ -104,10 +104,10 @@ describe('loadIgnoreRules', () => {
     expect(fileFilter('test.txt')).toBe(false);
   });
 
-  it('should combine rules from .gitignore and .geminiignore', async () => {
+  it('should combine rules from .gitignore and .llmcliignore', async () => {
     tmpDir = await createTmpDir({
       '.gitignore': '*.log',
-      '.geminiignore': '*.txt',
+      '.llmcliignore': '*.txt',
     });
     const ignore = loadIgnoreRules({
       projectRoot: tmpDir,

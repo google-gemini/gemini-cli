@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { spawnAsync } from '@google/gemini-cli-core';
+import { spawnAsync } from '@llmcli/core';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';

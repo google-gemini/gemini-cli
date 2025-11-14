@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 

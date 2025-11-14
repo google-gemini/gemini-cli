@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 import type {
   LoadableSettingScope,
@@ -41,7 +41,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger } from '@llmcli/core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 
 interface SettingsDialogProps {

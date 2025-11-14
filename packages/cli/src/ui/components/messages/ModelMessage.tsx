@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box } from '@jrichman/ink';
 import { theme } from '../../semantic-colors.js';
 
 interface ModelMessageProps {

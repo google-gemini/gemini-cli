@@ -6,7 +6,7 @@
 
 import { render } from '../../../test-utils/render.js';
 import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
-import { Text, Box } from 'ink';
+import { Text, Box } from '@jrichman/ink';
 import {
   createRef,
   act,

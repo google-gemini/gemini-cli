@@ -30,7 +30,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger } from '@llmcli/core';
 
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 

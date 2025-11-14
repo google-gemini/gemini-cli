@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
 
 export const MAX_WIDTH = 150; // Maximum width for the text that is shown

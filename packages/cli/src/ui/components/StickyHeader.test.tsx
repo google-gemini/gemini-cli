@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Text } from 'ink';
+import { Text } from '@jrichman/ink';
 import { describe, it, expect } from 'vitest';
 import { StickyHeader } from './StickyHeader.js';
 import { renderWithProviders } from '../../test-utils/render.js';

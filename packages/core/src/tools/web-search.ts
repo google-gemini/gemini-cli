@@ -76,10 +76,10 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   }
 
   async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
-    const geminiClient = this.config.getGeminiClient();
+    const llmcliClient = this.config.getGeminiClient();
 
     try {
-      const response = await geminiClient.generateContent(
+      const response = await llmcliClient.generateContent(
         { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
         signal,

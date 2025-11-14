@@ -12,7 +12,7 @@ import {
   useRef,
   useLayoutEffect,
 } from 'react';
-import { type DOMElement, measureElement } from 'ink';
+import { type DOMElement, measureElement } from '@jrichman/ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -52,7 +52,7 @@ import {
   refreshServerHierarchicalMemory,
   type ModelChangedPayload,
   type MemoryChangedPayload,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
@@ -68,7 +68,7 @@ import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
-import { useStdout, useStdin } from 'ink';
+import { useStdout, useStdin } from '@jrichman/ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
@@ -805,7 +805,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   // Initial prompt handling
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const initialPromptSubmitted = useRef(false);
-  const geminiClient = config.getGeminiClient();
+  const llmcliClient = config.getGeminiClient();
 
   useEffect(() => {
     if (activePtyId) {
@@ -843,7 +843,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
       !showPrivacyNotice &&
-      geminiClient?.isInitialized?.()
+      llmcliClient?.isInitialized?.()
     ) {
       handleFinalSubmit(initialPrompt);
       initialPromptSubmitted.current = true;
@@ -857,7 +857,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isThemeDialogOpen,
     isEditorDialogOpen,
     showPrivacyNotice,
-    geminiClient,
+    llmcliClient,
   ]);
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
@@ -1246,7 +1246,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
 
-  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
+  const [llmcliMdFileCount, setGeminiMdFileCount] = useState<number>(
     config.getGeminiMdFileCount(),
   );
   useEffect(() => {
@@ -1287,7 +1287,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
-      geminiMdFileCount,
+      llmcliMdFileCount,
       streamingState,
       initError,
       pendingGeminiHistoryItems,
@@ -1369,7 +1369,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
-      geminiMdFileCount,
+      llmcliMdFileCount,
       streamingState,
       initError,
       pendingGeminiHistoryItems,

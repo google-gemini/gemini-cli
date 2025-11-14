@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Newline, Text } from 'ink';
+import { Box, Newline, Text } from '@jrichman/ink';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { usePrivacySettings } from '../hooks/usePrivacySettings.js';
 
-import type { Config } from '@google/gemini-cli-core';
+import type { Config } from '@llmcli/core';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 

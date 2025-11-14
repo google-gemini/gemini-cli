@@ -16,7 +16,7 @@ import {
   IDEConnectionStatus,
   ideContextStore,
   type IDEConnectionState,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { isWorkspaceTrusted } from '../../config/trustedFolders.js';
 

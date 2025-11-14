@@ -12,7 +12,7 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   FilterFilesOptions,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import {
   AuthType,
   logToolCall,
@@ -31,7 +31,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   debugLogger,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
@@ -173,8 +173,8 @@ class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const geminiClient = config.getGeminiClient();
-    const chat = await geminiClient.startChat();
+    const llmcliClient = config.getGeminiClient();
+    const chat = await llmcliClient.startChat();
     const session = new Session(sessionId, chat, config, this.client);
     this.sessions.set(sessionId, session);
 

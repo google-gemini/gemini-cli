@@ -121,9 +121,9 @@ export class McpClientManager {
       } finally {
         // This is required to update the content generator configuration with the
         // new tool configuration.
-        const geminiClient = this.cliConfig.getGeminiClient();
-        if (geminiClient.isInitialized()) {
-          await geminiClient.setTools();
+        const llmcliClient = this.cliConfig.getGeminiClient();
+        if (llmcliClient.isInitialized()) {
+          await llmcliClient.setTools();
         }
       }
     }
@@ -198,9 +198,9 @@ export class McpClientManager {
         } finally {
           // This is required to update the content generator configuration with the
           // new tool configuration.
-          const geminiClient = this.cliConfig.getGeminiClient();
-          if (geminiClient.isInitialized()) {
-            await geminiClient.setTools();
+          const llmcliClient = this.cliConfig.getGeminiClient();
+          if (llmcliClient.isInitialized()) {
+            await llmcliClient.setTools();
           }
           resolve();
         }

@@ -16,9 +16,8 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 vi.mock('open');
 vi.mock('../../utils/version.js');
 vi.mock('../utils/formatters.js');
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     IdeClient: {

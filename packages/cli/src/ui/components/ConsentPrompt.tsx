@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import { type ReactNode } from 'react';
 import { theme } from '../semantic-colors.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';

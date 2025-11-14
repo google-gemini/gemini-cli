@@ -26,7 +26,7 @@ import type {
   EditorType,
   GeminiClient,
   AnyToolInvocation,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import {
   ApprovalMode,
   AuthType,
@@ -35,7 +35,7 @@ import {
   ToolConfirmationOutcome,
   tokenLimit,
   debugLogger,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
@@ -73,7 +73,7 @@ const MockedUserPromptEvent = vi.hoisted(() =>
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@llmcli/core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...actualCoreModule,
@@ -197,7 +197,7 @@ describe('useGeminiStream', () => {
       mcpServers: undefined,
       userAgent: 'test-agent',
       userMemory: '',
-      geminiMdFileCount: 0,
+      llmcliMdFileCount: 0,
       alwaysSkipModificationConfirmation: false,
       vertexai: false,
       showMemoryUsage: false,
@@ -256,7 +256,7 @@ describe('useGeminiStream', () => {
   const mockLoadedSettings: LoadedSettings = {
     merged: { preferredEditor: 'vscode' },
     user: { path: '/user/settings.json', settings: {} },
-    workspace: { path: '/workspace/.gemini/settings.json', settings: {} },
+    workspace: { path: '/workspace/.llmcli/settings.json', settings: {} },
     errors: [],
     forScope: vi.fn(),
     setValue: vi.fn(),
@@ -264,9 +264,9 @@ describe('useGeminiStream', () => {
 
   const renderTestHook = (
     initialToolCalls: TrackedToolCall[] = [],
-    geminiClient?: any,
+    llmcliClient?: any,
   ) => {
-    const client = geminiClient || mockConfig.getGeminiClient();
+    const client = llmcliClient || mockConfig.getGeminiClient();
 
     const initialProps = {
       client,

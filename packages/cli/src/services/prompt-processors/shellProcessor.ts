@@ -11,7 +11,7 @@ import {
   getShellConfiguration,
   ShellExecutionService,
   flatMapTextParts,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 
 import type { CommandContext } from '../../ui/commands/types.js';
 import type { IPromptProcessor, PromptPipelineContent } from './types.js';

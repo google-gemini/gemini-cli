@@ -65,7 +65,7 @@ describe('EditTool', () => {
   let tempDir: string;
   let rootDir: string;
   let mockConfig: Config;
-  let geminiClient: any;
+  let llmcliClient: any;
   let baseLlmClient: any;
 
   beforeEach(() => {
@@ -74,7 +74,7 @@ describe('EditTool', () => {
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
-    geminiClient = {
+    llmcliClient = {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
@@ -83,7 +83,7 @@ describe('EditTool', () => {
     };
 
     mockConfig = {
-      getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getGeminiClient: vi.fn().mockReturnValue(llmcliClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
@@ -448,7 +448,7 @@ describe('EditTool', () => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
-          expect(client).toBe(geminiClient);
+          expect(client).toBe(llmcliClient);
           expect(baseClient).toBe(baseLlmClient);
           return {
             params: {

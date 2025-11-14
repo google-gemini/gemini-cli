@@ -8,11 +8,7 @@ import { type CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
-import {
-  debugLogger,
-  FatalConfigError,
-  getErrorMessage,
-} from '@google/gemini-cli-core';
+import { debugLogger, FatalConfigError, getErrorMessage } from '@llmcli/core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface EnableArgs {

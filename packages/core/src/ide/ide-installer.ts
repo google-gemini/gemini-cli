@@ -122,7 +122,7 @@ class VsCodeInstaller implements IdeInstaller {
         commandPath,
         [
           '--install-extension',
-          'google.gemini-cli-vscode-ide-companion',
+          'google.llmcli-cli-vscode-ide-companion',
           '--force',
         ],
         { stdio: 'pipe', shell: this.platform === 'win32' },

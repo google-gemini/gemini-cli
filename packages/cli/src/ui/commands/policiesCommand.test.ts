@@ -9,7 +9,7 @@ import { policiesCommand } from './policiesCommand.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { type Config, PolicyDecision } from '@google/gemini-cli-core';
+import { type Config, PolicyDecision } from '@llmcli/core';
 
 describe('policiesCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;

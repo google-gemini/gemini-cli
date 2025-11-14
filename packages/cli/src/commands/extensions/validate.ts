@@ -5,7 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger } from '@llmcli/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import semver from 'semver';

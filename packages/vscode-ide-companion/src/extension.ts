@@ -13,9 +13,9 @@ import {
   detectIdeFromEnv,
   IDE_DEFINITIONS,
   type IdeInfo,
-} from '@google/gemini-cli-core/src/ide/detect-ide.js';
+} from '@llmcli/core/src/ide/detect-ide.js';
 
-const CLI_IDE_COMPANION_IDENTIFIER = 'Google.gemini-cli-vscode-ide-companion';
+const CLI_IDE_COMPANION_IDENTIFIER = 'Google.llmcli-cli-vscode-ide-companion';
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
 export const DIFF_SCHEME = 'gemini-diff';
 

@@ -23,8 +23,8 @@ import type {
   UserTierId,
   IdeInfo,
   FallbackIntent,
-} from '@google/gemini-cli-core';
-import type { DOMElement } from 'ink';
+} from '@llmcli/core';
+import type { DOMElement } from '@jrichman/ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
@@ -65,7 +65,7 @@ export interface UIState {
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
-  geminiMdFileCount: number;
+  llmcliMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;
   pendingGeminiHistoryItems: HistoryItemWithoutId[];

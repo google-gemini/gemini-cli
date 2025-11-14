@@ -5,7 +5,7 @@
  */
 
 import { render as inkRender } from 'ink-testing-library';
-import { Box } from 'ink';
+import { Box } from '@jrichman/ink';
 import type React from 'react';
 import { act } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
@@ -21,7 +21,7 @@ import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
 import { StreamingContext } from '../ui/contexts/StreamingContext.js';
 
-import { type Config } from '@google/gemini-cli-core';
+import { type Config } from '@llmcli/core';
 
 // Wrapper around ink-testing-library's render that ensures act() is called
 export const render = (

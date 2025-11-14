@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
+import { Box, Text, getBoundingBox, type DOMElement } from '@jrichman/ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -22,8 +22,8 @@ import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
-import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import type { Config } from '@llmcli/core';
+import { ApprovalMode } from '@llmcli/core';
 import {
   parseInputForHighlighting,
   buildSegmentsForVisualSlice,

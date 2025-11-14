@@ -26,12 +26,12 @@ import {
   type EditorType,
   checkHasEditorType,
   allowEditorTypeInSandbox,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 
 import { SettingPaths } from '../../config/settingPaths.js';
 
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@llmcli/core', async () => {
+  const actual = await vi.importActual('@llmcli/core');
   return {
     ...actual,
     checkHasEditorType: vi.fn(() => true),

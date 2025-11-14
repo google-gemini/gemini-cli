@@ -9,10 +9,7 @@ import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { type HistoryItem, ToolCallStatus } from '../types.js';
 import { MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
-import type {
-  Config,
-  ToolExecuteConfirmationDetails,
-} from '@google/gemini-cli-core';
+import type { Config, ToolExecuteConfirmationDetails } from '@llmcli/core';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 

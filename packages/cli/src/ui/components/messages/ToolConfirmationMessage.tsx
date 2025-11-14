@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useEffect, useState, useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type {
@@ -14,8 +14,8 @@ import type {
   ToolExecuteConfirmationDetails,
   ToolMcpConfirmationDetails,
   Config,
-} from '@google/gemini-cli-core';
-import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
+} from '@llmcli/core';
+import { IdeClient, ToolConfirmationOutcome } from '@llmcli/core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';

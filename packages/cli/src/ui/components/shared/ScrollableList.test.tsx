@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef, act } from 'react';
 import { render } from 'ink-testing-library';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { ScrollableList, type ScrollableListRef } from './ScrollableList.js';
 import { ScrollProvider } from '../../contexts/ScrollProvider.js';
 import { KeypressProvider } from '../../contexts/KeypressContext.js';

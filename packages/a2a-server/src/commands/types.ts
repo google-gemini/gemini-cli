@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
+import type { Config } from '@llmcli/core';
 
 export interface CommandArgument {
   readonly name: string;

@@ -31,10 +31,9 @@ async function main() {
       demandOption: true,
     })
     .option('cli-package-name', {
-      description:
-        'fully qualified package name with scope (e.g @google/gemini-cli)',
+      description: 'fully qualified package name with scope (e.g @llmcli/cli)',
       string: true,
-      default: '@google/gemini-cli',
+      default: '@llmcli/cli',
     })
     .option('dry-run', {
       description: 'Whether to run in dry-run mode.',

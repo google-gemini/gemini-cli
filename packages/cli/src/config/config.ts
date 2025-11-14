@@ -8,7 +8,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type { OutputFormat } from '@google/gemini-cli-core';
+import type { OutputFormat } from '@llmcli/core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
@@ -30,7 +30,7 @@ import {
   EDIT_TOOL_NAME,
   debugLogger,
   loadServerHierarchicalMemory,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import type { Settings } from './settings.js';
 
 import { getCliVersion } from '../utils/version.js';
@@ -41,7 +41,7 @@ import { appEvents } from '../utils/events.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
-import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
+import type { ExtensionEvents } from '@llmcli/core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
@@ -597,8 +597,8 @@ export async function loadCliConfig(
       ? [] // explicitly allowed servers overrides everything
       : settings.mcp?.excluded,
     userMemory: memoryContent,
-    geminiMdFileCount: fileCount,
-    geminiMdFilePaths: filePaths,
+    llmcliMdFileCount: fileCount,
+    llmcliMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode: settings.security?.disableYoloMode,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
@@ -631,6 +631,9 @@ export async function loadCliConfig(
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
     compressionThreshold: settings.model?.compressionThreshold,
+    localLLMBaseURL: settings.localLLM?.baseURL,
+    localLLMApiKey: settings.localLLM?.apiKey,
+    localLLMModel: settings.localLLM?.model,
     folderTrust,
     interactive,
     trustedFolder,

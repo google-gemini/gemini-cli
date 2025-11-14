@@ -21,7 +21,7 @@ import type { Config } from '../config/config.js';
 export type Summarizer = (
   config: Config,
   result: ToolResult,
-  geminiClient: GeminiClient,
+  llmcliClient: GeminiClient,
   abortSignal: AbortSignal,
 ) => Promise<string>;
 
@@ -29,7 +29,7 @@ export type Summarizer = (
  * The default summarizer for tool results.
  *
  * @param result The result of the tool execution.
- * @param geminiClient The Gemini client to use for summarization.
+ * @param llmcliClient The Gemini client to use for summarization.
  * @param abortSignal The abort signal to use for summarization.
  * @returns The summary of the result.
  */
@@ -57,14 +57,14 @@ Return the summary string which should first contain an overall summarization of
 export const llmSummarizer: Summarizer = async (
   config,
   result,
-  geminiClient,
+  llmcliClient,
   abortSignal,
 ) =>
   summarizeToolOutput(
     config,
     { model: 'summarizer-default' },
     partToString(result.llmContent),
-    geminiClient,
+    llmcliClient,
     abortSignal,
   );
 
@@ -72,7 +72,7 @@ export async function summarizeToolOutput(
   config: Config,
   modelConfigKey: ModelConfigKey,
   textToSummarize: string,
-  geminiClient: GeminiClient,
+  llmcliClient: GeminiClient,
   abortSignal: AbortSignal,
 ): Promise<string> {
   const maxOutputTokens =
@@ -90,7 +90,7 @@ export async function summarizeToolOutput(
 
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
   try {
-    const parsedResponse = await geminiClient.generateContent(
+    const parsedResponse = await llmcliClient.generateContent(
       modelConfigKey,
       contents,
       abortSignal,

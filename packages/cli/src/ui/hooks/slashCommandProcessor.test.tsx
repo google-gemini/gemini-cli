@@ -25,16 +25,15 @@ import {
   SlashCommandStatus,
   ToolConfirmationOutcome,
   makeFakeConfig,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { appEvents } from '../../utils/events.js';
 
 const { logSlashCommand } = vi.hoisted(() => ({
   logSlashCommand: vi.fn(),
 }));
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@llmcli/core')>();
 
   return {
     ...original,

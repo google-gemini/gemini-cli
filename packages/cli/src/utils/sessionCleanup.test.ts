@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
+import { SESSION_FILE_PREFIX, type Config } from '@llmcli/core';
 import type { Settings } from '../config/settings.js';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import { type SessionInfo, getAllSessionFiles } from './sessionUtils.js';

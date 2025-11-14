@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, listExtensions } from '@google/gemini-cli-core';
+import { debugLogger, listExtensions } from '@llmcli/core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {

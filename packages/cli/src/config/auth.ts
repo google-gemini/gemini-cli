@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@google/gemini-cli-core';
+import { AuthType } from '@llmcli/core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
 export function validateAuthMethod(authMethod: string): string | null {
@@ -31,6 +31,21 @@ export function validateAuthMethod(authMethod: string): string | null {
         '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
         '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
         'Update your environment and try again (no reload needed if using .env)!'
+      );
+    }
+    return null;
+  }
+
+  if (authMethod === AuthType.LOCAL_LLM) {
+    const hasLocalLLMConfig =
+      !!process.env['LOCAL_LLM_BASE_URL'] ||
+      !!loadSettings().merged.localLLM?.baseURL;
+    if (!hasLocalLLMConfig) {
+      return (
+        'When using Local LLM, you must specify either:\n' +
+        '• LOCAL_LLM_BASE_URL environment variable.\n' +
+        '• localLLM.baseURL in your settings file.\n' +
+        'Update your configuration and try again!'
       );
     }
     return null;

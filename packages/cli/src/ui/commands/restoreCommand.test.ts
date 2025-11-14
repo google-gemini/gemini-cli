@@ -11,11 +11,7 @@ import * as path from 'node:path';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import {
-  GEMINI_DIR,
-  type Config,
-  type GitService,
-} from '@google/gemini-cli-core';
+import { LLM_DIR, type Config, type GitService } from '@llmcli/core';
 
 describe('restoreCommand', () => {
   let mockContext: CommandContext;
@@ -30,7 +26,7 @@ describe('restoreCommand', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'restore-command-test-'),
     );
-    geminiTempDir = path.join(testRootDir, GEMINI_DIR);
+    geminiTempDir = path.join(testRootDir, LLM_DIR);
     checkpointsDir = path.join(geminiTempDir, 'checkpoints');
     // The command itself creates this, but for tests it's easier to have it ready.
     // Some tests might remove it to test error paths.
@@ -93,7 +89,7 @@ describe('restoreCommand', () => {
       ).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Could not determine the .gemini directory path.',
+        content: 'Could not determine the .llmcli directory path.',
       });
     });
 

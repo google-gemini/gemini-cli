@@ -6,11 +6,11 @@
 
 import * as path from 'node:path';
 import { type VariableSchema, VARIABLE_SCHEMA } from './variableSchema.js';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { LLM_DIR } from '@llmcli/core';
 
-export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
+export const EXTENSIONS_DIRECTORY_NAME = path.join(LLM_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
-export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
+export const INSTALL_METADATA_FILENAME = '.llmcli-extension-install.json';
 export const EXTENSION_SETTINGS_FILENAME = '.env';
 
 export type JsonObject = { [key: string]: JsonValue };

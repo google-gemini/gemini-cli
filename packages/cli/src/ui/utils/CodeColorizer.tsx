@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box } from '@jrichman/ink';
 import { common, createLowlight } from 'lowlight';
 import type {
   Root,
@@ -21,7 +21,7 @@ import {
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger } from '@llmcli/core';
 import { isAlternateBufferEnabled } from '../hooks/useAlternateBuffer.js';
 
 // Configure theming and parsing utilities.

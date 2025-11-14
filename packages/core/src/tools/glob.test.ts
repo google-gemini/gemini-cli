@@ -365,12 +365,12 @@ describe('GlobTool', () => {
         notExpectedToContain: ['a.ignored.txt'],
       },
       {
-        name: 'should respect .geminiignore files by default',
-        ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
-        filesToCreate: ['a.geminiignored.txt', 'b.notignored.txt'],
+        name: 'should respect .llmcliignore files by default',
+        ignoreFile: { name: '.llmcliignore', content: '*.llmcliignored.txt' },
+        filesToCreate: ['a.llmcliignored.txt', 'b.notignored.txt'],
         globToolParams: { pattern: '*.txt' },
         expectedCountMessage: 'Found 3 file(s)',
-        notExpectedToContain: ['a.geminiignored.txt'],
+        notExpectedToContain: ['a.llmcliignored.txt'],
       },
       {
         name: 'should not respect .gitignore when respect_git_ignore is false',
@@ -381,12 +381,12 @@ describe('GlobTool', () => {
         expectedToContain: ['a.ignored.txt'],
       },
       {
-        name: 'should not respect .geminiignore when respect_gemini_ignore is false',
-        ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
-        filesToCreate: ['a.geminiignored.txt'],
+        name: 'should not respect .llmcliignore when respect_gemini_ignore is false',
+        ignoreFile: { name: '.llmcliignore', content: '*.llmcliignored.txt' },
+        filesToCreate: ['a.llmcliignored.txt'],
         globToolParams: { pattern: '*.txt', respect_gemini_ignore: false },
         expectedCountMessage: 'Found 3 file(s)',
-        expectedToContain: ['a.geminiignored.txt'],
+        expectedToContain: ['a.llmcliignored.txt'],
       },
     ])(
       '$name',

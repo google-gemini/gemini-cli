@@ -18,7 +18,7 @@ import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 
-import { type DOMElement, measureElement, Box } from 'ink';
+import { type DOMElement, measureElement, Box } from '@jrichman/ink';
 
 export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
 

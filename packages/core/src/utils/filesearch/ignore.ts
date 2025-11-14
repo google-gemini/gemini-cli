@@ -28,7 +28,7 @@ export function loadIgnoreRules(options: LoadIgnoreRulesOptions): Ignore {
   }
 
   if (options.useGeminiignore) {
-    const geminiignorePath = path.join(options.projectRoot, '.geminiignore');
+    const geminiignorePath = path.join(options.projectRoot, '.llmcliignore');
     if (fs.existsSync(geminiignorePath)) {
       ignorer.add(fs.readFileSync(geminiignorePath, 'utf8'));
     }

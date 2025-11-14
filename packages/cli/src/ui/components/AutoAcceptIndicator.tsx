@@ -5,9 +5,9 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { theme } from '../semantic-colors.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@llmcli/core';
 
 interface AutoAcceptIndicatorProps {
   approvalMode: ApprovalMode;

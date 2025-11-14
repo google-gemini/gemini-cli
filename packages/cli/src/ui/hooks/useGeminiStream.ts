@@ -16,7 +16,7 @@ import type {
   ThoughtSummary,
   ToolCallRequestInfo,
   GeminiErrorEventValue,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import {
   GeminiEventType as ServerGeminiEventType,
   getErrorMessage,
@@ -37,7 +37,7 @@ import {
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
   HistoryItem,
@@ -89,7 +89,7 @@ function showCitations(settings: LoadedSettings): boolean {
  * API interaction, and tool call lifecycle.
  */
 export const useGeminiStream = (
-  geminiClient: GeminiClient,
+  llmcliClient: GeminiClient,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   config: Config,
@@ -218,7 +218,7 @@ export const useGeminiStream = (
     onExec,
     onDebugMessage,
     config,
-    geminiClient,
+    llmcliClient,
     setShellInputFocused,
     terminalWidth,
     terminalHeight,
@@ -898,7 +898,7 @@ export const useGeminiStream = (
             lastPromptIdRef.current = prompt_id!;
 
             try {
-              const stream = geminiClient.sendMessageStream(
+              const stream = llmcliClient.sendMessageStream(
                 queryToSend,
                 abortSignal,
                 prompt_id!,
@@ -994,7 +994,7 @@ export const useGeminiStream = (
       addItem,
       setPendingHistoryItem,
       setInitError,
-      geminiClient,
+      llmcliClient,
       onAuthError,
       config,
       startNewPrompt,
@@ -1117,13 +1117,13 @@ export const useGeminiStream = (
         }
         setIsResponding(false);
 
-        if (geminiClient) {
+        if (llmcliClient) {
           // We need to manually add the function responses to the history
           // so the model knows the tools were cancelled.
           const combinedParts = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
-          geminiClient.addHistory({
+          llmcliClient.addHistory({
             role: 'user',
             parts: combinedParts,
           });
@@ -1165,7 +1165,7 @@ export const useGeminiStream = (
     [
       submitQuery,
       markToolsAsSubmitted,
-      geminiClient,
+      llmcliClient,
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
@@ -1255,7 +1255,7 @@ export const useGeminiStream = (
             const toolName = toolCall.request.name;
             const fileName = path.basename(filePath);
             const toolCallWithSnapshotFileName = `${timestamp}-${fileName}-${toolName}.json`;
-            const clientHistory = await geminiClient?.getHistory();
+            const clientHistory = await llmcliClient?.getHistory();
             const toolCallWithSnapshotFilePath = path.join(
               checkpointDir,
               toolCallWithSnapshotFileName,
@@ -1295,7 +1295,7 @@ export const useGeminiStream = (
     onDebugMessage,
     gitService,
     history,
-    geminiClient,
+    llmcliClient,
     storage,
   ]);
 

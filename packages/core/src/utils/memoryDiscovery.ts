@@ -14,7 +14,7 @@ import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
-import { GEMINI_DIR } from './paths.js';
+import { LLM_DIR } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -151,7 +151,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
     const resolvedHome = path.resolve(userHomePath);
     const globalMemoryPath = path.join(
       resolvedHome,
-      GEMINI_DIR,
+      LLM_DIR,
       geminiMdFilename,
     );
 
@@ -187,7 +187,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
         : path.dirname(resolvedHome);
 
       while (currentDir && currentDir !== path.dirname(currentDir)) {
-        if (currentDir === path.join(resolvedHome, GEMINI_DIR)) {
+        if (currentDir === path.join(resolvedHome, LLM_DIR)) {
           break;
         }
 
@@ -336,7 +336,7 @@ export async function loadGlobalMemory(
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   const accessChecks = geminiMdFilenames.map(async (filename) => {
-    const globalPath = path.join(userHome, GEMINI_DIR, filename);
+    const globalPath = path.join(userHome, LLM_DIR, filename);
     try {
       await fs.access(globalPath, fsSync.constants.R_OK);
       if (debugMode) {
@@ -380,7 +380,7 @@ async function findUpwardGeminiFiles(
   let currentDir = path.resolve(startDir);
   const resolvedStopDir = path.resolve(stopDir);
   const geminiMdFilenames = getAllGeminiMdFilenames();
-  const globalGeminiDir = path.join(homedir(), GEMINI_DIR);
+  const globalGeminiDir = path.join(homedir(), LLM_DIR);
 
   if (debugMode) {
     logger.debug(

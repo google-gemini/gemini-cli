@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { checkForAllExtensionUpdates, updateExtension } from './update.js';
-import { GEMINI_DIR, KeychainTokenStorage } from '@google/gemini-cli-core';
+import { LLM_DIR, KeychainTokenStorage } from '@llmcli/core';
 import { isWorkspaceTrusted } from '../trustedFolders.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { createExtension } from '../../test-utils/createExtension.js';
@@ -55,9 +55,8 @@ vi.mock('../trustedFolders.js', () => ({
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     logExtensionInstallEvent: mockLogExtensionInstallEvent,
@@ -124,7 +123,7 @@ describe('update tests', () => {
       path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
     );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
+    userExtensionsDir = path.join(tempHomeDir, LLM_DIR, 'extensions');
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });

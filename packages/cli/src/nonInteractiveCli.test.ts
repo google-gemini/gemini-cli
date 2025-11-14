@@ -12,7 +12,7 @@ import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
   UserFeedbackPayload,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import {
   executeToolCall,
   ToolErrorType,
@@ -22,7 +22,7 @@ import {
   uiTelemetryService,
   FatalInputError,
   CoreEvent,
-} from '@google/gemini-cli-core';
+} from '@llmcli/core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import {
@@ -47,9 +47,8 @@ const mockCoreEvents = vi.hoisted(() => ({
   emit: vi.fn(),
 }));
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@llmcli/core')>();
 
   class MockChatRecordingService {
     initialize = vi.fn();
@@ -160,7 +159,7 @@ describe('runNonInteractive', () => {
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project'),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/project/.gemini/tmp'),
+        getProjectTempDir: vi.fn().mockReturnValue('/test/project/.llmcli/tmp'),
       },
       getIdeMode: vi.fn().mockReturnValue(false),
 

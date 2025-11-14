@@ -24,7 +24,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
   ) {
     this.projectRoot = path.resolve(projectRoot);
     if (this.extraPatterns) {
-      // extraPatterns are assumed to be from project root (like .geminiignore)
+      // extraPatterns are assumed to be from project root (like .llmcliignore)
       this.processedExtraPatterns = this.processPatterns(
         this.extraPatterns,
         '.',
@@ -203,7 +203,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
         }
       }
 
-      // Apply extra patterns (e.g. from .geminiignore) last for precedence
+      // Apply extra patterns (e.g. from .llmcliignore) last for precedence
       if (this.processedExtraPatterns.length > 0) {
         ig.add(this.processedExtraPatterns);
       }

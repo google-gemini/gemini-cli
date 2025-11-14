@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text } from '@jrichman/ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 
