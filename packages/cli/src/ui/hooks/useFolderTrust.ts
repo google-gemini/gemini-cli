@@ -14,6 +14,7 @@ import {
 } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
 import { type HistoryItemWithoutId, MessageType } from '../types.js';
+import { coreEvents } from '@google/gemini-cli-core';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
@@ -70,12 +71,9 @@ export const useFolderTrust = (
       try {
         trustedFolders.setValue(cwd, trustLevel);
       } catch (_e) {
-        addItem(
-          {
-            type: MessageType.WARNING,
-            text: 'Failed to save trust settings. Exiting Gemini CLI.',
-          },
-          Date.now(),
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to save trust settings. Exiting Gemini CLI.',
         );
         setTimeout(() => {
           process.exit(1);
@@ -97,7 +95,7 @@ export const useFolderTrust = (
         setIsFolderTrustDialogOpen(false);
       }
     },
-    [onTrustChange, isTrusted, addItem],
+    [onTrustChange, isTrusted],
   );
 
   return {
