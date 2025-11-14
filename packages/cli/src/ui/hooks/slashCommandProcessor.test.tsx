@@ -28,8 +28,27 @@ import {
 } from '@google/gemini-cli-core';
 import { appEvents } from '../../utils/events.js';
 
-const { logSlashCommand } = vi.hoisted(() => ({
+const {
+  logSlashCommand,
+  mockBuiltinLoadCommands,
+  mockFileLoadCommands,
+  mockMcpLoadCommands,
+  mockIdeClientGetInstance,
+  mockUseAlternateBuffer,
+} = vi.hoisted(() => ({
   logSlashCommand: vi.fn(),
+  mockBuiltinLoadCommands: vi.fn().mockResolvedValue([]),
+  mockFileLoadCommands: vi.fn().mockResolvedValue([]),
+  mockMcpLoadCommands: vi.fn().mockResolvedValue([]),
+  mockIdeClientGetInstance: vi.fn().mockResolvedValue({
+    addStatusChangeListener: vi.fn(),
+    removeStatusChangeListener: vi.fn(),
+  }),
+  mockUseAlternateBuffer: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('./useAlternateBuffer.js', () => ({
+  useAlternateBuffer: mockUseAlternateBuffer,
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -41,10 +60,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     logSlashCommand,
     getIdeInstaller: vi.fn().mockReturnValue(null),
     IdeClient: {
-      getInstance: vi.fn().mockResolvedValue({
-        addStatusChangeListener: vi.fn(),
-        removeStatusChangeListener: vi.fn(),
-      }),
+      getInstance: mockIdeClientGetInstance,
     },
   };
 });
@@ -65,23 +81,20 @@ vi.mock('node:process', () => {
   };
 });
 
-const mockBuiltinLoadCommands = vi.fn();
 vi.mock('../../services/BuiltinCommandLoader.js', () => ({
-  BuiltinCommandLoader: vi.fn().mockImplementation(() => ({
+  BuiltinCommandLoader: vi.fn(() => ({
     loadCommands: mockBuiltinLoadCommands,
   })),
 }));
 
-const mockFileLoadCommands = vi.fn();
 vi.mock('../../services/FileCommandLoader.js', () => ({
-  FileCommandLoader: vi.fn().mockImplementation(() => ({
+  FileCommandLoader: vi.fn(() => ({
     loadCommands: mockFileLoadCommands,
   })),
 }));
 
-const mockMcpLoadCommands = vi.fn();
 vi.mock('../../services/McpPromptLoader.js', () => ({
-  McpPromptLoader: vi.fn().mockImplementation(() => ({
+  McpPromptLoader: vi.fn(() => ({
     loadCommands: mockMcpLoadCommands,
   })),
 }));
@@ -130,6 +143,12 @@ describe('useSlashCommandProcessor', () => {
     mockBuiltinLoadCommands.mockResolvedValue([]);
     mockFileLoadCommands.mockResolvedValue([]);
     mockMcpLoadCommands.mockResolvedValue([]);
+    mockUseAlternateBuffer.mockReturnValue(false);
+    mockIdeClientGetInstance.mockResolvedValue({
+      addStatusChangeListener: vi.fn(),
+      removeStatusChangeListener: vi.fn(),
+    });
+    vi.spyOn(console, 'clear').mockImplementation(() => {});
   });
 
   afterEach(async () => {
@@ -137,6 +156,7 @@ describe('useSlashCommandProcessor', () => {
       await unmountHook();
       unmountHook = undefined;
     }
+    vi.restoreAllMocks();
   });
 
   const setupProcessorHook = async (
@@ -204,6 +224,44 @@ describe('useSlashCommandProcessor', () => {
       },
     };
   };
+
+  describe('Console Clear Safety', () => {
+    it('should not call console.clear if alternate buffer is active', async () => {
+      mockUseAlternateBuffer.mockReturnValue(true);
+      const clearCommand = createTestCommand({
+        name: 'clear',
+        action: async (context) => {
+          context.ui.clear();
+        },
+      });
+      const result = await setupProcessorHook([clearCommand]);
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/clear');
+      });
+
+      expect(mockClearItems).toHaveBeenCalled();
+      expect(console.clear).not.toHaveBeenCalled();
+    });
+
+    it('should call console.clear if alternate buffer is not active', async () => {
+      mockUseAlternateBuffer.mockReturnValue(false);
+      const clearCommand = createTestCommand({
+        name: 'clear',
+        action: async (context) => {
+          context.ui.clear();
+        },
+      });
+      const result = await setupProcessorHook([clearCommand]);
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/clear');
+      });
+
+      expect(mockClearItems).toHaveBeenCalled();
+      expect(console.clear).toHaveBeenCalled();
+    });
+  });
 
   describe('Initialization and Command Loading', () => {
     it('should initialize CommandService with all required loaders', async () => {
@@ -947,36 +1005,37 @@ describe('useSlashCommandProcessor', () => {
 
   describe('Slash Command Logging', () => {
     const mockCommandAction = vi.fn().mockResolvedValue({ type: 'handled' });
-    const loggingTestCommands: SlashCommand[] = [
-      createTestCommand({
-        name: 'logtest',
-        action: vi
-          .fn()
-          .mockResolvedValue({ type: 'message', content: 'hello world' }),
-      }),
-      createTestCommand({
-        name: 'logwithsub',
-        subCommands: [
-          createTestCommand({
-            name: 'sub',
-            action: mockCommandAction,
-          }),
-        ],
-      }),
-      createTestCommand({
-        name: 'fail',
-        action: vi.fn().mockRejectedValue(new Error('oh no!')),
-      }),
-      createTestCommand({
-        name: 'logalias',
-        altNames: ['la'],
-        action: mockCommandAction,
-      }),
-    ];
+    let loggingTestCommands: SlashCommand[];
 
     beforeEach(() => {
       mockCommandAction.mockClear();
       vi.mocked(logSlashCommand).mockClear();
+      loggingTestCommands = [
+        createTestCommand({
+          name: 'logtest',
+          action: vi
+            .fn()
+            .mockResolvedValue({ type: 'message', content: 'hello world' }),
+        }),
+        createTestCommand({
+          name: 'logwithsub',
+          subCommands: [
+            createTestCommand({
+              name: 'sub',
+              action: mockCommandAction,
+            }),
+          ],
+        }),
+        createTestCommand({
+          name: 'fail',
+          action: vi.fn().mockRejectedValue(new Error('oh no!')),
+        }),
+        createTestCommand({
+          name: 'logalias',
+          altNames: ['la'],
+          action: mockCommandAction,
+        }),
+      ];
     });
 
     it.each([
