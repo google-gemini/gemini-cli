@@ -192,7 +192,13 @@ export function convertToFunctionResponse(
         getResponseTextFromParts(
           singlePart.functionResponse.response['content'] as Part[],
         ) || '';
-      return [createFunctionResponsePart(callId, toolName, stringifiedOutput)];
+      return [
+        createFunctionResponsePart(
+          singlePart.functionResponse.id ?? callId,
+          singlePart.functionResponse.name ?? toolName,
+          stringifiedOutput,
+        ),
+      ];
     }
     return [singlePart];
   }
