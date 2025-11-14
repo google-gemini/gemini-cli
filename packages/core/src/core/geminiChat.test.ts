@@ -5,11 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type {
-  Content,
-  GenerateContentConfig,
-  GenerateContentResponse,
-} from '@google/genai';
+import type { Content, GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
@@ -88,7 +84,6 @@ describe('GeminiChat', () => {
   let mockContentGenerator: ContentGenerator;
   let chat: GeminiChat;
   let mockConfig: Config;
-  const config: GenerateContentConfig = {};
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -128,13 +123,21 @@ describe('GeminiChat', () => {
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => ({
+          model: modelConfigKey.model,
+          generateContentConfig: {
+            temperature: 0,
+          },
+        })),
+      },
       isInteractive: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     // Disable 429 simulation for tests
     setSimulate429(false);
     // Reset history for each test by creating a new instance
-    chat = new GeminiChat(mockConfig, config, []);
+    chat = new GeminiChat(mockConfig);
   });
 
   afterEach(() => {
@@ -148,13 +151,13 @@ describe('GeminiChat', () => {
         { role: 'user', parts: [{ text: 'Hello' }] },
         { role: 'model', parts: [{ text: 'Hi there' }] },
       ];
-      const chatWithHistory = new GeminiChat(mockConfig, config, history);
+      const chatWithHistory = new GeminiChat(mockConfig, '', [], history);
       const estimatedTokens = Math.ceil(JSON.stringify(history).length / 4);
       expect(chatWithHistory.getLastPromptTokenCount()).toBe(estimatedTokens);
     });
 
     it('should initialize lastPromptTokenCount for empty history', () => {
-      const chatEmpty = new GeminiChat(mockConfig, config, []);
+      const chatEmpty = new GeminiChat(mockConfig);
       expect(chatEmpty.getLastPromptTokenCount()).toBe(
         Math.ceil(JSON.stringify([]).length / 4),
       );
@@ -195,9 +198,10 @@ describe('GeminiChat', () => {
       // 2. Action & Assert: The stream processing should complete without throwing an error
       // because the presence of a tool call makes the empty final chunk acceptable.
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-tool-call-empty-end',
+        new AbortController().signal,
       );
       await expect(
         (async () => {
@@ -247,9 +251,10 @@ describe('GeminiChat', () => {
 
       // 2. Action & Assert: The stream should fail because there's no finish reason.
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-no-finish-empty-end',
+        new AbortController().signal,
       );
       await expect(
         (async () => {
@@ -293,9 +298,10 @@ describe('GeminiChat', () => {
 
       // 2. Action & Assert: The stream should complete without throwing an error.
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-valid-then-invalid-end',
+        new AbortController().signal,
       );
       await expect(
         (async () => {
@@ -340,9 +346,10 @@ describe('GeminiChat', () => {
 
       // 2. Action: Send a message and consume the stream.
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-empty-chunk-consolidation',
+        new AbortController().signal,
       );
       for await (const _ of stream) {
         // Consume the stream
@@ -398,9 +405,10 @@ describe('GeminiChat', () => {
 
       // 2. Action: Send a message and consume the stream.
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-multi-chunk',
+        new AbortController().signal,
       );
       for await (const _ of stream) {
         // Consume the stream to trigger history recording.
@@ -446,9 +454,10 @@ describe('GeminiChat', () => {
 
       // 2. Action: Send a message and fully consume the stream to trigger history recording.
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-mixed-chunk',
+        new AbortController().signal,
       );
       for await (const _ of stream) {
         // This loop consumes the stream.
@@ -509,16 +518,15 @@ describe('GeminiChat', () => {
 
       // 3. Action: Send the function response back to the model and consume the stream.
       const stream = await chat.sendMessageStream(
-        'test-model',
+        { model: 'test-model' },
         {
-          message: {
-            functionResponse: {
-              name: 'find_restaurant',
-              response: { name: 'Vesuvio' },
-            },
+          functionResponse: {
+            name: 'find_restaurant',
+            response: { name: 'Vesuvio' },
           },
         },
         'prompt-id-stream-1',
+        new AbortController().signal,
       );
 
       // 4. Assert: The stream processing should throw an InvalidStreamError.
@@ -559,9 +567,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-1',
+        new AbortController().signal,
       );
 
       // Should not throw an error
@@ -595,9 +604,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-1',
+        new AbortController().signal,
       );
 
       await expect(
@@ -630,9 +640,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-1',
+        new AbortController().signal,
       );
 
       await expect(
@@ -665,9 +676,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-1',
+        new AbortController().signal,
       );
 
       // Should not throw an error
@@ -701,9 +713,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test',
         'prompt-id-malformed',
+        new AbortController().signal,
       );
 
       // Should throw an error
@@ -747,9 +760,10 @@ describe('GeminiChat', () => {
 
       // 2. Send a message
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test retry' },
+        { model: 'test-model' },
+        'test retry',
         'prompt-id-retry-malformed',
+        new AbortController().signal,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -803,9 +817,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'hello' },
+        { model: 'test-model' },
+        'hello',
         'prompt-id-1',
+        new AbortController().signal,
       );
       for await (const _ of stream) {
         // consume stream
@@ -820,7 +835,12 @@ describe('GeminiChat', () => {
               parts: [{ text: 'hello' }],
             },
           ],
-          config: {},
+          config: {
+            systemInstruction: '',
+            tools: [],
+            temperature: 0,
+            abortSignal: expect.any(AbortSignal),
+          },
         },
         'prompt-id-1',
       );
@@ -885,9 +905,10 @@ describe('GeminiChat', () => {
 
       // ACT: Send a message and collect all events from the stream.
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-yield-retry',
+        new AbortController().signal,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -926,9 +947,10 @@ describe('GeminiChat', () => {
         );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test',
         'prompt-id-retry-success',
+        new AbortController().signal,
       );
       const chunks: StreamEvent[] = [];
       for await (const chunk of stream) {
@@ -997,9 +1019,10 @@ describe('GeminiChat', () => {
         );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test', config: { temperature: 0.5 } },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-retry-temperature',
+        new AbortController().signal,
       );
 
       for await (const _ of stream) {
@@ -1017,7 +1040,7 @@ describe('GeminiChat', () => {
         1,
         expect.objectContaining({
           config: expect.objectContaining({
-            temperature: 0.5,
+            temperature: 0,
           }),
         }),
         'prompt-id-retry-temperature',
@@ -1055,9 +1078,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test',
         'prompt-id-retry-fail',
+        new AbortController().signal,
       );
       await expect(async () => {
         for await (const _ of stream) {
@@ -1120,9 +1144,10 @@ describe('GeminiChat', () => {
         );
 
         const stream = await chat.sendMessageStream(
-          'test-model',
-          { message: 'test' },
+          { model: 'test-model' },
+          'test message',
           'prompt-id-400',
+          new AbortController().signal,
         );
 
         await expect(
@@ -1158,9 +1183,10 @@ describe('GeminiChat', () => {
           );
 
         const stream = await chat.sendMessageStream(
-          'test-model',
-          { message: 'test' },
+          { model: 'test-model' },
+          'test message',
           'prompt-id-429-retry',
+          new AbortController().signal,
         );
 
         const events: StreamEvent[] = [];
@@ -1206,9 +1232,10 @@ describe('GeminiChat', () => {
           );
 
         const stream = await chat.sendMessageStream(
-          'test-model',
-          { message: 'test' },
+          { model: 'test-model' },
+          'test message',
           'prompt-id-500-retry',
+          new AbortController().signal,
         );
 
         const events: StreamEvent[] = [];
@@ -1262,9 +1289,10 @@ describe('GeminiChat', () => {
         });
 
         const stream = await chat.sendMessageStream(
-          'test-model',
-          { message: 'test' },
+          { model: 'test-model' },
+          'test message',
           'prompt-id-fetch-error-retry',
+          new AbortController().signal,
         );
 
         const events: StreamEvent[] = [];
@@ -1325,9 +1353,10 @@ describe('GeminiChat', () => {
 
     // 3. Send a new message
     const stream = await chat.sendMessageStream(
-      'test-model',
-      { message: 'Second question' },
+      { model: 'test-model' },
+      'Second question',
       'prompt-id-retry-existing',
+      new AbortController().signal,
     );
     for await (const _ of stream) {
       // consume stream
@@ -1396,9 +1425,10 @@ describe('GeminiChat', () => {
 
     // 2. Call the method and consume the stream.
     const stream = await chat.sendMessageStream(
-      'test-model',
-      { message: 'test empty stream' },
+      { model: 'test-model' },
+      'test empty stream',
       'prompt-id-empty-stream',
+      new AbortController().signal,
     );
     const chunks: StreamEvent[] = [];
     for await (const chunk of stream) {
@@ -1476,18 +1506,20 @@ describe('GeminiChat', () => {
 
     // 3. Start the first stream and consume only the first chunk to pause it
     const firstStream = await chat.sendMessageStream(
-      'test-model',
-      { message: 'first' },
+      { model: 'test-model' },
+      'first',
       'prompt-1',
+      new AbortController().signal,
     );
     const firstStreamIterator = firstStream[Symbol.asyncIterator]();
     await firstStreamIterator.next();
 
     // 4. While the first stream is paused, start the second call. It will block.
     const secondStreamPromise = chat.sendMessageStream(
-      'test-model',
-      { message: 'second' },
+      { model: 'test-model' },
+      'second',
       'prompt-2',
+      new AbortController().signal,
     );
 
     // 5. Assert that only one API call has been made so far.
@@ -1545,9 +1577,10 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
+        { model: 'test-model' },
+        'test message',
         'prompt-id-res3',
+        new AbortController().signal,
       );
       for await (const _ of stream) {
         // consume stream
@@ -1631,9 +1664,10 @@ describe('GeminiChat', () => {
       });
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'trigger 429' },
+        { model: 'test-model' },
+        'trigger 429',
         'prompt-id-fb1',
+        new AbortController().signal,
       );
 
       // Consume stream to trigger logic
@@ -1665,9 +1699,10 @@ describe('GeminiChat', () => {
       mockHandleFallback.mockResolvedValue(false);
 
       const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test stop' },
+        { model: 'test-model' },
+        'test stop',
         'prompt-id-fb2',
+        new AbortController().signal,
       );
 
       await expect(
@@ -1723,9 +1758,10 @@ describe('GeminiChat', () => {
 
     // Send a message and consume the stream
     const stream = await chat.sendMessageStream(
-      'test-model',
-      { message: 'test' },
+      { model: 'test-model' },
+      'test message',
       'prompt-id-discard-test',
+      new AbortController().signal,
     );
     const events: StreamEvent[] = [];
     for await (const event of stream) {

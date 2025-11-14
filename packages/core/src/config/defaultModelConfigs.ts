@@ -5,6 +5,7 @@
  */
 
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import { DEFAULT_THINKING_MODE } from './models.js';
 
 // The default model configs. We use `base` as the parent for all of our model
 // configs, while `chat-base`, a child of `base`, is the parent of the models
@@ -25,7 +26,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         generateContentConfig: {
           thinkingConfig: {
             includeThoughts: true,
-            thinkingBudget: -1,
+            thinkingBudget: DEFAULT_THINKING_MODE,
           },
           temperature: 1,
           topP: 0.95,

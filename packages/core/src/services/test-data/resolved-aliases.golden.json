@@ -11,7 +11,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -23,7 +23,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -35,7 +35,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -47,7 +47,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
