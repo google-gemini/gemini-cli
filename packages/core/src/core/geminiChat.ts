@@ -350,8 +350,11 @@ export class GeminiChat {
           }
         }
 
-        if (lastError && isGemini2Model(model)) {
-          if (lastError instanceof InvalidStreamError) {
+        if (lastError) {
+          if (
+            lastError instanceof InvalidStreamError &&
+            isGemini2Model(model)
+          ) {
             logContentRetryFailure(
               self.config,
               new ContentRetryFailureEvent(
