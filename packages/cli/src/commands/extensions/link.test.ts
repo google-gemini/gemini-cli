@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { type CommandModule, type Argv } from 'yargs';
-import { handleUninstall, uninstallCommand } from './uninstall.js';
+import { handleLink, linkCommand } from './link.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
@@ -41,7 +41,7 @@ vi.mock('../../config/extensions/extensionSettings.js', () => ({
   promptForSetting: vi.fn(),
 }));
 
-describe('extensions uninstall command', () => {
+describe('extensions link command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockGetErrorMessage = vi.mocked(getErrorMessage);
   const mockExtensionManager = vi.mocked(ExtensionManager);
@@ -61,19 +61,19 @@ describe('extensions uninstall command', () => {
     mockExtensionManager.prototype.loadExtensions = vi
       .fn()
       .mockResolvedValue(undefined);
-    mockExtensionManager.prototype.uninstallExtension = vi
+    mockExtensionManager.prototype.installOrUpdateExtension = vi
       .fn()
-      .mockResolvedValue(undefined);
+      .mockResolvedValue({ name: 'my-linked-extension' });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('handleUninstall', () => {
-    it('should uninstall an extension', async () => {
+  describe('handleLink', () => {
+    it('should link an extension from a local path', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
-      await handleUninstall({ name: 'my-extension' });
+      await handleLink({ path: '/local/path/to/extension' });
 
       expect(mockExtensionManager).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -82,42 +82,45 @@ describe('extensions uninstall command', () => {
       );
       expect(mockExtensionManager.prototype.loadExtensions).toHaveBeenCalled();
       expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledWith('my-extension', false);
+        mockExtensionManager.prototype.installOrUpdateExtension,
+      ).toHaveBeenCalledWith({
+        source: '/local/path/to/extension',
+        type: 'link',
+      });
       expect(mockDebugLogger.log).toHaveBeenCalledWith(
-        'Extension "my-extension" successfully uninstalled.',
+        'Extension "my-linked-extension" linked successfully and enabled.',
       );
       mockCwd.mockRestore();
     });
 
-    it('should log an error message and exit with code 1 when uninstallation fails', async () => {
+    it('should log an error message and exit with code 1 when linking fails', async () => {
       const mockProcessExit = vi
         .spyOn(process, 'exit')
         .mockImplementation((() => {}) as (
           code?: string | number | null | undefined,
         ) => never);
-      const error = new Error('Uninstall failed');
+      const error = new Error('Link failed');
       (
-        mockExtensionManager.prototype.uninstallExtension as Mock
+        mockExtensionManager.prototype.installOrUpdateExtension as Mock
       ).mockRejectedValue(error);
-      mockGetErrorMessage.mockReturnValue('Uninstall failed message');
+      mockGetErrorMessage.mockReturnValue('Link failed message');
 
-      await handleUninstall({ name: 'my-extension' });
+      await handleLink({ path: '/local/path/to/extension' });
 
-      expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'Uninstall failed message',
-      );
+      expect(mockDebugLogger.error).toHaveBeenCalledWith('Link failed message');
       expect(mockProcessExit).toHaveBeenCalledWith(1);
       mockProcessExit.mockRestore();
     });
   });
 
-  describe('uninstallCommand', () => {
-    const command = uninstallCommand as CommandModule;
+  describe('linkCommand', () => {
+    const command = linkCommand as CommandModule;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('uninstall <name>');
-      expect(command.describe).toBe('Uninstalls an extension.');
+      expect(command.command).toBe('link <path>');
+      expect(command.describe).toBe(
+        'Links an extension from a local path. Updates made to the local path will always be reflected.',
+      );
     });
 
     describe('builder', () => {
@@ -138,36 +141,33 @@ describe('extensions uninstall command', () => {
         (command.builder as (yargs: Argv) => Argv)(
           yargsMock as unknown as Argv,
         );
-        expect(yargsMock.positional).toHaveBeenCalledWith('name', {
-          describe: 'The name or source path of the extension to uninstall.',
+        expect(yargsMock.positional).toHaveBeenCalledWith('path', {
+          describe: 'The name of the extension to link.',
           type: 'string',
         });
         expect(yargsMock.check).toHaveBeenCalled();
       });
-
-      it('check function should throw for missing name', () => {
-        (command.builder as (yargs: Argv) => Argv)(
-          yargsMock as unknown as Argv,
-        );
-        const checkCallback = yargsMock.check.mock.calls[0][0];
-        expect(() => checkCallback({ name: '' })).toThrow(
-          'Please include the name of the extension to uninstall as a positional argument.',
-        );
-      });
     });
 
-    it('handler should call handleUninstall', async () => {
+    it('handler should call handleLink', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       interface TestArgv {
-        name: string;
+        path: string;
         [key: string]: unknown;
       }
-      const argv: TestArgv = { name: 'my-extension', _: [], $0: '' };
+      const argv: TestArgv = {
+        path: '/local/path/to/extension',
+        _: [],
+        $0: '',
+      };
       await (command.handler as unknown as (args: TestArgv) => void)(argv);
 
       expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledWith('my-extension', false);
+        mockExtensionManager.prototype.installOrUpdateExtension,
+      ).toHaveBeenCalledWith({
+        source: '/local/path/to/extension',
+        type: 'link',
+      });
       mockCwd.mockRestore();
     });
   });
