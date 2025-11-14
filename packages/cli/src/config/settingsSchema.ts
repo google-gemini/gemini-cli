@@ -483,6 +483,15 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      showModelInfoInChat: {
+        type: 'boolean',
+        label: 'Show Model Info In Chat',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show the model name in the chat for each model turn.',
+        showInDialog: true,
+      },
       useFullWidth: {
         type: 'boolean',
         label: 'Use Full Width',
@@ -500,6 +509,16 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
+      incrementalRendering: {
+        type: 'boolean',
+        label: 'Incremental Rendering',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
       customWittyPhrases: {
