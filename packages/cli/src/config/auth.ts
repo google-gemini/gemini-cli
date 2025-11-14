@@ -36,5 +36,19 @@ export function validateAuthMethod(authMethod: string): string | null {
     return null;
   }
 
+  if (authMethod === AuthType.LOCAL_LLM) {
+    const hasLocalLLMConfig =
+      !!process.env['LOCAL_LLM_BASE_URL'] || !!loadSettings().merged.localLLM?.baseURL;
+    if (!hasLocalLLMConfig) {
+      return (
+        'When using Local LLM, you must specify either:\n' +
+        '• LOCAL_LLM_BASE_URL environment variable.\n' +
+        '• localLLM.baseURL in your settings file.\n' +
+        'Update your configuration and try again!'
+      );
+    }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 }

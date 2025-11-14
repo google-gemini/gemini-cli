@@ -305,6 +305,9 @@ export interface ConfigParameters {
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
+  localLLMBaseURL?: string;
+  localLLMApiKey?: string;
+  localLLMModel?: string;
 }
 
 export class Config {
@@ -397,6 +400,9 @@ export class Config {
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
   private readonly useWriteTodos: boolean;
+  private readonly localLLMBaseURL: string | undefined;
+  private readonly localLLMApiKey: string | undefined;
+  private readonly localLLMModel: string | undefined;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
@@ -513,6 +519,9 @@ export class Config {
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
+    this.localLLMBaseURL = params.localLLMBaseURL;
+    this.localLLMApiKey = params.localLLMApiKey;
+    this.localLLMModel = params.localLLMModel;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
@@ -1014,6 +1023,18 @@ export class Config {
 
   getProxy(): string | undefined {
     return this.proxy;
+  }
+
+  getLocalLLMBaseURL(): string | undefined {
+    return this.localLLMBaseURL;
+  }
+
+  getLocalLLMApiKey(): string | undefined {
+    return this.localLLMApiKey;
+  }
+
+  getLocalLLMModel(): string | undefined {
+    return this.localLLMModel;
   }
 
   getWorkingDir(): string {

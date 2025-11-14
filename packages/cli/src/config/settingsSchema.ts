@@ -732,6 +732,58 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  localLLM: {
+    type: 'object',
+    label: 'Local LLM',
+    category: 'Model',
+    requiresRestart: true,
+    default: {},
+    description: oneLine`
+      Configuration for local LLM providers (e.g., LM Studio, Ollama, LocalAI).
+      Use this to connect to OpenAI-compatible API endpoints running locally.
+    `,
+    showInDialog: false,
+    properties: {
+      baseURL: {
+        type: 'string',
+        label: 'Base URL',
+        category: 'Model',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: oneLine`
+          The base URL for your local LLM API endpoint.
+          For LM Studio, this is typically http://localhost:1234/v1.
+          For Ollama, this is typically http://localhost:11434/v1.
+        `,
+        showInDialog: false,
+      },
+      apiKey: {
+        type: 'string',
+        label: 'API Key',
+        category: 'Model',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: oneLine`
+          Optional API key for your local LLM.
+          Many local LLM servers don't require authentication.
+        `,
+        showInDialog: false,
+      },
+      model: {
+        type: 'string',
+        label: 'Model Name',
+        category: 'Model',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: oneLine`
+          The model name to use with your local LLM.
+          This should match the model name in your local LLM server.
+        `,
+        showInDialog: false,
+      },
+    },
+  },
+
   context: {
     type: 'object',
     label: 'Context',
