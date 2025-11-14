@@ -10,7 +10,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
-import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
+import type { GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
 import { chatCommand, serializeHistoryToMarkdown } from './chatCommand.js';
@@ -52,7 +52,7 @@ describe('chatCommand', () => {
       getHistory: mockGetHistory,
     });
     mockSaveCheckpoint = vi.fn().mockResolvedValue(undefined);
-    mockLoadCheckpoint = vi.fn().mockResolvedValue({ history: [] });
+    mockLoadCheckpoint = vi.fn().mockResolvedValue([]);
     mockDeleteCheckpoint = vi.fn().mockResolvedValue(true);
 
     mockContext = createMockCommandContext({
@@ -66,9 +66,6 @@ describe('chatCommand', () => {
           storage: {
             getProjectTempDir: () => '/project/root/.gemini/tmp/mockhash',
           },
-          getContentGeneratorConfig: () => ({
-            authType: AuthType.LOGIN_WITH_GOOGLE,
-          }),
         },
         logger: {
           saveCheckpoint: mockSaveCheckpoint,
@@ -218,10 +215,7 @@ describe('chatCommand', () => {
       const result = await saveCommand?.action?.(mockContext, tag);
 
       expect(mockCheckpointExists).not.toHaveBeenCalled(); // Should skip existence check
-      expect(mockSaveCheckpoint).toHaveBeenCalledWith(
-        { history, authType: AuthType.LOGIN_WITH_GOOGLE },
-        tag,
-      );
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(history, tag);
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -250,7 +244,7 @@ describe('chatCommand', () => {
     });
 
     it('should inform if checkpoint is not found', async () => {
-      mockLoadCheckpoint.mockResolvedValue({ history: [] });
+      mockLoadCheckpoint.mockResolvedValue([]);
 
       const result = await resumeCommand?.action?.(mockContext, badTag);
 
@@ -261,53 +255,12 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should resume a conversation with matching authType', async () => {
+    it('should resume a conversation', async () => {
       const conversation: Content[] = [
         { role: 'user', parts: [{ text: 'hello gemini' }] },
         { role: 'model', parts: [{ text: 'hello world' }] },
       ];
-      mockLoadCheckpoint.mockResolvedValue({
-        history: conversation,
-        authType: AuthType.LOGIN_WITH_GOOGLE,
-      });
-
-      const result = await resumeCommand?.action?.(mockContext, goodTag);
-
-      expect(result).toEqual({
-        type: 'load_history',
-        history: [
-          { type: 'user', text: 'hello gemini' },
-          { type: 'gemini', text: 'hello world' },
-        ] as HistoryItemWithoutId[],
-        clientHistory: conversation,
-      });
-    });
-
-    it('should block resuming a conversation with mismatched authType', async () => {
-      const conversation: Content[] = [
-        { role: 'user', parts: [{ text: 'hello gemini' }] },
-        { role: 'model', parts: [{ text: 'hello world' }] },
-      ];
-      mockLoadCheckpoint.mockResolvedValue({
-        history: conversation,
-        authType: AuthType.USE_GEMINI,
-      });
-
-      const result = await resumeCommand?.action?.(mockContext, goodTag);
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: `Cannot resume chat. It was saved with a different authentication method (${AuthType.USE_GEMINI}) than the current one (${AuthType.LOGIN_WITH_GOOGLE}).`,
-      });
-    });
-
-    it('should resume a legacy conversation without authType', async () => {
-      const conversation: Content[] = [
-        { role: 'user', parts: [{ text: 'hello gemini' }] },
-        { role: 'model', parts: [{ text: 'hello world' }] },
-      ];
-      mockLoadCheckpoint.mockResolvedValue({ history: conversation });
+      mockLoadCheckpoint.mockResolvedValue(conversation);
 
       const result = await resumeCommand?.action?.(mockContext, goodTag);
 

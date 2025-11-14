@@ -7,7 +7,6 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Content } from '@google/genai';
-import type { AuthType } from './contentGenerator.js';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -24,11 +23,6 @@ export interface LogEntry {
   timestamp: string;
   type: MessageSenderType;
   message: string;
-}
-
-export interface Checkpoint {
-  history: Content[];
-  authType?: AuthType;
 }
 
 // This regex matches any character that is NOT a letter (a-z, A-Z),
@@ -320,7 +314,7 @@ export class Logger {
     return newPath;
   }
 
-  async saveCheckpoint(checkpoint: Checkpoint, tag: string): Promise<void> {
+  async saveCheckpoint(conversation: Content[], tag: string): Promise<void> {
     if (!this.initialized) {
       debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot save a checkpoint.',
@@ -330,53 +324,42 @@ export class Logger {
     // Always save with the new encoded path.
     const path = this._checkpointPath(tag);
     try {
-      await fs.writeFile(path, JSON.stringify(checkpoint, null, 2), 'utf-8');
+      await fs.writeFile(path, JSON.stringify(conversation, null, 2), 'utf-8');
     } catch (error) {
       debugLogger.error('Error writing to checkpoint file:', error);
     }
   }
 
-  async loadCheckpoint(tag: string): Promise<Checkpoint> {
+  async loadCheckpoint(tag: string): Promise<Content[]> {
     if (!this.initialized) {
       debugLogger.error(
         'Logger not initialized or checkpoint file path not set. Cannot load checkpoint.',
       );
-      return { history: [] };
+      return [];
     }
 
     const path = await this._getCheckpointPath(tag);
     try {
       const fileContent = await fs.readFile(path, 'utf-8');
       const parsedContent = JSON.parse(fileContent);
-
-      // Handle legacy format (just an array of Content)
-      if (Array.isArray(parsedContent)) {
-        return { history: parsedContent as Content[] };
+      if (!Array.isArray(parsedContent)) {
+        debugLogger.warn(
+          `Checkpoint file at ${path} is not a valid JSON array. Returning empty checkpoint.`,
+        );
+        return [];
       }
-
-      if (
-        typeof parsedContent === 'object' &&
-        parsedContent !== null &&
-        'history' in parsedContent
-      ) {
-        return parsedContent as Checkpoint;
-      }
-
-      debugLogger.warn(
-        `Checkpoint file at ${path} has an unknown format. Returning empty checkpoint.`,
-      );
-      return { history: [] };
+      return parsedContent as Content[];
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         // This is okay, it just means the checkpoint doesn't exist in either format.
-        return { history: [] };
+        return [];
       }
       debugLogger.error(
         `Failed to read or parse checkpoint file ${path}:`,
         error,
       );
-      return { history: [] };
+      return [];
     }
   }
 
