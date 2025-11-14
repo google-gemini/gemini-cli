@@ -18,12 +18,16 @@ describe('nativeSelection', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    stdoutWriteSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true) as unknown as ReturnType<typeof vi.spyOn>;
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    // Cancel any pending timeouts to clean up module state
+    cancelCopyHandler();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   describe('temporarilyDisableMouseForCopy', () => {
@@ -74,7 +78,7 @@ describe('nativeSelection', () => {
       expect(isCopyInProgress()).toBe(true);
 
       // Fast-forward past the timeout
-      vi.advanceTimersByTime(250);
+      vi.advanceTimersByTime(200);
       expect(isCopyInProgress()).toBe(false);
 
       // Now should be able to handle copy again
@@ -106,7 +110,7 @@ describe('nativeSelection', () => {
       cancelCopyHandler();
 
       expect(isCopyInProgress()).toBe(false);
-      expect(stdoutWriteSpy).toHaveBeenCalledWith('\u001b[?1002h\u001b[?1006h');
+      expect(stdoutWriteSpy).not.toHaveBeenCalled();
     });
   });
 

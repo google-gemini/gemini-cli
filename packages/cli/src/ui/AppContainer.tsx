@@ -108,7 +108,10 @@ import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
-import { handleCopyKeyPress, cancelCopyHandler } from './utils/nativeSelection.js';
+import {
+  handleCopyKeyPress,
+  cancelCopyHandler,
+} from './utils/nativeSelection.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;

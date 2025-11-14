@@ -9,12 +9,12 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 /**
  * Native text selection support for alternate buffer mode.
- * 
+ *
  * When mouse events are enabled in the terminal (for scroll wheel support),
  * native text selection is disabled. This module provides a solution to
  * allow users to copy text using Ctrl+C/Cmd+C without requiring a special
  * copy mode (Ctrl+S).
- * 
+ *
  * The approach is to temporarily disable mouse events when Ctrl+C is detected,
  * allowing the terminal's native copy mechanism to work, then re-enable mouse
  * events after a brief delay.
@@ -42,10 +42,10 @@ let copyHandlerTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Handle Ctrl+C/Cmd+C key press to enable native text copying.
- * 
+ *
  * This temporarily disables mouse events, waits for the terminal to process
  * the copy operation, then re-enables mouse events.
- * 
+ *
  * @returns true if the copy handling was initiated, false if already in progress
  */
 export function handleCopyKeyPress(): boolean {
@@ -54,11 +54,13 @@ export function handleCopyKeyPress(): boolean {
     return false;
   }
 
-  debugLogger.log('[Selection] Ctrl+C detected, initiating native copy support');
-  
+  debugLogger.log(
+    '[Selection] Ctrl+C detected, initiating native copy support',
+  );
+
   // Disable mouse events to allow terminal's native copy
   temporarilyDisableMouseForCopy();
-  
+
   // Re-enable after a short delay to allow the copy operation to complete
   // 200ms should be sufficient for most terminals to process the Ctrl+C
   copyHandlerTimeout = setTimeout(() => {

@@ -102,15 +102,16 @@ available combinations.
 
 #### Text Selection & Copying (Alternate Buffer Mode)
 
-| Action                                                                          | Keys            |
-| ------------------------------------------------------------------------------- | --------------- |
-| Copy selected text (native terminal selection). First press enables selection. | `Ctrl + C`      |
-| Copy selected text (native terminal selection) on macOS.                        | `Cmd + C`       |
-| Force enter copy mode (legacy, use Ctrl+C for native selection instead).       | `Ctrl + S`      |
+| Action                                                                         | Keys       |
+| ------------------------------------------------------------------------------ | ---------- |
+| Copy selected text (native terminal selection). First press enables selection. | `Ctrl + C` |
+| Copy selected text (native terminal selection) on macOS.                       | `Cmd + C`  |
+| Force enter copy mode (legacy, use Ctrl+C for native selection instead).       | `Ctrl + S` |
 
-**Note:** In alternate buffer mode (full-screen UI), the first `Ctrl+C` temporarily
-disables mouse events to allow native text selection and copying. Subsequent
-`Ctrl+C` presses within 1 second will cancel the current request instead.
+**Note:** In alternate buffer mode (full-screen UI), the first `Ctrl+C`
+temporarily disables mouse events to allow native text selection and copying.
+Subsequent `Ctrl+C` presses within 1 second will cancel the current request
+instead.
 
 #### Session Control
 
