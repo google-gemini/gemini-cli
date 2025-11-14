@@ -412,8 +412,8 @@
         "compressionThreshold": {
           "title": "Compression Threshold",
           "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
-          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.2`",
-          "default": 0.2,
+          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.7`",
+          "default": 0.7,
           "type": "number"
         },
         "skipNextSpeakerCheck": {
