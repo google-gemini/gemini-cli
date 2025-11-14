@@ -575,6 +575,15 @@ export class GeminiChat {
         content: responseText,
       });
     }
+
+    // Stream validation logic: A stream is considered successful if:
+    // 1. There's a tool call OR
+    // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
+    //
+    // We throw an error only when there's no tool call AND:
+    // - No finish reason, OR
+    // - MALFORMED_FUNCTION_CALL finish reason OR
+    // - Empty response text (e.g., only thoughts with no actual content)
     if (!hasToolCall) {
       if (!finishReason) {
         throw new InvalidStreamError(
