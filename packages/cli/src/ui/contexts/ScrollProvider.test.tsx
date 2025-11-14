@@ -16,12 +16,12 @@ import { Box, type DOMElement } from 'ink';
 import type { MouseEvent } from '../hooks/useMouse.js';
 
 // Mock useMouse hook
-const mockUseMouseCallbacks = new Set<(event: MouseEvent) => void>();
+const mockUseMouseCallbacks = new Set<(event: MouseEvent) => void | boolean>();
 vi.mock('../hooks/useMouse.js', async () => {
   // We need to import React dynamically because this factory runs before top-level imports
   const React = await import('react');
   return {
-    useMouse: (callback: (event: MouseEvent) => void) => {
+    useMouse: (callback: (event: MouseEvent) => void | boolean) => {
       React.useEffect(() => {
         mockUseMouseCallbacks.add(callback);
         return () => {
@@ -79,6 +79,81 @@ describe('ScrollProvider', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  describe('Event Handling Status', () => {
+    it('returns true when scroll event is handled', () => {
+      const scrollBy = vi.fn();
+      const getScrollState = vi.fn(() => ({
+        scrollTop: 0,
+        scrollHeight: 100,
+        innerHeight: 10,
+      }));
+
+      render(
+        <ScrollProvider>
+          <TestScrollable
+            id="test-scrollable"
+            scrollBy={scrollBy}
+            getScrollState={getScrollState}
+          />
+        </ScrollProvider>,
+      );
+
+      let handled = false;
+      for (const callback of mockUseMouseCallbacks) {
+        if (
+          callback({
+            name: 'scroll-down',
+            col: 5,
+            row: 5,
+            shift: false,
+            ctrl: false,
+            meta: false,
+          }) === true
+        ) {
+          handled = true;
+        }
+      }
+      expect(handled).toBe(true);
+    });
+
+    it('returns false when scroll event is ignored (cannot scroll further)', () => {
+      const scrollBy = vi.fn();
+      // Already at bottom
+      const getScrollState = vi.fn(() => ({
+        scrollTop: 90,
+        scrollHeight: 100,
+        innerHeight: 10,
+      }));
+
+      render(
+        <ScrollProvider>
+          <TestScrollable
+            id="test-scrollable"
+            scrollBy={scrollBy}
+            getScrollState={getScrollState}
+          />
+        </ScrollProvider>,
+      );
+
+      let handled = false;
+      for (const callback of mockUseMouseCallbacks) {
+        if (
+          callback({
+            name: 'scroll-down',
+            col: 5,
+            row: 5,
+            shift: false,
+            ctrl: false,
+            meta: false,
+          }) === true
+        ) {
+          handled = true;
+        }
+      }
+      expect(handled).toBe(false);
+    });
   });
 
   it('calls scrollTo when clicking scrollbar track if available', async () => {

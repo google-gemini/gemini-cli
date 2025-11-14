@@ -35,7 +35,7 @@ export interface MouseEvent {
   ctrl: boolean;
 }
 
-export type MouseHandler = (event: MouseEvent) => void;
+export type MouseHandler = (event: MouseEvent) => void | boolean;
 
 export function getMouseEventName(
   buttonCode: number,
