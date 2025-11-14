@@ -150,6 +150,28 @@ describe('editCorrector', () => {
         'quote"text\nline',
       );
     });
+
+    // Test cases for the character corruption bug fix
+    describe('character corruption prevention', () => {
+      it('should NOT corrupt Windows file paths', () => {
+        // These should remain unchanged - they are legitimate file paths
+        expect(unescapeStringForGeminiBug('C:\\\\Users\\\\name')).toBe('C:\\\\Users\\\\name');
+        expect(unescapeStringForGeminiBug('D:\\\\workspace\\\\project')).toBe('D:\\\\workspace\\\\project');
+      });
+
+      it('should NOT corrupt multi-segment paths', () => {
+        // These should remain unchanged - they are legitimate paths
+        expect(unescapeStringForGeminiBug('path\\\\to\\\\file')).toBe('path\\\\to\\\\file');
+        expect(unescapeStringForGeminiBug('src\\\\components\\\\Button')).toBe('src\\\\components\\\\Button');
+      });
+
+      it('should still handle legitimate escape sequences', () => {
+        // These ARE actual escape sequences that should be unescaped
+        expect(unescapeStringForGeminiBug('Hello\\nWorld')).toBe('Hello\nWorld');
+        expect(unescapeStringForGeminiBug('Tab\\tSeparated')).toBe('Tab\tSeparated');
+        expect(unescapeStringForGeminiBug('Quote\\"Text')).toBe('Quote"Text');
+      });
+    });
   });
 
   describe('ensureCorrectEdit', () => {
