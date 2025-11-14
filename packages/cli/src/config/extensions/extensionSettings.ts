@@ -87,12 +87,18 @@ export async function maybePromptForSettings(
     }
   }
 
-  let envContent = '';
-  for (const [key, value] of Object.entries(nonSensitiveSettings)) {
-    envContent += `${key}=${value}\n`;
-  }
+  const envContent = formatEnvContent(nonSensitiveSettings);
 
   await fs.writeFile(envFilePath, envContent);
+}
+
+function formatEnvContent(settings: Record<string, string>): string {
+  let envContent = '';
+  for (const [key, value] of Object.entries(settings)) {
+    const formattedValue = value.includes(' ') ? `"${value}"` : value;
+    envContent += `${key}=${formattedValue}\n`;
+  }
+  return envContent;
 }
 
 export async function promptForSetting(
@@ -137,6 +143,61 @@ export async function getEnvContents(
     }
   }
   return customEnv;
+}
+
+export async function updateSetting(
+  extensionConfig: ExtensionConfig,
+  extensionId: string,
+  settingKey: string,
+  requestSetting: (setting: ExtensionSetting) => Promise<string>,
+): Promise<void> {
+  const { name: extensionName, settings } = extensionConfig;
+  if (!settings || settings.length === 0) {
+    console.log('This extension does not have any settings.');
+    return;
+  }
+
+  const settingToUpdate = settings.find(
+    (s) => s.name === settingKey || s.envVar === settingKey,
+  );
+
+  if (!settingToUpdate) {
+    console.log(`Setting ${settingKey} not found.`);
+    return;
+  }
+
+  const newValue = await requestSetting(settingToUpdate);
+  const keychain = new KeychainTokenStorage(
+    getKeychainStorageName(extensionName, extensionId),
+  );
+
+  if (settingToUpdate.sensitive) {
+    await keychain.setSecret(settingToUpdate.envVar, newValue);
+    return;
+  }
+
+  // For non-sensitive settings, we need to read the existing .env file,
+  // update the value, and write it back.
+  const allSettings = await getEnvContents(extensionConfig, extensionId);
+  allSettings[settingToUpdate.envVar] = newValue;
+
+  const envFilePath = new ExtensionStorage(extensionName).getEnvFilePath();
+
+  const nonSensitiveSettings: Record<string, string> = {};
+  for (const setting of settings) {
+    // We only care about non-sensitive settings for the .env file.
+    if (setting.sensitive) {
+      continue;
+    }
+    const value = allSettings[setting.envVar];
+    if (value !== undefined) {
+      nonSensitiveSettings[setting.envVar] = value;
+    }
+  }
+
+  const envContent = formatEnvContent(nonSensitiveSettings);
+
+  await fs.writeFile(envFilePath, envContent);
 }
 
 interface settingsChanges {
