@@ -683,7 +683,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 0.2 as number,
+        default: 0.7 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
