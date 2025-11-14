@@ -898,7 +898,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
-  const [selectionWarning, setSelectionWarning] = useState(false);
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
@@ -910,18 +910,28 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
-    const handleSelectionWarning = () => {
-      setSelectionWarning(true);
+
+    const handleWarning = (message: string) => {
+      setWarningMessage(message);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       timeoutId = setTimeout(() => {
-        setSelectionWarning(false);
+        setWarningMessage(null);
       }, WARNING_PROMPT_DURATION_MS);
     };
+
+    const handleSelectionWarning = () => {
+      handleWarning('Press Ctrl-S to enter selection mode to copy text.');
+    };
+    const handlePasteTimeout = () => {
+      handleWarning('Paste Timed out. Possibly due to slow connection.');
+    };
     appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
+    appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
     return () => {
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
+      appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -1373,7 +1383,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       embeddedShellFocused,
       showDebugProfiler,
       copyModeEnabled,
-      selectionWarning,
+      warningMessage,
     }),
     [
       isThemeDialogOpen,
@@ -1460,7 +1470,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       apiKeyDefaultValue,
       authState,
       copyModeEnabled,
-      selectionWarning,
+      warningMessage,
     ],
   );
 
