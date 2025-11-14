@@ -639,7 +639,14 @@ export class Config {
   }
 
   getModelInfoService(): ModelInfoService {
-    return this.modelInfoService;
+    if (this.modelInfoService) {
+      return this.modelInfoService;
+    } else {
+      // We hit this path only if this.contentGenerator doesn't exist.
+      throw new Error(
+        'ModelInfoService not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
+      );
+    }
   }
 
   async refreshAuth(authMethod: AuthType) {
