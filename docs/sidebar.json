@@ -73,6 +73,10 @@
         "slug": "docs/cli/keyboard-shortcuts"
       },
       {
+        "label": "Native Text Selection",
+        "slug": "docs/cli/native-selection"
+      },
+      {
         "label": "Model Selection",
         "slug": "docs/cli/model"
       },
