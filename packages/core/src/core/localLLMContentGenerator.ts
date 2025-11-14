@@ -63,9 +63,13 @@ export class LocalLLMContentGenerator implements ContentGenerator {
       'text' in contents &&
       !('role' in contents)
     ) {
+      const text =
+        typeof (contents as { text?: unknown }).text === 'string'
+          ? (contents as { text: string }).text
+          : '';
       messages.push({
         role: 'user',
-        content: contents.text || '',
+        content: text,
       });
       return messages;
     }
@@ -92,7 +96,6 @@ export class LocalLLMContentGenerator implements ContentGenerator {
         continue;
       }
 
-       
       const role: 'user' | 'assistant' | 'system' =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (content as any).role === 'user'
