@@ -8,7 +8,7 @@ import type React from 'react';
 import { useCallback, useContext, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import {
-  PREVIEW_GEMINI_MODEL_EXTERNAL_NAME,
+  PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -55,7 +55,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       {
         value: GEMINI_MODEL_ALIAS_PRO,
         title: config?.getPreviewFeatures()
-          ? `Pro (${PREVIEW_GEMINI_MODEL_EXTERNAL_NAME}, ${DEFAULT_GEMINI_MODEL})`
+          ? `Pro (${PREVIEW_GEMINI_MODEL}, ${DEFAULT_GEMINI_MODEL})`
           : `Pro (${DEFAULT_GEMINI_MODEL})`,
         description:
           'For complex tasks that require deep reasoning and creativity',
@@ -101,7 +101,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     : 'Gemini 3 is now available.';
 
   const subheader = config?.getPreviewFeatures()
-    ? `To disable Gemini 3, disable "Preview features" in /settings.\n\nWhen you select Auto or Pro, Gemini CLI will attempt to use ${PREVIEW_GEMINI_MODEL_EXTERNAL_NAME} first, before falling back to ${DEFAULT_GEMINI_MODEL}.`
+    ? `To disable Gemini 3, disable "Preview features" in /settings.\n\nWhen you select Auto or Pro, Gemini CLI will attempt to use ${PREVIEW_GEMINI_MODEL} first, before falling back to ${DEFAULT_GEMINI_MODEL}.`
     : 'To use Gemini 3, enable "Preview features" in /settings.';
 
   return (
