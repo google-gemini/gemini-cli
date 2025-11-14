@@ -61,8 +61,11 @@ export const usePermissionsModifyTrust = (
 ) => {
   const settings = useSettings();
   const cwd = targetDirectory;
+  // Normalize paths for case-insensitive file systems (macOS/Windows) to ensure
+  // accurate comparison between targetDirectory and process.cwd().
   const isCurrentWorkspace =
-    path.resolve(targetDirectory) === path.resolve(process.cwd());
+    path.resolve(targetDirectory).toLowerCase() ===
+    path.resolve(process.cwd()).toLowerCase();
 
   const [initialState] = useState(() =>
     getInitialTrustState(settings, cwd, isCurrentWorkspace),

@@ -12,8 +12,8 @@ import type {
 import { CommandKind } from './types.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import * as fs from 'node:fs';
+import { expandHomeDir } from '../utils/directoryUtils.js';
 
 export const permissionsCommand: SlashCommand = {
   name: 'permissions',
@@ -31,10 +31,8 @@ export const permissionsCommand: SlashCommand = {
 
         if (!dirPath) {
           targetDirectory = process.cwd();
-        } else if (dirPath.startsWith('~')) {
-          targetDirectory = path.join(os.homedir(), dirPath.slice(1));
         } else {
-          targetDirectory = path.resolve(dirPath);
+          targetDirectory = path.resolve(expandHomeDir(dirPath));
         }
 
         try {

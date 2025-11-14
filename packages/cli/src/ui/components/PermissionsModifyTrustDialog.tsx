@@ -16,10 +16,13 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
-interface PermissionsModifyTrustDialogProps {
+export interface PermissionsDialogProps {
+  targetDirectory?: string;
+}
+
+interface PermissionsModifyTrustDialogProps extends PermissionsDialogProps {
   onExit: () => void;
   addItem: UseHistoryManagerReturn['addItem'];
-  targetDirectory?: string;
 }
 
 export function PermissionsModifyTrustDialog({

@@ -32,10 +32,14 @@ vi.mock('node:process', () => ({
   cwd: mockedCwd,
 }));
 
-vi.mock('node:path', () => ({
-  resolve: vi.fn((p) => p),
-  join: vi.fn((...args) => args.join('/')),
-}));
+vi.mock('node:path', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    resolve: vi.fn((p) => p),
+    join: vi.fn((...args) => args.join('/')),
+  };
+});
 
 vi.mock('../../config/trustedFolders.js', () => ({
   loadTrustedFolders: mockedLoadTrustedFolders,
