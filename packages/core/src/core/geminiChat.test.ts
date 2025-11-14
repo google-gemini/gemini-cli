@@ -586,7 +586,7 @@ describe('GeminiChat', () => {
         }
       };
 
-      await expect(consumeStream()).resolves.not.toThrow();
+      await expect(consumeStream()).rejects.toThrow('Simulated Quota Error');
 
       expect(retryWithBackoff).toHaveBeenCalled();
 
@@ -1010,7 +1010,7 @@ describe('GeminiChat', () => {
             // Must loop to trigger the internal logic that throws.
           }
         })(),
-      ).resolves.not.toThrow();
+      ).rejects.toThrow(InvalidStreamError);
 
       // Should be called only 1 time (no retry)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
