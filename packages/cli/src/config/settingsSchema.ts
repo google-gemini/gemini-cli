@@ -483,6 +483,15 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      showModelInfoInChat: {
+        type: 'boolean',
+        label: 'Show Model Info In Chat',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show the model name in the chat for each model turn.',
+        showInDialog: true,
+      },
       useFullWidth: {
         type: 'boolean',
         label: 'Use Full Width',

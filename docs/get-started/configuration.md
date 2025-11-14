@@ -225,6 +225,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show citations for generated text in the chat.
   - **Default:** `false`
 
+- **`ui.showModelInfoInChat`** (boolean):
+  - **Description:** Show the model name in the chat for each model turn.
+  - **Default:** `false`
+
 - **`ui.useFullWidth`** (boolean):
   - **Description:** Use the entire width of the terminal for output.
   - **Default:** `true`
