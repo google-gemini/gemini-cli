@@ -32,6 +32,8 @@ import type { UpdateObject } from '../utils/updateCheck.js';
 export interface ProQuotaDialogRequest {
   failedModel: string;
   fallbackModel: string;
+  message: string;
+  isTerminalQuotaError: boolean;
   resolve: (intent: FallbackIntent) => void;
 }
 

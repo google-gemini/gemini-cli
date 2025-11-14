@@ -13,6 +13,11 @@ import {
 } from '../config/models.js';
 import { logFlashFallback, FlashFallbackEvent } from '../telemetry/index.js';
 import { coreEvents } from '../utils/events.js';
+import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { getErrorMessage } from '../utils/errors.js';
+
+const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
 export async function handleFallback(
   config: Config,
@@ -74,6 +79,10 @@ export async function handleFallback(
       case 'retry_later':
         return false;
 
+      case 'upgrade':
+        await handleUpgrade();
+        return false;
+
       default:
         throw new Error(
           `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,
@@ -82,6 +91,17 @@ export async function handleFallback(
   } catch (handlerError) {
     console.error('Fallback UI handler failed:', handlerError);
     return null;
+  }
+}
+
+async function handleUpgrade() {
+  try {
+    await openBrowserSecurely(UPGRADE_URL_PAGE);
+  } catch (error) {
+    debugLogger.warn(
+      'Failed to open browser automatically:',
+      getErrorMessage(error),
+    );
   }
 }
 

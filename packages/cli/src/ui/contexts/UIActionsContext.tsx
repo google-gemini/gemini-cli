@@ -43,7 +43,7 @@ export interface UIActions {
   handleFinalSubmit: (value: string) => void;
   handleClearScreen: () => void;
   handleProQuotaChoice: (
-    choice: 'retry_later' | 'retry_once' | 'retry_always',
+    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: (onPop: (messages: string | undefined) => void) => void;
