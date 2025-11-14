@@ -5,6 +5,7 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Define a simple interface for the model information we need.
 export interface ModelInfo {
@@ -43,7 +44,7 @@ export class ModelInfoService {
     } catch (error) {
       // A failure with 'thinkingConfig' likely reason indicates no support.
       // If the error is unrelated to thinking, false is still a better default to return.
-      console.log(
+      debugLogger.log(
         'GenerateContent returned error: %s when called with thinkingConfig set.',
         error,
       );
