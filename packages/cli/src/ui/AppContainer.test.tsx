@@ -606,6 +606,9 @@ describe('AppContainer State Management', () => {
         resumeChat: vi.fn(),
         getUserTier: vi.fn(),
         getChatRecordingService: vi.fn(() => mockChatRecordingService),
+        getModelInfoService: vi.fn(() => ({
+          isThinkingSupported: vi.fn().mockResolvedValue(true),
+        })),
       };
 
       const configWithRecording = {
