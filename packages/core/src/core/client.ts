@@ -61,10 +61,9 @@ export async function isThinkingSupported(
   model: string,
   modelInfoService: ModelInfoService,
 ) {
-  // if (model === DEFAULT_GEMINI_MODEL_AUTO) {
-  //   return true;
-  // }
-  console.log('asdf : async function isThinkingSupported');
+  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+    return true;
+  }
   return await modelInfoService.isThinkingSupported(model);
 }
 
