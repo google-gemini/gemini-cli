@@ -110,6 +110,7 @@ import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
+const MIN_CTRL_C_INTERVAL_MS = 400;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
@@ -884,6 +885,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const [ctrlCPressCount, setCtrlCPressCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCtrlCPressTimeRef = useRef<number>(0);
   const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
@@ -967,14 +969,19 @@ Logging in with Google... Please restart Gemini CLI to continue.
       clearTimeout(ctrlCTimerRef.current);
       ctrlCTimerRef.current = null;
     }
+    const now = Date.now();
+    const timeBetweenCtrlCPress = now - lastCtrlCPressTimeRef.current;
+
     if (ctrlCPressCount > 2) {
       recordExitFail(config);
     }
-    if (ctrlCPressCount > 1) {
+    if (ctrlCPressCount > 1 && timeBetweenCtrlCPress > MIN_CTRL_C_INTERVAL_MS) {
       handleSlashCommand('/quit');
     } else {
+      lastCtrlCPressTimeRef.current = now;
       ctrlCTimerRef.current = setTimeout(() => {
         setCtrlCPressCount(0);
+        lastCtrlCPressTimeRef.current = 0;
         ctrlCTimerRef.current = null;
       }, CTRL_EXIT_PROMPT_DURATION_MS);
     }
