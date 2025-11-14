@@ -284,13 +284,19 @@ export async function main() {
     validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
   );
 
-  // Set a default auth type if one isn't set.
-  if (!settings.merged.security?.auth?.selectedType) {
-    if (process.env['CLOUD_SHELL'] === 'true') {
+  // Set a default auth type if one isn't set or is set to a legacy type
+  if (
+    !settings.merged.security?.auth?.selectedType ||
+    settings.merged.security?.auth?.selectedType === AuthType.LEGACY_CLOUD_SHELL
+  ) {
+    if (
+      process.env['CLOUD_SHELL'] === 'true' ||
+      process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+    ) {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
-        AuthType.CLOUD_SHELL,
+        AuthType.COMPUTE_ADC,
       );
     }
   }

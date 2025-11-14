@@ -32,8 +32,8 @@ describe('validateAuthMethod', () => {
     expect(validateAuthMethod(AuthType.LOGIN_WITH_GOOGLE)).toBeNull();
   });
 
-  it('should return null for CLOUD_SHELL', () => {
-    expect(validateAuthMethod(AuthType.CLOUD_SHELL)).toBeNull();
+  it('should return null for COMPUTE_ADC', () => {
+    expect(validateAuthMethod(AuthType.COMPUTE_ADC)).toBeNull();
   });
 
   describe('USE_GEMINI', () => {
