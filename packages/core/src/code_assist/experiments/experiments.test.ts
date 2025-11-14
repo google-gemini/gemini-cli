@@ -42,8 +42,8 @@ describe('experiments', () => {
     const { getExperiments } = await import('./experiments.js');
     const mockApiResponse: ListExperimentsResponse = {
       flags: [
-        { name: 'flag1', boolValue: true },
-        { name: 'flag2', stringValue: 'value' },
+        { flagId: 234, boolValue: true },
+        { flagId: 345, stringValue: 'value' },
       ],
       experimentIds: [123, 456],
     };
@@ -58,12 +58,12 @@ describe('experiments', () => {
     );
 
     // Verify that the response was parsed correctly
-    expect(experiments.flags['flag1']).toEqual({
-      name: 'flag1',
+    expect(experiments.flags[234]).toEqual({
+      flagId: 234,
       boolValue: true,
     });
-    expect(experiments.flags['flag2']).toEqual({
-      name: 'flag2',
+    expect(experiments.flags[345]).toEqual({
+      flagId: 345,
       stringValue: 'value',
     });
     expect(experiments.experimentIds).toEqual([123, 456]);
@@ -85,7 +85,7 @@ describe('experiments', () => {
     const mockApiResponse: ListExperimentsResponse = {
       flags: [
         { boolValue: true } as Flag, // No name
-        { name: 'flag2', stringValue: 'value' },
+        { flagId: 256, stringValue: 'value' },
       ],
     };
     vi.mocked(mockServer.listExperiments).mockResolvedValue(mockApiResponse);
@@ -93,7 +93,7 @@ describe('experiments', () => {
     const experiments = await getExperiments(mockServer);
 
     expect(Object.keys(experiments.flags)).toHaveLength(1);
-    expect(experiments.flags['flag2']).toBeDefined();
+    expect(experiments.flags[256]).toBeDefined();
     expect(experiments.flags['undefined']).toBeUndefined();
   });
 

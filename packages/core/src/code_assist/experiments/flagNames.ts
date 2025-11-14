@@ -5,9 +5,8 @@
  */
 
 export const ExperimentFlags = {
-  CONTEXT_COMPRESSION_THRESHOLD:
-    'GeminiCLIContextCompression__threshold_fraction',
-  USER_CACHING: 'GcliUserCaching__user_caching',
+  CONTEXT_COMPRESSION_THRESHOLD: 45740197,
+  USER_CACHING: 45740198,
 } as const;
 
 export type ExperimentFlagName =

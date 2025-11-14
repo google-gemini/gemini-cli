@@ -38,8 +38,8 @@ export async function getExperiments(
 function parseExperiments(response: ListExperimentsResponse): Experiments {
   const flags: Record<string, Flag> = {};
   for (const flag of response.flags ?? []) {
-    if (flag.name) {
-      flags[flag.name] = flag;
+    if (flag.flagId) {
+      flags[flag.flagId] = flag;
     }
   }
   return {
