@@ -379,8 +379,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const relY = mouseY - y;
           const visualRow = buffer.visualScrollRow + relY;
           buffer.moveToVisualPosition(visualRow, relX);
+          return true;
         }
       }
+      return false;
     },
     [buffer],
   );

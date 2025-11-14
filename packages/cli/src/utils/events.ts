@@ -13,6 +13,7 @@ export enum AppEvent {
   OauthDisplayMessage = 'oauth-display-message',
   Flicker = 'flicker',
   McpClientUpdate = 'mcp-client-update',
+  SelectionWarning = 'selection-warning',
 }
 
 export interface AppEvents extends ExtensionEvents {
@@ -21,6 +22,7 @@ export interface AppEvents extends ExtensionEvents {
   [AppEvent.OauthDisplayMessage]: string[];
   [AppEvent.Flicker]: never[];
   [AppEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
+  [AppEvent.SelectionWarning]: never[];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();

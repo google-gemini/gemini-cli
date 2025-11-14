@@ -146,15 +146,16 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       if (direction === 'up' && canScrollUp) {
         pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
         scheduleFlush();
-        return;
+        return true;
       }
 
       if (direction === 'down' && canScrollDown) {
         pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
         scheduleFlush();
-        return;
+        return true;
       }
     }
+    return false;
   };
 
   const handleLeftPress = (mouseEvent: MouseEvent) => {
@@ -238,7 +239,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
           id: entry.id,
           offset,
         };
-        return;
+        return true;
       }
     }
 
@@ -250,21 +251,27 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     if (candidates.length > 0) {
       // The first candidate is the innermost one.
       candidates[0].flashScrollbar();
+      // We don't consider just flashing the scrollbar as handling the event
+      // in a way that should prevent other handlers (like drag warning)
+      // from checking it, although for left-press it doesn't matter much.
+      // But returning false is safer.
+      return false;
     }
+    return false;
   };
 
   const handleMove = (mouseEvent: MouseEvent) => {
     const state = dragStateRef.current;
-    if (!state.active || !state.id) return;
+    if (!state.active || !state.id) return false;
 
     const entry = scrollablesRef.current.get(state.id);
     if (!entry || !entry.ref.current) {
       state.active = false;
-      return;
+      return false;
     }
 
     const boundingBox = getBoundingBox(entry.ref.current);
-    if (!boundingBox) return;
+    if (!boundingBox) return false;
 
     const { y } = boundingBox;
     const { scrollTop, scrollHeight, innerHeight } = entry.getScrollState();
@@ -276,7 +283,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     const maxScrollTop = scrollHeight - innerHeight;
     const maxThumbY = innerHeight - thumbHeight;
 
-    if (maxThumbY <= 0) return;
+    if (maxThumbY <= 0) return false;
 
     const relativeMouseY = mouseEvent.row - y;
     // Calculate the target thumb position based on the mouse position and the offset.
@@ -295,6 +302,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     } else {
       entry.scrollBy(targetScrollTop - scrollTop);
     }
+    return true;
   };
 
   const handleLeftRelease = () => {
@@ -304,22 +312,25 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
         id: null,
         offset: 0,
       };
+      return true;
     }
+    return false;
   };
 
   useMouse(
     (event: MouseEvent) => {
       if (event.name === 'scroll-up') {
-        handleScroll('up', event);
+        return handleScroll('up', event);
       } else if (event.name === 'scroll-down') {
-        handleScroll('down', event);
+        return handleScroll('down', event);
       } else if (event.name === 'left-press') {
-        handleLeftPress(event);
+        return handleLeftPress(event);
       } else if (event.name === 'move') {
-        handleMove(event);
+        return handleMove(event);
       } else if (event.name === 'left-release') {
-        handleLeftRelease();
+        return handleLeftRelease();
       }
+      return false;
     },
     { isActive: true },
   );
