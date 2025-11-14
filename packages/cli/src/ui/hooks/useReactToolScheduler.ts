@@ -19,8 +19,8 @@ import type {
   ToolCall,
   Status as CoreStatus,
   EditorType,
-} from '@llmcli-core';
-import { CoreToolScheduler, debugLogger } from '@llmcli-core';
+} from '@llmcli/core';
+import { CoreToolScheduler, debugLogger } from '@llmcli/core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import type {
   HistoryItemToolGroup,

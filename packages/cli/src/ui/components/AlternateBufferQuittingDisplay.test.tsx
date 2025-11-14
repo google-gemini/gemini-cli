@@ -10,7 +10,7 @@ import { ToolCallStatus } from '../types.js';
 import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { Text } from 'ink';
 import { renderWithProviders } from '../../test-utils/render.js';
-import type { Config } from '@llmcli-core';
+import type { Config } from '@llmcli/core';
 
 vi.mock('../contexts/AppContext.js', () => ({
   useAppContext: () => ({
@@ -18,9 +18,8 @@ vi.mock('../contexts/AppContext.js', () => ({
   }),
 }));
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     getMCPServerStatus: vi.fn(),

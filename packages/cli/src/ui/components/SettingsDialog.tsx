@@ -41,7 +41,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { debugLogger } from '@llmcli-core';
+import { debugLogger } from '@llmcli/core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 
 interface SettingsDialogProps {

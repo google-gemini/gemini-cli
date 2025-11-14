@@ -16,10 +16,10 @@ import {
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   type ExtensionLoader,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
-import * as ServerConfig from '@llmcli-core';
+import * as ServerConfig from '@llmcli/core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
 
@@ -83,10 +83,9 @@ vi.mock('read-package-up', () => ({
   ),
 }));
 
-vi.mock('@llmcli-core', async () => {
-  const actualServer = await vi.importActual<typeof ServerConfig>(
-    '@llmcli-core',
-  );
+vi.mock('@llmcli/core', async () => {
+  const actualServer =
+    await vi.importActual<typeof ServerConfig>('@llmcli/core');
   return {
     ...actualServer,
     IdeClient: {

@@ -8,13 +8,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
 
-import type { MCPServerConfig } from '@llmcli-core';
+import type { MCPServerConfig } from '@llmcli/core';
 import {
   debugLogger,
   LLM_DIR,
   getErrorMessage,
   type TelemetrySettings,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import stripJsonComments from 'strip-json-comments';
 
 export const USER_SETTINGS_DIR = path.join(homedir(), LLM_DIR);

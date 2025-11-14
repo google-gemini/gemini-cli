@@ -15,7 +15,7 @@ import {
   type Mock,
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import { AuthType, type Config } from '@llmcli-core';
+import { AuthType, type Config } from '@llmcli/core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { AuthState } from '../types.js';
@@ -23,13 +23,12 @@ import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
-import { clearCachedCredentialFile } from '@llmcli-core';
+import { clearCachedCredentialFile } from '@llmcli/core';
 import { Text } from 'ink';
 
 // Mocks
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     clearCachedCredentialFile: vi.fn(),

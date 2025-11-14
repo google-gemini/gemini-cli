@@ -25,19 +25,19 @@ import type {
   Status as ToolCallStatusType,
   AnyDeclarativeTool,
   AnyToolInvocation,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolConfirmationOutcome,
   ApprovalMode,
   MockTool,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { ToolCallStatus } from '../types.js';
 
 // Mocks
-vi.mock('@llmcli-core', async () => {
-  const actual = await vi.importActual<any>('@llmcli-core');
+vi.mock('@llmcli/core', async () => {
+  const actual = await vi.importActual<any>('@llmcli/core');
   // Patch CoreToolScheduler to have cancelAll if it's missing in the test environment
   if (
     actual.CoreToolScheduler &&

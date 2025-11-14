@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import { parse, stringify } from 'comment-json';
-import { coreEvents } from '@llmcli-core';
+import { coreEvents } from '@llmcli/core';
 
 /**
  * Type representing an object that may contain Symbol keys for comments.

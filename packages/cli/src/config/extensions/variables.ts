@@ -6,7 +6,7 @@
 
 import * as path from 'node:path';
 import { type VariableSchema, VARIABLE_SCHEMA } from './variableSchema.js';
-import { LLM_DIR } from '@llmcli-core';
+import { LLM_DIR } from '@llmcli/core';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(LLM_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';

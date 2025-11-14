@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@llmcli-core';
+import { AuthType } from '@llmcli/core';
 import { vi } from 'vitest';
 import { validateAuthMethod } from './auth.js';
 

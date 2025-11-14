@@ -12,7 +12,7 @@ const getPackageJson = vi.hoisted(() => vi.fn());
 const debugLogger = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
-vi.mock('@llmcli-core', () => ({
+vi.mock('@llmcli/core', () => ({
   getPackageJson,
   debugLogger,
 }));

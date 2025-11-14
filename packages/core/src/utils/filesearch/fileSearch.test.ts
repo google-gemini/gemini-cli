@@ -6,7 +6,7 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
-import { createTmpDir, cleanupTmpDir } from '@llmcli-test-utils';
+import { createTmpDir, cleanupTmpDir } from '@llmcli/test-utils';
 
 describe('FileSearch', () => {
   let tmpDir: string;

@@ -5,8 +5,8 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import type { Config } from '@llmcli-core';
-import { debugLogger, getResponseText } from '@llmcli-core';
+import type { Config } from '@llmcli/core';
+import { debugLogger, getResponseText } from '@llmcli/core';
 import type { Content } from '@google/genai';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';

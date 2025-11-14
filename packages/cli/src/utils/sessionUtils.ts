@@ -4,15 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
-} from '@llmcli-core';
-import {
-  SESSION_FILE_PREFIX,
-  partListUnionToString,
-} from '@llmcli-core';
+import type { Config, ConversationRecord, MessageRecord } from '@llmcli/core';
+import { SESSION_FILE_PREFIX, partListUnionToString } from '@llmcli/core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 

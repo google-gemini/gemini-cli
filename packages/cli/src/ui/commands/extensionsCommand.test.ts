@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ExtensionLoader,
-  GeminiCLIExtension,
-} from '@llmcli-core';
+import type { ExtensionLoader, GeminiCLIExtension } from '@llmcli/core';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import {

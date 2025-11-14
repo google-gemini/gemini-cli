@@ -13,13 +13,12 @@ import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path'; // For mocking fs
-import { spawnAsync as mockSpawnAsync } from '@llmcli-core';
+import { spawnAsync as mockSpawnAsync } from '@llmcli/core';
 
-// Mock @llmcli-core
-vi.mock('@llmcli-core', async () => {
-  const original = await vi.importActual<
-    typeof import('@llmcli-core')
-  >('@llmcli-core');
+// Mock @llmcli/core
+vi.mock('@llmcli/core', async () => {
+  const original =
+    await vi.importActual<typeof import('@llmcli/core')>('@llmcli/core');
   return {
     ...original,
     spawnAsync: vi.fn(),

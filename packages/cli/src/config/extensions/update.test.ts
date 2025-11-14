@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { checkForAllExtensionUpdates, updateExtension } from './update.js';
-import { LLM_DIR, KeychainTokenStorage } from '@llmcli-core';
+import { LLM_DIR, KeychainTokenStorage } from '@llmcli/core';
 import { isWorkspaceTrusted } from '../trustedFolders.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { createExtension } from '../../test-utils/createExtension.js';
@@ -55,9 +55,8 @@ vi.mock('../trustedFolders.js', () => ({
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     logExtensionInstallEvent: mockLogExtensionInstallEvent,

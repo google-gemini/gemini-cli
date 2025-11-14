@@ -21,14 +21,13 @@ import {
   SettingScope,
   type LoadedSettings,
 } from '../../config/settings.js';
-import { FatalConfigError } from '@llmcli-core';
+import { FatalConfigError } from '@llmcli/core';
 
 // Mock dependencies
 vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     debugLogger: {
@@ -58,7 +57,7 @@ describe('extensions enable command', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockDebugLogger = (await import('@llmcli-core'))
+    mockDebugLogger = (await import('@llmcli/core'))
       .debugLogger as unknown as MockDebugLogger;
     mockLoadSettings.mockReturnValue({
       merged: {},

@@ -17,7 +17,7 @@ import { ExtensionStorage } from './storage.js';
 import prompts from 'prompts';
 import * as fsPromises from 'node:fs/promises';
 import * as fs from 'node:fs';
-import { KeychainTokenStorage } from '@llmcli-core';
+import { KeychainTokenStorage } from '@llmcli/core';
 
 vi.mock('prompts');
 vi.mock('os', async (importOriginal) => {
@@ -28,9 +28,8 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     KeychainTokenStorage: vi.fn().mockImplementation(() => ({

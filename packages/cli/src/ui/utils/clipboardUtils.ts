@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { debugLogger, spawnAsync } from '@llmcli-core';
+import { debugLogger, spawnAsync } from '@llmcli/core';
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)

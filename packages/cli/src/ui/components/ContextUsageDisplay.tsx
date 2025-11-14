@@ -6,7 +6,7 @@
 
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { tokenLimit } from '@llmcli-core';
+import { tokenLimit } from '@llmcli/core';
 
 export const ContextUsageDisplay = ({
   promptTokenCount,

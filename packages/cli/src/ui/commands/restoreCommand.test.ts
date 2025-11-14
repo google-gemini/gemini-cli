@@ -11,11 +11,7 @@ import * as path from 'node:path';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import {
-  LLM_DIR,
-  type Config,
-  type GitService,
-} from '@llmcli-core';
+import { LLM_DIR, type Config, type GitService } from '@llmcli/core';
 
 describe('restoreCommand', () => {
   let mockContext: CommandContext;

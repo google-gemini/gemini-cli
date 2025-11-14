@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { Storage } from '@llmcli-core';
-import { sessionId, Logger } from '@llmcli-core';
+import type { Storage } from '@llmcli/core';
+import { sessionId, Logger } from '@llmcli/core';
 
 /**
  * Hook to manage the logger instance.

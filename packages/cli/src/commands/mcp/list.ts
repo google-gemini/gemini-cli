@@ -7,12 +7,8 @@
 // File for 'gemini mcp list' command
 import type { CommandModule } from 'yargs';
 import { loadSettings } from '../../config/settings.js';
-import type { MCPServerConfig } from '@llmcli-core';
-import {
-  MCPServerStatus,
-  createTransport,
-  debugLogger,
-} from '@llmcli-core';
+import type { MCPServerConfig } from '@llmcli/core';
+import { MCPServerStatus, createTransport, debugLogger } from '@llmcli/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';

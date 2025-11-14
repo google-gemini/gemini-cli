@@ -18,7 +18,7 @@ import {
   usePromptCompletion,
   PROMPT_COMPLETION_MIN_LENGTH,
 } from './usePromptCompletion.js';
-import type { Config } from '@llmcli-core';
+import type { Config } from '@llmcli/core';
 import { useCompletion } from './useCompletion.js';
 
 export enum CompletionMode {

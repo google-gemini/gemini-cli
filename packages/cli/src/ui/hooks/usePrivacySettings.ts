@@ -10,7 +10,7 @@ import {
   type CodeAssistServer,
   UserTierId,
   getCodeAssistServer,
-} from '@llmcli-core';
+} from '@llmcli/core';
 
 export interface PrivacyState {
   isLoading: boolean;

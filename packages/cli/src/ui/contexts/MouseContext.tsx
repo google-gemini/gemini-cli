@@ -14,7 +14,7 @@ import {
   useRef,
 } from 'react';
 import { ESC } from '../utils/input.js';
-import { debugLogger } from '@llmcli-core';
+import { debugLogger } from '@llmcli/core';
 import {
   isIncompleteMouseSequence,
   parseMouseEvent,

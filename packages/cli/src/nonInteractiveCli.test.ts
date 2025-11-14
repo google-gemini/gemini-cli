@@ -12,7 +12,7 @@ import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
   UserFeedbackPayload,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import {
   executeToolCall,
   ToolErrorType,
@@ -22,7 +22,7 @@ import {
   uiTelemetryService,
   FatalInputError,
   CoreEvent,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import {
@@ -47,9 +47,8 @@ const mockCoreEvents = vi.hoisted(() => ({
   emit: vi.fn(),
 }));
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@llmcli/core')>();
 
   class MockChatRecordingService {
     initialize = vi.fn();

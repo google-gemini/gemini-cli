@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { type Config } from '@llmcli-core';
+import { type Config } from '@llmcli/core';
 
 interface TipsProps {
   config: Config;

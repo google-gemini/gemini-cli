@@ -9,7 +9,7 @@ import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { refreshServerHierarchicalMemory } from '@llmcli-core';
+import { refreshServerHierarchicalMemory } from '@llmcli/core';
 
 export function expandHomeDir(p: string): string {
   if (!p) {

@@ -90,25 +90,21 @@ if (!argv.s) {
   execSync('npm run build --workspaces', { stdio: 'inherit' });
 }
 
-console.log('packing @google/gemini-cli ...');
+console.log('packing @llmcli/cli ...');
 const cliPackageDir = join('packages', 'cli');
 rmSync(join(cliPackageDir, 'dist', 'google-gemini-cli-*.tgz'), { force: true });
-execSync(
-  `npm pack -w @google/gemini-cli --pack-destination ./packages/cli/dist`,
-  {
-    stdio: 'ignore',
-  },
-);
+execSync(`npm pack -w @llmcli/cli --pack-destination ./packages/cli/dist`, {
+  stdio: 'ignore',
+});
 
-console.log('packing @google/gemini-cli-core ...');
+console.log('packing @llmcli/core ...');
 const corePackageDir = join('packages', 'core');
 rmSync(join(corePackageDir, 'dist', 'google-gemini-cli-core-*.tgz'), {
   force: true,
 });
-execSync(
-  `npm pack -w @google/gemini-cli-core --pack-destination ./packages/core/dist`,
-  { stdio: 'ignore' },
-);
+execSync(`npm pack -w @llmcli/core --pack-destination ./packages/core/dist`, {
+  stdio: 'ignore',
+});
 
 const packageVersion = JSON.parse(
   readFileSync(join(process.cwd(), 'package.json'), 'utf-8'),

@@ -11,7 +11,7 @@ import type {
   MessageActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import type { DiscoveredMCPPrompt } from '@llmcli-core';
+import type { DiscoveredMCPPrompt } from '@llmcli/core';
 import {
   DiscoveredMCPTool,
   getMCPDiscoveryState,
@@ -20,7 +20,7 @@ import {
   MCPServerStatus,
   getErrorMessage,
   MCPOAuthTokenStorage,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
 
@@ -94,7 +94,7 @@ const authCommand: SlashCommand = {
       );
 
       // Import dynamically to avoid circular dependencies
-      const { MCPOAuthProvider } = await import('@llmcli-core');
+      const { MCPOAuthProvider } = await import('@llmcli/core');
 
       let oauthConfig = server.oauth;
       if (!oauthConfig) {

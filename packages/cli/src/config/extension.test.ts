@@ -14,7 +14,7 @@ import {
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   KeychainTokenStorage,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { loadSettings, SettingScope } from './settings.js';
 import {
   isWorkspaceTrusted,
@@ -86,9 +86,8 @@ const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 const mockLogExtensionUpdateEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionDisable = vi.hoisted(() => vi.fn());
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     logExtensionEnable: mockLogExtensionEnable,

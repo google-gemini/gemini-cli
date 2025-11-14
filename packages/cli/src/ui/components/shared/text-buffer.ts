@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { unescapePath } from '@llmcli-core';
+import { unescapePath } from '@llmcli/core';
 import {
   toCodePoints,
   cpLen,

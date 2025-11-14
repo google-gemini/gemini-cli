@@ -8,7 +8,7 @@ import {
   debugLogger,
   flatMapTextParts,
   readPathFromWorkspace,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import type { CommandContext } from '../../ui/commands/types.js';
 import { MessageType } from '../../ui/types.js';
 import {

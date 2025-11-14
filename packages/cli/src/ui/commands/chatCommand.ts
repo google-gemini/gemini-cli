@@ -15,7 +15,7 @@ import type {
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { decodeTagName } from '@llmcli-core';
+import { decodeTagName } from '@llmcli/core';
 import path from 'node:path';
 import type {
   HistoryItemWithoutId,

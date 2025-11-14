@@ -32,7 +32,7 @@ import {
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import type { Config, ResumedSessionData } from '@llmcli-core';
+import type { Config, ResumedSessionData } from '@llmcli/core';
 import {
   sessionId,
   logUserPrompt,
@@ -41,7 +41,7 @@ import {
   UserPromptEvent,
   debugLogger,
   recordSlowRender,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import {
   initializeApp,
   type InitializationResult,

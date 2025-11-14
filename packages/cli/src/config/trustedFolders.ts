@@ -13,7 +13,7 @@ import {
   isWithinRoot,
   ideContextStore,
   LLM_DIR,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 

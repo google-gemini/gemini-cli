@@ -35,9 +35,8 @@ vi.mock('../../config/settings.js');
 
 vi.mock('../../utils/errors.js');
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
 
   return {
     ...actual,
@@ -76,7 +75,7 @@ describe('extensions disable command', () => {
 
     // We need to re-import the mocked module to get the fresh mock
 
-    mockDebugLogger = (await import('@llmcli-core'))
+    mockDebugLogger = (await import('@llmcli/core'))
       .debugLogger as unknown as MockDebugLogger;
 
     mockLoadSettings.mockReturnValue({

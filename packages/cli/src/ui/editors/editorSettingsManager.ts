@@ -8,7 +8,7 @@ import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
   type EditorType,
-} from '@llmcli-core';
+} from '@llmcli/core';
 
 export interface EditorDisplay {
   name: string;

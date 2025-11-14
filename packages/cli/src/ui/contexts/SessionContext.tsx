@@ -14,12 +14,8 @@ import {
   useEffect,
 } from 'react';
 
-import type {
-  SessionMetrics,
-  ModelMetrics,
-  ToolCallStats,
-} from '@llmcli-core';
-import { uiTelemetryService, sessionId } from '@llmcli-core';
+import type { SessionMetrics, ModelMetrics, ToolCallStats } from '@llmcli/core';
+import { uiTelemetryService, sessionId } from '@llmcli/core';
 
 export enum ToolCallDecision {
   ACCEPT = 'accept',

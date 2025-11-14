@@ -19,7 +19,7 @@ import {
   clearCachedCredentialFile,
   debugLogger,
   type Config,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
 import { runExitCleanup } from '../../utils/cleanup.js';

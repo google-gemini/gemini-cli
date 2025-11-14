@@ -1,5 +1,5 @@
 {
-  "name": "@llmcli-a2a-server",
+  "name": "@llmcli/a2a-server",
   "version": "0.17.0-nightly.20251114.0fcbff506",
   "description": "LLM CLI A2A Server",
   "repository": {
@@ -10,7 +10,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini-cli-a2a-server": "dist/a2a-server.mjs"
+    "llm-cli-a2a-server": "dist/a2a-server.mjs"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
@@ -27,7 +27,7 @@
   "dependencies": {
     "@a2a-js/sdk": "^0.3.2",
     "@google-cloud/storage": "^7.16.0",
-    "@llmcli-core": "file:../core",
+    "@llmcli/core": "file:../core",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",
     "tar": "^7.5.2",

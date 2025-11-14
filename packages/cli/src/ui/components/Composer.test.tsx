@@ -22,7 +22,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
     vimMode: 'NORMAL',
   })),
 }));
-import { ApprovalMode } from '@llmcli-core';
+import { ApprovalMode } from '@llmcli/core';
 import { StreamingState } from '../types.js';
 
 // Mock child components

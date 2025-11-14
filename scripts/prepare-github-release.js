@@ -39,7 +39,7 @@ fs.writeFileSync(
 );
 console.log('Wrote .npmrc for @google-gemini scope to packages/core/');
 
-// Update @google/gemini-cli
+// Update @llmcli/cli
 updatePackageJson('packages/cli/package.json', (pkg) => {
   pkg.name = '@google-gemini/gemini-cli';
   pkg.files = ['bundle/'];
@@ -55,12 +55,12 @@ updatePackageJson('packages/cli/package.json', (pkg) => {
   delete pkg.config; // Deletes the sandboxImageUri
 });
 
-// Update @google/gemini-cli-a2a-server
+// Update @llmcli/cli-a2a-server
 updatePackageJson('packages/a2a-server/package.json', (pkg) => {
   pkg.name = '@google-gemini/gemini-cli-a2a-server';
 });
 
-// Update @google/gemini-cli-core
+// Update @llmcli/core
 updatePackageJson('packages/core/package.json', (pkg) => {
   pkg.name = '@google-gemini/gemini-cli-core';
 });

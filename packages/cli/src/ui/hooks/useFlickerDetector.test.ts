@@ -8,8 +8,8 @@ import { renderHook } from '../../test-utils/render.js';
 import { vi, type Mock } from 'vitest';
 import { useFlickerDetector } from './useFlickerDetector.js';
 import { useConfig } from '../contexts/ConfigContext.js';
-import { recordFlickerFrame } from '@llmcli-core';
-import { type Config } from '@llmcli-core';
+import { recordFlickerFrame } from '@llmcli/core';
+import { type Config } from '@llmcli/core';
 import { type DOMElement, measureElement } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
@@ -17,9 +17,8 @@ import { appEvents, AppEvent } from '../../utils/events.js';
 // Mock dependencies
 vi.mock('../contexts/ConfigContext.js');
 vi.mock('../contexts/UIStateContext.js');
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     recordFlickerFrame: vi.fn(),

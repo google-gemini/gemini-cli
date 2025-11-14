@@ -11,7 +11,7 @@ import {
   Logger,
   uiTelemetryService,
   type Config,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { CommandService } from './services/CommandService.js';
 import { FileCommandLoader } from './services/FileCommandLoader.js';
 import { McpPromptLoader } from './services/McpPromptLoader.js';

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@llmcli-core';
+import { AuthType } from '@llmcli/core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
 export function validateAuthMethod(authMethod: string): string | null {
@@ -38,7 +38,8 @@ export function validateAuthMethod(authMethod: string): string | null {
 
   if (authMethod === AuthType.LOCAL_LLM) {
     const hasLocalLLMConfig =
-      !!process.env['LOCAL_LLM_BASE_URL'] || !!loadSettings().merged.localLLM?.baseURL;
+      !!process.env['LOCAL_LLM_BASE_URL'] ||
+      !!loadSettings().merged.localLLM?.baseURL;
     if (!hasLocalLLMConfig) {
       return (
         'When using Local LLM, you must specify either:\n' +

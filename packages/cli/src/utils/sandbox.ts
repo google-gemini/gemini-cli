@@ -13,13 +13,13 @@ import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
 import { USER_SETTINGS_DIR } from '../config/settings.js';
 import { promisify } from 'node:util';
-import type { Config, SandboxConfig } from '@llmcli-core';
+import type { Config, SandboxConfig } from '@llmcli/core';
 import {
   coreEvents,
   debugLogger,
   FatalSandboxError,
   LLM_DIR,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
 
@@ -352,10 +352,7 @@ export async function start_sandbox(
     // determine full path for gemini-cli to distinguish linked vs installed setting
     const gcPath = fs.realpathSync(process.argv[1]);
 
-    const projectSandboxDockerfile = path.join(
-      LLM_DIR,
-      'sandbox.Dockerfile',
-    );
+    const projectSandboxDockerfile = path.join(LLM_DIR, 'sandbox.Dockerfile');
     const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
 
     const image = config.image;
@@ -434,9 +431,7 @@ export async function start_sandbox(
     // mount user settings directory inside container, after creating if missing
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
     const userSettingsDirOnHost = USER_SETTINGS_DIR;
-    const userSettingsDirInSandbox = getContainerPath(
-      `/home/node/${LLM_DIR}`,
-    );
+    const userSettingsDirInSandbox = getContainerPath(`/home/node/${LLM_DIR}`);
     if (!fs.existsSync(userSettingsDirOnHost)) {
       fs.mkdirSync(userSettingsDirOnHost);
     }

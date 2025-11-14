@@ -12,7 +12,7 @@ import type {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolResultDisplay,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 

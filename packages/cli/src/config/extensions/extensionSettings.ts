@@ -12,7 +12,7 @@ import { ExtensionStorage } from './storage.js';
 import type { ExtensionConfig } from '../extension.js';
 
 import prompts from 'prompts';
-import { KeychainTokenStorage } from '@llmcli-core';
+import { KeychainTokenStorage } from '@llmcli/core';
 
 export interface ExtensionSetting {
   name: string;

@@ -9,10 +9,10 @@ import { act, useState } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useAtCompletion } from './useAtCompletion.js';
-import type { Config, FileSearch } from '@llmcli-core';
-import { FileSearchFactory } from '@llmcli-core';
-import type { FileSystemStructure } from '@llmcli-test-utils';
-import { createTmpDir, cleanupTmpDir } from '@llmcli-test-utils';
+import type { Config, FileSearch } from '@llmcli/core';
+import { FileSearchFactory } from '@llmcli/core';
+import type { FileSystemStructure } from '@llmcli/test-utils';
+import { createTmpDir, cleanupTmpDir } from '@llmcli/test-utils';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test harness to capture the state from the hook's callbacks.

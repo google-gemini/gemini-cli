@@ -12,7 +12,7 @@ import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
-import { LLM_DIR, Storage } from '@llmcli-core';
+import { LLM_DIR, Storage } from '@llmcli/core';
 
 import * as fs from 'node:fs/promises';
 import os from 'node:os';

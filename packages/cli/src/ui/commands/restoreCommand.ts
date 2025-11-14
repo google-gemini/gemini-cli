@@ -12,7 +12,7 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import type { Config } from '@llmcli-core';
+import type { Config } from '@llmcli/core';
 
 async function restoreAction(
   context: CommandContext,

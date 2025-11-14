@@ -26,12 +26,12 @@ import {
   type EditorType,
   checkHasEditorType,
   allowEditorTypeInSandbox,
-} from '@llmcli-core';
+} from '@llmcli/core';
 
 import { SettingPaths } from '../../config/settingPaths.js';
 
-vi.mock('@llmcli-core', async () => {
-  const actual = await vi.importActual('@llmcli-core');
+vi.mock('@llmcli/core', async () => {
+  const actual = await vi.importActual('@llmcli/core');
   return {
     ...actual,
     checkHasEditorType: vi.fn(() => true),

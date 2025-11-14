@@ -6,13 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
-import {
-  AuthType,
-  type Config,
-  loadApiKey,
-  debugLogger,
-} from '@llmcli-core';
-import { getErrorMessage } from '@llmcli-core';
+import { AuthType, type Config, loadApiKey, debugLogger } from '@llmcli/core';
+import { getErrorMessage } from '@llmcli/core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
 

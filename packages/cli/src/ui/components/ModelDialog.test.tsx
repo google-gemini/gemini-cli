@@ -12,12 +12,12 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { ModelDialog } from './ModelDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
-import type { Config } from '@llmcli-core';
+import type { Config } from '@llmcli/core';
 
 vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),

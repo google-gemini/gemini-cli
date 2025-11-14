@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { uiTelemetryService } from '@llmcli-core';
+import { uiTelemetryService } from '@llmcli/core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 

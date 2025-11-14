@@ -5,9 +5,9 @@
  */
 
 import type { HistoryItemWithoutId } from '../types.js';
-import type { ConversationRecord } from '@llmcli-core';
+import type { ConversationRecord } from '@llmcli/core';
 import type { Part } from '@google/genai';
-import { partListUnionToString } from '@llmcli-core';
+import { partListUnionToString } from '@llmcli/core';
 import { MessageType, ToolCallStatus } from '../types.js';
 /**
  * Converts session/conversation data into UI history and Gemini client history formats.

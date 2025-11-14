@@ -1,5 +1,5 @@
 {
-  "name": "@llmcli-core",
+  "name": "@llmcli/core",
   "version": "0.17.0-nightly.20251114.0fcbff506",
   "description": "LLM CLI Core",
   "repository": {
@@ -80,7 +80,7 @@
     "node-pty": "^1.0.0"
   },
   "devDependencies": {
-    "@llmcli-test-utils": "file:../test-utils",
+    "@llmcli/test-utils": "file:../test-utils",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
     "@types/fast-levenshtein": "^0.0.4",

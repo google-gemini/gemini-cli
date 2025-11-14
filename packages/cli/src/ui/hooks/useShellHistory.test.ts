@@ -12,7 +12,7 @@ import { useShellHistory } from './useShellHistory.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { LLM_DIR } from '@llmcli-core';
+import { LLM_DIR } from '@llmcli/core';
 
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
@@ -35,9 +35,8 @@ vi.mock('node:fs', async (importOriginal) => {
     mkdirSync: vi.fn(),
   };
 });
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   const path = await import('node:path');
   class Storage {
     static getGlobalSettingsPath(): string {

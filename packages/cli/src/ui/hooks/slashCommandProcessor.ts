@@ -12,7 +12,7 @@ import type {
   Config,
   ExtensionsStartingEvent,
   ExtensionsStoppingEvent,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import {
   GitService,
   Logger,
@@ -22,7 +22,7 @@ import {
   ToolConfirmationOutcome,
   Storage,
   IdeClient,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
   Message,

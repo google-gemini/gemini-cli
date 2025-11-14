@@ -26,7 +26,7 @@ import type {
   EditorType,
   GeminiClient,
   AnyToolInvocation,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import {
   ApprovalMode,
   AuthType,
@@ -35,7 +35,7 @@ import {
   ToolConfirmationOutcome,
   tokenLimit,
   debugLogger,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
@@ -73,7 +73,7 @@ const MockedUserPromptEvent = vi.hoisted(() =>
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 
-vi.mock('@llmcli-core', async (importOriginal) => {
+vi.mock('@llmcli/core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...actualCoreModule,

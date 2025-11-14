@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MCPServerConfig } from '@llmcli-core';
-import { MCPServerStatus } from '@llmcli-core';
+import type { MCPServerConfig } from '@llmcli/core';
+import { MCPServerStatus } from '@llmcli/core';
 import { Box, Text } from 'ink';
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';

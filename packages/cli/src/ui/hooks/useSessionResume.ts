@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import type { Config, ResumedSessionData } from '@llmcli-core';
+import type { Config, ResumedSessionData } from '@llmcli/core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';

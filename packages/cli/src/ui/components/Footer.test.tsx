@@ -10,12 +10,11 @@ import {
   createMockSettings,
 } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
-import { tildeifyPath, ToolCallDecision } from '@llmcli-core';
+import { tildeifyPath, ToolCallDecision } from '@llmcli/core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...original,
     shortenPath: (p: string, len: number) => {

@@ -16,11 +16,8 @@ import type {
   ToolCallRequestInfo,
   ServerGeminiToolCallRequestEvent,
   Config,
-} from '@llmcli-core';
-import {
-  GeminiEventType,
-  SimpleExtensionLoader,
-} from '@llmcli-core';
+} from '@llmcli/core';
+import { GeminiEventType, SimpleExtensionLoader } from '@llmcli/core';
 import { v4 as uuidv4 } from 'uuid';
 
 import { logger } from '../utils/logger.js';

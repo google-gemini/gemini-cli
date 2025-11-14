@@ -7,7 +7,7 @@
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { listMcpServers } from './list.js';
 import { loadSettings } from '../../config/settings.js';
-import { createTransport, debugLogger } from '@llmcli-core';
+import { createTransport, debugLogger } from '@llmcli/core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -21,9 +21,8 @@ vi.mock('../../config/extensions/storage.js', () => ({
   },
 }));
 vi.mock('../../config/extension-manager.js');
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...original,
     createTransport: vi.fn(),

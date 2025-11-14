@@ -11,7 +11,7 @@ import { act } from 'react';
 import type { SessionMetrics } from './SessionContext.js';
 import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
-import { uiTelemetryService } from '@llmcli-core';
+import { uiTelemetryService } from '@llmcli/core';
 
 class ErrorBoundary extends Component<
   { children: ReactNode; onError: (error: Error) => void },

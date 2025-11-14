@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { coreEvents } from '@llmcli-core';
+import { coreEvents } from '@llmcli/core';
 import { type Result, type ErrorResponse } from './schema.js';
 import type { WritableStream, ReadableStream } from 'node:stream/web';
 

@@ -9,9 +9,9 @@ import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as childProcess from 'node:child_process';
-import { isGitRepository, debugLogger } from '@llmcli-core';
+import { isGitRepository, debugLogger } from '@llmcli/core';
 
-vi.mock('@llmcli-core', () => ({
+vi.mock('@llmcli/core', () => ({
   isGitRepository: vi.fn(),
   debugLogger: {
     log: vi.fn(),
@@ -203,9 +203,7 @@ describe('getInstallationInfo', () => {
     const info = getInstallationInfo(projectRoot, false);
     expect(info.packageManager).toBe(PackageManager.YARN);
     expect(info.isGlobal).toBe(true);
-    expect(info.updateCommand).toBe(
-      'yarn global add @llmcli@latest',
-    );
+    expect(info.updateCommand).toBe('yarn global add @llmcli@latest');
     expect(info.updateMessage).toContain('Attempting to automatically update');
 
     const infoDisabled = getInstallationInfo(projectRoot, true);

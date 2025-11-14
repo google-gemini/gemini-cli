@@ -10,12 +10,10 @@ import { activate } from './extension.js';
 import {
   IDE_DEFINITIONS,
   detectIdeFromEnv,
-} from '@llmcli-core/src/ide/detect-ide.js';
+} from '@llmcli/core/src/ide/detect-ide.js';
 
-vi.mock('@llmcli-core/src/ide/detect-ide.js', async () => {
-  const actual = await vi.importActual(
-    '@llmcli-core/src/ide/detect-ide.js',
-  );
+vi.mock('@llmcli/core/src/ide/detect-ide.js', async () => {
+  const actual = await vi.importActual('@llmcli/core/src/ide/detect-ide.js');
   return {
     ...actual,
     detectIdeFromEnv: vi.fn(() => IDE_DEFINITIONS.vscode),

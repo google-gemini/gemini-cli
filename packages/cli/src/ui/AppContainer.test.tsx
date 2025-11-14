@@ -25,7 +25,7 @@ import {
   CoreEvent,
   type UserFeedbackPayload,
   type ResumedSessionData,
-} from '@llmcli-core';
+} from '@llmcli/core';
 
 // Mock coreEvents
 const mockCoreEvents = vi.hoisted(() => ({
@@ -35,9 +35,8 @@ const mockCoreEvents = vi.hoisted(() => ({
   emit: vi.fn(),
 }));
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@llmcli/core')>();
   return {
     ...actual,
     coreEvents: mockCoreEvents,
@@ -138,7 +137,7 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { ShellExecutionService } from '@llmcli-core';
+import { ShellExecutionService } from '@llmcli/core';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
 

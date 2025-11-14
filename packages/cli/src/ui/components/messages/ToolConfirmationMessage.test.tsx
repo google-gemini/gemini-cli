@@ -6,10 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
-import type {
-  ToolCallConfirmationDetails,
-  Config,
-} from '@llmcli-core';
+import type { ToolCallConfirmationDetails, Config } from '@llmcli/core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 
 describe('ToolConfirmationMessage', () => {

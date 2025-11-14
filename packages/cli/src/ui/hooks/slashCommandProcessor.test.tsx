@@ -25,16 +25,15 @@ import {
   SlashCommandStatus,
   ToolConfirmationOutcome,
   makeFakeConfig,
-} from '@llmcli-core';
+} from '@llmcli/core';
 import { appEvents } from '../../utils/events.js';
 
 const { logSlashCommand } = vi.hoisted(() => ({
   logSlashCommand: vi.fn(),
 }));
 
-vi.mock('@llmcli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@llmcli-core')>();
+vi.mock('@llmcli/core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@llmcli/core')>();
 
   return {
     ...original,

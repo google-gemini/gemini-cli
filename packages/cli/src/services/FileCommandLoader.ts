@@ -9,8 +9,8 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import type { Config } from '@llmcli-core';
-import { Storage } from '@llmcli-core';
+import type { Config } from '@llmcli/core';
+import { Storage } from '@llmcli/core';
 import type { ICommandLoader } from './types.js';
 import type {
   CommandContext,

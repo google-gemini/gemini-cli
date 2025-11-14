@@ -15,12 +15,8 @@ import {
   type Mock,
 } from 'vitest';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
-import {
-  AuthType,
-  OutputFormat,
-  makeFakeConfig,
-} from '@llmcli-core';
-import type { Config } from '@llmcli-core';
+import { AuthType, OutputFormat, makeFakeConfig } from '@llmcli/core';
+import type { Config } from '@llmcli/core';
 import * as auth from './config/auth.js';
 import { type LoadedSettings } from './config/settings.js';
 
