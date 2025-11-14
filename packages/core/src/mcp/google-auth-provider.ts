@@ -123,4 +123,24 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
     // No-op
     return '';
   }
+
+  /**
+   * Returns the project ID used for quota.
+   */
+  async getQuotaProjectId(): Promise<string | undefined> {
+    const client = await this.auth.getClient();
+    return client.quotaProjectId;
+  }
+
+  /**
+   * Returns custom headers to be added to the request.
+   */
+  async getRequestHeaders(): Promise<Record<string, string>> {
+    const quotaProjectId = await this.getQuotaProjectId();
+    const headers: Record<string, string> = {};
+    if (quotaProjectId) {
+      headers['X-Goog-User-Project'] = quotaProjectId;
+    }
+    return headers;
+  }
 }

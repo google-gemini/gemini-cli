@@ -86,6 +86,7 @@ describe('GoogleCredentialProvider', () => {
     let mockClient: {
       getAccessToken: Mock;
       credentials?: { expiry_date: number | null };
+      quotaProjectId?: string;
     };
 
     beforeEach(() => {
@@ -152,6 +153,12 @@ describe('GoogleCredentialProvider', () => {
       expect(mockGetAccessToken).toHaveBeenCalledTimes(2); // new fetch
 
       vi.useRealTimers();
+    });
+
+    it('should return the quota project ID', async () => {
+      mockClient.quotaProjectId = 'test-quota-project';
+      const quotaProjectId = await provider.getQuotaProjectId();
+      expect(quotaProjectId).toBe('test-quota-project');
     });
   });
 });
