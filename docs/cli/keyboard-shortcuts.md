@@ -91,21 +91,32 @@ available combinations.
 
 #### App Controls
 
-| Action                                                            | Keys       |
-| ----------------------------------------------------------------- | ---------- |
-| Toggle detailed error information.                                | `F12`      |
-| Toggle the full TODO list.                                        | `Ctrl + T` |
-| Toggle IDE context details.                                       | `Ctrl + G` |
-| Toggle Markdown rendering.                                        | `Cmd + M`  |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S` |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S` |
-| Toggle focus between the shell and Gemini input.                  | `Ctrl + F` |
+| Action                                                         | Keys       |
+| -------------------------------------------------------------- | ---------- |
+| Toggle detailed error information.                             | `F12`      |
+| Toggle the full TODO list.                                     | `Ctrl + T` |
+| Toggle IDE context details.                                    | `Ctrl + G` |
+| Toggle Markdown rendering.                                     | `Cmd + M`  |
+| Expand a height-constrained response to show additional lines. | `Ctrl + S` |
+| Toggle focus between the shell and Gemini input.               | `Ctrl + F` |
+
+#### Text Selection & Copying (Alternate Buffer Mode)
+
+| Action                                                                          | Keys            |
+| ------------------------------------------------------------------------------- | --------------- |
+| Copy selected text (native terminal selection). First press enables selection. | `Ctrl + C`      |
+| Copy selected text (native terminal selection) on macOS.                        | `Cmd + C`       |
+| Force enter copy mode (legacy, use Ctrl+C for native selection instead).       | `Ctrl + S`      |
+
+**Note:** In alternate buffer mode (full-screen UI), the first `Ctrl+C` temporarily
+disables mouse events to allow native text selection and copying. Subsequent
+`Ctrl+C` presses within 1 second will cancel the current request instead.
 
 #### Session Control
 
 | Action                                       | Keys       |
 | -------------------------------------------- | ---------- |
-| Cancel the current request or quit the CLI.  | `Ctrl + C` |
+| Copy text or cancel the current request.     | `Ctrl + C` |
 | Exit the CLI when the input buffer is empty. | `Ctrl + D` |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
