@@ -176,7 +176,7 @@ describe('editCorrector', () => {
         mcpServers: undefined as Record<string, any> | undefined,
         userAgent: 'test-agent',
         userMemory: '',
-        geminiMdFileCount: 0,
+        llmcliMdFileCount: 0,
         alwaysSkipModificationConfirmation: false,
       };
       mockConfigInstance = {

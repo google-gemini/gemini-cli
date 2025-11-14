@@ -112,7 +112,7 @@ export const Composer = () => {
             !hideContextSummary && (
               <ContextSummaryDisplay
                 ideContext={uiState.ideContextState}
-                geminiMdFileCount={uiState.llmcliMdFileCount}
+                llmcliMdFileCount={uiState.llmcliMdFileCount}
                 contextFileNames={contextFileNames}
                 mcpServers={config.getMcpClientManager()?.getMcpServers() ?? {}}
                 blockedMcpServers={

@@ -464,7 +464,7 @@ describe('startInteractiveUI', () => {
     authError: null,
     themeError: null,
     shouldOpenAuthDialog: false,
-    geminiMdFileCount: 0,
+    llmcliMdFileCount: 0,
   };
 
   vi.mock('./utils/version.js', () => ({

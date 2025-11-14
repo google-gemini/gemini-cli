@@ -197,7 +197,7 @@ describe('useGeminiStream', () => {
       mcpServers: undefined,
       userAgent: 'test-agent',
       userMemory: '',
-      geminiMdFileCount: 0,
+      llmcliMdFileCount: 0,
       alwaysSkipModificationConfirmation: false,
       vertexai: false,
       showMemoryUsage: false,
@@ -264,9 +264,9 @@ describe('useGeminiStream', () => {
 
   const renderTestHook = (
     initialToolCalls: TrackedToolCall[] = [],
-    geminiClient?: any,
+    llmcliClient?: any,
   ) => {
-    const client = geminiClient || mockConfig.getGeminiClient();
+    const client = llmcliClient || mockConfig.getGeminiClient();
 
     const initialProps = {
       client,

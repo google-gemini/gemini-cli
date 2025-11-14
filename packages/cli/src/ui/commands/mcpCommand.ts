@@ -131,9 +131,9 @@ const authCommand: SlashCommand = {
         await mcpClientManager.restartServer(serverName);
       }
       // Update the client with the new tools
-      const geminiClient = config.getGeminiClient();
-      if (geminiClient?.isInitialized()) {
-        await geminiClient.setTools();
+      const llmcliClient = config.getGeminiClient();
+      if (llmcliClient?.isInitialized()) {
+        await llmcliClient.setTools();
       }
 
       // Reload the slash commands to reflect the changes.
@@ -320,9 +320,9 @@ const refreshCommand: SlashCommand = {
     await mcpClientManager.restart();
 
     // Update the client with the new tools
-    const geminiClient = config.getGeminiClient();
-    if (geminiClient?.isInitialized()) {
-      await geminiClient.setTools();
+    const llmcliClient = config.getGeminiClient();
+    if (llmcliClient?.isInitialized()) {
+      await llmcliClient.setTools();
     }
 
     // Reload the slash commands to reflect the changes.

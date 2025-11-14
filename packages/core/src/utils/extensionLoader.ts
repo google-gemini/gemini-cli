@@ -122,9 +122,9 @@ export abstract class ExtensionLoader {
     extension: GeminiCLIExtension,
   ): Promise<void> {
     if (extension.excludeTools && extension.excludeTools.length > 0) {
-      const geminiClient = this.config?.getGeminiClient();
-      if (geminiClient?.isInitialized()) {
-        await geminiClient.setTools();
+      const llmcliClient = this.config?.getGeminiClient();
+      if (llmcliClient?.isInitialized()) {
+        await llmcliClient.setTools();
       }
     }
   }

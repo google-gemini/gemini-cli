@@ -805,7 +805,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   // Initial prompt handling
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const initialPromptSubmitted = useRef(false);
-  const geminiClient = config.getGeminiClient();
+  const llmcliClient = config.getGeminiClient();
 
   useEffect(() => {
     if (activePtyId) {
@@ -843,7 +843,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
       !showPrivacyNotice &&
-      geminiClient?.isInitialized?.()
+      llmcliClient?.isInitialized?.()
     ) {
       handleFinalSubmit(initialPrompt);
       initialPromptSubmitted.current = true;
@@ -857,7 +857,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isThemeDialogOpen,
     isEditorDialogOpen,
     showPrivacyNotice,
-    geminiClient,
+    llmcliClient,
   ]);
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
@@ -1246,7 +1246,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
 
-  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
+  const [llmcliMdFileCount, setGeminiMdFileCount] = useState<number>(
     config.getGeminiMdFileCount(),
   );
   useEffect(() => {
@@ -1287,7 +1287,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
-      geminiMdFileCount,
+      llmcliMdFileCount,
       streamingState,
       initError,
       pendingGeminiHistoryItems,
@@ -1369,7 +1369,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
-      geminiMdFileCount,
+      llmcliMdFileCount,
       streamingState,
       initError,
       pendingGeminiHistoryItems,

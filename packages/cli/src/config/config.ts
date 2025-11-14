@@ -597,8 +597,8 @@ export async function loadCliConfig(
       ? [] // explicitly allowed servers overrides everything
       : settings.mcp?.excluded,
     userMemory: memoryContent,
-    geminiMdFileCount: fileCount,
-    geminiMdFilePaths: filePaths,
+    llmcliMdFileCount: fileCount,
+    llmcliMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode: settings.security?.disableYoloMode,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,

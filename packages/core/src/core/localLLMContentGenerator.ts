@@ -11,7 +11,6 @@ import type {
   CountTokensParameters,
   EmbedContentResponse,
   EmbedContentParameters,
-  Content,
   Part,
   FinishReason,
 } from '@google/genai';
@@ -44,7 +43,7 @@ export class LocalLLMContentGenerator implements ContentGenerator {
    * Convert Google Gemini content format to OpenAI messages format
    */
   private convertToOpenAIMessages(
-    contents: any,  // ContentListUnion can be string, Content, Content[], or Part
+    contents: unknown, // ContentListUnion can be string, Content, Content[], or Part
   ): OpenAI.Chat.ChatCompletionMessageParam[] {
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
@@ -58,7 +57,12 @@ export class LocalLLMContentGenerator implements ContentGenerator {
     }
 
     // Handle Part type (has text property but no role)
-    if (contents && typeof contents === 'object' && 'text' in contents && !('role' in contents)) {
+    if (
+      contents &&
+      typeof contents === 'object' &&
+      'text' in contents &&
+      !('role' in contents)
+    ) {
       messages.push({
         role: 'user',
         content: contents.text || '',
@@ -73,7 +77,7 @@ export class LocalLLMContentGenerator implements ContentGenerator {
       if (typeof content === 'string') {
         messages.push({
           role: 'user',
-          content: content,
+          content,
         });
         continue;
       }
@@ -82,25 +86,32 @@ export class LocalLLMContentGenerator implements ContentGenerator {
       if (content && 'text' in content && !('role' in content)) {
         messages.push({
           role: 'user',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content: (content as any).text || '',
         });
         continue;
       }
 
-      const role =
-        content.role === 'user'
+       
+      const role: 'user' | 'assistant' | 'system' =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (content as any).role === 'user'
           ? 'user'
-          : content.role === 'model'
+          : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (content as any).role === 'model'
             ? 'assistant'
             : 'system';
 
       // Combine all text parts into a single message
       let textContent = '';
-      if (content.parts) {
-        for (const part of content.parts) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((content as any).parts) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const part of (content as any).parts) {
           if (typeof part === 'string') {
             textContent += part + '\n';
           } else if (part && typeof part === 'object' && 'text' in part) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             textContent += (part as any).text + '\n';
           }
           // Note: Local LLMs may not support function calls, inline data, etc.
@@ -179,7 +190,9 @@ export class LocalLLMContentGenerator implements ContentGenerator {
   /**
    * Map OpenAI finish reasons to Gemini finish reasons
    */
-  private mapFinishReason(openaiReason?: string | null): FinishReason | undefined {
+  private mapFinishReason(
+    openaiReason?: string | null,
+  ): FinishReason | undefined {
     if (!openaiReason) return undefined;
 
     switch (openaiReason) {
@@ -196,7 +209,7 @@ export class LocalLLMContentGenerator implements ContentGenerator {
 
   async generateContent(
     request: GenerateContentParameters,
-    userPromptId: string,
+    _userPromptId: string,
   ): Promise<GenerateContentResponse> {
     try {
       const messages = this.convertToOpenAIMessages(request.contents);
@@ -219,7 +232,7 @@ export class LocalLLMContentGenerator implements ContentGenerator {
 
   async generateContentStream(
     request: GenerateContentParameters,
-    userPromptId: string,
+    _userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     return this.streamGenerator(request);
   }
@@ -295,7 +308,7 @@ export class LocalLLMContentGenerator implements ContentGenerator {
   }
 
   async embedContent(
-    request: EmbedContentParameters,
+    _request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     // Embedding is not commonly supported by all local LLMs
     // Return a minimal response

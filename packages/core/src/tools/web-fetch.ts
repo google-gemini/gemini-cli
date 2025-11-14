@@ -159,7 +159,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
       textContent = textContent.substring(0, MAX_CONTENT_LENGTH);
 
-      const geminiClient = this.config.getGeminiClient();
+      const llmcliClient = this.config.getGeminiClient();
       const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
 
 I was unable to access the URL directly. Instead, I have fetched the raw content of the page. Please use the following content to answer the request. Do not attempt to access the URL again.
@@ -168,7 +168,7 @@ I was unable to access the URL directly. Instead, I have fetched the raw content
 ${textContent}
 ---
 `;
-      const result = await geminiClient.generateContent(
+      const result = await llmcliClient.generateContent(
         { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
         signal,
@@ -248,10 +248,10 @@ ${textContent}
       return this.executeFallback(signal);
     }
 
-    const geminiClient = this.config.getGeminiClient();
+    const llmcliClient = this.config.getGeminiClient();
 
     try {
-      const response = await geminiClient.generateContent(
+      const response = await llmcliClient.generateContent(
         { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
         signal, // Pass signal

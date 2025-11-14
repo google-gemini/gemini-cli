@@ -60,7 +60,7 @@ export class Task {
   contextId: string;
   scheduler: CoreToolScheduler;
   config: Config;
-  geminiClient: GeminiClient;
+  llmcliClient: GeminiClient;
   pendingToolConfirmationDetails: Map<string, ToolCallConfirmationDetails>;
   taskState: TaskState;
   eventBus?: ExecutionEventBus;

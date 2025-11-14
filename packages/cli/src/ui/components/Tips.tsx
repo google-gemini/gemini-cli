@@ -14,7 +14,7 @@ interface TipsProps {
 }
 
 export const Tips: React.FC<TipsProps> = ({ config }) => {
-  const geminiMdFileCount = config.getGeminiMdFileCount();
+  const llmcliMdFileCount = config.getGeminiMdFileCount();
   return (
     <Box flexDirection="column">
       <Text color={theme.text.primary}>Tips for getting started:</Text>
@@ -24,7 +24,7 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
       <Text color={theme.text.primary}>
         2. Be specific for the best results.
       </Text>
-      {geminiMdFileCount === 0 && (
+      {llmcliMdFileCount === 0 && (
         <Text color={theme.text.primary}>
           3. Create{' '}
           <Text bold color={theme.text.accent}>
@@ -34,7 +34,7 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
         </Text>
       )}
       <Text color={theme.text.primary}>
-        {geminiMdFileCount === 0 ? '4.' : '3.'}{' '}
+        {llmcliMdFileCount === 0 ? '4.' : '3.'}{' '}
         <Text bold color={theme.text.accent}>
           /help
         </Text>{' '}

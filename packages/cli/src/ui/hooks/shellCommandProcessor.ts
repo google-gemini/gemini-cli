@@ -31,7 +31,7 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
 
 function addShellCommandToGeminiHistory(
-  geminiClient: GeminiClient,
+  llmcliClient: GeminiClient,
   rawQuery: string,
   resultText: string,
 ) {
@@ -40,7 +40,7 @@ function addShellCommandToGeminiHistory(
       ? resultText.substring(0, MAX_OUTPUT_LENGTH) + '\n... (truncated)'
       : resultText;
 
-  geminiClient.addHistory({
+  llmcliClient.addHistory({
     role: 'user',
     parts: [
       {
@@ -70,7 +70,7 @@ export const useShellCommandProcessor = (
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
-  geminiClient: GeminiClient,
+  llmcliClient: GeminiClient,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth?: number,
   terminalHeight?: number,
@@ -294,7 +294,7 @@ export const useShellCommandProcessor = (
 
               // Add the same complete, contextual result to the LLM's history.
               addShellCommandToGeminiHistory(
-                geminiClient,
+                llmcliClient,
                 rawQuery,
                 finalOutput,
               );
@@ -355,7 +355,7 @@ export const useShellCommandProcessor = (
       addItemToHistory,
       setPendingHistoryItem,
       onExec,
-      geminiClient,
+      llmcliClient,
       setShellInputFocused,
       terminalHeight,
       terminalWidth,

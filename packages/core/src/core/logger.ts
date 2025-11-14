@@ -68,7 +68,7 @@ export function decodeTagName(str: string): string {
 }
 
 export class Logger {
-  private geminiDir: string | undefined;
+  private llmcliDir: string | undefined;
   private logFilePath: string | undefined;
   private sessionId: string | undefined;
   private messageId = 0; // Instance-specific counter for the next messageId

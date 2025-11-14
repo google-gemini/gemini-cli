@@ -187,11 +187,11 @@ export async function runNonInteractive({
         }
       });
 
-      const geminiClient = config.getGeminiClient();
+      const llmcliClient = config.getGeminiClient();
 
       // Initialize chat.  Resume if resume data is passed.
       if (resumedSessionData) {
-        await geminiClient.resumeChat(
+        await llmcliClient.resumeChat(
           convertSessionToHistoryFormats(
             resumedSessionData.conversation.messages,
           ).clientHistory,
@@ -284,7 +284,7 @@ export async function runNonInteractive({
         }
         const toolCallRequests: ToolCallRequestInfo[] = [];
 
-        const responseStream = geminiClient.sendMessageStream(
+        const responseStream = llmcliClient.sendMessageStream(
           currentMessages[0]?.parts || [],
           abortController.signal,
           prompt_id,
@@ -400,8 +400,8 @@ export async function runNonInteractive({
           // Record tool calls with full metadata before sending responses to Gemini
           try {
             const currentModel =
-              geminiClient.getCurrentSequenceModel() ?? config.getModel();
-            geminiClient
+              llmcliClient.getCurrentSequenceModel() ?? config.getModel();
+            llmcliClient
               .getChat()
               .recordCompletedToolCalls(currentModel, completedToolCalls);
           } catch (error) {

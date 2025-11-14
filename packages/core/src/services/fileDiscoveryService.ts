@@ -23,7 +23,7 @@ export interface FilterReport {
 
 export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
-  private geminiIgnoreFilter: GeminiIgnoreFilter | null = null;
+  private llmcliIgnoreFilter: GeminiIgnoreFilter | null = null;
   private combinedIgnoreFilter: GitIgnoreFilter | null = null;
   private projectRoot: string;
 

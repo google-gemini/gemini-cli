@@ -64,7 +64,7 @@ describe('SmartEditTool', () => {
   let tempDir: string;
   let rootDir: string;
   let mockConfig: Config;
-  let geminiClient: any;
+  let llmcliClient: any;
   let fileSystemService: StandardFileSystemService;
   let baseLlmClient: BaseLlmClient;
 
@@ -74,7 +74,7 @@ describe('SmartEditTool', () => {
     rootDir = path.join(tempDir, 'root');
     fs.mkdirSync(rootDir);
 
-    geminiClient = {
+    llmcliClient = {
       generateJson: mockGenerateJson,
       getHistory: vi.fn().mockResolvedValue([]),
     };
@@ -92,7 +92,7 @@ describe('SmartEditTool', () => {
       getUseSmartEdit: vi.fn(() => false),
       getUseModelRouter: vi.fn(() => false),
       getProxy: vi.fn(() => undefined),
-      getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getGeminiClient: vi.fn().mockReturnValue(llmcliClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),

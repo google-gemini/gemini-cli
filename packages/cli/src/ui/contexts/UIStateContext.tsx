@@ -65,7 +65,7 @@ export interface UIState {
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
-  geminiMdFileCount: number;
+  llmcliMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;
   pendingGeminiHistoryItems: HistoryItemWithoutId[];

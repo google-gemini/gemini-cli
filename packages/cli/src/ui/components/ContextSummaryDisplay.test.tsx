@@ -26,7 +26,7 @@ const renderWithWidth = (
 
 describe('<ContextSummaryDisplay />', () => {
   const baseProps = {
-    geminiMdFileCount: 1,
+    llmcliMdFileCount: 1,
     contextFileNames: ['GEMINI.md'],
     mcpServers: { 'test-server': { command: 'test' } },
     ideContext: {
@@ -83,7 +83,7 @@ describe('<ContextSummaryDisplay />', () => {
   it('should not render empty parts', () => {
     const props = {
       ...baseProps,
-      geminiMdFileCount: 0,
+      llmcliMdFileCount: 0,
       contextFileNames: [],
       mcpServers: {},
     };

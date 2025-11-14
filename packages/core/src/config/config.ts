@@ -233,8 +233,8 @@ export interface ConfigParameters {
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   userMemory?: string;
-  geminiMdFileCount?: number;
-  geminiMdFilePaths?: string[];
+  llmcliMdFileCount?: number;
+  llmcliMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
@@ -337,14 +337,14 @@ export class Config {
   private readonly mcpServerCommand: string | undefined;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
-  private geminiMdFileCount: number;
-  private geminiMdFilePaths: string[];
+  private llmcliMdFileCount: number;
+  private llmcliMdFilePaths: string[];
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
-  private geminiClient!: GeminiClient;
+  private llmcliClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
   private modelRouterService: ModelRouterService;
   private readonly fileFiltering: {

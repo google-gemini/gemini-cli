@@ -69,7 +69,7 @@ expect.extend({
     const { isNot } = this;
     const event = JSON.parse(received[0].source_extension_json) as LogEvent;
     const metadata = event['event_metadata'][0];
-    const data = metadata.find((m) => m.llmcli_cli_key === key)?.value;
+    const data = metadata.find((m) => m.gemini_cli_key === key)?.value;
 
     const pass = data !== undefined && data === value;
 
@@ -85,7 +85,7 @@ expect.extend({
     const event = JSON.parse(received[0].source_extension_json) as LogEvent;
     const metadata = event['event_metadata'][0];
 
-    const pass = metadata.some((m) => m.llmcli_cli_key === key);
+    const pass = metadata.some((m) => m.gemini_cli_key === key);
 
     return {
       pass,

@@ -66,7 +66,7 @@ export function usePromptCompletion({
 
   const generatePromptSuggestions = useCallback(async () => {
     const trimmedText = buffer.text.trim();
-    const geminiClient = config?.getGeminiClient();
+    const llmcliClient = config?.getGeminiClient();
 
     if (trimmedText === lastRequestedTextRef.current) {
       return;
@@ -78,7 +78,7 @@ export function usePromptCompletion({
 
     if (
       trimmedText.length < PROMPT_COMPLETION_MIN_LENGTH ||
-      !geminiClient ||
+      !llmcliClient ||
       isSlashCommand(trimmedText) ||
       trimmedText.includes('@') ||
       !isPromptCompletionEnabled
@@ -106,7 +106,7 @@ export function usePromptCompletion({
         },
       ];
 
-      const response = await geminiClient.generateContent(
+      const response = await llmcliClient.generateContent(
         { model: 'prompt-completion' },
         contents,
         signal,
