@@ -35,7 +35,7 @@ vi.mock('node:process', () => ({
 vi.mock('node:path', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual && typeof actual === 'object' ? actual : {}),
     resolve: vi.fn((p) => p),
     join: vi.fn((...args) => args.join('/')),
   };
