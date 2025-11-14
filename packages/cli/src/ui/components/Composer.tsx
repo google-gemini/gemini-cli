@@ -103,6 +103,10 @@ export const Composer = () => {
             <Text color={theme.status.warning}>
               Press Ctrl-S to enter selection mode to copy text.
             </Text>
+          ) : uiState.pasteTimeoutWarning ? (
+            <Text color={theme.status.warning}>
+              Paste Timed out. Possibly due to slow connection.
+            </Text>
           ) : uiState.ctrlDPressedOnce ? (
             <Text color={theme.status.warning}>
               Press Ctrl+D again to exit.
