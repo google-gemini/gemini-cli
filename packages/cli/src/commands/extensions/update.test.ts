@@ -27,9 +27,9 @@ vi.mock('../../config/settings.js');
 vi.mock('../../utils/errors.js');
 vi.mock('../../config/extensions/update.js');
 vi.mock('../../config/extensions/github.js');
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@llmcli-core', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+    await importOriginal<typeof import('@llmcli-core')>();
   return {
     ...actual,
     debugLogger: {
@@ -65,7 +65,7 @@ describe('extensions update command', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockDebugLogger = (await import('@google/gemini-cli-core'))
+    mockDebugLogger = (await import('@llmcli-core'))
       .debugLogger as unknown as MockDebugLogger;
     mockLoadSettings.mockReturnValue({
       merged: { experimental: { extensionReloading: true } },

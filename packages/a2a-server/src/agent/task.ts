@@ -26,7 +26,7 @@ import {
   type Config,
   type UserTierId,
   type AnsiOutput,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import type { RequestContext } from '@a2a-js/sdk/server';
 import { type ExecutionEventBus } from '@a2a-js/sdk/server';
 import type {
@@ -85,7 +85,7 @@ export class Task {
     this.contextId = contextId;
     this.config = config;
     this.scheduler = this.createScheduler();
-    this.geminiClient = this.config.getGeminiClient();
+    this.llmcliClient = this.config.getGeminiClient();
     this.pendingToolConfirmationDetails = new Map();
     this.taskState = 'submitted';
     this.eventBus = eventBus;
@@ -815,7 +815,7 @@ export class Task {
       } else {
         parts = [response];
       }
-      this.geminiClient.addHistory({
+      this.llmcliClient.addHistory({
         role: 'user',
         parts,
       });
@@ -854,7 +854,7 @@ export class Task {
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
     // TODO: Determine what it mean to have, then add a prompt ID.
-    yield* this.geminiClient.sendMessageStream(
+    yield* this.llmcliClient.sendMessageStream(
       llmParts,
       aborted,
       /*prompt_id*/ '',
@@ -894,7 +894,7 @@ export class Task {
       // Set task state to working as we are about to call LLM
       this.setTaskStateAndPublishUpdate('working', stateChange);
       // TODO: Determine what it mean to have, then add a prompt ID.
-      yield* this.geminiClient.sendMessageStream(
+      yield* this.llmcliClient.sendMessageStream(
         llmParts,
         aborted,
         /*prompt_id*/ '',

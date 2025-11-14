@@ -18,11 +18,11 @@ import {
   GeminiEventType,
   type Config,
   type ToolCallRequestInfo,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
-import type { ToolCall } from '@google/gemini-cli-core';
+import type { ToolCall } from '@llmcli-core';
 
 describe('Task', () => {
   it('scheduleToolCalls should not modify the input requests array', async () => {

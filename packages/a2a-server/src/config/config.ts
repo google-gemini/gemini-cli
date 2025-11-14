@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { homedir } from 'node:os';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
+import type { TelemetryTarget } from '@llmcli-core';
 import {
   AuthType,
   Config,
@@ -17,11 +17,11 @@ import {
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
-  GEMINI_DIR,
+  LLM_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
   type ExtensionLoader,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 
 import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
@@ -82,7 +82,7 @@ export async function loadConfig(
     settings.folderTrust === true,
   );
   configParams.userMemory = memoryContent;
-  configParams.geminiMdFileCount = fileCount;
+  configParams.llmcliMdFileCount = fileCount;
   const config = new Config({
     ...configParams,
   });
@@ -155,8 +155,8 @@ export function loadEnvironment(): void {
 function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
-    // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
+    // prefer gemini-specific .env under LLM_DIR
+    const geminiEnvPath = path.join(currentDir, LLM_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
       return geminiEnvPath;
     }
@@ -167,7 +167,7 @@ function findEnvFile(startDir: string): string | null {
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
+      const homeGeminiEnvPath = path.join(process.cwd(), LLM_DIR, '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
         return homeGeminiEnvPath;
       }

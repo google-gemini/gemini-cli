@@ -8,7 +8,7 @@ import {
   type AuthType,
   type Config,
   getErrorMessage,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 
 /**
  * Handles the initial authentication flow.

@@ -12,7 +12,7 @@ import {
   TerminalQuotaError,
   UserTierId,
   DEFAULT_GEMINI_FLASH_MODEL,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';

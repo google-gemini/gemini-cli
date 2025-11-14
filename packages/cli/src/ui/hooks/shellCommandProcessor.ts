@@ -15,8 +15,8 @@ import type {
   Config,
   GeminiClient,
   ShellExecutionResult,
-} from '@google/gemini-cli-core';
-import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
+} from '@llmcli-core';
+import { isBinary, ShellExecutionService } from '@llmcli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';

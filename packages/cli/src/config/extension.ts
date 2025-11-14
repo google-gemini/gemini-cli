@@ -7,7 +7,7 @@
 import type {
   MCPServerConfig,
   ExtensionInstallMetadata,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { INSTALL_METADATA_FILENAME } from './extensions/variables.js';

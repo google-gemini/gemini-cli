@@ -10,11 +10,11 @@ import type {
   LoadedSettings,
 } from '../../config/settings.js';
 import { type HistoryItem, MessageType } from '../types.js';
-import type { EditorType } from '@google/gemini-cli-core';
+import type { EditorType } from '@llmcli-core';
 import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 
 import { SettingPaths } from '../../config/settingPaths.js';
 

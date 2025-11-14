@@ -199,9 +199,9 @@ describe('editCorrector', () => {
         setUserMemory: vi.fn((mem: string) => {
           configParams.userMemory = mem;
         }),
-        getGeminiMdFileCount: vi.fn(() => configParams.geminiMdFileCount),
+        getGeminiMdFileCount: vi.fn(() => configParams.llmcliMdFileCount),
         setGeminiMdFileCount: vi.fn((count: number) => {
-          configParams.geminiMdFileCount = count;
+          configParams.llmcliMdFileCount = count;
         }),
         getAlwaysSkipModificationConfirmation: vi.fn(
           () => configParams.alwaysSkipModificationConfirmation,

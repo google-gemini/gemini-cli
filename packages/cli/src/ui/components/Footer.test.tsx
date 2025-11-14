@@ -10,12 +10,12 @@ import {
   createMockSettings,
 } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
-import { tildeifyPath, ToolCallDecision } from '@google/gemini-cli-core';
+import { tildeifyPath, ToolCallDecision } from '@llmcli-core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@llmcli-core', async (importOriginal) => {
   const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+    await importOriginal<typeof import('@llmcli-core')>();
   return {
     ...original,
     shortenPath: (p: string, len: number) => {

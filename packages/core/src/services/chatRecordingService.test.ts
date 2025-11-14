@@ -43,7 +43,7 @@ describe('ChatRecordingService', () => {
       storage: {
         getProjectTempDir: vi
           .fn()
-          .mockReturnValue('/test/project/root/.gemini/tmp'),
+          .mockReturnValue('/test/project/root/.llmcli/tmp'),
       },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -80,7 +80,7 @@ describe('ChatRecordingService', () => {
       chatRecordingService.initialize();
 
       expect(mkdirSyncSpy).toHaveBeenCalledWith(
-        '/test/project/root/.gemini/tmp/chats',
+        '/test/project/root/.llmcli/tmp/chats',
         { recursive: true },
       );
       expect(writeFileSyncSpy).not.toHaveBeenCalled();
@@ -99,7 +99,7 @@ describe('ChatRecordingService', () => {
         .mockImplementation(() => undefined);
 
       chatRecordingService.initialize({
-        filePath: '/test/project/root/.gemini/tmp/chats/session.json',
+        filePath: '/test/project/root/.llmcli/tmp/chats/session.json',
         conversation: {
           sessionId: 'old-session-id',
         } as ConversationRecord,
@@ -397,7 +397,7 @@ describe('ChatRecordingService', () => {
         .mockImplementation(() => undefined);
       chatRecordingService.deleteSession('test-session-id');
       expect(unlinkSyncSpy).toHaveBeenCalledWith(
-        '/test/project/root/.gemini/tmp/chats/test-session-id.json',
+        '/test/project/root/.llmcli/tmp/chats/test-session-id.json',
       );
     });
   });

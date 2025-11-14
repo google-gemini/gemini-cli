@@ -9,7 +9,7 @@ import {
   ApprovalMode,
   PolicyDecision,
   PolicyEngine,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import { createPolicyEngineConfig } from './policy.js';
 import type { Settings } from './settings.js';
 

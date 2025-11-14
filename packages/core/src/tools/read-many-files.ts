@@ -61,7 +61,7 @@ export interface ReadManyFilesParams {
   useDefaultExcludes?: boolean;
 
   /**
-   * Whether to respect .gitignore and .geminiignore patterns (optional, defaults to true)
+   * Whether to respect .gitignore and .llmcliignore patterns (optional, defaults to true)
    */
   file_filtering_options?: {
     respect_git_ignore?: boolean;
@@ -482,7 +482,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
         },
         file_filtering_options: {
           description:
-            'Whether to respect ignore patterns from .gitignore or .geminiignore',
+            'Whether to respect ignore patterns from .gitignore or .llmcliignore',
           type: 'object',
           properties: {
             respect_git_ignore: {
@@ -492,7 +492,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
             },
             respect_gemini_ignore: {
               description:
-                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
+                'Optional: Whether to respect .llmcliignore patterns when listing files. Defaults to true.',
               type: 'boolean',
             },
           },

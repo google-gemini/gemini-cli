@@ -21,7 +21,7 @@ import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
 import { StreamingContext } from '../ui/contexts/StreamingContext.js';
 
-import { type Config } from '@google/gemini-cli-core';
+import { type Config } from '@llmcli-core';
 
 // Wrapper around ink-testing-library's render that ensures act() is called
 export const render = (

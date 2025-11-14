@@ -44,7 +44,7 @@ describe('createPolicyEngineConfig', () => {
           typeof path === 'string' &&
           nodePath
             .normalize(path)
-            .includes(nodePath.normalize('.gemini/policies'))
+            .includes(nodePath.normalize('.llmcli/policies'))
         ) {
           // Return empty array for user policies
           return [] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
@@ -567,7 +567,7 @@ describe('createPolicyEngineConfig', () => {
           typeof path === 'string' &&
           nodePath
             .normalize(path)
-            .includes(nodePath.normalize('.gemini/policies'))
+            .includes(nodePath.normalize('.llmcli/policies'))
         ) {
           return [
             {
@@ -593,7 +593,7 @@ describe('createPolicyEngineConfig', () => {
           typeof path === 'string' &&
           nodePath
             .normalize(path)
-            .includes(nodePath.normalize('.gemini/policies/write.toml'))
+            .includes(nodePath.normalize('.llmcli/policies/write.toml'))
         ) {
           return `
 [[rule]]
@@ -657,7 +657,7 @@ priority = 150
           typeof path === 'string' &&
           nodePath
             .normalize(path)
-            .includes(nodePath.normalize('.gemini/policies'))
+            .includes(nodePath.normalize('.llmcli/policies'))
         ) {
           return [
             {
@@ -683,7 +683,7 @@ priority = 150
           typeof path === 'string' &&
           nodePath
             .normalize(path)
-            .includes(nodePath.normalize('.gemini/policies/safety.toml'))
+            .includes(nodePath.normalize('.llmcli/policies/safety.toml'))
         ) {
           return `
 [[rule]]
@@ -758,7 +758,7 @@ required_context = ["environment"]
           typeof path === 'string' &&
           nodePath
             .normalize(path)
-            .includes(nodePath.normalize('.gemini/policies'))
+            .includes(nodePath.normalize('.llmcli/policies'))
         ) {
           return [
             {
@@ -785,7 +785,7 @@ required_context = ["environment"]
           nodePath
             .normalize(path)
             .includes(
-              nodePath.normalize('.gemini/policies/invalid_safety.toml'),
+              nodePath.normalize('.llmcli/policies/invalid_safety.toml'),
             )
         ) {
           return `

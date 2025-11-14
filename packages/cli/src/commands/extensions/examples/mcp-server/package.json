@@ -1,7 +1,7 @@
 {
   "name": "mcp-server-example",
   "version": "1.0.0",
-  "description": "Example MCP Server for Gemini CLI Extension",
+  "description": "Example MCP Server for LLM CLI Extension",
   "type": "module",
   "main": "example.js",
   "scripts": {

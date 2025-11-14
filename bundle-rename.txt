@@ -1,0 +1,1 @@
+Note: bundle/gemini.js will be renamed to bundle/llm.js during build

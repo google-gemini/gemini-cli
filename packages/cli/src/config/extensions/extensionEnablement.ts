@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { coreEvents, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import { coreEvents, type GeminiCLIExtension } from '@llmcli-core';
 import { ExtensionStorage } from './storage.js';
 
 export interface ExtensionEnablementConfig {

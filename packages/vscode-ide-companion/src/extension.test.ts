@@ -10,11 +10,11 @@ import { activate } from './extension.js';
 import {
   IDE_DEFINITIONS,
   detectIdeFromEnv,
-} from '@google/gemini-cli-core/src/ide/detect-ide.js';
+} from '@llmcli-core/src/ide/detect-ide.js';
 
-vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
+vi.mock('@llmcli-core/src/ide/detect-ide.js', async () => {
   const actual = await vi.importActual(
-    '@google/gemini-cli-core/src/ide/detect-ide.js',
+    '@llmcli-core/src/ide/detect-ide.js',
   );
   return {
     ...actual,
@@ -290,7 +290,7 @@ describe('activate', () => {
 
       expect(executeCommandMock).toHaveBeenCalledWith(
         'workbench.extensions.installExtension',
-        'Google.gemini-cli-vscode-ide-companion',
+        'Google.llmcli-cli-vscode-ide-companion',
       );
     });
 

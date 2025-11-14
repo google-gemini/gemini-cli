@@ -12,15 +12,15 @@ import {
   getErrorMessage,
   isWithinRoot,
   ideContextStore,
-  GEMINI_DIR,
-} from '@google/gemini-cli-core';
+  LLM_DIR,
+} from '@llmcli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 
 export function getUserSettingsDir(): string {
-  return path.join(homedir(), GEMINI_DIR);
+  return path.join(homedir(), LLM_DIR);
 }
 
 export function getTrustedFoldersPath(): string {

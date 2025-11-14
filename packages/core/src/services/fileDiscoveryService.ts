@@ -32,11 +32,11 @@ export class FileDiscoveryService {
     if (isGitRepository(this.projectRoot)) {
       this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
     }
-    this.geminiIgnoreFilter = new GeminiIgnoreParser(this.projectRoot);
+    this.llmcliIgnoreFilter = new GeminiIgnoreParser(this.projectRoot);
 
     if (this.gitIgnoreFilter) {
-      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      // Create combined parser: .gitignore + .geminiignore
+      const geminiPatterns = this.llmcliIgnoreFilter.getPatterns();
+      // Create combined parser: .gitignore + .llmcliignore
       this.combinedIgnoreFilter = new GitIgnoreParser(
         this.projectRoot,
         geminiPatterns,
@@ -61,7 +61,7 @@ export class FileDiscoveryService {
       if (respectGitIgnore && this.gitIgnoreFilter?.isIgnored(filePath)) {
         return false;
       }
-      if (respectGeminiIgnore && this.geminiIgnoreFilter?.isIgnored(filePath)) {
+      if (respectGeminiIgnore && this.llmcliIgnoreFilter?.isIgnored(filePath)) {
         return false;
       }
       return true;

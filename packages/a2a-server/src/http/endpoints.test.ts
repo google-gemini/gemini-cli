@@ -16,7 +16,7 @@ import type { AddressInfo } from 'node:net';
 import { createApp, updateCoderAgentCardUrl } from './app.js';
 import type { TaskMetadata } from '../types.js';
 import { createMockConfig } from '../utils/testing_utils.js';
-import { debugLogger, type Config } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@llmcli-core';
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug

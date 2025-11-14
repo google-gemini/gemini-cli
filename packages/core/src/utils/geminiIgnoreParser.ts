@@ -24,7 +24,7 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
   }
 
   private loadPatterns(): void {
-    const patternsFilePath = path.join(this.projectRoot, '.geminiignore');
+    const patternsFilePath = path.join(this.projectRoot, '.llmcliignore');
     let content: string;
     try {
       content = fs.readFileSync(patternsFilePath, 'utf-8');

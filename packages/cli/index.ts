@@ -8,7 +8,7 @@
 
 import './src/gemini.js';
 import { main } from './src/gemini.js';
-import { debugLogger, FatalError } from '@google/gemini-cli-core';
+import { debugLogger, FatalError } from '@llmcli-core';
 
 // --- Global Entry Point ---
 main().catch((error) => {

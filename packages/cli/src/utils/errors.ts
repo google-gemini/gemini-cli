@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
+import type { Config } from '@llmcli-core';
 import {
   OutputFormat,
   JsonFormatter,
@@ -16,7 +16,7 @@ import {
   FatalCancellationError,
   FatalToolExecutionError,
   isFatalToolError,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {

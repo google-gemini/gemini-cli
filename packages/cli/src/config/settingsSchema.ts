@@ -16,13 +16,13 @@ import type {
   AuthType,
   HookDefinition,
   HookEventName,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_MODEL_CONFIGS,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -868,11 +868,11 @@ const SETTINGS_SCHEMA = {
           },
           respectGeminiIgnore: {
             type: 'boolean',
-            label: 'Respect .geminiignore',
+            label: 'Respect .llmcliignore',
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .geminiignore files when searching',
+            description: 'Respect .llmcliignore files when searching',
             showInDialog: true,
           },
           enableRecursiveFileSearch: {

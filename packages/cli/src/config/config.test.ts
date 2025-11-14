@@ -16,10 +16,10 @@ import {
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   type ExtensionLoader,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
-import * as ServerConfig from '@google/gemini-cli-core';
+import * as ServerConfig from '@llmcli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
 
@@ -83,9 +83,9 @@ vi.mock('read-package-up', () => ({
   ),
 }));
 
-vi.mock('@google/gemini-cli-core', async () => {
+vi.mock('@llmcli-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(
-    '@google/gemini-cli-core',
+    '@llmcli-core',
   );
   return {
     ...actualServer,
@@ -725,12 +725,12 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     // This test is skipped because mockFs and fsPromises are not properly imported/mocked
     // TODO: Fix this test by properly setting up mock-fs and fs/promises mocks
     /*
-    const MOCK_GEMINI_DIR_LOCAL = path.join(
+    const MOCK_LLM_DIR_LOCAL = path.join(
       '/mock/home/user',
-      ServerConfig.GEMINI_DIR,
+      ServerConfig.LLM_DIR,
     );
     const MOCK_GLOBAL_PATH_LOCAL = path.join(
-      MOCK_GEMINI_DIR_LOCAL,
+      MOCK_LLM_DIR_LOCAL,
       'GEMINI.md',
     );
     mockFs({

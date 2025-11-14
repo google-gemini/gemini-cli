@@ -166,7 +166,7 @@ export const INFORMATIVE_TIPS = [
   'Expand your workspace with additional directories (/directory)...',
   'Control how /memory refresh loads context files (/settings)...',
   'Toggle respect for .gitignore files in context (/settings)...',
-  'Toggle respect for .geminiignore files in context (/settings)...',
+  'Toggle respect for .llmcliignore files in context (/settings)...',
   'Enable recursive file search for @-file completions (/settings)...',
   'Run tools in a secure sandbox environment (settings.json)...',
   'Use an interactive terminal for shell commands (/settings)...',

@@ -12,7 +12,7 @@ import {
   debugLogger,
   FatalConfigError,
   getErrorMessage,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface EnableArgs {

@@ -8,11 +8,11 @@ import type {
   Config,
   ConversationRecord,
   MessageRecord,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import {
   SESSION_FILE_PREFIX,
   partListUnionToString,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 

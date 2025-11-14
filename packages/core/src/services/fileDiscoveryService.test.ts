@@ -53,8 +53,8 @@ describe('FileDiscoveryService', () => {
       expect(service.shouldIgnoreFile('node_modules/foo.js')).toBe(false);
     });
 
-    it('should load .geminiignore patterns even when not in a git repo', async () => {
-      await createTestFile('.geminiignore', 'secrets.txt');
+    it('should load .llmcliignore patterns even when not in a git repo', async () => {
+      await createTestFile('.llmcliignore', 'secrets.txt');
       const service = new FileDiscoveryService(projectRoot);
 
       expect(service.shouldIgnoreFile('secrets.txt')).toBe(true);
@@ -66,7 +66,7 @@ describe('FileDiscoveryService', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/\n.git/\ndist');
-      await createTestFile('.geminiignore', 'logs/');
+      await createTestFile('.llmcliignore', 'logs/');
     });
 
     it('should filter out git-ignored and gemini-ignored files by default', () => {
@@ -140,7 +140,7 @@ describe('FileDiscoveryService', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/');
-      await createTestFile('.geminiignore', '*.log');
+      await createTestFile('.llmcliignore', '*.log');
     });
 
     it('should return filtered paths and correct ignored count', () => {
@@ -177,7 +177,7 @@ describe('FileDiscoveryService', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/');
-      await createTestFile('.geminiignore', '*.log');
+      await createTestFile('.llmcliignore', '*.log');
     });
 
     it('should return true for git-ignored files', () => {
@@ -245,14 +245,14 @@ describe('FileDiscoveryService', () => {
       ]);
     });
   });
-  describe('precedence (.geminiignore over .gitignore)', () => {
+  describe('precedence (.llmcliignore over .gitignore)', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
     });
 
-    it('should un-ignore a file in .geminiignore that is ignored in .gitignore', async () => {
+    it('should un-ignore a file in .llmcliignore that is ignored in .gitignore', async () => {
       await createTestFile('.gitignore', '*.txt');
-      await createTestFile('.geminiignore', '!important.txt');
+      await createTestFile('.llmcliignore', '!important.txt');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['file.txt', 'important.txt'].map((f) =>
@@ -263,9 +263,9 @@ describe('FileDiscoveryService', () => {
       expect(filtered).toEqual([path.join(projectRoot, 'important.txt')]);
     });
 
-    it('should un-ignore a directory in .geminiignore that is ignored in .gitignore', async () => {
+    it('should un-ignore a directory in .llmcliignore that is ignored in .gitignore', async () => {
       await createTestFile('.gitignore', 'logs/');
-      await createTestFile('.geminiignore', '!logs/');
+      await createTestFile('.llmcliignore', '!logs/');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['logs/app.log', 'other/app.log'].map((f) =>
@@ -276,9 +276,9 @@ describe('FileDiscoveryService', () => {
       expect(filtered).toEqual(files);
     });
 
-    it('should extend ignore rules in .geminiignore', async () => {
+    it('should extend ignore rules in .llmcliignore', async () => {
       await createTestFile('.gitignore', '*.log');
-      await createTestFile('.geminiignore', 'temp/');
+      await createTestFile('.llmcliignore', 'temp/');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['app.log', 'temp/file.txt'].map((f) =>
@@ -291,7 +291,7 @@ describe('FileDiscoveryService', () => {
 
     it('should use .gitignore rules if respectGeminiIgnore is false', async () => {
       await createTestFile('.gitignore', '*.txt');
-      await createTestFile('.geminiignore', '!important.txt');
+      await createTestFile('.llmcliignore', '!important.txt');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['file.txt', 'important.txt'].map((f) =>
@@ -306,9 +306,9 @@ describe('FileDiscoveryService', () => {
       expect(filtered).toEqual([]);
     });
 
-    it('should use .geminiignore rules if respectGitIgnore is false', async () => {
+    it('should use .llmcliignore rules if respectGitIgnore is false', async () => {
       await createTestFile('.gitignore', '*.txt');
-      await createTestFile('.geminiignore', '!important.txt\ntemp/');
+      await createTestFile('.llmcliignore', '!important.txt\ntemp/');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['file.txt', 'important.txt', 'temp/file.js'].map((f) =>
@@ -321,7 +321,7 @@ describe('FileDiscoveryService', () => {
       });
 
       // .gitignore is ignored, so *.txt is not applied.
-      // .geminiignore un-ignores important.txt (which wasn't ignored anyway)
+      // .llmcliignore un-ignores important.txt (which wasn't ignored anyway)
       // and ignores temp/
       expect(filtered).toEqual(
         ['file.txt', 'important.txt'].map((f) => path.join(projectRoot, f)),

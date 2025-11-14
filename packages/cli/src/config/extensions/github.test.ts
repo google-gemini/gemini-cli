@@ -29,7 +29,7 @@ import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import * as tar from 'tar';
 import * as archiver from 'archiver';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import type { GeminiCLIExtension } from '@llmcli-core';
 import { ExtensionManager } from '../extension-manager.js';
 import { loadSettings } from '../settings.js';
 import type { ExtensionSetting } from './extensionSettings.js';

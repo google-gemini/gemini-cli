@@ -12,9 +12,9 @@ import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
 
 import {
   coreEvents,
-  GEMINI_DIR,
+  LLM_DIR,
   type GeminiCLIExtension,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
@@ -39,7 +39,7 @@ let manager: ExtensionEnablementManager;
 describe('ExtensionEnablementManager', () => {
   beforeEach(() => {
     testDir = createTestDir();
-    vi.mocked(os.homedir).mockReturnValue(path.join(testDir.path, GEMINI_DIR));
+    vi.mocked(os.homedir).mockReturnValue(path.join(testDir.path, LLM_DIR));
     manager = new ExtensionEnablementManager();
   });
 

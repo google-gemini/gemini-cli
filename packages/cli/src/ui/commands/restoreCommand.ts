@@ -12,7 +12,7 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config } from '@llmcli-core';
 
 async function restoreAction(
   context: CommandContext,
@@ -28,7 +28,7 @@ async function restoreAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Could not determine the .gemini directory path.',
+      content: 'Could not determine the .llmcli directory path.',
     };
   }
 

@@ -10,7 +10,7 @@ import type {
   ResumedSessionData,
   CompletedToolCall,
   UserFeedbackPayload,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
@@ -28,7 +28,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';

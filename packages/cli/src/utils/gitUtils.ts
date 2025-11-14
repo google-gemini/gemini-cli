@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger } from '@llmcli-core';
 import { execSync } from 'node:child_process';
 import { ProxyAgent } from 'undici';
 

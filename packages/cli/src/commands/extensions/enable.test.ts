@@ -21,14 +21,14 @@ import {
   SettingScope,
   type LoadedSettings,
 } from '../../config/settings.js';
-import { FatalConfigError } from '@google/gemini-cli-core';
+import { FatalConfigError } from '@llmcli-core';
 
 // Mock dependencies
 vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+vi.mock('@llmcli-core', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+    await importOriginal<typeof import('@llmcli-core')>();
   return {
     ...actual,
     debugLogger: {
@@ -58,7 +58,7 @@ describe('extensions enable command', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockDebugLogger = (await import('@google/gemini-cli-core'))
+    mockDebugLogger = (await import('@llmcli-core'))
       .debugLogger as unknown as MockDebugLogger;
     mockLoadSettings.mockReturnValue({
       merged: {},

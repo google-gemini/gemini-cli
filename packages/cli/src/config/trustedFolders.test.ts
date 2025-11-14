@@ -5,7 +5,7 @@
  */
 
 import * as osActual from 'node:os';
-import { FatalConfigError, ideContextStore } from '@google/gemini-cli-core';
+import { FatalConfigError, ideContextStore } from '@llmcli-core';
 import {
   describe,
   it,

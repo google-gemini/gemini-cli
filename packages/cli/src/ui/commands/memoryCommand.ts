@@ -7,7 +7,7 @@
 import {
   getErrorMessage,
   refreshServerHierarchicalMemory,
-} from '@google/gemini-cli-core';
+} from '@llmcli-core';
 import { MessageType } from '../types.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
