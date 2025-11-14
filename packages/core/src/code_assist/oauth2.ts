@@ -26,6 +26,7 @@ import readline from 'node:readline';
 import { Storage } from '../config/storage.js';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
+import wrap from 'wrap-ansi';
 import { debugLogger } from '../utils/debugLogger.js';
 
 const userAccountManager = new UserAccountManager();
@@ -199,10 +200,11 @@ async function initOauthClient(
   } else {
     const webLogin = await authWithWeb(client);
 
+    const terminalWidth = process.stdout?.columns ?? 80;
     debugLogger.log(
       `\n\nCode Assist login required.\n` +
         `Attempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
+        `Otherwise navigate to:\n\n${wrap(webLogin.authUrl, terminalWidth)}\n\n`,
     );
     try {
       // Attempt to open the authentication URL in the default browser.
@@ -278,7 +280,8 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     'Please visit the following URL to authorize the application:',
   );
   debugLogger.log('');
-  debugLogger.log(authUrl);
+  const terminalWidth = process.stdout?.columns ?? 80;
+  debugLogger.log(wrap(authUrl, terminalWidth));
   debugLogger.log('');
 
   const code = await new Promise<string>((resolve) => {
