@@ -52,6 +52,7 @@ const renderComponent = (
         getUseSmartEdit: vi.fn(() => false),
         getUseModelRouter: vi.fn(() => false),
         getProxy: vi.fn(() => undefined),
+        isInteractive: vi.fn(() => false),
 
         // --- Spread test-specific overrides ---
         ...contextValue,

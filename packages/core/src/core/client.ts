@@ -54,6 +54,7 @@ import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -71,8 +72,9 @@ const MAX_TURNS = 100;
 export class GeminiClient {
   private chat?: GeminiChat;
   private readonly generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
+    temperature: 1,
+    topP: 0.95,
+    topK: 64,
   };
   private sessionTurnCount = 0;
 
@@ -519,6 +521,7 @@ export class GeminiClient {
       modelToUse = decision.model;
       // Lock the model for the rest of the sequence
       this.currentSequenceModel = modelToUse;
+      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
 
     const resultStream = turn.run(modelToUse, request, linkedSignal);
@@ -602,37 +605,42 @@ export class GeminiClient {
   }
 
   async generateContent(
+    modelConfigKey: ModelConfigKey,
     contents: Content[],
-    generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
-    model: string,
   ): Promise<GenerateContentResponse> {
-    let currentAttemptModel: string = model;
-
-    const configToUse: GenerateContentConfig = {
-      ...this.generateContentConfig,
-      ...generationConfig,
-    };
+    const desiredModelConfig =
+      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+    let {
+      model: currentAttemptModel,
+      generateContentConfig: currentAttemptGenerateContentConfig,
+    } = desiredModelConfig;
+    const fallbackModelConfig =
+      this.config.modelConfigService.getResolvedConfig({
+        ...modelConfigKey,
+        model: DEFAULT_GEMINI_FLASH_MODEL,
+      });
 
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
 
-      const requestConfig: GenerateContentConfig = {
-        abortSignal,
-        ...configToUse,
-        systemInstruction,
-      };
-
       const apiCall = () => {
-        const modelToUse = this.config.isInFallbackMode()
-          ? DEFAULT_GEMINI_FLASH_MODEL
-          : model;
-        currentAttemptModel = modelToUse;
+        const modelConfigToUse = this.config.isInFallbackMode()
+          ? fallbackModelConfig
+          : desiredModelConfig;
+        currentAttemptModel = modelConfigToUse.model;
+        currentAttemptGenerateContentConfig =
+          modelConfigToUse.generateContentConfig;
+        const requestConfig: GenerateContentConfig = {
+          ...currentAttemptGenerateContentConfig,
+          abortSignal,
+          systemInstruction,
+        };
 
         return this.getContentGeneratorOrFail().generateContent(
           {
-            model: modelToUse,
+            model: currentAttemptModel,
             config: requestConfig,
             contents,
           },
@@ -661,7 +669,7 @@ export class GeminiClient {
         `Error generating content via API with model ${currentAttemptModel}.`,
         {
           requestContents: contents,
-          requestConfig: configToUse,
+          requestConfig: currentAttemptGenerateContentConfig,
         },
         'generateContent-api',
       );

@@ -284,6 +284,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -349,6 +350,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -450,6 +452,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -546,6 +549,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -584,6 +588,7 @@ describe('CoreToolScheduler', () => {
       } as unknown as ToolRegistry;
       const mockConfig = createMockConfig({
         getToolRegistry: () => mockToolRegistry,
+        isInteractive: () => false,
       });
 
       // Create scheduler
@@ -637,6 +642,7 @@ describe('CoreToolScheduler with payload', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -938,6 +944,7 @@ describe('CoreToolScheduler edit cancellation', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1023,6 +1030,7 @@ describe('CoreToolScheduler YOLO mode', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1109,6 +1117,7 @@ describe('CoreToolScheduler request queueing', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1222,6 +1231,7 @@ describe('CoreToolScheduler request queueing', () => {
         terminalWidth: 80,
         terminalHeight: 24,
       }),
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1329,6 +1339,7 @@ describe('CoreToolScheduler request queueing', () => {
         terminalHeight: 24,
       }),
       getToolRegistry: () => toolRegistry,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1385,6 +1396,7 @@ describe('CoreToolScheduler request queueing', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1440,6 +1452,7 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
+      isInteractive: () => false,
     });
 
     const testTool = new TestApprovalTool(mockConfig);
@@ -1611,6 +1624,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1710,6 +1724,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
