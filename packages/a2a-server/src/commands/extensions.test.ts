@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { ExtensionsCommand, ListExtensionsCommand } from './extensions.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { CommandContext } from './types.js';
 
 const mockListExtensions = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -42,14 +42,14 @@ describe('ExtensionsCommand', () => {
 
   it('should default to listing extensions', async () => {
     const command = new ExtensionsCommand();
-    const mockConfig = {} as Config;
+    const mockConfig = { config: {} } as CommandContext;
     const mockExtensions = [{ name: 'ext1' }];
     mockListExtensions.mockReturnValue(mockExtensions);
 
     const result = await command.execute(mockConfig, []);
 
     expect(result).toEqual({ name: 'extensions list', data: mockExtensions });
-    expect(mockListExtensions).toHaveBeenCalledWith(mockConfig);
+    expect(mockListExtensions).toHaveBeenCalledWith(mockConfig.config);
   });
 });
 
@@ -61,19 +61,19 @@ describe('ListExtensionsCommand', () => {
 
   it('should call listExtensions with the provided config', async () => {
     const command = new ListExtensionsCommand();
-    const mockConfig = {} as Config;
+    const mockConfig = { config: {} } as CommandContext;
     const mockExtensions = [{ name: 'ext1' }];
     mockListExtensions.mockReturnValue(mockExtensions);
 
     const result = await command.execute(mockConfig, []);
 
     expect(result).toEqual({ name: 'extensions list', data: mockExtensions });
-    expect(mockListExtensions).toHaveBeenCalledWith(mockConfig);
+    expect(mockListExtensions).toHaveBeenCalledWith(mockConfig.config);
   });
 
   it('should return a message when no extensions are installed', async () => {
     const command = new ListExtensionsCommand();
-    const mockConfig = {} as Config;
+    const mockConfig = { config: {} } as CommandContext;
     mockListExtensions.mockReturnValue([]);
 
     const result = await command.execute(mockConfig, []);
@@ -82,6 +82,6 @@ describe('ListExtensionsCommand', () => {
       name: 'extensions list',
       data: 'No extensions installed.',
     });
-    expect(mockListExtensions).toHaveBeenCalledWith(mockConfig);
+    expect(mockListExtensions).toHaveBeenCalledWith(mockConfig.config);
   });
 });
