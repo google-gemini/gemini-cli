@@ -451,7 +451,7 @@ describe('startInteractiveUI', () => {
   const mockConfig = {
     getProjectRoot: () => '/root',
     getScreenReader: () => false,
-  } as Config;
+  } as unknown as Config;
   const mockSettings = {
     merged: {
       ui: {
@@ -474,8 +474,9 @@ describe('startInteractiveUI', () => {
 
   vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
     detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve(true)),
+    isKittyProtocolSupported: vi.fn(() => true),
+    isKittyProtocolEnabled: vi.fn(() => true),
   }));
-
   vi.mock('./ui/utils/updateCheck.js', () => ({
     checkForUpdates: vi.fn(() => Promise.resolve(null)),
   }));
@@ -529,7 +530,9 @@ describe('startInteractiveUI', () => {
 
     // Verify render options
     expect(options).toEqual({
+      alternateBuffer: true,
       exitOnCtrlC: false,
+      incrementalRendering: true,
       isScreenReaderEnabled: false,
       onRender: expect.any(Function),
     });
