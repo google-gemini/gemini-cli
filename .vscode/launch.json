@@ -12,7 +12,7 @@
       "runtimeArgs": ["run", "build-and-start"],
       "skipFiles": ["<node_internals>/**"],
       "cwd": "${workspaceFolder}",
-      "console": "internalConsole",
+      "console": "integratedTerminal",
       "env": {
         "GEMINI_SANDBOX": "false"
       }
