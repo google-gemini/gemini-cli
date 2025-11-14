@@ -5,13 +5,14 @@
  */
 
 import { describe, it, expect, vi, type MockInstance, type Mock } from 'vitest';
-import { handleInstall, installCommand } from './install.js';
+import { installCommand, handleInstall } from './install.js';
 import yargs from 'yargs';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import type { ExtensionManager } from '../../config/extension-manager.js';
 import type { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import type * as fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
+import * as extension from '../../config/extension.js';
 
 const mockInstallOrUpdateExtension: Mock<
   typeof ExtensionManager.prototype.installOrUpdateExtension
@@ -53,6 +54,15 @@ describe('extensions install command', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() => validationParser.parse('install')).toThrow(
       'Not enough non-option arguments: got 0, need at least 1',
+    );
+  });
+
+  it('should fail if both git source and local path are provided', () => {
+    const validationParser = yargs([]).command(installCommand).fail(false);
+    expect(() =>
+      validationParser.parse('install --source some-url --path /some/path'),
+    ).toThrow(
+      'Arguments --source and --path are mutually exclusive. Please provide only one.',
     );
   });
 });
@@ -166,5 +176,24 @@ describe('handleInstall', () => {
 
     expect(debugErrorSpy).toHaveBeenCalledWith('Install extension failed');
     expect(processSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('extensions install with org/repo', () => {
+  it('should call installExtension with the correct git URL', async () => {
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const installExtensionSpy = vi
+      .spyOn(extension, 'installExtension')
+      .mockResolvedValue('test-extension');
+
+    await handleInstall({ source: 'test-org/test-repo' });
+
+    expect(installExtensionSpy).toHaveBeenCalledWith({
+      source: 'https://github.com/test-org/test-repo.git',
+      type: 'git',
+    });
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "test-extension" installed successfully and enabled.',
+    );
   });
 });
