@@ -154,10 +154,9 @@ Slash commands provide meta-level control over the CLI itself.
     edits made by a tool. If run without a tool call ID, it will list available
     checkpoints to restore from.
   - **Usage:** `/restore [tool_call_id]`
-  - **Note:** Only available if checkpointing is enabled via
-    [settings](../get-started/configuration.md). See the
-    [Checkpointing documentation](../cli/checkpointing.md) for more details on
-    how to enable and use this feature.
+  - **Note:** Only available if checkpointing is configured via
+    [settings](../get-started/configuration.md). See
+    [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
 - **`/settings`**
   - **Description:** Open the settings editor to view and modify Gemini CLI

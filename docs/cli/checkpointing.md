@@ -44,10 +44,7 @@ your `settings.json` file.
 > 0.11.0. Checkpointing can now only be enabled through the `settings.json`
 > configuration file.
 
-### Using the `settings.json` File
-
-To enable checkpointing for all sessions, edit your `settings.json` file and add
-the following configuration:
+Add the following key to your `settings.json`:
 
 ```json
 {
