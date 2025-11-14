@@ -29,7 +29,7 @@ export class ModelInfoService {
     const contents = [{ role: 'user', parts: [{ text: 'Test prompt.' }] }];
     const config = {
       thinkingConfig: {
-        thinkingBudget: 1, // Attempt to use thinking
+        thinkingBudget: 1024, // Attempt to use thinking
       },
     };
 
