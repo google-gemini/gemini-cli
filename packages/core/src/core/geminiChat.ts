@@ -20,7 +20,6 @@ import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
-  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   getEffectiveModel,
@@ -401,15 +400,6 @@ export class GeminiChat {
         modelToUse === PREVIEW_GEMINI_MODEL
       ) {
         modelToUse = DEFAULT_GEMINI_MODEL;
-      }
-
-      if (
-        this.config.getQuotaErrorOccurred() &&
-        modelToUse === DEFAULT_GEMINI_FLASH_MODEL
-      ) {
-        throw new Error(
-          'Please submit a new query to continue with the Flash model.',
-        );
       }
 
       effectiveModel = modelToUse;

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// TODO: change the model name before the release.
-export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview-testing-only';
+export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
 // The external name of the preview model exposed to users.
 export const PREVIEW_GEMINI_MODEL_EXTERNAL_NAME = 'gemini-3-pro';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';

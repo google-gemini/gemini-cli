@@ -55,7 +55,10 @@ export const DialogManager = ({
       <ProQuotaDialog
         failedModel={uiState.proQuotaRequest.failedModel}
         fallbackModel={uiState.proQuotaRequest.fallbackModel}
+        message={uiState.proQuotaRequest.message}
+        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
         onChoice={uiActions.handleProQuotaChoice}
+        userTier={uiState.userTier}
       />
     );
   }
