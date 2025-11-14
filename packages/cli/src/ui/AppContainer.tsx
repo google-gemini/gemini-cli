@@ -893,6 +893,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [selectionWarning, setSelectionWarning] = useState(false);
+  const [pasteTimeoutWarning, setPasteTimeoutWarning] = useState(false);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
@@ -913,9 +914,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
         setSelectionWarning(false);
       }, WARNING_PROMPT_DURATION_MS);
     };
+    const handlePasteTimeout = () => {
+      setPasteTimeoutWarning(true);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        setPasteTimeoutWarning(false);
+      }, WARNING_PROMPT_DURATION_MS);
+    };
     appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
+    appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
     return () => {
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
+      appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -1367,6 +1379,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showDebugProfiler,
       copyModeEnabled,
       selectionWarning,
+      pasteTimeoutWarning,
     }),
     [
       isThemeDialogOpen,
@@ -1453,6 +1466,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       authState,
       copyModeEnabled,
       selectionWarning,
+      pasteTimeoutWarning,
     ],
   );
 

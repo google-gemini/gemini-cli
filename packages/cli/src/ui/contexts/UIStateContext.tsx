@@ -125,6 +125,7 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   selectionWarning: boolean;
+  pasteTimeoutWarning: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
