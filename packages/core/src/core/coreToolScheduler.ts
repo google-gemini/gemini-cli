@@ -181,50 +181,32 @@ export function convertToFunctionResponse(
     return [createFunctionResponsePart(callId, toolName, contentToProcess)];
   }
 
-  if (Array.isArray(contentToProcess)) {
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      'Tool execution succeeded.',
-    );
-    return [functionResponse, ...toParts(contentToProcess)];
-  }
+  // contentToProcess is either a single Part or an array of Parts, so we wrap
+  // everything into a single functionResponse with a 'content' field.
+  const parts = toParts(contentToProcess);
 
-  // After this point, contentToProcess is a single Part object.
-  if (contentToProcess.functionResponse) {
-    if (contentToProcess.functionResponse.response?.['content']) {
+  if (parts.length === 1 && parts[0].functionResponse) {
+    const singlePart = parts[0];
+    if (singlePart.functionResponse?.response?.['content']) {
       const stringifiedOutput =
         getResponseTextFromParts(
-          contentToProcess.functionResponse.response['content'] as Part[],
+          singlePart.functionResponse.response['content'] as Part[],
         ) || '';
       return [createFunctionResponsePart(callId, toolName, stringifiedOutput)];
     }
-    // It's a functionResponse that we should pass through as is.
-    return [contentToProcess];
+    return [singlePart];
   }
 
-  if (contentToProcess.inlineData || contentToProcess.fileData) {
-    const mimeType =
-      contentToProcess.inlineData?.mimeType ||
-      contentToProcess.fileData?.mimeType ||
-      'unknown';
-    const functionResponse = createFunctionResponsePart(
-      callId,
-      toolName,
-      `Binary content of type ${mimeType} was processed.`,
-    );
-    return [functionResponse, contentToProcess];
-  }
-
-  if (contentToProcess.text !== undefined) {
-    return [
-      createFunctionResponsePart(callId, toolName, contentToProcess.text),
-    ];
-  }
-
-  // Default case for other kinds of parts.
   return [
-    createFunctionResponsePart(callId, toolName, 'Tool execution succeeded.'),
+    {
+      functionResponse: {
+        id: callId,
+        name: toolName,
+        response: {
+          content: parts,
+        },
+      },
+    },
   ];
 }
 
