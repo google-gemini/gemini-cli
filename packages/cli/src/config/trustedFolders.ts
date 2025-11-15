@@ -82,7 +82,7 @@ export class LoadedTrustedFolders {
   ): boolean | undefined {
     const configToUse = config ?? this.user.config;
     const trustedPaths: string[] = [];
-    const untrustedPaths: string[] = [];
+    const untrustedPaths: string[] = []; // 1. Segregate rules into trust and distrust lists for prioritized processing.
 
     for (const rule of Object.entries(configToUse).map(
       ([path, trustLevel]) => ({ path, trustLevel }),
@@ -91,33 +91,36 @@ export class LoadedTrustedFolders {
         case TrustLevel.TRUST_FOLDER:
           trustedPaths.push(rule.path);
           break;
-        case TrustLevel.TRUST_PARENT:
+        case TrustLevel.TRUST_PARENT: // TRUST_PARENT applies trust to the parent of the configured path.
           trustedPaths.push(path.dirname(rule.path));
           break;
         case TrustLevel.DO_NOT_TRUST:
           untrustedPaths.push(rule.path);
           break;
-        default:
-          // Do nothing for unknown trust levels.
+        default: // Ignore unknown or invalid trust levels.
           break;
       }
-    }
+    } // This ensures that a specific DO_NOT_TRUST rule always wins
+    // against a more general TRUST_FOLDER rule from a parent.
+    // 2. Check for explicit distrust rules first.
+    for (const untrustedPath of untrustedPaths) {
+      // Distrust is inherited by all children, so we check if the
+      // location is *within* any untrusted path.
+      if (isWithinRoot(location, untrustedPath)) {
+        return false;
+      }
+    } // 3. If no distrust rules matched, check for trust rules.
+    // Trust is applied recursively; if the location is *within* any
+    // configured trusted path, it is considered trusted.
 
     for (const trustedPath of trustedPaths) {
       if (isWithinRoot(location, trustedPath)) {
         return true;
       }
-    }
-
-    for (const untrustedPath of untrustedPaths) {
-      if (path.normalize(location) === path.normalize(untrustedPath)) {
-        return false;
-      }
-    }
+    } // 4. If no rules matched, return undefined to indicate no opinion.
 
     return undefined;
   }
-
   setValue(path: string, trustLevel: TrustLevel): void {
     const originalTrustLevel = this.user.config[path];
     this.user.config[path] = trustLevel;
