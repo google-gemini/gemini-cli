@@ -1,0 +1,11 @@
+{
+  "tools": {
+    "sandbox": false
+  },
+  "telemetry": {
+    "enabled": true,
+    "target": "local",
+    "otlpEndpoint": "",
+    "outfile": "C:\\Users\\start export MA\\gemini-cli\\.integration-tests\\1760283282125\\should-perform-a-read-then-write-sequence\\telemetry.log"
+  }
+}
