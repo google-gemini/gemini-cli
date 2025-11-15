@@ -1,0 +1,154 @@
+.settings-container {
+  display: flex;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+.settings-sidebar {
+  width: 250px;
+  background-color: #252526;
+  padding: 40px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.settings-sidebar h2 {
+  margin-top: 0;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.scope-selector {
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.scope-selector label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.scope-selector select {
+  width: 100%;
+  padding: 8px;
+  background-color: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+}
+
+.settings-sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.settings-sidebar li {
+  padding: 10px 15px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.settings-sidebar li:hover {
+  background-color: #3c3c3c;
+}
+
+.settings-sidebar li.active {
+  background-color: #007acc;
+  color: white;
+}
+
+.close-button {
+  padding: 10px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 10px;
+}
+
+.settings-content {
+  flex-grow: 1;
+  padding: 40px 40px 20px;
+  overflow-y: auto;
+}
+
+.settings-content h3 {
+  margin-top: 0;
+  font-size: 24px;
+  border-bottom: 1px solid #3c3c3c;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.setting-info {
+  flex-grow: 1;
+}
+
+.setting-info label {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.setting-info p {
+  font-size: 14px;
+  color: #a0a0a0;
+  margin: 5px 0 0 0;
+}
+
+.setting-control {
+  min-width: 200px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.setting-control input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+}
+
+.setting-control input[type='number'],
+.setting-control input[type='text'],
+.setting-control select,
+.setting-control textarea {
+  width: 100%;
+  padding: 8px;
+  background-color: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+.setting-control textarea {
+  min-height: 100px;
+  resize: vertical;
+}

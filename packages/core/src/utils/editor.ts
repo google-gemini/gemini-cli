@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import * as os from 'node:os';
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
 
@@ -15,10 +18,11 @@ export type EditorType =
   | 'vim'
   | 'neovim'
   | 'zed'
-  | 'emacs';
+  | 'emacs'
+  | 'GeminiEditor';
 
 function isValidEditorType(editor: string): editor is EditorType {
-  return [
+  const validEditors = [
     'vscode',
     'vscodium',
     'windsurf',
@@ -27,7 +31,11 @@ function isValidEditorType(editor: string): editor is EditorType {
     'neovim',
     'zed',
     'emacs',
-  ].includes(editor);
+  ];
+  if (process.env['GEMINI_CLI_CONTEXT'] === 'electron') {
+    validEditors.push('GeminiEditor');
+  }
+  return validEditors.includes(editor);
 }
 
 interface DiffCommand {
@@ -63,9 +71,13 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  GeminiEditor: { win32: [], default: [] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
+  if (editor === 'GeminiEditor') {
+    return process.env['GEMINI_CLI_CONTEXT'] === 'electron';
+  }
   const commandConfig = editorCommands[editor];
   const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
@@ -156,6 +168,88 @@ export function getDiffCommand(
   }
 }
 
+async function openDiffGeminiEditor(
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
+  const diffId = process.env['GEMINI_SESSION_ID'];
+  if (!diffId) {
+    throw new Error('GEMINI_SESSION_ID environment variable not set.');
+  }
+  const diffDir = path.join(os.homedir(), '.gemini', 'tmp', 'diff', diffId);
+  await fs.mkdir(diffDir, { recursive: true });
+
+  try {
+    const oldContent = await fs.readFile(oldPath, 'utf-8');
+    const newContent = await fs.readFile(newPath, 'utf-8');
+    const fileType = path.extname(newPath);
+
+    await fs.writeFile(path.join(diffDir, `old${fileType}`), oldContent);
+    await fs.writeFile(path.join(diffDir, `new${fileType}`), newContent);
+
+    const meta = { filePath: newPath };
+    await fs.writeFile(path.join(diffDir, 'meta.json'), JSON.stringify(meta));
+
+    // Signal to the Electron app that the files are ready.
+    console.log(`GEMINI_EDITOR_REQUEST:${diffDir}`);
+
+    const responsePath = path.join(diffDir, 'response.json');
+
+    const waitForResponse = (): Promise<{
+      status: 'approve' | 'reject';
+      content?: string;
+    }> =>
+      new Promise((resolve, reject) => {
+        // This timeout is to prevent the process from hanging forever if the GUI doesn't respond.
+        const timeout = setTimeout(() => {
+          clearInterval(interval);
+          reject(new Error('Timeout waiting for editor response.'));
+        }, 300000); // 5 minutes timeout
+
+        const interval = setInterval(async () => {
+          try {
+            await fs.access(responsePath);
+            clearInterval(interval);
+            clearTimeout(timeout);
+            const responseContent = await fs.readFile(responsePath, 'utf-8');
+            const response = JSON.parse(responseContent);
+
+            if (response.status === 'approve') {
+              const updatedContent = await fs.readFile(
+                path.join(diffDir, `new${fileType}`),
+                'utf-8',
+              );
+              resolve({ status: 'approve', content: updatedContent });
+            } else {
+              resolve({ status: 'reject' });
+            }
+          } catch (e) {
+            const error = e as NodeJS.ErrnoException;
+            if (error.code !== 'ENOENT') {
+              clearInterval(interval);
+              clearTimeout(timeout);
+              reject(error);
+            }
+            // else, file not found, continue polling.
+          }
+        }, 500);
+      });
+
+    const response = await waitForResponse();
+
+    if (response.status === 'approve' && response.content) {
+      await fs.writeFile(newPath, response.content);
+    } else if (response.status === 'reject') {
+      // Do nothing, just exit gracefully.
+      return;
+    } else {
+      throw new Error('Changes rejected by user.');
+    }
+  } finally {
+    await fs.rm(diffDir, { recursive: true, force: true });
+  }
+}
+
 /**
  * Opens a diff tool to compare two files.
  * Terminal-based editors by default blocks parent process until the editor exits.
@@ -167,6 +261,23 @@ export async function openDiff(
   editor: EditorType,
   onEditorClose: () => void,
 ): Promise<void> {
+  if (editor === 'GeminiEditor') {
+    if (process.env['GEMINI_CLI_CONTEXT'] === 'electron') {
+      return openDiffGeminiEditor(oldPath, newPath);
+    } else {
+      // Fallback for non-electron environments
+      const fallbackEditor = process.env['EDITOR'] || 'vim';
+      if (isValidEditorType(fallbackEditor)) {
+        return openDiff(oldPath, newPath, fallbackEditor, onEditorClose);
+      } else {
+        console.error(
+          'GeminiEditor is only available in the Electron app. Please configure a different editor.',
+        );
+        return;
+      }
+    }
+  }
+
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
     debugLogger.error('No diff tool available. Install a supported editor.');

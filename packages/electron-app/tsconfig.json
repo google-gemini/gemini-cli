@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "composite": true,
+    "outDir": "dist",
+    "types": ["@testing-library/jest-dom"]
+  },
+  "include": [
+    "src",
+    "src/renderer/src/types/global.d.ts",
+    "vitest.config.ts",
+    "test-setup.ts"
+  ]
+}

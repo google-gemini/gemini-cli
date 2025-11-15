@@ -1,0 +1,49 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  position: fixed;
+  background-color: var(--bg-color);
+  color: var(--fg-color);
+}
+
+.title-bar {
+  height: 30px;
+  background-color: var(--bg-color);
+  color: var(--fg-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  position: relative;
+  user-select: none;
+  border-bottom: 1px solid var(--border-color, #44475a);
+}
+
+.title-bar-text {
+  flex: 1;
+  text-align: center;
+}
+
+.title-bar-controls {
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  display: flex;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}

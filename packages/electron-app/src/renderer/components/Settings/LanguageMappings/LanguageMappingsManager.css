@@ -1,0 +1,51 @@
+.language-mappings-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mappings-list {
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 5px;
+}
+
+.mapping-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px;
+}
+
+.remove-button {
+  background: none;
+  border: none;
+  color: #a0a0a0;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.add-mapping-form {
+  display: flex;
+  gap: 10px;
+}
+
+.add-mapping-form input {
+  flex-grow: 1;
+  padding: 8px;
+  background-color: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+}
+
+.add-mapping-form button {
+  padding: 8px 12px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
