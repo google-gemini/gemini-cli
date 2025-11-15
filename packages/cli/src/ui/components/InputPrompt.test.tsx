@@ -1381,7 +1381,6 @@ describe('InputPrompt', () => {
 
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
-          { kittyProtocolEnabled: true },
         );
         await act(async () => {
           await vi.runAllTimersAsync();
@@ -1436,6 +1435,9 @@ describe('InputPrompt', () => {
   });
 
   describe('enhanced input UX - double ESC clear functionality', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
     it('should clear buffer on second ESC press', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
@@ -1443,22 +1445,40 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
         stdin.write('\x1B');
-        await waitFor(() => {
-          expect(onEscapePromptChange).toHaveBeenCalledWith(false);
-        });
+        vi.advanceTimersByTime(100);
+
+        expect(onEscapePromptChange).toHaveBeenCalledWith(false);
       });
 
       await act(async () => {
         stdin.write('\x1B');
-        await waitFor(() => {
-          expect(props.buffer.setText).toHaveBeenCalledWith('');
-          expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
-        });
+        vi.advanceTimersByTime(100);
+
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should clear buffer on double ESC', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('text to clear');
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B\x1B');
+        vi.advanceTimersByTime(100);
+
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
       });
       unmount();
     });
@@ -1470,7 +1490,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1494,14 +1513,13 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
         stdin.write('\x1B');
-        await waitFor(() =>
-          expect(props.setShellModeActive).toHaveBeenCalledWith(false),
-        );
+        vi.advanceTimersByTime(100);
+
+        expect(props.setShellModeActive).toHaveBeenCalledWith(false);
       });
       unmount();
     });
@@ -1515,26 +1533,23 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
         stdin.write('\x1B');
+
+        vi.advanceTimersByTime(100);
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
       });
-      await waitFor(() =>
-        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled(),
-      );
       unmount();
     });
 
     it('should not call onEscapePromptChange when not provided', async () => {
-      vi.useFakeTimers();
       props.onEscapePromptChange = undefined;
       props.buffer.setText('some text');
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
       await act(async () => {
         await vi.runAllTimersAsync();
@@ -1547,14 +1562,12 @@ describe('InputPrompt', () => {
         await vi.runAllTimersAsync();
       });
 
-      vi.useRealTimers();
       unmount();
     });
 
     it('should not interfere with existing keyboard shortcuts', async () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1619,18 +1632,13 @@ describe('InputPrompt', () => {
     });
 
     it.each([
-      { name: 'standard', kittyProtocolEnabled: false, escapeSequence: '\x1B' },
-      {
-        name: 'kitty',
-        kittyProtocolEnabled: true,
-        escapeSequence: '\u001b[27u',
-      },
+      { name: 'standard', escapeSequence: '\x1B' },
+      { name: 'kitty', escapeSequence: '\u001b[27u' },
     ])(
       'resets reverse search state on Escape ($name)',
-      async ({ kittyProtocolEnabled, escapeSequence }) => {
+      async ({ escapeSequence }) => {
         const { stdin, stdout, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
-          { kittyProtocolEnabled },
         );
 
         await act(async () => {

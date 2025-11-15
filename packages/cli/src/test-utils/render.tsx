@@ -19,6 +19,7 @@ import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
+import { StreamingContext } from '../ui/contexts/StreamingContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
 
@@ -69,6 +70,9 @@ const mockConfig = {
   getTargetDir: () =>
     '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
   getDebugMode: () => false,
+  isTrustedFolder: () => true,
+  getIdeMode: () => false,
+  getEnableInteractiveShell: () => true,
 };
 
 const configProxy = new Proxy(mockConfig, {
@@ -120,17 +124,17 @@ export const renderWithProviders = (
     settings = mockSettings,
     uiState: providedUiState,
     width,
-    kittyProtocolEnabled = true,
     mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
+    useAlternateBuffer,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
-    kittyProtocolEnabled?: boolean;
     mouseEventsEnabled?: boolean;
     config?: Config;
+    useAlternateBuffer?: boolean;
   } = {},
 ): ReturnType<typeof render> => {
   const baseState: UIState = new Proxy(
@@ -152,7 +156,18 @@ export const renderWithProviders = (
   ) as UIState;
 
   const terminalWidth = width ?? baseState.terminalWidth;
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
+  let finalSettings = settings;
+  if (useAlternateBuffer !== undefined) {
+    finalSettings = createMockSettings({
+      ...settings.merged,
+      ui: {
+        ...settings.merged.ui,
+        useAlternateBuffer,
+      },
+    });
+  }
+
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, finalSettings);
 
   const finalUiState = {
     ...baseState,
@@ -162,24 +177,26 @@ export const renderWithProviders = (
 
   return render(
     <ConfigContext.Provider value={config}>
-      <SettingsContext.Provider value={settings}>
+      <SettingsContext.Provider value={finalSettings}>
         <UIStateContext.Provider value={finalUiState}>
-          <VimModeProvider settings={settings}>
+          <VimModeProvider settings={finalSettings}>
             <ShellFocusContext.Provider value={shellFocus}>
-              <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-                <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                  <ScrollProvider>
-                    <Box
-                      width={terminalWidth}
-                      flexShrink={0}
-                      flexGrow={0}
-                      flexDirection="column"
-                    >
-                      {component}
-                    </Box>
-                  </ScrollProvider>
-                </MouseProvider>
-              </KeypressProvider>
+              <StreamingContext.Provider value={finalUiState.streamingState}>
+                <KeypressProvider>
+                  <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                    <ScrollProvider>
+                      <Box
+                        width={terminalWidth}
+                        flexShrink={0}
+                        flexGrow={0}
+                        flexDirection="column"
+                      >
+                        {component}
+                      </Box>
+                    </ScrollProvider>
+                  </MouseProvider>
+                </KeypressProvider>
+              </StreamingContext.Provider>
             </ShellFocusContext.Provider>
           </VimModeProvider>
         </UIStateContext.Provider>

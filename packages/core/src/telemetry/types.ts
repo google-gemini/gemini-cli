@@ -161,6 +161,19 @@ export class EndSessionEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.session_id = config?.getSessionId();
   }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': this['event.name'],
+      'event.timestamp': this['event.timestamp'],
+      session_id: this.session_id,
+    };
+  }
+
+  toLogBody(): string {
+    return 'Session ended.';
+  }
 }
 
 export const EVENT_USER_PROMPT = 'gemini_cli.user_prompt';
@@ -299,7 +312,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         }
       }
     } else {
-      this.function_name = function_name!;
+      this.function_name = function_name as string;
       this.function_args = function_args!;
       this.duration_ms = duration_ms!;
       this.success = success!;
@@ -695,26 +708,38 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
   'event.timestamp': string;
   loop_type: LoopType;
   prompt_id: string;
+  confirmed_by_model?: string;
 
-  constructor(loop_type: LoopType, prompt_id: string) {
+  constructor(
+    loop_type: LoopType,
+    prompt_id: string,
+    confirmed_by_model?: string,
+  ) {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
     this.prompt_id = prompt_id;
+    this.confirmed_by_model = confirmed_by_model;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': this['event.name'],
       'event.timestamp': this['event.timestamp'],
       loop_type: this.loop_type,
       prompt_id: this.prompt_id,
     };
+
+    if (this.confirmed_by_model) {
+      attributes['confirmed_by_model'] = this.confirmed_by_model;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {
-    return `Loop detected. Type: ${this.loop_type}.`;
+    return `Loop detected. Type: ${this.loop_type}.${this.confirmed_by_model ? ` Confirmed by: ${this.confirmed_by_model}` : ''}`;
   }
 }
 
@@ -946,34 +971,6 @@ export class ConversationFinishedEvent {
 
   toLogBody(): string {
     return `Conversation finished.`;
-  }
-}
-
-export class KittySequenceOverflowEvent {
-  'event.name': 'kitty_sequence_overflow';
-  'event.timestamp': string; // ISO 8601
-  sequence_length: number;
-  truncated_sequence: string;
-  constructor(sequence_length: number, truncated_sequence: string) {
-    this['event.name'] = 'kitty_sequence_overflow';
-    this['event.timestamp'] = new Date().toISOString();
-    this.sequence_length = sequence_length;
-    // Truncate to first 20 chars for logging (avoid logging sensitive data)
-    this.truncated_sequence = truncated_sequence.substring(0, 20);
-  }
-
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
-      ...getCommonAttributes(config),
-      'event.name': this['event.name'],
-      'event.timestamp': this['event.timestamp'],
-      sequence_length: this.sequence_length,
-      truncated_sequence: this.truncated_sequence,
-    };
-  }
-
-  toLogBody(): string {
-    return `Kitty sequence buffer overflow: ${this.sequence_length} bytes`;
   }
 }
 
@@ -1432,6 +1429,48 @@ export class ModelSlashCommandEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_LLM_LOOP_CHECK = 'gemini_cli.llm_loop_check';
+export class LlmLoopCheckEvent implements BaseTelemetryEvent {
+  'event.name': 'llm_loop_check';
+  'event.timestamp': string;
+  prompt_id: string;
+  flash_confidence: number;
+  main_model: string;
+  main_model_confidence: number;
+
+  constructor(
+    prompt_id: string,
+    flash_confidence: number,
+    main_model: string,
+    main_model_confidence: number,
+  ) {
+    this['event.name'] = 'llm_loop_check';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.flash_confidence = flash_confidence;
+    this.main_model = main_model;
+    this.main_model_confidence = main_model_confidence;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_LLM_LOOP_CHECK,
+      'event.timestamp': this['event.timestamp'],
+      prompt_id: this.prompt_id,
+      flash_confidence: this.flash_confidence,
+      main_model: this.main_model,
+      main_model_confidence: this.main_model_confidence,
+    };
+  }
+
+  toLogBody(): string {
+    return this.main_model_confidence === -1
+      ? `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) check skipped`
+      : `LLM loop check. Flash confidence: ${this.flash_confidence.toFixed(2)}. Main model (${this.main_model}) confidence: ${this.main_model_confidence.toFixed(2)}`;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -1444,7 +1483,6 @@ export type TelemetryEvent =
   | LoopDetectedEvent
   | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
   | ConversationFinishedEvent
@@ -1462,6 +1500,7 @@ export type TelemetryEvent =
   | AgentStartEvent
   | AgentFinishEvent
   | RecoveryAttemptEvent
+  | LlmLoopCheckEvent
   | WebFetchFallbackAttemptEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
