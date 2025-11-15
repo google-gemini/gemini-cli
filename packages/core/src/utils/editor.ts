@@ -15,6 +15,7 @@ export type EditorType =
   | 'vim'
   | 'neovim'
   | 'zed'
+  | 'vscodeinsiders'
   | 'emacs';
 
 function isValidEditorType(editor: string): editor is EditorType {
@@ -26,6 +27,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'vim',
     'neovim',
     'zed',
+    'vscodeinsiders',
     'emacs',
   ].includes(editor);
 }
@@ -56,6 +58,7 @@ const editorCommands: Record<
   { win32: string[]; default: string[] }
 > = {
   vscode: { win32: ['code.cmd'], default: ['code'] },
+  vscodeinsiders: { win32: ['code-insiders.cmd'], default: ['code-insiders'] },
   vscodium: { win32: ['codium.cmd'], default: ['codium'] },
   windsurf: { win32: ['windsurf'], default: ['windsurf'] },
   cursor: { win32: ['cursor'], default: ['cursor'] },
@@ -74,7 +77,7 @@ export function checkHasEditorType(editor: EditorType): boolean {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
-  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (['vscode','vscodeinsiders', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
@@ -112,6 +115,7 @@ export function getDiffCommand(
 
   switch (editor) {
     case 'vscode':
+    case 'vscodeinsiders': // Add this line
     case 'vscodium':
     case 'windsurf':
     case 'cursor':
