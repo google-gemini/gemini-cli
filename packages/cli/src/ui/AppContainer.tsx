@@ -105,11 +105,13 @@ import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
+import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
+import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 
-const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
+const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
@@ -161,6 +163,9 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
   const [showDebugProfiler, setShowDebugProfiler] = useState(false);
+  const [customDialog, setCustomDialog] = useState<React.ReactNode | null>(
+    null,
+  );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
@@ -169,7 +174,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
-    config.isTrustedFolder(),
+    isWorkspaceTrusted(settings.merged).isTrusted,
   );
 
   const [queueErrorMessage, setQueueErrorMessage] = useState<string | null>(
@@ -196,14 +201,20 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [permissionsDialogProps, setPermissionsDialogProps] = useState<{
+    targetDirectory?: string;
+  } | null>(null);
   const openPermissionsDialog = useCallback(
-    () => setPermissionsDialogOpen(true),
+    (props?: { targetDirectory?: string }) => {
+      setPermissionsDialogOpen(true);
+      setPermissionsDialogProps(props ?? null);
+    },
     [],
   );
-  const closePermissionsDialog = useCallback(
-    () => setPermissionsDialogOpen(false),
-    [],
-  );
+  const closePermissionsDialog = useCallback(() => {
+    setPermissionsDialogOpen(false);
+    setPermissionsDialogProps(null);
+  }, []);
 
   const [mcpSamplingRequest, setMcpSamplingRequest] = useState<{
     serverName: string;
@@ -616,6 +627,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     slashCommandActions,
     extensionsUpdateStateInternal,
     isConfigInitialized,
+    setCustomDialog,
   );
 
   const performMemoryRefresh = useCallback(async () => {
@@ -765,9 +777,16 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();
     clearConsoleMessagesState();
-    console.clear();
+    if (!isAlternateBuffer) {
+      console.clear();
+    }
     refreshStatic();
-  }, [historyManager, clearConsoleMessagesState, refreshStatic]);
+  }, [
+    historyManager,
+    clearConsoleMessagesState,
+    refreshStatic,
+    isAlternateBuffer,
+  ]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
@@ -916,6 +935,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
+  const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
@@ -924,6 +944,38 @@ Logging in with Google... Please restart Gemini CLI to continue.
     restartReason: ideTrustRestartReason,
   } = useIdeTrustListener();
   const isInitialMount = useRef(true);
+
+  useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const handleWarning = (message: string) => {
+      setWarningMessage(message);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        setWarningMessage(null);
+      }, WARNING_PROMPT_DURATION_MS);
+    };
+
+    const handleSelectionWarning = () => {
+      handleWarning('Press Ctrl-S to enter selection mode to copy text.');
+    };
+    const handlePasteTimeout = () => {
+      handleWarning('Paste Timed out. Possibly due to slow connection.');
+    };
+    appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
+    appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+    return () => {
+      appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
+      appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (ideNeedsRestart) {
@@ -1000,7 +1052,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ctrlCTimerRef.current = setTimeout(() => {
         setCtrlCPressCount(0);
         ctrlCTimerRef.current = null;
-      }, CTRL_EXIT_PROMPT_DURATION_MS);
+      }, WARNING_PROMPT_DURATION_MS);
     }
   }, [ctrlCPressCount, config, setCtrlCPressCount, handleSlashCommand]);
 
@@ -1018,7 +1070,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ctrlDTimerRef.current = setTimeout(() => {
         setCtrlDPressCount(0);
         ctrlDTimerRef.current = null;
-      }, CTRL_EXIT_PROMPT_DURATION_MS);
+      }, WARNING_PROMPT_DURATION_MS);
     }
   }, [ctrlDPressCount, config, setCtrlDPressCount, handleSlashCommand]);
 
@@ -1250,6 +1302,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
     !!confirmationRequest ||
+    !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
@@ -1305,6 +1358,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
+      permissionsDialogProps,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1370,8 +1424,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
       embeddedShellFocused,
       showDebugProfiler,
       authState,
+      customDialog,
       copyModeEnabled,
       mcpSamplingRequest,
+      warningMessage,
     }),
     [
       isThemeDialogOpen,
@@ -1389,6 +1445,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
+      permissionsDialogProps,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1454,10 +1511,12 @@ Logging in with Google... Please restart Gemini CLI to continue.
       historyManager,
       embeddedShellFocused,
       showDebugProfiler,
+      customDialog,
       apiKeyDefaultValue,
       authState,
       copyModeEnabled,
       mcpSamplingRequest,
+      warningMessage,
     ],
   );
 
@@ -1479,6 +1538,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openPermissionsDialog,
       closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,
@@ -1507,6 +1567,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openPermissionsDialog,
       closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,

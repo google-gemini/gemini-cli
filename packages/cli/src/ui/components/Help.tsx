@@ -138,6 +138,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+S
+      </Text>{' '}
+      - Enter selection mode to copy text
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
       </Text>{' '}
       - Open input in external editor
@@ -159,6 +165,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
         Esc
       </Text>{' '}
       - Cancel operation / Clear input (double press)
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Page Up/Down
+      </Text>{' '}
+      - Scroll page up/down
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>

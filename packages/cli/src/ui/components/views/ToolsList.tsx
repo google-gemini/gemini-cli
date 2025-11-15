@@ -32,8 +32,7 @@ export const ToolsList: React.FC<ToolsListProps> = ({
           <Text color={theme.text.primary}>{'  '}- </Text>
           <Box flexDirection="column">
             <Text bold color={theme.text.accent}>
-              {tool.displayName}
-              {showDescriptions ? ` (${tool.name})` : ''}
+              {tool.displayName} ({tool.name})
             </Text>
             {showDescriptions && tool.description && (
               <MarkdownDisplay

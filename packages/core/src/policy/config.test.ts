@@ -9,7 +9,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import nodePath from 'node:path';
 
 import type { PolicySettings } from './types.js';
-import { ApprovalMode, PolicyDecision } from './types.js';
+import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 
 import { Storage } from '../config/storage.js';
 
@@ -638,6 +638,194 @@ priority = 150
     expect(rule?.argsPattern?.test('{"command":"git log"}')).toBe(true);
     expect(rule?.argsPattern?.test('{"command":"git commit"}')).toBe(false);
     expect(rule?.argsPattern?.test('{"command":"git push"}')).toBe(false);
+
+    vi.doUnmock('node:fs/promises');
+  });
+
+  it('should load safety_checker configuration from TOML', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const mockReaddir = vi.fn(
+      async (
+        path: string | Buffer | URL,
+        options?: Parameters<typeof actualFs.readdir>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return [
+            {
+              name: 'safety.toml',
+              isFile: () => true,
+              isDirectory: () => false,
+            },
+          ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
+        }
+        return actualFs.readdir(
+          path,
+          options as Parameters<typeof actualFs.readdir>[1],
+        );
+      },
+    );
+
+    const mockReadFile = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.readFile>[0],
+        options: Parameters<typeof actualFs.readFile>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies/safety.toml'))
+        ) {
+          return `
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 10
+
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 10
+
+[[safety_checker]]
+toolName = "write_file"
+priority = 10
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
+[safety_checker.checker.config]
+`;
+        }
+        return actualFs.readFile(path, options);
+      },
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      readFile: mockReadFile,
+      readdir: mockReaddir,
+    }));
+
+    vi.resetModules();
+    const { createPolicyEngineConfig } = await import('./config.js');
+
+    const settings: PolicySettings = {};
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.DEFAULT,
+      '/tmp/mock/default/policies',
+    );
+
+    const rule = config.rules?.find(
+      (r) => r.toolName === 'write_file' && r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeDefined();
+
+    const checker = config.checkers?.find(
+      (c) => c.toolName === 'write_file' && c.checker.type === 'in-process',
+    );
+    expect(checker).toBeDefined();
+    expect(checker?.checker.type).toBe('in-process');
+    expect(checker?.checker.name).toBe(InProcessCheckerType.ALLOWED_PATH);
+    expect(checker?.checker.required_context).toEqual(['environment']);
+
+    vi.doUnmock('node:fs/promises');
+  });
+
+  it('should reject invalid in-process checker names', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const mockReaddir = vi.fn(
+      async (
+        path: string | Buffer | URL,
+        options?: Parameters<typeof actualFs.readdir>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return [
+            {
+              name: 'invalid_safety.toml',
+              isFile: () => true,
+              isDirectory: () => false,
+            },
+          ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
+        }
+        return actualFs.readdir(
+          path,
+          options as Parameters<typeof actualFs.readdir>[1],
+        );
+      },
+    );
+
+    const mockReadFile = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.readFile>[0],
+        options: Parameters<typeof actualFs.readFile>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(
+              nodePath.normalize('.gemini/policies/invalid_safety.toml'),
+            )
+        ) {
+          return `
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 10
+
+[[safety_checker]]
+toolName = "write_file"
+priority = 10
+[safety_checker.checker]
+type = "in-process"
+name = "invalid-name"
+`;
+        }
+        return actualFs.readFile(path, options);
+      },
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      readFile: mockReadFile,
+      readdir: mockReaddir,
+    }));
+
+    vi.resetModules();
+    const { createPolicyEngineConfig } = await import('./config.js');
+
+    const settings: PolicySettings = {};
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.DEFAULT,
+      '/tmp/mock/default/policies',
+    );
+
+    // The rule should be rejected because 'invalid-name' is not in the enum
+    const rule = config.rules?.find((r) => r.toolName === 'write_file');
+    expect(rule).toBeUndefined();
 
     vi.doUnmock('node:fs/promises');
   });

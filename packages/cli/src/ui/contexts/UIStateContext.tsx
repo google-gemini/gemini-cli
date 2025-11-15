@@ -14,6 +14,7 @@ import type {
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
+  AuthState,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -65,6 +66,7 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isModelDialogOpen: boolean;
   isPermissionsDialogOpen: boolean;
+  permissionsDialogProps: { targetDirectory?: string } | null;
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
@@ -132,6 +134,9 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   mcpSamplingRequest: McpSamplingRequest | null;
+  warningMessage: string | null;
+  customDialog: React.ReactNode | null;
+  authState: AuthState;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

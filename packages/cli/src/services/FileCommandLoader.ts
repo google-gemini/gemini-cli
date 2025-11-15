@@ -85,6 +85,10 @@ export class FileCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of all loaded SlashCommands.
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
+    if (this.folderTrustEnabled && !this.isTrustedFolder) {
+      return [];
+    }
+
     const allCommands: SlashCommand[] = [];
     const globOptions = {
       nodir: true,
@@ -102,10 +106,6 @@ export class FileCommandLoader implements ICommandLoader {
           cwd: dirInfo.path,
         });
 
-        if (this.folderTrustEnabled && !this.isTrustedFolder) {
-          return [];
-        }
-
         const commandPromises = files.map((file) =>
           this.parseAndAdaptFile(
             path.join(dirInfo.path, file),
@@ -122,7 +122,10 @@ export class FileCommandLoader implements ICommandLoader {
         // Add all commands without deduplication
         allCommands.push(...commands);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        if (
+          !signal.aborted &&
+          (error as { code?: string })?.code !== 'ENOENT'
+        ) {
           console.error(
             `[FileCommandLoader] Error loading commands from ${dirInfo.path}:`,
             error,

@@ -19,7 +19,7 @@ export interface ListExperimentsResponse {
 }
 
 export interface Flag {
-  name?: string;
+  flagId?: number;
   boolValue?: boolean;
   floatValue?: number;
   intValue?: string; // int64

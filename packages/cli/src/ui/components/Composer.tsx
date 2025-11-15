@@ -99,6 +99,8 @@ export const Composer = () => {
             <Text color={theme.status.warning}>
               Press Ctrl+C again to exit.
             </Text>
+          ) : uiState.warningMessage ? (
+            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
           ) : uiState.ctrlDPressedOnce ? (
             <Text color={theme.status.warning}>
               Press Ctrl+D again to exit.

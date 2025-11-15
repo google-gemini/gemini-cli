@@ -298,7 +298,7 @@ describe('loggers', () => {
       const event = new UserPromptEvent(
         11,
         'prompt-id-9',
-        AuthType.CLOUD_SHELL,
+        AuthType.COMPUTE_ADC,
         'test-prompt',
       );
 
@@ -315,7 +315,7 @@ describe('loggers', () => {
           interactive: false,
           prompt_length: 11,
           prompt_id: 'prompt-id-9',
-          auth_type: 'cloud-shell',
+          auth_type: 'compute-default-credentials',
         },
       });
     });

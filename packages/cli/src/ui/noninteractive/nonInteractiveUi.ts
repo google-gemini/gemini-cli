@@ -27,5 +27,6 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     extensionsUpdateState: new Map(),
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
     addConfirmUpdateExtensionRequest: (_request) => {},
+    removeComponent: () => {},
   };
 }

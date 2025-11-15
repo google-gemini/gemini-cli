@@ -36,6 +36,11 @@ decision = "allow"
 priority = 15
 modes = ["autoEdit"]
 
+[rule.safety_checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
+
 [[rule]]
 toolName = "save_memory"
 decision = "ask_user"
@@ -56,6 +61,11 @@ toolName = "write_file"
 decision = "allow"
 priority = 15
 modes = ["autoEdit"]
+
+[rule.safety_checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
 
 [[rule]]
 toolName = "web_fetch"

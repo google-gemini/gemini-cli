@@ -8,12 +8,16 @@ import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { Header } from './Header.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
-import { longAsciiLogo } from './AsciiArt.js';
+import { longAsciiLogo, longAsciiLogoIde } from './AsciiArt.js';
 import * as semanticColors from '../semantic-colors.js';
+import * as terminalSetup from '../utils/terminalSetup.js';
 import { Text } from 'ink';
 import type React from 'react';
 
 vi.mock('../hooks/useTerminalSize.js');
+vi.mock('../utils/terminalSetup.js', () => ({
+  getTerminalProgram: vi.fn(),
+}));
 vi.mock('ink-gradient', () => {
   const MockGradient = ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -34,6 +38,7 @@ vi.mock('ink', async () => {
 describe('<Header />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue(null);
   });
 
   it('renders the long logo on a wide terminal', () => {
@@ -50,8 +55,38 @@ describe('<Header />', () => {
     );
   });
 
+  it('uses the IDE logo when running in an IDE', () => {
+    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+      columns: 120,
+      rows: 20,
+    });
+    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
+
+    render(<Header version="1.0.0" nightly={false} />);
+    expect(Text).toHaveBeenCalledWith(
+      expect.objectContaining({
+        children: longAsciiLogoIde,
+      }),
+      undefined,
+    );
+  });
+
   it('renders custom ASCII art when provided', () => {
     const customArt = 'CUSTOM ART';
+    render(
+      <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
+    );
+    expect(Text).toHaveBeenCalledWith(
+      expect.objectContaining({
+        children: customArt,
+      }),
+      undefined,
+    );
+  });
+
+  it('renders custom ASCII art as is when running in an IDE', () => {
+    const customArt = 'CUSTOM ART';
+    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
     render(
       <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
     );

@@ -50,11 +50,19 @@ export function AuthDialog({
       ? [
           {
             label: 'Use Cloud Shell user credentials',
-            value: AuthType.CLOUD_SHELL,
-            key: AuthType.CLOUD_SHELL,
+            value: AuthType.COMPUTE_ADC,
+            key: AuthType.COMPUTE_ADC,
           },
         ]
-      : []),
+      : process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+        ? [
+            {
+              label: 'Use metadata server application default credentials',
+              value: AuthType.COMPUTE_ADC,
+              key: AuthType.COMPUTE_ADC,
+            },
+          ]
+        : []),
     {
       label: 'Use Gemini API Key',
       value: AuthType.USE_GEMINI,
