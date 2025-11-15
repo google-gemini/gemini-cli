@@ -417,6 +417,7 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
@@ -431,10 +432,9 @@ export class Config {
     this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
-    this.workspaceContext = new WorkspaceContext(
-      this.targetDir,
-      params.includeDirectories ?? [],
-    );
+    this.folderTrust = params.folderTrust ?? false;
+    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+    this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
 
@@ -931,6 +931,14 @@ export class Config {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getPendingIncludeDirectories(): string[] {
+    return this.pendingIncludeDirectories;
+  }
+
+  clearPendingIncludeDirectories(): void {
+    this.pendingIncludeDirectories = [];
   }
 
   getShowMemoryUsage(): boolean {
