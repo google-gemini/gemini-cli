@@ -141,22 +141,21 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   const length = comprehensiveHistory.length;
   let i = 0;
   while (i < length) {
-    if (comprehensiveHistory[i].role === 'user') {
-      curatedHistory.push(comprehensiveHistory[i]);
+    const currentContent = comprehensiveHistory[i];
+    if (currentContent.role === 'user') {
+      curatedHistory.push(currentContent);
+      i++;
+    } else if (currentContent.role === 'model') {
+      // Process model turns one by one
+      // Only add the model content if it's valid
+      if (isValidContent(currentContent)) {
+        curatedHistory.push(currentContent);
+      }
+      // Always advance to the next item, even if invalid.
       i++;
     } else {
-      const modelOutput: Content[] = [];
-      let isValid = true;
-      while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
-          isValid = false;
-        }
-        i++;
-      }
-      if (isValid) {
-        curatedHistory.push(...modelOutput);
-      }
+      // Should not happen based on validateHistory, but advance anyway
+      i++;
     }
   }
   return curatedHistory;
@@ -576,25 +575,23 @@ export class GeminiChat {
       });
     }
 
-    // Stream validation logic: A stream is considered successful if:
-    // 1. There's a tool call OR
-    // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
-    //
-    // We throw an error only when there's no tool call AND:
-    // - No finish reason, OR
-    // - MALFORMED_FUNCTION_CALL finish reason OR
-    // - Empty response text (e.g., only thoughts with no actual content)
+    // Stream validation logic:
+    // 1. A malformed function call is *always* a retryable error,
+    //    even if other tool call parts were received.
+    if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
+      throw new InvalidStreamError(
+        'Model stream ended with malformed function call.',
+        'MALFORMED_FUNCTION_CALL',
+      );
+    }
+
+    // 2. If no tool call was present, we must have a valid finish
+    //    reason and non-empty response text.
     if (!hasToolCall) {
       if (!finishReason) {
         throw new InvalidStreamError(
           'Model stream ended without a finish reason.',
           'NO_FINISH_REASON',
-        );
-      }
-      if (finishReason === FinishReason.MALFORMED_FUNCTION_CALL) {
-        throw new InvalidStreamError(
-          'Model stream ended with malformed function call.',
-          'MALFORMED_FUNCTION_CALL',
         );
       }
       if (!responseText) {
@@ -605,13 +602,12 @@ export class GeminiChat {
       }
     }
 
+    // 3. If validation passed, add the consolidated parts to history.
     this.history.push({ role: 'model', parts: consolidatedParts });
   }
-
-  getLastPromptTokenCount(): number {
+   getLastPromptTokenCount(): number {
     return this.lastPromptTokenCount;
-  }
-
+   }
   /**
    * Gets the chat recording service instance.
    */
