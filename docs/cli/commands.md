@@ -33,8 +33,6 @@ Slash commands provide meta-level control over the CLI itself.
         - **Behavior:** Chats are saved into a project-specific directory,
           determined by where you run the CLI. Consequently, saved chats are
           only accessible when working within that same project.
-        - When you run `/chat list`, the CLI only scans these specific
-          directories to find available checkpoints.
         - **Note:** These checkpoints are for manually saving and resuming
           conversation states. For automatic checkpoints created before file
           modifications, see the
