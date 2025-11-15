@@ -155,7 +155,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
           </Text>
           <Text color={theme.text.primary}>
             Trusting a folder allows Gemini to read and perform auto-edits when
-            in auto-approval modes. This is a security feature to prevent
+            in auto-approval mode. This is a security feature to prevent
             accidental execution in untrusted directories.
           </Text>
         </Box>
