@@ -2452,3 +2452,37 @@ describe('Telemetry configuration via environment variables', () => {
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
 });
+
+describe('GitHub Workflow Name configuration', () => {
+  beforeEach(() => {
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('should capture GH_WORKFLOW_NAME from environment variable', async () => {
+    vi.stubEnv('GH_WORKFLOW_NAME', 'ci-build-and-test');
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getGhWorkflowName()).toBe('ci-build-and-test');
+  });
+
+  it('should be undefined when GH_WORKFLOW_NAME is not set', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getGhWorkflowName()).toBeUndefined();
+  });
+
+  it('should handle empty GH_WORKFLOW_NAME', async () => {
+    vi.stubEnv('GH_WORKFLOW_NAME', '');
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, 'test-session', argv);
+    expect(config.getGhWorkflowName()).toBe('');
+  });
+});
