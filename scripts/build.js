@@ -30,9 +30,27 @@ if (!existsSync(join(root, 'node_modules'))) {
   execSync('npm install', { stdio: 'inherit', cwd: root });
 }
 
+const workspaces = [
+  '@google/gemini-cli-test-utils',
+  '@google/gemini-cli-core',
+  '@google/gemini-cli-a2a-server',
+  '@google/gemini-cli',
+  'gemini-cli-vscode-ide-companion',
+];
+
+function buildWorkspace(workspace) {
+  console.log(`Building ${workspace}...`);
+  execSync(`npm run build --workspace ${workspace}`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
+}
+
 // build all workspaces/packages
 execSync('npm run generate', { stdio: 'inherit', cwd: root });
-execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
+for (const workspace of workspaces) {
+  buildWorkspace(workspace);
+}
 
 // also build container image if sandboxing is enabled
 // skip (-s) npm install + build since we did that above
