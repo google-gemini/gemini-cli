@@ -1,5 +1,7 @@
 ## Summary
 
+**IMPORTANT**: Before submitting your PR, please review our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).
+
 <!-- Concisely describe what this PR changes and why. Focus on impact and
 urgency. -->
 
