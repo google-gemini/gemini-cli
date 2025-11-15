@@ -1407,6 +1407,31 @@ export class Config {
       }
     }
 
+    // Register all other agents (including user-defined) as tools
+    const allAgents = this.agentRegistry.getAllDefinitions();
+    const excludeTools = this.getExcludeTools() || [];
+    const allowedTools = this.getAllowedTools();
+    const messageBusEnabled = this.getEnableMessageBusIntegration();
+
+    for (const agentDef of allAgents) {
+      // Skip codebase_investigator as it's already registered above
+      if (agentDef.name === 'codebase_investigator') {
+        continue;
+      }
+
+      const isExcluded = excludeTools.includes(agentDef.name);
+      const isAllowed = !allowedTools || allowedTools.includes(agentDef.name);
+
+      if (isAllowed && !isExcluded) {
+        const wrapper = new SubagentToolWrapper(
+          agentDef,
+          this,
+          messageBusEnabled ? this.getMessageBus() : undefined,
+        );
+        registry.registerTool(wrapper);
+      }
+    }
+
     await registry.discoverAllTools();
     registry.sortTools();
     return registry;
