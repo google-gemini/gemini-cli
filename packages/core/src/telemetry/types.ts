@@ -1500,6 +1500,8 @@ export type TelemetryEvent =
   | AgentStartEvent
   | AgentFinishEvent
   | RecoveryAttemptEvent
+  | WebFetchFallbackAttemptEvent
+  | UserPositiveFeedbackEvent;
   | LlmLoopCheckEvent
   | WebFetchFallbackAttemptEvent;
 
@@ -1735,5 +1737,34 @@ export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Web fetch fallback attempt. Reason: ${this.reason}`;
+  }
+}
+
+export const EVENT_USER_POSITIVE_FEEDBACK = 'gemini_cli.user_positive_feedback';
+export class UserPositiveFeedbackEvent implements BaseTelemetryEvent {
+  'event.name': 'user_positive_feedback';
+  'event.timestamp': string;
+  prompt_id: string;
+  feedback_type: 'positive';
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'user_positive_feedback';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+    this.feedback_type = 'positive';
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_USER_POSITIVE_FEEDBACK,
+      'event.timestamp': this['event.timestamp'],
+      prompt_id: this.prompt_id,
+      feedback_type: this.feedback_type,
+    };
+  }
+
+  toLogBody(): string {
+    return `User provided positive feedback for prompt ID: ${this.prompt_id}`;
   }
 }
