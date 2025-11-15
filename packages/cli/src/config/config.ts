@@ -659,6 +659,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
+    ghWorkflowName: process.env['GH_WORKFLOW_NAME'] || undefined,
   });
 }
 
