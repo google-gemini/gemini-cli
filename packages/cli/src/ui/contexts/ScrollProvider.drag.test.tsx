@@ -113,6 +113,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -125,6 +126,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -142,6 +144,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -159,6 +162,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -172,6 +176,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'none',
       });
     }
     expect(scrollBy).not.toHaveBeenCalled();
@@ -209,6 +214,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -231,6 +237,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -268,6 +275,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -305,6 +313,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -342,6 +351,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -407,6 +417,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
 
@@ -424,6 +435,7 @@ describe('ScrollProvider Drag', () => {
         shift: false,
         ctrl: false,
         meta: false,
+        button: 'left',
       });
     }
     // Expect scrollTo to be called with target and duration 0
