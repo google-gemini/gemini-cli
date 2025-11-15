@@ -49,6 +49,10 @@
         "slug": "docs/cli"
       },
       {
+        "label": "Alternate Screen Buffer",
+        "slug": "docs/cli/alternate-buffer"
+      },
+      {
         "label": "Commands",
         "slug": "docs/cli/commands"
       },
