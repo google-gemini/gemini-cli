@@ -944,10 +944,9 @@ export async function connectToMcpServer(
       // For now, we just use the resolved model from config
 
       const result = await geminiClient.generateContent(
+        { model: modelToUse },
         contents,
-        {},
         new AbortController().signal,
-        modelToUse,
       );
 
       const firstCandidate = result.candidates?.[0];
