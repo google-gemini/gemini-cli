@@ -8,7 +8,7 @@ import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
 import { theme } from '../../semantic-colors.js';
-import { toCodePoints } from '../../utils/textUtils.js';
+import { toGraphemes } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 
 let enableDebugLog = false;
@@ -468,11 +468,11 @@ function layoutInkElementAsStyledText(
               currentLineWidth += textWidth;
             } else {
               // Text needs truncation
-              const codePoints = toCodePoints(text);
+              const graphemes = toGraphemes(text);
               let truncatedWidth = currentLineWidth;
               let sliceEndIndex = 0;
 
-              for (const char of codePoints) {
+              for (const char of graphemes) {
                 const charWidth = stringWidth(char);
                 if (truncatedWidth + charWidth > maxContentWidth) {
                   break;
@@ -481,7 +481,7 @@ function layoutInkElementAsStyledText(
                 sliceEndIndex++;
               }
 
-              const slice = codePoints.slice(0, sliceEndIndex).join('');
+              const slice = graphemes.slice(0, sliceEndIndex).join('');
               if (slice) {
                 currentLine.push({ text: slice, props: segment.props });
               }
@@ -571,12 +571,12 @@ function layoutInkElementAsStyledText(
 
         if (wordWidth > availableWidth) {
           // Word is too long, needs to be split across lines
-          const wordAsCodePoints = toCodePoints(word);
-          let remainingWordAsCodePoints = wordAsCodePoints;
-          while (remainingWordAsCodePoints.length > 0) {
+          const wordAsGraphemes = toGraphemes(word);
+          let remainingWordAsGraphemes = wordAsGraphemes;
+          while (remainingWordAsGraphemes.length > 0) {
             let splitIndex = 0;
             let currentSplitWidth = 0;
-            for (const char of remainingWordAsCodePoints) {
+            for (const char of remainingWordAsGraphemes) {
               const charWidth = stringWidth(char);
               if (
                 wrappingPartWidth + currentSplitWidth + charWidth >
@@ -589,16 +589,16 @@ function layoutInkElementAsStyledText(
             }
 
             if (splitIndex > 0) {
-              const part = remainingWordAsCodePoints
+              const part = remainingWordAsGraphemes
                 .slice(0, splitIndex)
                 .join('');
               addToWrappingPart(part, segment.props);
               wrappingPartWidth += stringWidth(part);
-              remainingWordAsCodePoints =
-                remainingWordAsCodePoints.slice(splitIndex);
+              remainingWordAsGraphemes =
+                remainingWordAsGraphemes.slice(splitIndex);
             }
 
-            if (remainingWordAsCodePoints.length > 0) {
+            if (remainingWordAsGraphemes.length > 0) {
               addWrappingPartToLines();
             }
           }

@@ -8,6 +8,11 @@ import stripAnsi from 'strip-ansi';
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
+import {
+  tokenize,
+  styledCharsFromTokens,
+  type StyledChar,
+} from '@alcalzone/ansi-tokenize';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
@@ -24,16 +29,42 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
 
 /*
  * -------------------------------------------------------------------------
- *  Unicode‑aware helpers (work at the code‑point level rather than UTF‑16
- *  code units so that surrogate‑pair emoji count as one "column".)
+ *  Unicode‑aware helpers (work at the grapheme cluster level to properly
+ *  handle combining marks, emoji, and surrogate pairs)
  * ---------------------------------------------------------------------- */
 
-// Cache for code points to reduce GC pressure
-const codePointsCache = new Map<string, string[]>();
+// Cache for grapheme segmentation results (aligns with Ink's toStyledCharactersCache)
+const graphemeCache = new Map<string, string[]>();
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 
-export function toCodePoints(str: string): string[] {
-  // ASCII fast path - check if all chars are ASCII (0-127)
+/**
+ * Splits a string into an array of grapheme clusters (user-perceived characters).
+ *
+ * This implementation aligns with Ink's toStyledCharacters() logic for consistent
+ * cursor positioning and text wrapping. It manually combines Unicode sequences:
+ * - Regional indicators (flags)
+ * - Combining marks (diacritics)
+ * - Variation selectors
+ * - Skin tone modifiers
+ * - Zero-width joiners (ZWJ)
+ * - Keycaps
+ * - Tags block
+ *
+ * This is critical for:
+ * - Cursor positioning in text editors (must match Ink's behavior)
+ * - Backspace/delete operations
+ * - Text selection and manipulation
+ * - Vim mode navigation
+ *
+ * @param str - The string to split into grapheme clusters
+ * @returns An array of grapheme clusters
+ *
+ * @example
+ * toGraphemes('café') // ['c', 'a', 'f', 'é']
+ * toGraphemes('👨‍👩‍👧‍👦') // ['👨‍👩‍👧‍👦'] (single family emoji)
+ */
+export function toGraphemes(str: string): string[] {
+  // ASCII fast-path: avoid tokenization overhead for pure ASCII
   let isAscii = true;
   for (let i = 0; i < str.length; i++) {
     if (str.charCodeAt(i) > 127) {
@@ -47,29 +78,199 @@ export function toCodePoints(str: string): string[] {
 
   // Cache short strings
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
-    const cached = codePointsCache.get(str);
+    const cached = graphemeCache.get(str);
     if (cached) {
       return cached;
     }
   }
 
-  const result = Array.from(str);
+  // Use Ink's approach: tokenize ANSI, then manually combine grapheme clusters
+  const tokens = tokenize(str);
+  const characters = styledCharsFromTokens(tokens);
+  const combinedCharacters: string[] = [];
 
-  // Cache result (unlimited like Ink)
-  if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
-    codePointsCache.set(str, result);
+  for (let i = 0; i < characters.length; i++) {
+    const character = characters[i];
+    if (!character) {
+      continue;
+    }
+
+    // Handle tab expansion (4 spaces like Ink)
+    if (character.value === '\t') {
+      combinedCharacters.push(' ', ' ', ' ', ' ');
+      continue;
+    }
+
+    // Skip backspace
+    if (character.value === '\b') {
+      continue;
+    }
+
+    let { value } = character;
+    const firstCodePoint = value.codePointAt(0);
+
+    // 1. Regional Indicators (Flags)
+    // These combine in pairs.
+    // See: https://en.wikipedia.org/wiki/Regional_indicator_symbol
+    if (
+      firstCodePoint &&
+      firstCodePoint >= 0x1f1e6 &&
+      firstCodePoint <= 0x1f1ff &&
+      i + 1 < characters.length
+    ) {
+      const nextCharacter = characters[i + 1];
+
+      if (nextCharacter) {
+        const nextFirstCodePoint = nextCharacter.value.codePointAt(0);
+
+        if (
+          nextFirstCodePoint &&
+          nextFirstCodePoint >= 0x1f1e6 &&
+          nextFirstCodePoint <= 0x1f1ff
+        ) {
+          value += nextCharacter.value;
+          i++;
+
+          combinedCharacters.push(value);
+          continue;
+        }
+      }
+    }
+
+    // 2. Other combining characters
+    // See: https://en.wikipedia.org/wiki/Combining_character
+    while (i + 1 < characters.length) {
+      const nextCharacter = characters[i + 1];
+
+      if (!nextCharacter) {
+        break;
+      }
+
+      const codePoints = [...nextCharacter.value].map((char) =>
+        char.codePointAt(0),
+      );
+
+      const nextFirstCodePoint = codePoints[0];
+
+      if (!nextFirstCodePoint) {
+        break;
+      }
+
+      // Variation selectors
+      const isVariationSelector =
+        nextFirstCodePoint >= 0xfe00 && nextFirstCodePoint <= 0xfe0f;
+
+      // Skin tone modifiers
+      const isSkinToneModifier =
+        nextFirstCodePoint >= 0x1f3fb && nextFirstCodePoint <= 0x1f3ff;
+
+      const isZeroWidthJoiner = nextFirstCodePoint === 0x200d;
+      const isKeycap = nextFirstCodePoint === 0x20e3;
+
+      // Tags block (U+E0000 - U+E007F)
+      const isTagsBlock =
+        nextFirstCodePoint >= 0xe0000 && nextFirstCodePoint <= 0xe007f;
+
+      // Combining Diacritical Marks
+      const isCombiningMark =
+        nextFirstCodePoint >= 0x0300 && nextFirstCodePoint <= 0x036f;
+
+      const isCombining =
+        isVariationSelector ||
+        isSkinToneModifier ||
+        isZeroWidthJoiner ||
+        isKeycap ||
+        isTagsBlock ||
+        isCombiningMark;
+
+      if (!isCombining) {
+        break;
+      }
+
+      // Merge with previous character
+      value += nextCharacter.value;
+      i++; // Consume next character.
+
+      // If it was a ZWJ, also consume the character after it.
+      if (isZeroWidthJoiner && i + 1 < characters.length) {
+        const characterAfterZwj = characters[i + 1];
+
+        if (characterAfterZwj) {
+          value += characterAfterZwj.value;
+          i++; // Consume character after ZWJ.
+        }
+      }
+    }
+
+    combinedCharacters.push(value);
   }
 
-  return result;
+  // Cache result
+  if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
+    graphemeCache.set(str, combinedCharacters);
+  }
+
+  return combinedCharacters;
 }
 
+/**
+ * Split a string into Unicode code points (not grapheme clusters).
+ *
+ * @deprecated Use `toGraphemes` for UI-related operations that need to work with
+ * user-perceived characters. This function splits by code points and should only
+ * be used for internal logic that needs to inspect individual code points
+ * (e.g., `stripUnsafeCharacters` which filters control characters).
+ *
+ * Note: Code points are NOT the same as grapheme clusters. For example:
+ * - toCodePoints('é') may return ['e', '́'] (base + combining mark)
+ * - toGraphemes('é') returns ['é'] (single grapheme cluster)
+ *
+ * @param str - The string to split into code points
+ * @returns An array of code points (handling surrogate pairs correctly)
+ */
+export function toCodePoints(str: string): string[] {
+  // ASCII fast-path for performance (stripUnsafeCharacters is called on every keypress/paste)
+  let isAscii = true;
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) > 127) {
+      isAscii = false;
+      break;
+    }
+  }
+
+  if (isAscii) {
+    // Pure ASCII, split('') is faster
+    return str.split('');
+  }
+
+  // Non-ASCII: Use spread operator which correctly handles surrogate pairs
+  return [...str];
+}
+
+/**
+ * Get the length of a string in code points (not grapheme clusters).
+ *
+ * This function returns code point count, which is used for offset calculations
+ * in logicalPosToOffset/offsetToLogicalPos. For UI display purposes (cursor
+ * positioning, text width), use toGraphemes().length instead.
+ *
+ * @param str - The string to measure
+ * @returns The number of code points
+ */
 export function cpLen(str: string): number {
   return toCodePoints(str).length;
 }
 
+/**
+ * Slice a string by grapheme cluster indices.
+ *
+ * @param str - The string to slice
+ * @param start - The starting grapheme index
+ * @param end - The ending grapheme index (optional)
+ * @returns The sliced string
+ */
 export function cpSlice(str: string, start: number, end?: number): string {
-  // Slice by code‑point indices and re‑join.
-  const arr = toCodePoints(str).slice(start, end);
+  const arr = toGraphemes(str).slice(start, end);
   return arr.join('');
 }
 
@@ -147,6 +348,13 @@ export const getCachedStringWidth = (str: string): number => {
  */
 export const clearStringWidthCache = (): void => {
   stringWidthCache.clear();
+};
+
+/**
+ * Clear the grapheme cache (for testing purposes)
+ */
+export const clearGraphemeCache = (): void => {
+  graphemeCache.clear();
 };
 
 const regex = ansiRegex();
