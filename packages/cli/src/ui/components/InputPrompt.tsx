@@ -4,43 +4,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
-import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
-import { theme } from '../semantic-colors.js';
-import { useInputHistory } from '../hooks/useInputHistory.js';
-import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
-import chalk from 'chalk';
-import stringWidth from 'string-width';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
-import type { Key } from '../hooks/useKeypress.js';
-import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import {
-  parseInputForHighlighting,
-  buildSegmentsForVisualSlice,
-} from '../utils/highlight.js';
-import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
-import {
-  clipboardHasImage,
-  saveClipboardImage,
-  cleanupOldClipboardImages,
-} from '../utils/clipboardUtils.js';
+import chalk from 'chalk';
+import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
 import * as path from 'node:path';
-import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import stringWidth from 'string-width';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { Command, keyMatchers } from '../keyMatchers.js';
+import { theme } from '../semantic-colors.js';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { StreamingState } from '../types.js';
+import {
+  cleanupOldClipboardImages,
+  clipboardHasImage,
+  saveClipboardImage,
+} from '../utils/clipboardUtils.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
-import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
+import {
+  buildSegmentsForVisualSlice,
+  parseInputForHighlighting,
+} from '../utils/highlight.js';
+import { cpLen, cpSlice, toCodePoints } from '../utils/textUtils.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { MAX_WIDTH, SuggestionsDisplay } from './SuggestionsDisplay.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -315,7 +315,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   }, [buffer, popAllMessages, inputHistory]);
 
   // Handle clipboard image pasting with Ctrl+V
-  const handleClipboardImage = useCallback(async () => {
+  const handleClipboardImage = useCallback(async (): Promise<boolean> => {
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -355,11 +355,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          return true;
         }
       }
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
+    return false;
   }, [buffer, config]);
 
   const handleMouse = useCallback(
@@ -400,31 +402,48 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.paste) {
-        // Record paste time to prevent accidental auto-submission
-        if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
-          setRecentUnsafePasteTime(Date.now());
+        const handleTextPaste = () => {
+          // Record paste time to prevent accidental auto-submission
+          if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
+            setRecentUnsafePasteTime(Date.now());
 
-          // Clear any existing paste timeout
-          if (pasteTimeoutRef.current) {
-            clearTimeout(pasteTimeoutRef.current);
+            // Clear any existing paste timeout
+            if (pasteTimeoutRef.current) {
+              clearTimeout(pasteTimeoutRef.current);
+            }
+
+            // Clear the paste protection after a very short delay to prevent
+            // false positives.
+            // Due to how we use a reducer for text buffer state updates, it is
+            // reasonable to expect that key events that are really part of the
+            // same paste will be processed in the same event loop tick. 40ms
+            // is chosen arbitrarily as it is faster than a typical human
+            // could go from pressing paste to pressing enter. The fastest typists
+            // can type at 200 words per minute which roughly translates to 50ms
+            // per letter.
+            pasteTimeoutRef.current = setTimeout(() => {
+              setRecentUnsafePasteTime(null);
+              pasteTimeoutRef.current = null;
+            }, 40);
           }
+          // Ensure we never accidentally interpret paste as regular input.
+          buffer.handleInput(key);
+        };
 
-          // Clear the paste protection after a very short delay to prevent
-          // false positives.
-          // Due to how we use a reducer for text buffer state updates, it is
-          // reasonable to expect that key events that are really part of the
-          // same paste will be processed in the same event loop tick. 40ms
-          // is chosen arbitrarily as it is faster than a typical human
-          // could go from pressing paste to pressing enter. The fastest typists
-          // can type at 200 words per minute which roughly translates to 50ms
-          // per letter.
-          pasteTimeoutRef.current = setTimeout(() => {
-            setRecentUnsafePasteTime(null);
-            pasteTimeoutRef.current = null;
-          }, 40);
+        const isMac = process.platform === 'darwin';
+        if (isMac) {
+          // On macOS, Cmd+V arrives as a generic paste event. We check for an
+          // image and handle it, otherwise we fall through to regular text paste.
+          handleClipboardImage().then((imageWasPasted) => {
+            if (!imageWasPasted) {
+              handleTextPaste();
+            }
+          });
+        } else {
+          // On other platforms, we rely on the specific Ctrl+V keybinding for
+          // images, so any generic paste event is treated as text.
+          handleTextPaste();
         }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
         return;
       }
 
@@ -769,12 +788,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         buffer.openInExternalEditor();
-        return;
-      }
-
-      // Ctrl+V for clipboard image paste
-      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
-        handleClipboardImage();
         return;
       }
 

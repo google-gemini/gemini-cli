@@ -84,10 +84,10 @@ available combinations.
 
 #### External Tools
 
-| Action                                         | Keys       |
-| ---------------------------------------------- | ---------- |
-| Open the current prompt in an external editor. | `Ctrl + X` |
-| Paste an image from the clipboard.             | `Ctrl + V` |
+| Action                                         | Keys                  |
+| ---------------------------------------------- | --------------------- |
+| Open the current prompt in an external editor. | `Ctrl + X`            |
+| Paste an image from the clipboard.             | `Ctrl + V / Meta + V` |
 
 #### App Controls
 
