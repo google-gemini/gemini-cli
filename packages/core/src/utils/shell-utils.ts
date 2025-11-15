@@ -39,6 +39,23 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
+export const POWERSHELL_CONSTRAINED_LANGUAGE_ENV = '__PSLockdownPolicy';
+export const POWERSHELL_CONSTRAINED_LANGUAGE_VALUE = '4';
+
+/**
+ * Ensures any PowerShell process spawned with this env runs in Constrained Language Mode
+ * by forcing the lockdown policy value prior to launch.
+ */
+export function ensureConstrainedLanguageEnv(
+  env: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    [POWERSHELL_CONSTRAINED_LANGUAGE_ENV]:
+      POWERSHELL_CONSTRAINED_LANGUAGE_VALUE,
+  };
+}
+
 let bashLanguage: Language | null = null;
 let treeSitterInitialization: Promise<void> | null = null;
 let treeSitterInitializationError: Error | null = null;
