@@ -1,0 +1,62 @@
+<idea-plugin>
+  <id>com.google.gemini-cli</id>
+  <name>Gemini CLI Companion</name>
+  <vendor email="gemini-cli-support@google.com" url="https://github.com/google-gemini/gemini-cli">Google</vendor>
+
+  <description><![CDATA[
+    Enable Gemini CLI with direct access to your IDE workspace.
+    ]]></description>
+
+  <change-notes><![CDATA[
+    Initial release.
+    ]]></change-notes>
+
+  <!-- please see https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html
+       on how to target different products -->
+  <depends>com.intellij.modules.platform</depends>
+  <depends>org.jetbrains.plugins.terminal</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Add your extensions here -->
+
+    <applicationConfigurable
+      parentId="tools"
+      instance="com.google.gemini.cli.settings.GeminiCliSettingsConfigurable"
+      id="com.google.gemini.cli.settings.GeminiCliSettingsConfigurable"
+      displayName="Gemini CLI"/>
+    <notificationGroup id="Gemini CLI" displayType="BALLOON"/>
+    <applicationService serviceImplementation="com.google.gemini.cli.settings.GeminiCliSettingsState"/>
+    <postStartupActivity implementation="com.google.gemini.cli.GeminiCliStartupActivity"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
+    <localTerminalCustomizer implementation="com.google.gemini.cli.TerminalEnvVarCustomizer"/>
+  </extensions>
+
+  <applicationListeners>
+    <!-- Add your application listeners here -->
+  </applicationListeners>
+
+  <projectListeners>
+    <!-- Add your project listeners here -->
+  </projectListeners>
+
+  <actions>
+    <!-- Add your actions here -->
+    <action id="RunGeminiCLI" class="com.google.gemini.cli.RunGeminiCLIAction" text="Run Gemini CLI"
+      description="Run Gemini CLI in integrated terminal" icon="/icons/icon.svg">
+      <add-to-group group-id="MainToolbarRight" anchor="last"/>
+      <add-to-group group-id="ProjectViewToolbar" anchor="last"/>
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+      <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
+    </action>
+    <action id="OpenGeminiCliSettings" class="com.google.gemini.cli.settings.OpenGeminiCliSettingsAction" text="Gemini CLI Settings"
+      description="Open the Gemini CLI settings page">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+    </action>
+    <action id="ShowGeminiCliNotices" class="com.google.gemini.cli.ShowNoticesAction" text="Show Notices"
+      description="Show Gemini CLI notices and licenses">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>

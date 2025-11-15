@@ -1,0 +1,19 @@
+{
+  "name": "gemini-cli-jetbrains-companion",
+  "version": "0.1.0",
+  "description": "JetBrains IDE companion for Gemini CLI",
+  "private": true,
+  "scripts": {
+    "build": "./gradlew buildPlugin",
+    "clean": "./gradlew clean",
+    "test": "./gradlew test"
+  },
+  "keywords": [
+    "gemini-cli",
+    "jetbrains",
+    "ide",
+    "companion"
+  ],
+  "author": "Google",
+  "license": "Apache-2.0"
+}
