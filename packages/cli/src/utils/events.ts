@@ -14,6 +14,7 @@ export enum AppEvent {
   Flicker = 'flicker',
   McpClientUpdate = 'mcp-client-update',
   SelectionWarning = 'selection-warning',
+  PasteTimeout = 'paste-timeout',
 }
 
 export interface AppEvents extends ExtensionEvents {
@@ -23,6 +24,7 @@ export interface AppEvents extends ExtensionEvents {
   [AppEvent.Flicker]: never[];
   [AppEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [AppEvent.SelectionWarning]: never[];
+  [AppEvent.PasteTimeout]: never[];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();
