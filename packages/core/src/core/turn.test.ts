@@ -329,24 +329,44 @@ describe('Turn', () => {
       });
     });
 
-    it('should yield finished event when response has finish reason', async () => {
+    it.each([
+      {
+        description:
+          'should yield finished event when response has finish reason',
+        contentText: 'Partial response',
+        finishReason: 'STOP',
+        usageMetadata: {
+          promptTokenCount: 17,
+          candidatesTokenCount: 50,
+          cachedContentTokenCount: 10,
+          thoughtsTokenCount: 5,
+          toolUsePromptTokenCount: 2,
+        },
+      },
+      {
+        description: 'should yield finished event for MAX_TOKENS finish reason',
+        contentText: 'This is a long response that was cut off...',
+        finishReason: 'MAX_TOKENS',
+        usageMetadata: undefined,
+      },
+      {
+        description: 'should yield finished event for SAFETY finish reason',
+        contentText: 'Content blocked',
+        finishReason: 'SAFETY',
+        usageMetadata: undefined,
+      },
+    ])('$description', async ({ contentText, finishReason, usageMetadata }) => {
       const mockResponseStream = (async function* () {
         yield {
           type: StreamEventType.CHUNK,
           value: {
             candidates: [
               {
-                content: { parts: [{ text: 'Partial response' }] },
-                finishReason: 'STOP',
+                content: { parts: [{ text: contentText }] },
+                finishReason,
               },
             ],
-            usageMetadata: {
-              promptTokenCount: 17,
-              candidatesTokenCount: 50,
-              cachedContentTokenCount: 10,
-              thoughtsTokenCount: 5,
-              toolUsePromptTokenCount: 2,
-            },
+            usageMetadata,
           } as GenerateContentResponse,
         };
       })();
@@ -355,103 +375,17 @@ describe('Turn', () => {
       const events = [];
       for await (const event of turn.run(
         'test-model',
-        [{ text: 'Test finish reason' }],
+        [{ text: 'Test' }],
         new AbortController().signal,
       )) {
         events.push(event);
       }
 
       expect(events).toEqual([
-        { type: GeminiEventType.Content, value: 'Partial response' },
+        { type: GeminiEventType.Content, value: contentText },
         {
           type: GeminiEventType.Finished,
-          value: {
-            reason: 'STOP',
-            usageMetadata: {
-              promptTokenCount: 17,
-              candidatesTokenCount: 50,
-              cachedContentTokenCount: 10,
-              thoughtsTokenCount: 5,
-              toolUsePromptTokenCount: 2,
-            },
-          },
-        },
-      ]);
-    });
-
-    it('should yield finished event for MAX_TOKENS finish reason', async () => {
-      const mockResponseStream = (async function* () {
-        yield {
-          type: StreamEventType.CHUNK,
-          value: {
-            candidates: [
-              {
-                content: {
-                  parts: [
-                    { text: 'This is a long response that was cut off...' },
-                  ],
-                },
-                finishReason: 'MAX_TOKENS',
-              },
-            ],
-          },
-        };
-      })();
-      mockSendMessageStream.mockResolvedValue(mockResponseStream);
-
-      const events = [];
-      const reqParts: Part[] = [{ text: 'Generate long text' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
-        events.push(event);
-      }
-
-      expect(events).toEqual([
-        {
-          type: GeminiEventType.Content,
-          value: 'This is a long response that was cut off...',
-        },
-        {
-          type: GeminiEventType.Finished,
-          value: { reason: 'MAX_TOKENS', usageMetadata: undefined },
-        },
-      ]);
-    });
-
-    it('should yield finished event for SAFETY finish reason', async () => {
-      const mockResponseStream = (async function* () {
-        yield {
-          type: StreamEventType.CHUNK,
-          value: {
-            candidates: [
-              {
-                content: { parts: [{ text: 'Content blocked' }] },
-                finishReason: 'SAFETY',
-              },
-            ],
-          },
-        };
-      })();
-      mockSendMessageStream.mockResolvedValue(mockResponseStream);
-
-      const events = [];
-      const reqParts: Part[] = [{ text: 'Test safety' }];
-      for await (const event of turn.run(
-        'test-model',
-        reqParts,
-        new AbortController().signal,
-      )) {
-        events.push(event);
-      }
-
-      expect(events).toEqual([
-        { type: GeminiEventType.Content, value: 'Content blocked' },
-        {
-          type: GeminiEventType.Finished,
-          value: { reason: 'SAFETY', usageMetadata: undefined },
+          value: { reason: finishReason, usageMetadata },
         },
       ]);
     });
@@ -785,45 +719,34 @@ describe('Turn', () => {
       ]);
     });
 
-    it('should yield content events with traceId', async () => {
+    it.each([
+      {
+        description: 'should yield content events with traceId',
+        part: { text: 'Hello' },
+        responseId: 'trace-123',
+        expectedEvent: {
+          type: GeminiEventType.Content,
+          value: 'Hello',
+          traceId: 'trace-123',
+        },
+      },
+      {
+        description: 'should yield thought events with traceId',
+        part: { text: '[Thought: thinking]', thought: 'thinking' },
+        responseId: 'trace-456',
+        expectedEvent: {
+          type: GeminiEventType.Thought,
+          value: { subject: '', description: '[Thought: thinking]' },
+          traceId: 'trace-456',
+        },
+      },
+    ])('$description', async ({ part, responseId, expectedEvent }) => {
       const mockResponseStream = (async function* () {
         yield {
           type: StreamEventType.CHUNK,
           value: {
-            candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
-            responseId: 'trace-123',
-          } as GenerateContentResponse,
-        };
-      })();
-      mockSendMessageStream.mockResolvedValue(mockResponseStream);
-
-      const events = [];
-      for await (const event of turn.run(
-        'test-model',
-        [{ text: 'Hi' }],
-        new AbortController().signal,
-      )) {
-        events.push(event);
-      }
-
-      expect(events).toEqual([
-        { type: GeminiEventType.Content, value: 'Hello', traceId: 'trace-123' },
-      ]);
-    });
-
-    it('should yield thought events with traceId', async () => {
-      const mockResponseStream = (async function* () {
-        yield {
-          type: StreamEventType.CHUNK,
-          value: {
-            candidates: [
-              {
-                content: {
-                  parts: [{ text: '[Thought: thinking]', thought: 'thinking' }],
-                },
-              },
-            ],
-            responseId: 'trace-456',
+            candidates: [{ content: { parts: [part] } }],
+            responseId,
           } as unknown as GenerateContentResponse,
         };
       })();
@@ -838,13 +761,7 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(events).toEqual([
-        {
-          type: GeminiEventType.Thought,
-          value: { subject: '', description: '[Thought: thinking]' },
-          traceId: 'trace-456',
-        },
-      ]);
+      expect(events).toEqual([expectedEvent]);
     });
   });
 
