@@ -100,7 +100,8 @@ export function MouseProvider({
         !handled &&
         event.name === 'move' &&
         event.col >= 0 &&
-        event.row >= 0
+        event.row >= 0 &&
+        event.button === 'left'
       ) {
         // Terminal apps only receive mouse move events when the mouse is down
         // so this always indicates a mouse drag that the user was expecting
