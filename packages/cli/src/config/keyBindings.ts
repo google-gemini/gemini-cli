@@ -192,7 +192,11 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'x', ctrl: true },
     { sequence: '\x18', ctrl: true },
   ],
-  [Command.PASTE_CLIPBOARD_IMAGE]: [{ key: 'v', ctrl: true }],
+  // Support both Command+V on macOS and Ctrl+V on other platforms
+  [Command.PASTE_CLIPBOARD_IMAGE]: [
+    { key: 'v', ctrl: true }, // Ctrl+V on Windows/Linux
+    { key: 'v', command: true }, // Command+V on macOS
+  ],
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
