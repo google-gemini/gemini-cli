@@ -4,11 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { expandHomeDir, loadMemoryFromDirectories } from './directoryUtils.js';
-import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
+import { vi, describe, it, expect } from 'vitest';
+import { expandHomeDir } from './directoryUtils.js';
 import type * as osActual from 'node:os';
 import * as path from 'node:path';
 
@@ -55,112 +52,12 @@ describe('directoryUtils', () => {
     });
 
     it('should not change a path that does not need expansion', () => {
-      const regularPath = '/usr/local/bin';
+      const regularPath = path.join('usr', 'local', 'bin');
       expect(expandHomeDir(regularPath)).toBe(regularPath);
     });
 
     it('should return an empty string if input is empty', () => {
       expect(expandHomeDir('')).toBe('');
-    });
-  });
-
-  describe('loadMemoryFromDirectories', () => {
-    let mockConfig: Config;
-    let mockMemoryData: {
-      memoryContent: string;
-      fileCount: number;
-      filePaths: string[];
-    };
-
-    let mockSettings: LoadedSettings;
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-
-      mockMemoryData = {
-        memoryContent: 'mock memory',
-        fileCount: 10,
-        filePaths: ['/a/b/c.md'],
-      };
-
-      vi.mocked(loadServerHierarchicalMemory).mockResolvedValue(mockMemoryData);
-
-      mockConfig = {
-        shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(true),
-        getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
-        getWorkspaceContext: vi.fn().mockReturnValue({
-          getDirectories: vi.fn().mockReturnValue(['/test/dir/project']),
-        }),
-        getDebugMode: vi.fn().mockReturnValue(false),
-        getFileService: vi.fn().mockReturnValue({}),
-        getExtensionLoader: vi.fn().mockReturnValue({
-          getExtensions: vi.fn().mockReturnValue([]),
-        }),
-        getFolderTrust: vi.fn().mockReturnValue(true),
-        getFileFilteringOptions: vi.fn().mockReturnValue({}),
-        setUserMemory: vi.fn(),
-        setGeminiMdFileCount: vi.fn(),
-      } as unknown as Config;
-
-      mockSettings = {
-        merged: {
-          context: {
-            importFormat: 'tree',
-            discoveryMaxDirs: 1000,
-          },
-        },
-      } as unknown as LoadedSettings;
-    });
-
-    it('should return undefined if shouldLoadMemoryFromIncludeDirectories is false', async () => {
-      vi.mocked(
-        mockConfig.shouldLoadMemoryFromIncludeDirectories,
-      ).mockReturnValue(false);
-
-      const result = await loadMemoryFromDirectories(mockConfig, mockSettings);
-
-      expect(result).toBeUndefined();
-      expect(loadServerHierarchicalMemory).not.toHaveBeenCalled();
-    });
-
-    it('should call loadServerHierarchicalMemory and update config', async () => {
-      const result = await loadMemoryFromDirectories(mockConfig, mockSettings);
-
-      expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
-        '/test/dir',
-        ['/test/dir/project'],
-        false,
-        {},
-        {
-          getExtensions: expect.any(Function),
-        },
-        true,
-        'tree',
-        {},
-        1000,
-      );
-      expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
-        mockMemoryData.memoryContent,
-      );
-      expect(mockConfig.setGeminiMdFileCount).toHaveBeenCalledWith(
-        mockMemoryData.fileCount,
-      );
-      expect(result).toEqual({
-        memoryContent: 'mock memory',
-        fileCount: 10,
-      });
-    });
-
-    it('should throw an error if loadServerHierarchicalMemory fails', async () => {
-      const testError = new Error('Failed to load memory');
-      vi.mocked(loadServerHierarchicalMemory).mockRejectedValue(testError);
-
-      await expect(
-        loadMemoryFromDirectories(mockConfig, mockSettings),
-      ).rejects.toThrow(testError);
-
-      expect(mockConfig.setUserMemory).not.toHaveBeenCalled();
-      expect(mockConfig.setGeminiMdFileCount).not.toHaveBeenCalled();
     });
   });
 });

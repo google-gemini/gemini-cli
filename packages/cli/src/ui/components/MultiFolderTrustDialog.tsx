@@ -15,7 +15,6 @@ import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
 import { MessageType, type HistoryItem } from '../types.js';
 import type { Config } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
 
 export enum MultiFolderTrustChoice {
   YES,
@@ -30,21 +29,15 @@ export interface MultiFolderTrustDialogProps {
   errors: string[];
   finishAddingDirectories: (
     config: Config,
-    settings: LoadedSettings,
     addItem: (
       itemData: Omit<HistoryItem, 'id'>,
       baseTimestamp: number,
     ) => number,
-    setGeminiMdFileCount: (count: number) => void,
     added: string[],
     errors: string[],
-    silentOnSuccess?: boolean,
   ) => Promise<void>;
   config: Config;
-  settings: LoadedSettings;
   addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number;
-  setGeminiMdFileCount: (count: number) => void;
-  silentOnSuccess?: boolean;
 }
 
 export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
@@ -54,10 +47,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
   errors: initialErrors,
   finishAddingDirectories,
   config,
-  settings,
   addItem,
-  setGeminiMdFileCount,
-  silentOnSuccess,
 }) => {
   const [submitted, setSubmitted] = useState(false);
 
@@ -69,15 +59,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
         '\n- ',
       )}`,
     );
-    await finishAddingDirectories(
-      config,
-      settings,
-      addItem,
-      setGeminiMdFileCount,
-      trustedDirs,
-      errors,
-      silentOnSuccess,
-    );
+    await finishAddingDirectories(config, addItem, trustedDirs, errors);
     onComplete();
   };
 
@@ -150,15 +132,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
       }
     }
 
-    await finishAddingDirectories(
-      config,
-      settings,
-      addItem,
-      setGeminiMdFileCount,
-      added,
-      errors,
-      silentOnSuccess,
-    );
+    await finishAddingDirectories(config, addItem, added, errors);
     onComplete();
   };
 

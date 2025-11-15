@@ -11,7 +11,6 @@ import { waitFor } from '../../test-utils/async.js';
 import { useIncludeDirsTrust } from './useIncludeDirsTrust.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
 import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 
@@ -30,10 +29,8 @@ vi.mock('../components/MultiFolderTrustDialog.js', () => ({
 
 describe('useIncludeDirsTrust', () => {
   let mockConfig: Config;
-  let mockSettings: LoadedSettings;
   let mockHistoryManager: UseHistoryManagerReturn;
   let mockSetCustomDialog: Mock;
-  let mockSetGeminiMdFileCount: Mock;
   let mockWorkspaceContext: WorkspaceContext;
 
   beforeEach(() => {
@@ -64,7 +61,6 @@ describe('useIncludeDirsTrust', () => {
         .mockReturnValue({ addDirectoryContext: vi.fn() }),
     } as unknown as Config;
 
-    mockSettings = { merged: {} } as LoadedSettings;
     mockHistoryManager = {
       addItem: vi.fn(),
       history: [],
@@ -73,19 +69,15 @@ describe('useIncludeDirsTrust', () => {
       loadHistory: vi.fn(),
     };
     mockSetCustomDialog = vi.fn();
-    mockSetGeminiMdFileCount = vi.fn();
   });
 
   const renderTestHook = (isTrustedFolder: boolean | undefined) => {
     renderHook(() =>
       useIncludeDirsTrust(
         mockConfig,
-        mockSettings,
-        false,
         isTrustedFolder,
         mockHistoryManager,
         mockSetCustomDialog,
-        mockSetGeminiMdFileCount,
       ),
     );
   };

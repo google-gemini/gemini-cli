@@ -914,15 +914,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   } = useIdeTrustListener();
   const isInitialMount = useRef(true);
 
-  useIncludeDirsTrust(
-    config,
-    settings,
-    isFolderTrustDialogOpen,
-    isTrustedFolder,
-    historyManager,
-    setCustomDialog,
-    setGeminiMdFileCount,
-  );
+  useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;

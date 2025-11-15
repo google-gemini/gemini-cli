@@ -7,20 +7,15 @@
 import { useEffect } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
-import {
-  expandHomeDir,
-  loadMemoryFromDirectories,
-} from '../utils/directoryUtils.js';
+import { expandHomeDir } from '../utils/directoryUtils.js';
+import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
-import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType, type HistoryItem } from '../types.js';
 
 async function finishAddingDirectories(
   config: Config,
-  settings: LoadedSettings,
   addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
-  setGeminiMdFileCount: (count: number) => void,
   added: string[],
   errors: string[],
 ) {
@@ -36,11 +31,8 @@ async function finishAddingDirectories(
   }
 
   try {
-    if (added.length > 0) {
-      const result = await loadMemoryFromDirectories(config, settings);
-      if (result) {
-        setGeminiMdFileCount(result.fileCount);
-      }
+    if (config.shouldLoadMemoryFromIncludeDirectories()) {
+      await refreshServerHierarchicalMemory(config);
     }
   } catch (error) {
     errors.push(`Error refreshing memory: ${(error as Error).message}`);
@@ -60,12 +52,9 @@ async function finishAddingDirectories(
 
 export function useIncludeDirsTrust(
   config: Config,
-  settings: LoadedSettings,
-  isFolderTrustDialogOpen: boolean,
   isTrustedFolder: boolean | undefined,
   historyManager: UseHistoryManagerReturn,
   setCustomDialog: (dialog: React.ReactNode | null) => void,
-  setGeminiMdFileCount: (count: number) => void,
 ) {
   const { addItem } = historyManager;
 
@@ -100,14 +89,7 @@ export function useIncludeDirsTrust(
       }
 
       if (added.length > 0 || errors.length > 0) {
-        finishAddingDirectories(
-          config,
-          settings,
-          addItem,
-          setGeminiMdFileCount,
-          added,
-          errors,
-        );
+        finishAddingDirectories(config, addItem, added, errors);
       }
       config.clearPendingIncludeDirectories();
       return;
@@ -167,28 +149,12 @@ export function useIncludeDirsTrust(
           errors={errors}
           finishAddingDirectories={finishAddingDirectories}
           config={config}
-          settings={settings}
           addItem={addItem}
-          setGeminiMdFileCount={setGeminiMdFileCount}
         />,
       );
     } else if (added.length > 0 || errors.length > 0) {
-      finishAddingDirectories(
-        config,
-        settings,
-        addItem,
-        setGeminiMdFileCount,
-        added,
-        errors,
-      );
+      finishAddingDirectories(config, addItem, added, errors);
       config.clearPendingIncludeDirectories();
     }
-  }, [
-    isTrustedFolder,
-    config,
-    settings,
-    addItem,
-    setGeminiMdFileCount,
-    setCustomDialog,
-  ]);
+  }, [isTrustedFolder, config, addItem, setCustomDialog]);
 }

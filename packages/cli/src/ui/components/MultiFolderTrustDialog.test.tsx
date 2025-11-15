@@ -19,7 +19,6 @@ import {
 import * as trustedFolders from '../../config/trustedFolders.js';
 import * as directoryUtils from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -36,7 +35,6 @@ const mockedRadioButtonSelect = vi.mocked(RadioButtonSelect);
 const mockOnComplete = vi.fn();
 const mockFinishAddingDirectories = vi.fn();
 const mockAddItem = vi.fn();
-const mockSetGeminiMdFileCount = vi.fn();
 const mockAddDirectory = vi.fn();
 const mockSetValue = vi.fn();
 
@@ -45,8 +43,6 @@ const mockConfig = {
     addDirectory: mockAddDirectory,
   }),
 } as unknown as Config;
-
-const mockSettings = {} as LoadedSettings;
 
 const mockTrustedFolders = {
   setValue: mockSetValue,
@@ -59,9 +55,7 @@ const defaultProps: MultiFolderTrustDialogProps = {
   errors: [],
   finishAddingDirectories: mockFinishAddingDirectories,
   config: mockConfig,
-  settings: mockSettings,
   addItem: mockAddItem,
-  setGeminiMdFileCount: mockSetGeminiMdFileCount,
 };
 
 describe('MultiFolderTrustDialog', () => {
@@ -102,19 +96,17 @@ describe('MultiFolderTrustDialog', () => {
         shift: false,
         paste: false,
         sequence: '',
+        insertable: false,
       });
     });
 
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
-      mockSettings,
       mockAddItem,
-      mockSetGeminiMdFileCount,
       [],
       [
         'Operation cancelled. The following directories were not added:\n- /path/to/folder1',
       ],
-      undefined,
     );
     expect(mockOnComplete).toHaveBeenCalled();
   });
@@ -130,14 +122,11 @@ describe('MultiFolderTrustDialog', () => {
 
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
-      mockSettings,
       mockAddItem,
-      mockSetGeminiMdFileCount,
       [],
       [
         'The following directories were not added because they were not trusted:\n- /path/to/folder1',
       ],
-      undefined,
     );
     expect(mockOnComplete).toHaveBeenCalled();
     expect(mockAddDirectory).not.toHaveBeenCalled();
@@ -164,12 +153,9 @@ describe('MultiFolderTrustDialog', () => {
     expect(mockSetValue).not.toHaveBeenCalled();
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
-      mockSettings,
       mockAddItem,
-      mockSetGeminiMdFileCount,
       ['/already/trusted', '/path/to/folder1', '/path/to/folder2'],
       [],
-      undefined,
     );
     expect(mockOnComplete).toHaveBeenCalled();
   });
@@ -190,12 +176,9 @@ describe('MultiFolderTrustDialog', () => {
     );
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
-      mockSettings,
       mockAddItem,
-      mockSetGeminiMdFileCount,
       ['/path/to/folder1'],
       [],
-      undefined,
     );
     expect(mockOnComplete).toHaveBeenCalled();
   });
@@ -267,12 +250,9 @@ describe('MultiFolderTrustDialog', () => {
     expect(mockAddDirectory).not.toHaveBeenCalledWith('/path/to/error');
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
-      mockSettings,
       mockAddItem,
-      mockSetGeminiMdFileCount,
       ['/path/to/good'],
       ['initial error', "Error adding '/path/to/error': Test error"],
-      undefined,
     );
     expect(mockOnComplete).toHaveBeenCalled();
   });

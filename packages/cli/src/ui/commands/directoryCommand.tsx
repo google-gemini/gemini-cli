@@ -13,18 +13,13 @@ import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js'
 import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItem } from '../types.js';
-import {
-  expandHomeDir,
-  loadMemoryFromDirectories,
-} from '../utils/directoryUtils.js';
+import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
+import { expandHomeDir } from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
 
 async function finishAddingDirectories(
   config: Config,
-  settings: LoadedSettings,
   addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
-  setGeminiMdFileCount: (count: number) => void,
   added: string[],
   errors: string[],
 ) {
@@ -40,21 +35,16 @@ async function finishAddingDirectories(
   }
 
   try {
-    if (added.length > 0) {
-      const result = await loadMemoryFromDirectories(config, settings);
-      if (result) {
-        setGeminiMdFileCount(result.fileCount);
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join(
-              '\n- ',
-            )}`,
-          },
-          Date.now(),
-        );
-      }
+    if (config.shouldLoadMemoryFromIncludeDirectories()) {
+      await refreshServerHierarchicalMemory(config);
     }
+    addItem(
+      {
+        type: MessageType.INFO,
+        text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+      },
+      Date.now(),
+    );
   } catch (error) {
     errors.push(`Error refreshing memory: ${(error as Error).message}`);
   }
@@ -214,9 +204,7 @@ export const directoryCommand: SlashCommand = {
                   errors={errors}
                   finishAddingDirectories={finishAddingDirectories}
                   config={config}
-                  settings={settings}
                   addItem={addItem}
-                  setGeminiMdFileCount={context.ui.setGeminiMdFileCount}
                 />
               ),
             };
@@ -235,14 +223,7 @@ export const directoryCommand: SlashCommand = {
           }
         }
 
-        await finishAddingDirectories(
-          config,
-          settings,
-          addItem,
-          context.ui.setGeminiMdFileCount,
-          added,
-          errors,
-        );
+        await finishAddingDirectories(config, addItem, added, errors);
         return;
       },
     },
