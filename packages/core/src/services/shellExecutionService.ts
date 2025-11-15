@@ -27,6 +27,23 @@ const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
+function createShellEnvironment(
+  shell: ShellType,
+  overrides: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...overrides,
+  };
+
+  if (shell === 'powershell') {
+    // Force Constrained Language Mode for PowerShell invocations to harden against risky .NET access.
+    env['__PSLockdownPolicy'] = '4';
+  }
+
+  return env;
+}
+
 function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   if (shell !== 'bash') {
     return command;
@@ -210,18 +227,19 @@ export class ShellExecutionService {
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const spawnArgs = [...argsPrefix, guardedCommand];
 
+      const env = createShellEnvironment(shell, {
+        GEMINI_CLI: '1',
+        TERM: 'xterm-256color',
+        PAGER: 'cat',
+      });
+
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: 'cat',
-        },
+        env,
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
@@ -424,17 +442,18 @@ export class ShellExecutionService {
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
+      const env = createShellEnvironment(shell, {
+        GEMINI_CLI: '1',
+        TERM: 'xterm-256color',
+        PAGER: shellExecutionConfig.pager ?? 'cat',
+      });
+
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
         name: 'xterm',
         cols,
         rows,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: shellExecutionConfig.pager ?? 'cat',
-        },
+        env,
         handleFlowControl: true,
       });
 
