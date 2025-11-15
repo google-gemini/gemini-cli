@@ -129,28 +129,57 @@ if ([string]::IsNullOrEmpty($commandText)) {
   Write-Output '{"success":false}'
   exit 0
 }
-$tokens = $null
-$errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseInput($commandText, [ref]$tokens, [ref]$errors)
-if ($errors -and $errors.Count -gt 0) {
-  Write-Output '{"success":false}'
-  exit 0
-}
-$commandAsts = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
 $commandObjects = @()
-foreach ($commandAst in $commandAsts) {
-  $name = $commandAst.GetCommandName()
-  if ([string]::IsNullOrWhiteSpace($name)) {
-    continue
+$success = $false
+try {
+  $tokens = $null
+  $errors = $null
+  $ast = [System.Management.Automation.Language.Parser]::ParseInput($commandText, [ref]$tokens, [ref]$errors)
+  if ($errors -and $errors.Count -gt 0) {
+    Write-Output '{"success":false}'
+    exit 0
   }
-  $commandObjects += [PSCustomObject]@{
-    name = $name
-    text = $commandAst.Extent.Text.Trim()
+  $commandAsts = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
+  $commandObjects = @()
+  foreach ($commandAst in $commandAsts) {
+    $name = $commandAst.GetCommandName()
+    if ([string]::IsNullOrWhiteSpace($name)) {
+      continue
+    }
+    $commandObjects += [PSCustomObject]@{
+      name = $name
+      text = $commandAst.Extent.Text.Trim()
+    }
   }
-}
-[PSCustomObject]@{
-  success = $true
-  commands = $commandObjects
+  $success = $true
+} catch {
+  try {
+    # CLM-safe parser    
+    $separatorRegex = '&&|\\|\\||;|\\|'
+    if ($commandText -match "^\\s*($separatorRegex)|($separatorRegex)\\s*$") {
+      $success = $false
+    }
+    else {
+      $commands = $commandText -split $separatorRegex | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+      foreach ($command in $commands) {
+        $parts = $command.Split(' ', 2)
+        $name = $parts[0]
+        if (-not [string]::IsNullOrWhiteSpace($name)) {
+          $commandObjects += @{
+            name = $name
+            text = $command
+          }
+        }
+      }
+      $success = $commandObjects.Count -gt 0
+    }
+  } catch {
+    $success = $false
+  }
+} 
+@{
+    success = $success
+    commands = @($commandObjects)
 } | ConvertTo-Json -Compress
 `,
   'utf16le',
