@@ -29,7 +29,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ### Pre-requisites before installation
 
-- Node.js version 20 or higher
+- Node.js version 20 or higher (can be installed via Anaconda)
 - macOS, Linux, or Windows
 
 ### Quick Install
@@ -51,6 +51,17 @@ npm install -g @google/gemini-cli
 
 ```bash
 brew install gemini-cli
+```
+
+#### Alternative: Install with Anaconda (for restricted environments)
+
+```bash
+# Create and activate a new environment
+conda create -y -n gemini_env -c conda-forge nodejs
+conda activate gemini_env
+
+# Install Gemini CLI globally via npm (inside the environment)
+npm install -g @google/gemini-cli
 ```
 
 ## Release Cadence and Tags
