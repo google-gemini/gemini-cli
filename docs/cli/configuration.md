@@ -464,6 +464,11 @@ the `excludedProjectEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
+- **`GEMINI_CLI_CUSTOM_HEADERS`**:
+  - Adds extra HTTP headers to Gemini API and Code Assist requests.
+  - Accepts a comma-separated list of `Name: value` pairs.
+  - Example:
+    `export GEMINI_CLI_CUSTOM_HEADERS="X-My-Header: foo, X-Trace-ID: abc123"`.
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
