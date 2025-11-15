@@ -58,6 +58,7 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isModelDialogOpen: boolean;
   isPermissionsDialogOpen: boolean;
+  permissionsDialogProps: { targetDirectory?: string } | null;
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
@@ -124,6 +125,8 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
+  warningMessage: string | null;
+  customDialog: React.ReactNode | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
