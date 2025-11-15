@@ -18,10 +18,11 @@ import {
 import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
-export const PASTE_TIMEOUT = 50;
+export const PASTE_TIMEOUT = 30_000;
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -211,7 +212,12 @@ function bufferPaste(
         key = yield;
         clearTimeout(timeoutId);
 
-        if (key === null || key.name === 'paste-end') {
+        if (key === null) {
+          appEvents.emit(AppEvent.PasteTimeout);
+          break;
+        }
+
+        if (key.name === 'paste-end') {
           break;
         }
         buffer += key.sequence;
