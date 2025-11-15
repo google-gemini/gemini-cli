@@ -15,7 +15,8 @@ export type EditorType =
   | 'vim'
   | 'neovim'
   | 'zed'
-  | 'emacs';
+  | 'emacs'
+  | 'trae';
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -27,6 +28,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'neovim',
     'zed',
     'emacs',
+    'trae',
   ].includes(editor);
 }
 
@@ -63,6 +65,7 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  trae: { win32: ['trae'], default: ['trae'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -74,7 +77,9 @@ export function checkHasEditorType(editor: EditorType): boolean {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
-  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (
+    ['vscode', 'vscodium', 'windsurf', 'cursor', 'zed', 'trae'].includes(editor)
+  ) {
     return notUsingSandbox;
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
@@ -116,6 +121,7 @@ export function getDiffCommand(
     case 'windsurf':
     case 'cursor':
     case 'zed':
+    case 'trae':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
     case 'neovim':
