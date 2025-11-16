@@ -9,7 +9,7 @@ import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision, type SafetyCheckResult } from '../protocol.js';
 import type { SecurityPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
-import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../../config/models.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 const CONSECA_ENFORCEMENT_PROMPT = `
@@ -47,7 +47,7 @@ export async function enforcePolicy(
   policy: SecurityPolicy,
   toolCall: FunctionCall,
 ): Promise<SafetyCheckResult> {
-  const model = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+  const model = DEFAULT_GEMINI_FLASH_MODEL;
   let client;
   try {
     client = await getGeminiClient(model);
@@ -67,7 +67,10 @@ export async function enforcePolicy(
   }
 
   const toolName = toolCall.name;
-  debugLogger.debug(`[Conseca] Enforcing policy for tool: ${toolName}`, toolCall);
+  debugLogger.debug(
+    `[Conseca] Enforcing policy for tool: ${toolName}`,
+    toolCall,
+  );
   if (!toolName) {
     return {
       decision: SafetyCheckDecision.DENY,
