@@ -718,9 +718,10 @@ class McpCallableTool implements CallableTool {
     }
     const call = functionCalls[0];
 
+    let timeoutId: NodeJS.Timeout;
     // Create a promise that rejects after the timeout
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(new Error(`Tool call timed out after ${this.timeout}ms`));
       }, this.timeout);
     });
@@ -739,6 +740,7 @@ class McpCallableTool implements CallableTool {
         ),
         timeoutPromise,
       ]);
+      clearTimeout(timeoutId!);
 
       // Convert MCP content to GenAI Parts
       // The structure of result is { content: Array<ContentBlock>, isError?: boolean }
