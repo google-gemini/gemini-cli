@@ -775,7 +775,7 @@ class McpCallableTool implements CallableTool {
             name: call.name,
             response: {
               error: {
-                message: (error as Error).message,
+                message: error instanceof Error ? error.message : String(error),
                 isError: true,
               },
             },
