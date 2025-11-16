@@ -31,7 +31,11 @@ describe('ConsecaSafetyChecker', () => {
     // Reset state (since it's a singleton, we need to be careful)
     // We can't easily reset private state without a helper or recreating.
     // For now, we rely on the fact that we can set a new prompt.
-    mockConfig = {} as Config;
+    mockConfig = {
+      getToolRegistry: vi.fn().mockReturnValue({
+        getFunctionDeclarations: vi.fn().mockReturnValue([]),
+      }),
+    } as unknown as Config;
     checker.setConfig(mockConfig);
     vi.clearAllMocks();
 
@@ -72,8 +76,8 @@ describe('ConsecaSafetyChecker', () => {
     };
     vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
 
-    const policy1 = await checker.getPolicy('prompt', 'trusted');
-    const policy2 = await checker.getPolicy('prompt', 'trusted');
+    const policy1 = await checker.getPolicy('prompt', 'trusted', mockConfig);
+    const policy2 = await checker.getPolicy('prompt', 'trusted', mockConfig);
 
     expect(policy1).toBe(mockPolicy);
     expect(policy2).toBe(mockPolicy);
@@ -99,8 +103,8 @@ describe('ConsecaSafetyChecker', () => {
       .mockResolvedValueOnce(mockPolicy1)
       .mockResolvedValueOnce(mockPolicy2);
 
-    const policy1 = await checker.getPolicy('prompt1', 'trusted');
-    const policy2 = await checker.getPolicy('prompt2', 'trusted');
+    const policy1 = await checker.getPolicy('prompt1', 'trusted', mockConfig);
+    const policy2 = await checker.getPolicy('prompt2', 'trusted', mockConfig);
 
     expect(policy1).toBe(mockPolicy1);
     expect(policy2).toBe(mockPolicy2);
@@ -141,10 +145,12 @@ describe('ConsecaSafetyChecker', () => {
     expect(policyGenerator.generatePolicy).toHaveBeenCalledWith(
       'user prompt',
       expect.any(String),
+      mockConfig,
     );
     expect(policyEnforcer.enforcePolicy).toHaveBeenCalledWith(
       mockPolicy,
       input.toolCall,
+      mockConfig,
     );
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
@@ -175,7 +181,7 @@ describe('ConsecaSafetyChecker', () => {
     };
     vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
 
-    await checker.getPolicy('prompt', 'trusted');
+    await checker.getPolicy('prompt', 'trusted', mockConfig);
 
     expect(checker.getCurrentPolicy()).toBe(mockPolicy);
     expect(checker.getActiveUserPrompt()).toBe('prompt');
@@ -190,7 +196,7 @@ describe('ConsecaSafetyChecker', () => {
     };
     vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
 
-    await checker.getPolicy('telemetry_prompt', 'trusted');
+    await checker.getPolicy('telemetry_prompt', 'trusted', mockConfig);
 
     expect(logConsecaPolicyGeneration).toHaveBeenCalledWith(
       mockConfig,
