@@ -10,6 +10,7 @@ import { SafetyCheckDecision, type SafetyCheckResult } from '../protocol.js';
 import type { SecurityPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
 import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../../config/models.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 const CONSECA_ENFORCEMENT_PROMPT = `
 You are a security enforcement engine. Your goal is to check if a specific tool call complies with a given security policy.
@@ -66,6 +67,7 @@ export async function enforcePolicy(
   }
 
   const toolName = toolCall.name;
+  debugLogger.debug(`[Conseca] Enforcing policy for tool: ${toolName}`, toolCall);
   if (!toolName) {
     return {
       decision: SafetyCheckDecision.DENY,
@@ -109,16 +111,33 @@ ${JSON.stringify(toolCall, null, 2)}
     );
 
     const responseText = getResponseText(result);
+    debugLogger.debug(`[Conseca] Enforcement Raw Response: ${responseText}`);
+
     if (!responseText) {
+      debugLogger.debug(`[Conseca] Enforcement failed: Empty response`);
       return {
         decision: SafetyCheckDecision.DENY,
         reason: 'Empty response from enforcement model',
       };
     }
 
-    // Clean up markdown code blocks if present
-    const cleanText = responseText.replace(/^```json\n|\n```$/g, '');
+    let cleanText = responseText;
+    // Extract JSON from code block if present
+    const match = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match) {
+      cleanText = match[1];
+    } else {
+      // Fallback: try to find the first '{' and last '}'
+      const firstOpen = responseText.indexOf('{');
+      const lastClose = responseText.lastIndexOf('}');
+      if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+        cleanText = responseText.substring(firstOpen, lastClose + 1);
+      }
+    }
+
+    debugLogger.debug(`[Conseca] Enforcement Cleaned JSON: ${cleanText}`);
     const parsed = JSON.parse(cleanText);
+    debugLogger.debug(`[Conseca] Enforcement Parsed:`, parsed);
 
     let decision: SafetyCheckDecision;
     switch (parsed.decision) {
@@ -139,6 +158,7 @@ ${JSON.stringify(toolCall, null, 2)}
       reason: parsed.reason,
     };
   } catch (error) {
+    debugLogger.debug(`[Conseca] Enforcement failed with error:`, error);
     return {
       decision: SafetyCheckDecision.DENY,
       reason: `Policy enforcement failed: ${error instanceof Error ? error.message : String(error)}`,
