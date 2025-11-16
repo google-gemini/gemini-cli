@@ -34,7 +34,6 @@ import {
   getVersion,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
-import { getSettingsSchema } from './settingsSchema.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -677,13 +676,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
-    safety: {
-      ...settings.safety,
-      enableConseca:
-        settings.safety?.enableConseca ??
-        (getSettingsSchema().safety.properties.enableConseca
-          .default as boolean),
-    },
+    safety: settings.safety,
   });
 }
 

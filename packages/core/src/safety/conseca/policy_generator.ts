@@ -7,7 +7,7 @@
 import { getGeminiClient } from './utilities.js';
 import type { SecurityPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
-import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../../config/models.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 const CONSECA_POLICY_GENERATION_PROMPT = `
@@ -59,7 +59,7 @@ export async function generatePolicy(
   userPrompt: string,
   trustedContent: string,
 ): Promise<SecurityPolicy> {
-  const model = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+  const model = DEFAULT_GEMINI_FLASH_MODEL;
   let client;
   try {
     client = await getGeminiClient(model);
@@ -92,7 +92,9 @@ ${trustedContent}
     );
 
     const responseText = getResponseText(result);
-    debugLogger.debug(`[Conseca] Policy Generation Raw Response: ${responseText}`);
+    debugLogger.debug(
+      `[Conseca] Policy Generation Raw Response: ${responseText}`,
+    );
 
     if (!responseText) {
       debugLogger.debug(`[Conseca] Policy Generation failed: Empty response`);
@@ -112,7 +114,7 @@ ${trustedContent}
         cleanText = responseText.substring(firstOpen, lastClose + 1);
       }
     }
-    
+
     debugLogger.debug(`[Conseca] Policy Generation Cleaned JSON: ${cleanText}`);
 
     try {
@@ -120,7 +122,10 @@ ${trustedContent}
       debugLogger.debug(`[Conseca] Policy Generation Parsed:`, policy);
       return policy;
     } catch (parseError) {
-      debugLogger.debug(`[Conseca] Policy Generation JSON Parse Error:`, parseError);
+      debugLogger.debug(
+        `[Conseca] Policy Generation JSON Parse Error:`,
+        parseError,
+      );
       return {};
     }
   } catch (error) {
