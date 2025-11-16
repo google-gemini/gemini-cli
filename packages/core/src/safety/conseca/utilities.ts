@@ -26,6 +26,9 @@ export async function getGeminiClient(
           modelConfig: {
             generateContentConfig: {
               responseMimeType: 'application/json',
+              thinkingConfig: {
+                includeThoughts: false,
+              },
             },
           },
         },
