@@ -24,6 +24,7 @@ import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useTimeout } from '../../hooks/useTimeout.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -83,17 +84,14 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     }
   }, [resultDisplay]);
 
-  React.useEffect(() => {
-    if (!lastUpdateTime) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setShowFocusHint(true);
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, [lastUpdateTime]);
+  useTimeout(
+    () => {
+      if (lastUpdateTime) {
+        setShowFocusHint(true);
+      }
+    },
+    lastUpdateTime ? 5000 : null,
+  );
 
   React.useEffect(() => {
     if (isThisShellFocused) {
