@@ -687,8 +687,7 @@ export class Config {
           // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
           if (previewFeatures === undefined) {
             const remotePreviewFeatures =
-              experiments.flags['GeminiCLIPreviewAvailable__enable_preview']
-                ?.boolValue;
+              experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
             if (remotePreviewFeatures === true) {
               this.setPreviewFeatures(remotePreviewFeatures);
             }
