@@ -191,6 +191,28 @@ export type HistoryItemChatList = HistoryItemBase & {
   chats: ChatDetail[];
 };
 
+export type HistoryItemExampleList = HistoryItemBase & {
+  type: 'example_list';
+  examples: Array<{
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    difficulty: string;
+    estimatedTime: string;
+    tags: string[];
+    examplePrompt: string;
+    expectedOutcome: string;
+    tips: string[];
+    prerequisites?: string[];
+  }>;
+  category?: string;
+  difficulty?: string;
+  searchQuery?: string;
+  featured?: boolean;
+  showDetails?: boolean;
+};
+
 export interface ToolDefinition {
   name: string;
   displayName: string;
@@ -261,7 +283,8 @@ export type HistoryItemWithoutId =
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemMcpStatus
-  | HistoryItemChatList;
+  | HistoryItemChatList
+  | HistoryItemExampleList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -283,6 +306,7 @@ export enum MessageType {
   TOOLS_LIST = 'tools_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
+  EXAMPLE_LIST = 'example_list',
 }
 
 // Simplified message structure for internal feedback

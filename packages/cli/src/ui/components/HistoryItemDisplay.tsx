@@ -30,6 +30,7 @@ import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
+import { ExampleList } from './views/ExampleList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 
 interface HistoryItemDisplayProps {
@@ -153,6 +154,17 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
+      )}
+      {itemForDisplay.type === 'example_list' && (
+        <ExampleList
+          examples={itemForDisplay.examples}
+          category={itemForDisplay.category}
+          difficulty={itemForDisplay.difficulty}
+          searchQuery={itemForDisplay.searchQuery}
+          featured={itemForDisplay.featured}
+          showDetails={itemForDisplay.showDetails}
+          terminalWidth={terminalWidth}
+        />
       )}
     </Box>
   );
