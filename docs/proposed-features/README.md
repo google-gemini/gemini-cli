@@ -2,6 +2,18 @@
 
 This directory contains detailed proposals for ten new features designed to make Gemini CLI more helpful, useful, and educational for new users.
 
+## 📋 Planning Documents
+
+Before diving into individual features, review these comprehensive planning documents:
+
+- **[Implementation Plan](./IMPLEMENTATION_PLAN.md)** - Detailed 68-week sprint breakdown with deliverables, milestones, and testing strategy
+- **[Roadmap & Timeline](./ROADMAP.md)** - Visual timeline, Gantt chart, critical path, and release calendar
+- **[Resource Allocation & Budget](./RESOURCE_ALLOCATION.md)** - Team composition, budget breakdown (~$1.2M-$1.6M), and hiring timeline
+
+**Quick Summary**: 17 months, 4 phases, 2-4 engineers, estimated $1.2M-$1.6M total investment.
+
+---
+
 ## Overview
 
 These features focus on improving the onboarding experience, reducing the learning curve, and helping users discover and master Gemini CLI's capabilities through interactive, educational approaches.
