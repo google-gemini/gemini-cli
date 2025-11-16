@@ -212,8 +212,8 @@ export function validateVariables(
  * Parse variables from command-line arguments
  *
  * Parses arguments like "key1=value1 key2=value2" into a variables object.
- * For values containing '=' characters, splits on '=' and takes the first
- * segment as the key and the last segment as the value.
+ * Splits on the first '=' to extract key, and takes everything after as value.
+ * This preserves values that contain '=' characters.
  *
  * @param args - The argument string to parse
  * @returns Variables object
@@ -223,8 +223,11 @@ export function validateVariables(
  * const vars = parseVariablesFromArgs('file=app.ts issue=bug');
  * // vars = { file: 'app.ts', issue: 'bug' }
  *
- * const vars2 = parseVariablesFromArgs('expression=x=5');
- * // vars2 = { expression: '5' } (last segment after '=')
+ * const vars2 = parseVariablesFromArgs('url=https://example.com/?token=abc==');
+ * // vars2 = { url: 'https://example.com/?token=abc==' } (preserves all '=')
+ *
+ * const vars3 = parseVariablesFromArgs('expression=x=5');
+ * // vars3 = { expression: 'x=5' } (preserves full expression)
  * ```
  */
 export function parseVariablesFromArgs(
@@ -234,10 +237,10 @@ export function parseVariablesFromArgs(
   const parts = args.trim().split(/\s+/);
 
   for (const part of parts) {
-    const equalParts = part.split('=');
-    if (equalParts.length >= 2) {
-      const key = equalParts[0];
-      const value = equalParts[equalParts.length - 1];
+    const equalIndex = part.indexOf('=');
+    if (equalIndex > 0) {
+      const key = part.substring(0, equalIndex);
+      const value = part.substring(equalIndex + 1);
       // Validate key is a valid variable name (word characters only)
       if (key.match(/^\w+$/)) {
         variables[key] = value;

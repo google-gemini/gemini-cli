@@ -278,7 +278,24 @@ describe('parseVariablesFromArgs', () => {
     const args = 'expression=x=5';
     const variables = parseVariablesFromArgs(args);
 
-    expect(variables.expression).toBe('5');
+    // Should preserve everything after first '='
+    expect(variables.expression).toBe('x=5');
+  });
+
+  it('should handle URLs and query strings with equals', () => {
+    const args = 'url=https://example.com/?token=abc==';
+    const variables = parseVariablesFromArgs(args);
+
+    // Should preserve full URL including all '=' characters
+    expect(variables.url).toBe('https://example.com/?token=abc==');
+  });
+
+  it('should handle base64-like values', () => {
+    const args = 'data=SGVsbG8gV29ybGQ=';
+    const variables = parseVariablesFromArgs(args);
+
+    // Should preserve trailing '=' characters in base64
+    expect(variables.data).toBe('SGVsbG8gV29ybGQ=');
   });
 
   it('should trim whitespace', () => {
