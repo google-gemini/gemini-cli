@@ -67,5 +67,25 @@ export { ExampleRegistry, getExampleRegistry, resetExampleRegistry } from './reg
 export { ExampleRunner } from './runner.js';
 export type { RunExampleOptions } from './runner.js';
 
+// Export history tracking
+export {
+  ExampleHistory,
+  getExampleHistory,
+  resetExampleHistory,
+} from './history.js';
+export type { ExampleHistoryEntry, ExampleUsageStats } from './history.js';
+
+// Export context injection
+export {
+  injectContext,
+  extractVariables,
+  validateVariables,
+  parseVariablesFromArgs,
+} from './context-injection.js';
+export type {
+  ContextInjectionOptions,
+  InjectedContext,
+} from './context-injection.js';
+
 // Export examples
 export { BUILT_IN_EXAMPLES, getAllExamples, getExampleById } from './examples/index.js';

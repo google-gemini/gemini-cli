@@ -17,6 +17,11 @@ import {
   type Example,
   type ExampleCategory,
   type ExampleDifficulty,
+  getExampleHistory,
+  injectContext,
+  extractVariables,
+  validateVariables,
+  parseVariablesFromArgs,
 } from '@google/gemini-cli-core';
 import { MessageType, type HistoryItemExampleList } from '../types.js';
 
@@ -123,23 +128,27 @@ const featuredCommand: SlashCommand = {
 };
 
 /**
- * Run an example by ID
+ * Run an example by ID with optional variable substitution
  */
 const runCommand: SlashCommand = {
   name: 'run',
   altNames: ['exec', 'execute'],
-  description: 'Run an example by ID. Usage: /examples run <example-id>',
+  description:
+    'Run an example by ID with optional variables. Usage: /examples run <example-id> [var1=value1 var2=value2]',
   kind: CommandKind.BUILT_IN,
   action: async (
     context,
     args,
   ): Promise<MessageActionReturn | SubmitPromptActionReturn> => {
-    const exampleId = args.trim();
+    const parts = args.trim().split(/\s+/);
+    const exampleId = parts[0];
+
     if (!exampleId) {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing example ID. Usage: /examples run <example-id>',
+        content:
+          'Missing example ID. Usage: /examples run <example-id> [var1=value1 ...]',
       };
     }
 
@@ -154,23 +163,39 @@ const runCommand: SlashCommand = {
       };
     }
 
-    // Build the complete prompt with context files if specified
-    const promptParts: string[] = [];
+    // Parse variables from remaining arguments
+    const variablesArgs = parts.slice(1).join(' ');
+    const variables = parseVariablesFromArgs(variablesArgs);
 
-    if (example.contextFiles && example.contextFiles.length > 0) {
-      const contextRefs = example.contextFiles.map((f) => `@${f}`).join(' ');
-      promptParts.push(contextRefs);
-      promptParts.push('');
+    // Validate variables
+    const validation = validateVariables(example, variables);
+    if (!validation.valid) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Missing required variables: ${validation.missing.join(', ')}\n\nExample prompt uses: ${extractVariables(example.examplePrompt).map((v) => `{{${v}}}`).join(', ')}`,
+      };
     }
 
-    promptParts.push(example.examplePrompt);
+    // Inject context and variables
+    const injected = injectContext(example, {
+      variables,
+      includeDefaultFiles: true,
+    });
 
-    const fullPrompt = promptParts.join('\n');
+    // Record execution in history
+    const history = getExampleHistory();
+    history.record({
+      exampleId: example.id,
+      timestamp: Date.now(),
+      action: 'run',
+      contextVars: variables,
+    });
 
     // Submit the prompt directly to the chat
     return {
       type: 'submit_prompt',
-      content: fullPrompt,
+      content: injected.prompt,
     };
   },
   completion: async (context, partialArg) => {
@@ -297,18 +322,273 @@ const randomCommand: SlashCommand = {
 };
 
 /**
+ * Preview an example without running it
+ */
+const previewCommand: SlashCommand = {
+  name: 'preview',
+  description:
+    'Preview an example with context injection. Usage: /examples preview <example-id> [var1=value1 ...]',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    const parts = args.trim().split(/\s+/);
+    const exampleId = parts[0];
+
+    if (!exampleId) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Missing example ID. Usage: /examples preview <example-id> [var1=value1 ...]',
+      };
+    }
+
+    const registry = await getExampleRegistry();
+    const example = registry.get(exampleId);
+
+    if (!example) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Example '${exampleId}' not found. Use /examples list to see all examples.`,
+      };
+    }
+
+    // Parse variables from remaining arguments
+    const variablesArgs = parts.slice(1).join(' ');
+    const variables = parseVariablesFromArgs(variablesArgs);
+
+    // Get required variables
+    const requiredVars = extractVariables(example.examplePrompt);
+
+    // Inject context
+    const injected = injectContext(example, {
+      variables,
+      includeDefaultFiles: true,
+    });
+
+    // Build preview message
+    const lines: string[] = [
+      `📋 Preview: ${example.title}`,
+      '',
+      `**Category:** ${example.category}`,
+      `**Difficulty:** ${example.difficulty}`,
+      `**Estimated Time:** ${example.estimatedTime}`,
+    ];
+
+    if (requiredVars.length > 0) {
+      lines.push('');
+      lines.push('**Variables:**');
+      for (const varName of requiredVars) {
+        const value = variables[varName] || '<not provided>';
+        lines.push(`  {{${varName}}} = ${value}`);
+      }
+    }
+
+    if (injected.contextFiles.length > 0) {
+      lines.push('');
+      lines.push('**Context Files:**');
+      for (const file of injected.contextFiles) {
+        lines.push(`  @${file}`);
+      }
+    }
+
+    lines.push('');
+    lines.push('**Prompt:**');
+    lines.push('```');
+    lines.push(injected.prompt);
+    lines.push('```');
+
+    lines.push('');
+    lines.push(`*Run with:* /examples run ${exampleId}`);
+
+    // Record preview in history
+    const history = getExampleHistory();
+    history.record({
+      exampleId: example.id,
+      timestamp: Date.now(),
+      action: 'preview',
+      contextVars: variables,
+    });
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: lines.join('\n'),
+    };
+  },
+  completion: async (context, partialArg) => {
+    const registry = await getExampleRegistry();
+    const examples = registry.getAll();
+    return examples
+      .map((ex) => ex.id)
+      .filter((id) => id.startsWith(partialArg));
+  },
+};
+
+/**
+ * Show example execution history
+ */
+const historyCommand: SlashCommand = {
+  name: 'history',
+  description: 'Show recent example execution history',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    const history = getExampleHistory();
+    const limit = args.trim() ? parseInt(args.trim(), 10) : 20;
+    const recent = history.getRecent(limit);
+
+    if (recent.length === 0) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content:
+          'No example history yet. Run an example with /examples run <id> to get started.',
+      };
+    }
+
+    const stats = history.getStats();
+    const lines: string[] = [
+      '📊 Example Execution History',
+      '',
+      `Total Runs: ${stats.totalRuns}`,
+      `Total Previews: ${stats.totalPreviews}`,
+      '',
+      'Recent Activity:',
+    ];
+
+    for (const entry of recent.slice(0, limit)) {
+      const date = new Date(entry.timestamp);
+      const timeStr = date.toLocaleString();
+      const action = entry.action === 'run' ? '▶️' : entry.action === 'preview' ? '👁️' : '💾';
+      const vars = entry.contextVars
+        ? ` (${Object.keys(entry.contextVars).length} vars)`
+        : '';
+      lines.push(`  ${action} ${entry.exampleId}${vars} - ${timeStr}`);
+    }
+
+    if (stats.popularExamples.length > 0) {
+      lines.push('');
+      lines.push('Most Popular:');
+      for (const { exampleId, runCount } of stats.popularExamples.slice(0, 5)) {
+        lines.push(`  ${exampleId} (${runCount} runs)`);
+      }
+    }
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: lines.join('\n'),
+    };
+  },
+};
+
+/**
+ * Save an example as a custom slash command
+ */
+const saveCommand: SlashCommand = {
+  name: 'save',
+  description:
+    'Save an example as a custom command. Usage: /examples save <example-id> [command-name]',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    const parts = args.trim().split(/\s+/);
+    const exampleId = parts[0];
+    const commandName = parts[1] || exampleId;
+
+    if (!exampleId) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Missing example ID. Usage: /examples save <example-id> [command-name]',
+      };
+    }
+
+    const registry = await getExampleRegistry();
+    const example = registry.get(exampleId);
+
+    if (!example) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Example '${exampleId}' not found. Use /examples list to see all examples.`,
+      };
+    }
+
+    // Record save in history
+    const history = getExampleHistory();
+    history.record({
+      exampleId: example.id,
+      timestamp: Date.now(),
+      action: 'save',
+      notes: commandName,
+    });
+
+    // Build the command file content
+    const commandContent = [
+      `# ${example.title}`,
+      '',
+      `# ${example.description}`,
+      '',
+      `# Category: ${example.category}`,
+      `# Difficulty: ${example.difficulty}`,
+      `# Estimated Time: ${example.estimatedTime}`,
+      '',
+    ];
+
+    if (example.contextFiles && example.contextFiles.length > 0) {
+      commandContent.push(...example.contextFiles.map((f) => `@${f}`));
+      commandContent.push('');
+    }
+
+    commandContent.push(example.examplePrompt);
+
+    const message = [
+      `✅ Example saved as custom command!`,
+      '',
+      `Create a file at: \`.claude/commands/${commandName}.md\``,
+      '',
+      'With this content:',
+      '```markdown',
+      ...commandContent,
+      '```',
+      '',
+      `Then run it with: /${commandName}`,
+      '',
+      '**Note:** You\'ll need to reload commands with /reload or restart the CLI.',
+    ];
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: message.join('\n'),
+    };
+  },
+  completion: async (context, partialArg) => {
+    const registry = await getExampleRegistry();
+    const examples = registry.getAll();
+    return examples
+      .map((ex) => ex.id)
+      .filter((id) => id.startsWith(partialArg));
+  },
+};
+
+/**
  * Main /examples command
  */
 export const examplesCommand: SlashCommand = {
   name: 'examples',
-  description: 'Browse and run example prompts',
+  description: 'Browse and run example prompts with advanced features',
   kind: CommandKind.BUILT_IN,
   subCommands: [
     listCommand,
     searchCommand,
     featuredCommand,
     runCommand,
+    previewCommand,
     showCommand,
+    historyCommand,
+    saveCommand,
     statsCommand,
     randomCommand,
   ],
