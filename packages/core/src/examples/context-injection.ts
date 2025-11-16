@@ -212,6 +212,8 @@ export function validateVariables(
  * Parse variables from command-line arguments
  *
  * Parses arguments like "key1=value1 key2=value2" into a variables object.
+ * For values containing '=' characters, splits on '=' and takes the first
+ * segment as the key and the last segment as the value.
  *
  * @param args - The argument string to parse
  * @returns Variables object
@@ -220,6 +222,9 @@ export function validateVariables(
  * ```typescript
  * const vars = parseVariablesFromArgs('file=app.ts issue=bug');
  * // vars = { file: 'app.ts', issue: 'bug' }
+ *
+ * const vars2 = parseVariablesFromArgs('expression=x=5');
+ * // vars2 = { expression: '5' } (last segment after '=')
  * ```
  */
 export function parseVariablesFromArgs(
@@ -229,10 +234,14 @@ export function parseVariablesFromArgs(
   const parts = args.trim().split(/\s+/);
 
   for (const part of parts) {
-    const match = part.match(/^(\w+)=(.+)$/);
-    if (match) {
-      const [, key, value] = match;
-      variables[key] = value;
+    const equalParts = part.split('=');
+    if (equalParts.length >= 2) {
+      const key = equalParts[0];
+      const value = equalParts[equalParts.length - 1];
+      // Validate key is a valid variable name (word characters only)
+      if (key.match(/^\w+$/)) {
+        variables[key] = value;
+      }
     }
   }
 
