@@ -16,8 +16,8 @@ An MCP server enables the Gemini CLI to:
   through standardized schema definitions.
 - **Execute tools:** Call specific tools with defined arguments and receive
   structured responses.
-- **Access resources:** Read data from specific resources (though the Gemini CLI
-  primarily focuses on tool execution).
+- **Access resources:** Read data from specific resources that the server
+  exposes (files, API payloads, reports, etc.).
 
 With an MCP server, you can extend the Gemini CLI's capabilities to perform
 actions beyond its built-in features, such as interacting with databases, APIs,
@@ -40,6 +40,7 @@ The discovery process is orchestrated by `discoverMcpTools()`, which:
 4. **Sanitizes and validates** tool schemas for compatibility with the Gemini
    API
 5. **Registers tools** in the global tool registry with conflict resolution
+6. **Fetches and registers resources** if the server exposes any
 
 ### Execution layer (`mcp-tool.ts`)
 
@@ -58,6 +59,55 @@ The Gemini CLI supports three MCP transport types:
 - **Stdio Transport:** Spawns a subprocess and communicates via stdin/stdout
 - **SSE Transport:** Connects to Server-Sent Events endpoints
 - **Streamable HTTP Transport:** Uses HTTP streaming for communication
+
+## Working with MCP resources
+
+Some MCP servers expose contextual “resources” in addition to tools. Gemini CLI
+discovers these automatically and gives you and the model multiple ways to
+reference them.
+
+### Discovery and listing
+
+- When discovery runs, the CLI fetches each server’s `resources/list` results.
+- The `/mcp` command displays a “Resources” section alongside tools/prompts for
+  every connected server.
+- The model can also call the built-in `list_resources` tool:
+
+```json
+{
+  "tool": "list_resources",
+  "args": {
+    "server_name": "example-server"
+  }
+}
+```
+
+This returns a concise, plain-text list of URIs plus metadata so the model can
+choose which resource to read next.
+
+### Referencing resources in a conversation
+
+You can use the same `@` syntax already known for referencing local files:
+
+```
+@file:///example.txt
+```
+
+Resource URIs appear in the completion menu together with filesystem paths. When
+you submit the message, the CLI calls `resources/read` and injects the content
+in the conversation.
+
+### Model-facing tools
+
+Two built-in tools make resources available to the LLM:
+
+- **`list_resources`** – returns the current registry, optionally filtered by
+  server via `server_name`.
+- **`read_resource`** – takes a single `uri` argument. The CLI validates that
+  the URI was previously discovered and then performs `resources/read`.
+
+These tools are registered automatically whenever at least one MCP resource is
+available, so no additional configuration is required.
 
 ## How to set up your MCP server
 

@@ -103,6 +103,7 @@ export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 export * from './tools/tool-names.js';
+export * from './resources/resource-registry.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
@@ -123,6 +124,8 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './resources/list-resources-tool.js';
+export * from './resources/read-resource-tool.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';

@@ -20,9 +20,14 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   GetPromptResult,
   Prompt,
+  ReadResourceResult,
+  Resource,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
+  ListResourcesResultSchema,
   ListRootsRequestSchema,
+  ReadResourceResultSchema,
+  ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -54,6 +59,7 @@ import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -106,6 +112,7 @@ export class McpClient {
     private readonly serverConfig: MCPServerConfig,
     private readonly toolRegistry: ToolRegistry,
     private readonly promptRegistry: PromptRegistry,
+    private readonly resourceRegistry: ResourceRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly cliConfig: Config,
     private readonly debugMode: boolean,
@@ -148,6 +155,7 @@ export class McpClient {
           },
         );
       }
+      this.registerNotificationHandlers();
       const originalOnError = this.client.onerror;
       this.client.onerror = (error) => {
         if (this.status !== MCPServerStatus.CONNECTED) {
@@ -176,9 +184,11 @@ export class McpClient {
 
     const prompts = await this.discoverPrompts();
     const tools = await this.discoverTools(cliConfig);
+    const resources = await this.discoverResources();
+    this.updateResourceRegistry(resources);
 
-    if (prompts.length === 0 && tools.length === 0) {
-      throw new Error('No prompts or tools found on the server.');
+    if (prompts.length === 0 && tools.length === 0 && resources.length === 0) {
+      throw new Error('No prompts, tools, or resources found on the server.');
     }
 
     for (const tool of tools) {
@@ -196,6 +206,7 @@ export class McpClient {
     }
     this.toolRegistry.removeMcpToolsByServer(this.serverName);
     this.promptRegistry.removePromptsByServer(this.serverName);
+    this.resourceRegistry.removeResourcesByServer(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -248,6 +259,53 @@ export class McpClient {
   private async discoverPrompts(): Promise<Prompt[]> {
     this.assertConnected();
     return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
+  }
+
+  private async discoverResources(): Promise<Resource[]> {
+    this.assertConnected();
+    return discoverResources(this.serverName, this.client!);
+  }
+
+  private updateResourceRegistry(resources: Resource[]): void {
+    this.resourceRegistry.setResourcesForServer(this.serverName, resources);
+  }
+
+  async readResource(uri: string): Promise<ReadResourceResult> {
+    this.assertConnected();
+    return this.client!.request(
+      {
+        method: 'resources/read',
+        params: { uri },
+      },
+      ReadResourceResultSchema,
+    );
+  }
+
+  private registerNotificationHandlers(): void {
+    if (!this.client) {
+      return;
+    }
+    this.client.setNotificationHandler(
+      ResourceListChangedNotificationSchema,
+      async () => {
+        await this.handleResourceListChanged();
+      },
+    );
+  }
+
+  private async handleResourceListChanged(): Promise<void> {
+    try {
+      const resources = await this.discoverResources();
+      this.updateResourceRegistry(resources);
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        `Error refreshing resources from ${this.serverName}: ${getErrorMessage(
+          error,
+        )}`,
+        error,
+      );
+    }
   }
 
   getServerConfig(): MCPServerConfig {
@@ -944,6 +1002,52 @@ export async function discoverPrompts(
   }
 }
 
+export async function discoverResources(
+  mcpServerName: string,
+  mcpClient: Client,
+): Promise<Resource[]> {
+  if (mcpClient.getServerCapabilities()?.resources == null) {
+    return [];
+  }
+
+  const resources = await listResources(mcpServerName, mcpClient);
+  return resources;
+}
+
+async function listResources(
+  mcpServerName: string,
+  mcpClient: Client,
+): Promise<Resource[]> {
+  const resources: Resource[] = [];
+  let cursor: string | undefined;
+  try {
+    do {
+      const response = await mcpClient.request(
+        {
+          method: 'resources/list',
+          params: cursor ? { cursor } : {},
+        },
+        ListResourcesResultSchema,
+      );
+      resources.push(...(response.resources ?? []));
+      cursor = response.nextCursor ?? undefined;
+    } while (cursor);
+  } catch (error) {
+    if (error instanceof Error && error.message?.includes('Method not found')) {
+      return [];
+    }
+    coreEvents.emitFeedback(
+      'error',
+      `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
+        error,
+      )}`,
+      error,
+    );
+    throw error;
+  }
+  return resources;
+}
+
 /**
  * Invokes a prompt on a connected MCP client.
  *
@@ -1179,6 +1283,9 @@ export async function connectToMcpServer(
 
   mcpClient.registerCapabilities({
     roots: {
+      listChanged: true,
+    },
+    resources: {
       listChanged: true,
     },
   });
