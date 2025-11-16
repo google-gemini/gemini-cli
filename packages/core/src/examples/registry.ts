@@ -234,29 +234,15 @@ export class ExampleRegistry {
 
   /**
    * Load built-in examples
-   * This will import all example files from the examples directory
+   * This imports all examples from the centralized BUILT_IN_EXAMPLES array
    */
   private async loadBuiltInExamples(): Promise<void> {
-    // Import all example modules
-    // Note: In production, these would be dynamically imported
-    // For now, we'll import them directly
+    // Import the BUILT_IN_EXAMPLES array from the centralized index
+    const { BUILT_IN_EXAMPLES } = await import('./examples/index.js');
 
-    const exampleModules = await Promise.all([
-      import('./examples/code-understanding/explain-architecture.js'),
-      import('./examples/code-understanding/find-vulnerabilities.js'),
-      import('./examples/development/write-tests.js'),
-      import('./examples/development/generate-commits.js'),
-      import('./examples/file-operations/rename-photos.js'),
-      import('./examples/file-operations/combine-csvs.js'),
-      import('./examples/data-analysis/parse-logs.js'),
-      import('./examples/automation/git-workflow.js'),
-      import('./examples/documentation/generate-readme.js'),
-    ].map((p) => p.catch(() => null))); // Gracefully handle missing files
-
-    for (const module of exampleModules) {
-      if (module && module.default) {
-        this.register(module.default);
-      }
+    // Register all examples from the array
+    for (const example of BUILT_IN_EXAMPLES) {
+      this.register(example);
     }
   }
 }
