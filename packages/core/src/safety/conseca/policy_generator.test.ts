@@ -6,21 +6,24 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generatePolicy } from './policy_generator.js';
-import * as utilities from './utilities.js';
-import type { GeminiClient } from '../../core/client.js';
-
-vi.mock('./utilities.js');
+import type { Config } from '../../config/config.js';
+import type { ContentGenerator } from '../../core/contentGenerator.js';
 
 describe('policy_generator', () => {
-  let mockClient: GeminiClient;
+  let mockConfig: Config;
+  let mockContentGenerator: ContentGenerator;
 
   beforeEach(() => {
-    mockClient = {
+    mockContentGenerator = {
       generateContent: vi.fn(),
-    } as unknown as GeminiClient;
+    } as unknown as ContentGenerator;
+
+    mockConfig = {
+      getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+    } as unknown as Config;
   });
 
-  it('should return a policy object when client is available', async () => {
+  it('should return a policy object when content generator is available', async () => {
     const mockPolicy = {
       read_file: {
         permissions: 'ALLOW',
@@ -28,7 +31,7 @@ describe('policy_generator', () => {
         rationale: 'Test',
       },
     };
-    mockClient.generateContent = vi.fn().mockResolvedValue({
+    mockContentGenerator.generateContent = vi.fn().mockResolvedValue({
       candidates: [
         {
           content: {
@@ -37,33 +40,37 @@ describe('policy_generator', () => {
         },
       ],
     });
-    vi.mocked(utilities.getGeminiClient).mockResolvedValue(mockClient);
 
-    const policy = await generatePolicy('test prompt', 'trusted content');
+    const policy = await generatePolicy(
+      'test prompt',
+      'trusted content',
+      mockConfig,
+    );
 
-    expect(utilities.getGeminiClient).toHaveBeenCalled();
-    expect(mockClient.generateContent).toHaveBeenCalledWith(
-      expect.anything(), // model config
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: 'user',
-          parts: expect.arrayContaining([
-            expect.objectContaining({
-              text: expect.stringContaining('User Prompt:'),
-            }),
-          ]),
+    expect(mockConfig.getContentGenerator).toHaveBeenCalled();
+    expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: expect.any(String),
+        config: expect.objectContaining({
+          responseMimeType: 'application/json',
         }),
-      ]),
-      expect.anything(), // signal
+        contents: expect.any(Array),
+      }),
+      'conseca-policy-generation',
     );
     expect(policy).toEqual(mockPolicy);
   });
 
-  it('should handle missing client gracefully (though getGeminiClient always returns one now)', async () => {
-    // If getGeminiClient throws or something
-    vi.mocked(utilities.getGeminiClient).mockRejectedValue(new Error('Failed'));
+  it('should handle missing content generator gracefully', async () => {
+    vi.mocked(mockConfig.getContentGenerator).mockReturnValue(
+      undefined as unknown as ContentGenerator,
+    );
 
-    const policy = await generatePolicy('test prompt', 'trusted content');
+    const policy = await generatePolicy(
+      'test prompt',
+      'trusted content',
+      mockConfig,
+    );
 
     expect(policy).toEqual({});
   });

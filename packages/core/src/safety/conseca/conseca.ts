@@ -40,56 +40,76 @@ export class ConsecaSafetyChecker implements InProcessChecker {
   }
 
   async check(input: SafetyCheckInput): Promise<SafetyCheckResult> {
-    debugLogger.debug(`[Conseca] check called. History is: ${JSON.stringify(input.context.history)}`);
+    debugLogger.debug(
+      `[Conseca] check called. History is: ${JSON.stringify(input.context.history)}`,
+    );
+
+    if (!this.config) {
+      debugLogger.debug('[Conseca] check failed: Config not initialized');
+      return {
+        decision: SafetyCheckDecision.DENY,
+        reason: 'Config not initialized',
+      };
+    }
+
     const userPrompt = this.extractUserPrompt(input);
     let trustedContent = '';
 
-    if (this.config) {
-      const toolRegistry = this.config.getToolRegistry();
-      if (toolRegistry) {
-        const tools = toolRegistry.getFunctionDeclarations();
-        trustedContent = JSON.stringify(tools, null, 2);
+    const toolRegistry = this.config.getToolRegistry();
+    if (toolRegistry) {
+      const tools = toolRegistry.getFunctionDeclarations();
+      trustedContent = JSON.stringify(tools, null, 2);
+    }
+
+    if (userPrompt) {
+      await this.getPolicy(userPrompt, trustedContent, this.config);
+    } else {
+      debugLogger.debug(
+        `[Conseca] Skipping policy generation because userPrompt is null`,
+      );
+    }
+
+    if (!this.currentPolicy) {
+      // If policy generation failed or wasn't triggered, we can't enforce.
+      // Default to DENY for safety? Or ALLOW if no user prompt (e.g. system tool)?
+      // For now, if no policy, we can't check.
+      // But wait, if we have a policy from previous turn, we use it?
+      // The requirement implies per-turn policy or session policy?
+      // "Dynamically generating a security policy based on the user's prompt"
+      // If no new prompt, maybe keep old policy?
+      // For now, let's assume we need a policy.
+      if (!this.currentPolicy) {
+        return {
+          decision: SafetyCheckDecision.ALLOW, // Fallback if no policy generated yet?
+          reason: 'No security policy generated.',
+        };
       }
     }
 
-
-    if (userPrompt) {
-      await this.getPolicy(userPrompt, trustedContent);
-    } else {
-      debugLogger.debug(`[Conseca] Skipping policy generation because userPrompt is null`);
-    }
-
-    if (this.currentPolicy) {
-      return enforcePolicy(this.currentPolicy, input.toolCall);
-    }
-
-    return {
-      decision: SafetyCheckDecision.ALLOW,
-    };
+    return enforcePolicy(this.currentPolicy, input.toolCall, this.config);
   }
 
   async getPolicy(
     userPrompt: string,
     trustedContent: string,
+    config: Config,
   ): Promise<SecurityPolicy> {
     if (this.activeUserPrompt === userPrompt && this.currentPolicy) {
       return this.currentPolicy;
     }
 
-    const policy = await generatePolicy(userPrompt, trustedContent);
+    const policy = await generatePolicy(userPrompt, trustedContent, config);
     this.currentPolicy = policy;
     this.activeUserPrompt = userPrompt;
 
-    if (this.config) {
-      logConsecaPolicyGeneration(
-        this.config,
-        new ConsecaPolicyGenerationEvent(
-          userPrompt,
-          trustedContent,
-          JSON.stringify(policy),
-        ),
-      );
-    }
+    logConsecaPolicyGeneration(
+      config,
+      new ConsecaPolicyGenerationEvent(
+        userPrompt,
+        trustedContent,
+        JSON.stringify(policy),
+      ),
+    );
 
     return policy;
   }
@@ -100,7 +120,9 @@ export class ConsecaSafetyChecker implements InProcessChecker {
         input.context.history.turns[input.context.history.turns.length - 1];
       return lastTurn.user.text;
     }
-    debugLogger.debug(`[Conseca] extractUserPrompt failed. History length: ${input.context.history?.turns?.length}`);
+    debugLogger.debug(
+      `[Conseca] extractUserPrompt failed. History length: ${input.context.history?.turns?.length}`,
+    );
     return null;
   }
 
