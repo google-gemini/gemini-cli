@@ -863,13 +863,7 @@ export async function loadCliConfig(
         agents: refreshedSettings.merged.agents,
       };
     },
-    safety: {
-      ...settings.safety,
-      enableConseca:
-        settings.safety?.enableConseca ??
-        (getSettingsSchema().safety.properties.enableConseca
-          .default as boolean),
-    },
+    safety: settings.safety,
   });
 }
 
