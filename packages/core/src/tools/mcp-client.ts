@@ -746,7 +746,6 @@ class McpCallableTool implements CallableTool {
         ),
         timeoutPromise,
       ]);
-      clearTimeout(timeoutId!);
 
       // Convert MCP content to GenAI Parts
       // The structure of result is { content: Array<ContentBlock>, isError?: boolean }
@@ -783,6 +782,8 @@ class McpCallableTool implements CallableTool {
           },
         },
       ];
+    } finally {
+      clearTimeout(timeoutId!);
     }
   }
 }
