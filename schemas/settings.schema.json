@@ -8,9 +8,9 @@
   "properties": {
     "$schema": {
       "title": "Schema",
-      "markdownDescription": "Description not provided.\n\n- Category: `$schema`\n- Requires restart: `no`\n- Default: `https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json`",
-      "default": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
-      "type": "string"
+      "description": "The URL of the JSON schema for this settings file. Used by editors for validation and autocompletion.",
+      "type": "string",
+      "default": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json"
     },
     "mcpServers": {
       "title": "MCP Servers",
