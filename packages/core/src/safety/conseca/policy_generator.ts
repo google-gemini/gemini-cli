@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getGeminiClient } from './utilities.js';
+import type { Config } from '../../config/config.js';
 import type { SecurityPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
@@ -50,6 +50,11 @@ Example JSON:
 
 3.  **Rationale:**
     *   Reference the user's prompt.
+
+User Prompt: "{{user_prompt}}"
+
+Trusted Tools (Context):
+{{trusted_content}}
 `;
 
 /**
@@ -58,37 +63,40 @@ Example JSON:
 export async function generatePolicy(
   userPrompt: string,
   trustedContent: string,
+  config: Config,
 ): Promise<SecurityPolicy> {
   const model = DEFAULT_GEMINI_FLASH_MODEL;
-  let client;
-  try {
-    client = await getGeminiClient(model);
-  } catch (error) {
-    console.error(
-      'Failed to initialize Gemini client for policy generation:',
-      error,
+  const contentGenerator = config.getContentGenerator();
+
+  if (!contentGenerator) {
+    debugLogger.debug(
+      '[Conseca] Policy Generation failed: Content generator not initialized',
     );
     return {};
   }
 
-  const prompt = `
-User Prompt: "${userPrompt}"
-
-Trusted Tools (Context):
-${trustedContent}
-`;
-
   try {
-    const abortController = new AbortController();
-    const result = await client.generateContent(
-      { model },
-      [
-        {
-          role: 'user',
-          parts: [{ text: CONSECA_POLICY_GENERATION_PROMPT }, { text: prompt }],
+    const result = await contentGenerator.generateContent(
+      {
+        model,
+        config: {
+          responseMimeType: 'application/json',
         },
-      ],
-      abortController.signal,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: CONSECA_POLICY_GENERATION_PROMPT.replace(
+                  '{{user_prompt}}',
+                  userPrompt,
+                ).replace('{{trusted_content}}', trustedContent),
+              },
+            ],
+          },
+        ],
+      },
+      'conseca-policy-generation',
     );
 
     const responseText = getResponseText(result);
