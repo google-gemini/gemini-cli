@@ -108,6 +108,8 @@ export enum EventNames {
   APPROVAL_MODE_SWITCH = 'approval_mode_switch',
   APPROVAL_MODE_DURATION = 'approval_mode_duration',
   PLAN_EXECUTION = 'plan_execution',
+  CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
+  CONSECA_VERDICT = 'conseca_verdict',
 }
 
 export interface LogResponse {
