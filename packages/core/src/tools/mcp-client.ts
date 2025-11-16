@@ -19,6 +19,9 @@ import {
   GetPromptResultSchema,
   ListPromptsResultSchema,
   ListRootsRequestSchema,
+  ListToolsResultSchema,
+  CallToolResultSchema,
+  type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
@@ -27,8 +30,13 @@ import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
-import type { FunctionDeclaration } from '@google/genai';
-import { mcpToTool } from '@google/genai';
+import type {
+  FunctionDeclaration,
+  CallableTool,
+  FunctionCall,
+  Part,
+  Tool,
+} from '@google/genai';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
@@ -621,29 +629,32 @@ export async function discoverTools(
     // Only request tools if the server supports them.
     if (mcpClient.getServerCapabilities()?.tools == null) return [];
 
-    const mcpCallableTool = mcpToTool(mcpClient, {
-      timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-    });
-    const tool = await mcpCallableTool.tool();
+    const response = await mcpClient.request(
+      { method: 'tools/list', params: {} },
+      ListToolsResultSchema,
+    );
 
-    if (!Array.isArray(tool.functionDeclarations)) {
-      // This is a valid case for a prompt-only server
-      return [];
-    }
-
+    const tools = response.tools;
     const discoveredTools: DiscoveredMCPTool[] = [];
-    for (const funcDecl of tool.functionDeclarations) {
+
+    for (const toolDef of tools) {
       try {
-        if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
+        if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
           continue;
         }
+
+        const mcpCallableTool = new McpCallableTool(
+          mcpClient,
+          toolDef,
+          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+        );
 
         const tool = new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
-          funcDecl.name!,
-          funcDecl.description ?? '',
-          funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
+          toolDef.name,
+          toolDef.description ?? '',
+          toolDef.inputSchema ?? { type: 'object', properties: {} },
           mcpServerConfig.trust,
           undefined,
           cliConfig,
@@ -654,10 +665,11 @@ export async function discoverTools(
 
         discoveredTools.push(tool);
       } catch (error) {
+        console.error('Error creating DiscoveredMCPTool:', error);
         coreEvents.emitFeedback(
           'error',
           `Error discovering tool: '${
-            funcDecl.name
+            toolDef.name
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
           error,
         );
@@ -678,6 +690,93 @@ export async function discoverTools(
       );
     }
     return [];
+  }
+}
+
+class McpCallableTool implements CallableTool {
+  constructor(
+    private readonly client: Client,
+    private readonly toolDef: McpTool,
+    private readonly timeout: number,
+  ) {}
+
+  async tool(): Promise<Tool> {
+    return {
+      functionDeclarations: [
+        {
+          name: this.toolDef.name,
+          description: this.toolDef.description,
+          parametersJsonSchema: this.toolDef.inputSchema,
+        },
+      ],
+    };
+  }
+
+  async callTool(functionCalls: FunctionCall[]): Promise<Part[]> {
+    // We only expect one function call at a time for MCP tools in this context
+    if (functionCalls.length !== 1) {
+      throw new Error('McpCallableTool only supports single function call');
+    }
+    const call = functionCalls[0];
+
+    // Create a promise that rejects after the timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Tool call timed out after ${this.timeout}ms`));
+      }, this.timeout);
+    });
+
+    try {
+      const result = await Promise.race([
+        this.client.request(
+          {
+            method: 'tools/call',
+            params: {
+              name: call.name,
+              arguments: call.args as Record<string, unknown>,
+            },
+          },
+          CallToolResultSchema,
+        ),
+        timeoutPromise,
+      ]);
+
+      // Convert MCP content to GenAI Parts
+      // The structure of result is { content: Array<ContentBlock>, isError?: boolean }
+      // We wrap this in the expected structure for the SDK or handle it in DiscoveredMCPTool
+      // DiscoveredMCPTool expects `Part[]` from `callTool`.
+      // However, `CallableTool.callTool` returns `Promise<Part[] | ToolResponse>`.
+      // Let's match what `mcpToTool` likely returned or what `DiscoveredMCPTool` expects.
+      // Looking at `DiscoveredMCPToolInvocation.execute`, it calls `this.mcpTool.callTool(functionCalls)`.
+      // And then `transformMcpContentToParts` takes `rawResponseParts`.
+
+      // IMPORTANT: The `mcpToTool` implementation returns a specific structure that `DiscoveredMCPTool` relies on.
+      // Specifically, it seems to return an array where the first item has `functionResponse`.
+
+      return [
+        {
+          functionResponse: {
+            name: call.name,
+            response: result,
+          },
+        },
+      ];
+    } catch (error) {
+      // Return error in the format expected by DiscoveredMCPTool
+      return [
+        {
+          functionResponse: {
+            name: call.name,
+            response: {
+              error: {
+                message: (error as Error).message,
+                isError: true,
+              },
+            },
+          },
+        },
+      ];
+    }
   }
 }
 
