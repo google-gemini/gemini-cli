@@ -879,7 +879,8 @@ export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_CONSECA_POLICY_GENERATION = 'gemini_cli.conseca.policy_generation';
+export const EVENT_CONSECA_POLICY_GENERATION =
+  'gemini_cli.conseca.policy_generation';
 export class ConsecaPolicyGenerationEvent implements BaseTelemetryEvent {
   'event.name': 'conseca_policy_generation';
   'event.timestamp': string;

@@ -9,18 +9,23 @@ import { logs } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
-import { ClearcutLogger, EventNames } from './clearcut-logger/clearcut-logger.js';
+import {
+  ClearcutLogger,
+  EventNames,
+} from './clearcut-logger/clearcut-logger.js';
 import { EventMetadataKey } from './clearcut-logger/event-metadata-key.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type {
   ConsecaPolicyGenerationEvent,
   ConsecaVerdictEvent,
 } from './types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export function logConsecaPolicyGeneration(
   config: Config,
   event: ConsecaPolicyGenerationEvent,
 ): void {
+  debugLogger.debug('Conseca Policy Generation Event:', event);
   const clearcutLogger = ClearcutLogger.getInstance(config);
   if (clearcutLogger) {
     const data = [
@@ -56,6 +61,7 @@ export function logConsecaVerdict(
   config: Config,
   event: ConsecaVerdictEvent,
 ): void {
+  debugLogger.debug('Conseca Verdict Event:', event);
   const clearcutLogger = ClearcutLogger.getInstance(config);
   if (clearcutLogger) {
     const data = [

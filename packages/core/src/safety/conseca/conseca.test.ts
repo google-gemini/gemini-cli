@@ -36,7 +36,7 @@ describe('ConsecaSafetyChecker', () => {
     vi.clearAllMocks();
 
     // Default mock implementations
-    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue('mock policy');
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({});
     vi.mocked(policyEnforcer.enforcePolicy).mockResolvedValue({
       decision: SafetyCheckDecision.ALLOW,
     });
@@ -63,8 +63,14 @@ describe('ConsecaSafetyChecker', () => {
   });
 
   it('getPolicy should return cached policy if user prompt matches', async () => {
-    const mockPolicy = { tool: { permissions: 'ALLOW', constraints: 'None', rationale: 'Test' } };
-    (policyGenerator.generatePolicy as any).mockResolvedValue(mockPolicy);
+    const mockPolicy = {
+      tool: {
+        permissions: 'ALLOW' as const,
+        constraints: 'None',
+        rationale: 'Test',
+      },
+    };
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
 
     const policy1 = await checker.getPolicy('prompt', 'trusted');
     const policy2 = await checker.getPolicy('prompt', 'trusted');
@@ -75,9 +81,21 @@ describe('ConsecaSafetyChecker', () => {
   });
 
   it('getPolicy should generate new policy if user prompt changes', async () => {
-    const mockPolicy1 = { tool1: { permissions: 'ALLOW', constraints: 'None', rationale: 'Test' } };
-    const mockPolicy2 = { tool2: { permissions: 'ALLOW', constraints: 'None', rationale: 'Test' } };
-    (policyGenerator.generatePolicy as any)
+    const mockPolicy1 = {
+      tool1: {
+        permissions: 'ALLOW' as const,
+        constraints: 'None',
+        rationale: 'Test',
+      },
+    };
+    const mockPolicy2 = {
+      tool2: {
+        permissions: 'ALLOW' as const,
+        constraints: 'None',
+        rationale: 'Test',
+      },
+    };
+    vi.mocked(policyGenerator.generatePolicy)
       .mockResolvedValueOnce(mockPolicy1)
       .mockResolvedValueOnce(mockPolicy2);
 
@@ -90,9 +108,15 @@ describe('ConsecaSafetyChecker', () => {
   });
 
   it('check should call getPolicy and enforcePolicy', async () => {
-    const mockPolicy = { tool: { permissions: 'ALLOW', constraints: 'None', rationale: 'Test' } };
-    (policyGenerator.generatePolicy as any).mockResolvedValue(mockPolicy);
-    (policyEnforcer.enforcePolicy as any).mockResolvedValue({
+    const mockPolicy = {
+      tool: {
+        permissions: 'ALLOW' as const,
+        constraints: 'None',
+        rationale: 'Test',
+      },
+    };
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
+    vi.mocked(policyEnforcer.enforcePolicy).mockResolvedValue({
       decision: SafetyCheckDecision.ALLOW,
     });
 
@@ -142,12 +166,35 @@ describe('ConsecaSafetyChecker', () => {
 
   // Test state helpers
   it('should expose current state via helpers', async () => {
-    const mockPolicy = { tool: { permissions: 'ALLOW', constraints: 'None', rationale: 'Test' } };
-    (policyGenerator.generatePolicy as any).mockResolvedValue(mockPolicy);
+    const mockPolicy = {
+      tool: {
+        permissions: 'ALLOW' as const,
+        constraints: 'None',
+        rationale: 'Test',
+      },
+    };
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
 
     await checker.getPolicy('prompt', 'trusted');
 
     expect(checker.getCurrentPolicy()).toBe(mockPolicy);
     expect(checker.getActiveUserPrompt()).toBe('prompt');
+  });
+  it('should log policy generation event when config is set', async () => {
+    const mockPolicy = {
+      tool: {
+        permissions: 'ALLOW' as const,
+        constraints: 'None',
+        rationale: 'Test',
+      },
+    };
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
+
+    await checker.getPolicy('telemetry_prompt', 'trusted');
+
+    expect(logConsecaPolicyGeneration).toHaveBeenCalledWith(
+      mockConfig,
+      expect.anything(),
+    );
   });
 });

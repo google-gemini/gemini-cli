@@ -131,11 +131,20 @@ import { isSubpath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
+import { ApprovalMode, InProcessCheckerType } from '../policy/types.js';
+import { CheckerRunner } from '../safety/checker-runner.js';
+import { ContextBuilder } from '../safety/context-builder.js';
+import { CheckerRegistry } from '../safety/registry.js';
+import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
+}
+
+export interface SafetySettings {
+  enableConseca?: boolean;
 }
 
 export interface BugCommandSettings {
@@ -498,6 +507,8 @@ export interface ConfigParameters {
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
+  enableModelAvailabilityService?: boolean;
+  safety?: SafetySettings;
   experimentalJitContext?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -540,6 +551,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  readonly safety: SafetySettings;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -868,13 +880,41 @@ export class Config {
     this.recordResponses = params.recordResponses;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine({
-      ...params.policyEngineConfig,
-      approvalMode:
-        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    this.hooks = params.hooks;
+    this.experiments = params.experiments;
+    this.safety = params.safety ?? {};
+
+    if (params.contextFileName) {
+      setGeminiMdFilename(params.contextFileName);
+    }
+
+    // Initialize Safety Infrastructure
+    const contextBuilder = new ContextBuilder(this);
+    const checkerRegistry = new CheckerRegistry(this.targetDir); // Using targetDir as dummy path for now
+    const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
+      checkersPath: this.targetDir,
     });
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
+
+    this.policyEngine = new PolicyEngine(
+      params.policyEngineConfig,
+      checkerRunner,
+    );
+
+    // Register Conseca if enabled
+    if (this.safety.enableConseca) {
+      debugLogger.log('Registering Conseca Safety Checker');
+      ConsecaSafetyChecker.getInstance().setConfig(this);
+      this.policyEngine.addChecker({
+        checker: {
+          type: 'in-process',
+          name: InProcessCheckerType.CONSECA,
+        },
+        priority: 100, // High priority
+      });
+    }
+
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
