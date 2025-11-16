@@ -36,6 +36,14 @@ describe('McpStatus', () => {
       },
     ],
     prompts: [],
+    resources: [
+      {
+        serverName: 'server-1',
+        name: 'resource-1',
+        uri: 'file:///tmp/resource-1.txt',
+        description: 'A test resource',
+      },
+    ],
     blockedServers: [],
     serverStatus: () => MCPServerStatus.CONNECTED,
     authStatus: {},

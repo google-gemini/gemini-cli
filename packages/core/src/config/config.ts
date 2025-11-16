@@ -17,6 +17,7 @@ import {
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
+import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -30,6 +31,8 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { ListResourcesTool } from '../resources/list-resources-tool.js';
+import { ReadResourceTool } from '../resources/read-resource-tool.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -331,6 +334,7 @@ export class Config {
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
+  private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
   private sessionId: string;
   private fileSystemService: FileSystemService;
@@ -656,6 +660,7 @@ export class Config {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
+    this.resourceRegistry = new ResourceRegistry();
 
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
@@ -919,6 +924,10 @@ export class Config {
 
   getPromptRegistry(): PromptRegistry {
     return this.promptRegistry;
+  }
+
+  getResourceRegistry(): ResourceRegistry {
+    return this.resourceRegistry;
   }
 
   getDebugMode(): boolean {
@@ -1551,6 +1560,8 @@ export class Config {
     registerCoreTool(WebFetchTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
+    registerCoreTool(ListResourcesTool, this);
+    registerCoreTool(ReadResourceTool, this);
     registerCoreTool(WebSearchTool, this);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool, this);

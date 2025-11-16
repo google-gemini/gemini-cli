@@ -6,22 +6,26 @@ Note: First startup may take longer. Tool availability will update automatically
 
 Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
+🟢 server-1 - Ready (1 tool, 1 resource)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with a blocked server 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
+🟢 server-1 - Ready (1 tool, 1 resource)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 
 🔴 server-1 (from test-extension) - Blocked
 "
@@ -30,62 +34,72 @@ A test server
 exports[`McpStatus > renders correctly with a connected server 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
+🟢 server-1 - Ready (1 tool, 1 resource)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with a connecting server 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
+🟢 server-1 - Ready (1 tool, 1 resource)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with a disconnected server 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
+🟢 server-1 - Ready (1 tool, 1 resource)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with authenticated OAuth status 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool) (OAuth)
+🟢 server-1 - Ready (1 tool, 1 resource) (OAuth)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with expired OAuth status 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool) (OAuth expired)
+🟢 server-1 - Ready (1 tool, 1 resource) (OAuth expired)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with parametersJsonSchema 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
+🟢 server-1 - Ready (1 tool, 1 resource)
 A test server
   Tools:
   - tool-1
@@ -99,13 +113,15 @@ A test server
           }
         }
       }
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with prompts 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool, 1 prompt)
+🟢 server-1 - Ready (1 tool, 1 prompt, 1 resource)
 A test server
   Tools:
   - tool-1
@@ -113,13 +129,15 @@ A test server
   Prompts:
   - prompt-1
     A test prompt
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with schema enabled 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
+🟢 server-1 - Ready (1 tool, 1 resource)
 A test server
   Tools:
   - tool-1
@@ -133,16 +151,20 @@ A test server
           }
         }
       }
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
 
 exports[`McpStatus > renders correctly with unauthenticated OAuth status 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool) (OAuth not authenticated)
+🟢 server-1 - Ready (1 tool, 1 resource) (OAuth not authenticated)
 A test server
   Tools:
   - tool-1
     A test tool
+  Resources:
+  - resource-1 (file:///tmp/resource-1.txt)  A test resource
 "
 `;
