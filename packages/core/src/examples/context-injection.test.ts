@@ -366,6 +366,111 @@ describe('validateVariables', () => {
     expect(result.valid).toBe(true);
     expect(result.missing).toEqual([]);
   });
+
+  describe('with variable defaults (P1 fix)', () => {
+    it('should accept missing variables when they have defaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}} for {{issue}}',
+        variableDefaults: {
+          file: 'index.ts',
+          issue: 'bugs',
+        },
+      });
+
+      // No variables provided, but all have defaults
+      const result = validateVariables(example, {});
+
+      expect(result.valid).toBe(true);
+      expect(result.missing).toEqual([]);
+    });
+
+    it('should accept partial variables when missing ones have defaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Analyze {{file}} in {{mode}} for {{issue}}',
+        variableDefaults: {
+          mode: 'production',
+          issue: 'bugs',
+        },
+      });
+
+      // Only provide 'file', others have defaults
+      const result = validateVariables(example, { file: 'app.ts' });
+
+      expect(result.valid).toBe(true);
+      expect(result.missing).toEqual([]);
+    });
+
+    it('should still detect missing variables without defaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Analyze {{file}} for {{issue}}',
+        variableDefaults: {
+          issue: 'bugs',
+        },
+      });
+
+      // 'file' has no default and is not provided
+      const result = validateVariables(example, {});
+
+      expect(result.valid).toBe(false);
+      expect(result.missing).toEqual(['file']);
+    });
+
+    it('should allow provided variables to override defaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}} for {{issue}}',
+        variableDefaults: {
+          file: 'default.ts',
+          issue: 'bugs',
+        },
+      });
+
+      // Override the default 'file' value
+      const result = validateVariables(example, { file: 'custom.ts' });
+
+      expect(result.valid).toBe(true);
+      expect(result.missing).toEqual([]);
+    });
+
+    it('should handle examples without variableDefaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}} for {{issue}}',
+        // No variableDefaults
+      });
+
+      const result = validateVariables(example, { file: 'app.ts' });
+
+      expect(result.valid).toBe(false);
+      expect(result.missing).toEqual(['issue']);
+    });
+
+    it('should handle empty variableDefaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}}',
+        variableDefaults: {},
+      });
+
+      const result = validateVariables(example, {});
+
+      expect(result.valid).toBe(false);
+      expect(result.missing).toEqual(['file']);
+    });
+
+    it('should validate complex scenario with mixed defaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Analyze {{file}} in {{dir}} for {{issue}} using {{tool}}',
+        variableDefaults: {
+          dir: 'src',
+          tool: 'eslint',
+        },
+      });
+
+      // Provide file, missing issue (no default), dir and tool have defaults
+      const result = validateVariables(example, { file: 'app.ts' });
+
+      expect(result.valid).toBe(false);
+      expect(result.missing).toEqual(['issue']);
+    });
+  });
 });
 
 describe('parseVariablesFromArgs', () => {

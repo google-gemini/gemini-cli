@@ -186,22 +186,32 @@ export function extractVariables(prompt: string): string[] {
 }
 
 /**
- * Validate that all required variables are provided
+ * Validate that all required variables are provided or have defaults
+ *
+ * A variable is considered satisfied if it is either:
+ * - Provided by the user in the variables parameter, OR
+ * - Has a default value in example.variableDefaults
  *
  * @param example - The example to validate
- * @param variables - Variables provided
+ * @param variables - Variables provided by user
  * @returns Object with validation result
  *
  * @example
  * ```typescript
  * const example = {
  *   examplePrompt: 'Analyze {{file}} for {{issue}}',
+ *   variableDefaults: { issue: 'bugs' },
  *   // ...
  * };
  *
- * const result = validateVariables(example, { file: 'app.ts' });
- * // result.valid = false
- * // result.missing = ['issue']
+ * // Valid - 'file' provided, 'issue' has default
+ * const result1 = validateVariables(example, { file: 'app.ts' });
+ * // result1.valid = true
+ *
+ * // Invalid - 'file' not provided and has no default
+ * const result2 = validateVariables(example, {});
+ * // result2.valid = false
+ * // result2.missing = ['file']
  * ```
  */
 export function validateVariables(
@@ -210,8 +220,12 @@ export function validateVariables(
 ): { valid: boolean; missing: string[]; extra: string[] } {
   const required = extractVariables(example.examplePrompt);
   const provided = Object.keys(variables);
+  const defaults = example.variableDefaults || {};
 
-  const missing = required.filter((v) => !provided.includes(v));
+  // A variable is missing only if it's not provided AND has no default
+  const missing = required.filter(
+    (v) => !provided.includes(v) && !(v in defaults),
+  );
   const extra = provided.filter((v) => !required.includes(v));
 
   return {

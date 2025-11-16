@@ -364,6 +364,105 @@ const variablePattern = /\{\{([a-zA-Z_]\w*)\}\}/g;  // Rejects {{123}}
  */
 ```
 
+### P1: Variable Validation Ignored Defaults
+
+**Critical bug discovered post-implementation.**
+
+**Issue:** The `/examples run` command validated variables BEFORE `injectContext()` was called, so even though `injectContext()` correctly merged variable defaults, the validation rejected examples with defaults when users didn't provide all variables.
+
+**Example of the bug:**
+```typescript
+// Example with defaults
+{
+  id: 'analyze',
+  examplePrompt: 'Analyze {{file}} for {{issue}}',
+  variableDefaults: {
+    file: 'index.ts',
+    issue: 'bugs',
+  },
+}
+
+// User runs without arguments
+/examples run analyze
+
+// Bug: Validation fails with "Missing required variables: file, issue"
+// Expected: Should use defaults and run successfully
+```
+
+**Root Cause:** The `validateVariables()` function only checked if variables were provided by the user. It didn't consider `example.variableDefaults`.
+
+**Fix:** Updated `validateVariables()` to consider a variable satisfied if it's either provided by the user OR has a default value.
+
+**File:** `packages/core/src/examples/context-injection.ts`
+
+```typescript
+// Before (incorrect)
+export function validateVariables(
+  example: Example,
+  variables: Record<string, string>,
+): { valid: boolean; missing: string[]; extra: string[] } {
+  const required = extractVariables(example.examplePrompt);
+  const provided = Object.keys(variables);
+
+  const missing = required.filter((v) => !provided.includes(v));
+  // ...
+}
+
+// After (correct)
+export function validateVariables(
+  example: Example,
+  variables: Record<string, string>,
+): { valid: boolean; missing: string[]; extra: string[] } {
+  const required = extractVariables(example.examplePrompt);
+  const provided = Object.keys(variables);
+  const defaults = example.variableDefaults || {};
+
+  // A variable is missing only if it's not provided AND has no default
+  const missing = required.filter(
+    (v) => !provided.includes(v) && !(v in defaults),
+  );
+  // ...
+}
+```
+
+**Updated JSDoc:**
+
+```typescript
+/**
+ * Validate that all required variables are provided or have defaults
+ *
+ * A variable is considered satisfied if it is either:
+ * - Provided by the user in the variables parameter, OR
+ * - Has a default value in example.variableDefaults
+ *
+ * @example
+ * const example = {
+ *   examplePrompt: 'Analyze {{file}} for {{issue}}',
+ *   variableDefaults: { issue: 'bugs' },
+ * };
+ *
+ * // Valid - 'file' provided, 'issue' has default
+ * const result1 = validateVariables(example, { file: 'app.ts' });
+ * // result1.valid = true
+ *
+ * // Invalid - 'file' not provided and has no default
+ * const result2 = validateVariables(example, {});
+ * // result2.valid = false
+ * // result2.missing = ['file']
+ */
+```
+
+**Test Coverage:** Added 7 comprehensive tests in nested describe block "with variable defaults (P1 fix)":
+- ✅ Accept missing variables when they have defaults
+- ✅ Accept partial variables when missing ones have defaults
+- ✅ Still detect missing variables without defaults
+- ✅ Allow provided variables to override defaults
+- ✅ Handle examples without variableDefaults
+- ✅ Handle empty variableDefaults
+- ✅ Validate complex scenario with mixed defaults
+
+**Impact:** This fix makes the variable defaults feature actually work as intended. Users can now run examples with defaults without providing all variables.
+
 ---
 
 ## Testing
@@ -409,15 +508,25 @@ Added variable defaults test suite (7 tests):
 - ✅ Use all defaults when no variables provided
 - ✅ Handle complex default values (URLs, etc.)
 
+Added validation with defaults test suite (7 tests - P1 fix):
+
+- ✅ Accept missing variables when they have defaults
+- ✅ Accept partial variables when missing ones have defaults
+- ✅ Still detect missing variables without defaults
+- ✅ Allow provided variables to override defaults
+- ✅ Handle examples without variableDefaults
+- ✅ Handle empty variableDefaults
+- ✅ Validate complex scenario with mixed defaults
+
 ### Test Results
 
 ```
-✓ packages/core/src/examples/context-injection.test.ts (31 tests)
+✓ packages/core/src/examples/context-injection.test.ts (38 tests)
 ✓ packages/core/src/examples/history.test.ts (33 tests)
 
 Test Files  2 passed (2)
-Tests      64 passed (64)
-Duration   614ms
+Tests      71 passed (71)
+Duration   ~600ms
 ```
 
 **All Phase 4 tests pass! ✅**
@@ -448,6 +557,8 @@ Duration   614ms
    - Modified `injectContext()` to merge variable defaults with provided variables
    - Fixed `extractVariables()` regex to reject variables starting with digits
    - Updated JSDoc with clarified variable naming rules
+   - **P1 Fix:** Modified `validateVariables()` to respect variable defaults
+   - Updated JSDoc for `validateVariables()` with defaults behavior
 
 **Test Files:**
 
@@ -458,6 +569,7 @@ Duration   614ms
 
 5. **`packages/core/src/examples/context-injection.test.ts`**
    - Added 7 new tests for variable defaults feature
+   - **P1 Fix:** Added 7 new tests for validation with defaults
 
 ### CLI Package
 
@@ -843,12 +955,14 @@ Potential improvements for future phases:
 2. 1-5 star rating system with CLI command
 3. Variable defaults for examples
 
-✅ **1 Bug Fix:**
+✅ **2 Bug Fixes:**
 - Variable name validation (reject numeric-only names)
+- **P1:** Variable validation respects defaults (critical fix)
 
-✅ **24 New Tests:**
+✅ **31 New Tests:**
 - 17 tests for persistence and ratings
 - 7 tests for variable defaults
+- 7 tests for validation with defaults (P1 fix)
 - 100% passing
 
 ✅ **Zero Documentation Debt:**
@@ -856,6 +970,7 @@ Potential improvements for future phases:
 - Usage guide with examples
 - Architecture diagrams
 - Edge case documentation
+- P1 bug fix fully documented
 
 ### Files Changed
 
@@ -864,8 +979,8 @@ Potential improvements for future phases:
 
 ### Test Coverage
 
-- **64 total tests passing**
-- **31 context-injection tests** (including 7 new)
+- **71 total tests passing**
+- **38 context-injection tests** (including 14 new)
 - **33 history tests** (including 17 new)
 
 ### Impact
