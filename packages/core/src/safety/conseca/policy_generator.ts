@@ -8,6 +8,7 @@ import { getGeminiClient } from './utilities.js';
 import type { SecurityPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
 import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../../config/models.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 const CONSECA_POLICY_GENERATION_PROMPT = `
 You are a security expert responsible for generating fine-grained security policies for a large language model integrated into a command-line tool. Your role is to act as a "policy generator" that creates temporary, context-specific rules based on a user's prompt and the tools available to the main LLM.
@@ -91,13 +92,37 @@ ${trustedContent}
     );
 
     const responseText = getResponseText(result);
+    debugLogger.debug(`[Conseca] Policy Generation Raw Response: ${responseText}`);
+
     if (!responseText) {
+      debugLogger.debug(`[Conseca] Policy Generation failed: Empty response`);
       return {};
     }
 
-    // Clean up markdown code blocks if present
-    const cleanText = responseText.replace(/^```json\n|\n```$/g, '');
-    return JSON.parse(cleanText) as SecurityPolicy;
+    let cleanText = responseText;
+    // Extract JSON from code block if present
+    const match = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match) {
+      cleanText = match[1];
+    } else {
+      // Fallback: try to find the first '{' and last '}'
+      const firstOpen = responseText.indexOf('{');
+      const lastClose = responseText.lastIndexOf('}');
+      if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+        cleanText = responseText.substring(firstOpen, lastClose + 1);
+      }
+    }
+    
+    debugLogger.debug(`[Conseca] Policy Generation Cleaned JSON: ${cleanText}`);
+
+    try {
+      const policy = JSON.parse(cleanText) as SecurityPolicy;
+      debugLogger.debug(`[Conseca] Policy Generation Parsed:`, policy);
+      return policy;
+    } catch (parseError) {
+      debugLogger.debug(`[Conseca] Policy Generation JSON Parse Error:`, parseError);
+      return {};
+    }
   } catch (error) {
     console.error('Policy generation failed:', error);
     return {};

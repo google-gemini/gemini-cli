@@ -31,6 +31,7 @@ import {
   loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
+import { getSettingsSchema } from './settingsSchema.js';
 
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -665,6 +666,13 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
+    safety: {
+      ...settings.safety,
+      enableConseca:
+        settings.safety?.enableConseca ??
+        (getSettingsSchema().safety.properties.enableConseca
+          .default as boolean),
+    },
   });
 }
 
