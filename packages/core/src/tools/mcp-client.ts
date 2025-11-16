@@ -639,7 +639,13 @@ export async function discoverTools(
 
     for (const toolDef of tools) {
       try {
-        if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
+        if (
+          !isEnabled(
+            toolDef as unknown as FunctionDeclaration,
+            mcpServerName,
+            mcpServerConfig,
+          )
+        ) {
           continue;
         }
 
