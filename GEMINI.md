@@ -1,3 +1,14 @@
+# Project Overview
+
+Gemini CLI is an open-source AI agent that brings the power of Gemini directly
+into your terminal. It provides lightweight access to Gemini, giving you the
+most direct path from your prompt to our model.
+
+This is a TypeScript monorepo using npm workspaces. The project is structured
+into several packages, including a CLI, a core library, and a VS Code extension.
+It uses Vitest for testing, ESLint for linting, and Prettier for formatting. The
+project is licensed under the Apache License 2.0.
+
 ## Building and running
 
 Before submitting any changes, it is crucial to validate them by running the
@@ -14,6 +25,19 @@ This single command ensures that your changes meet all the quality gates of the
 project. While you can run the individual steps (`build`, `test`, `typecheck`,
 `lint`) separately, it is highly recommended to use `npm run preflight` to
 ensure a comprehensive validation.
+
+## Contributing
+
+We welcome contributions! To get started, please follow these steps:
+
+1.  **Sign the Contributor License Agreement (CLA).**
+2.  **Find an issue** you'd like to work on.
+3.  **Fork the repository** and create a new branch.
+4.  **Make your changes** and ensure all checks pass by running
+    `npm run preflight`.
+5.  **Open a pull request.**
+
+For more details, please see the [Contributing Guide](./CONTRIBUTING.md).
 
 ## Writing Tests
 
