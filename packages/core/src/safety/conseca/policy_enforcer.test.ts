@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { enforcePolicy } from './policy_enforcer.js';
 import * as utilities from './utilities.js';
-import { GeminiClient } from '../../core/client.js';
+import type { GeminiClient } from '../../core/client.js';
 import { SafetyCheckDecision } from '../protocol.js';
 import type { FunctionCall } from '@google/genai';
 
@@ -25,14 +25,18 @@ describe('policy_enforcer', () => {
 
   it('should return ALLOW when client returns ALLOW', async () => {
     mockClient.generateContent = vi.fn().mockResolvedValue({
-      candidates: [{
-        content: {
-          parts: [{ text: JSON.stringify({ decision: 'ALLOW', reason: 'Safe' }) }]
-        }
-      }]
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: JSON.stringify({ decision: 'ALLOW', reason: 'Safe' }) },
+            ],
+          },
+        },
+      ],
     });
     vi.mocked(utilities.getGeminiClient).mockResolvedValue(mockClient);
-    
+
     const toolCall: FunctionCall = { name: 'testTool', args: {} };
     const policy = {
       testTool: {
@@ -50,11 +54,13 @@ describe('policy_enforcer', () => {
         expect.objectContaining({
           role: 'user',
           parts: expect.arrayContaining([
-            expect.objectContaining({ text: expect.stringContaining('Security Policy for testTool:') })
-          ])
-        })
+            expect.objectContaining({
+              text: expect.stringContaining('Security Policy for testTool:'),
+            }),
+          ]),
+        }),
       ]),
-      expect.anything()
+      expect.anything(),
     );
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
@@ -77,18 +83,20 @@ describe('policy_enforcer', () => {
 
   it('should DENY if tool policy is missing', async () => {
     vi.mocked(utilities.getGeminiClient).mockResolvedValue(mockClient);
-    
+
     const toolCall: FunctionCall = { name: 'unknownTool', args: {} };
     const policy = {};
     const result = await enforcePolicy(policy, toolCall);
 
     expect(result.decision).toBe(SafetyCheckDecision.DENY);
-    expect(result.reason).toContain("No security policy generated for tool 'unknownTool'");
+    expect(result.reason).toContain(
+      "No security policy generated for tool 'unknownTool'",
+    );
   });
 
   it('should DENY if tool name is missing', async () => {
     vi.mocked(utilities.getGeminiClient).mockResolvedValue(mockClient);
-    
+
     const toolCall = { args: {} } as FunctionCall;
     const policy = {};
     const result = await enforcePolicy(policy, toolCall);

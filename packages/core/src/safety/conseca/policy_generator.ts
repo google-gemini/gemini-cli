@@ -63,10 +63,13 @@ export async function generatePolicy(
   try {
     client = await getGeminiClient(model);
   } catch (error) {
-    console.error('Failed to initialize Gemini client for policy generation:', error);
+    console.error(
+      'Failed to initialize Gemini client for policy generation:',
+      error,
+    );
     return {};
   }
-  
+
   const prompt = `
 User Prompt: "${userPrompt}"
 
@@ -78,7 +81,12 @@ ${trustedContent}
     const abortController = new AbortController();
     const result = await client.generateContent(
       { model },
-      [{ role: 'user', parts: [{ text: CONSECA_POLICY_GENERATION_PROMPT }, { text: prompt }] }],
+      [
+        {
+          role: 'user',
+          parts: [{ text: CONSECA_POLICY_GENERATION_PROMPT }, { text: prompt }],
+        },
+      ],
       abortController.signal,
     );
 
