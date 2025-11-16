@@ -807,6 +807,27 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  safety: {
+    type: 'object',
+    label: 'Safety',
+    category: 'Safety',
+    requiresRestart: true,
+    default: {},
+    description: 'Safety settings.',
+    showInDialog: false,
+    properties: {
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Conseca',
+        category: 'Safety',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable the Conseca in-process safety checker.',
+        showInDialog: true,
+      },
+    },
+  },
+
   telemetry: {
     type: 'object',
     label: 'Telemetry',
