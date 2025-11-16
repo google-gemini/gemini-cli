@@ -24,10 +24,9 @@ import { useEffect, useRef } from 'react';
 export function useTimeout(callback: () => void, delay: number | null): void {
   const savedCallback = useRef(callback);
 
-  // Update the saved callback if it changes
-  useEffect(() => {
-    savedCallback.current = callback;
-  }, [callback]);
+  // Always update the ref to the latest callback. It's safe to do this
+  // during render because it's not read until the effect runs.
+  savedCallback.current = callback;
 
   // Set up the timeout
   useEffect(() => {
