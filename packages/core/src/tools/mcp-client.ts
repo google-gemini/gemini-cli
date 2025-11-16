@@ -665,7 +665,6 @@ export async function discoverTools(
 
         discoveredTools.push(tool);
       } catch (error) {
-        console.error('Error creating DiscoveredMCPTool:', error);
         coreEvents.emitFeedback(
           'error',
           `Error discovering tool: '${
