@@ -150,6 +150,135 @@ describe('injectContext', () => {
 
     expect(result.contextPreview).toBe('@file1.ts @file2.ts');
   });
+
+  describe('variable defaults (Phase 4)', () => {
+    it('should use default variable values when not provided', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}} for {{issue}}',
+        variableDefaults: {
+          file: 'src/app.ts',
+          issue: 'bugs',
+        },
+      });
+
+      const result = injectContext(example);
+
+      expect(result.prompt).toContain('Check src/app.ts for bugs');
+      expect(result.substitutions).toHaveLength(2);
+    });
+
+    it('should override defaults with provided variables', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}} for {{issue}}',
+        variableDefaults: {
+          file: 'default.ts',
+          issue: 'bugs',
+        },
+      });
+
+      const result = injectContext(example, {
+        variables: {
+          file: 'custom.ts',
+        },
+      });
+
+      expect(result.prompt).toContain('Check custom.ts for bugs');
+      expect(result.substitutions.find((s) => s.variable === 'file')?.value).toBe(
+        'custom.ts',
+      );
+      expect(result.substitutions.find((s) => s.variable === 'issue')?.value).toBe(
+        'bugs',
+      );
+    });
+
+    it('should merge defaults with provided variables', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}} in {{directory}} for {{issue}}',
+        variableDefaults: {
+          directory: 'src',
+          issue: 'bugs',
+        },
+      });
+
+      const result = injectContext(example, {
+        variables: {
+          file: 'app.ts',
+          issue: 'errors',
+        },
+      });
+
+      expect(result.prompt).toContain('Check app.ts in src for errors');
+      expect(result.substitutions).toHaveLength(3);
+      expect(result.substitutions.find((s) => s.variable === 'file')?.value).toBe(
+        'app.ts',
+      );
+      expect(
+        result.substitutions.find((s) => s.variable === 'directory')?.value,
+      ).toBe('src');
+      expect(result.substitutions.find((s) => s.variable === 'issue')?.value).toBe(
+        'errors',
+      );
+    });
+
+    it('should work without any variable defaults', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}}',
+      });
+
+      const result = injectContext(example, {
+        variables: { file: 'app.ts' },
+      });
+
+      expect(result.prompt).toContain('Check app.ts');
+    });
+
+    it('should allow empty defaults object', () => {
+      const example = createMockExample({
+        examplePrompt: 'Check {{file}}',
+        variableDefaults: {},
+      });
+
+      const result = injectContext(example, {
+        variables: { file: 'app.ts' },
+      });
+
+      expect(result.prompt).toContain('Check app.ts');
+    });
+
+    it('should use all defaults when no variables provided', () => {
+      const example = createMockExample({
+        examplePrompt: 'Analyze {{file}} for {{issue}} in {{mode}} mode',
+        variableDefaults: {
+          file: 'index.ts',
+          issue: 'performance',
+          mode: 'strict',
+        },
+      });
+
+      const result = injectContext(example);
+
+      expect(result.prompt).toContain(
+        'Analyze index.ts for performance in strict mode',
+      );
+      expect(result.substitutions).toHaveLength(3);
+    });
+
+    it('should handle complex default values', () => {
+      const example = createMockExample({
+        examplePrompt: 'Fetch from {{url}} with {{token}}',
+        variableDefaults: {
+          url: 'https://api.example.com/v1',
+          token: 'default-api-key-123',
+        },
+      });
+
+      const result = injectContext(example);
+
+      expect(result.prompt).toContain(
+        'Fetch from https://api.example.com/v1 with default-api-key-123',
+      );
+    });
+  });
 });
 
 describe('extractVariables', () => {

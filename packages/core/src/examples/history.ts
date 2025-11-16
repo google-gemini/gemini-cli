@@ -18,11 +18,14 @@
  * Example Execution History
  *
  * Tracks user interactions with examples, including when they were run,
- * success status, and user feedback.
+ * success status, and user feedback. Supports persistent storage to disk.
  *
  * @module examples/history
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import type { Example } from './types.js';
 
 /**
@@ -72,14 +75,38 @@ export interface ExampleUsageStats {
     exampleId: string;
     commandName: string;
   }>;
+
+  /** Highest rated examples */
+  topRated: Array<{
+    exampleId: string;
+    averageRating: number;
+    ratingCount: number;
+  }>;
 }
 
 /**
- * Manages example execution history
+ * Get the default history file path
+ */
+function getHistoryFilePath(): string {
+  const homeDir = os.homedir();
+  const configDir = path.join(homeDir, '.gemini-cli');
+  return path.join(configDir, 'example-history.json');
+}
+
+/**
+ * Manages example execution history with persistent storage
  */
 export class ExampleHistory {
   private entries: ExampleHistoryEntry[] = [];
   private maxEntries = 1000;
+  private filePath: string;
+  private autoSave: boolean;
+
+  constructor(filePath?: string, autoSave = true) {
+    this.filePath = filePath || getHistoryFilePath();
+    this.autoSave = autoSave;
+    this.load(); // Auto-load on construction
+  }
 
   /**
    * Record an example interaction
@@ -91,6 +118,34 @@ export class ExampleHistory {
     if (this.entries.length > this.maxEntries) {
       this.entries = this.entries.slice(0, this.maxEntries);
     }
+
+    // Auto-save if enabled
+    if (this.autoSave) {
+      this.save();
+    }
+  }
+
+  /**
+   * Rate an example
+   *
+   * @param exampleId - Example to rate
+   * @param rating - Rating from 1-5
+   * @param notes - Optional notes about the rating
+   */
+  rate(exampleId: string, rating: number, notes?: string): void {
+    // Validate rating
+    if (rating < 1 || rating > 5) {
+      throw new Error('Rating must be between 1 and 5');
+    }
+
+    // Add a rating entry
+    this.record({
+      exampleId,
+      timestamp: Date.now(),
+      action: 'run', // Treat rating as a run event
+      rating,
+      notes,
+    });
   }
 
   /**
@@ -150,12 +205,33 @@ export class ExampleHistory {
       commandName: entry.notes || entry.exampleId, // Use notes field for command name
     }));
 
+    // Calculate top-rated examples
+    const ratings = new Map<string, number[]>();
+    for (const entry of this.entries) {
+      if (entry.rating) {
+        const exampleRatings = ratings.get(entry.exampleId) || [];
+        exampleRatings.push(entry.rating);
+        ratings.set(entry.exampleId, exampleRatings);
+      }
+    }
+
+    const topRated = Array.from(ratings.entries())
+      .map(([exampleId, ratingArray]) => ({
+        exampleId,
+        averageRating:
+          ratingArray.reduce((sum, r) => sum + r, 0) / ratingArray.length,
+        ratingCount: ratingArray.length,
+      }))
+      .sort((a, b) => b.averageRating - a.averageRating)
+      .slice(0, 10);
+
     return {
       totalRuns: runEntries.length,
       totalPreviews: previewEntries.length,
       recentExamples,
       popularExamples,
       savedCommands,
+      topRated,
     };
   }
 
@@ -164,6 +240,9 @@ export class ExampleHistory {
    */
   clear(): void {
     this.entries = [];
+    if (this.autoSave) {
+      this.save();
+    }
   }
 
   /**
@@ -171,6 +250,44 @@ export class ExampleHistory {
    */
   clearForExample(exampleId: string): void {
     this.entries = this.entries.filter((e) => e.exampleId !== exampleId);
+    if (this.autoSave) {
+      this.save();
+    }
+  }
+
+  /**
+   * Save history to disk
+   */
+  save(): void {
+    try {
+      const dirPath = path.dirname(this.filePath);
+
+      // Ensure directory exists
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+
+      // Write history to file
+      fs.writeFileSync(this.filePath, this.toJSON(), 'utf8');
+    } catch (error) {
+      // Silently fail if we can't save (e.g., permissions)
+      console.error('Failed to save example history:', error);
+    }
+  }
+
+  /**
+   * Load history from disk
+   */
+  load(): void {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const json = fs.readFileSync(this.filePath, 'utf8');
+        this.fromJSON(json);
+      }
+    } catch (error) {
+      // Silently fail if we can't load
+      console.error('Failed to load example history:', error);
+    }
   }
 
   /**

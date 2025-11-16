@@ -574,6 +574,83 @@ const saveCommand: SlashCommand = {
 };
 
 /**
+ * Rate an example
+ */
+const rateCommand: SlashCommand = {
+  name: 'rate',
+  description:
+    'Rate an example from 1-5 stars. Usage: /examples rate <example-id> <1-5> [notes]',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    const parts = args.trim().split(/\s+/);
+    const exampleId = parts[0];
+    const ratingStr = parts[1];
+
+    if (!exampleId || !ratingStr) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Missing required arguments. Usage: /examples rate <example-id> <1-5> [notes]',
+      };
+    }
+
+    const rating = parseInt(ratingStr, 10);
+    if (isNaN(rating) || rating < 1 || rating > 5) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Rating must be a number between 1 and 5.',
+      };
+    }
+
+    const registry = await getExampleRegistry();
+    const example = registry.get(exampleId);
+
+    if (!example) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Example '${exampleId}' not found. Use /examples list to see all examples.`,
+      };
+    }
+
+    // Get notes (everything after rating)
+    const notes = parts.slice(2).join(' ') || undefined;
+
+    // Record rating in history
+    const history = getExampleHistory();
+    history.rate(exampleId, rating, notes);
+
+    const stars = '⭐'.repeat(rating);
+    const message = [
+      `✅ Rated "${example.title}" ${stars} (${rating}/5)`,
+      '',
+    ];
+
+    if (notes) {
+      message.push(`Notes: ${notes}`);
+      message.push('');
+    }
+
+    message.push('Thank you for your feedback!');
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: message.join('\n'),
+    };
+  },
+  completion: async (context, partialArg) => {
+    const registry = await getExampleRegistry();
+    const examples = registry.getAll();
+    return examples
+      .map((ex) => ex.id)
+      .filter((id) => id.startsWith(partialArg));
+  },
+};
+
+/**
  * Main /examples command
  */
 export const examplesCommand: SlashCommand = {
@@ -588,6 +665,7 @@ export const examplesCommand: SlashCommand = {
     previewCommand,
     showCommand,
     historyCommand,
+    rateCommand,
     saveCommand,
     statsCommand,
     randomCommand,

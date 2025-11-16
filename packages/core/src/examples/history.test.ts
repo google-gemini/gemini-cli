@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import {
   ExampleHistory,
   getExampleHistory,
@@ -23,9 +26,27 @@ import {
 
 describe('ExampleHistory', () => {
   let history: ExampleHistory;
+  let tempDir: string;
+  let tempFile: string;
 
   beforeEach(() => {
-    history = new ExampleHistory();
+    // Create temp file for each test to avoid auto-loading existing history
+    tempDir = path.join(os.tmpdir(), `gemini-cli-test-${Date.now()}-${Math.random()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    tempFile = path.join(tempDir, 'test-history.json');
+
+    // Create fresh history instance with temp file and auto-save disabled
+    history = new ExampleHistory(tempFile, false);
+  });
+
+  afterEach(() => {
+    // Clean up temp files
+    if (fs.existsSync(tempFile)) {
+      fs.unlinkSync(tempFile);
+    }
+    if (fs.existsSync(tempDir)) {
+      fs.rmdirSync(tempDir, { recursive: true });
+    }
   });
 
   describe('record', () => {
@@ -247,6 +268,233 @@ describe('ExampleHistory', () => {
       expect(history.getAll()).toHaveLength(0);
     });
   });
+
+  describe('rate (Phase 4)', () => {
+    it('should record a rating for an example', () => {
+      history.rate('example-1', 5, 'Excellent example!');
+
+      const entries = history.getAll();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].exampleId).toBe('example-1');
+      expect(entries[0].rating).toBe(5);
+      expect(entries[0].notes).toBe('Excellent example!');
+      expect(entries[0].action).toBe('run');
+    });
+
+    it('should validate rating is between 1 and 5', () => {
+      expect(() => history.rate('example-1', 0)).toThrow(
+        'Rating must be between 1 and 5',
+      );
+      expect(() => history.rate('example-1', 6)).toThrow(
+        'Rating must be between 1 and 5',
+      );
+      expect(() => history.rate('example-1', -1)).toThrow(
+        'Rating must be between 1 and 5',
+      );
+    });
+
+    it('should accept ratings without notes', () => {
+      history.rate('example-1', 4);
+
+      const entries = history.getAll();
+      expect(entries[0].rating).toBe(4);
+      expect(entries[0].notes).toBeUndefined();
+    });
+
+    it('should allow multiple ratings for same example', () => {
+      history.rate('example-1', 5);
+      history.rate('example-1', 3);
+      history.rate('example-1', 4);
+
+      const entries = history.getForExample('example-1');
+      expect(entries).toHaveLength(3);
+      expect(entries.map((e) => e.rating)).toEqual([4, 3, 5]);
+    });
+  });
+
+  describe('getStats with ratings (Phase 4)', () => {
+    it('should calculate top-rated examples', () => {
+      // Example 1: two 5-star ratings (avg: 5.0)
+      history.rate('example-1', 5);
+      history.rate('example-1', 5);
+
+      // Example 2: one 4-star rating (avg: 4.0)
+      history.rate('example-2', 4);
+
+      // Example 3: 3-star and 5-star (avg: 4.0)
+      history.rate('example-3', 3);
+      history.rate('example-3', 5);
+
+      const stats = history.getStats();
+
+      expect(stats.topRated).toHaveLength(3);
+      expect(stats.topRated[0].exampleId).toBe('example-1');
+      expect(stats.topRated[0].averageRating).toBe(5.0);
+      expect(stats.topRated[0].ratingCount).toBe(2);
+
+      // Example 2 and 3 both have 4.0 avg, order may vary
+      const secondAndThird = stats.topRated.slice(1, 3);
+      expect(secondAndThird.some((s) => s.exampleId === 'example-2')).toBe(
+        true,
+      );
+      expect(secondAndThird.some((s) => s.exampleId === 'example-3')).toBe(
+        true,
+      );
+    });
+
+    it('should handle examples without ratings', () => {
+      history.record({
+        exampleId: 'unrated',
+        timestamp: Date.now(),
+        action: 'run',
+      });
+      history.rate('example-1', 5);
+
+      const stats = history.getStats();
+
+      expect(stats.topRated).toHaveLength(1);
+      expect(stats.topRated[0].exampleId).toBe('example-1');
+    });
+
+    it('should limit top-rated to 10 examples', () => {
+      for (let i = 1; i <= 15; i++) {
+        history.rate(`example-${i}`, 5);
+      }
+
+      const stats = history.getStats();
+      expect(stats.topRated).toHaveLength(10);
+    });
+  });
+
+  describe('save and load (Phase 4)', () => {
+    it('should save history to disk', () => {
+      const testHistory = new ExampleHistory(tempFile, false);
+      testHistory.record({
+        exampleId: 'test-example',
+        timestamp: 12345,
+        action: 'run',
+      });
+
+      testHistory.save();
+
+      expect(fs.existsSync(tempFile)).toBe(true);
+      const content = fs.readFileSync(tempFile, 'utf8');
+      const parsed = JSON.parse(content);
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0].exampleId).toBe('test-example');
+    });
+
+    it('should load history from disk', () => {
+      // Write test data to file
+      const testData = [
+        {
+          exampleId: 'loaded-example',
+          timestamp: 54321,
+          action: 'preview',
+        },
+      ];
+      fs.writeFileSync(tempFile, JSON.stringify(testData, null, 2));
+
+      const testHistory = new ExampleHistory(tempFile, false);
+
+      const entries = testHistory.getAll();
+      expect(entries).toHaveLength(1);
+      expect(entries[0].exampleId).toBe('loaded-example');
+      expect(entries[0].timestamp).toBe(54321);
+    });
+
+    it('should auto-save when enabled', () => {
+      const testHistory = new ExampleHistory(tempFile, true);
+
+      testHistory.record({
+        exampleId: 'auto-saved',
+        timestamp: Date.now(),
+        action: 'run',
+      });
+
+      // Should auto-save immediately
+      expect(fs.existsSync(tempFile)).toBe(true);
+      const content = fs.readFileSync(tempFile, 'utf8');
+      const parsed = JSON.parse(content);
+      expect(parsed[0].exampleId).toBe('auto-saved');
+    });
+
+    it('should not auto-save when disabled', () => {
+      const testHistory = new ExampleHistory(tempFile, false);
+
+      testHistory.record({
+        exampleId: 'not-auto-saved',
+        timestamp: Date.now(),
+        action: 'run',
+      });
+
+      expect(fs.existsSync(tempFile)).toBe(false);
+    });
+
+    it('should create directory if it does not exist', () => {
+      const nestedDir = path.join(tempDir, 'nested', 'path');
+      const nestedFile = path.join(nestedDir, 'history.json');
+
+      const testHistory = new ExampleHistory(nestedFile, false);
+      testHistory.record({
+        exampleId: 'test',
+        timestamp: Date.now(),
+        action: 'run',
+      });
+      testHistory.save();
+
+      expect(fs.existsSync(nestedFile)).toBe(true);
+    });
+
+    it('should handle save errors gracefully', () => {
+      const invalidPath = '/invalid/path/that/does/not/exist/history.json';
+      const testHistory = new ExampleHistory(invalidPath, false);
+
+      // Should not throw, just log error
+      expect(() => testHistory.save()).not.toThrow();
+    });
+
+    it('should handle load errors gracefully', () => {
+      const testHistory = new ExampleHistory(tempFile, false);
+      // File doesn't exist yet, should not throw
+      testHistory.load();
+      expect(testHistory.getAll()).toHaveLength(0);
+    });
+
+    it('should auto-load on construction', () => {
+      // Create a file with test data
+      const testData = [
+        {
+          exampleId: 'auto-loaded',
+          timestamp: 99999,
+          action: 'run',
+        },
+      ];
+      fs.writeFileSync(tempFile, JSON.stringify(testData));
+
+      // Create new instance - should auto-load
+      const testHistory = new ExampleHistory(tempFile, false);
+
+      expect(testHistory.getAll()).toHaveLength(1);
+      expect(testHistory.getAll()[0].exampleId).toBe('auto-loaded');
+    });
+
+    it('should round-trip save and load with ratings', () => {
+      const testHistory1 = new ExampleHistory(tempFile, false);
+      testHistory1.rate('example-1', 5, 'Great!');
+      testHistory1.rate('example-2', 3, 'Okay');
+      testHistory1.save();
+
+      const testHistory2 = new ExampleHistory(tempFile, false);
+      const entries = testHistory2.getAll();
+
+      expect(entries).toHaveLength(2);
+      expect(entries[0].rating).toBe(3);
+      expect(entries[0].notes).toBe('Okay');
+      expect(entries[1].rating).toBe(5);
+      expect(entries[1].notes).toBe('Great!');
+    });
+  });
 });
 
 describe('getExampleHistory', () => {
@@ -262,6 +510,9 @@ describe('getExampleHistory', () => {
 
   it('should persist data across calls', () => {
     const history1 = getExampleHistory();
+    // Clear any existing history first
+    history1.clear();
+
     history1.record({
       exampleId: 'test',
       timestamp: Date.now(),

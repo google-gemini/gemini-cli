@@ -101,6 +101,12 @@ export function injectContext(
     includeDefaultFiles = true,
   } = options;
 
+  // Merge provided variables with defaults
+  const mergedVariables = {
+    ...(example.variableDefaults || {}),
+    ...variables, // Provided variables override defaults
+  };
+
   // Collect all context files
   const contextFiles: string[] = [];
 
@@ -122,7 +128,7 @@ export function injectContext(
 
   for (const match of matches) {
     const variable = match[1];
-    const value = variables[variable];
+    const value = mergedVariables[variable];
 
     if (value !== undefined) {
       prompt = prompt.replace(match[0], value);
@@ -150,6 +156,8 @@ export function injectContext(
  * Extract variables from a prompt
  *
  * Finds all {{variable}} patterns in the prompt and returns their names.
+ * Variable names must start with a letter or underscore, followed by any
+ * combination of letters, digits, or underscores (standard identifier rules).
  *
  * @param prompt - The prompt to analyze
  * @returns Array of variable names found
@@ -158,10 +166,15 @@ export function injectContext(
  * ```typescript
  * const variables = extractVariables('Analyze {{file}} for {{issue}}');
  * // variables = ['file', 'issue']
+ *
+ * const vars2 = extractVariables('Test {{var1}} and {{123}}');
+ * // vars2 = ['var1']  ({{123}} is not a valid identifier)
  * ```
  */
 export function extractVariables(prompt: string): string[] {
-  const variablePattern = /\{\{(\w+)\}\}/g;
+  // Match {{variable}} where variable starts with letter/underscore
+  // Follows standard identifier naming rules
+  const variablePattern = /\{\{([a-zA-Z_]\w*)\}\}/g;
   const matches = prompt.matchAll(variablePattern);
   const variables = new Set<string>();
 

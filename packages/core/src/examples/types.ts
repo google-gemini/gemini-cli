@@ -132,6 +132,9 @@ export interface Example {
 
   /** Optional prerequisites to run example */
   prerequisites?: string[];
+
+  /** Default values for variables (used when not provided) */
+  variableDefaults?: Record<string, string>;
 }
 
 /**
