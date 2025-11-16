@@ -51,7 +51,10 @@ export async function enforcePolicy(
   try {
     client = await getGeminiClient(model);
   } catch (error) {
-    console.error('Failed to initialize Gemini client for policy enforcement:', error);
+    console.error(
+      'Failed to initialize Gemini client for policy enforcement:',
+      error,
+    );
     // Fail open or closed? Protocol says we should probably fail closed (DENY) if we can't check.
     // But previous stub returned ALLOW.
     // The user said "default to DENY" in prompt rules.
@@ -96,7 +99,12 @@ ${JSON.stringify(toolCall, null, 2)}
     const abortController = new AbortController();
     const result = await client.generateContent(
       { model },
-      [{ role: 'user', parts: [{ text: CONSECA_ENFORCEMENT_PROMPT }, { text: prompt }] }],
+      [
+        {
+          role: 'user',
+          parts: [{ text: CONSECA_ENFORCEMENT_PROMPT }, { text: prompt }],
+        },
+      ],
       abortController.signal,
     );
 
@@ -107,7 +115,6 @@ ${JSON.stringify(toolCall, null, 2)}
         reason: 'Empty response from enforcement model',
       };
     }
-
 
     // Clean up markdown code blocks if present
     const cleanText = responseText.replace(/^```json\n|\n```$/g, '');
