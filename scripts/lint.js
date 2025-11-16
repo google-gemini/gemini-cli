@@ -44,6 +44,9 @@ function getPlatformArch() {
       shellcheck: 'darwin.aarch64',
     };
   }
+  if (platform === 'win32') {
+    return {};
+  }
   throw new Error(`Unsupported platform/architecture: ${platform}/${arch}`);
 }
 
@@ -68,14 +71,15 @@ const yamllintCheck =
  * @type {{[linterName: string]: Linter}}
  */
 const LINTERS = {
-  actionlint: {
-    check: 'command -v actionlint',
-    installer: `
+  actionlint: platformArch.actionlint
+    ? {
+        check: 'command -v actionlint',
+        installer: `
       mkdir -p "${TEMP_DIR}/actionlint"
       curl -sSLo "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
       tar -xzf "${TEMP_DIR}/.actionlint.tgz" -C "${TEMP_DIR}/actionlint"
     `,
-    run: `
+        run: `
       actionlint \
         -color \
         -ignore 'SC2002:' \
@@ -83,15 +87,17 @@ const LINTERS = {
         -ignore 'SC2129:' \
         -ignore 'label ".+" is unknown'
     `,
-  },
-  shellcheck: {
-    check: 'command -v shellcheck',
-    installer: `
+      }
+    : { check: 'true', installer: 'true', run: 'true' }, // No-op for unsupported platforms
+  shellcheck: platformArch.shellcheck
+    ? {
+        check: 'command -v shellcheck',
+        installer: `
       mkdir -p "${TEMP_DIR}/shellcheck"
       curl -sSLo "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
       tar -xf "${TEMP_DIR}/.shellcheck.txz" -C "${TEMP_DIR}/shellcheck" --strip-components=1
     `,
-    run: `
+        run: `
       git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type \
         | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
         | xargs shellcheck \
@@ -102,7 +108,8 @@ const LINTERS = {
           --format=gcc \
           --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
     `,
-  },
+      }
+    : { check: 'true', installer: 'true', run: 'true' }, // No-op for unsupported platforms
   yamllint: {
     check: yamllintCheck,
     installer: `
