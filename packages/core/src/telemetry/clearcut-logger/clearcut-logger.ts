@@ -95,6 +95,8 @@ export enum EventNames {
   RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
   LLM_LOOP_CHECK = 'llm_loop_check',
+  CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
+  CONSECA_VERDICT = 'conseca_verdict',
 }
 
 export interface LogResponse {

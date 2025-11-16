@@ -47,6 +47,10 @@ export {
   logExtensionUpdateEvent,
   logWebFetchFallbackAttempt,
 } from './loggers.js';
+export {
+  logConsecaPolicyGeneration,
+  logConsecaVerdict,
+} from './conseca_logger.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
   SlashCommandStatus,
@@ -62,6 +66,8 @@ export {
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
   ToolCallDecision,
+  ConsecaPolicyGenerationEvent,
+  ConsecaVerdictEvent,
 } from './types.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
