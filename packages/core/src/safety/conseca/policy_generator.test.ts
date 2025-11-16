@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generatePolicy } from './policy_generator.js';
 import * as utilities from './utilities.js';
-import { GeminiClient } from '../../core/client.js';
+import type { GeminiClient } from '../../core/client.js';
 
 vi.mock('./utilities.js');
 
@@ -29,14 +29,16 @@ describe('policy_generator', () => {
       },
     };
     mockClient.generateContent = vi.fn().mockResolvedValue({
-      candidates: [{
-        content: {
-          parts: [{ text: JSON.stringify(mockPolicy) }]
-        }
-      }]
+      candidates: [
+        {
+          content: {
+            parts: [{ text: JSON.stringify(mockPolicy) }],
+          },
+        },
+      ],
     });
     vi.mocked(utilities.getGeminiClient).mockResolvedValue(mockClient);
-    
+
     const policy = await generatePolicy('test prompt', 'trusted content');
 
     expect(utilities.getGeminiClient).toHaveBeenCalled();
@@ -46,11 +48,13 @@ describe('policy_generator', () => {
         expect.objectContaining({
           role: 'user',
           parts: expect.arrayContaining([
-            expect.objectContaining({ text: expect.stringContaining('User Prompt:') })
-          ])
-        })
+            expect.objectContaining({
+              text: expect.stringContaining('User Prompt:'),
+            }),
+          ]),
+        }),
       ]),
-      expect.anything() // signal
+      expect.anything(), // signal
     );
     expect(policy).toEqual(mockPolicy);
   });
