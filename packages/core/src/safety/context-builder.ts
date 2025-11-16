@@ -6,6 +6,7 @@
 
 import type { SafetyCheckInput, ConversationTurn } from './protocol.js';
 import type { Config } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Builds context objects for safety checkers, ensuring sensitive data is filtered.
@@ -20,6 +21,19 @@ export class ContextBuilder {
    * Builds the full context object with all available data.
    */
   buildFullContext(): SafetyCheckInput['context'] {
+    debugLogger.debug(`[ContextBuilder] buildFullContext called. History is: ${JSON.stringify(this.conversationHistory)}`);
+    //TODO: Conversation history is does not contain the user prompt. We need to add it.
+    const history = [...this.conversationHistory];
+    const currentQuestion = this.config.getQuestion();
+    if (currentQuestion && history.length === 0) {
+      history.push({
+        user: {
+          text: currentQuestion,
+        },
+        model: {},
+      });
+    }
+
     return {
       environment: {
         cwd: process.cwd(),
@@ -29,7 +43,7 @@ export class ContextBuilder {
           .getDirectories() as string[],
       },
       history: {
-        turns: this.conversationHistory,
+        turns: history,
       },
     };
   }

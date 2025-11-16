@@ -855,6 +855,7 @@ export class Config {
     const checkerRegistry = new CheckerRegistry(this.targetDir); // Using targetDir as dummy path for now
     const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
       checkersPath: this.targetDir,
+      timeout: 30000, // 30 seconds to allow for LLM-based checkers
     });
 
     this.policyEngine = new PolicyEngine(
@@ -864,7 +865,7 @@ export class Config {
 
     // Register Conseca if enabled
     if (this.safety.enableConseca) {
-      debugLogger.log('Registering Conseca Safety Checker');
+      debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
       ConsecaSafetyChecker.getInstance().setConfig(this);
       this.policyEngine.addChecker({
         checker: {
