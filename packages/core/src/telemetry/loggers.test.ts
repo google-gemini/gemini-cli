@@ -212,6 +212,7 @@ describe('loggers', () => {
           }),
         }),
         isInteractive: () => false,
+        getGhWorkflowName: () => 'test-workflow',
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -245,6 +246,7 @@ describe('loggers', () => {
           extensions_count: 2,
           extensions: 'ext-one,ext-two',
           auth_type: 'vertex-ai',
+          gh_workflow_name: 'test-workflow',
         },
       });
     });

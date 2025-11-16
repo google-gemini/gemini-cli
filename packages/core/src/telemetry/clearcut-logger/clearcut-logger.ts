@@ -490,6 +490,12 @@ export class ClearcutLogger {
         value: event.extension_ids.toString(),
       },
     ];
+    if (event.gh_workflow_name) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
+        value: event.gh_workflow_name,
+      });
+    }
     this.sessionData = data;
 
     // Flush start event immediately

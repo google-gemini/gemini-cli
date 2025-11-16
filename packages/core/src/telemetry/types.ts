@@ -71,6 +71,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   extensions: string;
   extension_ids: string;
   auth_type?: string;
+  gh_workflow_name?: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -108,6 +109,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
     this.auth_type = generatorConfig?.authType;
+    this.gh_workflow_name = config.getGhWorkflowName();
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -143,6 +145,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
       auth_type: this.auth_type,
+      gh_workflow_name: this.gh_workflow_name,
     };
   }
 
