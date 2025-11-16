@@ -27,14 +27,17 @@ import type { Config } from '../config/config.js';
 import type { AnyToolInvocation } from '../index.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
-const mockHomedir = vi.hoisted(() => vi.fn());
+const mockHomedir = vi.hoisted(() => vi.fn(() => '/home/user'));
+const mockTmpdir = vi.hoisted(() => vi.fn(() => '/tmp'));
 vi.mock('os', () => ({
   default: {
     platform: mockPlatform,
     homedir: mockHomedir,
+    tmpdir: mockTmpdir,
   },
   platform: mockPlatform,
   homedir: mockHomedir,
+  tmpdir: mockTmpdir,
 }));
 
 const mockQuote = vi.hoisted(() => vi.fn());

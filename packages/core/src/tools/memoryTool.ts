@@ -99,7 +99,7 @@ interface SaveMemoryParams {
 }
 
 export function getGlobalMemoryFilePath(): string {
-  return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
+  return path.join(Storage.getConfigDir(), getCurrentGeminiMdFilename());
 }
 
 /**
