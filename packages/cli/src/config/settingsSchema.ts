@@ -821,7 +821,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Conseca',
         category: 'Safety',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Enable the Conseca in-process safety checker.',
         showInDialog: true,
       },
