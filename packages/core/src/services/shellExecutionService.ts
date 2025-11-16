@@ -756,10 +756,6 @@ export class ShellExecutionService {
    * @param rows The new number of rows.
    */
   static resizePty(pid: number, cols: number, rows: number): void {
-    if (!this.isPtyActive(pid)) {
-      return;
-    }
-
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {
@@ -790,10 +786,6 @@ export class ShellExecutionService {
    * @param lines The number of lines to scroll.
    */
   static scrollPty(pid: number, lines: number): void {
-    if (!this.isPtyActive(pid)) {
-      return;
-    }
-
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {

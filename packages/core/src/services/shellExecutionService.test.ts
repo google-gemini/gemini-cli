@@ -294,19 +294,19 @@ describe('ShellExecutionService', () => {
       expect(mockHeadlessTerminal.resize).toHaveBeenCalledWith(100, 40);
     });
 
-    it('should not resize the pty if it is not active', async () => {
-      const isPtyActiveSpy = vi
-        .spyOn(ShellExecutionService, 'isPtyActive')
-        .mockReturnValue(false);
+    it('should ignore resize errors if the pty has already exited', async () => {
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw new Error('Cannot resize a pty that has already exited');
+      });
 
       await simulateExecution('ls -l', (pty) => {
+        // This call should not throw an error because it's caught internally.
         ShellExecutionService.resizePty(pty.pid!, 100, 40);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
-      expect(mockPtyProcess.resize).not.toHaveBeenCalled();
-      expect(mockHeadlessTerminal.resize).not.toHaveBeenCalled();
-      isPtyActiveSpy.mockRestore();
+      // We expect resize to have been called, and the error to be handled.
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
     });
 
     it('should ignore errors when resizing an exited pty', async () => {
