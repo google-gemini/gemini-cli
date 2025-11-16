@@ -135,6 +135,15 @@ export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
  * `as const` is crucial for TypeScript to infer the most specific types possible.
  */
 const SETTINGS_SCHEMA = {
+  $schema: {
+    type: 'string',
+    label: 'Schema',
+    category: '$schema',
+    requiresRestart: false,
+    default:
+      'https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json',
+  },
+
   // Maintained for compatibility/criticality
   mcpServers: {
     type: 'object',
