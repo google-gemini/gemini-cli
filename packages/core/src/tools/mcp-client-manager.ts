@@ -175,6 +175,7 @@ export class McpClientManager {
               this.cliConfig.getPromptRegistry(),
               this.cliConfig.getWorkspaceContext(),
               this.cliConfig.getDebugMode(),
+              this.cliConfig,
             );
           if (!existing) {
             this.clients.set(name, client);

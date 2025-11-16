@@ -216,6 +216,13 @@ export const AppContainer = (props: AppContainerProps) => {
     setPermissionsDialogProps(null);
   }, []);
 
+  const [mcpSamplingRequest, setMcpSamplingRequest] = useState<{
+    serverName: string;
+    prompt: unknown;
+    resolve: () => void;
+    reject: (reason?: unknown) => void;
+  } | null>(null);
+
   const toggleDebugProfiler = useCallback(
     () => setShowDebugProfiler((prev) => !prev),
     [],
@@ -288,11 +295,35 @@ export const AppContainer = (props: AppContainerProps) => {
       setCurrentModel(payload.model);
     };
 
+    const handleMcpSamplingRequest = (payload: {
+      serverName: string;
+      prompt: unknown;
+      resolve: () => void;
+      reject: (reason?: unknown) => void;
+    }) => {
+      // Wrap the resolve and reject to clear the state after calling them
+      const wrappedResolve = () => {
+        payload.resolve();
+        setMcpSamplingRequest(null);
+      };
+      const wrappedReject = (reason?: unknown) => {
+        payload.reject(reason);
+        setMcpSamplingRequest(null);
+      };
+      setMcpSamplingRequest({
+        ...payload,
+        resolve: wrappedResolve,
+        reject: wrappedReject,
+      });
+    };
+
     coreEvents.on(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
+    coreEvents.on(CoreEvent.McpSamplingRequest, handleMcpSamplingRequest);
     return () => {
       coreEvents.off(CoreEvent.FallbackModeChanged, handleFallbackModeChanged);
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
+      coreEvents.off(CoreEvent.McpSamplingRequest, handleMcpSamplingRequest);
     };
   }, [getEffectiveModel]);
 
@@ -1285,6 +1316,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
     isAuthDialogOpen ||
+    !!mcpSamplingRequest ||
     authState === AuthState.AwaitingApiKeyInput;
 
   const pendingHistoryItems = useMemo(
@@ -1391,8 +1423,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       showDebugProfiler,
+      authState,
       customDialog,
       copyModeEnabled,
+      mcpSamplingRequest,
       warningMessage,
     }),
     [
@@ -1481,6 +1515,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       apiKeyDefaultValue,
       authState,
       copyModeEnabled,
+      mcpSamplingRequest,
       warningMessage,
     ],
   );

@@ -16,6 +16,7 @@ import type {
   Prompt,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
+  CreateMessageRequestSchema,
   GetPromptResultSchema,
   ListPromptsResultSchema,
   ListRootsRequestSchema,
@@ -23,6 +24,10 @@ import {
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -43,7 +48,7 @@ import type {
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { coreEvents } from '../utils/events.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -96,6 +101,7 @@ export class McpClient {
     private readonly promptRegistry: PromptRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly debugMode: boolean,
+    private readonly cliConfig: Config,
   ) {}
 
   /**
@@ -109,14 +115,17 @@ export class McpClient {
     }
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
-      this.client = await connectToMcpServer(
+      const { client, transport } = await connectToMcpServer(
         this.serverName,
         this.serverConfig,
         this.debugMode,
         this.workspaceContext,
+        this.cliConfig,
       );
+      this.client = client;
+      this.transport = transport;
       const originalOnError = this.client.onerror;
-      this.client.onerror = (error) => {
+      this.client.onerror = async (error) => {
         if (this.status !== MCPServerStatus.CONNECTED) {
           return;
         }
@@ -127,6 +136,14 @@ export class McpClient {
           error,
         );
         this.updateStatus(MCPServerStatus.DISCONNECTED);
+        // Close transport to prevent memory leaks
+        if (this.transport) {
+          try {
+            await this.transport.close();
+          } catch (_closeError) {
+            // Ignore errors when closing transport
+          }
+        }
       };
       this.updateStatus(MCPServerStatus.CONNECTED);
     } catch (error) {
@@ -542,17 +559,29 @@ export async function connectAndDiscover(
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
   let mcpClient: Client | undefined;
+  let transport: Transport | undefined;
   try {
-    mcpClient = await connectToMcpServer(
+    const result = await connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
       debugMode,
       workspaceContext,
+      cliConfig,
     );
+    mcpClient = result.client;
+    transport = result.transport;
 
-    mcpClient.onerror = (error) => {
+    mcpClient.onerror = async (error) => {
       coreEvents.emitFeedback('error', `MCP ERROR (${mcpServerName}):`, error);
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+      // Close transport to prevent memory leaks
+      if (transport) {
+        try {
+          await transport.close();
+        } catch (_closeError) {
+          // Ignore errors when closing transport
+        }
+      }
     };
 
     // Attempt to discover both prompts and tools
@@ -583,8 +612,11 @@ export async function connectAndDiscover(
     }
     toolRegistry.sortTools();
   } catch (error) {
+    if (transport) {
+      await transport.close();
+    }
     if (mcpClient) {
-      mcpClient.close();
+      await mcpClient.close();
     }
     coreEvents.emitFeedback(
       'error',
@@ -792,7 +824,7 @@ export function hasNetworkTransport(config: MCPServerConfig): boolean {
  *
  * @param mcpServerName The name of the MCP server, used for logging and identification.
  * @param mcpServerConfig The configuration specifying how to connect to the server.
- * @returns A promise that resolves to a connected MCP `Client` instance.
+ * @returns A promise that resolves to a connected MCP `Client` instance and its `Transport`.
  * @throws An error if the connection fails or the configuration is invalid.
  */
 export async function connectToMcpServer(
@@ -800,7 +832,8 @@ export async function connectToMcpServer(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
-): Promise<Client> {
+  cliConfig: Config,
+): Promise<{ client: Client; transport: Transport }> {
   const mcpClient = new Client({
     name: 'gemini-cli-mcp-client',
     version: '0.0.1',
@@ -810,6 +843,7 @@ export async function connectToMcpServer(
     roots: {
       listChanged: true,
     },
+    sampling: {},
   });
 
   mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
@@ -823,6 +857,148 @@ export async function connectToMcpServer(
     return {
       roots,
     };
+  });
+
+  mcpClient.setRequestHandler(CreateMessageRequestSchema, async (req) => {
+    const autoConfirm = cliConfig.getAutoConfirmMcpSampling();
+
+    let rejectSampling: ((reason?: unknown) => void) | undefined;
+
+    if (!autoConfirm) {
+      const consentPromise = new Promise<void>((resolve, reject) => {
+        rejectSampling = reject; // Store for error handling
+        coreEvents.emit(CoreEvent.McpSamplingRequest, {
+          serverName: mcpServerName,
+          prompt: req.params.messages,
+          resolve,
+          reject: (_reason?: unknown) =>
+            reject(new Error('User rejected sampling request')),
+        });
+      });
+
+      await consentPromise;
+    }
+
+    try {
+      const geminiClient = cliConfig.getGeminiClient();
+      const contents = req.params.messages.map((message) => {
+        // MCP spec: message.content is a single object (not an array)
+        const content = message.content as {
+          type: string;
+          text?: string;
+          data?: string;
+          mimeType?: string;
+        };
+
+        let parts;
+        if (content.type === 'text' && content.text) {
+          parts = [{ text: content.text }];
+        } else if (
+          content.type === 'image' &&
+          content.data &&
+          content.mimeType
+        ) {
+          // For image content, convert to Gemini format
+          parts = [
+            {
+              inlineData: {
+                mimeType: content.mimeType,
+                data: content.data,
+              },
+            },
+          ];
+        } else if (
+          content.type === 'audio' &&
+          content.data &&
+          content.mimeType
+        ) {
+          // For audio content, convert to Gemini format
+          parts = [
+            {
+              inlineData: {
+                mimeType: content.mimeType,
+                data: content.data,
+              },
+            },
+          ];
+        } else {
+          throw new Error(
+            `Unsupported or invalid content type: ${content.type}`,
+          );
+        }
+
+        return {
+          role: message.role as 'user' | 'model',
+          parts,
+        };
+      });
+
+      // Resolve the model to use for sampling
+      // If the config model is "auto", use flash as it's faster and cheaper for sampling
+      let modelToUse = cliConfig.getModel();
+      if (modelToUse === DEFAULT_GEMINI_MODEL_AUTO) {
+        modelToUse = DEFAULT_GEMINI_FLASH_MODEL;
+      }
+
+      // TODO: Consider req.params.modelPreferences to select model based on server hints
+      // For now, we just use the resolved model from config
+
+      const result = await geminiClient.generateContent(
+        { model: modelToUse },
+        contents,
+        new AbortController().signal,
+      );
+
+      const firstCandidate = result.candidates?.[0];
+      if (
+        !firstCandidate ||
+        !firstCandidate.content ||
+        !firstCandidate.content.parts
+      ) {
+        throw new Error('No response from Gemini');
+      }
+
+      // MCP spec: response content should be a single object (not an array)
+      // Gemini can return multiple parts, so we'll concatenate text parts
+      const textParts: string[] = [];
+      for (const part of firstCandidate.content.parts) {
+        if ('text' in part && part.text) {
+          textParts.push(part.text);
+        } else {
+          throw new Error(
+            'Unsupported response part type - only text parts are supported',
+          );
+        }
+      }
+
+      const responseContent = {
+        type: 'text' as const,
+        text: textParts.join(''),
+      };
+
+      // Map Gemini's finish reason to MCP's stopReason
+      // Gemini: STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER, BLOCKLIST, PROHIBITED_CONTENT, SPII
+      // MCP: endTurn, maxTokens, stopSequence (we'll map to endTurn or maxTokens)
+      let stopReason: 'endTurn' | 'maxTokens' | 'stopSequence' = 'endTurn';
+      if (firstCandidate.finishReason === 'MAX_TOKENS') {
+        stopReason = 'maxTokens';
+      }
+
+      // MCP spec: return role, content, model, and stopReason at top level (not wrapped in "message")
+      return {
+        role: 'assistant' as const,
+        content: responseContent,
+        model: modelToUse,
+        stopReason,
+      };
+    } catch (error) {
+      // Close the dialog with an error message if consent was required
+      if (rejectSampling) {
+        rejectSampling(error);
+      }
+      // Re-throw to propagate to MCP server
+      throw error;
+    }
   });
 
   let unlistenDirectories: Unsubscribe | undefined =
@@ -861,7 +1037,7 @@ export async function connectToMcpServer(
       await mcpClient.connect(transport, {
         timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
       });
-      return mcpClient;
+      return { client: mcpClient, transport };
     } catch (error) {
       await transport.close();
       throw error;
@@ -989,7 +1165,7 @@ export async function connectToMcpServer(
                   timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
                 });
                 // Connection successful with OAuth
-                return mcpClient;
+                return { client: mcpClient, transport: oauthTransport };
               } else {
                 throw new Error(
                   `Failed to create OAuth transport for server '${mcpServerName}'`,
@@ -1117,7 +1293,7 @@ export async function connectToMcpServer(
                       mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
                   });
                   // Connection successful with OAuth
-                  return mcpClient;
+                  return { client: mcpClient, transport: oauthTransport };
                 } else {
                   throw new Error(
                     `Failed to create OAuth transport for server '${mcpServerName}'`,
