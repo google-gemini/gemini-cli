@@ -32,7 +32,7 @@ export const ConsentPrompt = (props: ConsentPromptProps) => {
         <MarkdownDisplay
           isPending={true}
           text={prompt}
-          terminalWidth={terminalWidth}
+          terminalWidth={terminalWidth - 6}
         />
       ) : (
         prompt
