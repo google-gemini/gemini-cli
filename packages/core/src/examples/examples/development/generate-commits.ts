@@ -50,9 +50,7 @@ Format as a complete commit message I can copy-paste.`,
     '/docs/tools/shell.md',
     '/docs/examples/git-workflow.md',
   ],
-  prerequisites: ['Sta
-
-ge your changes with: git add <files>'],
+  prerequisites: ['Stage your changes with: git add <files>'],
   featured: true,
 };
 

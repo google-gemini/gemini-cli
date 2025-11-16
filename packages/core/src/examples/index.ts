@@ -57,6 +57,7 @@ export type {
   ExampleResult,
   ExampleStats,
   ExampleInteraction,
+  ChatService,
 } from './types.js';
 
 // Export registry

@@ -23,8 +23,7 @@
  * @module examples/runner
  */
 
-import type { Example, ExampleResult } from './types.js';
-import type { ChatService } from '../core/chat-service.js';
+import type { Example, ExampleResult, ChatService } from './types.js';
 
 /**
  * Options for running an example
@@ -220,9 +219,7 @@ export class ExampleRunner {
    * Execute the prompt through the chat service
    */
   private async execute(prompt: string): Promise<string> {
-    // This would integrate with the actual chat service
-    // For now, return a placeholder
-    return 'Example executed successfully';
+    return await this.chatService.executePrompt(prompt);
   }
 
   /**

@@ -231,3 +231,25 @@ export interface ExampleInteraction {
   /** Whether user saved it as custom command */
   savedAsCommand?: boolean;
 }
+
+/**
+ * Minimal interface for chat service integration
+ *
+ * This interface defines the contract that the ExampleRunner uses to execute
+ * prompts. Implementations should integrate with the actual Gemini CLI chat
+ * system (e.g., GeminiChat class).
+ *
+ * @remarks
+ * This is a minimal interface to keep the Example Library decoupled from
+ * specific chat implementations. It allows for easier testing and flexibility
+ * in how examples are executed.
+ */
+export interface ChatService {
+  /**
+   * Execute a prompt through the chat service
+   *
+   * @param prompt - The prompt to execute
+   * @returns The response from the model
+   */
+  executePrompt(prompt: string): Promise<string>;
+}
