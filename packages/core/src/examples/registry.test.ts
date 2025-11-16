@@ -43,6 +43,41 @@ describe('ExampleRegistry', () => {
       const examples = registry.getAll();
       expect(examples.length).toBeGreaterThan(0);
     });
+
+    it('should load all 24 Phase 2 examples', () => {
+      const examples = registry.getAll();
+      expect(examples.length).toBe(24);
+    });
+
+    it('should have 5 code-understanding examples', () => {
+      const examples = registry.search({ category: 'code-understanding' });
+      expect(examples.length).toBe(5);
+    });
+
+    it('should have 5 development examples', () => {
+      const examples = registry.search({ category: 'development' });
+      expect(examples.length).toBe(5);
+    });
+
+    it('should have 5 file-operations examples', () => {
+      const examples = registry.search({ category: 'file-operations' });
+      expect(examples.length).toBe(5);
+    });
+
+    it('should have 3 data-analysis examples', () => {
+      const examples = registry.search({ category: 'data-analysis' });
+      expect(examples.length).toBe(3);
+    });
+
+    it('should have 3 automation examples', () => {
+      const examples = registry.search({ category: 'automation' });
+      expect(examples.length).toBe(3);
+    });
+
+    it('should have 3 documentation examples', () => {
+      const examples = registry.search({ category: 'documentation' });
+      expect(examples.length).toBe(3);
+    });
   });
 
   describe('get', () => {
