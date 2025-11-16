@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 159
+  // Next ID: 166
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -605,4 +605,27 @@ export enum EventMetadataKey {
 
   // Logs whether the token storage type was forced by an environment variable.
   GEMINI_CLI_TOKEN_STORAGE_FORCED = 158,
+  // Conseca Event Keys
+  // ==========================================================================
+
+  // Logs the policy generation event.
+  CONSECA_POLICY_GENERATION = 159,
+
+  // Logs the verdict event.
+  CONSECA_VERDICT = 160,
+
+  // Logs the generated policy content.
+  CONSECA_GENERATED_POLICY = 161,
+
+  // Logs the verdict result (e.g. ALLOW/BLOCK).
+  CONSECA_VERDICT_RESULT = 162,
+
+  // Logs the verdict rationale.
+  CONSECA_VERDICT_RATIONALE = 163,
+
+  // Logs the trusted content used.
+  CONSECA_TRUSTED_CONTENT = 164,
+
+  // Logs the user prompt for Conseca events.
+  CONSECA_USER_PROMPT = 165,
 }
