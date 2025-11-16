@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getGeminiClient } from './utilities.js';
+import type { Config } from '../../config/config.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision, type SafetyCheckResult } from '../protocol.js';
 import type { SecurityPolicy } from './types.js';
@@ -19,50 +19,42 @@ Input:
 1.  **Security Policy:** A set of rules defining allowed and denied actions for this specific tool.
 2.  **Tool Call:** The actual function call the system intends to execute.
 
-Output:
-You must return a JSON object with the following fields:
--   "decision": One of "ALLOW", "DENY", or "ASK_USER".
--   "reason": A concise explanation of why the decision was made.
+You are a security enforcement engine. Your job is to check if a tool call complies with a security policy.
 
-Rules:
--   If the policy explicitly allows the tool call with its arguments, return "ALLOW".
--   If the policy explicitly denies the tool call or its arguments, return "DENY".
--   If the policy requires user confirmation (e.g., "ASK_USER"), return "ASK_USER".
--   If the policy is ambiguous or does not cover the tool call, default to "DENY" for safety.
--   Be strict with argument constraints (e.g., file paths, commands).
+Security Policy:
+{{policy}}
 
-Response Format:
-\`\`\`json
-{
-  "decision": "ALLOW" | "DENY" | "ASK_USER",
-  "reason": "..."
-}
-\`\`\`
+Tool Call:
+{{tool_call}}
+
+Evaluate the tool call against the policy.
+1. Check if the tool is allowed.
+2. Check if the arguments match the constraints.
+3. Output a JSON object with:
+   - "decision": "ALLOW" or "DENY" or "ASK_USER"
+   - "reason": A brief explanation.
+
+Output strictly JSON.
 `;
 
 /**
- * Enforces the security policy on a tool call.
+ * Enforces the security policy for a given tool call.
  */
 export async function enforcePolicy(
   policy: SecurityPolicy,
   toolCall: FunctionCall,
+  config: Config,
 ): Promise<SafetyCheckResult> {
   const model = DEFAULT_GEMINI_FLASH_MODEL;
-  let client;
-  try {
-    client = await getGeminiClient(model);
-  } catch (error) {
-    console.error(
-      'Failed to initialize Gemini client for policy enforcement:',
-      error,
+  const contentGenerator = config.getContentGenerator();
+
+  if (!contentGenerator) {
+    debugLogger.debug(
+      '[Conseca] Enforcement failed: Content generator not initialized',
     );
-    // Fail open or closed? Protocol says we should probably fail closed (DENY) if we can't check.
-    // But previous stub returned ALLOW.
-    // The user said "default to DENY" in prompt rules.
-    // If the *checker* is broken, we should probably DENY to be safe.
     return {
       decision: SafetyCheckDecision.DENY,
-      reason: 'Internal error: Failed to initialize safety checker client.',
+      reason: 'Content generator not initialized',
     };
   }
 
@@ -74,43 +66,48 @@ export async function enforcePolicy(
   if (!toolName) {
     return {
       decision: SafetyCheckDecision.DENY,
-      reason: 'Tool name is missing.',
+      reason: 'Tool name is missing',
     };
   }
 
-  const toolPolicy = policy[toolName];
+  // If the tool is not in the policy, we should probably DENY or ASK_USER.
+  // Let's default to DENY for safety if not explicitly allowed/mentioned.
+  // However, the policy generator might have omitted it if it wasn't relevant.
+  // But for "yolo mode" safety, we want to check everything.
+  // Let's assume the policy covers relevant tools. If missing, maybe ASK_USER?
+  // For now, let's proceed to check with the LLM if we have a policy.
 
-  if (!toolPolicy) {
-    // If no policy exists for this tool, we should probably DENY or ASK_USER by default.
-    // For now, let's be safe and DENY if it's not explicitly in the policy map (assuming policy map covers all relevant tools).
-    // However, if the policy map is partial, we might want to fallback to a general check.
-    // Let's assume the policy generator should have generated a policy for it if it was relevant.
-    // If it's not in the map, it might be an "unexpected" tool call.
-    return {
-      decision: SafetyCheckDecision.DENY,
-      reason: `No security policy generated for tool '${toolName}'.`,
-    };
-  }
-
-  const prompt = `
-Security Policy for ${toolName}:
-${JSON.stringify(toolPolicy, null, 2)}
-
-Tool Call:
-${JSON.stringify(toolCall, null, 2)}
-`;
+  const policyStr = JSON.stringify(policy[toolName] || {}, null, 2);
+  const toolCallStr = JSON.stringify(toolCall, null, 2);
+  debugLogger.debug(
+    `[Conseca] Enforcing policy for tool: ${toolName}`,
+    toolCall,
+    policyStr,
+    toolCallStr,
+  );
 
   try {
-    const abortController = new AbortController();
-    const result = await client.generateContent(
-      { model },
-      [
-        {
-          role: 'user',
-          parts: [{ text: CONSECA_ENFORCEMENT_PROMPT }, { text: prompt }],
+    const result = await contentGenerator.generateContent(
+      {
+        model,
+        config: {
+          responseMimeType: 'application/json',
         },
-      ],
-      abortController.signal,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: CONSECA_ENFORCEMENT_PROMPT.replace(
+                  '{{policy}}',
+                  policyStr,
+                ).replace('{{tool_call}}', toolCallStr),
+              },
+            ],
+          },
+        ],
+      },
+      'conseca-policy-enforcement',
     );
 
     const responseText = getResponseText(result);
