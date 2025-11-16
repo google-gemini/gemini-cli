@@ -34,18 +34,12 @@ export const VimModeProvider = ({
 }) => {
   const initialVimEnabled = settings.merged.general?.vimMode ?? false;
   const [vimEnabled, setVimEnabled] = useState(initialVimEnabled);
-  const [vimMode, setVimMode] = useState<VimMode>(
-    initialVimEnabled ? 'NORMAL' : 'INSERT',
-  );
+  const [vimMode, setVimMode] = useState<VimMode>('INSERT');
 
   useEffect(() => {
     // Initialize vimEnabled from settings on mount
     const enabled = settings.merged.general?.vimMode ?? false;
     setVimEnabled(enabled);
-    // When vim mode is enabled, always start in NORMAL mode
-    if (enabled) {
-      setVimMode('NORMAL');
-    }
   }, [settings.merged.general?.vimMode]);
 
   const toggleVimEnabled = useCallback(async () => {
