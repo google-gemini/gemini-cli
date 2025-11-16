@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { logs } from '@opentelemetry/api-logs';
+import { logs, type Logger } from '@opentelemetry/api-logs';
 import {
   logConsecaPolicyGeneration,
   logConsecaVerdict,
@@ -27,7 +27,10 @@ vi.mock('./clearcut-logger/clearcut-logger.js');
 describe('conseca_logger', () => {
   let mockConfig: Config;
   let mockLogger: { emit: ReturnType<typeof vi.fn> };
-  let mockClearcutLogger: { enqueueLogEvent: ReturnType<typeof vi.fn>; createLogEvent: ReturnType<typeof vi.fn> };
+  let mockClearcutLogger: {
+    enqueueLogEvent: ReturnType<typeof vi.fn>;
+    createLogEvent: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     mockConfig = {
@@ -40,14 +43,16 @@ describe('conseca_logger', () => {
     mockLogger = {
       emit: vi.fn(),
     };
-    vi.mocked(logs.getLogger).mockReturnValue(mockLogger as any);
+    vi.mocked(logs.getLogger).mockReturnValue(mockLogger as unknown as Logger);
     vi.mocked(sdk.isTelemetrySdkInitialized).mockReturnValue(true);
 
     mockClearcutLogger = {
       enqueueLogEvent: vi.fn(),
       createLogEvent: vi.fn().mockReturnValue({ event_name: 'test' }),
     };
-    vi.mocked(ClearcutLogger.getInstance).mockReturnValue(mockClearcutLogger as any);
+    vi.mocked(ClearcutLogger.getInstance).mockReturnValue(
+      mockClearcutLogger as unknown as ClearcutLogger,
+    );
   });
 
   afterEach(() => {

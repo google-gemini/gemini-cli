@@ -56,7 +56,10 @@ export class ConsecaSafetyChecker implements InProcessChecker {
     };
   }
 
-  async getPolicy(userPrompt: string, trustedContent: string): Promise<SecurityPolicy> {
+  async getPolicy(
+    userPrompt: string,
+    trustedContent: string,
+  ): Promise<SecurityPolicy> {
     if (this.activeUserPrompt === userPrompt && this.currentPolicy) {
       return this.currentPolicy;
     }
@@ -68,7 +71,11 @@ export class ConsecaSafetyChecker implements InProcessChecker {
     if (this.config) {
       logConsecaPolicyGeneration(
         this.config,
-        new ConsecaPolicyGenerationEvent(userPrompt, trustedContent, JSON.stringify(policy)),
+        new ConsecaPolicyGenerationEvent(
+          userPrompt,
+          trustedContent,
+          JSON.stringify(policy),
+        ),
       );
     }
 
@@ -76,10 +83,7 @@ export class ConsecaSafetyChecker implements InProcessChecker {
   }
 
   private extractUserPrompt(input: SafetyCheckInput): string | null {
-    if (
-      input.context.history &&
-      input.context.history.turns.length > 0
-    ) {
+    if (input.context.history && input.context.history.turns.length > 0) {
       const lastTurn =
         input.context.history.turns[input.context.history.turns.length - 1];
       return lastTurn.user.text;
