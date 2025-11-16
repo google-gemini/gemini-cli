@@ -50,6 +50,7 @@ import {
   saveModelChange,
   loadSettings,
 } from './settings.js';
+import { getSettingsSchema } from './settingsSchema.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -877,6 +878,13 @@ export async function loadCliConfig(
         disabledSkills: refreshedSettings.merged.skills.disabled,
         agents: refreshedSettings.merged.agents,
       };
+    },
+    safety: {
+      ...settings.safety,
+      enableConseca:
+        settings.safety?.enableConseca ??
+        (getSettingsSchema().safety.properties.enableConseca
+          .default as boolean),
     },
   });
 }

@@ -12,6 +12,7 @@ import {
   logConsecaPolicyGeneration,
   ConsecaPolicyGenerationEvent,
 } from '../../telemetry/index.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 
 import { generatePolicy } from './policy_generator.js';
@@ -39,12 +40,23 @@ export class ConsecaSafetyChecker implements InProcessChecker {
   }
 
   async check(input: SafetyCheckInput): Promise<SafetyCheckResult> {
+    debugLogger.debug(`[Conseca] check called. History is: ${JSON.stringify(input.context.history)}`);
     const userPrompt = this.extractUserPrompt(input);
-    // TODO: Retrieve real trusted content (tool definitions)
-    const trustedContent = 'Mock Tool Definitions';
+    let trustedContent = '';
+
+    if (this.config) {
+      const toolRegistry = this.config.getToolRegistry();
+      if (toolRegistry) {
+        const tools = toolRegistry.getFunctionDeclarations();
+        trustedContent = JSON.stringify(tools, null, 2);
+      }
+    }
+
 
     if (userPrompt) {
       await this.getPolicy(userPrompt, trustedContent);
+    } else {
+      debugLogger.debug(`[Conseca] Skipping policy generation because userPrompt is null`);
     }
 
     if (this.currentPolicy) {
@@ -88,6 +100,7 @@ export class ConsecaSafetyChecker implements InProcessChecker {
         input.context.history.turns[input.context.history.turns.length - 1];
       return lastTurn.user.text;
     }
+    debugLogger.debug(`[Conseca] extractUserPrompt failed. History length: ${input.context.history?.turns?.length}`);
     return null;
   }
 
