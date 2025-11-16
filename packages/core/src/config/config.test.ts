@@ -400,7 +400,7 @@ describe('Server Config (config.ts)', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer); // Simulate Google auth by returning a truthy value
       vi.mocked(getExperiments).mockResolvedValue({
         flags: {
-          GeminiCLIPreviewAvailable__enable_preview: { boolValue: true },
+          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: true },
         },
         experimentIds: [],
       });
@@ -414,7 +414,7 @@ describe('Server Config (config.ts)', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer);
       vi.mocked(getExperiments).mockResolvedValue({
         flags: {
-          GeminiCLIPreviewAvailable__enable_preview: { boolValue: false },
+          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: false },
         },
         experimentIds: [],
       });
