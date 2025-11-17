@@ -26,13 +26,7 @@ import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
-import type {
-  FunctionDeclaration,
-  CallableTool,
-  FunctionCall,
-  Part,
-  Tool,
-} from '@google/genai';
+import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
@@ -629,13 +623,7 @@ export async function discoverTools(
     const discoveredTools: DiscoveredMCPTool[] = [];
     for (const toolDef of response.tools) {
       try {
-        if (
-          !isEnabled(
-            toolDef as unknown as FunctionDeclaration,
-            mcpServerName,
-            mcpServerConfig,
-          )
-        ) {
+        if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
           continue;
         }
 
@@ -1409,9 +1397,13 @@ export async function createTransport(
   );
 }
 
+interface NamedTool {
+  name?: string;
+}
+
 /** Visible for testing */
 export function isEnabled(
-  funcDecl: FunctionDeclaration,
+  funcDecl: NamedTool,
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
 ): boolean {
