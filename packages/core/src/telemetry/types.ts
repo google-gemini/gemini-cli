@@ -887,17 +887,24 @@ export class ConsecaPolicyGenerationEvent implements BaseTelemetryEvent {
   user_prompt: string;
   trusted_content: string;
   policy: string;
+  error?: string;
 
-  constructor(user_prompt: string, trusted_content: string, policy: string) {
+  constructor(
+    user_prompt: string,
+    trusted_content: string,
+    policy: string,
+    error?: string,
+  ) {
     this['event.name'] = 'conseca_policy_generation';
     this['event.timestamp'] = new Date().toISOString();
     this.user_prompt = user_prompt;
     this.trusted_content = trusted_content;
     this.policy = policy;
+    this.error = error;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_CONSECA_POLICY_GENERATION,
       'event.timestamp': this['event.timestamp'],
@@ -905,6 +912,12 @@ export class ConsecaPolicyGenerationEvent implements BaseTelemetryEvent {
       trusted_content: this.trusted_content,
       policy: this.policy,
     };
+
+    if (this.error) {
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {

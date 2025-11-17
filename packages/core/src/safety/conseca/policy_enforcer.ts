@@ -77,6 +77,13 @@ export async function enforcePolicy(
     toolCallStr,
   );
 
+  if (!policyStr) {
+    return {
+      decision: SafetyCheckDecision.ALLOW,
+      reason: 'Policy for tool ' + toolName + ' is missing',
+    };
+  }
+
   try {
     const result = await contentGenerator.generateContent(
       {

@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 166
+  // Next ID: 167
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -628,4 +628,7 @@ export enum EventMetadataKey {
 
   // Logs the user prompt for Conseca events.
   CONSECA_USER_PROMPT = 165,
+
+  // Logs the error message for Conseca events.
+  CONSECA_ERROR = 166,
 }
