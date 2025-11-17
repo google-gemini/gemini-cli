@@ -16,7 +16,12 @@ import {
 import type { WriteFileToolParams } from './write-file.js';
 import { getCorrectedFileContent, WriteFileTool } from './write-file.js';
 import { ToolErrorType } from './tool-error.js';
-import type { FileDiff, ToolEditConfirmationDetails } from './tools.js';
+import type {
+  FileDiff,
+  ToolEditConfirmationDetails,
+  ToolInvocation,
+  ToolResult,
+} from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { type EditToolParams } from './edit.js';
 import type { Config } from '../config/config.js';
@@ -850,30 +855,40 @@ describe('WriteFileTool', () => {
           vi.restoreAllMocks();
         }
 
-        if (mockFsExistsSync) {
-          const originalExistsSync = fs.existsSync;
-          vi.spyOn(fs, 'existsSync').mockImplementation((path) =>
-            path === filePath ? false : originalExistsSync(path as string),
-          );
+        let existsSyncSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+        try {
+          if (mockFsExistsSync) {
+            const originalExistsSync = fs.existsSync;
+            existsSyncSpy = vi
+              .spyOn(fs, 'existsSync')
+              .mockImplementation((path) =>
+                path === filePath ? false : originalExistsSync(path as string),
+              );
+          }
+
+          vi.spyOn(fsService, 'writeTextFile').mockImplementationOnce(() => {
+            const error = new Error(errorMessage) as NodeJS.ErrnoException;
+            if (errorCode) error.code = errorCode;
+            return Promise.reject(error);
+          });
+
+          const params = { file_path: filePath, content };
+          const invocation = tool.build(params);
+          const result = await invocation.execute(abortSignal);
+
+          expect(result.error?.type).toBe(errorType);
+          const errorSuffix = errorCode ? ` (${errorCode})` : '';
+          const expectedMessage = errorCode
+            ? `${expectedMessagePrefix}: ${filePath}${errorSuffix}`
+            : `${expectedMessagePrefix}: ${errorMessage}`;
+          expect(result.llmContent).toContain(expectedMessage);
+          expect(result.returnDisplay).toContain(expectedMessage);
+        } finally {
+          if (existsSyncSpy) {
+            existsSyncSpy.mockRestore();
+          }
         }
-
-        vi.spyOn(fsService, 'writeTextFile').mockImplementationOnce(() => {
-          const error = new Error(errorMessage) as NodeJS.ErrnoException;
-          if (errorCode) error.code = errorCode;
-          return Promise.reject(error);
-        });
-
-        const params = { file_path: filePath, content };
-        const invocation = tool.build(params);
-        const result = await invocation.execute(abortSignal);
-
-        expect(result.error?.type).toBe(errorType);
-        const errorSuffix = errorCode ? ` (${errorCode})` : '';
-        const expectedMessage = errorCode
-          ? `${expectedMessagePrefix}: ${filePath}${errorSuffix}`
-          : `${expectedMessagePrefix}: ${errorMessage}`;
-        expect(result.llmContent).toContain(expectedMessage);
-        expect(result.returnDisplay).toContain(expectedMessage);
       },
     );
   });
