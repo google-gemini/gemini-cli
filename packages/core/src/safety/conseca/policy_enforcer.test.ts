@@ -67,7 +67,7 @@ describe('policy_enforcer', () => {
           }),
         ]),
       }),
-      'conseca-policy-enforcement',
+      'conseca-enforcement',
     );
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
@@ -96,7 +96,11 @@ describe('policy_enforcer', () => {
     const result = await enforcePolicy(policy, toolCall, mockConfig);
 
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
     expect(result.reason).toBe('Tool name is missing');
+    if (result.decision === SafetyCheckDecision.ALLOW) {
+      expect(result.error).toBe('Tool name is missing');
+    }
   });
 
   it('should handle empty policy by checking with LLM (fail-open/check behavior)', async () => {
@@ -126,9 +130,12 @@ describe('policy_enforcer', () => {
 
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
     expect(mockContentGenerator.generateContent).toHaveBeenCalled();
+    if (result.decision === SafetyCheckDecision.ALLOW) {
+      expect(result.error).toBeUndefined();
+    }
   });
 
-  it('should handle malformed JSON response from LLM by DENYing', async () => {
+  it('should handle malformed JSON response from LLM by failing open (ALLOW)', async () => {
     mockContentGenerator.generateContent = vi.fn().mockResolvedValue({
       candidates: [
         {
@@ -150,6 +157,9 @@ describe('policy_enforcer', () => {
     const result = await enforcePolicy(policy, toolCall, mockConfig);
 
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
-    expect(result.reason).toContain('Policy enforcement failed');
+    expect(result.reason).toContain('JSON Parse Error');
+    if (result.decision === SafetyCheckDecision.ALLOW) {
+      expect(result.error).toContain('JSON Parse Error');
+    }
   });
 });
