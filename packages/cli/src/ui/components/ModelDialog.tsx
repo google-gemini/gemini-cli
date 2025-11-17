@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useContext, useMemo } from 'react';
+import { useCallback, useContext, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import {
   PREVIEW_GEMINI_MODEL,
@@ -29,8 +29,82 @@ interface ModelDialogProps {
   onClose: () => void;
 }
 
+
+
+interface PersistModelPromptProps {
+  selectedModel: string;
+  onPersist: (model: string) => void;
+  onNoPersist: (model: string) => void;
+  onClose: () => void;
+}
+
+function PersistModelPrompt({
+  selectedModel,
+  onPersist,
+  onNoPersist,
+  onClose,
+}: PersistModelPromptProps): React.JSX.Element {
+  const handlePersist = useCallback(() => {
+    onPersist(selectedModel);
+    onClose();
+  }, [onPersist, selectedModel, onClose]);
+
+  const handleNoPersist = useCallback(() => {
+    onNoPersist(selectedModel);
+    onClose();
+  }, [onNoPersist, selectedModel, onClose]);
+
+  const options = useMemo(
+    () => [
+      {
+        value: 'yes',
+        title: 'Yes',
+        description: 'Save for future sessions',
+        key: 'yes',
+      },
+      {
+        value: 'no',
+        title: 'No',
+        description: 'Apply to current session only',
+        key: 'no',
+      },
+    ],
+    [],
+  );
+
+  return (
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      padding={1}
+      width="100%"
+    >
+      <Text bold>
+        Do you want to save &quot;{selectedModel}&quot; for future sessions?
+      </Text>
+      <Box marginTop={1}>
+        <DescriptiveRadioButtonSelect
+          items={options}
+          onSelect={(value) =>
+            value === 'yes' ? handlePersist() : handleNoPersist()
+          }
+          initialIndex={0}
+          showNumbers={true}
+        />
+      </Box>
+      <Box marginTop={1} flexDirection="column">
+        <Text color={theme.text.secondary}>(Press Esc to close)</Text>
+      </Box>
+    </Box>
+  );
+}
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
+  const [showPersistPrompt, setShowPersistPrompt] = useState(false);
+  const [tempSelectedModel, setTempSelectedModel] = useState<string | null>(
+    null,
+  );
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -84,16 +158,20 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   );
 
   // Handle selection internally (Autonomous Dialog).
-  const handleSelect = useCallback(
+  const handleSelect = useCallback((model: string) => {
+    setTempSelectedModel(model);
+    setShowPersistPrompt(true);
+  }, []);
+
+  const handlePersist = useCallback(
     (model: string) => {
       if (config) {
-        config.setModel(model);
+        config.setModel(model, true);
         const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }
-      onClose();
     },
-    [config, onClose],
+    [config],
   );
 
   const header = config?.getPreviewFeatures()
@@ -103,6 +181,28 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const subheader = config?.getPreviewFeatures()
     ? `To disable Gemini 3, disable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features\n\nWhen you select Auto or Pro, Gemini CLI will attempt to use ${PREVIEW_GEMINI_MODEL} first, before falling back to ${DEFAULT_GEMINI_MODEL}.`
     : `To use Gemini 3, enable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features`;
+
+  const handleNoPersist = useCallback(
+    (model: string) => {
+      if (config) {
+        config.setModel(model, false);
+        const event = new ModelSlashCommandEvent(model);
+        logModelSlashCommand(config, event);
+      }
+    },
+    [config],
+  );
+
+  if (showPersistPrompt && tempSelectedModel) {
+    return (
+      <PersistModelPrompt
+        selectedModel={tempSelectedModel}
+        onPersist={handlePersist}
+        onNoPersist={handleNoPersist}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <Box
@@ -120,7 +220,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         </ThemedGradient>
         <Text>{subheader}</Text>
       </Box>
-
       <Box marginTop={1}>
         <DescriptiveRadioButtonSelect
           items={options}
@@ -131,7 +230,10 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
-          {'To use a specific Gemini model on startup, use the --model flag.'}
+          Applies to this session and future Gemini CLI sessions.
+        </Text>
+        <Text color={theme.text.secondary}>
+          {'> To use a specific Gemini model on startup, use the --model flag.'}
         </Text>
       </Box>
       <Box marginTop={1} flexDirection="column">

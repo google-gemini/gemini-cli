@@ -6,12 +6,14 @@
 
 import { render } from '../../test-utils/render.js';
 import { cleanup } from 'ink-testing-library';
+import { act } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   GEMINI_MODEL_ALIAS_FLASH_LITE,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_PRO,
   DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import { ModelDialog } from './ModelDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -152,16 +154,66 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('calls config.setModel and onClose when DescriptiveRadioButtonSelect.onSelect is triggered', () => {
-    const { props, mockConfig, unmount } = renderComponent({}, {}); // Pass empty object for contextValue
+  it('calls config.setModel with persist=true and onClose when "Yes" is selected in the persistence prompt', async () => {
+    const { props, mockConfig, unmount } = renderComponent({}, {});
 
-    const childOnSelect = mockedSelect.mock.calls[0][0].onSelect;
-    expect(childOnSelect).toBeDefined();
+    // Simulate initial model selection
+    const initialSelect = mockedSelect.mock.calls[0][0].onSelect;
+    expect(initialSelect).toBeDefined();
+    await act(async () => {
+      initialSelect(DEFAULT_GEMINI_MODEL);
+    });
 
-    childOnSelect(GEMINI_MODEL_ALIAS_PRO);
+    // After initial selection, the persistence prompt should be rendered,
+    // which uses another DescriptiveRadioButtonSelect.
+    // We need to access the props of the second call to mockedSelect.
+    expect(mockedSelect).toHaveBeenCalledTimes(2);
+    const persistencePromptSelect = mockedSelect.mock.calls[1][0].onSelect;
+    expect(persistencePromptSelect).toBeDefined();
 
-    // Assert against the default mock provided by renderComponent
-    expect(mockConfig?.setModel).toHaveBeenCalledWith(GEMINI_MODEL_ALIAS_PRO);
+    // Simulate selecting "Yes" in the persistence prompt
+    await act(async () => {
+      persistencePromptSelect('yes');
+    });
+
+    // Assert that config.setModel was called with the model and persist=true
+    expect(mockConfig?.setModel).toHaveBeenCalledTimes(1); // Should be called once
+    expect(mockConfig?.setModel).toHaveBeenCalledWith(
+      DEFAULT_GEMINI_MODEL,
+      true,
+    );
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('calls config.setModel with persist=false and onClose when "No" is selected in the persistence prompt', async () => {
+    const { props, mockConfig, unmount } = renderComponent({}, {});
+
+    // Simulate initial model selection
+    const initialSelect = mockedSelect.mock.calls[0][0].onSelect;
+    expect(initialSelect).toBeDefined();
+    await act(async () => {
+      initialSelect(DEFAULT_GEMINI_MODEL);
+    });
+
+    // After initial selection, the persistence prompt should be rendered,
+    // which uses another DescriptiveRadioButtonSelect.
+    // We need to access the props of the second call to mockedSelect.
+    expect(mockedSelect).toHaveBeenCalledTimes(2);
+    const persistencePromptSelect = mockedSelect.mock.calls[1][0].onSelect;
+    expect(persistencePromptSelect).toBeDefined();
+
+    // Simulate selecting "No" in the persistence prompt
+    await act(async () => {
+      persistencePromptSelect('no');
+    });
+
+    // Assert that config.setModel was called with the model and persist=false
+    expect(mockConfig?.setModel).toHaveBeenCalledTimes(1); // Should be called once
+    expect(mockConfig?.setModel).toHaveBeenCalledWith(
+      DEFAULT_GEMINI_MODEL,
+      false,
+    );
     expect(props.onClose).toHaveBeenCalledTimes(1);
     unmount();
   });
