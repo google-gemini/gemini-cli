@@ -29,16 +29,16 @@ describe('ContextDetector', () => {
     expect(type).toBe('nodejs');
   });
 
-  it('should track recent files', () => {
+  it('should track recent files', async () => {
     detector.trackFile('test.ts');
     detector.trackFile('app.ts');
-    const context = detector.detect();
-    expect((await context).recentFiles).toContain('app.ts');
+    const context = await detector.detect();
+    expect(context.recentFiles).toContain('app.ts');
   });
 
-  it('should track recent commands', () => {
+  it('should track recent commands', async () => {
     detector.trackCommand('/wizard start');
-    const context = detector.detect();
-    expect((await context).recentCommands).toContain('/wizard start');
+    const context = await detector.detect();
+    expect(context.recentCommands).toContain('/wizard start');
   });
 });
