@@ -367,6 +367,23 @@ describe('Server Config (config.ts)', () => {
       ).toHaveBeenCalledWith();
     });
 
+    it('should strip thoughts when switching from GenAI to Vertex AI', async () => {
+      const config = new Config(baseParams);
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({ authType }) as unknown as ContentGeneratorConfig,
+      );
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(
+        config.getGeminiClient().stripThoughtsFromHistory,
+      ).toHaveBeenCalledWith();
+    });
+
     it('should not strip thoughts when switching from Vertex to GenAI', async () => {
       const config = new Config(baseParams);
 
