@@ -54,7 +54,6 @@ export enum Command {
 
   // External tools
   OPEN_EXTERNAL_EDITOR = 'openExternalEditor',
-  PASTE_CLIPBOARD_IMAGE = 'pasteClipboardImage',
 
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
@@ -192,7 +191,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'x', ctrl: true },
     { sequence: '\x18', ctrl: true },
   ],
-  [Command.PASTE_CLIPBOARD_IMAGE]: [{ key: 'v', ctrl: true }],
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],

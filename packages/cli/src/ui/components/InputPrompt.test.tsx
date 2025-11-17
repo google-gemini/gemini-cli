@@ -430,7 +430,12 @@ describe('InputPrompt', () => {
       );
     });
 
-    it('should handle Ctrl+V when clipboard has an image', async () => {
+    it.each([
+      {
+        os: 'macOS',
+        pasteSequence: '\x1b[200~\x1b[201~',
+      },
+    ])('should handle paste on $os', async ({ pasteSequence }) => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
       vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
         '/test/.gemini-clipboard/clipboard-123.png',
@@ -440,10 +445,10 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
 
-      // Send Ctrl+V
       await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
+        stdin.write(pasteSequence);
       });
+
       await waitFor(() => {
         expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
         expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
@@ -457,106 +462,140 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should not insert anything when clipboard has no image', async () => {
-      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+    it.each([
+      {
+        os: 'macOS',
+        pasteSequence: '\x1b[200~\x1b[201~',
+      },
+    ])(
+      'should not insert anything when clipboard has no image on $os',
+      async ({ pasteSequence }) => {
+        vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
 
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
-      });
-      await waitFor(() => {
-        expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
-      });
-      expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
-      expect(mockBuffer.setText).not.toHaveBeenCalled();
-      unmount();
-    });
-
-    it('should handle image save failure gracefully', async () => {
-      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
-
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
-      });
-      await waitFor(() => {
-        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
-      });
-      expect(mockBuffer.setText).not.toHaveBeenCalled();
-      unmount();
-    });
-
-    it('should insert image path at cursor position with proper spacing', async () => {
-      const imagePath = path.join(
-        'test',
-        '.gemini-clipboard',
-        'clipboard-456.png',
-      );
-      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(imagePath);
-
-      // Set initial text and cursor position
-      mockBuffer.text = 'Hello world';
-      mockBuffer.cursor = [0, 5]; // Cursor after "Hello"
-      mockBuffer.lines = ['Hello world'];
-      mockBuffer.replaceRangeByOffset = vi.fn();
-
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
-      });
-      await waitFor(() => {
-        // Should insert at cursor position with spaces
-        expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
-      });
-
-      // Get the actual call to see what path was used
-      const actualCall = vi.mocked(mockBuffer.replaceRangeByOffset).mock
-        .calls[0];
-      expect(actualCall[0]).toBe(5); // start offset
-      expect(actualCall[1]).toBe(5); // end offset
-      expect(actualCall[2]).toBe(
-        ' @' + path.relative(path.join('test', 'project', 'src'), imagePath),
-      );
-      unmount();
-    });
-
-    it('should handle errors during clipboard operations', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
-        new Error('Clipboard error'),
-      );
-
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('\x16'); // Ctrl+V
-      });
-      await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error handling clipboard image:',
-          expect.any(Error),
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
         );
-      });
-      expect(mockBuffer.setText).not.toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
-      unmount();
-    });
+        await act(async () => {
+          stdin.write(pasteSequence);
+        });
+        await waitFor(() => {
+          expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+        });
+        expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
+        expect(mockBuffer.setText).not.toHaveBeenCalled();
+        unmount();
+      },
+    );
+
+    it.each([
+      {
+        os: 'macOS',
+        pasteSequence: '\x1b[200~\x1b[201~',
+      },
+    ])(
+      'should handle image save failure gracefully on $os',
+      async ({ pasteSequence }) => {
+        vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+        vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write(pasteSequence);
+        });
+        await waitFor(() => {
+          expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+        });
+        expect(mockBuffer.setText).not.toHaveBeenCalled();
+        unmount();
+      },
+    );
+
+    it.each([
+      {
+        os: 'macOS',
+        pasteSequence: '\x1b[200~\x1b[201~',
+      },
+    ])(
+      'should insert image path at cursor position with proper spacing on $os',
+      async ({ pasteSequence }) => {
+        const imagePath = path.join(
+          'test',
+          '.gemini-clipboard',
+          'clipboard-456.png',
+        );
+        vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+        vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
+          imagePath,
+        );
+
+        // Set initial text and cursor position
+        mockBuffer.text = 'Hello world';
+        mockBuffer.cursor = [0, 5]; // Cursor after "Hello"
+        mockBuffer.lines = ['Hello world'];
+        mockBuffer.replaceRangeByOffset = vi.fn();
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write(pasteSequence);
+        });
+        await waitFor(() => {
+          // Should insert at cursor position with spaces
+          expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
+        });
+
+        // Get the actual call to see what path was used
+        const actualCall = vi.mocked(mockBuffer.replaceRangeByOffset).mock
+          .calls[0];
+        expect(actualCall[0]).toBe(5); // start offset
+        expect(actualCall[1]).toBe(5); // end offset
+        expect(actualCall[2]).toBe(
+          ' @' + path.relative(path.join('test', 'project', 'src'), imagePath),
+        );
+        unmount();
+      },
+    );
+
+    it.each([
+      {
+        os: 'macOS',
+        pasteSequence: '\x1b[200~\x1b[201~',
+      },
+    ])(
+      'should handle errors during clipboard operations on $os',
+      async ({ pasteSequence }) => {
+        const consoleErrorSpy = vi
+          .spyOn(console, 'error')
+          .mockImplementation(() => {});
+        vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
+          new Error('Clipboard error'),
+        );
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write(pasteSequence);
+        });
+        await waitFor(() => {
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Error handling clipboard image:',
+            expect.any(Error),
+          );
+        });
+        expect(mockBuffer.setText).not.toHaveBeenCalled();
+
+        consoleErrorSpy.mockRestore();
+        unmount();
+      },
+    );
   });
 
   it.each([
@@ -931,14 +970,19 @@ describe('InputPrompt', () => {
   });
 
   describe('unfocused paste', () => {
-    it('should handle bracketed paste when not focused', async () => {
+    it.each([
+      {
+        os: 'macOS',
+        pasteSequence: '\x1B[200~pasted text\x1B[201~',
+      },
+    ])('should handle bracketed paste on $os', async ({ pasteSequence }) => {
       props.focus = false;
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
 
       await act(async () => {
-        stdin.write('\x1B[200~pasted text\x1B[201~');
+        stdin.write(pasteSequence);
       });
       await waitFor(() => {
         expect(mockBuffer.handleInput).toHaveBeenCalledWith(
@@ -951,20 +995,60 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should ignore regular keypresses when not focused', async () => {
-      props.focus = false;
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
+    it('should handle non-bracketed paste as plain text', async () => {
+      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
 
       await act(async () => {
-        stdin.write('a');
+        // Directly simulate the paste event
+        props.buffer.handleInput({
+          paste: true,
+          sequence: 'pasted text',
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        });
       });
-      await waitFor(() => {});
 
-      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(props.buffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({
+            paste: true,
+            sequence: 'pasted text',
+          }),
+        );
+      });
+
+      expect(clipboardUtils.clipboardHasImage).not.toHaveBeenCalled();
       unmount();
     });
+
+    it.each([
+      {
+        os: 'macOS',
+        keySequence: 'a',
+      },
+      {
+        os: 'other',
+        keySequence: 'a',
+      },
+    ])(
+      'should ignore regular keypresses when not focused on $os',
+      async ({ keySequence }) => {
+        props.focus = false;
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write(keySequence);
+        });
+        await waitFor(() => {});
+
+        expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+        unmount();
+      },
+    );
   });
 
   describe('Highlighting and Cursor Display', () => {
