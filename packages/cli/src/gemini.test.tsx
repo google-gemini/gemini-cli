@@ -124,6 +124,13 @@ vi.mock('./config/sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn(),
 }));
 
+vi.mock('./ui/utils/mouse.js', () => ({
+  enableMouseEvents: vi.fn(),
+  disableMouseEvents: vi.fn(),
+  parseMouseEvent: vi.fn(),
+  isIncompleteMouseSequence: vi.fn(),
+}));
+
 describe('gemini.tsx main function', () => {
   let originalEnvGeminiSandbox: string | undefined;
   let originalEnvSandbox: string | undefined;
