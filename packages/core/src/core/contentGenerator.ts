@@ -115,18 +115,18 @@ export async function createContentGenerator(
       return FakeContentGenerator.fromFile(gcConfig.fakeResponses);
     }
     const version = process.env['CLI_VERSION'] || process.version;
-    const baseUrlOverride = process.env['GOOGLE_GEMINI_BASE_URL'] || undefined;
+    const customHeadersEnv =
+      process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
-    const customHeaders = parseCustomHeaders(
-      process.env['GEMINI_CLI_CUSTOM_HEADERS'],
-    );
-    // Databricks support - pass the api token as a header
-    if (baseUrlOverride && baseUrlOverride.includes('databricks.com')) {
-      customHeaders['Authorization'] = `Bearer ${config.apiKey}`;
-    }
+    const customHeadersMap = {
+      ...parseCustomHeaders(customHeadersEnv),
+      // If custom headers env var and api key are both defined, pass the api key as a Authorization Header
+      ...(customHeadersEnv &&
+        config.apiKey && { Authorization: `Bearer ${config.apiKey}` }),
+    };
 
     const baseHeaders: Record<string, string> = {
-      ...customHeaders,
+      ...customHeadersMap,
       'User-Agent': userAgent,
     };
     if (

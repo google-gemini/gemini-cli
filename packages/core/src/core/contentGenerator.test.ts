@@ -157,7 +157,7 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS for GoogleGenAI requests', async () => {
+  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS and pass api key as Authorization Header for GoogleGenAI requests', async () => {
     const mockConfig = {
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
@@ -187,97 +187,7 @@ describe('createContentGenerator', () => {
           'User-Agent': expect.any(String),
           'X-Test-Header': 'test',
           Another: 'value',
-        }),
-      },
-    });
-    expect(generator).toEqual(
-      new LoggingContentGenerator(
-        (mockGenerator as GoogleGenAI).models,
-        mockConfig,
-      ),
-    );
-  });
-
-  it('If GOOGLE_GEMINI_BASE_URL is defined and is a databricks URL, should pass in the api key as a header', async () => {
-    const mockConfig = {
-      getUsageStatisticsEnabled: () => false,
-    } as unknown as Config;
-
-    const mockGenerator = {
-      models: {},
-    } as unknown as GoogleGenAI;
-    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
-    vi.stubEnv(
-      'GEMINI_CLI_CUSTOM_HEADERS',
-      'X-Test-Header: test, Another: value',
-    );
-    vi.stubEnv(
-      'GOOGLE_GEMINI_BASE_URL',
-      'https://test-workspace.databricks.com',
-    );
-
-    const generator = await createContentGenerator(
-      {
-        apiKey: 'test-api-key',
-        authType: AuthType.USE_GEMINI,
-      },
-      mockConfig,
-    );
-
-    expect(GoogleGenAI).toHaveBeenCalledWith({
-      apiKey: 'test-api-key',
-      vertexai: undefined,
-      httpOptions: {
-        headers: expect.objectContaining({
-          'User-Agent': expect.any(String),
-          'X-Test-Header': 'test',
           Authorization: 'Bearer test-api-key',
-          Another: 'value',
-        }),
-      },
-    });
-    expect(generator).toEqual(
-      new LoggingContentGenerator(
-        (mockGenerator as GoogleGenAI).models,
-        mockConfig,
-      ),
-    );
-  });
-
-  it('If GOOGLE_GEMINI_BASE_URL is defined and is a databricks URL, auth header should take precedence over GEMINI_CLI_CUSTOM_HEADERS', async () => {
-    const mockConfig = {
-      getUsageStatisticsEnabled: () => false,
-    } as unknown as Config;
-
-    const mockGenerator = {
-      models: {},
-    } as unknown as GoogleGenAI;
-    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
-    vi.stubEnv(
-      'GEMINI_CLI_CUSTOM_HEADERS',
-      'Authorization: Bearer wrong-api-token, Another: value',
-    );
-    vi.stubEnv(
-      'GOOGLE_GEMINI_BASE_URL',
-      'https://test-workspace.databricks.com',
-    );
-
-    const generator = await createContentGenerator(
-      {
-        apiKey: 'correct-api-key',
-        authType: AuthType.USE_GEMINI,
-      },
-      mockConfig,
-    );
-
-    expect(GoogleGenAI).toHaveBeenCalledWith({
-      apiKey: 'correct-api-key',
-      vertexai: undefined,
-      httpOptions: {
-        headers: expect.objectContaining({
-          'User-Agent': expect.any(String),
-          Authorization: 'Bearer correct-api-key',
-          Another: 'value',
         }),
       },
     });
