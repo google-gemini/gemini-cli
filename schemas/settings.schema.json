@@ -435,6 +435,12 @@
           "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
+        },
+        "preferredModel": {
+          "title": "Preferred Model",
+          "description": "The preferred model to use for conversations.",
+          "markdownDescription": "The preferred model to use for conversations.\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "string"
         }
       },
       "additionalProperties": false

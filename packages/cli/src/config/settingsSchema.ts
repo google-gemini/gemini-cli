@@ -710,6 +710,15 @@ const SETTINGS_SCHEMA = {
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
+      preferredModel: {
+        type: 'string',
+        label: 'Preferred Model',
+        category: 'Model',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'The preferred model to use for conversations.',
+        showInDialog: false,
+      },
     },
   },
 
