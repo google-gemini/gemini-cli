@@ -42,6 +42,14 @@ export function logConsecaPolicyGeneration(
         value: safeJsonStringify(event.policy),
       },
     ];
+
+    if (event.error) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.CONSECA_ERROR,
+        value: event.error,
+      });
+    }
+
     clearcutLogger.enqueueLogEvent(
       clearcutLogger.createLogEvent(EventNames.CONSECA_POLICY_GENERATION, data),
     );

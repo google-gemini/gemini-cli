@@ -85,6 +85,26 @@ describe('conseca_logger', () => {
     expect(mockClearcutLogger.enqueueLogEvent).toHaveBeenCalled();
   });
 
+  it('should log policy generation error to Clearcut', () => {
+    const event = new ConsecaPolicyGenerationEvent(
+      'user prompt',
+      'trusted content',
+      '{}',
+      'some error',
+    );
+
+    logConsecaPolicyGeneration(mockConfig, event);
+
+    expect(mockClearcutLogger.createLogEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({
+          value: 'some error',
+        }),
+      ]),
+    );
+  });
+
   it('should log verdict event to OTEL and Clearcut', () => {
     const event = new ConsecaVerdictEvent(
       'user prompt',
