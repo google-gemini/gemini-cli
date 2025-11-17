@@ -169,6 +169,7 @@ describe('runNonInteractive', () => {
       getOutputFormat: vi.fn().mockReturnValue('text'),
       getFolderTrust: vi.fn().mockReturnValue(false),
       isTrustedFolder: vi.fn().mockReturnValue(false),
+      getGhWorkflowName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     mockSettings = {
