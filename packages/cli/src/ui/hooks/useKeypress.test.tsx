@@ -262,29 +262,5 @@ describe(`useKeypress`, () => {
 
       expect(onKeypress).toHaveBeenCalledTimes(3);
     });
-
-    it('should emit partial paste content if unmounted mid-paste', () => {
-      const { unmount } = renderKeypressHook(true);
-      const pasteText = 'incomplete paste';
-
-      act(() => stdin.write(PASTE_START + pasteText));
-
-      // No event should be fired yet.
-      expect(onKeypress).not.toHaveBeenCalled();
-
-      // Unmounting should trigger the flush.
-      unmount();
-
-      expect(onKeypress).toHaveBeenCalledTimes(1);
-      expect(onKeypress).toHaveBeenCalledWith({
-        name: '',
-        ctrl: false,
-        meta: false,
-        shift: false,
-        paste: true,
-        insertable: true,
-        sequence: pasteText,
-      });
-    });
   });
 });

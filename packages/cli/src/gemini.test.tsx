@@ -21,7 +21,7 @@ import {
 } from './gemini.js';
 import { type LoadedSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { type Config } from '@google/gemini-cli-core';
+import { type Config, type ResumedSessionData } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
 
@@ -124,6 +124,13 @@ vi.mock('./config/sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn(),
 }));
 
+vi.mock('./ui/utils/mouse.js', () => ({
+  enableMouseEvents: vi.fn(),
+  disableMouseEvents: vi.fn(),
+  parseMouseEvent: vi.fn(),
+  isIncompleteMouseSequence: vi.fn(),
+}));
+
 describe('gemini.tsx main function', () => {
   let originalEnvGeminiSandbox: string | undefined;
   let originalEnvSandbox: string | undefined;
@@ -189,6 +196,8 @@ describe('gemini.tsx main function', () => {
         getSandbox: () => false,
         getDebugMode: () => false,
         getListExtensions: () => false,
+        getListSessions: () => false,
+        getDeleteSession: () => undefined,
         getMcpServers: () => ({}),
         getMcpClientManager: vi.fn(),
         initialize: vi.fn(),
@@ -339,6 +348,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       getSandbox: () => false,
       getDebugMode: () => false,
       getListExtensions: () => false,
+      getListSessions: () => false,
+      getDeleteSession: () => undefined,
       getMcpServers: () => ({}),
       getMcpClientManager: vi.fn(),
       initialize: vi.fn(),
@@ -391,6 +402,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       screenReader: undefined,
       useSmartEdit: undefined,
       useWriteTodos: undefined,
+      resume: undefined,
+      listSessions: undefined,
+      deleteSession: undefined,
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
@@ -444,7 +458,7 @@ describe('startInteractiveUI', () => {
   const mockConfig = {
     getProjectRoot: () => '/root',
     getScreenReader: () => false,
-  } as Config;
+  } as unknown as Config;
   const mockSettings = {
     merged: {
       ui: {
@@ -467,8 +481,9 @@ describe('startInteractiveUI', () => {
 
   vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
     detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve(true)),
+    isKittyProtocolSupported: vi.fn(() => true),
+    isKittyProtocolEnabled: vi.fn(() => true),
   }));
-
   vi.mock('./ui/utils/updateCheck.js', () => ({
     checkForUpdates: vi.fn(() => Promise.resolve(null)),
   }));
@@ -488,6 +503,7 @@ describe('startInteractiveUI', () => {
     settings: LoadedSettings,
     startupWarnings: string[],
     workspaceRoot: string,
+    resumedSessionData: ResumedSessionData | undefined,
     initializationResult: InitializationResult,
   ) {
     await act(async () => {
@@ -496,6 +512,7 @@ describe('startInteractiveUI', () => {
         settings,
         startupWarnings,
         workspaceRoot,
+        resumedSessionData,
         initializationResult,
       );
     });
@@ -510,6 +527,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 
@@ -519,7 +537,9 @@ describe('startInteractiveUI', () => {
 
     // Verify render options
     expect(options).toEqual({
+      alternateBuffer: true,
       exitOnCtrlC: false,
+      incrementalRendering: true,
       isScreenReaderEnabled: false,
       onRender: expect.any(Function),
     });
@@ -538,6 +558,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 
@@ -563,6 +584,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 
@@ -579,6 +601,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 
@@ -610,6 +633,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 

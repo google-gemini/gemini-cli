@@ -594,6 +594,34 @@ describe('extension tests', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should not load github extensions if blockGitExtensions is set', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://somehost.com/foo/bar',
+        },
+      });
+
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === 'my-ext');
+
+      expect(extension).toBeUndefined();
+    });
+
     describe('id generation', () => {
       it('should generate id from source for non-github git urls', async () => {
         createExtension({
@@ -874,6 +902,30 @@ describe('extension tests', () => {
         type: 'link',
       });
       fs.rmSync(targetExtDir, { recursive: true, force: true });
+    });
+
+    it('should not install a github extension if blockGitExtensions is set', async () => {
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      await extensionManager.loadExtensions();
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: gitUrl,
+          type: 'git',
+        }),
+      ).rejects.toThrow(
+        'Installing extensions from remote sources is disallowed by your current settings.',
+      );
     });
 
     it('should prompt for trust if workspace is not trusted', async () => {
@@ -1551,6 +1603,34 @@ This extension will run the following MCP servers:
       await extensionManager.uninstallExtension('my-local-extension', false);
 
       expect(fs.existsSync(sourceExtDir)).toBe(false);
+      expect(extensionManager.getExtensions()).toHaveLength(1);
+      expect(fs.existsSync(otherExtDir)).toBe(true);
+    });
+
+    it('should uninstall an extension on non-matching extension directory name', async () => {
+      // Create an extension with a name that differs from the directory name.
+      const sourceExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'My-Local-Extension',
+        version: '1.0.0',
+      });
+      const newSourceExtDir = path.join(
+        userExtensionsDir,
+        'my-local-extension',
+      );
+      fs.renameSync(sourceExtDir, newSourceExtDir);
+
+      const otherExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'other-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.uninstallExtension('my-local-extension', false);
+
+      expect(fs.existsSync(sourceExtDir)).toBe(false);
+      expect(fs.existsSync(newSourceExtDir)).toBe(false);
       expect(extensionManager.getExtensions()).toHaveLength(1);
       expect(fs.existsSync(otherExtDir)).toBe(true);
     });
