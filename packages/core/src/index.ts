@@ -152,6 +152,9 @@ export * from './suggestions/index.js';
 // Export explain mode
 export * from './explain/index.js';
 
+// Export examples
+export * from './examples/index.js';
+
 // Export tutorials
 export * from './tutorials/index.js';
 
