@@ -34,6 +34,7 @@
     "@modelcontextprotocol/sdk": "^1.15.1",
     "@types/update-notifier": "^6.0.8",
     "ansi-regex": "^6.2.2",
+    "clipboardy": "^5.0.0",
     "command-exists": "^1.2.9",
     "comment-json": "^4.2.5",
     "diff": "^7.0.0",

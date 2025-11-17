@@ -87,7 +87,7 @@ available combinations.
 | Action                                         | Keys       |
 | ---------------------------------------------- | ---------- |
 | Open the current prompt in an external editor. | `Ctrl + X` |
-| Paste an image from the clipboard.             | `Ctrl + V` |
+| Paste from the clipboard.                      | `Ctrl + V` |
 
 #### App Controls
 
