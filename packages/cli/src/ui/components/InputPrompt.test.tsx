@@ -24,6 +24,7 @@ import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import clipboardy from 'clipboardy';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -35,6 +36,7 @@ vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
 vi.mock('../hooks/useReverseSearchCompletion.js');
+vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
 
@@ -557,6 +559,32 @@ describe('InputPrompt', () => {
       expect(mockBuffer.setText).not.toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
+      unmount();
+    });
+  });
+
+  describe('clipboard text paste', () => {
+    it('should insert text from clipboard on Ctrl+V', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      vi.mocked(clipboardy.read).mockResolvedValue('pasted text');
+      vi.mocked(mockBuffer.replaceRangeByOffset).mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(clipboardy.read).toHaveBeenCalled();
+        expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
+          expect.any(Number),
+          expect.any(Number),
+          'pasted text',
+        );
+      });
       unmount();
     });
   });
