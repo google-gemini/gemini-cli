@@ -57,6 +57,11 @@ Trusted Tools (Context):
 {{trusted_content}}
 `;
 
+export interface PolicyGenerationResult {
+  policy: SecurityPolicy;
+  error?: string;
+}
+
 /**
  * Generates a security policy for the given user prompt and trusted content.
  */
@@ -64,7 +69,7 @@ export async function generatePolicy(
   userPrompt: string,
   trustedContent: string,
   config: Config,
-): Promise<SecurityPolicy> {
+): Promise<PolicyGenerationResult> {
   const model = DEFAULT_GEMINI_FLASH_MODEL;
   const contentGenerator = config.getContentGenerator();
 
@@ -72,7 +77,7 @@ export async function generatePolicy(
     debugLogger.debug(
       '[Conseca] Policy Generation failed: Content generator not initialized',
     );
-    return {};
+    return { policy: {}, error: 'Content generator not initialized' };
   }
 
   try {
@@ -106,7 +111,7 @@ export async function generatePolicy(
 
     if (!responseText) {
       debugLogger.debug(`[Conseca] Policy Generation failed: Empty response`);
-      return {};
+      return { policy: {}, error: 'Empty response from policy generator' };
     }
 
     let cleanText = responseText;
@@ -128,16 +133,22 @@ export async function generatePolicy(
     try {
       const policy = JSON.parse(cleanText) as SecurityPolicy;
       debugLogger.debug(`[Conseca] Policy Generation Parsed:`, policy);
-      return policy;
+      return { policy };
     } catch (parseError) {
       debugLogger.debug(
         `[Conseca] Policy Generation JSON Parse Error:`,
         parseError,
       );
-      return {};
+      return {
+        policy: {},
+        error: `JSON Parse Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Cleaned JSON: ${cleanText}`,
+      };
     }
   } catch (error) {
     console.error('Policy generation failed:', error);
-    return {};
+    return {
+      policy: {},
+      error: `Policy generation failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
