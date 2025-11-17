@@ -853,7 +853,6 @@ export async function saveModelChange(
   try {
     const loadedSettings = loadSettings();
     loadedSettings.setValue(SettingScope.User, 'model.preferredModel', model);
-    saveSettings(loadedSettings.user);
   } catch (error) {
     coreEvents.emitFeedback(
       'error',
