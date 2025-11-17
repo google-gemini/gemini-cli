@@ -16,11 +16,7 @@ import type {
   Prompt,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
-  GetPromptResultSchema,
-  ListPromptsResultSchema,
   ListRootsRequestSchema,
-  ListToolsResultSchema,
-  CallToolResultSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
@@ -629,15 +625,9 @@ export async function discoverTools(
     // Only request tools if the server supports them.
     if (mcpClient.getServerCapabilities()?.tools == null) return [];
 
-    const response = await mcpClient.request(
-      { method: 'tools/list', params: {} },
-      ListToolsResultSchema,
-    );
-
-    const tools = response.tools;
+    const response = await mcpClient.listTools({});
     const discoveredTools: DiscoveredMCPTool[] = [];
-
-    for (const toolDef of tools) {
+    for (const toolDef of response.tools) {
       try {
         if (
           !isEnabled(
@@ -724,40 +714,15 @@ class McpCallableTool implements CallableTool {
     }
     const call = functionCalls[0];
 
-    let timeoutId: NodeJS.Timeout;
-    // Create a promise that rejects after the timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error(`Tool call timed out after ${this.timeout}ms`));
-      }, this.timeout);
-    });
-
     try {
-      const result = await Promise.race([
-        this.client.request(
-          {
-            method: 'tools/call',
-            params: {
-              name: call.name,
-              arguments: call.args as Record<string, unknown>,
-            },
-          },
-          CallToolResultSchema,
-        ),
-        timeoutPromise,
-      ]);
-
-      // Convert MCP content to GenAI Parts
-      // The structure of result is { content: Array<ContentBlock>, isError?: boolean }
-      // We wrap this in the expected structure for the SDK or handle it in DiscoveredMCPTool
-      // DiscoveredMCPTool expects `Part[]` from `callTool`.
-      // However, `CallableTool.callTool` returns `Promise<Part[] | ToolResponse>`.
-      // Let's match what `mcpToTool` likely returned or what `DiscoveredMCPTool` expects.
-      // Looking at `DiscoveredMCPToolInvocation.execute`, it calls `this.mcpTool.callTool(functionCalls)`.
-      // And then `transformMcpContentToParts` takes `rawResponseParts`.
-
-      // IMPORTANT: The `mcpToTool` implementation returns a specific structure that `DiscoveredMCPTool` relies on.
-      // Specifically, it seems to return an array where the first item has `functionResponse`.
+      const result = await this.client.callTool(
+        {
+          name: call.name!,
+          arguments: call.args as Record<string, unknown>,
+        },
+        undefined,
+        { timeout: this.timeout },
+      );
 
       return [
         {
@@ -804,10 +769,7 @@ export async function discoverPrompts(
     // Only request prompts if the server supports them.
     if (mcpClient.getServerCapabilities()?.prompts == null) return [];
 
-    const response = await mcpClient.request(
-      { method: 'prompts/list', params: {} },
-      ListPromptsResultSchema,
-    );
+    const response = await mcpClient.listPrompts({});
 
     for (const prompt of response.prompts) {
       promptRegistry.registerPrompt({
@@ -853,16 +815,17 @@ export async function invokeMcpPrompt(
   promptParams: Record<string, unknown>,
 ): Promise<GetPromptResult> {
   try {
-    const response = await mcpClient.request(
-      {
-        method: 'prompts/get',
-        params: {
-          name: promptName,
-          arguments: promptParams,
-        },
-      },
-      GetPromptResultSchema,
-    );
+    const sanitizedParams: Record<string, string> = {};
+    for (const [key, value] of Object.entries(promptParams)) {
+      if (value !== undefined && value !== null) {
+        sanitizedParams[key] = String(value);
+      }
+    }
+
+    const response = await mcpClient.getPrompt({
+      name: promptName,
+      arguments: sanitizedParams,
+    });
 
     return response;
   } catch (error) {

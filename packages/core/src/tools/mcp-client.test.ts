@@ -70,7 +70,7 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
-        request: vi.fn().mockResolvedValue({
+        listTools: vi.fn().mockResolvedValue({
           tools: [
             {
               name: 'testFunction',
@@ -81,6 +81,10 @@ describe('mcp-client', () => {
             },
           ],
         }),
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [],
+        }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -105,10 +109,7 @@ describe('mcp-client', () => {
       );
       await client.connect();
       await client.discover({} as Config);
-      expect(mockedClient.request).toHaveBeenCalledWith(
-        { method: 'tools/list', params: {} },
-        expect.anything(),
-      );
+      expect(mockedClient.listTools).toHaveBeenCalledWith({});
     });
 
     it('should not skip tools even if a parameter is missing a type', async () => {
@@ -123,7 +124,8 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
-        request: vi.fn().mockResolvedValue({
+
+        listTools: vi.fn().mockResolvedValue({
           tools: [
             {
               name: 'validTool',
@@ -144,8 +146,11 @@ describe('mcp-client', () => {
               },
             },
           ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({
           prompts: [],
         }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -184,7 +189,9 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
-        request: vi.fn().mockRejectedValue(new Error('Test error')),
+        listTools: vi.fn().mockResolvedValue({ tools: [] }),
+        listPrompts: vi.fn().mockRejectedValue(new Error('Test error')),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -226,7 +233,8 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
-        request: vi.fn().mockResolvedValue({ prompts: [] }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -265,20 +273,17 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
-        request: vi.fn().mockImplementation((req) => {
-          if (req.method === 'prompts/list') return { prompts: [] };
-          if (req.method === 'tools/list')
-            return {
-              tools: [
-                {
-                  name: 'testTool',
-                  description: 'A test tool',
-                  inputSchema: { type: 'object', properties: {} },
-                },
-              ],
-            };
-          return {};
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testTool',
+              description: 'A test tool',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
         }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -315,7 +320,7 @@ describe('mcp-client', () => {
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
-        request: vi.fn().mockResolvedValue({
+        listTools: vi.fn().mockResolvedValue({
           tools: [
             {
               name: 'toolWithDefs',
@@ -336,8 +341,11 @@ describe('mcp-client', () => {
               },
             },
           ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({
           prompts: [],
         }),
+        request: vi.fn().mockResolvedValue({}),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
@@ -391,20 +399,18 @@ describe('mcp-client', () => {
         getServerCapabilities: vi
           .fn()
           .mockReturnValue({ tools: {}, prompts: {} }),
-        request: vi.fn().mockImplementation((req) => {
-          if (req.method === 'prompts/list')
-            return { prompts: [{ id: 'prompt1', text: 'a prompt' }] };
-          if (req.method === 'tools/list')
-            return {
-              tools: [
-                {
-                  name: 'testTool',
-                  description: 'A test tool',
-                  inputSchema: { type: 'object', properties: {} },
-                },
-              ],
-            };
-          return {};
+        listPrompts: vi.fn().mockResolvedValue({
+          prompts: [{ id: 'prompt1', text: 'a prompt' }],
+        }),
+        request: vi.fn().mockResolvedValue({}),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testTool',
+              description: 'A test tool',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
         }),
       };
       vi.mocked(ClientLib.Client).mockReturnValue(
