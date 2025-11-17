@@ -74,9 +74,6 @@ export async function generatePolicy(
   const contentGenerator = config.getContentGenerator();
 
   if (!contentGenerator) {
-    debugLogger.debug(
-      '[Conseca] Policy Generation failed: Content generator not initialized',
-    );
     return { policy: {}, error: 'Content generator not initialized' };
   }
 
@@ -110,7 +107,6 @@ export async function generatePolicy(
     );
 
     if (!responseText) {
-      debugLogger.debug(`[Conseca] Policy Generation failed: Empty response`);
       return { policy: {}, error: 'Empty response from policy generator' };
     }
 
@@ -127,8 +123,6 @@ export async function generatePolicy(
         cleanText = responseText.substring(firstOpen, lastClose + 1);
       }
     }
-
-    debugLogger.debug(`[Conseca] Policy Generation Cleaned JSON: ${cleanText}`);
 
     try {
       const policy = JSON.parse(cleanText) as SecurityPolicy;
