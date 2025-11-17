@@ -257,6 +257,7 @@ describe('Gemini Client (client.ts)', () => {
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getUseSmartEdit: vi.fn().mockReturnValue(false),
       getUseModelRouter: vi.fn().mockReturnValue(false),
+      getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -336,6 +337,29 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).not.toBe(initialChat);
       expect(newHistory.length).toBe(initialHistory.length);
       expect(JSON.stringify(newHistory)).not.toContain('some old message');
+    });
+  });
+
+  describe('startChat', () => {
+    it('should include environment context when resuming a session', async () => {
+      const extraHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Old message' }] },
+        { role: 'model', parts: [{ text: 'Old response' }] },
+      ];
+
+      const chat = await client.startChat(extraHistory);
+      const history = chat.getHistory();
+
+      // The first message should be the environment context
+      expect(history[0].role).toBe('user');
+      expect(history[0].parts?.[0]?.text).toContain('This is the Gemini CLI');
+      expect(history[0].parts?.[0]?.text).toContain(
+        "The project's temporary directory is:",
+      );
+
+      // The subsequent messages should be the extra history
+      expect(history[1]).toEqual(extraHistory[0]);
+      expect(history[2]).toEqual(extraHistory[1]);
     });
   });
 
@@ -1468,6 +1492,7 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toEqual([
+        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
@@ -1519,7 +1544,10 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      expect(events).toEqual([{ type: GeminiEventType.InvalidStream }]);
+      expect(events).toEqual([
+        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
+        { type: GeminiEventType.InvalidStream },
+      ]);
 
       // Verify that turn.run was called only once
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
@@ -1553,10 +1581,12 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 2 InvalidStream events (original + 1 retry)
-      expect(events.length).toBe(2);
+      // We expect 3 events (model_info + original + 1 retry)
+      expect(events.length).toBe(3);
       expect(
-        events.every((e) => e.type === GeminiEventType.InvalidStream),
+        events
+          .filter((e) => e.type !== GeminiEventType.ModelInfo)
+          .every((e) => e.type === GeminiEventType.InvalidStream),
       ).toBe(true);
 
       // Verify that turn.run was called twice

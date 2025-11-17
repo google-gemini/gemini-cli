@@ -114,10 +114,12 @@ export async function createPolicyEngineConfig(
   const policyDirs = getPolicyDirectories(defaultPoliciesDir);
 
   // Load policies from TOML files
-  const { rules: tomlRules, errors } = await loadPoliciesFromToml(
-    approvalMode,
-    policyDirs,
-    (dir) => getPolicyTier(dir, defaultPoliciesDir),
+  const {
+    rules: tomlRules,
+    checkers: tomlCheckers,
+    errors,
+  } = await loadPoliciesFromToml(approvalMode, policyDirs, (dir) =>
+    getPolicyTier(dir, defaultPoliciesDir),
   );
 
   // Emit any errors encountered during TOML loading to the UI
@@ -129,6 +131,7 @@ export async function createPolicyEngineConfig(
   }
 
   const rules: PolicyRule[] = [...tomlRules];
+  const checkers = [...tomlCheckers];
 
   // Priority system for policy rules:
   // - Higher priority numbers win over lower priority numbers
@@ -225,6 +228,7 @@ export async function createPolicyEngineConfig(
 
   return {
     rules,
+    checkers,
     defaultDecision: PolicyDecision.ASK_USER,
   };
 }

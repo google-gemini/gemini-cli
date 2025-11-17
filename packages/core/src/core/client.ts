@@ -39,6 +39,7 @@ import {
   getEffectiveModel,
   DEFAULT_TEMP,
   DEFAULT_TOP_P,
+  DEFAULT_TOP_K,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
@@ -76,6 +77,7 @@ export class GeminiClient {
   private readonly generateContentConfig: GenerateContentConfig = {
     temperature: DEFAULT_TEMP,
     topP: DEFAULT_TOP_P,
+    topK: DEFAULT_TOP_K,
   };
   private sessionTurnCount = 0;
 
@@ -536,6 +538,7 @@ export class GeminiClient {
       modelToUse = decision.model;
       // Lock the model for the rest of the sequence
       this.currentSequenceModel = modelToUse;
+      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
 
     const resultStream = turn.run(modelToUse, request, linkedSignal);

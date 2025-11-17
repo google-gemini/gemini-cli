@@ -424,9 +424,7 @@ export async function loadCliConfig(
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
       cwd,
-      settings.context?.loadMemoryFromIncludeDirectories
-        ? includeDirectories
-        : [],
+      [],
       debugMode,
       fileService,
       extensionManager,

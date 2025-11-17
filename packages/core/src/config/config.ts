@@ -28,7 +28,6 @@ import { SmartEditTool } from '../tools/smart-edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
@@ -416,6 +415,7 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
@@ -430,10 +430,9 @@ export class Config {
     this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
-    this.workspaceContext = new WorkspaceContext(
-      this.targetDir,
-      params.includeDirectories ?? [],
-    );
+    this.folderTrust = params.folderTrust ?? false;
+    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+    this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
 
@@ -517,7 +516,7 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
@@ -747,12 +746,11 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    this.setFallbackMode(false);
-
-    if (this.model !== newModel) {
+    if (this.model !== newModel || this.inFallbackMode) {
       this.model = newModel;
       coreEvents.emitModelChanged(newModel);
     }
+    this.setFallbackMode(false);
   }
 
   isInFallbackMode(): boolean {
@@ -932,6 +930,14 @@ export class Config {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getPendingIncludeDirectories(): string[] {
+    return this.pendingIncludeDirectories;
+  }
+
+  clearPendingIncludeDirectories(): void {
+    this.pendingIncludeDirectories = [];
   }
 
   getShowMemoryUsage(): boolean {
@@ -1379,7 +1385,6 @@ export class Config {
     }
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
@@ -1431,8 +1436,8 @@ export class Config {
     this.experiments = experiments;
     const flagSummaries = Object.entries(experiments.flags ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, flag]) => {
-        const summary: Record<string, unknown> = { name };
+      .map(([flagId, flag]) => {
+        const summary: Record<string, unknown> = { flagId };
         if (flag.boolValue !== undefined) {
           summary['boolValue'] = flag.boolValue;
         }

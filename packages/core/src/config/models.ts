@@ -15,8 +15,9 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 // Cap the thinking at 8192 to prevent run-away thinking loops.
 export const DEFAULT_THINKING_MODE = 8192;
 
-export const DEFAULT_TEMP = 0;
-export const DEFAULT_TOP_P = 1;
+export const DEFAULT_TEMP = 1;
+export const DEFAULT_TOP_P = 0.95;
+export const DEFAULT_TOP_K = 64;
 
 /**
  * Determines the effective model to use, applying fallback logic if necessary.

@@ -47,7 +47,6 @@ import {
   type EditToolParams,
   calculateReplacement,
 } from './smart-edit.js';
-import { applyReplacement } from './edit.js';
 import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
@@ -172,35 +171,6 @@ describe('SmartEditTool', () => {
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
-  });
-
-  describe('applyReplacement', () => {
-    it('should return newString if isNewFile is true', () => {
-      expect(applyReplacement(null, 'old', 'new', true)).toBe('new');
-      expect(applyReplacement('existing', 'old', 'new', true)).toBe('new');
-    });
-
-    it('should replace oldString with newString in currentContent', () => {
-      expect(applyReplacement('hello old world old', 'old', 'new', false)).toBe(
-        'hello new world new',
-      );
-    });
-
-    it('should treat $ literally and not as replacement pattern', () => {
-      const current = 'regex end is $ and more';
-      const oldStr = 'regex end is $';
-      const newStr = 'regex end is $ and correct';
-      const result = applyReplacement(current, oldStr, newStr, false);
-      expect(result).toBe('regex end is $ and correct and more');
-    });
-
-    it("should treat $' literally and not as a replacement pattern", () => {
-      const current = 'foo';
-      const oldStr = 'foo';
-      const newStr = "bar$'baz";
-      const result = applyReplacement(current, oldStr, newStr, false);
-      expect(result).toBe("bar$'baz");
-    });
   });
 
   describe('calculateReplacement', () => {
@@ -576,6 +546,63 @@ describe('SmartEditTool', () => {
       };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(
+        ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      );
+    });
+  });
+
+  describe('expected_replacements', () => {
+    const testFile = 'replacements_test.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+    });
+
+    it('should succeed when occurrences match expected_replacements', async () => {
+      fs.writeFileSync(filePath, 'foo foo foo', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace all foo with bar',
+        old_string: 'foo',
+        new_string: 'bar',
+        expected_replacements: 3,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error).toBeUndefined();
+      expect(fs.readFileSync(filePath, 'utf8')).toBe('bar bar bar');
+    });
+
+    it('should fail when occurrences do not match expected_replacements', async () => {
+      fs.writeFileSync(filePath, 'foo foo foo', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace all foo with bar',
+        old_string: 'foo',
+        new_string: 'bar',
+        expected_replacements: 2,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(
+        ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      );
+    });
+
+    it('should default to 1 expected replacement if not specified', async () => {
+      fs.writeFileSync(filePath, 'foo foo', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace foo with bar',
+        old_string: 'foo',
+        new_string: 'bar',
+        // expected_replacements is undefined, defaults to 1
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      // Should fail because there are 2 occurrences but default expectation is 1
       expect(result.error?.type).toBe(
         ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
       );

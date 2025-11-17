@@ -25,6 +25,7 @@ import { type Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_TEMP,
+  DEFAULT_TOP_K,
   DEFAULT_TOP_P,
 } from '../config/models.js';
 import type { Part, FunctionDeclaration, Schema } from '@google/genai';
@@ -85,6 +86,7 @@ async function createAdkAgent<TOutput extends z.ZodTypeAny>(
     generateContentConfig: {
       temperature: modelConfig?.temp ?? DEFAULT_TEMP,
       topP: modelConfig?.top_p ?? DEFAULT_TOP_P,
+      topK: DEFAULT_TOP_K,
       thinkingConfig: {
         includeThoughts: true,
         thinkingBudget: modelConfig?.thinkingBudget ?? -1,

@@ -8,12 +8,22 @@ CLI, configure **one** of the following authentication methods:
   - Use Gemini API key
   - Use Vertex AI
 - Headless (non-interactive) mode
-- Google Cloud Shell
+- Google Cloud Environments (Cloud Shell, Compute Engine, etc.)
 
 ## Quick Check: Running in Google Cloud Shell?
 
 If you are running the Gemini CLI within a Google Cloud Shell environment,
 authentication is typically automatic using your Cloud Shell credentials.
+
+### Other Google Cloud Environments (e.g., Compute Engine)
+
+Some other Google Cloud environments, such as Compute Engine VMs, might also
+support automatic authentication. In these environments, Gemini CLI can
+automatically use Application Default Credentials (ADC) sourced from the
+environment's metadata server.
+
+If automatic authentication does not occur in your environment, you will need to
+use one of the interactive methods described below.
 
 ## Authenticate in Interactive mode
 

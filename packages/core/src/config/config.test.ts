@@ -430,7 +430,6 @@ describe('Server Config (config.ts)', () => {
   });
 
   it('should initialize WorkspaceContext with includeDirectories', () => {
-    const resolved = path.resolve(baseParams.targetDir);
     const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
       ...baseParams,
@@ -439,11 +438,13 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(paramsWithIncludeDirs);
     const workspaceContext = config.getWorkspaceContext();
     const directories = workspaceContext.getDirectories();
-    // Should include the target directory plus the included directories
-    expect(directories).toHaveLength(3);
-    expect(directories).toContain(resolved);
-    expect(directories).toContain(path.join(resolved, 'dir1'));
-    expect(directories).toContain(path.join(resolved, 'dir2'));
+
+    // Should include only the target directory initially
+    expect(directories).toHaveLength(1);
+    expect(directories).toContain(path.resolve(baseParams.targetDir));
+
+    // The other directories should be in the pending list
+    expect(config.getPendingIncludeDirectories()).toEqual(includeDirectories);
   });
 
   it('Config constructor should set telemetry to true when provided as true', () => {
@@ -1473,6 +1474,37 @@ describe('Config getHooks', () => {
       expect(config.getModel()).toBe(proModel);
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
+    });
+
+    it('should allow setting auto model from non-auto model and disable fallback mode', () => {
+      const config = new Config(baseParams);
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      config.setModel('auto');
+
+      expect(config.getModel()).toBe('auto');
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+    });
+
+    it('should allow setting auto model from auto model if it is in the fallback mode', () => {
+      const config = new Config({
+        cwd: '/tmp',
+        targetDir: '/path/to/target',
+        debugMode: false,
+        sessionId: 'test-session-id',
+        model: 'auto',
+        usageStatisticsEnabled: false,
+      });
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      config.setModel('auto');
+
+      expect(config.getModel()).toBe('auto');
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
     });
   });
 });
