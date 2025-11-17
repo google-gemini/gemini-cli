@@ -145,3 +145,9 @@ export * from './hooks/types.js';
 
 // Export onboarding
 export * from './onboarding/index.js';
+
+// Export suggestions
+export * from './suggestions/index.js';
+
+// Export explain mode
+export * from './explain/index.js';

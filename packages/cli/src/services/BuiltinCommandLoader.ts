@@ -42,6 +42,8 @@ import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 import { examplesCommand } from '../ui/commands/examplesCommand.js';
 import { wizardCommand } from '../ui/commands/wizardCommand.js';
 import { onboardingCommand } from '../ui/commands/onboardingCommand.js';
+import { suggestCommand } from '../ui/commands/suggestCommand.js';
+import { explainCommand } from '../ui/commands/explainCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -95,6 +97,8 @@ export class BuiltinCommandLoader implements ICommandLoader {
       terminalSetupCommand,
       wizardCommand,
       onboardingCommand,
+      suggestCommand,
+      explainCommand,
     ];
 
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
