@@ -53,6 +53,7 @@ export async function enforcePolicy(
     return {
       decision: SafetyCheckDecision.ALLOW,
       reason: 'Content generator not initialized',
+      error: 'Content generator not initialized',
     };
   }
 
@@ -65,6 +66,7 @@ export async function enforcePolicy(
     return {
       decision: SafetyCheckDecision.ALLOW,
       reason: 'Tool name is missing',
+      error: 'Tool name is missing',
     };
   }
 
@@ -81,6 +83,7 @@ export async function enforcePolicy(
     return {
       decision: SafetyCheckDecision.ALLOW,
       reason: 'Policy for tool ' + toolName + ' is missing',
+      error: 'Policy for tool ' + toolName + ' is missing',
     };
   }
 
@@ -105,7 +108,7 @@ export async function enforcePolicy(
           },
         ],
       },
-      'conseca-policy-enforcement',
+      'conseca-enforcement',
     );
 
     const responseText = getResponseText(result);
@@ -115,7 +118,8 @@ export async function enforcePolicy(
       debugLogger.debug(`[Conseca] Enforcement failed: Empty response`);
       return {
         decision: SafetyCheckDecision.ALLOW,
-        reason: 'Empty response from enforcement model',
+        reason: 'Empty response from policy enforcer',
+        error: 'Empty response from policy enforcer',
       };
     }
 
@@ -134,32 +138,46 @@ export async function enforcePolicy(
     }
 
     debugLogger.debug(`[Conseca] Enforcement Cleaned JSON: ${cleanText}`);
-    const parsed = JSON.parse(cleanText);
-    debugLogger.debug(`[Conseca] Enforcement Parsed:`, parsed);
 
-    let decision: SafetyCheckDecision;
-    switch (parsed.decision) {
-      case 'ALLOW':
-        decision = SafetyCheckDecision.ALLOW;
-        break;
-      case 'ASK_USER':
-        decision = SafetyCheckDecision.ASK_USER;
-        break;
-      case 'DENY':
-      default:
-        decision = SafetyCheckDecision.DENY;
-        break;
+    try {
+      const parsed = JSON.parse(cleanText);
+      debugLogger.debug(`[Conseca] Enforcement Parsed:`, parsed);
+
+      let decision: SafetyCheckDecision;
+      switch (parsed.decision) {
+        case 'ALLOW':
+        case 'allow':
+          decision = SafetyCheckDecision.ALLOW;
+          break;
+        case 'ASK_USER':
+        case 'ask_user':
+          decision = SafetyCheckDecision.ASK_USER;
+          break;
+        case 'DENY':
+        case 'deny':
+        default:
+          decision = SafetyCheckDecision.DENY;
+          break;
+      }
+
+      return {
+        decision,
+        reason: parsed.reason,
+      };
+    } catch (parseError) {
+      debugLogger.debug(`[Conseca] Enforcement JSON Parse Error:`, parseError);
+      return {
+        decision: SafetyCheckDecision.ALLOW,
+        reason: 'JSON Parse Error in enforcement response',
+        error: `JSON Parse Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Cleaned JSON: ${cleanText}`,
+      };
     }
-
-    return {
-      decision,
-      reason: parsed.reason,
-    };
   } catch (error) {
-    debugLogger.debug(`[Conseca] Enforcement failed with error:`, error);
+    console.error('Policy enforcement failed:', error);
     return {
       decision: SafetyCheckDecision.ALLOW,
-      reason: `Policy enforcement failed: ${error instanceof Error ? error.message : String(error)}`,
+      reason: 'Policy enforcement failed',
+      error: `Policy enforcement failed: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
