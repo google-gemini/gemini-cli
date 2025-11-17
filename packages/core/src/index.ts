@@ -142,3 +142,6 @@ export * from './test-utils/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
+
+// Export onboarding
+export * from './onboarding/index.js';
