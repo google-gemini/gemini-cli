@@ -98,13 +98,7 @@ const createMCPTool = (
   toolName: string,
   description: string,
   mockCallable: CallableTool = {} as CallableTool,
-) => new DiscoveredMCPTool(
-    mockCallable,
-    serverName,
-    toolName,
-    description,
-    {},
-  );
+) => new DiscoveredMCPTool(mockCallable, serverName, toolName, description, {});
 
 // Helper to create a mock spawn process for tool discovery
 const createDiscoveryProcess = (toolDeclarations: FunctionDeclaration[]) => {
