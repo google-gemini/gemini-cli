@@ -89,6 +89,9 @@ describe('<ToolMessage />', () => {
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
+    isFirst: true,
+    borderColor: 'green',
+    borderDimColor: false,
   };
 
   it('renders basic tool information', () => {

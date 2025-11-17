@@ -72,8 +72,9 @@ const MAX_TURNS = 100;
 export class GeminiClient {
   private chat?: GeminiChat;
   private readonly generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
+    temperature: 1,
+    topP: 0.95,
+    topK: 64,
   };
   private sessionTurnCount = 0;
 
@@ -520,6 +521,7 @@ export class GeminiClient {
       modelToUse = decision.model;
       // Lock the model for the rest of the sequence
       this.currentSequenceModel = modelToUse;
+      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
 
     const resultStream = turn.run(modelToUse, request, linkedSignal);

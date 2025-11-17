@@ -9,7 +9,9 @@ import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
 // Track if it's the very first activation globally across the app
+
 let hasShownFirstRequestTip = false;
+
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 
 // For testing purposes: reset the first request flag
