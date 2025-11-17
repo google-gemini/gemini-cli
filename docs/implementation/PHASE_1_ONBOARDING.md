@@ -266,17 +266,19 @@ Resets the entire checklist.
 Key implementation features:
 - **20 Tasks**: Carefully curated across 3 categories
 - **Dependency Management**: Prerequisite system prevents out-of-order completion
+- **Prerequisite Enforcement**: `completeTask()` validates all prerequisites are completed before allowing task completion; throws descriptive error with task titles if prerequisites are unmet
 - **Circular Dependency Prevention**: Task graph validation (tested)
 - **Progress Calculation**: Real-time updates on task state changes
 - **Completion Detection**: Marks onboarding complete when all essential tasks done
 - **Persistent State**: Saves task completions, timestamps, and notes
-- **Error Handling**: Throws descriptive errors for invalid task IDs
+- **Error Handling**: Throws descriptive errors for invalid task IDs and unmet prerequisites
 
 #### Testing: `packages/core/src/onboarding/checklist.test.ts`
 
 Comprehensive test coverage including:
 - Task definitions validation (20 tasks, categories, unique IDs)
 - Prerequisite validation (no circular dependencies)
+- **Prerequisite enforcement** (validates prerequisites before completion, multiple prerequisites, transitive dependencies, descriptive error messages)
 - Task state management (start, complete, skip, reset)
 - Progress calculation (percentage, completion rate)
 - Statistics computation (by category, timing metrics)

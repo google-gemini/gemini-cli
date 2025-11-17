@@ -111,6 +111,39 @@ describe('OnboardingChecklist', () => {
   let tempDir: string;
   let checklist: OnboardingChecklist;
 
+  /**
+   * Helper to complete all tasks in dependency order
+   */
+  const completeAllTasksInOrder = (checklistInstance: OnboardingChecklist) => {
+    const completed = new Set<string>();
+    const tasksArray = ONBOARDING_TASKS;
+
+    // Keep trying to complete tasks until all are done
+    while (completed.size < tasksArray.length) {
+      let progress = false;
+
+      for (const task of tasksArray) {
+        if (completed.has(task.id)) continue;
+
+        // Check if all prerequisites are met
+        const prerequisitesMet =
+          !task.prerequisites ||
+          task.prerequisites.every((prereqId) => completed.has(prereqId));
+
+        if (prerequisitesMet) {
+          checklistInstance.completeTask(task.id);
+          completed.add(task.id);
+          progress = true;
+        }
+      }
+
+      // Prevent infinite loop
+      if (!progress) {
+        throw new Error('Cannot complete all tasks - circular dependencies?');
+      }
+    }
+  };
+
   beforeEach(() => {
     // Create a temporary directory for test state
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'checklist-test-'));
@@ -260,14 +293,15 @@ describe('OnboardingChecklist', () => {
     });
 
     it('should check for completion of essential tasks', () => {
-      // Complete all essential tasks
-      const essentialTasks = ONBOARDING_TASKS.filter(
-        (t) => t.category === 'essential',
-      );
-
-      essentialTasks.forEach((task) => {
-        checklist.completeTask(task.id);
-      });
+      // Complete all essential tasks in order respecting prerequisites
+      // Essential tasks: complete-wizard, authenticate, first-prompt,
+      // explore-examples, run-example, configure-workspace
+      checklist.completeTask('complete-wizard');
+      checklist.completeTask('authenticate');
+      checklist.completeTask('first-prompt');
+      checklist.completeTask('explore-examples');
+      checklist.completeTask('run-example');
+      checklist.completeTask('configure-workspace');
 
       const state = checklist.getState();
       expect(state.isComplete).toBe(true);
@@ -277,6 +311,88 @@ describe('OnboardingChecklist', () => {
       checklist.completeTask('complete-wizard');
       const state = checklist.getState();
       expect(state.isComplete).toBe(false);
+    });
+
+    it('should enforce prerequisites before completing', () => {
+      // 'authenticate' requires 'complete-wizard'
+      expect(() => checklist.completeTask('authenticate')).toThrow(
+        'Cannot complete task "Set Up Authentication": unmet prerequisites: Complete Quick Start Wizard',
+      );
+    });
+
+    it('should allow completion when prerequisites are met', () => {
+      // Complete prerequisite first
+      checklist.completeTask('complete-wizard');
+
+      // Now 'authenticate' should succeed
+      expect(() => checklist.completeTask('authenticate')).not.toThrow();
+
+      const completion = checklist.getTaskCompletion('authenticate');
+      expect(completion?.status).toBe('completed');
+    });
+
+    it('should enforce multiple prerequisites', () => {
+      // 'project-analysis' requires both 'use-file-context' and 'use-tools'
+      expect(() => checklist.completeTask('project-analysis')).toThrow(
+        'unmet prerequisites',
+      );
+
+      // Complete only one prerequisite
+      checklist.completeTask('complete-wizard');
+      checklist.completeTask('authenticate');
+      checklist.completeTask('first-prompt');
+      checklist.completeTask('use-file-context');
+
+      // Should still fail because 'use-tools' is not complete
+      expect(() => checklist.completeTask('project-analysis')).toThrow(
+        'unmet prerequisites',
+      );
+
+      // Complete second prerequisite
+      checklist.completeTask('use-tools');
+
+      // Now should succeed
+      expect(() => checklist.completeTask('project-analysis')).not.toThrow();
+    });
+
+    it('should allow completion of tasks without prerequisites', () => {
+      // 'complete-wizard' has no prerequisites
+      expect(() => checklist.completeTask('complete-wizard')).not.toThrow();
+
+      const completion = checklist.getTaskCompletion('complete-wizard');
+      expect(completion?.status).toBe('completed');
+    });
+
+    it('should throw descriptive error with task titles', () => {
+      try {
+        checklist.completeTask('authenticate');
+        fail('Should have thrown error');
+      } catch (error: any) {
+        expect(error.message).toContain('Set Up Authentication');
+        expect(error.message).toContain('Complete Quick Start Wizard');
+        expect(error.message).toContain('unmet prerequisites');
+      }
+    });
+
+    it('should enforce transitive prerequisites', () => {
+      // 'first-prompt' requires 'authenticate' which requires 'complete-wizard'
+      expect(() => checklist.completeTask('first-prompt')).toThrow(
+        'unmet prerequisites',
+      );
+
+      // Complete first level prerequisite
+      checklist.completeTask('complete-wizard');
+
+      // Still should fail because direct prerequisite not met
+      expect(() => checklist.completeTask('first-prompt')).toThrow(
+        'unmet prerequisites',
+      );
+
+      // Complete direct prerequisite
+      checklist.completeTask('authenticate');
+
+      // Now should succeed
+      expect(() => checklist.completeTask('first-prompt')).not.toThrow();
     });
   });
 
@@ -373,9 +489,12 @@ describe('OnboardingChecklist', () => {
     });
 
     it('should calculate completion rate', () => {
-      // Complete 5 tasks (25%)
-      const tasksToComplete = ONBOARDING_TASKS.slice(0, 5);
-      tasksToComplete.forEach((task) => checklist.completeTask(task.id));
+      // Complete 5 tasks (25%) in order respecting prerequisites
+      checklist.completeTask('complete-wizard');
+      checklist.completeTask('authenticate');
+      checklist.completeTask('first-prompt');
+      checklist.completeTask('explore-examples');
+      checklist.completeTask('run-example');
 
       const stats = checklist.getStats();
       expect(stats.completionRate).toBe(25);
@@ -578,9 +697,7 @@ describe('OnboardingChecklist', () => {
     });
 
     it('should reach 100% when all tasks complete', () => {
-      ONBOARDING_TASKS.forEach((task) => {
-        checklist.completeTask(task.id);
-      });
+      completeAllTasksInOrder(checklist);
 
       expect(checklist.getState().progress).toBe(100);
     });
@@ -598,38 +715,46 @@ describe('OnboardingChecklist', () => {
 
   describe('completion detection', () => {
     it('should mark as complete when all essential tasks done', () => {
-      const essentialTasks = ONBOARDING_TASKS.filter(
-        (t) => t.category === 'essential',
-      );
-
-      essentialTasks.forEach((task) => {
-        checklist.completeTask(task.id);
-      });
+      // Complete all 6 essential tasks in dependency order
+      checklist.completeTask('complete-wizard');
+      checklist.completeTask('authenticate');
+      checklist.completeTask('first-prompt');
+      checklist.completeTask('explore-examples');
+      checklist.completeTask('run-example');
+      checklist.completeTask('configure-workspace');
 
       expect(checklist.getState().isComplete).toBe(true);
     });
 
     it('should not mark as complete with only core tasks', () => {
-      const coreTasks = ONBOARDING_TASKS.filter((t) => t.category === 'core');
+      // Core tasks require essential tasks as prerequisites
+      // Complete prerequisites first
+      checklist.completeTask('complete-wizard');
+      checklist.completeTask('authenticate');
+      checklist.completeTask('first-prompt');
+      checklist.completeTask('explore-examples');
+      checklist.completeTask('run-example');
 
-      coreTasks.forEach((task) => {
-        checklist.completeTask(task.id);
-      });
+      // Now complete some core tasks
+      checklist.completeTask('use-file-context');
+      checklist.completeTask('multimodal-prompt');
+      checklist.completeTask('use-tools');
 
+      // Should not be complete because not all essential tasks done
+      // (missing configure-workspace)
       expect(checklist.getState().isComplete).toBe(false);
     });
 
     it('should remain incomplete if any essential task is skipped', () => {
-      const essentialTasks = ONBOARDING_TASKS.filter(
-        (t) => t.category === 'essential',
-      );
+      // Complete some essential tasks
+      checklist.completeTask('complete-wizard');
+      checklist.completeTask('authenticate');
+      checklist.completeTask('first-prompt');
+      checklist.completeTask('explore-examples');
+      checklist.completeTask('run-example');
 
-      // Complete all but one essential task
-      essentialTasks.slice(0, -1).forEach((task) => {
-        checklist.completeTask(task.id);
-      });
-
-      checklist.skipTask(essentialTasks[essentialTasks.length - 1].id);
+      // Skip the last essential task
+      checklist.skipTask('configure-workspace');
 
       expect(checklist.getState().isComplete).toBe(false);
     });

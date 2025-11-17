@@ -352,6 +352,23 @@ export class OnboardingChecklist {
       throw new Error(`Task not found: ${taskId}`);
     }
 
+    // Validate prerequisites before completing
+    const task = this.tasks.get(taskId)!;
+    if (task.prerequisites && task.prerequisites.length > 0) {
+      const unmetPrerequisites = task.prerequisites.filter(
+        (prereqId) => this.state.tasks[prereqId]?.status !== 'completed',
+      );
+
+      if (unmetPrerequisites.length > 0) {
+        const unmetTasks = unmetPrerequisites
+          .map((id) => this.tasks.get(id)?.title || id)
+          .join(', ');
+        throw new Error(
+          `Cannot complete task "${task.title}": unmet prerequisites: ${unmetTasks}`,
+        );
+      }
+    }
+
     const existing = this.state.tasks[taskId];
     this.state.tasks[taskId] = {
       taskId,

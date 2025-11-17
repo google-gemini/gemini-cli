@@ -186,6 +186,23 @@ Progress: 100%
 🎉 Congratulations! You have completed all essential onboarding tasks!
 ```
 
+**Prerequisite Enforcement:**
+
+Tasks cannot be completed if their prerequisites are not met. If you try to complete a task without completing its prerequisites first, you'll see an error:
+
+```bash
+/onboarding complete authenticate
+```
+
+**Error Output:**
+```
+❌ Cannot complete task "Set Up Authentication": unmet prerequisites: Complete Quick Start Wizard
+
+💡 Complete the required tasks first, then try again.
+```
+
+Complete prerequisite tasks in order before attempting dependent tasks.
+
 ### `/onboarding skip <task-id>`
 
 Skip a task (mark as skipped).

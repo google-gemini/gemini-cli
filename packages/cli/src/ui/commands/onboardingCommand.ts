@@ -121,7 +121,17 @@ function completeTask(checklist: any, taskId: string): MessageActionReturn {
     };
   }
 
-  checklist.completeTask(taskId);
+  try {
+    checklist.completeTask(taskId);
+  } catch (error: any) {
+    // Handle prerequisite validation error
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `❌ ${error.message}\n\n💡 Complete the required tasks first, then try again.`,
+    };
+  }
+
   const state = checklist.getState();
 
   let celebration = '';
