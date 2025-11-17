@@ -176,53 +176,48 @@ describe('SmartEditTool', () => {
   describe('calculateReplacement', () => {
     const abortSignal = new AbortController().signal;
 
-    it('should perform an exact replacement', async () => {
-      const content = 'hello world';
-      const result = await calculateReplacement(mockConfig, {
-        params: {
-          file_path: 'test.txt',
-          instruction: 'test',
-          old_string: 'world',
-          new_string: 'moon',
-        },
-        currentContent: content,
-        abortSignal,
-      });
-      expect(result.newContent).toBe('hello moon');
-      expect(result.occurrences).toBe(1);
-    });
-
-    it('should perform a flexible, whitespace-insensitive replacement', async () => {
-      const content = '  hello\n    world\n';
-      const result = await calculateReplacement(mockConfig, {
-        params: {
-          file_path: 'test.txt',
-          instruction: 'test',
-          old_string: 'hello\nworld',
-          new_string: 'goodbye\nmoon',
-        },
-        currentContent: content,
-        abortSignal,
-      });
-      expect(result.newContent).toBe('  goodbye\n  moon\n');
-      expect(result.occurrences).toBe(1);
-    });
-
-    it('should return 0 occurrences if no match is found', async () => {
-      const content = 'hello world';
-      const result = await calculateReplacement(mockConfig, {
-        params: {
-          file_path: 'test.txt',
-          instruction: 'test',
-          old_string: 'nomatch',
-          new_string: 'moon',
-        },
-        currentContent: content,
-        abortSignal,
-      });
-      expect(result.newContent).toBe(content);
-      expect(result.occurrences).toBe(0);
-    });
+    it.each([
+      {
+        name: 'perform an exact replacement',
+        content: 'hello world',
+        old_string: 'world',
+        new_string: 'moon',
+        expected: 'hello moon',
+        occurrences: 1,
+      },
+      {
+        name: 'perform a flexible, whitespace-insensitive replacement',
+        content: '  hello\n    world\n',
+        old_string: 'hello\nworld',
+        new_string: 'goodbye\nmoon',
+        expected: '  goodbye\n  moon\n',
+        occurrences: 1,
+      },
+      {
+        name: 'return 0 occurrences if no match is found',
+        content: 'hello world',
+        old_string: 'nomatch',
+        new_string: 'moon',
+        expected: 'hello world',
+        occurrences: 0,
+      },
+    ])(
+      'should $name',
+      async ({ content, old_string, new_string, expected, occurrences }) => {
+        const result = await calculateReplacement(mockConfig, {
+          params: {
+            file_path: 'test.txt',
+            instruction: 'test',
+            old_string,
+            new_string,
+          },
+          currentContent: content,
+          abortSignal,
+        });
+        expect(result.newContent).toBe(expected);
+        expect(result.occurrences).toBe(occurrences);
+      },
+    );
 
     it('should perform a regex-based replacement for flexible intra-line whitespace', async () => {
       // This case would fail with the previous exact and line-trimming flexible logic
@@ -496,60 +491,44 @@ describe('SmartEditTool', () => {
       filePath = path.join(rootDir, testFile);
     });
 
-    it('should return FILE_NOT_FOUND error', async () => {
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: 'any',
-        new_string: 'new',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.FILE_NOT_FOUND);
-    });
-
-    it('should return ATTEMPT_TO_CREATE_EXISTING_FILE error', async () => {
-      fs.writeFileSync(filePath, 'existing content', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: '',
-        new_string: 'new content',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(
-        ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
-      );
-    });
-
-    it('should return NO_OCCURRENCE_FOUND error', async () => {
-      fs.writeFileSync(filePath, 'content', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: 'not-found',
-        new_string: 'new',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
-    });
-
-    it('should return EXPECTED_OCCURRENCE_MISMATCH error', async () => {
-      fs.writeFileSync(filePath, 'one one two', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: 'one',
-        new_string: 'new',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(
-        ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-      );
-    });
+    it.each([
+      {
+        name: 'FILE_NOT_FOUND',
+        setup: () => {}, // no file created
+        params: { old_string: 'any', new_string: 'new' },
+        expectedError: ToolErrorType.FILE_NOT_FOUND,
+      },
+      {
+        name: 'ATTEMPT_TO_CREATE_EXISTING_FILE',
+        setup: (fp: string) => fs.writeFileSync(fp, 'existing content', 'utf8'),
+        params: { old_string: '', new_string: 'new content' },
+        expectedError: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
+      },
+      {
+        name: 'NO_OCCURRENCE_FOUND',
+        setup: (fp: string) => fs.writeFileSync(fp, 'content', 'utf8'),
+        params: { old_string: 'not-found', new_string: 'new' },
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+      },
+      {
+        name: 'EXPECTED_OCCURRENCE_MISMATCH',
+        setup: (fp: string) => fs.writeFileSync(fp, 'one one two', 'utf8'),
+        params: { old_string: 'one', new_string: 'new' },
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+    ])(
+      'should return $name error',
+      async ({ setup, params, expectedError }) => {
+        setup(filePath);
+        const invocation = tool.build({
+          file_path: filePath,
+          instruction: 'test',
+          ...params,
+        });
+        const result = await invocation.execute(new AbortController().signal);
+        expect(result.error?.type).toBe(expectedError);
+      },
+    );
   });
 
   describe('expected_replacements', () => {
@@ -560,53 +539,51 @@ describe('SmartEditTool', () => {
       filePath = path.join(rootDir, testFile);
     });
 
-    it('should succeed when occurrences match expected_replacements', async () => {
-      fs.writeFileSync(filePath, 'foo foo foo', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace all foo with bar',
-        old_string: 'foo',
-        new_string: 'bar',
-        expected_replacements: 3,
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error).toBeUndefined();
-      expect(fs.readFileSync(filePath, 'utf8')).toBe('bar bar bar');
-    });
+    it.each([
+      {
+        name: 'succeed when occurrences match expected_replacements',
+        content: 'foo foo foo',
+        expected: 3,
+        shouldSucceed: true,
+        finalContent: 'bar bar bar',
+      },
+      {
+        name: 'fail when occurrences do not match expected_replacements',
+        content: 'foo foo foo',
+        expected: 2,
+        shouldSucceed: false,
+      },
+      {
+        name: 'default to 1 expected replacement if not specified',
+        content: 'foo foo',
+        expected: undefined,
+        shouldSucceed: false,
+      },
+    ])(
+      'should $name',
+      async ({ content, expected, shouldSucceed, finalContent }) => {
+        fs.writeFileSync(filePath, content, 'utf8');
+        const params: EditToolParams = {
+          file_path: filePath,
+          instruction: 'Replace all foo with bar',
+          old_string: 'foo',
+          new_string: 'bar',
+          ...(expected !== undefined && { expected_replacements: expected }),
+        };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
 
-    it('should fail when occurrences do not match expected_replacements', async () => {
-      fs.writeFileSync(filePath, 'foo foo foo', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace all foo with bar',
-        old_string: 'foo',
-        new_string: 'bar',
-        expected_replacements: 2,
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(
-        ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-      );
-    });
-
-    it('should default to 1 expected replacement if not specified', async () => {
-      fs.writeFileSync(filePath, 'foo foo', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace foo with bar',
-        old_string: 'foo',
-        new_string: 'bar',
-        // expected_replacements is undefined, defaults to 1
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      // Should fail because there are 2 occurrences but default expectation is 1
-      expect(result.error?.type).toBe(
-        ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-      );
-    });
+        if (shouldSucceed) {
+          expect(result.error).toBeUndefined();
+          if (finalContent)
+            expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
+        } else {
+          expect(result.error?.type).toBe(
+            ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+          );
+        }
+      },
+    );
   });
 
   describe('IDE mode', () => {
