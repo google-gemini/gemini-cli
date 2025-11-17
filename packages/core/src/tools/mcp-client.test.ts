@@ -242,7 +242,6 @@ describe('mcp-client', () => {
       vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
         {} as SdkClientStdioLib.StdioClientTransport,
       );
-      // mcpToTool is no longer used
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
