@@ -146,6 +146,7 @@ describe('InputPrompt', () => {
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),
       visualToLogicalMap: [[0, 0]],
+      getOffset: vi.fn().mockReturnValue(0),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -505,6 +506,7 @@ describe('InputPrompt', () => {
       // Set initial text and cursor position
       mockBuffer.text = 'Hello world';
       mockBuffer.cursor = [0, 5]; // Cursor after "Hello"
+      vi.mocked(mockBuffer.getOffset).mockReturnValue(5);
       mockBuffer.lines = ['Hello world'];
       mockBuffer.replaceRangeByOffset = vi.fn();
 
