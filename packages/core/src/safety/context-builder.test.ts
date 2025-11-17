@@ -24,6 +24,7 @@ describe('ContextBuilder', () => {
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(mockWorkspaces),
       }),
+      getQuestion: vi.fn().mockReturnValue('mock question'),
       apiKey: 'secret-api-key',
       somePublicConfig: 'public-value',
       nested: {
@@ -51,6 +52,11 @@ describe('ContextBuilder', () => {
   it('should handle missing history', () => {
     contextBuilder = new ContextBuilder(mockConfig);
     const context = contextBuilder.buildFullContext();
-    expect(context.history?.turns).toEqual([]);
+    expect(context.history?.turns).toEqual([
+      {
+        user: { text: 'mock question' },
+        model: {},
+      },
+    ]);
   });
 });
