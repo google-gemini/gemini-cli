@@ -855,7 +855,8 @@ describe('WriteFileTool', () => {
           vi.restoreAllMocks();
         }
 
-        let existsSyncSpy: ReturnType<typeof vi.spyOn> | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let existsSyncSpy: any;
 
         try {
           if (mockFsExistsSync) {

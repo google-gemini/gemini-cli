@@ -422,7 +422,9 @@ describe('WebFetchTool', () => {
       confirmed: boolean,
       correlationId = 'test-correlation-id',
     ) => {
-      const responseHandler = subscribeSpy.mock.calls[0][1];
+      const responseHandler = subscribeSpy.mock.calls[0][1] as (
+        response: ToolConfirmationResponse,
+      ) => void;
       const response: ToolConfirmationResponse = {
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         correlationId,
