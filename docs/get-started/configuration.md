@@ -100,7 +100,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.previewFeatures`** (boolean):
   - **Description:** Enable preview features (e.g., preview models).
-  - **Default:** `undefined`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`general.preferredEditor`** (string):
