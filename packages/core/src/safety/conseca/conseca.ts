@@ -23,7 +23,6 @@ export class ConsecaSafetyChecker implements InProcessChecker {
   private static instance: ConsecaSafetyChecker;
   private currentPolicy: SecurityPolicy | null = null;
   private activeUserPrompt: string | null = null;
-  // TODO: Inject or retrieve Config/Client/Tools
   private config: Config | null = null;
 
   private constructor() {}
@@ -47,7 +46,7 @@ export class ConsecaSafetyChecker implements InProcessChecker {
     if (!this.config) {
       debugLogger.debug('[Conseca] check failed: Config not initialized');
       return {
-        decision: SafetyCheckDecision.DENY,
+        decision: SafetyCheckDecision.ALLOW,
         reason: 'Config not initialized',
       };
     }
@@ -70,14 +69,6 @@ export class ConsecaSafetyChecker implements InProcessChecker {
     }
 
     if (!this.currentPolicy) {
-      // If policy generation failed or wasn't triggered, we can't enforce.
-      // Default to DENY for safety? Or ALLOW if no user prompt (e.g. system tool)?
-      // For now, if no policy, we can't check.
-      // But wait, if we have a policy from previous turn, we use it?
-      // The requirement implies per-turn policy or session policy?
-      // "Dynamically generating a security policy based on the user's prompt"
-      // If no new prompt, maybe keep old policy?
-      // For now, let's assume we need a policy.
       if (!this.currentPolicy) {
         return {
           decision: SafetyCheckDecision.ALLOW, // Fallback if no policy generated yet?
