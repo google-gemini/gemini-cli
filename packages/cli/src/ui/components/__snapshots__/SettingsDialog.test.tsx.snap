@@ -6,7 +6,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
@@ -16,11 +16,11 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -41,7 +41,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             true*                                     │
 │                                                                                                  │
@@ -51,11 +51,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -76,7 +76,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             false*                                    │
 │                                                                                                  │
@@ -86,11 +86,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │   Debug Keystroke Logging                              false*                                    │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -111,7 +111,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
@@ -121,11 +121,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -146,7 +146,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
@@ -156,11 +156,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -181,7 +181,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │   Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│   Preview Features (e.g., models)                      undefined                                 │
+│   Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
@@ -191,11 +191,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -216,7 +216,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             false*                                    │
 │                                                                                                  │
@@ -226,11 +226,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -251,7 +251,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
@@ -261,11 +261,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -286,7 +286,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │ > Settings                                                                                       │
 │                                                                                                  │
 │ ▲                                                                                                │
-│ ● Preview Features (e.g., models)                      undefined                                 │
+│ ● Preview Features (e.g., models)                      false                                     │
 │                                                                                                  │
 │   Vim Mode                                             true*                                     │
 │                                                                                                  │
@@ -296,11 +296,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │   Debug Keystroke Logging                              true*                                     │
 │                                                                                                  │
-│   Session Retention                                    undefined                                 │
-│                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
+│                                                                                                  │
+│   Hide Window Title                                    true*                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │

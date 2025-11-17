@@ -165,7 +165,7 @@ const SETTINGS_SCHEMA = {
         label: 'Preview Features (e.g., models)',
         category: 'General',
         requiresRestart: true,
-        default: undefined as boolean | undefined,
+        default: false,
         description: 'Enable preview features (e.g., preview models).',
         showInDialog: true,
       },
@@ -260,6 +260,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: undefined as SessionRetentionSettings | undefined,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
