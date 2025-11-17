@@ -32,7 +32,7 @@ import {
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import { type Config } from '@google/gemini-cli-core';
+import type { Config, ResumedSessionData } from '@google/gemini-cli-core';
 import {
   sessionId,
   logUserPrompt,
@@ -55,6 +55,7 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { SessionSelector } from './utils/sessionUtils.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
@@ -68,12 +69,14 @@ import {
   relaunchOnExitCode,
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { deleteSession, listSessions } from './utils/sessions.js';
 import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import ansiEscapes from 'ansi-escapes';
+import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -152,33 +155,22 @@ export async function startInteractiveUI(
   settings: LoadedSettings,
   startupWarnings: string[],
   workspaceRoot: string = process.cwd(),
+  resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
 ) {
-  // When not in screen reader mode, disable line wrapping.
-  // We rely on Ink to manage all line wrapping by forcing all content to be
-  // narrower than the terminal width so there is no need for the terminal to
-  // also attempt line wrapping.
-  // Disabling line wrapping reduces Ink rendering artifacts particularly when
-  // the terminal is resized on terminals that full respect this escape code
-  // such as Ghostty. Some terminals such as Iterm2 only respect line wrapping
-  // when using the alternate buffer, which Gemini CLI does not use because we
-  // do not yet have support for scrolling in that mode.
-  if (!config.getScreenReader()) {
-    process.stdout.write('\x1b[?7l');
-  }
-
-  const mouseEventsEnabled = settings.merged.ui?.useAlternateBuffer === true;
+  // Never enter Ink alternate buffer mode when screen reader mode is enabled
+  // as there is no benefit of alternate buffer mode when using a screen reader
+  // and the Ink alternate buffer mode requires line wrapping harmful to
+  // screen readers.
+  const useAlternateBuffer =
+    isAlternateBufferEnabled(settings) && !config.getScreenReader();
+  const mouseEventsEnabled = useAlternateBuffer;
   if (mouseEventsEnabled) {
     enableMouseEvents();
-  }
-
-  registerCleanup(() => {
-    // Re-enable line wrapping on exit.
-    process.stdout.write('\x1b[?7h');
-    if (mouseEventsEnabled) {
+    registerCleanup(() => {
       disableMouseEvents();
-    }
-  });
+    });
+  }
 
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -203,9 +195,9 @@ export async function startInteractiveUI(
                 <VimModeProvider settings={settings}>
                   <AppContainer
                     config={config}
-                    settings={settings}
                     startupWarnings={startupWarnings}
                     version={version}
+                    resumedSessionData={resumedSessionData}
                     initializationResult={initializationResult}
                   />
                 </VimModeProvider>
@@ -233,8 +225,10 @@ export async function startInteractiveUI(
           recordSlowRender(config, renderTime);
         }
       },
-      alternateBuffer: settings.merged.ui?.useAlternateBuffer,
-      alternateBufferAlreadyActive: settings.merged.ui?.useAlternateBuffer,
+      alternateBuffer: useAlternateBuffer,
+      incrementalRendering:
+        settings.merged.ui?.incrementalRendering !== false &&
+        useAlternateBuffer,
     },
   );
 
@@ -290,13 +284,19 @@ export async function main() {
     validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
   );
 
-  // Set a default auth type if one isn't set.
-  if (!settings.merged.security?.auth?.selectedType) {
-    if (process.env['CLOUD_SHELL'] === 'true') {
+  // Set a default auth type if one isn't set or is set to a legacy type
+  if (
+    !settings.merged.security?.auth?.selectedType ||
+    settings.merged.security?.auth?.selectedType === AuthType.LEGACY_CLOUD_SHELL
+  ) {
+    if (
+      process.env['CLOUD_SHELL'] === 'true' ||
+      process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+    ) {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
-        AuthType.CLOUD_SHELL,
+        AuthType.COMPUTE_ADC,
       );
     }
   }
@@ -416,13 +416,26 @@ export async function main() {
       process.exit(0);
     }
 
+    // Handle --list-sessions flag
+    if (config.getListSessions()) {
+      await listSessions(config);
+      process.exit(0);
+    }
+
+    // Handle --delete-session flag
+    const sessionToDelete = config.getDeleteSession();
+    if (sessionToDelete) {
+      await deleteSession(config, sessionToDelete);
+      process.exit(0);
+    }
+
     const wasRaw = process.stdin.isRaw;
     if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
       process.stdin.setRawMode(true);
 
-      if (settings.merged.ui?.useAlternateBuffer) {
+      if (isAlternateBufferEnabled(settings)) {
         process.stdout.write(ansiEscapes.enterAlternativeScreen);
 
         // Ink will cleanup so there is no need for us to manually cleanup.
@@ -462,6 +475,26 @@ export async function main() {
       ...(await getUserStartupWarnings()),
     ];
 
+    // Handle --resume flag
+    let resumedSessionData: ResumedSessionData | undefined = undefined;
+    if (argv.resume) {
+      const sessionSelector = new SessionSelector(config);
+      try {
+        const result = await sessionSelector.resolveSession(argv.resume);
+        resumedSessionData = {
+          conversation: result.sessionData,
+          filePath: result.sessionPath,
+        };
+        // Use the existing session ID to continue recording to the same session
+        config.setSessionId(resumedSessionData.conversation.sessionId);
+      } catch (error) {
+        console.error(
+          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        process.exit(1);
+      }
+    }
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       await startInteractiveUI(
@@ -469,6 +502,7 @@ export async function main() {
         settings,
         startupWarnings,
         process.cwd(),
+        resumedSessionData,
         initializationResult,
       );
       return;
@@ -522,6 +556,7 @@ export async function main() {
       input,
       prompt_id,
       hasDeprecatedPromptArg,
+      resumedSessionData,
     });
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
