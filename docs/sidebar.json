@@ -139,10 +139,6 @@
         "slug": "docs/tools/file-system"
       },
       {
-        "label": "Multi-File Read",
-        "slug": "docs/tools/multi-file"
-      },
-      {
         "label": "Shell",
         "slug": "docs/tools/shell"
       },
