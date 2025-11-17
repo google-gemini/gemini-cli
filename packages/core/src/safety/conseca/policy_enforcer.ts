@@ -29,7 +29,7 @@ Evaluate the tool call against the policy.
 1. Check if the tool is allowed.
 2. Check if the arguments match the constraints.
 3. Output a JSON object with:
-   - "decision": "ALLOW" or "DENY" or "ASK_USER"
+   - "decision": "ALLOW" or "DENY".
    - "reason": A brief explanation.
 
 Output strictly JSON.
@@ -47,9 +47,6 @@ export async function enforcePolicy(
   const contentGenerator = config.getContentGenerator();
 
   if (!contentGenerator) {
-    debugLogger.debug(
-      '[Conseca] Enforcement failed: Content generator not initialized',
-    );
     return {
       decision: SafetyCheckDecision.ALLOW,
       reason: 'Content generator not initialized',
@@ -58,10 +55,6 @@ export async function enforcePolicy(
   }
 
   const toolName = toolCall.name;
-  debugLogger.debug(
-    `[Conseca] Enforcing policy for tool: ${toolName}`,
-    toolCall,
-  );
   if (!toolName) {
     return {
       decision: SafetyCheckDecision.ALLOW,
@@ -115,14 +108,13 @@ export async function enforcePolicy(
     debugLogger.debug(`[Conseca] Enforcement Raw Response: ${responseText}`);
 
     if (!responseText) {
-      debugLogger.debug(`[Conseca] Enforcement failed: Empty response`);
       return {
         decision: SafetyCheckDecision.ALLOW,
         reason: 'Empty response from policy enforcer',
         error: 'Empty response from policy enforcer',
       };
     }
-
+    // TODO: Remove this redundancy after verifying that LLM always returns JSON.
     let cleanText = responseText;
     // Extract JSON from code block if present
     const match = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -136,8 +128,6 @@ export async function enforcePolicy(
         cleanText = responseText.substring(firstOpen, lastClose + 1);
       }
     }
-
-    debugLogger.debug(`[Conseca] Enforcement Cleaned JSON: ${cleanText}`);
 
     try {
       const parsed = JSON.parse(cleanText);
@@ -165,7 +155,6 @@ export async function enforcePolicy(
         reason: parsed.reason,
       };
     } catch (parseError) {
-      debugLogger.debug(`[Conseca] Enforcement JSON Parse Error:`, parseError);
       return {
         decision: SafetyCheckDecision.ALLOW,
         reason: 'JSON Parse Error in enforcement response',
