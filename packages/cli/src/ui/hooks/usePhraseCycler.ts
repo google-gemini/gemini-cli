@@ -8,16 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
-// Track if it's the very first activation globally across the app
-
-let hasShownFirstRequestTip = false;
-
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
-
-// For testing purposes: reset the first request flag
-export const __resetFirstRequestFlagForTesting = () => {
-  hasShownFirstRequestTip = false;
-};
 
 /**
  * Custom hook to manage cycling through loading phrases.
@@ -39,6 +30,7 @@ export const usePhraseCycler = (
     loadingPhrases[0],
   );
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasShownFirstRequestTipRef = useRef(false);
 
   useEffect(() => {
     if (isWaiting) {
@@ -59,10 +51,10 @@ export const usePhraseCycler = (
         } else {
           let phraseList;
           // Show a tip on the first request after startup, then continue with 1/6 chance
-          if (!hasShownFirstRequestTip) {
+          if (!hasShownFirstRequestTipRef.current) {
             // Show a tip during the first request
             phraseList = INFORMATIVE_TIPS;
-            hasShownFirstRequestTip = true; // Mark that we've shown the first request tip
+            hasShownFirstRequestTipRef.current = true;
           } else {
             // Roughly 1 in 6 chance to show a tip after the first request
             const showTip = Math.random() < 1 / 6;

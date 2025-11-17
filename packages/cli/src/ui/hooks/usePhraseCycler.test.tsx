@@ -11,7 +11,6 @@ import { Text } from 'ink';
 import {
   usePhraseCycler,
   PHRASE_CHANGE_INTERVAL_MS,
-  __resetFirstRequestFlagForTesting,
 } from './usePhraseCycler.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
@@ -33,7 +32,6 @@ const TestComponent = ({
 describe('usePhraseCycler', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    __resetFirstRequestFlagForTesting();
   });
 
   afterEach(() => {

@@ -9,16 +9,12 @@ import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useLoadingIndicator } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
-import {
-  PHRASE_CHANGE_INTERVAL_MS,
-  __resetFirstRequestFlagForTesting,
-} from './usePhraseCycler.js';
+import { PHRASE_CHANGE_INTERVAL_MS } from './usePhraseCycler.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    __resetFirstRequestFlagForTesting();
   });
 
   afterEach(() => {
