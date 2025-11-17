@@ -735,8 +735,6 @@ class McpCallableTool implements CallableTool {
           },
         },
       ];
-    } finally {
-      clearTimeout(timeoutId!);
     }
   }
 }
