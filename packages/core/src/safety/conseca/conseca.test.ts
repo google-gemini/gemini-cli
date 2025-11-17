@@ -8,7 +8,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConsecaSafetyChecker } from './conseca.js';
 import { SafetyCheckDecision } from '../protocol.js';
 import type { SafetyCheckInput } from '../protocol.js';
-import { logConsecaPolicyGeneration } from '../../telemetry/index.js';
+import {
+  logConsecaPolicyGeneration,
+  logConsecaVerdict,
+} from '../../telemetry/index.js';
 import type { Config } from '../../config/config.js';
 import * as policyGenerator from './policy_generator.js';
 import * as policyEnforcer from './policy_enforcer.js';
@@ -16,6 +19,8 @@ import * as policyEnforcer from './policy_enforcer.js';
 vi.mock('../../telemetry/index.js', () => ({
   logConsecaPolicyGeneration: vi.fn(),
   ConsecaPolicyGenerationEvent: vi.fn(),
+  logConsecaVerdict: vi.fn(),
+  ConsecaVerdictEvent: vi.fn(),
 }));
 
 vi.mock('./policy_generator.js');
@@ -40,7 +45,7 @@ describe('ConsecaSafetyChecker', () => {
     vi.clearAllMocks();
 
     // Default mock implementations
-    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({});
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({ policy: {} });
     vi.mocked(policyEnforcer.enforcePolicy).mockResolvedValue({
       decision: SafetyCheckDecision.ALLOW,
     });
@@ -74,7 +79,9 @@ describe('ConsecaSafetyChecker', () => {
         rationale: 'Test',
       },
     };
-    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({
+      policy: mockPolicy,
+    });
 
     const policy1 = await checker.getPolicy('prompt', 'trusted', mockConfig);
     const policy2 = await checker.getPolicy('prompt', 'trusted', mockConfig);
@@ -100,8 +107,8 @@ describe('ConsecaSafetyChecker', () => {
       },
     };
     vi.mocked(policyGenerator.generatePolicy)
-      .mockResolvedValueOnce(mockPolicy1)
-      .mockResolvedValueOnce(mockPolicy2);
+      .mockResolvedValueOnce({ policy: mockPolicy1 })
+      .mockResolvedValueOnce({ policy: mockPolicy2 });
 
     const policy1 = await checker.getPolicy('prompt1', 'trusted', mockConfig);
     const policy2 = await checker.getPolicy('prompt2', 'trusted', mockConfig);
@@ -119,7 +126,9 @@ describe('ConsecaSafetyChecker', () => {
         rationale: 'Test',
       },
     };
-    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({
+      policy: mockPolicy,
+    });
     vi.mocked(policyEnforcer.enforcePolicy).mockResolvedValue({
       decision: SafetyCheckDecision.ALLOW,
     });
@@ -179,7 +188,9 @@ describe('ConsecaSafetyChecker', () => {
         rationale: 'Test',
       },
     };
-    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({
+      policy: mockPolicy,
+    });
 
     await checker.getPolicy('prompt', 'trusted', mockConfig);
 
@@ -194,11 +205,53 @@ describe('ConsecaSafetyChecker', () => {
         rationale: 'Test',
       },
     };
-    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue(mockPolicy);
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({
+      policy: mockPolicy,
+    });
 
     await checker.getPolicy('telemetry_prompt', 'trusted', mockConfig);
 
     expect(logConsecaPolicyGeneration).toHaveBeenCalledWith(
+      mockConfig,
+      expect.anything(),
+    );
+  });
+
+  it('should log verdict event on check', async () => {
+    const mockPolicy = {
+      tool: {
+        permissions: 'ALLOW' as const,
+        constraints: 'None',
+        rationale: 'Test',
+      },
+    };
+    vi.mocked(policyGenerator.generatePolicy).mockResolvedValue({
+      policy: mockPolicy,
+    });
+    vi.mocked(policyEnforcer.enforcePolicy).mockResolvedValue({
+      decision: SafetyCheckDecision.ALLOW,
+      reason: 'Allowed by policy',
+    });
+
+    const input: SafetyCheckInput = {
+      protocolVersion: '1.0.0',
+      toolCall: { name: 'tool', args: {} },
+      context: {
+        environment: { cwd: '.', workspaces: [] },
+        history: {
+          turns: [
+            {
+              user: { text: 'user prompt' },
+              model: {},
+            },
+          ],
+        },
+      },
+    };
+
+    await checker.check(input);
+
+    expect(logConsecaVerdict).toHaveBeenCalledWith(
       mockConfig,
       expect.anything(),
     );
