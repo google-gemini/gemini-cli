@@ -160,3 +160,10 @@ export * from './workflows/index.js';
 
 // Export learning path
 export * from './learning-path/index.js';
+
+// Export playground
+export * from './playground/index.js';
+
+// Export command history
+export * from './history/index.js';
+
