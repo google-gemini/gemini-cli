@@ -49,7 +49,9 @@ export interface TutorialProgress {
   startedAt: number;
   lastUpdatedAt: number;
   completed: boolean;
+  completedAt?: number;
   score?: number;
+  timeSpent?: number;
 }
 
 export interface TutorialStats {
@@ -59,5 +61,5 @@ export interface TutorialStats {
   totalSteps: number;
   completedSteps: number;
   averageScore: number;
-  timeSpent: number;
+  totalTimeSpent: number;
 }

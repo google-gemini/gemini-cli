@@ -61,6 +61,8 @@ export class TutorialEngine {
     const module = this.getModule(moduleId);
     if (module && progress.completedSteps.length === module.steps.length) {
       progress.completed = true;
+      progress.completedAt = Date.now();
+      progress.timeSpent = progress.completedAt - progress.startedAt;
       progress.score = 100;
     }
 
@@ -118,6 +120,17 @@ export class TutorialEngine {
       ? scores.reduce((a, b) => a + b, 0) / scores.length
       : 0;
 
+    // Calculate total time spent across all tutorials
+    const totalTimeSpent = Array.from(this.progress.values()).reduce((sum, p) => {
+      if (p.completed && p.timeSpent) {
+        return sum + p.timeSpent;
+      } else if (!p.completed) {
+        // For in-progress tutorials, calculate current time spent
+        return sum + (Date.now() - p.startedAt);
+      }
+      return sum;
+    }, 0);
+
     return {
       totalModules,
       completedModules,
@@ -125,7 +138,7 @@ export class TutorialEngine {
       totalSteps,
       completedSteps,
       averageScore,
-      timeSpent: 0,
+      totalTimeSpent,
     };
   }
 

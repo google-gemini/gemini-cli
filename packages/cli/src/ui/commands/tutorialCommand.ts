@@ -147,10 +147,13 @@ function showProgress(engine: any, moduleId: string): MessageActionReturn {
   const totalSteps = module.steps.length;
   const percentage = Math.round((completedSteps / totalSteps) * 100);
 
+  // Calculate time spent (use stored value if completed, otherwise calculate current)
+  const timeSpent = progress.timeSpent || (Date.now() - progress.startedAt);
+
   return {
     type: 'message',
     messageType: 'info',
-    content: `📊 **Tutorial Progress: ${module.title}**\n\nCompleted: ${completedSteps}/${totalSteps} steps (${percentage}%)\nCurrent step: ${progress.currentStep + 1}\nTime spent: ${Math.round(progress.timeSpent / 60000)} minutes\n\n${progress.completed ? '✅ Tutorial completed!' : '_Continue: /tutorial next ' + moduleId + '_'}`,
+    content: `📊 **Tutorial Progress: ${module.title}**\n\nCompleted: ${completedSteps}/${totalSteps} steps (${percentage}%)\nCurrent step: ${progress.currentStep + 1}\nTime spent: ${Math.round(timeSpent / 60000)} minutes\n\n${progress.completed ? '✅ Tutorial completed!' : '_Continue: /tutorial next ' + moduleId + '_'}`,
   };
 }
 
