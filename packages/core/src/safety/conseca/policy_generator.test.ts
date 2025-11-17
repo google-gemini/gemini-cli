@@ -41,7 +41,7 @@ describe('policy_generator', () => {
       ],
     });
 
-    const policy = await generatePolicy(
+    const result = await generatePolicy(
       'test prompt',
       'trusted content',
       mockConfig,
@@ -58,7 +58,8 @@ describe('policy_generator', () => {
       }),
       'conseca-policy-generation',
     );
-    expect(policy).toEqual(mockPolicy);
+    expect(result.policy).toEqual(mockPolicy);
+    expect(result.error).toBeUndefined();
   });
 
   it('should handle missing content generator gracefully', async () => {
@@ -66,12 +67,13 @@ describe('policy_generator', () => {
       undefined as unknown as ContentGenerator,
     );
 
-    const policy = await generatePolicy(
+    const result = await generatePolicy(
       'test prompt',
       'trusted content',
       mockConfig,
     );
 
-    expect(policy).toEqual({});
+    expect(result.policy).toEqual({});
+    expect(result.error).toBe('Content generator not initialized');
   });
 });
