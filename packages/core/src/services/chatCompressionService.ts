@@ -19,7 +19,7 @@ import { getInitialChatHistory } from '../utils/environmentContext.js';
  * Default threshold for compression token count as a fraction of the model's
  * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.2;
+export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.7;
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
@@ -106,7 +106,8 @@ export class ChatCompressionService {
     // Don't compress if not forced and we are under the limit.
     if (!force) {
       const threshold =
-        config.getCompressionThreshold() ?? DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
+        (await config.getCompressionThreshold()) ??
+        DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
       if (originalTokenCount < threshold * tokenLimit(model)) {
         return {
           newHistory: null,

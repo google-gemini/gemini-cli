@@ -73,6 +73,10 @@
         "slug": "docs/cli/keyboard-shortcuts"
       },
       {
+        "label": "Model Selection",
+        "slug": "docs/cli/model"
+      },
+      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
       },
@@ -133,10 +137,6 @@
       {
         "label": "File System",
         "slug": "docs/tools/file-system"
-      },
-      {
-        "label": "Multi-File Read",
-        "slug": "docs/tools/multi-file"
       },
       {
         "label": "Shell",

@@ -594,6 +594,34 @@ describe('extension tests', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should not load github extensions if blockGitExtensions is set', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://somehost.com/foo/bar',
+        },
+      });
+
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === 'my-ext');
+
+      expect(extension).toBeUndefined();
+    });
+
     describe('id generation', () => {
       it('should generate id from source for non-github git urls', async () => {
         createExtension({
@@ -874,6 +902,30 @@ describe('extension tests', () => {
         type: 'link',
       });
       fs.rmSync(targetExtDir, { recursive: true, force: true });
+    });
+
+    it('should not install a github extension if blockGitExtensions is set', async () => {
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      await extensionManager.loadExtensions();
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: gitUrl,
+          type: 'git',
+        }),
+      ).rejects.toThrow(
+        'Installing extensions from remote sources is disallowed by your current settings.',
+      );
     });
 
     it('should prompt for trust if workspace is not trusted', async () => {
@@ -1555,6 +1607,34 @@ This extension will run the following MCP servers:
       expect(fs.existsSync(otherExtDir)).toBe(true);
     });
 
+    it('should uninstall an extension on non-matching extension directory name', async () => {
+      // Create an extension with a name that differs from the directory name.
+      const sourceExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'My-Local-Extension',
+        version: '1.0.0',
+      });
+      const newSourceExtDir = path.join(
+        userExtensionsDir,
+        'my-local-extension',
+      );
+      fs.renameSync(sourceExtDir, newSourceExtDir);
+
+      const otherExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'other-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.uninstallExtension('my-local-extension', false);
+
+      expect(fs.existsSync(sourceExtDir)).toBe(false);
+      expect(fs.existsSync(newSourceExtDir)).toBe(false);
+      expect(extensionManager.getExtensions()).toHaveLength(1);
+      expect(fs.existsSync(otherExtDir)).toBe(true);
+    });
+
     it('should throw an error if the extension does not exist', async () => {
       await extensionManager.loadExtensions();
       await expect(
@@ -1666,7 +1746,10 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('my-extension', SettingScope.User);
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.User,
+      );
       expect(
         isEnabled({
           name: 'my-extension',
@@ -1683,7 +1766,10 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('my-extension', SettingScope.Workspace);
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.Workspace,
+      );
       expect(
         isEnabled({
           name: 'my-extension',
@@ -1706,8 +1792,14 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('my-extension', SettingScope.User);
-      extensionManager.disableExtension('my-extension', SettingScope.User);
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.User,
+      );
+      await extensionManager.disableExtension(
+        'my-extension',
+        SettingScope.User,
+      );
       expect(
         isEnabled({
           name: 'my-extension',
@@ -1738,7 +1830,7 @@ This extension will run the following MCP servers:
       });
 
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.disableExtension('ext1', SettingScope.Workspace);
 
       expect(mockLogExtensionDisable).toHaveBeenCalled();
       expect(ExtensionDisableEvent).toHaveBeenCalledWith(
@@ -1766,7 +1858,7 @@ This extension will run the following MCP servers:
         version: '1.0.0',
       });
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.User);
+      await extensionManager.disableExtension('ext1', SettingScope.User);
       let activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(0);
 
@@ -1783,7 +1875,7 @@ This extension will run the following MCP servers:
         version: '1.0.0',
       });
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.disableExtension('ext1', SettingScope.Workspace);
       let activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(0);
 
@@ -1804,8 +1896,8 @@ This extension will run the following MCP servers:
         },
       });
       await extensionManager.loadExtensions();
-      extensionManager.disableExtension('ext1', SettingScope.Workspace);
-      extensionManager.enableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.disableExtension('ext1', SettingScope.Workspace);
+      await extensionManager.enableExtension('ext1', SettingScope.Workspace);
 
       expect(mockLogExtensionEnable).toHaveBeenCalled();
       expect(ExtensionEnableEvent).toHaveBeenCalledWith(

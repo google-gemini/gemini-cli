@@ -53,7 +53,6 @@ export const DialogManager = ({
   if (uiState.proQuotaRequest) {
     return (
       <ProQuotaDialog
-        failedModel={uiState.proQuotaRequest.failedModel}
         fallbackModel={uiState.proQuotaRequest.fallbackModel}
         onChoice={uiActions.handleProQuotaChoice}
       />
@@ -206,6 +205,7 @@ export const DialogManager = ({
       <PermissionsModifyTrustDialog
         onExit={uiActions.closePermissionsDialog}
         addItem={addItem}
+        targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
       />
     );
   }

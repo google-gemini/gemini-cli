@@ -14,16 +14,15 @@ import { Kind, BaseDeclarativeTool, BaseToolInvocation } from './tools.js';
 import type { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { connectAndDiscover } from './mcp-client.js';
-import { McpClientManager } from './mcp-client-manager.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import type { EventEmitter } from 'node:events';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+
+export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
 
 type ToolParams = Record<string, unknown>;
 
@@ -33,10 +32,12 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
-    private readonly toolName: string,
+    private readonly originalToolName: string,
+    prefixedToolName: string,
     params: ToolParams,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus, prefixedToolName);
   }
 
   getDescription(): string {
@@ -48,7 +49,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
-    const child = spawn(callCommand, [this.toolName]);
+    const child = spawn(callCommand, [this.originalToolName]);
     child.stdin.write(JSON.stringify(this.params));
     child.stdin.end();
 
@@ -127,18 +128,24 @@ export class DiscoveredTool extends BaseDeclarativeTool<
   ToolParams,
   ToolResult
 > {
+  private readonly originalName: string;
+
   constructor(
     private readonly config: Config,
-    name: string,
-    override readonly description: string,
+    originalName: string,
+    prefixedName: string,
+    description: string,
     override readonly parameterSchema: Record<string, unknown>,
+    messageBus?: MessageBus,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
-    description += `
+    const fullDescription =
+      description +
+      `
 
 This tool was discovered from the project by executing the command \`${discoveryCmd}\` on project root.
-When called, this tool will execute the command \`${callCommand} ${name}\` on project root.
+When called, this tool will execute the command \`${callCommand} ${originalName}\` on project root.
 Tool discovery and call commands can be configured in project or user settings.
 
 When called, the tool call command is executed as a subprocess.
@@ -152,14 +159,16 @@ Exit Code: Exit code or \`(none)\` if terminated by signal.
 Signal: Signal number or \`(none)\` if no signal was received.
 `;
     super(
-      name,
-      name,
-      description,
+      prefixedName,
+      prefixedName,
+      fullDescription,
       Kind.Other,
       parameterSchema,
       false, // isOutputMarkdown
       false, // canUpdateOutput
+      messageBus,
     );
+    this.originalName = originalName;
   }
 
   protected createInvocation(
@@ -168,20 +177,26 @@ Signal: Signal number or \`(none)\` if no signal was received.
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
-    return new DiscoveredToolInvocation(this.config, this.name, params);
+    return new DiscoveredToolInvocation(
+      this.config,
+      this.originalName,
+      this.name,
+      params,
+      _messageBus,
+    );
   }
 }
 
 export class ToolRegistry {
   // The tools keyed by tool name as seen by the LLM.
-  private tools: Map<string, AnyDeclarativeTool> = new Map();
+  // This includes tools which are currently not active, use `getActiveTools`
+  // and `isActive` to get only the active tools.
+  private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
-  private mcpClientManager: McpClientManager;
   private messageBus?: MessageBus;
 
-  constructor(config: Config, eventEmitter?: EventEmitter) {
+  constructor(config: Config) {
     this.config = config;
-    this.mcpClientManager = new McpClientManager(this, config, eventEmitter);
   }
 
   setMessageBus(messageBus: MessageBus): void {
@@ -194,10 +209,14 @@ export class ToolRegistry {
 
   /**
    * Registers a tool definition.
+   *
+   * Note that excluded tools are still registered to allow for enabling them
+   * later in the session.
+   *
    * @param tool - The tool object containing schema and execution logic.
    */
   registerTool(tool: AnyDeclarativeTool): void {
-    if (this.tools.has(tool.name)) {
+    if (this.allKnownTools.has(tool.name)) {
       if (tool instanceof DiscoveredMCPTool) {
         tool = tool.asFullyQualifiedTool();
       } else {
@@ -207,13 +226,50 @@ export class ToolRegistry {
         );
       }
     }
-    this.tools.set(tool.name, tool);
+    this.allKnownTools.set(tool.name, tool);
+  }
+
+  /**
+   * Sorts tools as:
+   * 1. Built in tools.
+   * 2. Discovered tools.
+   * 3. MCP tools ordered by server name.
+   *
+   * This is a stable sort in that tries preserve existing order.
+   */
+  sortTools(): void {
+    const getPriority = (tool: AnyDeclarativeTool): number => {
+      if (tool instanceof DiscoveredMCPTool) return 2;
+      if (tool instanceof DiscoveredTool) return 1;
+      return 0; // Built-in
+    };
+
+    this.allKnownTools = new Map(
+      Array.from(this.allKnownTools.entries()).sort((a, b) => {
+        const toolA = a[1];
+        const toolB = b[1];
+        const priorityA = getPriority(toolA);
+        const priorityB = getPriority(toolB);
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+
+        if (priorityA === 2) {
+          const serverA = (toolA as DiscoveredMCPTool).serverName;
+          const serverB = (toolB as DiscoveredMCPTool).serverName;
+          return serverA.localeCompare(serverB);
+        }
+
+        return 0;
+      }),
+    );
   }
 
   private removeDiscoveredTools(): void {
-    for (const tool of this.tools.values()) {
+    for (const tool of this.allKnownTools.values()) {
       if (tool instanceof DiscoveredTool || tool instanceof DiscoveredMCPTool) {
-        this.tools.delete(tool.name);
+        this.allKnownTools.delete(tool.name);
       }
     }
   }
@@ -223,9 +279,9 @@ export class ToolRegistry {
    * @param serverName The name of the server to remove tools from.
    */
   removeMcpToolsByServer(serverName: string): void {
-    for (const [name, tool] of this.tools.entries()) {
+    for (const [name, tool] of this.allKnownTools.entries()) {
       if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
-        this.tools.delete(name);
+        this.allKnownTools.delete(name);
       }
     }
   }
@@ -238,64 +294,7 @@ export class ToolRegistry {
   async discoverAllTools(): Promise<void> {
     // remove any previously discovered tools
     this.removeDiscoveredTools();
-
-    this.config.getPromptRegistry().clear();
-
     await this.discoverAndRegisterToolsFromCommand();
-
-    // discover tools using MCP servers, if configured
-    await this.mcpClientManager.discoverAllMcpTools();
-  }
-
-  /**
-   * Discovers tools from project (if available and configured).
-   * Can be called multiple times to update discovered tools.
-   * This will NOT discover tools from the command line, only from MCP servers.
-   */
-  async discoverMcpTools(): Promise<void> {
-    // remove any previously discovered tools
-    this.removeDiscoveredTools();
-
-    this.config.getPromptRegistry().clear();
-
-    // discover tools using MCP servers, if configured
-    await this.mcpClientManager.discoverAllMcpTools();
-  }
-
-  /**
-   * Restarts all MCP servers and re-discovers tools.
-   */
-  async restartMcpServers(): Promise<void> {
-    await this.discoverMcpTools();
-  }
-
-  /**
-   * Discover or re-discover tools for a single MCP server.
-   * @param serverName - The name of the server to discover tools from.
-   */
-  async discoverToolsForServer(serverName: string): Promise<void> {
-    // Remove any previously discovered tools from this server
-    for (const [name, tool] of this.tools.entries()) {
-      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
-        this.tools.delete(name);
-      }
-    }
-
-    this.config.getPromptRegistry().removePromptsByServer(serverName);
-
-    const mcpServers = this.config.getMcpServers() ?? {};
-    const serverConfig = mcpServers[serverName];
-    if (serverConfig) {
-      await connectAndDiscover(
-        serverName,
-        serverConfig,
-        this,
-        this.config.getPromptRegistry(),
-        this.config.getDebugMode(),
-        this.config.getWorkspaceContext(),
-        this.config,
-      );
-    }
   }
 
   private async discoverAndRegisterToolsFromCommand(): Promise<void> {
@@ -410,8 +409,10 @@ export class ToolRegistry {
           new DiscoveredTool(
             this.config,
             func.name,
+            DISCOVERED_TOOL_PREFIX + func.name,
             func.description ?? '',
             parameters as Record<string, unknown>,
+            this.messageBus,
           ),
         );
       }
@@ -422,6 +423,45 @@ export class ToolRegistry {
   }
 
   /**
+   * @returns All the tools that are not excluded.
+   */
+  private getActiveTools(): AnyDeclarativeTool[] {
+    const excludedTools = this.config.getExcludeTools() ?? new Set([]);
+    const activeTools: AnyDeclarativeTool[] = [];
+    for (const tool of this.allKnownTools.values()) {
+      if (this.isActiveTool(tool, excludedTools)) {
+        activeTools.push(tool);
+      }
+    }
+    return activeTools;
+  }
+
+  /**
+   * @param tool
+   * @param excludeTools (optional, helps performance for repeated calls)
+   * @returns Whether or not the `tool` is not excluded.
+   */
+  private isActiveTool(
+    tool: AnyDeclarativeTool,
+    excludeTools?: Set<string>,
+  ): boolean {
+    excludeTools ??= this.config.getExcludeTools() ?? new Set([]);
+    const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
+    const possibleNames = [tool.name, normalizedClassName];
+    if (tool instanceof DiscoveredMCPTool) {
+      // Check both the unqualified and qualified name for MCP tools.
+      if (tool.name.startsWith(tool.getFullyQualifiedPrefix())) {
+        possibleNames.push(
+          tool.name.substring(tool.getFullyQualifiedPrefix().length),
+        );
+      } else {
+        possibleNames.push(`${tool.getFullyQualifiedPrefix()}${tool.name}`);
+      }
+    }
+    return !possibleNames.some((name) => excludeTools.has(name));
+  }
+
+  /**
    * Retrieves the list of tool schemas (FunctionDeclaration array).
    * Extracts the declarations from the ToolListUnion structure.
    * Includes discovered (vs registered) tools if configured.
@@ -429,7 +469,7 @@ export class ToolRegistry {
    */
   getFunctionDeclarations(): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
-    this.tools.forEach((tool) => {
+    this.getActiveTools().forEach((tool) => {
       declarations.push(tool.schema);
     });
     return declarations;
@@ -443,8 +483,8 @@ export class ToolRegistry {
   getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     for (const name of toolNames) {
-      const tool = this.tools.get(name);
-      if (tool) {
+      const tool = this.allKnownTools.get(name);
+      if (tool && this.isActiveTool(tool)) {
         declarations.push(tool.schema);
       }
     }
@@ -452,17 +492,18 @@ export class ToolRegistry {
   }
 
   /**
-   * Returns an array of all registered and discovered tool names.
+   * Returns an array of all registered and discovered tool names which are not
+   * excluded via configuration.
    */
   getAllToolNames(): string[] {
-    return Array.from(this.tools.keys());
+    return this.getActiveTools().map((tool) => tool.name);
   }
 
   /**
    * Returns an array of all registered and discovered tool instances.
    */
   getAllTools(): AnyDeclarativeTool[] {
-    return Array.from(this.tools.values()).sort((a, b) =>
+    return this.getActiveTools().sort((a, b) =>
       a.displayName.localeCompare(b.displayName),
     );
   }
@@ -472,7 +513,7 @@ export class ToolRegistry {
    */
   getToolsByServer(serverName: string): AnyDeclarativeTool[] {
     const serverTools: AnyDeclarativeTool[] = [];
-    for (const tool of this.tools.values()) {
+    for (const tool of this.getActiveTools()) {
       if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
         serverTools.push(tool);
       }
@@ -484,6 +525,10 @@ export class ToolRegistry {
    * Get the definition of a specific tool.
    */
   getTool(name: string): AnyDeclarativeTool | undefined {
-    return this.tools.get(name);
+    const tool = this.allKnownTools.get(name);
+    if (tool && this.isActiveTool(tool)) {
+      return tool;
+    }
+    return;
   }
 }

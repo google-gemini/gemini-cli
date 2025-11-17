@@ -559,94 +559,52 @@ describe('InputPrompt', () => {
     });
   });
 
-  it('should complete a partial parent command', async () => {
-    // SCENARIO: /mem -> Tab
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
+  it.each([
+    {
+      name: 'should complete a partial parent command',
+      bufferText: '/mem',
       suggestions: [{ label: 'memory', value: 'memory', description: '...' }],
-      activeSuggestionIndex: 0,
-    });
-    props.buffer.setText('/mem');
-
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-
-    await act(async () => {
-      stdin.write('\t'); // Press Tab
-    });
-    await waitFor(() =>
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
-    );
-    unmount();
-  });
-
-  it('should append a sub-command when the parent command is already complete', async () => {
-    // SCENARIO: /memory -> Tab (to accept 'add')
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
+      activeIndex: 0,
+    },
+    {
+      name: 'should append a sub-command when parent command is complete',
+      bufferText: '/memory ',
       suggestions: [
         { label: 'show', value: 'show' },
         { label: 'add', value: 'add' },
       ],
-      activeSuggestionIndex: 1, // 'add' is highlighted
-    });
-    props.buffer.setText('/memory ');
-
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-
-    await act(async () => {
-      stdin.write('\t'); // Press Tab
-    });
-    await waitFor(() =>
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(1),
-    );
-    unmount();
-  });
-
-  it('should handle the "backspace" edge case correctly', async () => {
-    // SCENARIO: /memory -> Backspace -> /memory -> Tab (to accept 'show')
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
+      activeIndex: 1,
+    },
+    {
+      name: 'should handle the backspace edge case correctly',
+      bufferText: '/memory',
       suggestions: [
         { label: 'show', value: 'show' },
         { label: 'add', value: 'add' },
       ],
-      activeSuggestionIndex: 0, // 'show' is highlighted
-    });
-    // The user has backspaced, so the query is now just '/memory'
-    props.buffer.setText('/memory');
-
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
-
-    await act(async () => {
-      stdin.write('\t'); // Press Tab
-    });
-    await waitFor(() =>
-      // It should NOT become '/show'. It should correctly become '/memory show'.
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
-    );
-    unmount();
-  });
-
-  it('should complete a partial argument for a command', async () => {
-    // SCENARIO: /chat resume fi- -> Tab
-    mockedUseCommandCompletion.mockReturnValue({
-      ...mockCommandCompletion,
-      showSuggestions: true,
+      activeIndex: 0,
+    },
+    {
+      name: 'should complete a partial argument for a command',
+      bufferText: '/chat resume fi-',
       suggestions: [{ label: 'fix-foo', value: 'fix-foo' }],
-      activeSuggestionIndex: 0,
+      activeIndex: 0,
+    },
+  ])('$name', async ({ bufferText, suggestions, activeIndex }) => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions,
+      activeSuggestionIndex: activeIndex,
     });
-    props.buffer.setText('/chat resume fi-');
-
+    props.buffer.setText(bufferText);
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
-    await act(async () => {
-      stdin.write('\t'); // Press Tab
-    });
+    await act(async () => stdin.write('\t'));
     await waitFor(() =>
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0),
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(
+        activeIndex,
+      ),
     );
     unmount();
   });
@@ -937,51 +895,36 @@ describe('InputPrompt', () => {
   });
 
   describe('vim mode', () => {
-    it('should not call buffer.handleInput when vim mode is enabled and vim handles the input', async () => {
-      props.vimHandleInput = vi.fn().mockReturnValue(true); // Mock that vim handled it.
+    it.each([
+      {
+        name: 'should not call buffer.handleInput when vim handles input',
+        vimHandled: true,
+        expectBufferHandleInput: false,
+      },
+      {
+        name: 'should call buffer.handleInput when vim does not handle input',
+        vimHandled: false,
+        expectBufferHandleInput: true,
+      },
+      {
+        name: 'should call handleInput when vim mode is disabled',
+        vimHandled: false,
+        expectBufferHandleInput: true,
+      },
+    ])('$name', async ({ vimHandled, expectBufferHandleInput }) => {
+      props.vimHandleInput = vi.fn().mockReturnValue(vimHandled);
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
 
-      await act(async () => {
-        stdin.write('i');
-      });
+      await act(async () => stdin.write('i'));
       await waitFor(() => {
         expect(props.vimHandleInput).toHaveBeenCalled();
-      });
-      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
-      unmount();
-    });
-
-    it('should call buffer.handleInput when vim mode is enabled but vim does not handle the input', async () => {
-      props.vimHandleInput = vi.fn().mockReturnValue(false); // Mock that vim did NOT handle it.
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('i');
-      });
-      await waitFor(() => {
-        expect(props.vimHandleInput).toHaveBeenCalled();
-        expect(mockBuffer.handleInput).toHaveBeenCalled();
-      });
-      unmount();
-    });
-
-    it('should call handleInput when vim mode is disabled', async () => {
-      // Mock vimHandleInput to return false (vim didn't handle the input)
-      props.vimHandleInput = vi.fn().mockReturnValue(false);
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('i');
-      });
-      await waitFor(() => {
-        expect(props.vimHandleInput).toHaveBeenCalled();
-        expect(mockBuffer.handleInput).toHaveBeenCalled();
+        if (expectBufferHandleInput) {
+          expect(mockBuffer.handleInput).toHaveBeenCalled();
+        } else {
+          expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+        }
       });
       unmount();
     });
@@ -1354,7 +1297,6 @@ describe('InputPrompt', () => {
 
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
-          { kittyProtocolEnabled: true },
         );
         await act(async () => {
           await vi.runAllTimersAsync();
@@ -1409,6 +1351,9 @@ describe('InputPrompt', () => {
   });
 
   describe('enhanced input UX - double ESC clear functionality', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
     it('should clear buffer on second ESC press', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
@@ -1416,22 +1361,40 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
         stdin.write('\x1B');
-        await waitFor(() => {
-          expect(onEscapePromptChange).toHaveBeenCalledWith(false);
-        });
+        vi.advanceTimersByTime(100);
+
+        expect(onEscapePromptChange).toHaveBeenCalledWith(false);
       });
 
       await act(async () => {
         stdin.write('\x1B');
-        await waitFor(() => {
-          expect(props.buffer.setText).toHaveBeenCalledWith('');
-          expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
-        });
+        vi.advanceTimersByTime(100);
+
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should clear buffer on double ESC', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('text to clear');
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B\x1B');
+        vi.advanceTimersByTime(100);
+
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
       });
       unmount();
     });
@@ -1443,7 +1406,6 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1467,14 +1429,13 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
         stdin.write('\x1B');
-        await waitFor(() =>
-          expect(props.setShellModeActive).toHaveBeenCalledWith(false),
-        );
+        vi.advanceTimersByTime(100);
+
+        expect(props.setShellModeActive).toHaveBeenCalledWith(false);
       });
       unmount();
     });
@@ -1488,26 +1449,23 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
         stdin.write('\x1B');
+
+        vi.advanceTimersByTime(100);
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
       });
-      await waitFor(() =>
-        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled(),
-      );
       unmount();
     });
 
     it('should not call onEscapePromptChange when not provided', async () => {
-      vi.useFakeTimers();
       props.onEscapePromptChange = undefined;
       props.buffer.setText('some text');
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
       await act(async () => {
         await vi.runAllTimersAsync();
@@ -1520,14 +1478,12 @@ describe('InputPrompt', () => {
         await vi.runAllTimersAsync();
       });
 
-      vi.useRealTimers();
       unmount();
     });
 
     it('should not interfere with existing keyboard shortcuts', async () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
-        { kittyProtocolEnabled: false },
       );
 
       await act(async () => {
@@ -1592,18 +1548,13 @@ describe('InputPrompt', () => {
     });
 
     it.each([
-      { name: 'standard', kittyProtocolEnabled: false, escapeSequence: '\x1B' },
-      {
-        name: 'kitty',
-        kittyProtocolEnabled: true,
-        escapeSequence: '\u001b[27u',
-      },
+      { name: 'standard', escapeSequence: '\x1B' },
+      { name: 'kitty', escapeSequence: '\u001b[27u' },
     ])(
       'resets reverse search state on Escape ($name)',
-      async ({ kittyProtocolEnabled, escapeSequence }) => {
+      async ({ escapeSequence }) => {
         const { stdin, stdout, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
-          { kittyProtocolEnabled },
         );
 
         await act(async () => {
@@ -2226,8 +2177,6 @@ describe('InputPrompt', () => {
       );
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
-        // This snapshot is good to make sure there was an input prompt but does
-        // not show the inverted cursor because snapshots do not show colors.
         expect(stdout.lastFrame()).toMatchSnapshot();
       });
       unmount();
