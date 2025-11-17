@@ -47,6 +47,12 @@ vi.mock('../utils/events.js', () => ({
 describe('mcp-client', () => {
   let workspaceContext: WorkspaceContext;
   let testWorkspace: string;
+  const mockConfig = {
+    getAutoConfirmMcpSampling: () => false,
+    getGeminiClient: () => ({
+      generateContent: vi.fn(),
+    }),
+  } as unknown as Config;
 
   beforeEach(() => {
     // create a tmp dir for this test
@@ -75,9 +81,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        close: vi.fn(),
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () => ({
           functionDeclarations: [
@@ -101,6 +107,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         workspaceContext,
         false,
+        mockConfig,
       );
       await client.connect();
       await client.discover({} as Config);
@@ -124,9 +131,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        close: vi.fn(),
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -166,6 +173,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         workspaceContext,
         false,
+        mockConfig,
       );
       await client.connect();
       await client.discover({} as Config);
@@ -188,9 +196,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        close: vi.fn(),
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () => Promise.resolve({ functionDeclarations: [] }),
       } as unknown as GenAiLib.CallableTool);
@@ -207,6 +215,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         workspaceContext,
         false,
+        mockConfig,
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
@@ -233,9 +242,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        close: vi.fn(),
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
@@ -251,6 +260,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         workspaceContext,
         false,
+        mockConfig,
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
@@ -273,9 +283,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        close: vi.fn(),
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -301,6 +311,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         workspaceContext,
         false,
+        mockConfig,
       );
       await client.connect();
       await client.discover({} as Config);
@@ -325,9 +336,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        close: vi.fn(),
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
@@ -360,6 +371,7 @@ describe('mcp-client', () => {
         mockedPromptRegistry,
         workspaceContext,
         false,
+        mockConfig,
       );
       await client.connect();
       await client.discover({} as Config);
@@ -639,6 +651,12 @@ describe('connectToMcpServer with OAuth', () => {
   let testWorkspace: string;
   let mockAuthProvider: MCPOAuthProvider;
   let mockTokenStorage: MCPOAuthTokenStorage;
+  const mockConfig = {
+    getAutoConfirmMcpSampling: () => false,
+    getGeminiClient: () => ({
+      generateContent: vi.fn(),
+    }),
+  } as unknown as Config;
 
   beforeEach(() => {
     mockedClient = {
@@ -702,14 +720,16 @@ describe('connectToMcpServer with OAuth', () => {
       },
     );
 
-    const client = await connectToMcpServer(
+    const { client, transport } = await connectToMcpServer(
       'test-server',
       { httpUrl: serverUrl },
       false,
       workspaceContext,
+      mockConfig,
     );
 
     expect(client).toBe(mockedClient);
+    expect(transport).toBeDefined();
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
 
@@ -746,14 +766,16 @@ describe('connectToMcpServer with OAuth', () => {
       },
     );
 
-    const client = await connectToMcpServer(
+    const { client, transport } = await connectToMcpServer(
       'test-server',
       { httpUrl: serverUrl },
       false,
       workspaceContext,
+      mockConfig,
     );
 
     expect(client).toBe(mockedClient);
+    expect(transport).toBeDefined();
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
     expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
