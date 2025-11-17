@@ -217,11 +217,14 @@ export class PlaygroundEngine {
       throw new Error(`Invalid hint index: ${hintIndex}`);
     }
 
-    const progress = this.progress.get(challengeId);
-    if (progress) {
-      progress.hintsUsed = Math.max(progress.hintsUsed, hintIndex + 1);
-      this.saveState();
+    // Ensure progress exists before tracking hint usage
+    if (!this.progress.has(challengeId)) {
+      this.startChallenge(challengeId);
     }
+
+    const progress = this.progress.get(challengeId)!;
+    progress.hintsUsed = Math.max(progress.hintsUsed, hintIndex + 1);
+    this.saveState();
 
     return challenge.hints[hintIndex];
   }
@@ -230,11 +233,14 @@ export class PlaygroundEngine {
     const challenge = this.getChallenge(challengeId);
     if (!challenge) throw new Error(`Challenge not found: ${challengeId}`);
 
-    const progress = this.progress.get(challengeId);
-    if (progress) {
-      progress.solutionViewed = true;
-      this.saveState();
+    // Ensure progress exists before marking solution as viewed
+    if (!this.progress.has(challengeId)) {
+      this.startChallenge(challengeId);
     }
+
+    const progress = this.progress.get(challengeId)!;
+    progress.solutionViewed = true;
+    this.saveState();
 
     return {
       solution: challenge.solution,
