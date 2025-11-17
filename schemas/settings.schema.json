@@ -507,6 +507,23 @@
       },
       "additionalProperties": false
     },
+    "safety": {
+      "title": "Safety",
+      "description": "Safety settings.",
+      "markdownDescription": "Safety settings.\n\n- Category: `Safety`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enableConseca": {
+          "title": "Enable Conseca",
+          "description": "Enable the Conseca in-process safety checker.",
+          "markdownDescription": "Enable the Conseca in-process safety checker.\n\n- Category: `Safety`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "telemetry": {
       "title": "Telemetry",
       "description": "Telemetry configuration.",

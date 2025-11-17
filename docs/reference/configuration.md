@@ -351,6 +351,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+#### `safety`
+
+- **`safety.enableConseca`** (boolean):
+  - **Description:** Enable the Conseca in-process safety checker.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `model`
 
 - **`model.name`** (string):
