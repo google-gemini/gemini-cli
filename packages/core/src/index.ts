@@ -151,3 +151,12 @@ export * from './suggestions/index.js';
 
 // Export explain mode
 export * from './explain/index.js';
+
+// Export tutorials
+export * from './tutorials/index.js';
+
+// Export workflows
+export * from './workflows/index.js';
+
+// Export learning path
+export * from './learning-path/index.js';
