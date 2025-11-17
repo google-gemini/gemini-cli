@@ -76,6 +76,7 @@ export class ConsecaSafetyChecker implements InProcessChecker {
       result = {
         decision: SafetyCheckDecision.ALLOW, // Fallback if no policy generated yet
         reason: 'No security policy generated.',
+        error: 'No security policy generated.',
       };
     } else {
       result = await enforcePolicy(
@@ -93,6 +94,7 @@ export class ConsecaSafetyChecker implements InProcessChecker {
         JSON.stringify(input.toolCall),
         result.decision,
         result.reason || '',
+        'error' in result ? result.error : undefined,
       ),
     );
 

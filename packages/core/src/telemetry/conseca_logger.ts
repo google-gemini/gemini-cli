@@ -91,9 +91,17 @@ export function logConsecaVerdict(
       },
       {
         gemini_cli_key: EventMetadataKey.CONSECA_VERDICT_RATIONALE,
-        value: safeJsonStringify(event.verdict_rationale),
+        value: event.verdict_rationale,
       },
     ];
+
+    if (event.error) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.CONSECA_ERROR,
+        value: event.error,
+      });
+    }
+
     clearcutLogger.enqueueLogEvent(
       clearcutLogger.createLogEvent(EventNames.CONSECA_VERDICT, data),
     );

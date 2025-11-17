@@ -934,6 +934,7 @@ export class ConsecaVerdictEvent implements BaseTelemetryEvent {
   tool_call: string;
   verdict: string;
   verdict_rationale: string;
+  error?: string;
 
   constructor(
     user_prompt: string,
@@ -941,6 +942,7 @@ export class ConsecaVerdictEvent implements BaseTelemetryEvent {
     tool_call: string,
     verdict: string,
     verdict_rationale: string,
+    error?: string,
   ) {
     this['event.name'] = 'conseca_verdict';
     this['event.timestamp'] = new Date().toISOString();
@@ -949,10 +951,11 @@ export class ConsecaVerdictEvent implements BaseTelemetryEvent {
     this.tool_call = tool_call;
     this.verdict = verdict;
     this.verdict_rationale = verdict_rationale;
+    this.error = error;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
+    const attributes: LogAttributes = {
       ...getCommonAttributes(config),
       'event.name': EVENT_CONSECA_VERDICT,
       'event.timestamp': this['event.timestamp'],
@@ -962,6 +965,12 @@ export class ConsecaVerdictEvent implements BaseTelemetryEvent {
       verdict: this.verdict,
       verdict_rationale: this.verdict_rationale,
     };
+
+    if (this.error) {
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
   }
 
   toLogBody(): string {
