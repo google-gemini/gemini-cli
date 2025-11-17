@@ -523,4 +523,7 @@ export enum EventMetadataKey {
 
   // Logs the user prompt for Conseca events.
   CONSECA_USER_PROMPT = 136,
+
+  // Logs the error message for Conseca events.
+  CONSECA_ERROR = 137,
 }

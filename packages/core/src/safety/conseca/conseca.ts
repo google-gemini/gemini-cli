@@ -11,6 +11,8 @@ import { SafetyCheckDecision } from '../protocol.js';
 import {
   logConsecaPolicyGeneration,
   ConsecaPolicyGenerationEvent,
+  logConsecaVerdict,
+  ConsecaVerdictEvent,
 } from '../../telemetry/index.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
@@ -68,16 +70,33 @@ export class ConsecaSafetyChecker implements InProcessChecker {
       );
     }
 
+    let result: SafetyCheckResult;
+
     if (!this.currentPolicy) {
-      if (!this.currentPolicy) {
-        return {
-          decision: SafetyCheckDecision.ALLOW, // Fallback if no policy generated yet?
-          reason: 'No security policy generated.',
-        };
-      }
+      result = {
+        decision: SafetyCheckDecision.ALLOW, // Fallback if no policy generated yet
+        reason: 'No security policy generated.',
+      };
+    } else {
+      result = await enforcePolicy(
+        this.currentPolicy,
+        input.toolCall,
+        this.config,
+      );
     }
 
-    return enforcePolicy(this.currentPolicy, input.toolCall, this.config);
+    logConsecaVerdict(
+      this.config,
+      new ConsecaVerdictEvent(
+        userPrompt || '',
+        JSON.stringify(this.currentPolicy || {}),
+        JSON.stringify(input.toolCall),
+        result.decision,
+        result.reason || '',
+      ),
+    );
+
+    return result;
   }
 
   async getPolicy(
@@ -89,7 +108,11 @@ export class ConsecaSafetyChecker implements InProcessChecker {
       return this.currentPolicy;
     }
 
-    const policy = await generatePolicy(userPrompt, trustedContent, config);
+    const { policy, error } = await generatePolicy(
+      userPrompt,
+      trustedContent,
+      config,
+    );
     this.currentPolicy = policy;
     this.activeUserPrompt = userPrompt;
 
@@ -99,6 +122,7 @@ export class ConsecaSafetyChecker implements InProcessChecker {
         userPrompt,
         trustedContent,
         JSON.stringify(policy),
+        error,
       ),
     );
 
