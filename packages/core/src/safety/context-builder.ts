@@ -21,7 +21,9 @@ export class ContextBuilder {
    * Builds the full context object with all available data.
    */
   buildFullContext(): SafetyCheckInput['context'] {
-    debugLogger.debug(`[ContextBuilder] buildFullContext called. History is: ${JSON.stringify(this.conversationHistory)}`);
+    debugLogger.debug(
+      `[ContextBuilder] buildFullContext called. History is: ${JSON.stringify(this.conversationHistory)}`,
+    );
     //TODO: Conversation history is does not contain the user prompt. We need to add it.
     const history = [...this.conversationHistory];
     const currentQuestion = this.config.getQuestion();
