@@ -1309,6 +1309,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
         setWarningBannerText(warningBanner);
         setBannerVisible(true);
         refreshStatic();
+        const authType = config.getContentGeneratorConfig()?.authType;
+        if (
+          authType === AuthType.USE_GEMINI ||
+          authType === AuthType.USE_VERTEX_AI
+        ) {
+          setDefaultBannerText(
+            'Gemini 3 is now available.\nTo use Gemini 3, enable "Preview features" in /settings\nLearn more at https://goo.gle/enable-preview-features',
+          );
+        }
       }
     };
     fetchBannerTexts();
