@@ -109,7 +109,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
     this.auth_type = generatorConfig?.authType;
-    this.gh_workflow_name = config.getGhWorkflowName();
+    this.gh_workflow_name = process.env['GH_WORKFLOW_NAME'];
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()

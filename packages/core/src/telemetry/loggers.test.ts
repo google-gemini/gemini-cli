@@ -212,8 +212,9 @@ describe('loggers', () => {
           }),
         }),
         isInteractive: () => false,
-        getGhWorkflowName: () => 'test-workflow',
       } as unknown as Config;
+
+      vi.stubEnv('GH_WORKFLOW_NAME', 'test-workflow');
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
       logCliConfiguration(mockConfig, startSessionEvent);
