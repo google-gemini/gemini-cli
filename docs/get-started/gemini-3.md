@@ -30,7 +30,7 @@ standard, and free tier users.
 
 Note: Whether you’re automatically granted access or accepted from the waitlist,
 you’ll still need to enable Gemini 3 Pro
-[using the `/settings` command](../cli/settings).
+[using the `/settings` command](../cli/settings.md).
 
 ## How to join the waitlist
 
@@ -58,7 +58,7 @@ access–you still need to enable Gemini 3 Pro within Gemini CLI.
 To enable Gemini 3 Pro, use the `/settings` command in Gemini CLI and set
 **Preview Features** to `true`.
 
-For more information, see [Gemini CLI Settings](../cli/settings).
+For more information, see [Gemini CLI Settings](../cli/settings.md).
 
 ### Usage limits and fallback
 
