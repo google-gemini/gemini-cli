@@ -20,8 +20,10 @@ import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
-  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
   getEffectiveModel,
+  isGemini2Model,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
@@ -68,6 +70,8 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
   maxAttempts: 2, // 1 initial call + 1 retry
   initialDelayMs: 500,
 };
+
+export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -243,6 +247,11 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
+    // Preview Model Bypass mode for the new request.
+    // This ensures that we attempt to use Preview Model for every new user turn
+    // (unless the "Always" fallback mode is active, which is handled separately).
+    this.config.setPreviewModelBypassMode(false);
+
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -275,11 +284,17 @@ export class GeminiChat {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
 
-        for (
-          let attempt = 0;
-          attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
-          attempt++
+        let maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
+        // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
+        // when probing the Preview Model.
+        if (
+          self.config.isPreviewModelFallbackMode() &&
+          model === PREVIEW_GEMINI_MODEL
         ) {
+          maxAttempts = 1;
+        }
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
           try {
             if (attempt > 0) {
               yield { type: StreamEventType.RETRY };
@@ -311,9 +326,9 @@ export class GeminiChat {
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
 
-            if (isContentError) {
+            if (isContentError && isGemini2Model(model)) {
               // Check if we have more attempts left.
-              if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
+              if (attempt < maxAttempts - 1) {
                 logContentRetry(
                   self.config,
                   new ContentRetryEvent(
@@ -338,17 +353,29 @@ export class GeminiChat {
         }
 
         if (lastError) {
-          if (lastError instanceof InvalidStreamError) {
+          if (
+            lastError instanceof InvalidStreamError &&
+            isGemini2Model(model)
+          ) {
             logContentRetryFailure(
               self.config,
               new ContentRetryFailureEvent(
-                INVALID_CONTENT_RETRY_OPTIONS.maxAttempts,
+                maxAttempts,
                 (lastError as InvalidStreamError).type,
                 model,
               ),
             );
           }
           throw lastError;
+        } else {
+          // Preview Model successfully used, disable fallback mode.
+          // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
+          if (
+            model === PREVIEW_GEMINI_MODEL &&
+            !self.config.isPreviewModelBypassMode()
+          ) {
+            self.config.setPreviewModelFallbackMode(false);
+          }
         }
       } finally {
         streamDoneResolver!();
@@ -362,25 +389,35 @@ export class GeminiChat {
     params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    let effectiveModel = model;
+    const contentsForPreviewModel =
+      this.ensureActiveLoopHasThoughtSignatures(requestContents);
     const apiCall = () => {
-      const modelToUse = getEffectiveModel(
+      let modelToUse = getEffectiveModel(
         this.config.isInFallbackMode(),
         model,
+        this.config.getPreviewFeatures(),
       );
 
+      // Preview Model Bypass Logic:
+      // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
+      // IF the effective model is currently Preview Model.
       if (
-        this.config.getQuotaErrorOccurred() &&
-        modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+        this.config.isPreviewModelBypassMode() &&
+        modelToUse === PREVIEW_GEMINI_MODEL
       ) {
-        throw new Error(
-          'Please submit a new query to continue with the Flash model.',
-        );
+        modelToUse = DEFAULT_GEMINI_MODEL;
       }
+
+      effectiveModel = modelToUse;
 
       return this.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: requestContents,
+          contents:
+            modelToUse === PREVIEW_GEMINI_MODEL
+              ? contentsForPreviewModel
+              : requestContents,
           config: { ...this.generationConfig, ...params.config },
         },
         prompt_id,
@@ -390,13 +427,18 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => await handleFallback(this.config, model, authType, error);
+    ) => await handleFallback(this.config, effectiveModel, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: params.config?.abortSignal,
+      maxAttempts:
+        this.config.isPreviewModelFallbackMode() &&
+        model === PREVIEW_GEMINI_MODEL
+          ? 1
+          : undefined,
     });
 
     return this.processStreamResponse(model, streamResponse);
@@ -467,6 +509,55 @@ export class GeminiChat {
       }
       return newContent;
     });
+  }
+
+  // To ensure our requests validate, the first function call in every model
+  // turn within the active loop must have a `thoughtSignature` property.
+  // If we do not do this, we will get back 400 errors from the API.
+  ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
+    // First, find the start of the active loop by finding the last user turn
+    // with a text message, i.e. that is not a function response.
+    let activeLoopStartIndex = -1;
+    for (let i = requestContents.length - 1; i >= 0; i--) {
+      const content = requestContents[i];
+      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+        activeLoopStartIndex = i;
+        break;
+      }
+    }
+
+    if (activeLoopStartIndex === -1) {
+      return requestContents;
+    }
+
+    // Iterate through every message in the active loop, ensuring that the first
+    // function call in each message's list of parts has a valid
+    // thoughtSignature property. If it does not we replace the function call
+    // with a copy that uses the synthetic thought signature.
+    const newContents = requestContents.slice(); // Shallow copy the array
+    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
+      const content = newContents[i];
+      if (content.role === 'model' && content.parts) {
+        const newParts = content.parts.slice();
+        for (let j = 0; j < newParts.length; j++) {
+          const part = newParts[j]!;
+          if (part.functionCall) {
+            if (!part.thoughtSignature) {
+              newParts[j] = {
+                ...part,
+                thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+              };
+              newContents[i] = {
+                ...content,
+                parts: newParts,
+              };
+            }
+            break; // Only consider the first function call
+          }
+        }
+      }
+    }
+    return newContents;
   }
 
   setTools(tools: Tool[]): void {
