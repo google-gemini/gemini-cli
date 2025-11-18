@@ -372,3 +372,18 @@ See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
 <p align="center">
   Built with ❤️ by Google and the open source community
 </p>
+
+
+## Troubleshooting Homebrew Installation (macOS)
+
+Some users may experience issues where `gemini` does not upgrade or install properly
+when using Homebrew. If you encounter problems such as:
+
+- `brew upgrade gemini` does not update to the latest version  
+- `gemini` uses an outdated binary even after upgrading  
+- Homebrew works only inside `gemini shell` but not in normal Terminal  
+
+You can fix this by ensuring that Homebrew is initialized correctly in your shell:
+
+```bash
+eval "$(/opt/homebrew/bin/brew shellenv)"
