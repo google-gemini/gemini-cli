@@ -6,6 +6,7 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react';
 import type { HistoryItem } from '../types.js';
+import type { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
 
 // Type for the updater function passed to updateHistoryItem
 type HistoryItemUpdater = (
@@ -33,7 +34,11 @@ export interface UseHistoryManagerReturn {
  * Encapsulates the history array, message ID generation, adding items,
  * updating items, and clearing the history.
  */
-export function useHistory(): UseHistoryManagerReturn {
+export function useHistory({
+  chatRecordingService,
+}: {
+  chatRecordingService?: ChatRecordingService | null;
+} = {}): UseHistoryManagerReturn {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messageIdCounterRef = useRef(0);
 
@@ -71,9 +76,47 @@ export function useHistory(): UseHistoryManagerReturn {
         }
         return [...prevHistory, newItem];
       });
+
+      // Record UI-specific messages, but don't do it if we're actually loading
+      // an existing session.
+      if (!isResuming && chatRecordingService) {
+        switch (itemData.type) {
+          case 'compression':
+          case 'info':
+            chatRecordingService?.recordMessage({
+              model: undefined,
+              type: 'info',
+              content: itemData.text ?? '',
+            });
+            break;
+          case 'warning':
+            chatRecordingService?.recordMessage({
+              model: undefined,
+              type: 'warning',
+              content: itemData.text ?? '',
+            });
+            break;
+          case 'error':
+            chatRecordingService?.recordMessage({
+              model: undefined,
+              type: 'error',
+              content: itemData.text ?? '',
+            });
+            break;
+          case 'user':
+          case 'gemini':
+          case 'gemini_content':
+            // Core conversation recording handled by GeminiChat.
+            break;
+          default:
+            // Ignore the rest.
+            break;
+        }
+      }
+
       return id; // Return the generated ID (even if not added, to keep signature)
     },
-    [getNextMessageId],
+    [getNextMessageId, chatRecordingService],
   );
 
   /**
