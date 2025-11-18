@@ -49,7 +49,7 @@
     "fast-uri": "^3.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",
-    "glob": "^10.4.5",
+    "glob": "^12.0.0",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",
     "https-proxy-agent": "^7.0.6",
