@@ -19,8 +19,30 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
-// Mock dependencies
-vi.mock('../../config/extension-manager.js');
+// NOTE: This file uses vi.hoisted() mocks to enable testing of sequential
+// mock behaviors (mockResolvedValueOnce/mockRejectedValueOnce chaining).
+// The hoisted mocks persist across vi.clearAllMocks() calls, which is necessary
+// for testing partial failure scenarios in the multiple extension uninstall feature.
+
+// Hoisted mocks - these survive vi.clearAllMocks()
+const mockUninstallExtension = vi.hoisted(() => vi.fn());
+const mockLoadExtensions = vi.hoisted(() => vi.fn());
+
+// Mock dependencies with hoisted functions
+vi.mock('../../config/extension-manager.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/extension-manager.js')>();
+  return {
+    ...actual,
+    ExtensionManager: vi.fn().mockImplementation(() => ({
+      uninstallExtension: mockUninstallExtension,
+      loadExtensions: mockLoadExtensions,
+      setRequestConsent: vi.fn(),
+      setRequestSetting: vi.fn(),
+    })),
+  };
+});
+
 vi.mock('../../config/settings.js');
 vi.mock('../../utils/errors.js');
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -52,26 +74,23 @@ describe('extensions uninstall command', () => {
   let mockDebugLogger: MockDebugLogger;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
     mockDebugLogger = (await import('@google/gemini-cli-core'))
       .debugLogger as unknown as MockDebugLogger;
     mockLoadSettings.mockReturnValue({
       merged: {},
     } as unknown as LoadedSettings);
-    mockExtensionManager.prototype.loadExtensions = vi
-      .fn()
-      .mockResolvedValue(undefined);
-    mockExtensionManager.prototype.uninstallExtension = vi
-      .fn()
-      .mockResolvedValue(undefined);
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    mockLoadExtensions.mockClear();
+    mockUninstallExtension.mockClear();
+    vi.clearAllMocks();
   });
 
   describe('handleUninstall', () => {
     it('should uninstall a single extension', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockUninstallExtension.mockResolvedValue(undefined);
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       await handleUninstall({ names: ['my-extension'] });
 
@@ -80,10 +99,11 @@ describe('extensions uninstall command', () => {
           workspaceDir: '/test/dir',
         }),
       );
-      expect(mockExtensionManager.prototype.loadExtensions).toHaveBeenCalled();
-      expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledWith('my-extension', false);
+      expect(mockLoadExtensions).toHaveBeenCalled();
+      expect(mockUninstallExtension).toHaveBeenCalledWith(
+        'my-extension',
+        false,
+      );
       expect(mockDebugLogger.log).toHaveBeenCalledWith(
         'Extension "my-extension" successfully uninstalled.',
       );
@@ -91,21 +111,15 @@ describe('extensions uninstall command', () => {
     });
 
     it('should uninstall multiple extensions', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockUninstallExtension.mockResolvedValue(undefined);
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       await handleUninstall({ names: ['ext1', 'ext2', 'ext3'] });
 
-      expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledTimes(3);
-      expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledWith('ext1', false);
-      expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledWith('ext2', false);
-      expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledWith('ext3', false);
+      expect(mockUninstallExtension).toHaveBeenCalledTimes(3);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext1', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext2', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext3', false);
       expect(mockDebugLogger.log).toHaveBeenCalledWith(
         'Extension "ext1" successfully uninstalled.',
       );
@@ -119,6 +133,7 @@ describe('extensions uninstall command', () => {
     });
 
     it('should report errors for failed uninstalls but continue with others', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       const mockProcessExit = vi
         .spyOn(process, 'exit')
@@ -126,22 +141,17 @@ describe('extensions uninstall command', () => {
           code?: string | number | null | undefined,
         ) => never);
 
-      (
-        mockExtensionManager.prototype.uninstallExtension as Mock
-      ).mockResolvedValueOnce(undefined);
-      (
-        mockExtensionManager.prototype.uninstallExtension as Mock
-      ).mockRejectedValueOnce(new Error('Extension not found'));
-      (
-        mockExtensionManager.prototype.uninstallExtension as Mock
-      ).mockResolvedValueOnce(undefined);
+      const error = new Error('Extension not found');
+      // Chain sequential mock behaviors - this works with hoisted mocks
+      mockUninstallExtension
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce(undefined);
       mockGetErrorMessage.mockReturnValue('Extension not found');
 
       await handleUninstall({ names: ['ext1', 'ext2', 'ext3'] });
 
-      expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledTimes(3);
+      expect(mockUninstallExtension).toHaveBeenCalledTimes(3);
       expect(mockDebugLogger.log).toHaveBeenCalledWith(
         'Extension "ext1" successfully uninstalled.',
       );
@@ -157,6 +167,7 @@ describe('extensions uninstall command', () => {
     });
 
     it('should exit with error code if all uninstalls fail', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       const mockProcessExit = vi
         .spyOn(process, 'exit')
@@ -164,9 +175,7 @@ describe('extensions uninstall command', () => {
           code?: string | number | null | undefined,
         ) => never);
       const error = new Error('Extension not found');
-      (
-        mockExtensionManager.prototype.uninstallExtension as Mock
-      ).mockRejectedValue(error);
+      mockUninstallExtension.mockRejectedValue(error);
       mockGetErrorMessage.mockReturnValue('Extension not found');
 
       await handleUninstall({ names: ['ext1', 'ext2'] });
@@ -190,9 +199,7 @@ describe('extensions uninstall command', () => {
           code?: string | number | null | undefined,
         ) => never);
       const error = new Error('Initialization failed');
-      (mockExtensionManager.prototype.loadExtensions as Mock).mockRejectedValue(
-        error,
-      );
+      mockLoadExtensions.mockRejectedValue(error);
       mockGetErrorMessage.mockReturnValue('Initialization failed message');
 
       await handleUninstall({ names: ['my-extension'] });
@@ -253,6 +260,8 @@ describe('extensions uninstall command', () => {
     });
 
     it('handler should call handleUninstall', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockUninstallExtension.mockResolvedValue(undefined);
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       interface TestArgv {
         names: string[];
@@ -261,9 +270,10 @@ describe('extensions uninstall command', () => {
       const argv: TestArgv = { names: ['my-extension'], _: [], $0: '' };
       await (command.handler as unknown as (args: TestArgv) => void)(argv);
 
-      expect(
-        mockExtensionManager.prototype.uninstallExtension,
-      ).toHaveBeenCalledWith('my-extension', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith(
+        'my-extension',
+        false,
+      );
       mockCwd.mockRestore();
     });
   });
