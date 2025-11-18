@@ -34,6 +34,7 @@ export interface ProQuotaDialogRequest {
   fallbackModel: string;
   message: string;
   isTerminalQuotaError: boolean;
+  isModelNotFoundError?: boolean;
   resolve: (intent: FallbackIntent) => void;
 }
 

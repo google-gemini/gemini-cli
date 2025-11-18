@@ -57,6 +57,7 @@ export const DialogManager = ({
         fallbackModel={uiState.proQuotaRequest.fallbackModel}
         message={uiState.proQuotaRequest.message}
         isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
+        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
         userTier={uiState.userTier}
       />

@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
-import type { HttpError } from './retry.js';
+import { type HttpError, ModelNotFoundError } from './httpErrors.js';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
 import { debugLogger } from './debugLogger.js';
@@ -16,6 +16,7 @@ import {
   TerminalQuotaError,
   RetryableQuotaError,
 } from './googleQuotaErrors.js';
+import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -465,5 +466,36 @@ describe('retryWithBackoff', () => {
     );
     // 3 attempts (initial + 2 retries) fail with 500, then fallback triggers, then 1 success
     expect(mockFn).toHaveBeenCalledTimes(4);
+  });
+
+  it('should trigger fallback for OAuth personal users on ModelNotFoundError', async () => {
+    const fallbackCallback = vi.fn().mockResolvedValue(PREVIEW_GEMINI_MODEL);
+
+    let fallbackOccurred = false;
+    const mockFn = vi.fn().mockImplementation(async () => {
+      if (!fallbackOccurred) {
+        throw new ModelNotFoundError('Requested entity was not found.', 404);
+      }
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      onPersistent429: async (authType?: string, error?: unknown) => {
+        fallbackOccurred = true;
+        return await fallbackCallback(authType, error);
+      },
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toBe('success');
+    expect(fallbackCallback).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+      expect.any(ModelNotFoundError),
+    );
+    expect(mockFn).toHaveBeenCalledTimes(2);
   });
 });

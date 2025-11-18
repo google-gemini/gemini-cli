@@ -71,6 +71,7 @@ describe('ProQuotaDialog', () => {
             fallbackModel="gemini-2.5-flash"
             message="paid tier quota error"
             isTerminalQuotaError={true}
+            isModelNotFoundError={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.LEGACY}
           />,
@@ -103,6 +104,7 @@ describe('ProQuotaDialog', () => {
             fallbackModel="gemini-2.5-flash"
             message="free tier quota error"
             isTerminalQuotaError={true}
+            isModelNotFoundError={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.FREE}
           />,
@@ -142,6 +144,7 @@ describe('ProQuotaDialog', () => {
             fallbackModel="gemini-2.5-flash"
             message="capacity error"
             isTerminalQuotaError={false}
+            isModelNotFoundError={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.FREE}
           />,
@@ -161,6 +164,74 @@ describe('ProQuotaDialog', () => {
                 key: 'retry_always',
               },
               { label: 'Stop', value: 'retry_later', key: 'retry_later' },
+            ],
+          }),
+          undefined,
+        );
+        unmount();
+      });
+    });
+
+    describe('when it is a model not found error', () => {
+      it('should render switch and stop options regardless of tier', () => {
+        const { unmount } = render(
+          <ProQuotaDialog
+            failedModel="gemini-3-pro-preview"
+            fallbackModel="gemini-2.5-pro"
+            message="You don't have access to gemini-3-pro-preview yet."
+            isTerminalQuotaError={false}
+            isModelNotFoundError={true}
+            onChoice={mockOnChoice}
+            userTier={UserTierId.FREE}
+          />,
+        );
+
+        expect(RadioButtonSelect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              {
+                label: 'Switch to gemini-2.5-pro',
+                value: 'retry_always',
+                key: 'retry_always',
+              },
+              {
+                label: 'Stop',
+                value: 'retry_later',
+                key: 'retry_later',
+              },
+            ],
+          }),
+          undefined,
+        );
+        unmount();
+      });
+
+      it('should render switch and stop options for paid tier as well', () => {
+        const { unmount } = render(
+          <ProQuotaDialog
+            failedModel="gemini-3-pro-preview"
+            fallbackModel="gemini-2.5-pro"
+            message="You don't have access to gemini-3-pro-preview yet."
+            isTerminalQuotaError={false}
+            isModelNotFoundError={true}
+            onChoice={mockOnChoice}
+            userTier={UserTierId.LEGACY}
+          />,
+        );
+
+        expect(RadioButtonSelect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              {
+                label: 'Switch to gemini-2.5-pro',
+                value: 'retry_always',
+                key: 'retry_always',
+              },
+              {
+                label: 'Stop',
+                value: 'retry_later',
+                key: 'retry_later',
+              },
             ],
           }),
           undefined,

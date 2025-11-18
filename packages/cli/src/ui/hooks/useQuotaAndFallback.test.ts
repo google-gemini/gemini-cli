@@ -26,6 +26,7 @@ import {
   type GoogleApiError,
   RetryableQuotaError,
   PREVIEW_GEMINI_MODEL,
+  ModelNotFoundError,
 } from '@google/gemini-cli-core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -283,6 +284,50 @@ describe('useQuotaAndFallback', () => {
           expect(lastCall.text).toContain('Switched to fallback model.');
         });
       }
+
+      it('should handle ModelNotFoundError correctly', async () => {
+        const { result } = renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        let promise: Promise<FallbackIntent | null>;
+        const error = new ModelNotFoundError('model not found', 404);
+
+        await act(() => {
+          promise = handler('gemini-3-pro-preview', 'gemini-2.5-pro', error);
+        });
+
+        // The hook should now have a pending request for the UI to handle
+        const request = result.current.proQuotaRequest;
+        expect(request).not.toBeNull();
+        expect(request?.failedModel).toBe('gemini-3-pro-preview');
+        expect(request?.isTerminalQuotaError).toBe(false);
+        expect(request?.isModelNotFoundError).toBe(true);
+
+        const message = request!.message;
+        expect(message).toBe(
+          `It seems like you don't have access to Gemini 3.
+Learn more at https://goo.gle/enable-preview-features
+To disable Gemini 3, disable "Preview features" in /settings.`,
+        );
+
+        // Simulate the user choosing to switch
+        await act(() => {
+          result.current.handleProQuotaChoice('retry_always');
+        });
+
+        const intent = await promise!;
+        expect(intent).toBe('retry_always');
+        expect(result.current.proQuotaRequest).toBeNull();
+      });
     });
   });
 

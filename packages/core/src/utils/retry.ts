@@ -14,13 +14,10 @@ import {
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
+import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
 const FETCH_FAILED_MESSAGE =
   'exception TypeError: fetch failed sending request';
-
-export interface HttpError extends Error {
-  status?: number;
-}
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -146,8 +143,12 @@ export async function retryWithBackoff<T>(
       }
 
       const classifiedError = classifyGoogleError(error);
+      const errorCode = getErrorStatus(error);
 
-      if (classifiedError instanceof TerminalQuotaError) {
+      if (
+        classifiedError instanceof TerminalQuotaError ||
+        classifiedError instanceof ModelNotFoundError
+      ) {
         if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
           try {
             const fallbackModel = await onPersistent429(
@@ -166,7 +167,6 @@ export async function retryWithBackoff<T>(
         throw classifiedError; // Throw if no fallback or fallback failed.
       }
 
-      const errorCode = getErrorStatus(error);
       const is500 =
         errorCode !== undefined && errorCode >= 500 && errorCode < 600;
 
@@ -231,33 +231,6 @@ export async function retryWithBackoff<T>(
   }
 
   throw new Error('Retry attempts exhausted');
-}
-
-/**
- * Extracts the HTTP status code from an error object.
- * @param error The error object.
- * @returns The HTTP status code, or undefined if not found.
- */
-export function getErrorStatus(error: unknown): number | undefined {
-  if (typeof error === 'object' && error !== null) {
-    if ('status' in error && typeof error.status === 'number') {
-      return error.status;
-    }
-    // Check for error.response.status (common in axios errors)
-    if (
-      'response' in error &&
-      typeof (error as { response?: unknown }).response === 'object' &&
-      (error as { response?: unknown }).response !== null
-    ) {
-      const response = (
-        error as { response: { status?: unknown; headers?: unknown } }
-      ).response;
-      if ('status' in response && typeof response.status === 'number') {
-        return response.status;
-      }
-    }
-  }
-  return undefined;
 }
 
 /**
