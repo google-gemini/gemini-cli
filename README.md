@@ -109,6 +109,8 @@ npm install -g @google/gemini-cli@nightly
   [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time
   information
 - Conversation checkpointing to save and resume complex sessions
+- Automatic prompt draft autosave so in-progress turns survive crashes (control
+  it anytime with `/drafts`)
 - Custom context files (GEMINI.md) to tailor behavior for your projects
 
 ### GitHub Integration

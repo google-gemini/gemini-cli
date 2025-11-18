@@ -52,13 +52,13 @@
     "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
+    "preflight": "npm ci && npm run format && npm run lint:ci && npm run clean && npm run build && npm run typecheck && npm run test:ci",
     "prepare": "husky && npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
-    "clean": "node scripts/clean.js",
+    "clean": "rimraf node_modules bundle packages/cli/src/generated/ packages/**/dist packages/vscode-ide-companion/node_modules packages/vscode-ide-companion/*.vsix",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
@@ -111,6 +111,7 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
     "react-devtools-core": "^6.1.2",
+    "rimraf": "^6.1.0",
     "semver": "^7.7.2",
     "strip-ansi": "^7.1.2",
     "tsx": "^4.20.3",
