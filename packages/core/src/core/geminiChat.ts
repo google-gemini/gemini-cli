@@ -71,6 +71,8 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
   initialDelayMs: 500,
 };
 
+export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+
 /**
  * Returns true if the response is valid, false otherwise.
  */
@@ -388,6 +390,8 @@ export class GeminiChat {
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     let effectiveModel = model;
+    const contentsForPreviewModel =
+      this.ensureActiveLoopHasThoughtSignatures(requestContents);
     const apiCall = () => {
       let modelToUse = getEffectiveModel(
         this.config.isInFallbackMode(),
@@ -410,7 +414,10 @@ export class GeminiChat {
       return this.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: requestContents,
+          contents:
+            modelToUse === PREVIEW_GEMINI_MODEL
+              ? contentsForPreviewModel
+              : requestContents,
           config: { ...this.generationConfig, ...params.config },
         },
         prompt_id,
@@ -502,6 +509,55 @@ export class GeminiChat {
       }
       return newContent;
     });
+  }
+
+  // To ensure our requests validate, the first function call in every model
+  // turn within the active loop must have a `thoughtSignature` property.
+  // If we do not do this, we will get back 400 errors from the API.
+  ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
+    // First, find the start of the active loop by finding the last user turn
+    // with a text message, i.e. that is not a function response.
+    let activeLoopStartIndex = -1;
+    for (let i = requestContents.length - 1; i >= 0; i--) {
+      const content = requestContents[i];
+      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+        activeLoopStartIndex = i;
+        break;
+      }
+    }
+
+    if (activeLoopStartIndex === -1) {
+      return requestContents;
+    }
+
+    // Iterate through every message in the active loop, ensuring that the first
+    // function call in each message's list of parts has a valid
+    // thoughtSignature property. If it does not we replace the function call
+    // with a copy that uses the synthetic thought signature.
+    const newContents = requestContents.slice(); // Shallow copy the array
+    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
+      const content = newContents[i];
+      if (content.role === 'model' && content.parts) {
+        const newParts = content.parts.slice();
+        for (let j = 0; j < newParts.length; j++) {
+          const part = newParts[j]!;
+          if (part.functionCall) {
+            if (!part.thoughtSignature) {
+              newParts[j] = {
+                ...part,
+                thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+              };
+              newContents[i] = {
+                ...content,
+                parts: newParts,
+              };
+            }
+            break; // Only consider the first function call
+          }
+        }
+      }
+    }
+    return newContents;
   }
 
   setTools(tools: Tool[]): void {
