@@ -40,6 +40,7 @@ describe('ClassifierStrategy', () => {
       request: [{ text: 'simple task' }],
       signal: new AbortController().signal,
     };
+
     mockResolvedConfig = {
       model: 'classifier',
       generateContentConfig: {},
@@ -48,6 +49,7 @@ describe('ClassifierStrategy', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
+      getPreviewFeatures: () => false,
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),

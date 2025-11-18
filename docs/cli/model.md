@@ -14,14 +14,28 @@ Use the following command in Gemini CLI:
 
 Running this command will open a dialog with your model options:
 
-- **Auto (recommended):** Let the system choose the best model for your task.
-  Typically, this is the best option.
-- **Pro:** For complex tasks that require deep reasoning and creativity. The Pro
-  model may take longer to return a response.
-- **Flash:** For tasks that need a balance of speed and reasoning. The Flash
-  model will usually return a faster response than Pro.
-- **Flash-Lite:** For simple tasks that need to be done quickly. The Flash-Lite
-  model is typically the fastest.
+| Option             | Description                                                   | Models                                                                                     |
+| ------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Auto (recommended) | Let the system choose the best model for your task.           | gemini-3-pro-preview (if enabled), gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite |
+| Pro                | For complex tasks that require deep reasoning and creativity. | gemini-3-pro-preview (if enabled), gemini-2.5-pro                                          |
+| Flash              | For tasks that need a balance of speed and reasoning.         | gemini-2.5-flash                                                                           |
+| Flash-Lite         | For simple tasks that need to be done quickly.                | gemini-2.5-flash-lite                                                                      |
+
+### Gemini 3 Pro and Preview Features
+
+Note: Gemini 3 is not currently available on all account types. To learn more
+about Gemini 3 access, refer to
+[Gemini 3 Pro on Gemini CLI](../get-started/gemini-3).
+
+To enable Gemini 3 Pro (if available), enable
+[**Preview features** by using the `settings` command](../cli/settings). Once
+enabled, Gemini CLI will attempt to use Gemini 3 Pro when you select **Auto** or
+**Pro**. Both **Auto** and **Pro** will try to use Gemini 3 Pro before falling
+back to Gemini 2.5 Pro.
+
+You can also use the `--model` flag to specify a particular Gemini model on
+startup. For more details, refer to the
+[configuration documentation](./configuration.md).
 
 Changes to these settings will be applied to all subsequent interactions with
 Gemini CLI.
