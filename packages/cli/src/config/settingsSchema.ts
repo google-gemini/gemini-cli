@@ -160,6 +160,15 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
+      previewFeatures: {
+        type: 'boolean',
+        label: 'Preview Features (e.g., models)',
+        category: 'General',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable preview features (e.g., preview models).',
+        showInDialog: true,
+      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -251,6 +260,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: undefined as SessionRetentionSettings | undefined,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
@@ -683,7 +693,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 0.2 as number,
+        default: 0.7 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
