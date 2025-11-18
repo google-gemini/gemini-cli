@@ -25,6 +25,7 @@ import {
   CoreEvent,
   type UserFeedbackPayload,
   type ResumedSessionData,
+  AuthType,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -1794,6 +1795,23 @@ describe('AppContainer State Management', () => {
 
       expect(resizePtySpy).toHaveBeenCalled();
       unmount();
+    });
+  });
+  describe('Banner Text', () => {
+    it('should render placeholder banner text for USE_GEMINI auth type', async () => {
+      const config = makeFakeConfig();
+      vi.spyOn(config, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.USE_GEMINI,
+        apiKey: 'fake-key',
+      });
+      const { unmount } = renderAppContainer();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      await vi.waitFor(() => {
+        expect(capturedUIState.bannerData.defaultText).toBeDefined();
+        unmount();
+      });
     });
   });
 });
