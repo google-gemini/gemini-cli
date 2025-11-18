@@ -340,7 +340,15 @@ export async function downloadFromGitHubRelease(
     }
 
     try {
-      await downloadFile(archiveUrl, downloadedAssetPath);
+      // GitHub API requires different Accept headers for different types of downloads:
+      // 1. Binary Assets (e.g. release artifacts): Require 'application/octet-stream' to return the raw content.
+      // 2. Source Tarballs (e.g. /tarball/{ref}): Require 'application/vnd.github+json' (or similar) to return
+      //    a 302 Redirect to the actual download location (codeload.github.com).
+      //    Sending 'application/octet-stream' for tarballs results in a 415 Unsupported Media Type error.
+      const headers = asset
+        ? { Accept: 'application/octet-stream' }
+        : { Accept: 'application/vnd.github+json' };
+      await downloadFile(archiveUrl, downloadedAssetPath, { headers });
     } catch (error) {
       return {
         failureReason: 'failed to download asset',
@@ -457,24 +465,31 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   return undefined;
 }
 
-async function downloadFile(url: string, dest: string): Promise<void> {
-  const headers: {
-    'User-agent': string;
-    Accept: string;
-    Authorization?: string;
-  } = {
+interface DownloadOptions {
+  headers?: Record<string, string>;
+}
+
+async function downloadFile(
+  url: string,
+  dest: string,
+  options?: DownloadOptions,
+): Promise<void> {
+  const headers: Record<string, string> = {
     'User-agent': 'gemini-cli',
     Accept: 'application/octet-stream',
+    ...options?.headers,
   };
   const token = getGitHubToken();
   if (token) {
-    headers.Authorization = `token ${token}`;
+    headers['Authorization'] = `token ${token}`;
   }
   return new Promise((resolve, reject) => {
     https
       .get(url, { headers }, (res) => {
         if (res.statusCode === 302 || res.statusCode === 301) {
-          downloadFile(res.headers.location!, dest).then(resolve).catch(reject);
+          downloadFile(res.headers.location!, dest, options)
+            .then(resolve)
+            .catch(reject);
           return;
         }
         if (res.statusCode !== 200) {
