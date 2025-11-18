@@ -20,9 +20,11 @@ import { AuthType } from '../core/contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 import { logFlashFallback } from '../telemetry/index.js';
 import type { FallbackModelHandler } from './types.js';
+import { ModelNotFoundError } from '../utils/httpErrors.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
@@ -39,7 +41,12 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     isInFallbackMode: vi.fn(() => false),
     setFallbackMode: vi.fn(),
+    isPreviewModelFallbackMode: vi.fn(() => false),
+    setPreviewModelFallbackMode: vi.fn(),
+    isPreviewModelBypassMode: vi.fn(() => false),
+    setPreviewModelBypassMode: vi.fn(),
     fallbackHandler: undefined,
+    getFallbackModelHandler: vi.fn(),
     isInteractive: vi.fn(() => false),
     ...overrides,
   }) as unknown as Config;
@@ -99,7 +106,7 @@ describe('handleFallback', () => {
 
   describe('when handler returns "retry"', () => {
     it('should activate fallback mode, log telemetry, and return true', async () => {
-      mockHandler.mockResolvedValue('retry');
+      mockHandler.mockResolvedValue('retry_always');
 
       const result = await handleFallback(
         mockConfig,
@@ -152,7 +159,7 @@ describe('handleFallback', () => {
 
   it('should pass the correct context (failedModel, fallbackModel, error) to the handler', async () => {
     const mockError = new Error('Quota Exceeded');
-    mockHandler.mockResolvedValue('retry');
+    mockHandler.mockResolvedValue('retry_always');
 
     await handleFallback(mockConfig, MOCK_PRO_MODEL, AUTH_OAUTH, mockError);
 
@@ -171,7 +178,7 @@ describe('handleFallback', () => {
       setFallbackMode: vi.fn(),
     });
 
-    mockHandler.mockResolvedValue('retry');
+    mockHandler.mockResolvedValue('retry_always');
 
     const result = await handleFallback(
       activeFallbackConfig,
@@ -200,5 +207,108 @@ describe('handleFallback', () => {
       handlerError,
     );
     expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
+  });
+
+  describe('Preview Model Fallback Logic', () => {
+    const previewModel = PREVIEW_GEMINI_MODEL;
+
+    it('should always set Preview Model bypass mode on failure', async () => {
+      await handleFallback(mockConfig, previewModel, AUTH_OAUTH);
+      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
+    });
+
+    it('should silently retry if Preview Model fallback mode is already active', async () => {
+      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(true);
+
+      const result = await handleFallback(mockConfig, previewModel, AUTH_OAUTH);
+
+      expect(result).toBe(true);
+      expect(mockHandler).not.toHaveBeenCalled();
+    });
+
+    it('should activate Preview Model fallback mode when handler returns "retry_always"', async () => {
+      mockHandler.mockResolvedValue('retry_always');
+
+      const result = await handleFallback(mockConfig, previewModel, AUTH_OAUTH);
+
+      expect(result).toBe(true);
+      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
+      expect(mockConfig.setPreviewModelFallbackMode).toHaveBeenCalledWith(true);
+    });
+
+    it('should NOT set fallback mode if user chooses "retry_once"', async () => {
+      mockHandler.mockResolvedValue('retry_once');
+
+      const result = await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+        new Error('Capacity'),
+      );
+
+      expect(result).toBe(true);
+      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
+      expect(mockConfig.setPreviewModelFallbackMode).not.toHaveBeenCalled();
+    });
+
+    it('should set fallback mode if user chooses "retry_always"', async () => {
+      mockHandler.mockResolvedValue('retry_always');
+
+      const result = await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+        new Error('Capacity'),
+      );
+
+      expect(result).toBe(true);
+      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
+      expect(mockConfig.setPreviewModelFallbackMode).toHaveBeenCalledWith(true);
+    });
+    it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails', async () => {
+      const mockFallbackHandler = vi.fn().mockResolvedValue('stop');
+      vi.mocked(mockConfig.fallbackModelHandler!).mockImplementation(
+        mockFallbackHandler,
+      );
+
+      await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+      );
+
+      expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_MODEL,
+        undefined,
+      );
+    });
+  });
+
+  it('should return null if ModelNotFoundError occurs for a non-preview model', async () => {
+    const modelNotFoundError = new ModelNotFoundError('Not found');
+    const result = await handleFallback(
+      mockConfig,
+      DEFAULT_GEMINI_MODEL, // Not preview model
+      AUTH_OAUTH,
+      modelNotFoundError,
+    );
+    expect(result).toBeNull();
+    expect(mockHandler).not.toHaveBeenCalled();
+  });
+
+  it('should consult handler if ModelNotFoundError occurs for preview model', async () => {
+    const modelNotFoundError = new ModelNotFoundError('Not found');
+    mockHandler.mockResolvedValue('retry_always');
+
+    const result = await handleFallback(
+      mockConfig,
+      PREVIEW_GEMINI_MODEL,
+      AUTH_OAUTH,
+      modelNotFoundError,
+    );
+
+    expect(result).toBe(true);
+    expect(mockHandler).toHaveBeenCalled();
   });
 });

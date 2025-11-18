@@ -121,11 +121,12 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
 async function setIdeModeAndSyncConnection(
   config: Config,
   value: boolean,
+  options: { logToConsole?: boolean } = {},
 ): Promise<void> {
   config.setIdeMode(value);
   const ideClient = await IdeClient.getInstance();
   if (value) {
-    await ideClient.connect();
+    await ideClient.connect(options);
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.SESSION));
   } else {
     await ideClient.disconnect();
@@ -144,7 +145,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         ({
           type: 'message',
           messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
+          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
         }) as const,
     };
   }
@@ -212,7 +213,9 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         );
         // Poll for up to 5 seconds for the extension to activate.
         for (let i = 0; i < 10; i++) {
-          await setIdeModeAndSyncConnection(context.services.config!, true);
+          await setIdeModeAndSyncConnection(context.services.config!, true, {
+            logToConsole: false,
+          });
           if (
             ideClient.getConnectionStatus().status ===
             IDEConnectionStatus.Connected

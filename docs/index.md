@@ -28,12 +28,18 @@ This documentation is organized into the following sections:
 - **[Configuration](./get-started/configuration.md):** Information on
   configuring the CLI.
 - **[Examples](./get-started/examples.md):** Example usage of Gemini CLI.
+- **[Get started with Gemini 3](./get-started/gemini-3.md):** Learn how to
+  enable and use Gemini 3.
 
 ### CLI
 
 - **[CLI overview](./cli/index.md):** Overview of the command-line interface.
 - **[Commands](./cli/commands.md):** Description of available CLI commands.
 - **[Enterprise](./cli/enterprise.md):** Gemini CLI for enterprise.
+- **[Model Selection](./cli/model.md):** Select the model used to process your
+  commands with `/model`.
+- **[Settings](./cli/settings.md):** Configure various aspects of the CLI's
+  behavior and appearance with `/settings`.
 - **[Themes](./cli/themes.md):** Themes for Gemini CLI.
 - **[Token Caching](./cli/token-caching.md):** Token caching and optimization.
 - **[Tutorials](./cli/tutorials.md):** Tutorials for Gemini CLI.

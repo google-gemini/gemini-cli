@@ -12,6 +12,9 @@ export {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
+  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
 } from './src/config/models.js';
 export {
   serializeTerminalToObject,
@@ -49,3 +52,4 @@ export * from './src/utils/googleQuotaErrors.js';
 export type { GoogleApiError } from './src/utils/googleErrors.js';
 export { getCodeAssistServer } from './src/code_assist/codeAssist.js';
 export { getExperiments } from './src/code_assist/experiments/experiments.js';
+export { getErrorStatus, ModelNotFoundError } from './src/utils/httpErrors.js';

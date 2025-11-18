@@ -322,6 +322,30 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
+    it('should have previewFeatures setting in schema', () => {
+      expect(
+        getSettingsSchema().general.properties.previewFeatures,
+      ).toBeDefined();
+      expect(getSettingsSchema().general.properties.previewFeatures.type).toBe(
+        'boolean',
+      );
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.category,
+      ).toBe('General');
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.default,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.requiresRestart,
+      ).toBe(true);
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.showInDialog,
+      ).toBe(true);
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.description,
+      ).toBe('Enable preview features (e.g., preview models).');
+    });
+
     it('should have useModelRouter setting in schema', () => {
       expect(
         getSettingsSchema().experimental.properties.useModelRouter,

@@ -157,6 +157,7 @@ export const Composer = () => {
           suggestionsWidth={uiState.suggestionsWidth}
           onSubmit={uiActions.handleFinalSubmit}
           userMessages={uiState.userMessages}
+          setBannerVisible={uiActions.setBannerVisible}
           onClearScreen={uiActions.handleClearScreen}
           config={config}
           slashCommands={uiState.slashCommands || []}

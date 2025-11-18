@@ -88,6 +88,12 @@ describe('detectIde', () => {
     vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
   });
+
+  it('should detect AntiGravity', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
+  });
 });
 
 describe('detectIde with ideInfoFromFile', () => {

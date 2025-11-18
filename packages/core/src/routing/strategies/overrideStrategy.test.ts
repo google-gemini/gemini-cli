@@ -19,6 +19,7 @@ describe('OverrideStrategy', () => {
   it('should return null when the override model is auto', async () => {
     const mockConfig = {
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      getPreviewFeatures: () => false,
     } as Config;
 
     const decision = await strategy.route(mockContext, mockConfig, mockClient);
@@ -29,6 +30,7 @@ describe('OverrideStrategy', () => {
     const overrideModel = 'gemini-2.5-pro-custom';
     const mockConfig = {
       getModel: () => overrideModel,
+      getPreviewFeatures: () => false,
     } as Config;
 
     const decision = await strategy.route(mockContext, mockConfig, mockClient);
@@ -46,6 +48,7 @@ describe('OverrideStrategy', () => {
     const overrideModel = 'gemini-2.5-flash-experimental';
     const mockConfig = {
       getModel: () => overrideModel,
+      getPreviewFeatures: () => false,
     } as Config;
 
     const decision = await strategy.route(mockContext, mockConfig, mockClient);

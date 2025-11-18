@@ -24,6 +24,10 @@
         "slug": "docs/get-started"
       },
       {
+        "label": "Gemini 3 Pro on Gemini CLI",
+        "slug": "docs/get-started/gemini-3"
+      },
+      {
         "label": "Authentication",
         "slug": "docs/get-started/authentication"
       },
@@ -79,6 +83,10 @@
       {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
+      },
+      {
+        "label": "Settings",
+        "slug": "docs/cli/settings"
       },
       {
         "label": "Telemetry",

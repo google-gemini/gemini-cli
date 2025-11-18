@@ -15,11 +15,7 @@ import {
 } from 'vitest';
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
-import {
-  isThinkingDefault,
-  isThinkingSupported,
-  GeminiClient,
-} from './client.js';
+import { isThinkingSupported, GeminiClient } from './client.js';
 import {
   AuthType,
   type ContentGenerator,
@@ -147,28 +143,13 @@ describe('isThinkingSupported', () => {
     expect(isThinkingSupported('gemini-2.5-pro')).toBe(true);
   });
 
+  it('should return true for gemini-3-pro', () => {
+    expect(isThinkingSupported('gemini-3-pro')).toBe(true);
+  });
+
   it('should return false for other models', () => {
     expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
     expect(isThinkingSupported('some-other-model')).toBe(false);
-  });
-});
-
-describe('isThinkingDefault', () => {
-  it('should return false for gemini-2.5-flash-lite', () => {
-    expect(isThinkingDefault('gemini-2.5-flash-lite')).toBe(false);
-  });
-
-  it('should return true for gemini-2.5', () => {
-    expect(isThinkingDefault('gemini-2.5')).toBe(true);
-  });
-
-  it('should return true for gemini-2.5-pro', () => {
-    expect(isThinkingDefault('gemini-2.5-pro')).toBe(true);
-  });
-
-  it('should return false for other models', () => {
-    expect(isThinkingDefault('gemini-1.5-flash')).toBe(false);
-    expect(isThinkingDefault('some-other-model')).toBe(false);
   });
 });
 
@@ -241,6 +222,7 @@ describe('Gemini Client (client.ts)', () => {
       getIdeModeFeature: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(true),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),

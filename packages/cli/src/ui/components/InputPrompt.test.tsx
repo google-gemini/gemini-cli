@@ -235,6 +235,7 @@ describe('InputPrompt', () => {
       focus: true,
       setQueueErrorMessage: vi.fn(),
       streamingState: StreamingState.Idle,
+      setBannerVisible: vi.fn(),
     };
   });
 
@@ -808,6 +809,19 @@ describe('InputPrompt', () => {
 
     await waitFor(() => {
       expect(props.buffer.setText).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should call setBannerVisible(false) when clear screen key is pressed', async () => {
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+
+    await act(async () => {
+      stdin.write('\x0C'); // Ctrl+L
+    });
+
+    await waitFor(() => {
+      expect(props.setBannerVisible).toHaveBeenCalledWith(false);
     });
     unmount();
   });

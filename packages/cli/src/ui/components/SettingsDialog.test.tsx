@@ -367,17 +367,17 @@ describe('SettingsDialog', () => {
 
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
-      // Wait for initial render and verify we're on Vim Mode (first setting)
+      // Wait for initial render and verify we're on Preview Features (first setting)
       await waitFor(() => {
-        expect(lastFrame()).toContain('Vim Mode');
+        expect(lastFrame()).toContain('Preview Features (e.g., models)');
       });
 
-      // Navigate to Disable Auto Update setting and verify we're there
+      // Navigate to Vim Mode setting and verify we're there
       act(() => {
         stdin.write(TerminalKeys.DOWN_ARROW as string);
       });
       await waitFor(() => {
-        expect(lastFrame()).toContain('Disable Auto Update');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Toggle the setting
@@ -397,10 +397,10 @@ describe('SettingsDialog', () => {
       });
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
-        new Set<string>(['general.disableAutoUpdate']),
+        new Set<string>(['general.vimMode']),
         expect.objectContaining({
           general: expect.objectContaining({
-            disableAutoUpdate: true,
+            vimMode: true,
           }),
         }),
         expect.any(LoadedSettings),
@@ -571,7 +571,7 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        expect(lastFrame()).toContain('Hide Window Title');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Verify the dialog is rendered properly

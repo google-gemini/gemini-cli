@@ -137,11 +137,12 @@ export class IdeClient {
     this.trustChangeListeners.delete(listener);
   }
 
-  async connect(): Promise<void> {
+  async connect(options: { logToConsole?: boolean } = {}): Promise<void> {
+    const logError = options.logToConsole ?? true;
     if (!this.currentIde) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks`,
+        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
         false,
       );
       return;
@@ -163,7 +164,7 @@ export class IdeClient {
     );
 
     if (!isValid) {
-      this.setState(IDEConnectionStatus.Disconnected, error, true);
+      this.setState(IDEConnectionStatus.Disconnected, error, logError);
       return;
     }
 
@@ -205,7 +206,7 @@ export class IdeClient {
     this.setState(
       IDEConnectionStatus.Disconnected,
       `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
-      true,
+      logError,
     );
   }
 

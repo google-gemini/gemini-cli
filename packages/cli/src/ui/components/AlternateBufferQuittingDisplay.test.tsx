@@ -12,6 +12,10 @@ import { Text } from 'ink';
 import { renderWithProviders } from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
 
+vi.mock('../utils/terminalSetup.js', () => ({
+  getTerminalProgram: () => null,
+}));
+
 vi.mock('../contexts/AppContext.js', () => ({
   useAppContext: () => ({
     version: '0.10.0',
@@ -85,6 +89,11 @@ const mockConfig = {
   getTargetDir: () => '/tmp',
   getDebugMode: () => false,
   getGeminiMdFileCount: () => 0,
+  getExperiments: () => ({
+    flags: {},
+    experimentIds: [],
+  }),
+  getPreviewFeatures: () => false,
 } as unknown as Config;
 
 describe('AlternateBufferQuittingDisplay', () => {
@@ -101,6 +110,10 @@ describe('AlternateBufferQuittingDisplay', () => {
           activePtyId: undefined,
           embeddedShellFocused: false,
           renderMarkdown: false,
+          bannerData: {
+            defaultText: '',
+            warningText: '',
+          },
         },
         config: mockConfig,
       },

@@ -7,6 +7,7 @@
 // Export config
 export * from './config/config.js';
 export * from './config/defaultModelConfigs.js';
+export * from './config/models.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
