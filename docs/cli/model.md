@@ -25,10 +25,10 @@ Running this command will open a dialog with your model options:
 
 Note: Gemini 3 is not currently available on all account types. To learn more
 about Gemini 3 access, refer to
-[Gemini 3 Pro on Gemini CLI](../get-started/gemini-3).
+[Gemini 3 Pro on Gemini CLI](../get-started/gemini-3.md).
 
 To enable Gemini 3 Pro (if available), enable
-[**Preview features** by using the `settings` command](../cli/settings). Once
+[**Preview features** by using the `settings` command](../cli/settings.md). Once
 enabled, Gemini CLI will attempt to use Gemini 3 Pro when you select **Auto** or
 **Pro**. Both **Auto** and **Pro** will try to use Gemini 3 Pro before falling
 back to Gemini 2.5 Pro.

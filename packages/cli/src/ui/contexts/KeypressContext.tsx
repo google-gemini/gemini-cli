@@ -405,9 +405,9 @@ function* emitKeys(
           code += match[1] + match[3];
           // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
           modifier = parseInt(match[2] ?? '1', 10) - 1;
-        } else if ((match = /^((\d;)?(\d))?([A-Za-z])$/.exec(cmd))) {
-          code += match[4];
-          modifier = parseInt(match[3] ?? '1', 10) - 1;
+        } else if ((match = /^(\d+)?(?:;(\d+))?([A-Za-z])$/.exec(cmd))) {
+          code += match[3];
+          modifier = parseInt(match[2] ?? match[1] ?? '1', 10) - 1;
         } else {
           code += cmd;
         }
