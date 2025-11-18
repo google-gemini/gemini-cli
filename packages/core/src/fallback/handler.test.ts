@@ -24,6 +24,7 @@ import {
 } from '../config/models.js';
 import { logFlashFallback } from '../telemetry/index.js';
 import type { FallbackModelHandler } from './types.js';
+import { ModelNotFoundError } from '../utils/httpErrors.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
@@ -282,5 +283,32 @@ describe('handleFallback', () => {
         undefined,
       );
     });
+  });
+
+  it('should return null if ModelNotFoundError occurs for a non-preview model', async () => {
+    const modelNotFoundError = new ModelNotFoundError('Not found');
+    const result = await handleFallback(
+      mockConfig,
+      DEFAULT_GEMINI_MODEL, // Not preview model
+      AUTH_OAUTH,
+      modelNotFoundError,
+    );
+    expect(result).toBeNull();
+    expect(mockHandler).not.toHaveBeenCalled();
+  });
+
+  it('should consult handler if ModelNotFoundError occurs for preview model', async () => {
+    const modelNotFoundError = new ModelNotFoundError('Not found');
+    mockHandler.mockResolvedValue('retry_always');
+
+    const result = await handleFallback(
+      mockConfig,
+      PREVIEW_GEMINI_MODEL,
+      AUTH_OAUTH,
+      modelNotFoundError,
+    );
+
+    expect(result).toBe(true);
+    expect(mockHandler).toHaveBeenCalled();
   });
 });

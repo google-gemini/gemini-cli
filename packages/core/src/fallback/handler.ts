@@ -16,6 +16,7 @@ import { coreEvents } from '../utils/events.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { ModelNotFoundError } from '../utils/httpErrors.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -27,6 +28,14 @@ export async function handleFallback(
 ): Promise<string | boolean | null> {
   // Applicability Checks
   if (authType !== AuthType.LOGIN_WITH_GOOGLE) return null;
+
+  // Guardrail: If it's a ModelNotFoundError but NOT the preview model, do not handle it.
+  if (
+    error instanceof ModelNotFoundError &&
+    failedModel !== PREVIEW_GEMINI_MODEL
+  ) {
+    return null;
+  }
 
   // Preview Model Specific Logic
   if (failedModel === PREVIEW_GEMINI_MODEL) {

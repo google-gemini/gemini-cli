@@ -21,6 +21,7 @@ interface ProQuotaDialogProps {
   fallbackModel: string;
   message: string;
   isTerminalQuotaError: boolean;
+  isModelNotFoundError?: boolean;
   onChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
@@ -32,6 +33,7 @@ export function ProQuotaDialog({
   fallbackModel,
   message,
   isTerminalQuotaError,
+  isModelNotFoundError,
   onChoice,
   userTier,
 }: ProQuotaDialogProps): React.JSX.Element {
@@ -56,62 +58,58 @@ export function ProQuotaDialog({
         key: 'retry_later',
       },
     ];
-  } else {
+  } else if (isModelNotFoundError || (isTerminalQuotaError && isPaidTier)) {
     // out of quota
-    if (isTerminalQuotaError) {
-      if (isPaidTier) {
-        items = [
-          {
-            label: `Switch to ${fallbackModel}`,
-            value: 'retry_always' as const,
-            key: 'retry_always',
-          },
-          {
-            label: `Stop`,
-            value: 'retry_later' as const,
-            key: 'retry_later',
-          },
-        ];
-      } else {
-        // free user gets an option to upgrade
-        items = [
-          {
-            label: `Switch to ${fallbackModel}`,
-            value: 'retry_always' as const,
-            key: 'retry_always',
-          },
-          {
-            label: 'Upgrade for higher limits',
-            value: 'upgrade' as const,
-            key: 'upgrade',
-          },
-          {
-            label: `Stop`,
-            value: 'retry_later' as const,
-            key: 'retry_later',
-          },
-        ];
-      }
-    } else {
-      // capacity error
-      items = [
-        {
-          label: 'Keep trying',
-          value: 'retry_once' as const,
-          key: 'retry_once',
-        },
-        {
-          label: `Switch to ${fallbackModel}`,
-          value: 'retry_always' as const,
-          key: 'retry_always',
-        },
-        {
-          label: 'Stop',
-          value: 'retry_later' as const,
-          key: 'retry_later',
-        },
-      ];
-    }
+    items = [
+      {
+        label: `Switch to ${fallbackModel}`,
+        value: 'retry_always' as const,
+        key: 'retry_always',
+      },
+      {
+        label: `Stop`,
+        value: 'retry_later' as const,
+        key: 'retry_later',
+      },
+    ];
+  } else if (isTerminalQuotaError && !isPaidTier) {
+    // free user gets an option to upgrade
+    items = [
+      {
+        label: `Switch to ${fallbackModel}`,
+        value: 'retry_always' as const,
+        key: 'retry_always',
+      },
+      {
+        label: 'Upgrade for higher limits',
+        value: 'upgrade' as const,
+        key: 'upgrade',
+      },
+      {
+        label: `Stop`,
+        value: 'retry_later' as const,
+        key: 'retry_later',
+      },
+    ];
+  } else {
+    // capacity error
+    items = [
+      {
+        label: 'Keep trying',
+        value: 'retry_once' as const,
+        key: 'retry_once',
+      },
+      {
+        label: `Switch to ${fallbackModel}`,
+        value: 'retry_always' as const,
+        key: 'retry_always',
+      },
+      {
+        label: 'Stop',
+        value: 'retry_later' as const,
+        key: 'retry_later',
+      },
+    ];
   }
 
   const handleSelect = (
@@ -129,7 +127,7 @@ export function ProQuotaDialog({
         <RadioButtonSelect items={items} onSelect={handleSelect} />
       </Box>
       <Text color={theme.text.primary}>
-        {failedModel === PREVIEW_GEMINI_MODEL
+        {failedModel === PREVIEW_GEMINI_MODEL && !isModelNotFoundError
           ? 'Note: We will periodically retry Preview Model to see if congestion has cleared.'
           : 'Note: You can always use /model to select a different option.'}
       </Text>

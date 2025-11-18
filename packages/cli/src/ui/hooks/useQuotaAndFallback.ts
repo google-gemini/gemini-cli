@@ -10,6 +10,7 @@ import {
   type FallbackModelHandler,
   type FallbackIntent,
   TerminalQuotaError,
+  ModelNotFoundError,
   type UserTierId,
   PREVIEW_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
@@ -53,6 +54,7 @@ export function useQuotaAndFallback({
 
       let message: string;
       let isTerminalQuotaError = false;
+      let isModelNotFoundError = false;
       if (error instanceof TerminalQuotaError) {
         isTerminalQuotaError = true;
         // Common part of the message for both tiers
@@ -62,6 +64,14 @@ export function useQuotaAndFallback({
           `/stats for usage details`,
           `/auth to switch to API key.`,
         ].filter(Boolean);
+        message = messageLines.join('\n');
+      } else if (error instanceof ModelNotFoundError) {
+        isModelNotFoundError = true;
+        const messageLines = [
+          `It seems like you don't have access to Gemini 3.`,
+          `Learn more at https://goo.gle/enable-preview-features`,
+          `To disable Gemini 3, disable "Preview features" in /settings.`,
+        ];
         message = messageLines.join('\n');
       } else {
         message = `${failedModel} is currently experiencing high demand. We apologize and appreciate your patience.`;
@@ -83,6 +93,7 @@ export function useQuotaAndFallback({
             resolve,
             message,
             isTerminalQuotaError,
+            isModelNotFoundError,
           });
         },
       );
@@ -108,7 +119,7 @@ export function useQuotaAndFallback({
           historyManager.addItem(
             {
               type: MessageType.INFO,
-              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}. We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.`,
+              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}. ${!proQuotaRequest.isModelNotFoundError ? `We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.` : ''}`,
             },
             Date.now(),
           );
