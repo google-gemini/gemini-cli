@@ -20,3 +20,4 @@ export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const LS_TOOL_NAME = 'list_directory';
 export const MEMORY_TOOL_NAME = 'save_memory';
+export const HF_IMAGE_GEN_TOOL_NAME = 'huggingface_image_generation';

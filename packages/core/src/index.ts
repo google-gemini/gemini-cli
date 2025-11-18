@@ -41,6 +41,7 @@ export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
 export * from './code_assist/types.js';
 export * from './core/apiKeyCredentialStorage.js';
+export * from './core/hfApiKeyStorage.js';
 
 // Export utilities
 export * from './utils/paths.js';
@@ -79,6 +80,7 @@ export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
+export * from './services/modelService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
