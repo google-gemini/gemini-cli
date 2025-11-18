@@ -145,28 +145,28 @@ describe('stableStringify', () => {
 
   describe('circular references', () => {
     it('should handle simple circular reference', () => {
-      const obj: any = { a: 1 };
+      const obj: Record<string, unknown> = { a: 1 };
       obj.self = obj;
 
       expect(stableStringify(obj)).toBe('{"a":1,"self":"[Circular]"}');
     });
 
     it('should handle circular reference in nested object', () => {
-      const obj: any = { a: 1, nested: {} };
-      obj.nested.parent = obj;
+      const obj: Record<string, unknown> = { a: 1, nested: {} };
+      obj.nested = { parent: obj };
 
       expect(stableStringify(obj)).toBe('{"a":1,"nested":{"parent":"[Circular]"}}');
     });
 
     it('should handle circular reference in array', () => {
-      const obj: any = { items: [] };
-      obj.items.push(obj);
+      const obj: Record<string, unknown> = { items: [] };
+      (obj.items as unknown[]).push(obj);
 
       expect(stableStringify(obj)).toBe('{"items":["[Circular]"]}');
     });
 
     it('should handle multiple circular references', () => {
-      const obj: any = { a: 1 };
+      const obj: Record<string, unknown> = { a: 1 };
       obj.ref1 = obj;
       obj.ref2 = obj;
 
@@ -174,7 +174,9 @@ describe('stableStringify', () => {
     });
 
     it('should handle deep circular references', () => {
-      const obj: any = { level1: { level2: { level3: {} } } };
+      const obj: Record<string, Record<string, Record<string, Record<string, unknown>>>> = {
+        level1: { level2: { level3: {} } },
+      };
       obj.level1.level2.level3.root = obj;
 
       expect(stableStringify(obj)).toBe(
@@ -194,8 +196,8 @@ describe('stableStringify', () => {
     });
 
     it('should handle array with circular reference to parent object', () => {
-      const obj: any = { data: [1, 2, 3] };
-      obj.data.push(obj);
+      const obj: Record<string, unknown> = { data: [1, 2, 3] };
+      (obj.data as unknown[]).push(obj);
 
       expect(stableStringify(obj)).toBe('{"data":[1,2,3,"[Circular]"]}');
     });
@@ -408,9 +410,9 @@ describe('stableStringify', () => {
     });
 
     it('should handle circular reference chains without infinite loop', () => {
-      const obj1: any = { name: 'obj1' };
-      const obj2: any = { name: 'obj2' };
-      const obj3: any = { name: 'obj3' };
+      const obj1: Record<string, unknown> = { name: 'obj1' };
+      const obj2: Record<string, unknown> = { name: 'obj2' };
+      const obj3: Record<string, unknown> = { name: 'obj3' };
 
       obj1.next = obj2;
       obj2.next = obj3;
@@ -481,13 +483,14 @@ describe('stableStringify', () => {
     });
 
     it('should handle sparse arrays', () => {
+      // eslint-disable-next-line no-sparse-arrays
       const arr = [1, , 3]; // sparse array with empty slot
       // Sparse arrays map over actual indices, empty slots result in empty positions
       expect(stableStringify(arr)).toBe('[1,,3]');
     });
 
     it('should handle arrays with object properties', () => {
-      const arr: any = [1, 2, 3];
+      const arr: unknown[] & { customProp?: string } = [1, 2, 3];
       arr.customProp = 'value';
       // Only array indices are serialized, not custom properties
       expect(stableStringify(arr)).toBe('[1,2,3]');

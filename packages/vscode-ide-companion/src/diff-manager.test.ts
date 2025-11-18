@@ -10,13 +10,13 @@ import { DiffContentProvider, DiffManager } from './diff-manager.js';
 
 vi.mock('vscode', () => {
   const EventEmitterMock = vi.fn(() => {
-    const listeners: Array<(arg: any) => void> = [];
+    const listeners: Array<(arg: unknown) => void> = [];
     return {
-      event: vi.fn((listener: (arg: any) => void) => {
+      event: vi.fn((listener: (arg: unknown) => void) => {
         listeners.push(listener);
         return { dispose: vi.fn() };
       }),
-      fire: vi.fn((arg: any) => {
+      fire: vi.fn((arg: unknown) => {
         listeners.forEach((listener) => listener(arg));
       }),
       dispose: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock('vscode', () => {
         scheme: 'file',
         path,
       })),
-      from: vi.fn((components: any) => ({
+      from: vi.fn((components: Record<string, unknown>) => ({
         ...components,
         toString: () =>
           `${components.scheme}://${components.path}${components.query ? `?${components.query}` : ''}`,
@@ -193,11 +193,11 @@ describe('DiffManager', () => {
     diffManager = new DiffManager(mockLog, diffContentProvider);
 
     vi.mocked(vscode.commands.executeCommand).mockResolvedValue(undefined);
-    vi.mocked(vscode.workspace.fs.stat).mockResolvedValue({} as any);
+    vi.mocked(vscode.workspace.fs.stat).mockResolvedValue({} as never);
     vi.mocked(vscode.workspace.openTextDocument).mockImplementation(
       async (uri: vscode.Uri) => {
         const content = diffContentProvider.getContent(uri) || '';
-        return createMockTextDocument(uri, content) as any;
+        return createMockTextDocument(uri, content) as never;
       },
     );
   });
@@ -272,7 +272,7 @@ describe('DiffManager', () => {
 
       // Check that some URI was set with the content
       expect(setContentSpy).toHaveBeenCalled();
-      const [uri, content] = setContentSpy.mock.calls[0];
+      const [_uri, content] = setContentSpy.mock.calls[0];
       expect(content).toBe(newContent);
     });
 
@@ -534,7 +534,7 @@ describe('DiffManager', () => {
         document: createMockTextDocument(diffUri, 'content'),
       };
 
-      await listener(mockEditor as any);
+      await listener(mockEditor as never);
 
       expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
         'setContext',
@@ -562,7 +562,7 @@ describe('DiffManager', () => {
         document: createMockTextDocument(otherUri, 'other content'),
       };
 
-      await listener(mockEditor as any);
+      await listener(mockEditor as never);
 
       expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
         'setContext',
@@ -580,7 +580,7 @@ describe('DiffManager', () => {
           onDidChangeActiveTextEditor.mock.calls.length - 1
         ][0];
 
-      await listener(undefined as any);
+      await listener(undefined as never);
 
       expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
         'setContext',
@@ -599,7 +599,7 @@ describe('DiffManager', () => {
       const manager = new DiffManager(
         () => {},
         new DiffContentProvider(),
-      ) as any;
+      ) as { dispose: () => void; subscriptions: unknown[] };
       manager.subscriptions = [mockSubscription];
 
       manager.dispose();
