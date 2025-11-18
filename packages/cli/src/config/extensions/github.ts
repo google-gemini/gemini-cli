@@ -487,7 +487,12 @@ async function downloadFile(
     https
       .get(url, { headers }, (res) => {
         if (res.statusCode === 302 || res.statusCode === 301) {
-          downloadFile(res.headers.location!, dest, options)
+          if (!res.headers.location) {
+            return reject(
+              new Error('Redirect response missing Location header'),
+            );
+          }
+          downloadFile(res.headers.location, dest, options)
             .then(resolve)
             .catch(reject);
           return;
