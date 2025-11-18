@@ -4,14 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { act } from 'react';
 import type { ToolMessageProps } from './ToolMessage.js';
 import { ToolMessage } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
-import type { AnsiOutput } from '@google/gemini-cli-core';
+import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { waitFor } from '../../../test-utils/async.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
+import { SHELL_COMMAND_NAME } from '../../constants.js';
 
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
@@ -66,19 +70,6 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
   },
 }));
 
-// Helper to render with context
-const renderWithContext = (
-  ui: React.ReactElement,
-  streamingState: StreamingState,
-) => {
-  const contextValue: StreamingState = streamingState;
-  return renderWithProviders(
-    <StreamingContext.Provider value={contextValue}>
-      {ui}
-    </StreamingContext.Provider>,
-  );
-};
-
 describe('<ToolMessage />', () => {
   const baseProps: ToolMessageProps = {
     callId: 'tool-123',
@@ -93,6 +84,29 @@ describe('<ToolMessage />', () => {
     borderColor: 'green',
     borderDimColor: false,
   };
+
+  const mockSetEmbeddedShellFocused = vi.fn();
+  const uiActions = {
+    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
+  };
+
+  // Helper to render with context
+  const renderWithContext = (
+    ui: React.ReactElement,
+    streamingState: StreamingState,
+  ) => {
+    const contextValue: StreamingState = streamingState;
+    return renderWithProviders(
+      <StreamingContext.Provider value={contextValue}>
+        {ui}
+      </StreamingContext.Provider>,
+      { uiActions },
+    );
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('renders basic tool information', () => {
     const { lastFrame } = renderWithContext(
@@ -230,5 +244,125 @@ describe('<ToolMessage />', () => {
       StreamingState.Idle,
     );
     expect(lastFrame()).toContain('MockAnsiOutput:hello');
+  });
+
+  describe('interactive shell focus', () => {
+    const shellProps: ToolMessageProps = {
+      ...baseProps,
+      name: SHELL_COMMAND_NAME,
+      status: ToolCallStatus.Executing,
+      config: {
+        getEnableInteractiveShell: () => true,
+      } as unknown as Config,
+    };
+
+    it('clicks inside the shell area sets focus to true', async () => {
+      const { stdin, lastFrame } = renderWithProviders(
+        <ToolMessage {...shellProps} />,
+        {
+          mouseEventsEnabled: true,
+          uiActions,
+        },
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('A tool for testing'); // Wait for render
+      });
+
+      await act(async () => {
+        // Simulate a click inside the shell box
+        // Assuming the box starts at (0,0) because it's the root component in the test
+        stdin.write('\x1b[<0;2;2M'); // Click at column 2, row 2 (1-based)
+      });
+
+      await waitFor(() => {
+        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
+      });
+    });
+
+    it('handles focus for SHELL_TOOL_NAME (core shell tool)', async () => {
+      const coreShellProps: ToolMessageProps = {
+        ...shellProps,
+        name: SHELL_TOOL_NAME,
+      };
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <ToolMessage {...coreShellProps} />,
+        {
+          mouseEventsEnabled: true,
+          uiActions,
+        },
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('A tool for testing');
+      });
+
+      await act(async () => {
+        stdin.write('\x1b[<0;2;2M');
+      });
+
+      await waitFor(() => {
+        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
+      });
+    });
+
+    it('clicks outside the shell area sets focus to false', async () => {
+      const { stdin, lastFrame } = renderWithProviders(
+        <ToolMessage {...shellProps} />,
+        {
+          mouseEventsEnabled: true,
+          uiActions,
+        },
+      );
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('A tool for testing'); // Wait for render
+      });
+
+      await act(async () => {
+        // Simulate a click outside the shell box
+        stdin.write('\x1b[<0;100;100M'); // Click at column 100, row 100
+      });
+
+      await waitFor(() => {
+        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+      });
+    });
+
+    it('resets focus when shell finishes', async () => {
+      let updateStatus: (s: ToolCallStatus) => void = () => {};
+
+      const Wrapper = () => {
+        const [status, setStatus] = React.useState(ToolCallStatus.Executing);
+        updateStatus = setStatus;
+        return (
+          <ToolMessage
+            {...shellProps}
+            status={status}
+            embeddedShellFocused={true}
+            activeShellPtyId={1}
+            ptyId={1}
+          />
+        );
+      };
+
+      const { lastFrame } = renderWithContext(<Wrapper />, StreamingState.Idle);
+
+      // Verify it is initially focused
+      await waitFor(() => {
+        expect(lastFrame()).toContain('(Focused)');
+      });
+
+      // Now update status to Success
+      await act(async () => {
+        updateStatus(ToolCallStatus.Success);
+      });
+
+      // Should call setEmbeddedShellFocused(false) because isThisShellFocused became false
+      await waitFor(() => {
+        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+      });
+    });
   });
 });

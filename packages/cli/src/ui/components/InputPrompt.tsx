@@ -42,6 +42,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -126,6 +127,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
+  const { setEmbeddedShellFocused } = useUIActions();
   const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
@@ -376,6 +378,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           mouseY >= y &&
           mouseY < y + height
         ) {
+          if (isEmbeddedShellFocused) {
+            setEmbeddedShellFocused(false);
+          }
           const relX = mouseX - x;
           const relY = mouseY - y;
           const visualRow = buffer.visualScrollRow + relY;
@@ -387,10 +392,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       return false;
     },
-    [buffer, handleClipboardPaste],
+    [
+      buffer,
+      isEmbeddedShellFocused,
+      setEmbeddedShellFocused,
+      handleClipboardPaste,
+    ],
   );
 
-  useMouse(handleMouse, { isActive: focus && !isEmbeddedShellFocused });
+  useMouse(handleMouse, { isActive: focus });
 
   const handleInput = useCallback(
     (key: Key) => {

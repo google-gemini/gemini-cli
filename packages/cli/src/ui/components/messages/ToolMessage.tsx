@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
@@ -22,8 +22,11 @@ import {
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
+import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useMouse, type MouseEvent } from '../../contexts/MouseContext.js';
+import { useUIActions } from '../../contexts/UIActionsContext.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -68,10 +71,60 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
   const isThisShellFocused =
-    (name === SHELL_COMMAND_NAME || name === 'Shell') &&
+    (name === SHELL_COMMAND_NAME ||
+      name === 'Shell' ||
+      name === SHELL_TOOL_NAME) &&
     status === ToolCallStatus.Executing &&
     ptyId === activeShellPtyId &&
     embeddedShellFocused;
+
+  const { setEmbeddedShellFocused } = useUIActions();
+  const containerRef = React.useRef<DOMElement>(null);
+  // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
+  const isThisShellFocusable =
+    (name === SHELL_COMMAND_NAME ||
+      name === 'Shell' ||
+      name === SHELL_TOOL_NAME) &&
+    status === ToolCallStatus.Executing &&
+    config?.getEnableInteractiveShell();
+
+  useMouse(
+    (event: MouseEvent) => {
+      if (isThisShellFocusable && event.name === 'left-press') {
+        if (containerRef.current) {
+          const { x, y, width, height } = getBoundingBox(containerRef.current);
+          // Terminal mouse events are 1-based, Ink layout is 0-based.
+          const mouseX = event.col - 1;
+          const mouseY = event.row - 1;
+
+          if (
+            mouseX >= x &&
+            mouseX < x + width &&
+            mouseY >= y &&
+            mouseY < y + height
+          ) {
+            setEmbeddedShellFocused(true);
+            return;
+          }
+        }
+        // If we clicked outside or containerRef is missing, unfocus
+        setEmbeddedShellFocused(false);
+      }
+    },
+    { isActive: !!isThisShellFocusable },
+  );
+
+  const wasFocusedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (isThisShellFocused) {
+      wasFocusedRef.current = true;
+    } else if (wasFocusedRef.current) {
+      if (embeddedShellFocused) {
+        setEmbeddedShellFocused(false);
+      }
+      wasFocusedRef.current = false;
+    }
+  }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
 
   const [lastUpdateTime, setLastUpdateTime] = React.useState<Date | null>(null);
   const [userHasFocused, setUserHasFocused] = React.useState(false);
@@ -100,11 +153,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       setUserHasFocused(true);
     }
   }, [isThisShellFocused]);
-
-  const isThisShellFocusable =
-    (name === SHELL_COMMAND_NAME || name === 'Shell') &&
-    status === ToolCallStatus.Executing &&
-    config?.getEnableInteractiveShell();
 
   const shouldShowFocusHint =
     isThisShellFocusable && (showFocusHint || userHasFocused);
@@ -199,7 +247,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ]);
 
   return (
-    <>
+    <Box ref={containerRef} flexDirection="column" width={terminalWidth}>
       <StickyHeader
         width={terminalWidth}
         isFirst={isFirst}
@@ -244,7 +292,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           </Box>
         )}
       </Box>
-    </>
+    </Box>
   );
 };
 
@@ -257,7 +305,10 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status,
   name,
 }) => {
-  const isShell = name === SHELL_COMMAND_NAME || name === SHELL_NAME;
+  const isShell =
+    name === SHELL_COMMAND_NAME ||
+    name === SHELL_NAME ||
+    name === SHELL_TOOL_NAME;
   const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
 
   return (

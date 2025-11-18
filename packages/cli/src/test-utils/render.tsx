@@ -8,6 +8,7 @@ import { render as inkRender } from 'ink-testing-library';
 import { Box } from 'ink';
 import type React from 'react';
 import { act } from 'react';
+import { vi } from 'vitest';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -20,6 +21,10 @@ import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
 import { StreamingContext } from '../ui/contexts/StreamingContext.js';
+import {
+  type UIActions,
+  UIActionsContext,
+} from '../ui/contexts/UIActionsContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
 
@@ -117,6 +122,38 @@ const baseMockUiState = {
   currentModel: 'gemini-pro',
 };
 
+const mockUIActions: UIActions = {
+  handleThemeSelect: vi.fn(),
+  closeThemeDialog: vi.fn(),
+  handleThemeHighlight: vi.fn(),
+  handleAuthSelect: vi.fn(),
+  setAuthState: vi.fn(),
+  onAuthError: vi.fn(),
+  handleEditorSelect: vi.fn(),
+  exitEditorDialog: vi.fn(),
+  exitPrivacyNotice: vi.fn(),
+  closeSettingsDialog: vi.fn(),
+  closeModelDialog: vi.fn(),
+  openPermissionsDialog: vi.fn(),
+  closePermissionsDialog: vi.fn(),
+  setShellModeActive: vi.fn(),
+  vimHandleInput: vi.fn(),
+  handleIdePromptComplete: vi.fn(),
+  handleFolderTrustSelect: vi.fn(),
+  setConstrainHeight: vi.fn(),
+  onEscapePromptChange: vi.fn(),
+  refreshStatic: vi.fn(),
+  handleFinalSubmit: vi.fn(),
+  handleClearScreen: vi.fn(),
+  handleProQuotaChoice: vi.fn(),
+  setQueueErrorMessage: vi.fn(),
+  popAllMessages: vi.fn(),
+  handleApiKeySubmit: vi.fn(),
+  handleApiKeyCancel: vi.fn(),
+  setBannerVisible: vi.fn(),
+  setEmbeddedShellFocused: vi.fn(),
+};
+
 export const renderWithProviders = (
   component: React.ReactElement,
   {
@@ -127,6 +164,7 @@ export const renderWithProviders = (
     mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
     useAlternateBuffer,
+    uiActions,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -135,6 +173,7 @@ export const renderWithProviders = (
     mouseEventsEnabled?: boolean;
     config?: Config;
     useAlternateBuffer?: boolean;
+    uiActions?: Partial<UIActions>;
   } = {},
 ): ReturnType<typeof render> => {
   const baseState: UIState = new Proxy(
@@ -175,6 +214,8 @@ export const renderWithProviders = (
     mainAreaWidth,
   };
 
+  const finalUIActions = { ...mockUIActions, ...uiActions };
+
   return render(
     <ConfigContext.Provider value={config}>
       <SettingsContext.Provider value={finalSettings}>
@@ -182,20 +223,22 @@ export const renderWithProviders = (
           <VimModeProvider settings={finalSettings}>
             <ShellFocusContext.Provider value={shellFocus}>
               <StreamingContext.Provider value={finalUiState.streamingState}>
-                <KeypressProvider>
-                  <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                    <ScrollProvider>
-                      <Box
-                        width={terminalWidth}
-                        flexShrink={0}
-                        flexGrow={0}
-                        flexDirection="column"
-                      >
-                        {component}
-                      </Box>
-                    </ScrollProvider>
-                  </MouseProvider>
-                </KeypressProvider>
+                <UIActionsContext.Provider value={finalUIActions}>
+                  <KeypressProvider>
+                    <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                      <ScrollProvider>
+                        <Box
+                          width={terminalWidth}
+                          flexShrink={0}
+                          flexGrow={0}
+                          flexDirection="column"
+                        >
+                          {component}
+                        </Box>
+                      </ScrollProvider>
+                    </MouseProvider>
+                  </KeypressProvider>
+                </UIActionsContext.Provider>
               </StreamingContext.Provider>
             </ShellFocusContext.Provider>
           </VimModeProvider>
