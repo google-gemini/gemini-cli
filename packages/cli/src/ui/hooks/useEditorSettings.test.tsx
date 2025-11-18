@@ -21,12 +21,13 @@ import type {
   LoadedSettings,
 } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
-import { MessageType, type HistoryItem } from '../types.js';
+import { MessageType } from '../types.js';
 import {
   type EditorType,
   checkHasEditorType,
   allowEditorTypeInSandbox,
 } from '@google/gemini-cli-core';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 import { SettingPaths } from '../../config/settingPaths.js';
 
@@ -45,9 +46,7 @@ const mockAllowEditorTypeInSandbox = vi.mocked(allowEditorTypeInSandbox);
 describe('useEditorSettings', () => {
   let mockLoadedSettings: LoadedSettings;
   let mockSetEditorError: MockedFunction<(error: string | null) => void>;
-  let mockAddItem: MockedFunction<
-    (item: Omit<HistoryItem, 'id'>, timestamp: number) => void
-  >;
+  let mockAddItem: MockedFunction<UseHistoryManagerReturn['addItem']>;
   let result: ReturnType<typeof useEditorSettings>;
 
   function TestComponent() {

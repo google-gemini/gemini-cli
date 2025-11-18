@@ -307,6 +307,7 @@ export const useSlashCommandProcessor = (
     async (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
+      addToHistory: boolean = true,
       overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
       if (!commands) {
@@ -323,8 +324,13 @@ export const useSlashCommandProcessor = (
 
       setIsProcessing(true);
 
-      const userMessageTimestamp = Date.now();
-      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
+      if (addToHistory) {
+        const userMessageTimestamp = Date.now();
+        addItem(
+          { type: MessageType.USER, text: trimmed },
+          userMessageTimestamp,
+        );
+      }
 
       let hasError = false;
       const {
