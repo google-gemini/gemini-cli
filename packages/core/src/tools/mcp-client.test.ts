@@ -38,16 +38,36 @@ vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
 
 vi.mock('../mcp/google-auth-provider.js', () => {
-  const mockGetRequestHeaders = vi.fn().mockResolvedValue({});
-  const mockTokens = vi.fn().mockResolvedValue({ access_token: 'test-token' });
+  class GoogleCredentialProvider {
+    constructor(private readonly config?: { url?: string; httpUrl?: string }) {
+      const url = this.config?.url || this.config?.httpUrl;
+      if (!url) {
+        throw new Error(
+          'URL must be provided in the config for Google Credentials provider',
+        );
+      }
+    }
 
-  const MockGoogleCredentialProvider = vi.fn().mockImplementation(() => ({
-    getRequestHeaders: mockGetRequestHeaders,
-    tokens: mockTokens,
-  }));
+    async getRequestHeaders() {
+      const quotaProjectId = await this.getQuotaProjectId();
+      const headers: Record<string, string> = {};
+      if (quotaProjectId) {
+        headers['X-Goog-User-Project'] = quotaProjectId;
+      }
+      return headers;
+    }
+
+    async tokens() {
+      return { access_token: 'test-token' };
+    }
+
+    async getQuotaProjectId() {
+      return undefined;
+    }
+  }
 
   return {
-    GoogleCredentialProvider: MockGoogleCredentialProvider,
+    GoogleCredentialProvider,
   };
 });
 vi.mock('../utils/events.js', () => ({
