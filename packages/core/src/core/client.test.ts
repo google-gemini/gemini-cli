@@ -15,11 +15,7 @@ import {
 } from 'vitest';
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
-import {
-  isThinkingDefault,
-  isThinkingSupported,
-  GeminiClient,
-} from './client.js';
+import { isThinkingSupported, GeminiClient } from './client.js';
 import {
   AuthType,
   type ContentGenerator,
@@ -147,28 +143,13 @@ describe('isThinkingSupported', () => {
     expect(isThinkingSupported('gemini-2.5-pro')).toBe(true);
   });
 
+  it('should return true for gemini-3-pro', () => {
+    expect(isThinkingSupported('gemini-3-pro')).toBe(true);
+  });
+
   it('should return false for other models', () => {
     expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
     expect(isThinkingSupported('some-other-model')).toBe(false);
-  });
-});
-
-describe('isThinkingDefault', () => {
-  it('should return false for gemini-2.5-flash-lite', () => {
-    expect(isThinkingDefault('gemini-2.5-flash-lite')).toBe(false);
-  });
-
-  it('should return true for gemini-2.5', () => {
-    expect(isThinkingDefault('gemini-2.5')).toBe(true);
-  });
-
-  it('should return true for gemini-2.5-pro', () => {
-    expect(isThinkingDefault('gemini-2.5-pro')).toBe(true);
-  });
-
-  it('should return false for other models', () => {
-    expect(isThinkingDefault('gemini-1.5-flash')).toBe(false);
-    expect(isThinkingDefault('some-other-model')).toBe(false);
   });
 });
 
@@ -241,6 +222,7 @@ describe('Gemini Client (client.ts)', () => {
       getIdeModeFeature: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(true),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
@@ -254,6 +236,7 @@ describe('Gemini Client (client.ts)', () => {
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getUseSmartEdit: vi.fn().mockReturnValue(false),
       getUseModelRouter: vi.fn().mockReturnValue(false),
+      getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -1488,6 +1471,7 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toEqual([
+        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
@@ -1539,7 +1523,10 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      expect(events).toEqual([{ type: GeminiEventType.InvalidStream }]);
+      expect(events).toEqual([
+        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
+        { type: GeminiEventType.InvalidStream },
+      ]);
 
       // Verify that turn.run was called only once
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
@@ -1573,10 +1560,12 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 2 InvalidStream events (original + 1 retry)
-      expect(events.length).toBe(2);
+      // We expect 3 events (model_info + original + 1 retry)
+      expect(events.length).toBe(3);
       expect(
-        events.every((e) => e.type === GeminiEventType.InvalidStream),
+        events
+          .filter((e) => e.type !== GeminiEventType.ModelInfo)
+          .every((e) => e.type === GeminiEventType.InvalidStream),
       ).toBe(true);
 
       // Verify that turn.run was called twice

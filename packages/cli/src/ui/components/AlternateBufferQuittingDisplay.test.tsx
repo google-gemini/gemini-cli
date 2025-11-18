@@ -11,7 +11,10 @@ import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { Text } from 'ink';
 import { renderWithProviders } from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
-import type { ToolMessageProps } from './messages/ToolMessage.js';
+
+vi.mock('../utils/terminalSetup.js', () => ({
+  getTerminalProgram: () => null,
+}));
 
 vi.mock('../contexts/AppContext.js', () => ({
   useAppContext: () => ({
@@ -30,14 +33,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('../GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: () => <Text>Spinner</Text>,
-}));
-
-vi.mock('./messages/ToolMessage.js', () => ({
-  ToolMessage: (props: ToolMessageProps) => (
-    <Text>
-      ToolMessage: {props.name} - {props.status}
-    </Text>
-  ),
 }));
 
 const mockHistory: HistoryItem[] = [
@@ -94,6 +89,11 @@ const mockConfig = {
   getTargetDir: () => '/tmp',
   getDebugMode: () => false,
   getGeminiMdFileCount: () => 0,
+  getExperiments: () => ({
+    flags: {},
+    experimentIds: [],
+  }),
+  getPreviewFeatures: () => false,
 } as unknown as Config;
 
 describe('AlternateBufferQuittingDisplay', () => {
@@ -110,6 +110,10 @@ describe('AlternateBufferQuittingDisplay', () => {
           activePtyId: undefined,
           embeddedShellFocused: false,
           renderMarkdown: false,
+          bannerData: {
+            defaultText: '',
+            warningText: '',
+          },
         },
         config: mockConfig,
       },

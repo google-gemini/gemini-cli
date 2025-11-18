@@ -14,7 +14,10 @@ import type { EditorType } from '@google/gemini-cli-core';
 import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
+  getEditorDisplayName,
 } from '@google/gemini-cli-core';
+
+import { SettingPaths } from '../../config/settingPaths.js';
 
 interface UseEditorSettingsReturn {
   isEditorDialogOpen: boolean;
@@ -48,11 +51,15 @@ export const useEditorSettings = (
       }
 
       try {
-        loadedSettings.setValue(scope, 'preferredEditor', editorType);
+        loadedSettings.setValue(
+          scope,
+          SettingPaths.General.PreferredEditor,
+          editorType,
+        );
         addItem(
           {
             type: MessageType.INFO,
-            text: `Editor preference ${editorType ? `set to "${editorType}"` : 'cleared'} in ${scope} settings.`,
+            text: `Editor preference ${editorType ? `set to "${getEditorDisplayName(editorType)}"` : 'cleared'} in ${scope} settings.`,
           },
           Date.now(),
         );

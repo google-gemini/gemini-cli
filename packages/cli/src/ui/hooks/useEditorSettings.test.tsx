@@ -28,6 +28,8 @@ import {
   allowEditorTypeInSandbox,
 } from '@google/gemini-cli-core';
 
+import { SettingPaths } from '../../config/settingPaths.js';
+
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
   return {
@@ -114,14 +116,14 @@ describe('useEditorSettings', () => {
 
     expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
       scope,
-      'preferredEditor',
+      SettingPaths.General.PreferredEditor,
       editorType,
     );
 
     expect(mockAddItem).toHaveBeenCalledWith(
       {
         type: MessageType.INFO,
-        text: 'Editor preference set to "vscode" in User settings.',
+        text: 'Editor preference set to "VS Code" in User settings.',
       },
       expect.any(Number),
     );
@@ -142,7 +144,7 @@ describe('useEditorSettings', () => {
 
     expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
       scope,
-      'preferredEditor',
+      SettingPaths.General.PreferredEditor,
       undefined,
     );
 
@@ -162,6 +164,11 @@ describe('useEditorSettings', () => {
     render(<TestComponent />);
 
     const editorTypes: EditorType[] = ['cursor', 'windsurf', 'vim'];
+    const displayNames: Record<string, string> = {
+      cursor: 'Cursor',
+      windsurf: 'Windsurf',
+      vim: 'Vim',
+    };
     const scope = SettingScope.User;
 
     editorTypes.forEach((editorType) => {
@@ -171,14 +178,14 @@ describe('useEditorSettings', () => {
 
       expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
         scope,
-        'preferredEditor',
+        SettingPaths.General.PreferredEditor,
         editorType,
       );
 
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: `Editor preference set to "${editorType}" in User settings.`,
+          text: `Editor preference set to "${displayNames[editorType]}" in User settings.`,
         },
         expect.any(Number),
       );
@@ -201,14 +208,14 @@ describe('useEditorSettings', () => {
 
       expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
         scope,
-        'preferredEditor',
+        SettingPaths.General.PreferredEditor,
         editorType,
       );
 
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: `Editor preference set to "vscode" in ${scope} settings.`,
+          text: `Editor preference set to "VS Code" in ${scope} settings.`,
         },
         expect.any(Number),
       );

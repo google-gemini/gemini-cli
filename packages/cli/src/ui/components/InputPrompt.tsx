@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
@@ -79,6 +80,7 @@ export interface InputPromptProps {
   streamingState: StreamingState;
   popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
   suggestionsPosition?: 'above' | 'below';
+  setBannerVisible: (visible: boolean) => void;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -120,6 +122,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   streamingState,
   popAllMessages,
   suggestionsPosition = 'below',
+  setBannerVisible,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -315,7 +318,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   }, [buffer, popAllMessages, inputHistory]);
 
   // Handle clipboard image pasting with Ctrl+V
-  const handleClipboardImage = useCallback(async () => {
+  const handleClipboardPaste = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -331,14 +334,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
           const currentText = buffer.text;
-          const [row, col] = buffer.cursor;
-
-          // Calculate offset from row/col
-          let offset = 0;
-          for (let i = 0; i < row; i++) {
-            offset += buffer.lines[i].length + 1; // +1 for newline
-          }
-          offset += col;
+          const offset = buffer.getOffset();
 
           // Add spaces around the path if needed
           let textToInsert = insertText;
@@ -355,8 +351,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          return;
         }
       }
+
+      const textToInsert = await clipboardy.read();
+      const offset = buffer.getOffset();
+      buffer.replaceRangeByOffset(offset, offset, textToInsert);
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
@@ -379,10 +380,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const relY = mouseY - y;
           const visualRow = buffer.visualScrollRow + relY;
           buffer.moveToVisualPosition(visualRow, relX);
+          return true;
         }
+      } else if (event.name === 'right-release') {
+        handleClipboardPaste();
       }
+      return false;
     },
-    [buffer],
+    [buffer, handleClipboardPaste],
   );
 
   useMouse(handleMouse, { isActive: focus && !isEmbeddedShellFocused });
@@ -522,6 +527,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
+        setBannerVisible(false);
         onClearScreen();
         return;
       }
@@ -770,9 +776,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Ctrl+V for clipboard image paste
-      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
-        handleClipboardImage();
+      // Ctrl+V for clipboard paste
+      if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
+        handleClipboardPaste();
         return;
       }
 
@@ -803,7 +809,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmit,
       shellHistory,
       reverseSearchCompletion,
-      handleClipboardImage,
+      handleClipboardPaste,
       resetCompletionState,
       showEscapePrompt,
       resetEscapeState,
@@ -816,6 +822,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchCompletion,
       kittyProtocol.supported,
       tryLoadQueuedMessages,
+      setBannerVisible,
     ],
   );
 
