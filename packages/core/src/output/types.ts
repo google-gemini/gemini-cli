@@ -80,6 +80,8 @@ export interface StreamStats {
   total_tokens: number;
   input_tokens: number;
   output_tokens: number;
+  cached_tokens: number;
+  thoughts_tokens: number;
   duration_ms: number;
   tool_calls: number;
 }
