@@ -167,4 +167,23 @@ describe('<AppHeader />', () => {
     );
     unmount();
   });
+
+  it('should render banner text with unescaped newlines', () => {
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      bannerData: {
+        defaultText: 'First line\\nSecond line',
+        warningText: '',
+      },
+      bannerVisible: true,
+    };
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig, uiState },
+    );
+
+    expect(lastFrame()).not.toContain('First line\\nSecond line');
+    unmount();
+  });
 });

@@ -36,6 +36,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
     !config.getPreviewFeatures() &&
     defaultBannerShownCount < 5;
   const bannerText = showDefaultBanner ? defaultText : warningText;
+  const unescapedBannerText = bannerText.replace(/\\n/g, '\n');
 
   const defaultColor = Colors.AccentBlue;
   const fontColor = warningText === '' ? defaultColor : theme.status.warning;
@@ -54,10 +55,10 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
       {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
         <>
           <Header version={version} nightly={nightly} />
-          {bannerVisible && bannerText && (
+          {bannerVisible && unescapedBannerText && (
             <Banner
               width={mainAreaWidth}
-              bannerText={bannerText}
+              bannerText={unescapedBannerText}
               color={fontColor}
             />
           )}
