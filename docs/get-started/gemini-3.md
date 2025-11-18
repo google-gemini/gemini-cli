@@ -1,12 +1,13 @@
 # Gemini 3 Pro on Gemini CLI (Join the Waitlist)
 
-We’re excited to bring Gemini 3 Pro to Gemini CLI. For Google AI Ultra
-subscribers and paid Gemini and Vertex API key holders, Gemini 3 Pro is already
-available and ready to enable. For everyone else, we're gradually expanding
-access through a waitlist. Sign up for the waitlist now to access Gemini 3 Pro
-once approved.
+We’re excited to bring Gemini 3 Pro to Gemini CLI. For Google AI Ultra users
+(Google AI Ultra for Business is not currently supported) and paid Gemini and
+Vertex API key holders, Gemini 3 Pro is already available and ready to enable.
+For everyone else, we're gradually expanding access
+[through a waitlist](https://goo.gle/geminicli-waitlist-signup). Sign up for the
+waitlist now to access Gemini 3 Pro once approved.
 
-Note: Please wait until you have been approved to use Gemini 3 Pro to enable
+**Note:** Please wait until you have been approved to use Gemini 3 Pro to enable
 **Preview Features**. If enabled early, the CLI will fallback to Gemini 2.5 Pro.
 
 ## Do I need to join the waitlist?
@@ -14,7 +15,8 @@ Note: Please wait until you have been approved to use Gemini 3 Pro to enable
 The following users will be **automatically granted access** to Gemini 3 Pro on
 Gemini CLI:
 
-- Google AI Ultra subscribers.
+- Google AI Ultra subscribers (excluding Google AI Ultra for Business, which is
+  on the roadmap).
 - Gemini API key users
   [with access to Gemini 3](https://ai.google.dev/gemini-api/docs/rate-limits).
 - Vertex API key users
@@ -74,9 +76,10 @@ There may be times when the Gemini 3 Pro model is overloaded. When that happens,
 Gemini CLI will ask you to decide whether you want to keep trying Gemini 3 Pro
 or fallback to Gemini 2.5 Pro.
 
-Note: The **Keep trying** option uses exponential backoff, in which Gemini CLI
-waits longer between each retry, when the system is busy. If the retry doesn't
-happen immediately, please wait a few minutes for the request to process.
+**Note:** The **Keep trying** option uses exponential backoff, in which Gemini
+CLI waits longer between each retry, when the system is busy. If the retry
+doesn't happen immediately, please wait a few minutes for the request to
+process.
 
 ## Model selection & routing types
 
