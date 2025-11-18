@@ -406,6 +406,7 @@ describe('KeypressContext', () => {
   describe('Parameterized functional keys', () => {
     it.each([
       // Parameterized
+      { sequence: `\x1b[1;129A`, expected: { name: 'up' } },
       { sequence: `\x1b[1;2H`, expected: { name: 'home', shift: true } },
       { sequence: `\x1b[1;5F`, expected: { name: 'end', ctrl: true } },
       { sequence: `\x1b[1;1P`, expected: { name: 'f1' } },
@@ -448,6 +449,10 @@ describe('KeypressContext', () => {
       {
         sequence: `\x1b[F`,
         expected: { name: 'end', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[5H`,
+        expected: { name: 'home', ctrl: true, meta: false, shift: false },
       },
     ])(
       'should recognize sequence "$sequence" as $expected.name',
