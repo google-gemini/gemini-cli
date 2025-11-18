@@ -307,8 +307,8 @@ export const useSlashCommandProcessor = (
     async (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
-      addToHistory: boolean = true,
       overwriteConfirmed?: boolean,
+      addToHistory: boolean = true,
     ): Promise<SlashCommandProcessorResult | false> => {
       if (!commands) {
         return false;
