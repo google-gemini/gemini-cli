@@ -4,18 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import fsPromises from 'fs/promises';
-import path from 'path';
-import { EOL } from 'os';
-import { spawn } from 'child_process';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
+import { EOL } from 'node:os';
+import { spawn } from 'node:child_process';
 import { globStream } from 'glob';
-import { BaseTool, ToolResult } from './tools.js';
-import { Type } from '@google/genai';
-import { SchemaValidator } from '../utils/schemaValidator.js';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
+import type { Config } from '../config/config.js';
+import type { FileExclusions } from '../utils/ignorePatterns.js';
+import { ToolErrorType } from './tool-error.js';
+import { GREP_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // --- Interfaces ---
 
@@ -31,7 +36,7 @@ export interface GrepToolParams {
   /**
    * The directory to search in (optional, defaults to current directory relative to root)
    */
-  path?: string;
+  dir_path?: string;
 
   /**
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
@@ -48,67 +53,43 @@ interface GrepMatch {
   line: string;
 }
 
-// --- GrepLogic Class ---
+class GrepToolInvocation extends BaseToolInvocation<
+  GrepToolParams,
+  ToolResult
+> {
+  private readonly fileExclusions: FileExclusions;
 
-/**
- * Implementation of the Grep tool logic (moved from CLI)
- */
-export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
-  static readonly Name = 'search_file_content'; // Keep static name
-
-  /**
-   * Creates a new instance of the GrepLogic
-   * @param rootDirectory Root directory to ground this tool in. All operations will be restricted to this directory.
-   */
-  constructor(private rootDirectory: string) {
-    super(
-      GrepTool.Name,
-      'SearchText',
-      'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
-      {
-        properties: {
-          pattern: {
-            description:
-              "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
-            type: Type.STRING,
-          },
-          path: {
-            description:
-              'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
-            type: Type.STRING,
-          },
-          include: {
-            description:
-              "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
-            type: Type.STRING,
-          },
-        },
-        required: ['pattern'],
-        type: Type.OBJECT,
-      },
-    );
-    // Ensure rootDirectory is absolute and normalized
-    this.rootDirectory = path.resolve(rootDirectory);
+  constructor(
+    private readonly config: Config,
+    params: GrepToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+    this.fileExclusions = config.getFileExclusions();
   }
-
-  // --- Validation Methods ---
 
   /**
    * Checks if a path is within the root directory and resolves it.
    * @param relativePath Path relative to the root directory (or undefined for root).
-   * @returns The absolute path if valid and exists.
+   * @returns The absolute path if valid and exists, or null if no path specified (to search all directories).
    * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
    */
-  private resolveAndValidatePath(relativePath?: string): string {
-    const targetPath = path.resolve(this.rootDirectory, relativePath || '.');
+  private resolveAndValidatePath(relativePath?: string): string | null {
+    // If no path specified, return null to indicate searching all workspace directories
+    if (!relativePath) {
+      return null;
+    }
 
-    // Security Check: Ensure the resolved path is still within the root directory.
-    if (
-      !targetPath.startsWith(this.rootDirectory) &&
-      targetPath !== this.rootDirectory
-    ) {
+    const targetPath = path.resolve(this.config.getTargetDir(), relativePath);
+
+    // Security Check: Ensure the resolved path is within workspace boundaries
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
+      const directories = workspaceContext.getDirectories();
       throw new Error(
-        `Path validation failed: Attempted path "${relativePath || '.'}" resolves outside the allowed root directory "${this.rootDirectory}".`,
+        `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
       );
     }
 
@@ -130,89 +111,79 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
     return targetPath;
   }
 
-  /**
-   * Validates the parameters for the tool
-   * @param params Parameters to validate
-   * @returns An error message string if invalid, null otherwise
-   */
-  validateToolParams(params: GrepToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
-    }
-
+  async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      new RegExp(params.pattern);
-    } catch (error) {
-      return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
-    }
+      const workspaceContext = this.config.getWorkspaceContext();
+      const searchDirAbs = this.resolveAndValidatePath(this.params.dir_path);
+      const searchDirDisplay = this.params.dir_path || '.';
 
-    try {
-      this.resolveAndValidatePath(params.path);
-    } catch (error) {
-      return getErrorMessage(error);
-    }
+      // Determine which directories to search
+      let searchDirectories: readonly string[];
+      if (searchDirAbs === null) {
+        // No path specified - search all workspace directories
+        searchDirectories = workspaceContext.getDirectories();
+      } else {
+        // Specific path provided - search only that directory
+        searchDirectories = [searchDirAbs];
+      }
 
-    return null; // Parameters are valid
-  }
+      // Collect matches from all search directories
+      let allMatches: GrepMatch[] = [];
+      for (const searchDir of searchDirectories) {
+        const matches = await this.performGrepSearch({
+          pattern: this.params.pattern,
+          path: searchDir,
+          include: this.params.include,
+          signal,
+        });
 
-  // --- Core Execution ---
+        // Add directory prefix if searching multiple directories
+        if (searchDirectories.length > 1) {
+          const dirName = path.basename(searchDir);
+          matches.forEach((match) => {
+            match.filePath = path.join(dirName, match.filePath);
+          });
+        }
 
-  /**
-   * Executes the grep search with the given parameters
-   * @param params Parameters for the grep search
-   * @returns Result of the grep search
-   */
-  async execute(
-    params: GrepToolParams,
-    signal: AbortSignal,
-  ): Promise<ToolResult> {
-    const validationError = this.validateToolParams(params);
-    if (validationError) {
-      return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: `Model provided invalid parameters. Error: ${validationError}`,
-      };
-    }
+        allMatches = allMatches.concat(matches);
+      }
 
-    let searchDirAbs: string;
-    try {
-      searchDirAbs = this.resolveAndValidatePath(params.path);
-      const searchDirDisplay = params.path || '.';
+      let searchLocationDescription: string;
+      if (searchDirAbs === null) {
+        const numDirs = workspaceContext.getDirectories().length;
+        searchLocationDescription =
+          numDirs > 1
+            ? `across ${numDirs} workspace directories`
+            : `in the workspace directory`;
+      } else {
+        searchLocationDescription = `in path "${searchDirDisplay}"`;
+      }
 
-      const matches: GrepMatch[] = await this.performGrepSearch({
-        pattern: params.pattern,
-        path: searchDirAbs,
-        include: params.include,
-        signal,
-      });
-
-      if (matches.length === 0) {
-        const noMatchMsg = `No matches found for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}.`;
+      if (allMatches.length === 0) {
+        const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
         return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
       }
 
-      const matchesByFile = matches.reduce(
+      // Group matches by file
+      const matchesByFile = allMatches.reduce(
         (acc, match) => {
-          const relativeFilePath =
-            path.relative(
-              searchDirAbs,
-              path.resolve(searchDirAbs, match.filePath),
-            ) || path.basename(match.filePath);
-          if (!acc[relativeFilePath]) {
-            acc[relativeFilePath] = [];
+          const fileKey = match.filePath;
+          if (!acc[fileKey]) {
+            acc[fileKey] = [];
           }
-          acc[relativeFilePath].push(match);
-          acc[relativeFilePath].sort((a, b) => a.lineNumber - b.lineNumber);
+          acc[fileKey].push(match);
+          acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
           return acc;
         },
         {} as Record<string, GrepMatch[]>,
       );
 
-      const matchCount = matches.length;
+      const matchCount = allMatches.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
 
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${params.pattern}" in path "${searchDirDisplay}"${params.include ? ` (filter: "${params.include}")` : ''}:\n---\n`;
+      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}:
+---
+`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
@@ -228,16 +199,18 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         returnDisplay: `Found ${matchCount} ${matchTerm}`,
       };
     } catch (error) {
-      console.error(`Error during GrepLogic execution: ${error}`);
+      debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.GREP_EXECUTION_ERROR,
+        },
       };
     }
   }
-
-  // --- Grep Implementation Logic ---
 
   /**
    * Checks if a command is available in the system's PATH.
@@ -252,10 +225,16 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       try {
         const child = spawn(checkCommand, checkArgs, {
           stdio: 'ignore',
-          shell: process.platform === 'win32',
+          shell: true,
         });
         child.on('close', (code) => resolve(code === 0));
-        child.on('error', () => resolve(false));
+        child.on('error', (err) => {
+          debugLogger.debug(
+            `[GrepTool] Failed to start process for '${command}':`,
+            err.message,
+          );
+          resolve(false);
+        });
       } catch {
         resolve(false);
       }
@@ -313,21 +292,36 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
   /**
    * Gets a description of the grep operation
-   * @param params Parameters for the grep operation
    * @returns A string describing the grep
    */
-  getDescription(params: GrepToolParams): string {
-    let description = `'${params.pattern}'`;
-    if (params.include) {
-      description += ` in ${params.include}`;
+  getDescription(): string {
+    let description = `'${this.params.pattern}'`;
+    if (this.params.include) {
+      description += ` in ${this.params.include}`;
     }
-    if (params.path) {
-      const resolvedPath = path.resolve(this.rootDirectory, params.path);
-      if (resolvedPath === this.rootDirectory || params.path === '.') {
+    if (this.params.dir_path) {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        this.params.dir_path,
+      );
+      if (
+        resolvedPath === this.config.getTargetDir() ||
+        this.params.dir_path === '.'
+      ) {
         description += ` within ./`;
       } else {
-        const relativePath = makeRelative(resolvedPath, this.rootDirectory);
+        const relativePath = makeRelative(
+          resolvedPath,
+          this.config.getTargetDir(),
+        );
         description += ` within ${shortenPath(relativePath)}`;
+      }
+    } else {
+      // When no path is specified, indicate searching all workspace directories
+      const workspaceContext = this.config.getWorkspaceContext();
+      const directories = workspaceContext.getDirectories();
+      if (directories.length > 1) {
+        description += ` across all workspace directories`;
       }
     }
     return description;
@@ -394,18 +388,44 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (gitError: unknown) {
-          console.debug(
-            `GrepLogic: git grep failed: ${getErrorMessage(gitError)}. Falling back...`,
+          debugLogger.debug(
+            `GrepLogic: git grep failed: ${getErrorMessage(
+              gitError,
+            )}. Falling back...`,
           );
         }
       }
 
       // --- Strategy 2: System grep ---
+      debugLogger.debug(
+        'GrepLogic: System grep is being considered as fallback strategy.',
+      );
+
       const grepAvailable = await this.isCommandAvailable('grep');
       if (grepAvailable) {
         strategyUsed = 'system grep';
-        const grepArgs = ['-r', '-n', '-H', '-E'];
-        const commonExcludes = ['.git', 'node_modules', 'bower_components'];
+        const grepArgs = ['-r', '-n', '-H', '-E', '-I'];
+        // Extract directory names from exclusion patterns for grep --exclude-dir
+        const globExcludes = this.fileExclusions.getGlobExcludes();
+        const commonExcludes = globExcludes
+          .map((pattern) => {
+            let dir = pattern;
+            if (dir.startsWith('**/')) {
+              dir = dir.substring(3);
+            }
+            if (dir.endsWith('/**')) {
+              dir = dir.slice(0, -3);
+            } else if (dir.endsWith('/')) {
+              dir = dir.slice(0, -1);
+            }
+
+            // Only consider patterns that are likely directories. This filters out file patterns.
+            if (dir && !dir.includes('/') && !dir.includes('*')) {
+              return dir;
+            }
+            return null;
+          })
+          .filter((dir): dir is string => !!dir);
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
         if (include) {
           grepArgs.push(`--include=${include}`);
@@ -474,25 +494,21 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           });
           return this.parseGrepOutput(output, absolutePath);
         } catch (grepError: unknown) {
-          console.debug(
-            `GrepLogic: System grep failed: ${getErrorMessage(grepError)}. Falling back...`,
+          debugLogger.debug(
+            `GrepLogic: System grep failed: ${getErrorMessage(
+              grepError,
+            )}. Falling back...`,
           );
         }
       }
 
       // --- Strategy 3: Pure JavaScript Fallback ---
-      console.debug(
+      debugLogger.debug(
         'GrepLogic: Falling back to JavaScript grep implementation.',
       );
       strategyUsed = 'javascript fallback';
       const globPattern = include ? include : '**/*';
-      const ignorePatterns = [
-        '.git/**',
-        'node_modules/**',
-        'bower_components/**',
-        '.svn/**',
-        '.hg/**',
-      ]; // Use glob patterns for ignores here
+      const ignorePatterns = this.fileExclusions.getGlobExcludes();
 
       const filesStream = globStream(globPattern, {
         cwd: absolutePath,
@@ -525,8 +541,10 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         } catch (readError: unknown) {
           // Ignore errors like permission denied or file gone during read
           if (!isNodeError(readError) || readError.code !== 'ENOENT') {
-            console.debug(
-              `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(readError)}`,
+            debugLogger.debug(
+              `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(
+                readError,
+              )}`,
             );
           }
         }
@@ -534,10 +552,138 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
 
       return allMatches;
     } catch (error: unknown) {
-      console.error(
-        `GrepLogic: Error in performGrepSearch (Strategy: ${strategyUsed}): ${getErrorMessage(error)}`,
+      debugLogger.warn(
+        `GrepLogic: Error in performGrepSearch (Strategy: ${strategyUsed}): ${getErrorMessage(
+          error,
+        )}`,
       );
       throw error; // Re-throw
     }
+  }
+}
+
+// --- GrepLogic Class ---
+
+/**
+ * Implementation of the Grep tool logic (moved from CLI)
+ */
+export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
+  static readonly Name = GREP_TOOL_NAME;
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
+    super(
+      GrepTool.Name,
+      'SearchText',
+      'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
+      Kind.Search,
+      {
+        properties: {
+          pattern: {
+            description:
+              "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
+            type: 'string',
+          },
+          dir_path: {
+            description:
+              'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
+            type: 'string',
+          },
+          include: {
+            description:
+              "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
+            type: 'string',
+          },
+        },
+        required: ['pattern'],
+        type: 'object',
+      },
+      true,
+      false,
+      messageBus,
+    );
+  }
+
+  /**
+   * Checks if a path is within the root directory and resolves it.
+   * @param relativePath Path relative to the root directory (or undefined for root).
+   * @returns The absolute path if valid and exists, or null if no path specified (to search all directories).
+   * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
+   */
+  private resolveAndValidatePath(relativePath?: string): string | null {
+    // If no path specified, return null to indicate searching all workspace directories
+    if (!relativePath) {
+      return null;
+    }
+
+    const targetPath = path.resolve(this.config.getTargetDir(), relativePath);
+
+    // Security Check: Ensure the resolved path is within workspace boundaries
+    const workspaceContext = this.config.getWorkspaceContext();
+    if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
+      const directories = workspaceContext.getDirectories();
+      throw new Error(
+        `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
+      );
+    }
+
+    // Check existence and type after resolving
+    try {
+      const stats = fs.statSync(targetPath);
+      if (!stats.isDirectory()) {
+        throw new Error(`Path is not a directory: ${targetPath}`);
+      }
+    } catch (error: unknown) {
+      if (isNodeError(error) && error.code !== 'ENOENT') {
+        throw new Error(`Path does not exist: ${targetPath}`);
+      }
+      throw new Error(
+        `Failed to access path stats for ${targetPath}: ${error}`,
+      );
+    }
+
+    return targetPath;
+  }
+
+  /**
+   * Validates the parameters for the tool
+   * @param params Parameters to validate
+   * @returns An error message string if invalid, null otherwise
+   */
+  protected override validateToolParamValues(
+    params: GrepToolParams,
+  ): string | null {
+    try {
+      new RegExp(params.pattern);
+    } catch (error) {
+      return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+    }
+
+    // Only validate dir_path if one is provided
+    if (params.dir_path) {
+      try {
+        this.resolveAndValidatePath(params.dir_path);
+      } catch (error) {
+        return getErrorMessage(error);
+      }
+    }
+
+    return null; // Parameters are valid
+  }
+
+  protected createInvocation(
+    params: GrepToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ): ToolInvocation<GrepToolParams, ToolResult> {
+    return new GrepToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

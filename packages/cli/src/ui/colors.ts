@@ -5,7 +5,7 @@
  */
 
 import { themeManager } from './themes/theme-manager.js';
-import { ColorsTheme } from './themes/theme.js';
+import type { ColorsTheme } from './themes/theme.js';
 
 export const Colors: ColorsTheme = {
   get type() {
@@ -38,11 +38,20 @@ export const Colors: ColorsTheme = {
   get AccentRed() {
     return themeManager.getActiveTheme().colors.AccentRed;
   },
+  get DiffAdded() {
+    return themeManager.getActiveTheme().colors.DiffAdded;
+  },
+  get DiffRemoved() {
+    return themeManager.getActiveTheme().colors.DiffRemoved;
+  },
   get Comment() {
     return themeManager.getActiveTheme().colors.Comment;
   },
   get Gray() {
     return themeManager.getActiveTheme().colors.Gray;
+  },
+  get DarkGray() {
+    return themeManager.getActiveTheme().colors.DarkGray;
   },
   get GradientColors() {
     return themeManager.getActiveTheme().colors.GradientColors;

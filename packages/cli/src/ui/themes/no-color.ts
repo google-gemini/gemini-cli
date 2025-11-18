@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Theme, ColorsTheme } from './theme.js';
+import type { ColorsTheme } from './theme.js';
+import { Theme } from './theme.js';
+import type { SemanticColors } from './semantic-tokens.js';
 
 const noColorColorsTheme: ColorsTheme = {
   type: 'ansi',
@@ -17,12 +19,47 @@ const noColorColorsTheme: ColorsTheme = {
   AccentGreen: '',
   AccentYellow: '',
   AccentRed: '',
+  DiffAdded: '',
+  DiffRemoved: '',
   Comment: '',
   Gray: '',
+  DarkGray: '',
+};
+
+const noColorSemanticColors: SemanticColors = {
+  text: {
+    primary: '',
+    secondary: '',
+    link: '',
+    accent: '',
+    response: '',
+  },
+  background: {
+    primary: '',
+    diff: {
+      added: '',
+      removed: '',
+    },
+  },
+  border: {
+    default: '',
+    focused: '',
+  },
+  ui: {
+    comment: '',
+    symbol: '',
+    dark: '',
+    gradient: [],
+  },
+  status: {
+    error: '',
+    success: '',
+    warning: '',
+  },
 };
 
 export const NoColorTheme: Theme = new Theme(
-  'No Color',
+  'NoColor',
   'dark',
   {
     hljs: {
@@ -88,4 +125,5 @@ export const NoColorTheme: Theme = new Theme(
     },
   },
   noColorColorsTheme,
+  noColorSemanticColors,
 );

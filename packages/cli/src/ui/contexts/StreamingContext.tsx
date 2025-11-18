@@ -5,7 +5,7 @@
  */
 
 import React, { createContext } from 'react';
-import { StreamingState } from '../types.js';
+import type { StreamingState } from '../types.js';
 
 export const StreamingContext = createContext<StreamingState | undefined>(
   undefined,

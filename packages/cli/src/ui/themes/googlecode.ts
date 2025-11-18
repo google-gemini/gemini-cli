@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme, type ColorsTheme } from './theme.js';
+import { type ColorsTheme, Theme, lightTheme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const googleCodeColors: ColorsTheme = {
   type: 'light',
   Background: 'white',
-  Foreground: 'black',
+  Foreground: '#444',
   LightBlue: '#066',
   AccentBlue: '#008',
   AccentPurple: '#606',
@@ -17,8 +18,11 @@ const googleCodeColors: ColorsTheme = {
   AccentGreen: '#080',
   AccentYellow: '#660',
   AccentRed: '#800',
+  DiffAdded: '#C6EAD8',
+  DiffRemoved: '#FEDEDE',
   Comment: '#5f6368',
   Gray: lightTheme.Gray,
+  DarkGray: interpolateColor(lightTheme.Gray, '#ffffff', 0.5),
   GradientColors: ['#066', '#606'],
 };
 

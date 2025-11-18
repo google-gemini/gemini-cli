@@ -4,18 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
-import { Text, Box, useInput } from 'ink';
-import { Colors } from '../../colors.js';
+import type React from 'react';
+import { Text } from 'ink';
+import { theme } from '../../semantic-colors.js';
+import { BaseSelectionList } from './BaseSelectionList.js';
+import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
 /**
  * Represents a single option for the RadioButtonSelect.
  * Requires a label for display and a value to be returned on selection.
  */
-export interface RadioSelectItem<T> {
+export interface RadioSelectItem<T> extends SelectionListItem<T> {
   label: string;
-  value: T;
-  disabled?: boolean;
   themeNameDisplay?: string;
   themeTypeDisplay?: string;
 }
@@ -39,6 +39,8 @@ export interface RadioButtonSelectProps<T> {
   showScrollArrows?: boolean;
   /** The maximum number of items to show at once. */
   maxItemsToShow?: number;
+  /** Whether to show numbers next to items. */
+  showNumbers?: boolean;
 }
 
 /**
@@ -52,106 +54,38 @@ export function RadioButtonSelect<T>({
   initialIndex = 0,
   onSelect,
   onHighlight,
-  isFocused,
+  isFocused = true,
   showScrollArrows = false,
   maxItemsToShow = 10,
+  showNumbers = true,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
-  const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const [scrollOffset, setScrollOffset] = useState(0);
-
-  useEffect(() => {
-    const newScrollOffset = Math.max(
-      0,
-      Math.min(activeIndex - maxItemsToShow + 1, items.length - maxItemsToShow),
-    );
-    if (activeIndex < scrollOffset) {
-      setScrollOffset(activeIndex);
-    } else if (activeIndex >= scrollOffset + maxItemsToShow) {
-      setScrollOffset(newScrollOffset);
-    }
-  }, [activeIndex, items.length, scrollOffset, maxItemsToShow]);
-
-  useInput(
-    (input, key) => {
-      if (input === 'k' || key.upArrow) {
-        const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
-        setActiveIndex(newIndex);
-        onHighlight?.(items[newIndex]!.value);
-      }
-      if (input === 'j' || key.downArrow) {
-        const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
-        setActiveIndex(newIndex);
-        onHighlight?.(items[newIndex]!.value);
-      }
-      if (key.return) {
-        onSelect(items[activeIndex]!.value);
-      }
-
-      // Enable selection directly from number keys.
-      if (/^[1-9]$/.test(input)) {
-        const targetIndex = Number.parseInt(input, 10) - 1;
-        if (targetIndex >= 0 && targetIndex < visibleItems.length) {
-          const selectedItem = visibleItems[targetIndex];
-          if (selectedItem) {
-            onSelect?.(selectedItem.value);
-          }
-        }
-      }
-    },
-    { isActive: isFocused && items.length > 0 },
-  );
-
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
-
   return (
-    <Box flexDirection="column">
-      {showScrollArrows && (
-        <Text color={scrollOffset > 0 ? Colors.Foreground : Colors.Gray}>
-          ▲
-        </Text>
-      )}
-      {visibleItems.map((item, index) => {
-        const itemIndex = scrollOffset + index;
-        const isSelected = activeIndex === itemIndex;
-
-        let textColor = Colors.Foreground;
-        if (isSelected) {
-          textColor = Colors.AccentGreen;
-        } else if (item.disabled) {
-          textColor = Colors.Gray;
+    <BaseSelectionList<T, RadioSelectItem<T>>
+      items={items}
+      initialIndex={initialIndex}
+      onSelect={onSelect}
+      onHighlight={onHighlight}
+      isFocused={isFocused}
+      showNumbers={showNumbers}
+      showScrollArrows={showScrollArrows}
+      maxItemsToShow={maxItemsToShow}
+      renderItem={(item, { titleColor }) => {
+        // Handle special theme display case for ThemeDialog compatibility
+        if (item.themeNameDisplay && item.themeTypeDisplay) {
+          return (
+            <Text color={titleColor} wrap="truncate" key={item.key}>
+              {item.themeNameDisplay}{' '}
+              <Text color={theme.text.secondary}>{item.themeTypeDisplay}</Text>
+            </Text>
+          );
         }
-
+        // Regular label display
         return (
-          <Box key={item.label}>
-            <Box minWidth={2} flexShrink={0}>
-              <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
-                {isSelected ? '●' : '○'}
-              </Text>
-            </Box>
-            {item.themeNameDisplay && item.themeTypeDisplay ? (
-              <Text color={textColor} wrap="truncate">
-                {item.themeNameDisplay}{' '}
-                <Text color={Colors.Gray}>{item.themeTypeDisplay}</Text>
-              </Text>
-            ) : (
-              <Text color={textColor} wrap="truncate">
-                {item.label}
-              </Text>
-            )}
-          </Box>
+          <Text color={titleColor} wrap="truncate">
+            {item.label}
+          </Text>
         );
-      })}
-      {showScrollArrows && (
-        <Text
-          color={
-            scrollOffset + maxItemsToShow < items.length
-              ? Colors.Foreground
-              : Colors.Gray
-          }
-        >
-          ▼
-        </Text>
-      )}
-    </Box>
+      }}
+    />
   );
 }

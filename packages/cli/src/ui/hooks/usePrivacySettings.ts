@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GaxiosError } from 'gaxios';
 import { useState, useEffect, useCallback } from 'react';
-import { Config, CodeAssistServer, UserTierId } from '@google/gemini-cli-core';
+import {
+  type Config,
+  type CodeAssistServer,
+  UserTierId,
+  getCodeAssistServer,
+} from '@google/gemini-cli-core';
 
 export interface PrivacyState {
   isLoading: boolean;
@@ -26,7 +30,7 @@ export const usePrivacySettings = (config: Config) => {
         isLoading: true,
       });
       try {
-        const server = getCodeAssistServer(config);
+        const server = getCodeAssistServerOrFail(config);
         const tier = await getTier(server);
         if (tier !== UserTierId.FREE) {
           // We don't need to fetch opt-out info since non-free tier
@@ -57,7 +61,7 @@ export const usePrivacySettings = (config: Config) => {
   const updateDataCollectionOptIn = useCallback(
     async (optIn: boolean) => {
       try {
-        const server = getCodeAssistServer(config);
+        const server = getCodeAssistServerOrFail(config);
         const updatedOptIn = await setRemoteDataCollectionOptIn(server, optIn);
         setPrivacyState({
           isLoading: false,
@@ -80,13 +84,12 @@ export const usePrivacySettings = (config: Config) => {
   };
 };
 
-function getCodeAssistServer(config: Config): CodeAssistServer {
-  const server = config.getGeminiClient().getContentGenerator();
-  // Neither of these cases should ever happen.
-  if (!(server instanceof CodeAssistServer)) {
+function getCodeAssistServerOrFail(config: Config): CodeAssistServer {
+  const server = getCodeAssistServer(config);
+  if (server === undefined) {
     throw new Error('Oauth not being used');
-  } else if (!server.projectId) {
-    throw new Error('Oauth not being used');
+  } else if (server.projectId === undefined) {
+    throw new Error('CodeAssist server is missing a project ID');
   }
   return server;
 }
@@ -113,13 +116,18 @@ async function getRemoteDataCollectionOptIn(
   try {
     const resp = await server.getCodeAssistGlobalUserSetting();
     return resp.freeTierDataCollectionOptin;
-  } catch (e) {
-    if (e instanceof GaxiosError) {
-      if (e.response?.status === 404) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const gaxiosError = error as {
+        response?: {
+          status?: unknown;
+        };
+      };
+      if (gaxiosError.response?.status === 404) {
         return true;
       }
     }
-    throw e;
+    throw error;
   }
 }
 

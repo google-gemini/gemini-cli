@@ -1,36 +1,41 @@
-name: Gemini Scheduled PR Triage 🚀
+name: 'Gemini Scheduled PR Triage 🚀'
 
 on:
   schedule:
     - cron: '*/15 * * * *' # Runs every 15 minutes
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 jobs:
   audit-prs:
     timeout-minutes: 15
-    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    if: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
-      contents: read
-      id-token: write
-      issues: write
-      pull-requests: write
-    runs-on: ubuntu-latest
+      contents: 'read'
+      id-token: 'write'
+      issues: 'write'
+      pull-requests: 'write'
+    runs-on: 'ubuntu-latest'
     outputs:
-      prs_needing_comment: ${{ steps.run_triage.outputs.prs_needing_comment }}
+      prs_needing_comment: '${{ steps.run_triage.outputs.prs_needing_comment }}'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
-      - name: Generate GitHub App Token
-        id: generate_token
-        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+          permission-pull-requests: 'write'
 
-      - name: Run PR Triage Script
-        id: run_triage
+      - name: 'Run PR Triage Script'
+        id: 'run_triage'
+        shell: 'bash'
         env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: ./.github/scripts/pr-triage.sh
+          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_REPOSITORY: '${{ github.repository }}'
+        run: |-
+          ./.github/scripts/pr-triage.sh

@@ -4,17 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getErrorMessage } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  refreshServerHierarchicalMemory,
+} from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import { SlashCommand, SlashCommandActionReturn } from './types.js';
+import type { SlashCommand, SlashCommandActionReturn } from './types.js';
+import { CommandKind } from './types.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
-  description: 'Commands for interacting with memory.',
+  description: 'Commands for interacting with memory',
+  kind: CommandKind.BUILT_IN,
   subCommands: [
     {
       name: 'show',
-      description: 'Show the current memory contents.',
+      description: 'Show the current memory contents',
+      kind: CommandKind.BUILT_IN,
       action: async (context) => {
         const memoryContent = context.services.config?.getUserMemory() || '';
         const fileCount = context.services.config?.getGeminiMdFileCount() || 0;
@@ -35,7 +41,8 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'add',
-      description: 'Add content to the memory.',
+      description: 'Add content to the memory',
+      kind: CommandKind.BUILT_IN,
       action: (context, args): SlashCommandActionReturn | void => {
         if (!args || args.trim() === '') {
           return {
@@ -62,7 +69,8 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'refresh',
-      description: 'Refresh the memory from the source.',
+      description: 'Refresh the memory from the source',
+      kind: CommandKind.BUILT_IN,
       action: async (context) => {
         context.ui.addItem(
           {
@@ -73,10 +81,11 @@ export const memoryCommand: SlashCommand = {
         );
 
         try {
-          const result = await context.services.config?.refreshMemory();
+          const config = await context.services.config;
+          if (config) {
+            const { memoryContent, fileCount } =
+              await refreshServerHierarchicalMemory(config);
 
-          if (result) {
-            const { memoryContent, fileCount } = result;
             const successMessage =
               memoryContent.length > 0
                 ? `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
@@ -100,6 +109,28 @@ export const memoryCommand: SlashCommand = {
             Date.now(),
           );
         }
+      },
+    },
+    {
+      name: 'list',
+      description: 'Lists the paths of the GEMINI.md files in use',
+      kind: CommandKind.BUILT_IN,
+      action: async (context) => {
+        const filePaths = context.services.config?.getGeminiMdFilePaths() || [];
+        const fileCount = filePaths.length;
+
+        const messageContent =
+          fileCount > 0
+            ? `There are ${fileCount} GEMINI.md file(s) in use:\n\n${filePaths.join('\n')}`
+            : 'No GEMINI.md files in use.';
+
+        context.ui.addItem(
+          {
+            type: MessageType.INFO,
+            text: messageContent,
+          },
+          Date.now(),
+        );
       },
     },
   ],

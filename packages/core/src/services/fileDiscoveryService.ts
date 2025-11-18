@@ -4,60 +4,64 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GitIgnoreParser, GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
+import type { GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
+import type { GeminiIgnoreFilter } from '../utils/geminiIgnoreParser.js';
+import { GitIgnoreParser } from '../utils/gitIgnoreParser.js';
+import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
-import * as path from 'path';
-
-const GEMINI_IGNORE_FILE_NAME = '.geminiignore';
+import * as path from 'node:path';
 
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
   respectGeminiIgnore?: boolean;
 }
 
+export interface FilterReport {
+  filteredPaths: string[];
+  ignoredCount: number;
+}
+
 export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
-  private geminiIgnoreFilter: GitIgnoreFilter | null = null;
+  private geminiIgnoreFilter: GeminiIgnoreFilter | null = null;
+  private combinedIgnoreFilter: GitIgnoreFilter | null = null;
   private projectRoot: string;
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
     if (isGitRepository(this.projectRoot)) {
-      const parser = new GitIgnoreParser(this.projectRoot);
-      try {
-        parser.loadGitRepoPatterns();
-      } catch (_error) {
-        // ignore file not found
-      }
-      this.gitIgnoreFilter = parser;
+      this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
     }
-    const gParser = new GitIgnoreParser(this.projectRoot);
-    try {
-      gParser.loadPatterns(GEMINI_IGNORE_FILE_NAME);
-    } catch (_error) {
-      // ignore file not found
+    this.geminiIgnoreFilter = new GeminiIgnoreParser(this.projectRoot);
+
+    if (this.gitIgnoreFilter) {
+      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
+      // Create combined parser: .gitignore + .geminiignore
+      this.combinedIgnoreFilter = new GitIgnoreParser(
+        this.projectRoot,
+        geminiPatterns,
+      );
     }
-    this.geminiIgnoreFilter = gParser;
   }
 
   /**
    * Filters a list of file paths based on git ignore rules
    */
-  filterFiles(
-    filePaths: string[],
-    options: FilterFilesOptions = {
-      respectGitIgnore: true,
-      respectGeminiIgnore: true,
-    },
-  ): string[] {
+  filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
+    const { respectGitIgnore = true, respectGeminiIgnore = true } = options;
     return filePaths.filter((filePath) => {
-      if (options.respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
+      if (
+        respectGitIgnore &&
+        respectGeminiIgnore &&
+        this.combinedIgnoreFilter
+      ) {
+        return !this.combinedIgnoreFilter.isIgnored(filePath);
+      }
+
+      if (respectGitIgnore && this.gitIgnoreFilter?.isIgnored(filePath)) {
         return false;
       }
-      if (
-        options.respectGeminiIgnore &&
-        this.shouldGeminiIgnoreFile(filePath)
-      ) {
+      if (respectGeminiIgnore && this.geminiIgnoreFilter?.isIgnored(filePath)) {
         return false;
       }
       return true;
@@ -65,23 +69,23 @@ export class FileDiscoveryService {
   }
 
   /**
-   * Checks if a single file should be git-ignored
+   * Filters a list of file paths based on git ignore rules and returns a report
+   * with counts of ignored files.
    */
-  shouldGitIgnoreFile(filePath: string): boolean {
-    if (this.gitIgnoreFilter) {
-      return this.gitIgnoreFilter.isIgnored(filePath);
-    }
-    return false;
-  }
+  filterFilesWithReport(
+    filePaths: string[],
+    opts: FilterFilesOptions = {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
+  ): FilterReport {
+    const filteredPaths = this.filterFiles(filePaths, opts);
+    const ignoredCount = filePaths.length - filteredPaths.length;
 
-  /**
-   * Checks if a single file should be gemini-ignored
-   */
-  shouldGeminiIgnoreFile(filePath: string): boolean {
-    if (this.geminiIgnoreFilter) {
-      return this.geminiIgnoreFilter.isIgnored(filePath);
-    }
-    return false;
+    return {
+      filteredPaths,
+      ignoredCount,
+    };
   }
 
   /**
@@ -91,21 +95,6 @@ export class FileDiscoveryService {
     filePath: string,
     options: FilterFilesOptions = {},
   ): boolean {
-    const { respectGitIgnore = true, respectGeminiIgnore = true } = options;
-
-    if (respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
-      return true;
-    }
-    if (respectGeminiIgnore && this.shouldGeminiIgnoreFile(filePath)) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Returns loaded patterns from .geminiignore
-   */
-  getGeminiIgnorePatterns(): string[] {
-    return this.geminiIgnoreFilter?.getPatterns() ?? [];
+    return this.filterFiles([filePath], options).length === 0;
   }
 }

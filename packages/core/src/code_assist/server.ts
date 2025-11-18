@@ -4,16 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client } from 'google-auth-library';
-import {
+import type { AuthClient } from 'google-auth-library';
+import type {
   CodeAssistGlobalUserSettingResponse,
+  GoogleRpcResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
-  LongrunningOperationResponse,
+  LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
 } from './types.js';
-import {
+import type {
+  ListExperimentsRequest,
+  ListExperimentsResponse,
+} from './experiments/types.js';
+import type {
   CountTokensParameters,
   CountTokensResponse,
   EmbedContentParameters,
@@ -21,34 +27,19 @@ import {
   GenerateContentParameters,
   GenerateContentResponse,
 } from '@google/genai';
-import * as readline from 'readline';
-import { ContentGenerator } from '../core/contentGenerator.js';
+import * as readline from 'node:readline';
+import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
-import {
+import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
+} from './converter.js';
+import {
   fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
-import { Readable } from 'node:stream';
-
-interface ErrorData {
-  error?: {
-    message?: string;
-  };
-}
-
-interface GaxiosResponse {
-  status: number;
-  data: unknown;
-}
-
-interface StreamError extends Error {
-  status?: number;
-  response?: GaxiosResponse;
-}
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -60,21 +51,26 @@ export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
-  private userTier: UserTierId | undefined = undefined;
-
   constructor(
-    readonly client: OAuth2Client,
+    readonly client: AuthClient,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
+    readonly userTier?: UserTierId,
   ) {}
 
   async generateContentStream(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
       'streamGenerateContent',
-      toGenerateContentRequest(req, this.projectId, this.sessionId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
@@ -86,10 +82,16 @@ export class CodeAssistServer implements ContentGenerator {
 
   async generateContent(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
-      toGenerateContentRequest(req, this.projectId, this.sessionId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return fromGenerateContentResponse(resp);
@@ -97,8 +99,8 @@ export class CodeAssistServer implements ContentGenerator {
 
   async onboardUser(
     req: OnboardUserRequest,
-  ): Promise<LongrunningOperationResponse> {
-    return await this.requestPost<LongrunningOperationResponse>(
+  ): Promise<LongRunningOperationResponse> {
+    return await this.requestPost<LongRunningOperationResponse>(
       'onboardUser',
       req,
     );
@@ -107,10 +109,20 @@ export class CodeAssistServer implements ContentGenerator {
   async loadCodeAssist(
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
-    return await this.requestPost<LoadCodeAssistResponse>(
-      'loadCodeAssist',
-      req,
-    );
+    try {
+      return await this.requestPost<LoadCodeAssistResponse>(
+        'loadCodeAssist',
+        req,
+      );
+    } catch (e) {
+      if (isVpcScAffectedUser(e)) {
+        return {
+          currentTier: { id: UserTierId.STANDARD },
+        };
+      } else {
+        throw e;
+      }
+    }
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
@@ -140,6 +152,23 @@ export class CodeAssistServer implements ContentGenerator {
     _req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     throw Error();
+  }
+
+  async listExperiments(
+    metadata: ClientMetadata,
+  ): Promise<ListExperimentsResponse> {
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
+    const req: ListExperimentsRequest = {
+      project: projectId,
+      metadata: { ...metadata, duetProject: projectId },
+    };
+    return await this.requestPost<ListExperimentsResponse>(
+      'listExperiments',
+      req,
+    );
   }
 
   async requestPost<T>(
@@ -196,102 +225,49 @@ export class CodeAssistServer implements ContentGenerator {
     });
 
     return (async function* (): AsyncGenerator<T> {
-      // Convert ReadableStream to Node.js stream if needed
-      let nodeStream: NodeJS.ReadableStream;
-
-      if (res.data instanceof ReadableStream) {
-        // Convert Web ReadableStream to Node.js Readable stream
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        nodeStream = Readable.fromWeb(res.data as any);
-      } else if (
-        res.data &&
-        typeof (res.data as NodeJS.ReadableStream).on === 'function'
-      ) {
-        // Already a Node.js stream
-        nodeStream = res.data as NodeJS.ReadableStream;
-      } else {
-        // If res.data is not a stream, it might be an error response
-        // Try to extract error information from the response
-        let errorMessage =
-          'Response data is not a readable stream. This may indicate a server error or quota issue.';
-
-        if (res.data && typeof res.data === 'object') {
-          // Check if this is an error response with error details
-          const errorData = res.data as ErrorData;
-          if (errorData.error?.message) {
-            errorMessage = errorData.error.message;
-          } else if (typeof errorData === 'string') {
-            errorMessage = errorData;
-          }
-        }
-
-        // Create an error that looks like a quota error if it contains quota information
-        const error: StreamError = new Error(errorMessage);
-        // Add status and response properties so it can be properly handled by retry logic
-        error.status = res.status;
-        error.response = res;
-        throw error;
-      }
-
       const rl = readline.createInterface({
-        input: nodeStream,
+        input: res.data as NodeJS.ReadableStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
       let bufferedLines: string[] = [];
       for await (const line of rl) {
-        // blank lines are used to separate JSON objects in the stream
-        if (line === '') {
+        if (line.startsWith('data: ')) {
+          bufferedLines.push(line.slice(6).trim());
+        } else if (line === '') {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
           yield JSON.parse(bufferedLines.join('\n')) as T;
           bufferedLines = []; // Reset the buffer after yielding
-        } else if (line.startsWith('data: ')) {
-          bufferedLines.push(line.slice(6).trim());
-        } else {
-          throw new Error(`Unexpected line format in response: ${line}`);
         }
+        // Ignore other lines like comments or id fields
       }
     })();
   }
 
-  async getTier(): Promise<UserTierId | undefined> {
-    if (this.userTier === undefined) {
-      await this.detectUserTier();
-    }
-    return this.userTier;
-  }
-
-  private async detectUserTier(): Promise<void> {
-    try {
-      // Reset user tier when detection runs
-      this.userTier = undefined;
-
-      // Only attempt tier detection if we have a project ID
-      if (this.projectId) {
-        const loadRes = await this.loadCodeAssist({
-          cloudaicompanionProject: this.projectId,
-          metadata: {
-            ideType: 'IDE_UNSPECIFIED',
-            platform: 'PLATFORM_UNSPECIFIED',
-            pluginType: 'GEMINI',
-            duetProject: this.projectId,
-          },
-        });
-        if (loadRes.currentTier) {
-          this.userTier = loadRes.currentTier.id;
-        }
-      }
-    } catch (error) {
-      // Silently fail - this is not critical functionality
-      // We'll default to FREE tier behavior if tier detection fails
-      console.debug('User tier detection failed:', error);
-    }
-  }
-
   getMethodUrl(method: string): string {
-    const endpoint = process.env.CODE_ASSIST_ENDPOINT ?? CODE_ASSIST_ENDPOINT;
+    const endpoint =
+      process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
     return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
   }
+}
+
+function isVpcScAffectedUser(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const gaxiosError = error as {
+      response?: {
+        data?: unknown;
+      };
+    };
+    const response = gaxiosError.response?.data as
+      | GoogleRpcResponse
+      | undefined;
+    if (Array.isArray(response?.error?.details)) {
+      return response.error.details.some(
+        (detail) => detail.reason === 'SECURITY_POLICY_VIOLATED',
+      );
+    }
+  }
+  return false;
 }

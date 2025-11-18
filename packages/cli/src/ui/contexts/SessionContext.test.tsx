@@ -4,17 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type MutableRefObject } from 'react';
-import { render } from 'ink-testing-library';
-import { renderHook } from '@testing-library/react';
-import { act } from 'react-dom/test-utils';
-import {
-  SessionStatsProvider,
-  useSessionStats,
-  SessionMetrics,
-} from './SessionContext.js';
+import { type MutableRefObject, Component, type ReactNode } from 'react';
+import { render } from '../../test-utils/render.js';
+
+import { act } from 'react';
+import type { SessionMetrics } from './SessionContext.js';
+import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { uiTelemetryService } from '@google/gemini-cli-core';
+
+class ErrorBoundary extends Component<
+  { children: ReactNode; onError: (error: Error) => void },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; onError: (error: Error) => void }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(_error: Error) {
+    return { hasError: true };
+  }
+
+  override componentDidCatch(error: Error) {
+    this.props.onError(error);
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
 
 /**
  * A test harness component that uses the hook and exposes the context value
@@ -36,7 +58,7 @@ describe('SessionStatsContext', () => {
       ReturnType<typeof useSessionStats> | undefined
     > = { current: undefined };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
@@ -47,6 +69,7 @@ describe('SessionStatsContext', () => {
     expect(stats?.sessionStartTime).toBeInstanceOf(Date);
     expect(stats?.metrics).toBeDefined();
     expect(stats?.metrics.models).toEqual({});
+    unmount();
   });
 
   it('should update metrics when the uiTelemetryService emits an update', () => {
@@ -54,7 +77,7 @@ describe('SessionStatsContext', () => {
       ReturnType<typeof useSessionStats> | undefined
     > = { current: undefined };
 
-    render(
+    const { unmount } = render(
       <SessionStatsProvider>
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
@@ -87,6 +110,7 @@ describe('SessionStatsContext', () => {
           accept: 1,
           reject: 0,
           modify: 0,
+          auto_accept: 0,
         },
         byName: {
           'test-tool': {
@@ -98,9 +122,14 @@ describe('SessionStatsContext', () => {
               accept: 1,
               reject: 0,
               modify: 0,
+              auto_accept: 0,
             },
           },
         },
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
@@ -114,19 +143,114 @@ describe('SessionStatsContext', () => {
     const stats = contextRef.current?.stats;
     expect(stats?.metrics).toEqual(newMetrics);
     expect(stats?.lastPromptTokenCount).toBe(100);
+    unmount();
+  });
+
+  it('should not update metrics if the data is the same', () => {
+    const contextRef: MutableRefObject<
+      ReturnType<typeof useSessionStats> | undefined
+    > = { current: undefined };
+
+    let renderCount = 0;
+    const CountingTestHarness = () => {
+      contextRef.current = useSessionStats();
+      renderCount++;
+      return null;
+    };
+
+    const { unmount } = render(
+      <SessionStatsProvider>
+        <CountingTestHarness />
+      </SessionStatsProvider>,
+    );
+
+    expect(renderCount).toBe(1);
+
+    const metrics: SessionMetrics = {
+      models: {
+        'gemini-pro': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+          tokens: {
+            prompt: 10,
+            candidates: 20,
+            total: 30,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    };
+
+    act(() => {
+      uiTelemetryService.emit('update', { metrics, lastPromptTokenCount: 10 });
+    });
+
+    expect(renderCount).toBe(2);
+
+    act(() => {
+      uiTelemetryService.emit('update', { metrics, lastPromptTokenCount: 10 });
+    });
+
+    expect(renderCount).toBe(2);
+
+    const newMetrics = {
+      ...metrics,
+      models: {
+        'gemini-pro': {
+          api: { totalRequests: 2, totalErrors: 0, totalLatencyMs: 200 },
+          tokens: {
+            prompt: 20,
+            candidates: 40,
+            total: 60,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+        },
+      },
+    };
+    act(() => {
+      uiTelemetryService.emit('update', {
+        metrics: newMetrics,
+        lastPromptTokenCount: 20,
+      });
+    });
+
+    expect(renderCount).toBe(3);
+    unmount();
   });
 
   it('should throw an error when useSessionStats is used outside of a provider', () => {
-    // Suppress console.error for this test since we expect an error
+    const onError = vi.fn();
+    // Suppress console.error from React for this test
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    try {
-      // Expect renderHook itself to throw when the hook is used outside a provider
-      expect(() => {
-        renderHook(() => useSessionStats());
-      }).toThrow('useSessionStats must be used within a SessionStatsProvider');
-    } finally {
-      consoleSpy.mockRestore();
-    }
+    const { unmount } = render(
+      <ErrorBoundary onError={onError}>
+        <TestHarness contextRef={{ current: undefined }} />
+      </ErrorBoundary>,
+    );
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'useSessionStats must be used within a SessionStatsProvider',
+      }),
+    );
+
+    consoleSpy.mockRestore();
+    unmount();
   });
 });

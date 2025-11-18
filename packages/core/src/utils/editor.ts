@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn, spawnSync } from 'node:child_process';
+import { debugLogger } from './debugLogger.js';
 
 export type EditorType =
   | 'vscode'
@@ -13,7 +14,8 @@ export type EditorType =
   | 'cursor'
   | 'vim'
   | 'neovim'
-  | 'zed';
+  | 'zed'
+  | 'emacs';
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -24,6 +26,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'vim',
     'neovim',
     'zed',
+    'emacs',
   ].includes(editor);
 }
 
@@ -44,28 +47,37 @@ function commandExists(cmd: string): boolean {
   }
 }
 
-const editorCommands: Record<EditorType, { win32: string; default: string }> = {
-  vscode: { win32: 'code.cmd', default: 'code' },
-  vscodium: { win32: 'codium.cmd', default: 'codium' },
-  windsurf: { win32: 'windsurf', default: 'windsurf' },
-  cursor: { win32: 'cursor', default: 'cursor' },
-  vim: { win32: 'vim', default: 'vim' },
-  neovim: { win32: 'nvim', default: 'nvim' },
-  zed: { win32: 'zed', default: 'zed' },
+/**
+ * Editor command configurations for different platforms.
+ * Each editor can have multiple possible command names, listed in order of preference.
+ */
+const editorCommands: Record<
+  EditorType,
+  { win32: string[]; default: string[] }
+> = {
+  vscode: { win32: ['code.cmd'], default: ['code'] },
+  vscodium: { win32: ['codium.cmd'], default: ['codium'] },
+  windsurf: { win32: ['windsurf'], default: ['windsurf'] },
+  cursor: { win32: ['cursor'], default: ['cursor'] },
+  vim: { win32: ['vim'], default: ['vim'] },
+  neovim: { win32: ['nvim'], default: ['nvim'] },
+  zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
+  emacs: { win32: ['emacs.exe'], default: ['emacs'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
   const commandConfig = editorCommands[editor];
-  const command =
+  const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  return commandExists(command);
+  return commands.some((cmd) => commandExists(cmd));
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
-  const notUsingSandbox = !process.env.SANDBOX;
+  const notUsingSandbox = !process.env['SANDBOX'];
   if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
+  // For terminal-based editors like vim and emacs, allow in sandbox.
   return true;
 }
 
@@ -92,8 +104,12 @@ export function getDiffCommand(
     return null;
   }
   const commandConfig = editorCommands[editor];
-  const command =
+  const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  const command =
+    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
+    commands[commands.length - 1];
+
   switch (editor) {
     case 'vscode':
     case 'vscodium':
@@ -125,10 +141,15 @@ export function getDiffCommand(
           'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
           // Auto close all windows when one is closed
           '-c',
-          'autocmd WinClosed * wqa',
+          'autocmd BufWritePost * wqa',
           oldPath,
           newPath,
         ],
+      };
+    case 'emacs':
+      return {
+        command: 'emacs',
+        args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
       };
     default:
       return null;
@@ -144,58 +165,49 @@ export async function openDiff(
   oldPath: string,
   newPath: string,
   editor: EditorType,
+  onEditorClose: () => void,
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
-    console.error('No diff tool available. Install a supported editor.');
+    debugLogger.error('No diff tool available. Install a supported editor.');
     return;
   }
 
-  try {
-    switch (editor) {
-      case 'vscode':
-      case 'vscodium':
-      case 'windsurf':
-      case 'cursor':
-      case 'zed':
-        // Use spawn for GUI-based editors to avoid blocking the entire process
-        return new Promise((resolve, reject) => {
-          const childProcess = spawn(diffCommand.command, diffCommand.args, {
-            stdio: 'inherit',
-            shell: true,
-          });
+  const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
 
-          childProcess.on('close', (code) => {
-            if (code === 0) {
-              resolve();
-            } else {
-              reject(new Error(`${editor} exited with code ${code}`));
-            }
-          });
-
-          childProcess.on('error', (error) => {
-            reject(error);
-          });
-        });
-
-      case 'vim':
-      case 'neovim': {
-        // Use execSync for terminal-based editors
-        const command =
-          process.platform === 'win32'
-            ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
-            : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        execSync(command, {
-          stdio: 'inherit',
-          encoding: 'utf8',
-        });
-        break;
+  if (isTerminalEditor) {
+    try {
+      const result = spawnSync(diffCommand.command, diffCommand.args, {
+        stdio: 'inherit',
+      });
+      if (result.error) {
+        throw result.error;
       }
-
-      default:
-        throw new Error(`Unsupported editor: ${editor}`);
+      if (result.status !== 0) {
+        throw new Error(`${editor} exited with code ${result.status}`);
+      }
+    } finally {
+      onEditorClose();
     }
-  } catch (error) {
-    console.error(error);
+    return;
   }
+
+  return new Promise<void>((resolve, reject) => {
+    const childProcess = spawn(diffCommand.command, diffCommand.args, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+
+    childProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${editor} exited with code ${code}`));
+      }
+    });
+
+    childProcess.on('error', (error) => {
+      reject(error);
+    });
+  });
 }
