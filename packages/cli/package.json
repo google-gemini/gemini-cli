@@ -41,7 +41,7 @@
     "dotenv": "^17.1.0",
     "extract-zip": "^2.0.1",
     "fzf": "^0.5.2",
-    "glob": "^10.4.5",
+    "glob": "^12.0.0",
     "highlight.js": "^11.11.1",
     "ink": "npm:@jrichman/ink@6.4.3",
     "ink-gradient": "^3.0.0",
