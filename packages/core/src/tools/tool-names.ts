@@ -20,3 +20,7 @@ export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const LS_TOOL_NAME = 'list_directory';
 export const MEMORY_TOOL_NAME = 'save_memory';
+export const CODE_COMPLETION_TOOL_NAME = 'code_completion';
+export const IMAGE_GENERATION_TOOL_NAME = 'generate_image';
+export const VIDEO_GENERATION_TOOL_NAME = 'generate_video';
+export const ERROR_HANDLER_TOOL_NAME = 'handle_error';
