@@ -7,6 +7,8 @@
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { AgentFileLoader } from './file-loader.js';
+import { Storage } from '../config/storage.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -25,11 +27,40 @@ export class AgentRegistry {
    */
   async initialize(): Promise<void> {
     this.loadBuiltInAgents();
+    await this.loadUserAgents();
 
     if (this.config.getDebugMode()) {
       debugLogger.log(
         `[AgentRegistry] Initialized with ${this.agents.size} agents.`,
       );
+    }
+  }
+
+  /**
+   * Loads user-defined agents from ~/.gemini/agents directory.
+   */
+  private async loadUserAgents(): Promise<void> {
+    try {
+      const userAgentsDir = Storage.getUserAgentsDir();
+      const loader = new AgentFileLoader();
+      const controller = new AbortController();
+
+      const userAgents = await loader.loadAgents(
+        userAgentsDir,
+        controller.signal,
+      );
+
+      for (const agent of userAgents) {
+        this.registerAgent(agent);
+
+        if (this.config.getDebugMode()) {
+          debugLogger.log(
+            `[AgentRegistry] Loaded user agent '${agent.name}' from ${userAgentsDir}`,
+          );
+        }
+      }
+    } catch (error) {
+      debugLogger.warn('[AgentRegistry] Error loading user agents:', error);
     }
   }
 
@@ -57,6 +88,10 @@ export class AgentRegistry {
           max_turns:
             investigatorSettings.maxNumTurns ??
             CodebaseInvestigatorAgent.runConfig.max_turns,
+        },
+        metadata: {
+          icon: '🔍',
+          source: 'built-in',
         },
       };
       this.registerAgent(agentDef);

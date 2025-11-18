@@ -19,6 +19,7 @@ import {
 } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
+import type { AgentDefinition } from '../agents/types.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import type { Config } from '../config/config.js';
 import { GEMINI_DIR } from '../utils/paths.js';
@@ -111,6 +112,12 @@ export function getCoreSystemPrompt(
     .getToolRegistry()
     .getAllToolNames()
     .includes(WriteTodosTool.Name);
+
+  // Get all registered agents (excluding codebase_investigator which is handled separately)
+  const userAgents = config
+    .getAgentRegistry()
+    .getAllDefinitions()
+    .filter((agent) => agent.name !== CodebaseInvestigatorAgent.name);
 
   let basePrompt: string;
   if (systemMdEnabled) {
@@ -283,6 +290,36 @@ ${(function () {
   }
   return '';
 })()}`,
+      specializedAgents: `
+${(function () {
+  if (userAgents.length === 0) {
+    return '';
+  }
+
+  const agentsList = userAgents
+    .map((agent) => {
+      const displayName = agent.displayName || agent.name;
+      const metadata = (
+        agent as AgentDefinition & { metadata?: Record<string, unknown> }
+      ).metadata;
+      const icon =
+        (typeof metadata?.['icon'] === 'string'
+          ? metadata['icon']
+          : undefined) || '🤖';
+      return `- **${icon} ${displayName}** (\`${agent.name}\`): ${agent.description}`;
+    })
+    .join('\n');
+
+  return `
+## Specialized Agents
+
+You have access to specialized agents for specific tasks. Consider using these agents when their domain matches the user's request:
+
+${agentsList}
+
+When a task clearly falls within an agent's domain of expertise, **prefer using that agent** rather than implementing the solution manually. These agents have been specifically configured with domain knowledge and appropriate tools.
+`;
+})()}`,
       finalReminder: `
 # Final Reminder
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${READ_FILE_TOOL_NAME}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.`,
@@ -305,6 +342,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     orderedPrompts.push(
       'primaryWorkflows_suffix',
       'operationalGuidelines',
+      'specializedAgents',
       'sandbox',
       'git',
       'finalReminder',
