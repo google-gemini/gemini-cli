@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist/preload"
+  },
+  "include": ["src/preload/**/*.ts"],
+  "exclude": ["node_modules"]
+}

@@ -25,15 +25,19 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   vscodium: 'VSCodium',
   windsurf: 'Windsurf',
   zed: 'Zed',
+  GeminiEditor: 'Gemini Editor (GUI)',
 };
 
 class EditorSettingsManager {
-  private readonly availableEditors: EditorDisplay[];
+  availableEditors: EditorDisplay[];
 
   constructor() {
-    const editorTypes = Object.keys(
-      EDITOR_DISPLAY_NAMES,
-    ).sort() as EditorType[];
+    let editorTypes = Object.keys(EDITOR_DISPLAY_NAMES).sort() as EditorType[];
+
+    if (process.env['GEMINI_CLI_CONTEXT'] !== 'electron') {
+      editorTypes = editorTypes.filter((type) => type !== 'GeminiEditor');
+    }
+
     this.availableEditors = [
       {
         name: 'None',

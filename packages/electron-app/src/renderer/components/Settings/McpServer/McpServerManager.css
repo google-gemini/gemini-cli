@@ -1,0 +1,37 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+.mcp-server-list {
+  margin-top: 10px;
+  border-top: 1px solid #3c3c3c;
+}
+
+.add-new-server-button {
+  padding: 8px 12px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-new-server-button:hover {
+  background-color: #005a9e;
+}
+
+.setting-control button {
+  margin-left: 10px;
+  padding: 6px 10px;
+  background-color: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.setting-control button:hover {
+  background-color: #5a5a5a;
+}

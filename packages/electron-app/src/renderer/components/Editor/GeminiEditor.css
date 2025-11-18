@@ -1,0 +1,61 @@
+.gemini-editor-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.gemini-editor-modal {
+  display: flex;
+  flex-direction: column;
+  height: 90%;
+  width: 90%;
+  background-color: var(--modal-bg);
+  color: var(--modal-fg);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.gemini-editor-header {
+  flex-shrink: 0;
+  margin: 0 0 1rem 0;
+}
+
+.gemini-editor-container {
+  flex-grow: 1;
+  position: relative;
+  border: 1px solid var(--border-color);
+  overflow-y: auto;
+}
+
+.gemini-editor-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.gemini-editor-footer {
+  flex-shrink: 0;
+  padding-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.gemini-editor-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--modal-fg);
+  background-color: var(--button-bg);
+}

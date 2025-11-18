@@ -1,0 +1,17 @@
+.error-boundary-container {
+  padding: 20px;
+  background-color: #282a36;
+  color: #ff5555;
+  height: 100vh;
+  font-family: monospace;
+  overflow: auto;
+}
+
+.error-boundary-button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background-color: #44475a;
+  color: #f8f8f2;
+  border: none;
+  cursor: pointer;
+}
