@@ -1,0 +1,149 @@
+# Extended Gemini CLI Configuration
+# This configuration file enables advanced features for each repository
+# including code completions, error handling, and media generation
+
+# ==============================================================================
+# CODE COMPLETIONS SETTINGS
+# ==============================================================================
+code_completion:
+  enabled: true
+  # Model to use for code completions (default: gemini-2.0-flash-exp)
+  model: 'gemini-2.0-flash-exp'
+  # Maximum tokens for completions
+  max_tokens: 500
+  # Temperature for code generation (0.0 = deterministic, 1.0 = creative)
+  temperature: 0.2
+  # Languages to enable completions for (empty = all languages)
+  languages:
+    - typescript
+    - javascript
+    - python
+    - java
+    - go
+    - rust
+    - cpp
+
+# ==============================================================================
+# ERROR HANDLING SETTINGS
+# ==============================================================================
+error_handling:
+  enabled: true
+  # Automatically analyze errors from shell commands
+  auto_analyze: true
+  # Suggest fixes automatically
+  suggest_fixes: true
+  # Model to use for error analysis
+  model: 'gemini-2.5-pro-002'
+  # Error patterns to watch for
+  patterns:
+    - 'TypeError'
+    - 'ReferenceError'
+    - 'SyntaxError'
+    - 'RuntimeError'
+    - 'Exception'
+  # Whether to save error reports to .gemini/errors/
+  save_reports: true
+
+# ==============================================================================
+# IMAGE GENERATION SETTINGS (Using Imagen)
+# ==============================================================================
+image_generation:
+  enabled: true
+  # Vertex AI project configuration
+  vertex_ai:
+    project_id: 'your-project-id'
+    location: 'us-central1'
+  # Imagen model to use
+  model: 'imagen-3.0-generate-001'
+  # Default quality preset: 'standard', 'high', 'ultra'
+  default_quality: 'high'
+  # Default aspect ratio
+  default_aspect_ratio: '16:9'
+  # Output directory for generated images (relative to repo root)
+  output_directory: '.gemini/generated/images'
+  # Safety settings
+  safety:
+    block_nsfw: true
+    block_violence: true
+
+# ==============================================================================
+# VIDEO GENERATION SETTINGS (Using Veo)
+# ==============================================================================
+video_generation:
+  enabled: true
+  # Vertex AI project configuration
+  vertex_ai:
+    project_id: 'your-project-id'
+    location: 'us-central1'
+  # Veo model to use
+  model: 'veo-001'
+  # Default quality preset: 'standard', 'high', 'cinematic'
+  default_quality: 'high'
+  # Default duration in seconds
+  default_duration: 5
+  # Default aspect ratio
+  default_aspect_ratio: '16:9'
+  # Default frame rate
+  default_fps: 24
+  # Output directory for generated videos (relative to repo root)
+  output_directory: '.gemini/generated/videos'
+
+# ==============================================================================
+# PULL REQUEST REVIEW BOT SETTINGS
+# ==============================================================================
+code_review:
+  disable: false
+  comment_severity_threshold: 'HIGH'
+  max_review_comments: -1
+  pull_request_opened:
+    help: false
+    summary: true
+    code_review: true
+
+# ==============================================================================
+# REPOSITORY-SPECIFIC SETTINGS
+# ==============================================================================
+# You can ignore specific patterns
+ignore_patterns:
+  - 'node_modules/'
+  - 'dist/'
+  - 'build/'
+  - '.gemini/generated/'
+  - '*.log'
+
+# ==============================================================================
+# ADVANCED FEATURES
+# ==============================================================================
+advanced:
+  # Enable automatic code quality checks
+  auto_quality_checks: true
+  # Enable smart error recovery
+  smart_error_recovery: true
+  # Enable context-aware completions
+  context_aware_completions: true
+  # Enable multi-file analysis
+  multi_file_analysis: true
+
+# ==============================================================================
+# USAGE LIMITS (to prevent excessive API usage)
+# ==============================================================================
+limits:
+  # Maximum code completions per hour
+  completions_per_hour: 100
+  # Maximum error analyses per hour
+  error_analyses_per_hour: 50
+  # Maximum image generations per day
+  images_per_day: 20
+  # Maximum video generations per day
+  videos_per_day: 5
+
+# ==============================================================================
+# NOTIFICATIONS
+# ==============================================================================
+notifications:
+  # Notify when error analysis completes
+  error_analysis_complete: true
+  # Notify when media generation completes
+  media_generation_complete: true
+  # Notification method: 'console', 'desktop', 'webhook'
+  method: 'console'

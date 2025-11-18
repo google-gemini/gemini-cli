@@ -53,6 +53,10 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
+import { CodeCompletionTool } from '../tools/code-completion.js';
+import { ImageGenerationTool } from '../tools/image-generation.js';
+import { VideoGenerationTool } from '../tools/video-generation.js';
+import { ErrorHandlerTool } from '../tools/error-handler.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
@@ -1183,6 +1187,32 @@ export class Config {
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool, this);
     }
+
+    // Register new AI-powered tools
+    const workingDirectory =
+      this.getWorkspaceContext().getDirectories()[0] || process.cwd();
+    registerCoreTool(
+      CodeCompletionTool,
+      undefined, // messageBus will be added by registerCoreTool
+      this.getGeminiClient(),
+    );
+    registerCoreTool(
+      ErrorHandlerTool,
+      undefined, // messageBus will be added by registerCoreTool
+      this.getGeminiClient(),
+    );
+    registerCoreTool(
+      ImageGenerationTool,
+      undefined, // messageBus will be added by registerCoreTool
+      this.getGeminiClient(),
+      workingDirectory,
+    );
+    registerCoreTool(
+      VideoGenerationTool,
+      undefined, // messageBus will be added by registerCoreTool
+      this.getGeminiClient(),
+      workingDirectory,
+    );
 
     // Register Subagents as Tools
     if (this.getCodebaseInvestigatorSettings().enabled) {
