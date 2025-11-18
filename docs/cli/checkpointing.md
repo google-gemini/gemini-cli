@@ -37,22 +37,12 @@ file in your project's temporary directory, typically located at
 
 ## Enabling the Feature
 
-The Checkpointing feature is disabled by default. To enable it, you can either
-use a command-line flag or edit your `settings.json` file.
+The Checkpointing feature is disabled by default. To enable it, you need to edit
+your `settings.json` file.
 
-### Using the Command-Line Flag
-
-You can enable checkpointing for the current session by using the
-`--checkpointing` flag when starting the Gemini CLI:
-
-```bash
-gemini --checkpointing
-```
-
-### Using the `settings.json` File
-
-To enable checkpointing by default for all sessions, you need to edit your
-`settings.json` file.
+> **Note:** The `--checkpointing` command-line flag was removed in version
+> 0.11.0. Checkpointing can now only be enabled through the `settings.json`
+> configuration file.
 
 Add the following key to your `settings.json`:
 

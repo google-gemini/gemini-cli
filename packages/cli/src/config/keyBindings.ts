@@ -25,6 +25,14 @@ export enum Command {
   // Screen control
   CLEAR_SCREEN = 'clearScreen',
 
+  // Scrolling
+  SCROLL_UP = 'scrollUp',
+  SCROLL_DOWN = 'scrollDown',
+  SCROLL_HOME = 'scrollHome',
+  SCROLL_END = 'scrollEnd',
+  PAGE_UP = 'pageUp',
+  PAGE_DOWN = 'pageDown',
+
   // History navigation
   HISTORY_UP = 'historyUp',
   HISTORY_DOWN = 'historyDown',
@@ -46,7 +54,7 @@ export enum Command {
 
   // External tools
   OPEN_EXTERNAL_EDITOR = 'openExternalEditor',
-  PASTE_CLIPBOARD_IMAGE = 'pasteClipboardImage',
+  PASTE_CLIPBOARD = 'pasteClipboard',
 
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
@@ -120,6 +128,14 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Screen control
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
 
+  // Scrolling
+  [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
+  [Command.SCROLL_DOWN]: [{ key: 'down', shift: true }],
+  [Command.SCROLL_HOME]: [{ key: 'home' }],
+  [Command.SCROLL_END]: [{ key: 'end' }],
+  [Command.PAGE_UP]: [{ key: 'pageup' }],
+  [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
+
   // History navigation
   [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
   [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true, shift: false }],
@@ -176,7 +192,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'x', ctrl: true },
     { sequence: '\x18', ctrl: true },
   ],
-  [Command.PASTE_CLIPBOARD_IMAGE]: [{ key: 'v', ctrl: true }],
+  [Command.PASTE_CLIPBOARD]: [{ key: 'v', ctrl: true }],
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
@@ -231,6 +247,17 @@ export const commandCategories: readonly CommandCategory[] = [
     commands: [Command.CLEAR_SCREEN],
   },
   {
+    title: 'Scrolling',
+    commands: [
+      Command.SCROLL_UP,
+      Command.SCROLL_DOWN,
+      Command.SCROLL_HOME,
+      Command.SCROLL_END,
+      Command.PAGE_UP,
+      Command.PAGE_DOWN,
+    ],
+  },
+  {
     title: 'History & Search',
     commands: [
       Command.HISTORY_UP,
@@ -265,7 +292,7 @@ export const commandCategories: readonly CommandCategory[] = [
   },
   {
     title: 'External Tools',
-    commands: [Command.OPEN_EXTERNAL_EDITOR, Command.PASTE_CLIPBOARD_IMAGE],
+    commands: [Command.OPEN_EXTERNAL_EDITOR, Command.PASTE_CLIPBOARD],
   },
   {
     title: 'App Controls',
@@ -298,6 +325,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.CLEAR_INPUT]: 'Clear all text in the input field.',
   [Command.DELETE_WORD_BACKWARD]: 'Delete the previous word.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.SCROLL_UP]: 'Scroll content up.',
+  [Command.SCROLL_DOWN]: 'Scroll content down.',
+  [Command.SCROLL_HOME]: 'Scroll to the top.',
+  [Command.SCROLL_END]: 'Scroll to the bottom.',
+  [Command.PAGE_UP]: 'Scroll up by one page.',
+  [Command.PAGE_DOWN]: 'Scroll down by one page.',
   [Command.HISTORY_UP]: 'Show the previous entry in history.',
   [Command.HISTORY_DOWN]: 'Show the next entry in history.',
   [Command.NAVIGATION_UP]: 'Move selection up in lists.',
@@ -311,7 +344,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt in an external editor.',
-  [Command.PASTE_CLIPBOARD_IMAGE]: 'Paste an image from the clipboard.',
+  [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
   [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: 'Toggle IDE context details.',

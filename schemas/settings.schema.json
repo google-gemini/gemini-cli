@@ -268,6 +268,13 @@
           "default": false,
           "type": "boolean"
         },
+        "showModelInfoInChat": {
+          "title": "Show Model Info In Chat",
+          "description": "Show the model name in the chat for each model turn.",
+          "markdownDescription": "Show the model name in the chat for each model turn.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "useFullWidth": {
           "title": "Use Full Width",
           "description": "Use the entire width of the terminal for output.",
@@ -405,8 +412,8 @@
         "compressionThreshold": {
           "title": "Compression Threshold",
           "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
-          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.2`",
-          "default": 0.2,
+          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.7`",
+          "default": 0.7,
           "type": "number"
         },
         "skipNextSpeakerCheck": {
