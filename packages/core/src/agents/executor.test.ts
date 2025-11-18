@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { AgentExecutor, type ActivityCallback } from './executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -20,6 +28,7 @@ import {
   type Part,
   type GenerateContentResponse,
   type GenerateContentConfig,
+  type Content,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -44,10 +53,26 @@ import type {
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
+import { CompressionStatus } from '../core/turn.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
 
-const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
-  mockSendMessageStream: vi.fn(),
-  mockExecuteToolCall: vi.fn(),
+const { mockSendMessageStream, mockExecuteToolCall, mockCompress } = vi.hoisted(
+  () => ({
+    mockSendMessageStream: vi.fn(),
+    mockExecuteToolCall: vi.fn(),
+    mockCompress: vi.fn(),
+  }),
+);
+
+let mockChatHistory: Content[] = [];
+const mockSetHistory = vi.fn((newHistory: Content[]) => {
+  mockChatHistory = newHistory;
+});
+
+vi.mock('../services/chatCompressionService.js', () => ({
+  ChatCompressionService: vi.fn().mockImplementation(() => ({
+    compress: mockCompress,
+  })),
 }));
 
 vi.mock('../core/geminiChat.js', async (importOriginal) => {
@@ -56,6 +81,8 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
     ...actual,
     GeminiChat: vi.fn().mockImplementation(() => ({
       sendMessageStream: mockSendMessageStream,
+      getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
+      setHistory: mockSetHistory,
     })),
   };
 });
@@ -193,6 +220,8 @@ describe('AgentExecutor', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    mockCompress.mockClear();
+    mockSetHistory.mockClear();
     mockSendMessageStream.mockReset();
     mockExecuteToolCall.mockReset();
     mockedLogAgentStart.mockReset();
@@ -200,10 +229,21 @@ describe('AgentExecutor', () => {
     mockedPromptIdContext.getStore.mockReset();
     mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
+    (ChatCompressionService as Mock).mockImplementation(() => ({
+      compress: mockCompress,
+    }));
+    mockCompress.mockResolvedValue({
+      newHistory: null,
+      info: { compressionStatus: CompressionStatus.NOOP },
+    });
+
     MockedGeminiChat.mockImplementation(
       () =>
         ({
           sendMessageStream: mockSendMessageStream,
+          getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
+          getLastPromptTokenCount: vi.fn(() => 100),
+          setHistory: mockSetHistory,
         }) as unknown as GeminiChat,
     );
 
@@ -288,6 +328,47 @@ describe('AgentExecutor', () => {
       expect(executor['agentId']).toMatch(
         new RegExp(`^${parentId}-${definition.name}-`),
       );
+    });
+
+    it('should correctly apply templates to initialMessages', async () => {
+      const definition = createTestDefinition();
+      // Override promptConfig to use initialMessages instead of systemPrompt
+      definition.promptConfig = {
+        initialMessages: [
+          { role: 'user', parts: [{ text: 'Goal: ${goal}' }] },
+          { role: 'model', parts: [{ text: 'OK, starting on ${goal}.' }] },
+        ],
+      };
+      const inputs = { goal: 'TestGoal' };
+
+      // Mock a response to prevent the loop from running forever
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      await executor.run(inputs, signal);
+
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const startHistory = chatConstructorArgs[2]; // history is the 3rd arg
+
+      expect(startHistory).toBeDefined();
+      expect(startHistory).toHaveLength(2);
+
+      // Perform checks on defined objects to satisfy TS
+      const firstPart = startHistory?.[0]?.parts?.[0];
+      expect(firstPart?.text).toBe('Goal: TestGoal');
+
+      const secondPart = startHistory?.[1]?.parts?.[0];
+      expect(secondPart?.text).toBe('OK, starting on TestGoal.');
     });
   });
 
@@ -380,9 +461,16 @@ describe('AgentExecutor', () => {
 
       const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
       const chatConfig = chatConstructorArgs[1];
-      expect(chatConfig?.systemInstruction).toContain(
+      const systemInstruction = chatConfig?.systemInstruction as string;
+
+      expect(systemInstruction).toContain(
         `MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool`,
       );
+      expect(systemInstruction).toContain('Mocked Environment Context');
+      expect(systemInstruction).toContain(
+        'You are running in a non-interactive mode',
+      );
+      expect(systemInstruction).toContain('Always use absolute paths');
 
       const turn1Params = getMockMessageParams(0);
 
@@ -878,6 +966,203 @@ describe('AgentExecutor', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('Edge Cases and Error Handling', () => {
+    it('should report an error if complete_task output fails schema validation', async () => {
+      const definition = createTestDefinition(
+        [],
+        {},
+        'default',
+        z.string().min(10), // The schema is for the output value itself
+      );
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Invalid arg (too short)
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'short' },
+          id: 'call1',
+        },
+      ]);
+
+      // Turn 2: Corrected
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'This is a much longer and valid result' },
+          id: 'call2',
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Validation test' }, signal);
+
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+      const expectedError =
+        'Output validation failed: {"formErrors":["String must contain at least 10 character(s)"],"fieldErrors":{}}';
+
+      // Check that the error was reported in the activity stream
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: {
+            context: 'tool_call',
+            name: TASK_COMPLETE_TOOL_NAME,
+            error: expect.stringContaining('Output validation failed'),
+          },
+        }),
+      );
+
+      // Check that the error was sent back to the model for the next turn
+      const turn2Params = getMockMessageParams(1);
+      const turn2Parts = turn2Params.message;
+      expect(turn2Parts).toEqual([
+        expect.objectContaining({
+          functionResponse: expect.objectContaining({
+            name: TASK_COMPLETE_TOOL_NAME,
+            response: { error: expectedError },
+            id: 'call1',
+          }),
+        }),
+      ]);
+
+      // Check that the agent eventually succeeded
+      expect(output.result).toContain('This is a much longer and valid result');
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+    });
+
+    it('should throw and log if GeminiChat creation fails', async () => {
+      const definition = createTestDefinition();
+      const initError = new Error('Chat creation failed');
+      MockedGeminiChat.mockImplementationOnce(() => {
+        throw initError;
+      });
+
+      // We expect the error to be thrown during the run, not creation
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      await expect(executor.run({ goal: 'test' }, signal)).rejects.toThrow(
+        `Failed to create chat object: ${initError}`,
+      );
+
+      // Ensure the error was reported via the activity callback
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            error: `Error: Failed to create chat object: ${initError}`,
+          }),
+        }),
+      );
+
+      // Ensure the agent run was logged as a failure
+      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          terminate_reason: AgentTerminateMode.ERROR,
+        }),
+      );
+    });
+
+    it('should handle a failed tool call and feed the error to the model', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const toolErrorMessage = 'Tool failed spectacularly';
+
+      // Turn 1: Model calls a tool that will fail
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '/fake' }, id: 'call1' },
+      ]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'error',
+        request: {
+          callId: 'call1',
+          name: LS_TOOL_NAME,
+          args: { path: '/fake' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: '',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LS_TOOL_NAME,
+                response: { error: toolErrorMessage },
+                id: 'call1',
+              },
+            },
+          ],
+          error: {
+            type: 'ToolError',
+            message: toolErrorMessage,
+          },
+          errorType: 'ToolError',
+          contentLength: 0,
+        },
+      });
+
+      // Turn 2: Model sees the error and completes
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'Aborted due to tool failure.' },
+          id: 'call2',
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Tool failure test' }, signal);
+
+      expect(mockExecuteToolCall).toHaveBeenCalledTimes(1);
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+      // Verify the error was reported in the activity stream
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: {
+            context: 'tool_call',
+            name: LS_TOOL_NAME,
+            error: toolErrorMessage,
+          },
+        }),
+      );
+
+      // Verify the error was sent back to the model
+      const turn2Params = getMockMessageParams(1);
+      const parts = turn2Params.message;
+      expect(parts).toEqual([
+        expect.objectContaining({
+          functionResponse: expect.objectContaining({
+            name: LS_TOOL_NAME,
+            id: 'call1',
+            response: {
+              error: toolErrorMessage,
+            },
+          }),
+        }),
+      ]);
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('Aborted due to tool failure.');
     });
   });
 
@@ -1438,6 +1723,207 @@ describe('AgentExecutor', () => {
       expect(recoveryEvent).toBeInstanceOf(RecoveryAttemptEvent);
       expect(recoveryEvent.success).toBe(true);
       expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
+    });
+  });
+  describe('Chat Compression', () => {
+    const mockWorkResponse = (id: string) => {
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
+      mockExecuteToolCall.mockResolvedValueOnce({
+        status: 'success',
+        request: {
+          callId: id,
+          name: LS_TOOL_NAME,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      });
+    };
+
+    it('should attempt to compress chat history on each turn', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Mock compression to do nothing
+      mockCompress.mockResolvedValue({
+        newHistory: null,
+        info: { compressionStatus: CompressionStatus.NOOP },
+      });
+
+      // Turn 1
+      mockWorkResponse('t1');
+
+      // Turn 2: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 'call2',
+          },
+        ],
+        'T2',
+      );
+
+      await executor.run({ goal: 'Compress test' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(2);
+    });
+
+    it('should update chat history when compression is successful', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const compressedHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'compressed' }] },
+      ];
+
+      mockCompress.mockResolvedValue({
+        newHistory: compressedHistory,
+        info: { compressionStatus: CompressionStatus.COMPRESSED },
+      });
+
+      // Turn 1: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 'call1',
+          },
+        ],
+        'T1',
+      );
+
+      await executor.run({ goal: 'Compress success' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
+    });
+
+    it('should pass hasFailedCompressionAttempt=true to compression after a failure', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // First call fails
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: {
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        },
+      });
+      // Second call is neutral
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: { compressionStatus: CompressionStatus.NOOP },
+      });
+
+      // Turn 1
+      mockWorkResponse('t1');
+      // Turn 2: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 't2',
+          },
+        ],
+        'T2',
+      );
+
+      await executor.run({ goal: 'Compress fail' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(2);
+      // First call, hasFailedCompressionAttempt is false
+      expect(mockCompress.mock.calls[0][5]).toBe(false);
+      // Second call, hasFailedCompressionAttempt is true
+      expect(mockCompress.mock.calls[1][5]).toBe(true);
+    });
+
+    it('should reset hasFailedCompressionAttempt flag after a successful compression', async () => {
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const compressedHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'compressed' }] },
+      ];
+
+      // Turn 1: Fails
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: {
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        },
+      });
+      // Turn 2: Succeeds
+      mockCompress.mockResolvedValueOnce({
+        newHistory: compressedHistory,
+        info: { compressionStatus: CompressionStatus.COMPRESSED },
+      });
+      // Turn 3: Neutral
+      mockCompress.mockResolvedValueOnce({
+        newHistory: null,
+        info: { compressionStatus: CompressionStatus.NOOP },
+      });
+
+      // Turn 1
+      mockWorkResponse('t1');
+      // Turn 2
+      mockWorkResponse('t2');
+      // Turn 3: Complete
+      mockModelResponse(
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 't3',
+          },
+        ],
+        'T3',
+      );
+
+      await executor.run({ goal: 'Compress reset' }, signal);
+
+      expect(mockCompress).toHaveBeenCalledTimes(3);
+      // Call 1: hasFailed... is false
+      expect(mockCompress.mock.calls[0][5]).toBe(false);
+      // Call 2: hasFailed... is true
+      expect(mockCompress.mock.calls[1][5]).toBe(true);
+      // Call 3: hasFailed... is false again
+      expect(mockCompress.mock.calls[2][5]).toBe(false);
+
+      expect(mockSetHistory).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
     });
   });
 });

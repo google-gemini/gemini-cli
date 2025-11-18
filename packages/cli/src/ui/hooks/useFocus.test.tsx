@@ -55,7 +55,7 @@ describe('useFocus', () => {
       return null;
     }
     const { unmount } = render(
-      <KeypressProvider kittyProtocolEnabled={false}>
+      <KeypressProvider>
         <TestComponent />
       </KeypressProvider>,
     );
@@ -84,7 +84,7 @@ describe('useFocus', () => {
 
     // Simulate focus-out event
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[O'));
+      stdin.emit('data', '\x1b[O');
     });
 
     // State should now be unfocused
@@ -96,13 +96,13 @@ describe('useFocus', () => {
 
     // Simulate focus-out to set initial state to false
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[O'));
+      stdin.emit('data', '\x1b[O');
     });
     expect(result.current).toBe(false);
 
     // Simulate focus-in event
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[I'));
+      stdin.emit('data', '\x1b[I');
     });
 
     // State should now be focused
@@ -128,22 +128,22 @@ describe('useFocus', () => {
     const { result } = renderFocusHook();
 
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[O'));
+      stdin.emit('data', '\x1b[O');
     });
     expect(result.current).toBe(false);
 
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[O'));
+      stdin.emit('data', '\x1b[O');
     });
     expect(result.current).toBe(false);
 
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[I'));
+      stdin.emit('data', '\x1b[I');
     });
     expect(result.current).toBe(true);
 
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[I'));
+      stdin.emit('data', '\x1b[I');
     });
     expect(result.current).toBe(true);
   });
@@ -153,13 +153,13 @@ describe('useFocus', () => {
 
     // Simulate focus-out event
     act(() => {
-      stdin.emit('data', Buffer.from('\x1b[O'));
+      stdin.emit('data', '\x1b[O');
     });
     expect(result.current).toBe(false);
 
     // Simulate a keypress
     act(() => {
-      stdin.emit('data', Buffer.from('a'));
+      stdin.emit('data', 'a');
     });
     expect(result.current).toBe(true);
   });

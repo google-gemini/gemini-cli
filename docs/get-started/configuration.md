@@ -98,6 +98,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
+- **`general.previewFeatures`** (boolean):
+  - **Description:** Enable preview features (e.g., preview models).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in.
   - **Default:** `undefined`
@@ -225,14 +230,25 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show citations for generated text in the chat.
   - **Default:** `false`
 
+- **`ui.showModelInfoInChat`** (boolean):
+  - **Description:** Show the model name in the chat for each model turn.
+  - **Default:** `false`
+
 - **`ui.useFullWidth`** (boolean):
   - **Description:** Use the entire width of the terminal for output.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.useAlternateBuffer`** (boolean):
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.
-  - **Default:** `false`
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`ui.incrementalRendering`** (boolean):
+  - **Description:** Enable incremental rendering for the UI. This option will
+    reduce flickering but may cause rendering artifacts. Only supported when
+    useAlternateBuffer is enabled.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.customWittyPhrases`** (array):
@@ -289,12 +305,26 @@ their corresponding top-level category object in your `settings.json` file.
 - **`model.compressionThreshold`** (number):
   - **Description:** The fraction of context usage at which to trigger context
     compression (e.g. 0.2, 0.3).
-  - **Default:** `0.2`
+  - **Default:** `0.7`
   - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
+
+#### `modelConfigs`
+
+- **`modelConfigs.aliases`** (object):
+  - **Description:** Named presets for model configs. Can be used in place of a
+    model name and can inherit from other aliases using an `extends` property.
+  - **Default:**
+    `{"base":{"modelConfig":{"generateContentConfig":{"temperature":0,"topP":1}}},"chat-base":{"extends":"base","modelConfig":{"generateContentConfig":{"thinkingConfig":{"includeThoughts":true,"thinkingBudget":-1},"temperature":1,"topP":0.95,"topK":64}}},"gemini-2.5-pro":{"extends":"chat-base","modelConfig":{"model":"gemini-2.5-pro"}},"gemini-2.5-flash":{"extends":"chat-base","modelConfig":{"model":"gemini-2.5-flash"}},"gemini-2.5-flash-lite":{"extends":"chat-base","modelConfig":{"model":"gemini-2.5-flash-lite"}},"gemini-2.5-flash-base":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash"}},"classifier":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":1024,"thinkingConfig":{"thinkingBudget":512}}}},"prompt-completion":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"temperature":0.3,"maxOutputTokens":16000,"thinkingConfig":{"thinkingBudget":0}}}},"edit-corrector":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"thinkingConfig":{"thinkingBudget":0}}}},"summarizer-default":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":2000}}},"summarizer-shell":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":2000}}},"web-search":{"extends":"gemini-2.5-flash-base","modelConfig":{"generateContentConfig":{"tools":[{"googleSearch":{}}]}}},"web-fetch":{"extends":"gemini-2.5-flash-base","modelConfig":{"generateContentConfig":{"tools":[{"urlContext":{}}]}}},"web-fetch-fallback":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"loop-detection":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"loop-detection-double-check":{"extends":"base","modelConfig":{"model":"gemini-2.5-pro"}},"llm-edit-fixer":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"next-speaker-checker":{"extends":"gemini-2.5-flash-base","modelConfig":{}}}`
+
+- **`modelConfigs.overrides`** (array):
+  - **Description:** Apply specific configuration overrides based on matches,
+    with a primary key of model (or alias). The most specific match will be
+    used.
+  - **Default:** `[]`
 
 #### `context`
 
@@ -466,13 +496,18 @@ their corresponding top-level category object in your `settings.json` file.
 #### `useWriteTodos`
 
 - **`useWriteTodos`** (boolean):
-  - **Description:** Enable the write_todos_list tool.
+  - **Description:** Enable the write_todos tool.
   - **Default:** `true`
 
 #### `security`
 
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.blockGitExtensions`** (boolean):
+  - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -537,19 +572,19 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.maxNumTurns`** (number):
   - **Description:** Maximum number of turns for the Codebase Investigator
     agent.
-  - **Default:** `15`
+  - **Default:** `10`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.maxTimeMinutes`** (number):
   - **Description:** Maximum time for the Codebase Investigator agent (in
     minutes).
-  - **Default:** `5`
+  - **Default:** `3`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
