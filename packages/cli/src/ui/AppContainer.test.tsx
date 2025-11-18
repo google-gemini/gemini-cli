@@ -1814,4 +1814,61 @@ describe('AppContainer State Management', () => {
       });
     });
   });
+
+  describe('onCancelSubmit Behavior', () => {
+    let mockSetText: Mock;
+
+    beforeEach(() => {
+      mockSetText = vi.fn();
+      mockedUseTextBuffer.mockReturnValue({
+        text: '',
+        setText: mockSetText,
+      });
+      mockedUseLogger.mockReturnValue({
+        getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+      });
+    });
+
+    it('clears the prompt when onCancelSubmit is called with shouldRestorePrompt=false', async () => {
+      const { unmount } = renderAppContainer();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      const onCancelSubmit = mockedUseGeminiStream.mock.lastCall![14];
+
+      expect(typeof onCancelSubmit).toBe('function');
+
+      act(() => {
+        onCancelSubmit(false);
+      });
+
+      expect(mockSetText).toHaveBeenCalledWith('');
+
+      unmount();
+    });
+
+    it('restores the prompt when onCancelSubmit is called with shouldRestorePrompt=true (or undefined)', async () => {
+      mockedUseLogger.mockReturnValue({
+        getPreviousUserMessages: vi
+          .fn()
+          .mockResolvedValue(['previous message']),
+      });
+
+      const { unmount } = renderAppContainer();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      const onCancelSubmit = mockedUseGeminiStream.mock.lastCall![14];
+
+      await act(async () => {
+        onCancelSubmit(true);
+      });
+
+      expect(mockSetText).toHaveBeenCalledWith('previous message');
+
+      unmount();
+    });
+  });
 });
