@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { Header } from './Header.js';
 import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -14,7 +14,46 @@ import { Banner } from './Banner.js';
 import { theme } from '../semantic-colors.js';
 import { Colors } from '../colors.js';
 import { persistentState } from '../../utils/persistentState.js';
-import { useState, useEffect, useRef } from 'react';
+import { ThemedGradient } from './ThemedGradient.js';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+
+function getFormattedBannerContent(
+  rawText: string,
+  isWarning: boolean,
+  subsequentLineColor: string,
+): ReactNode {
+  if (isWarning) {
+    return (
+      <Text color={theme.status.warning}>{rawText.replace(/\\n/g, '\n')}</Text>
+    );
+  }
+
+  const lines = rawText.split('\\n');
+
+  if (lines.length <= 1) {
+    return (
+      <ThemedGradient>
+        <Text>{rawText.replace(/\\n/g, '\n')}</Text>
+      </ThemedGradient>
+    );
+  }
+
+  return lines.map((line, index) => {
+    if (index === 0) {
+      return (
+        <ThemedGradient key={index}>
+          <Text>{line}</Text>
+        </ThemedGradient>
+      );
+    }
+
+    return (
+      <Text key={index} color={subsequentLineColor}>
+        {line}
+      </Text>
+    );
+  });
+}
 
 interface AppHeaderProps {
   version: string;
@@ -35,11 +74,17 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
     warningText === '' &&
     !config.getPreviewFeatures() &&
     defaultBannerShownCount < 5;
-  const bannerText = showDefaultBanner ? defaultText : warningText;
-  const unescapedBannerText = bannerText.replace(/\\n/g, '\n');
 
-  const defaultColor = Colors.AccentBlue;
-  const fontColor = warningText === '' ? defaultColor : theme.status.warning;
+  const bannerText = showDefaultBanner ? defaultText : warningText;
+  const isWarning = warningText !== '';
+
+  const subsequentLineColor = theme.text.primary;
+
+  const formattedBannerContent = getFormattedBannerContent(
+    bannerText,
+    isWarning,
+    subsequentLineColor,
+  );
 
   const hasIncrementedRef = useRef(false);
   useEffect(() => {
@@ -55,11 +100,11 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
       {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
         <>
           <Header version={version} nightly={nightly} />
-          {bannerVisible && unescapedBannerText && (
+          {bannerVisible && bannerText && (
             <Banner
               width={mainAreaWidth}
-              bannerText={unescapedBannerText}
-              color={fontColor}
+              bannerText={formattedBannerContent}
+              color={isWarning ? theme.status.warning : Colors.Gray}
             />
           )}
         </>

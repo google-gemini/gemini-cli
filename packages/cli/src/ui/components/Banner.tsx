@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
-import { ThemedGradient } from './ThemedGradient.js';
+import { Box } from 'ink';
 
 interface BannerProps {
-  bannerText: string;
+  bannerText: React.ReactNode;
   color: string;
   width: number;
 }
@@ -22,8 +21,6 @@ export const Banner = ({ bannerText, color, width }: BannerProps) => (
     paddingLeft={1}
     paddingRight={1}
   >
-    <ThemedGradient>
-      <Text>{bannerText}</Text>
-    </ThemedGradient>
+    {bannerText}
   </Box>
 );
