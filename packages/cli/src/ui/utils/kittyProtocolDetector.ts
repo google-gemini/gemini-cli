@@ -5,8 +5,11 @@
  */
 
 let detectionComplete = false;
-let protocolSupported = false;
-let protocolEnabled = false;
+
+let kittySupported = false;
+let sgrMouseSupported = false;
+
+let kittyEnabled = false;
 let sgrMouseEnabled = false;
 
 /**
@@ -14,15 +17,15 @@ let sgrMouseEnabled = false;
  * Definitive document about this protocol lives at https://sw.kovidgoyal.net/kitty/keyboard-protocol/
  * This function should be called once at app startup.
  */
-export async function detectAndEnableKittyProtocol(): Promise<boolean> {
+export async function detectAndEnableKittyProtocol(): Promise<void> {
   if (detectionComplete) {
-    return protocolSupported;
+    return;
   }
 
   return new Promise((resolve) => {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       detectionComplete = true;
-      resolve(false);
+      resolve();
       return;
     }
 
@@ -42,7 +45,7 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
         process.stdin.setRawMode(false);
       }
       detectionComplete = true;
-      resolve(false);
+      resolve();
     };
 
     const handleData = (data: Buffer) => {
@@ -73,23 +76,20 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
         }
 
         if (progressiveEnhancementReceived) {
-          // Enable the protocol
-          process.stdout.write('\x1b[>1u');
-          protocolSupported = true;
-          protocolEnabled = true;
+          kittySupported = true;
         }
 
         // Broaden mouse support by enabling SGR mode if we get any device
         // attribute response, which is a strong signal of a modern terminal.
-        process.stdout.write('\x1b[?1006h');
-        sgrMouseEnabled = true;
+        sgrMouseSupported = true;
 
         // Set up cleanup on exit for all enabled protocols
         process.on('exit', disableAllProtocols);
         process.on('SIGTERM', disableAllProtocols);
 
+        enableSupportedProtocol();
         detectionComplete = true;
-        resolve(protocolSupported);
+        resolve();
       }
     };
 
@@ -106,10 +106,14 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
   });
 }
 
+export function isKittyProtocolEnabled(): boolean {
+  return kittyEnabled;
+}
+
 function disableAllProtocols() {
-  if (protocolEnabled) {
+  if (kittyEnabled) {
     process.stdout.write('\x1b[<u');
-    protocolEnabled = false;
+    kittyEnabled = false;
   }
   if (sgrMouseEnabled) {
     process.stdout.write('\x1b[?1006l'); // Disable SGR Mouse
@@ -117,10 +121,17 @@ function disableAllProtocols() {
   }
 }
 
-export function isKittyProtocolEnabled(): boolean {
-  return protocolEnabled;
-}
-
-export function isKittyProtocolSupported(): boolean {
-  return protocolSupported;
+/**
+ * This is exported so we can reenable this after exiting an editor which might
+ * change the mode.
+ */
+export function enableSupportedProtocol(): void {
+  if (kittySupported) {
+    process.stdout.write('\x1b[>1u');
+    kittyEnabled = true;
+  }
+  if (sgrMouseSupported) {
+    process.stdout.write('\x1b[?1006h');
+    sgrMouseEnabled = true;
+  }
 }

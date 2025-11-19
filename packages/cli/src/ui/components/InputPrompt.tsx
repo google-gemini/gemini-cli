@@ -404,7 +404,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
-        if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
+        if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
 
           // Clear any existing paste timeout
@@ -820,7 +820,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       recentUnsafePasteTime,
       commandSearchActive,
       commandSearchCompletion,
-      kittyProtocol.supported,
+      kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
     ],
