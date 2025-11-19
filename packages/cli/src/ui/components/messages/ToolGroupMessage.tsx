@@ -109,7 +109,21 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           tool.name === SHELL_COMMAND_NAME ||
           tool.name === SHELL_NAME ||
           tool.name === SHELL_TOOL_NAME;
-        const ToolComponent = isShellTool ? ShellToolMessage : ToolMessage;
+
+        const commonProps = {
+          ...tool,
+          availableTerminalHeight: availableTerminalHeightPerToolMessage,
+          terminalWidth,
+          emphasis: isConfirming
+            ? ('high' as const)
+            : toolAwaitingApproval
+              ? ('low' as const)
+              : ('medium' as const),
+          config,
+          isFirst,
+          borderColor,
+          borderDimColor,
+        };
 
         return (
           <Box
@@ -118,20 +132,15 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={terminalWidth}
           >
-            <ToolComponent
-              {...tool}
-              availableTerminalHeight={availableTerminalHeightPerToolMessage}
-              terminalWidth={terminalWidth}
-              emphasis={
-                isConfirming ? 'high' : toolAwaitingApproval ? 'low' : 'medium'
-              }
-              activeShellPtyId={activeShellPtyId}
-              embeddedShellFocused={embeddedShellFocused}
-              config={config}
-              isFirst={isFirst}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-            />
+            {isShellTool ? (
+              <ShellToolMessage
+                {...commonProps}
+                activeShellPtyId={activeShellPtyId}
+                embeddedShellFocused={embeddedShellFocused}
+              />
+            ) : (
+              <ToolMessage {...commonProps} />
+            )}
             <Box
               borderLeft={true}
               borderRight={true}

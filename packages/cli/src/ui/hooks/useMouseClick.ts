@@ -10,7 +10,7 @@ import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 
 export const useMouseClick = (
   containerRef: React.RefObject<DOMElement | null>,
-  handler: (event: MouseEvent, x: number, y: number) => void,
+  handler: (event: MouseEvent, relativeX: number, relativeY: number) => void,
   options: { isActive?: boolean; button?: 'left' | 'right' } = {},
 ) => {
   const { isActive = true, button = 'left' } = options;
@@ -24,13 +24,16 @@ export const useMouseClick = (
         const mouseX = event.col - 1;
         const mouseY = event.row - 1;
 
+        const relativeX = mouseX - x;
+        const relativeY = mouseY - y;
+
         if (
-          mouseX >= x &&
-          mouseX < x + width &&
-          mouseY >= y &&
-          mouseY < y + height
+          relativeX >= 0 &&
+          relativeX < width &&
+          relativeY >= 0 &&
+          relativeY < height
         ) {
-          handler(event, mouseX, mouseY);
+          handler(event, relativeX, relativeY);
         }
       }
     },

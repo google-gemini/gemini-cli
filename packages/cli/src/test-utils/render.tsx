@@ -76,7 +76,7 @@ export const simulateClick = async (
   row: number,
   button: 0 | 1 | 2 = 0, // 0 for left, 1 for middle, 2 for right
 ) => {
-  // Ink mouse events are 1-based, so convert if necessary.
+  // Terminal mouse events are 1-based, so convert if necessary.
   const mouseEventString = `\x1b[<${button};${col};${row}M`;
   await act(async () => {
     stdin.write(mouseEventString);

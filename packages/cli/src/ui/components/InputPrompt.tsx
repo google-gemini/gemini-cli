@@ -7,7 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -368,37 +368,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   useMouseClick(
     innerBoxRef,
-    (_event, _mouseX, mouseY) => {
+    (_event, relX, relY) => {
       if (isEmbeddedShellFocused) {
         setEmbeddedShellFocused(false);
       }
-      // The x coordinate in the handler is relative to the container (mouseX - x).
-      // but useMouseClick passes (mouseX - x) as the second argument?
-      // Let's check useMouseClick implementation:
-      // handler(event, mouseX, mouseY);
-      // wait, mouseX in useMouseClick is event.col - 1. It is NOT relative to the container.
-      // I need to check the implementation of useMouseClick I wrote.
-      // const mouseX = event.col - 1;
-      // const mouseY = event.row - 1;
-      // handler(event, mouseX, mouseY);
-      // So it passes absolute terminal coordinates (0-based).
-
-      // In the original code:
-      // const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
-      // const relX = mouseX - x;
-      // const relY = mouseY - y;
-      // const visualRow = buffer.visualScrollRow + relY;
-      // buffer.moveToVisualPosition(visualRow, relX);
-
-      // So I need to recalculate relative coordinates here because useMouseClick passes absolute ones.
-      if (innerBoxRef.current) {
-        const { x, y } = getBoundingBox(innerBoxRef.current);
-        // _mouseX and mouseY are 0-based absolute coordinates passed from useMouseClick
-        const relX = _mouseX - x;
-        const relY = mouseY - y;
-        const visualRow = buffer.visualScrollRow + relY;
-        buffer.moveToVisualPosition(visualRow, relX);
-      }
+      const visualRow = buffer.visualScrollRow + relY;
+      buffer.moveToVisualPosition(visualRow, relX);
     },
     { isActive: focus },
   );
