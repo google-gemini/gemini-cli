@@ -571,7 +571,9 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   );
   const mcpInstructions =
     config.getMcpClientManager()?.getMcpInstructions() || '';
-  const finalMemory = result.memoryContent + mcpInstructions;
+  const finalMemory = [result.memoryContent, mcpInstructions.trimStart()]
+    .filter(Boolean)
+    .join('\n\n');
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
