@@ -31,41 +31,19 @@ export class ModelInfoService {
   }
 
   private async _checkThinkingSupport(modelName: string): Promise<boolean> {
-    // Ideally, we should use models.get() API call, but the returned Model object doesn't contain thinking bool.
-    //   const model = await this.googleGenAI.models.get({ model: modelName });
-    //   return model?.thinking;
-    // As a workaround, we are going to try and call generateContent with thinking budget set.
-    // If the model doesn't have thinking capability, it should return an error.
-    // const contents = [{ role: 'user', parts: [{ text: 'Test prompt.' }] }];
-    // const config = {
-    //   thinkingConfig: {
-    //     thinkingBudget: -1, // Attempt to use thinking
-    //   },
-    // };
-
     try {
-      // Attempt to generate content with thinkingConfig
       const model = await this.googleGenAI.models.get({
         model: modelName,
       });
-      return model?.thinking;
+      return !!model?.thinking;
     } catch (error) {
       debugLogger.log(
-        'model.get returned error %s when called for model=%s',
+        'googleGenAI models.get() API call returned error: %s for model=%s',
         error,
         modelName,
       );
-      return false;
     }
-
-    //   return true;
-    // } catch (error) {
-    //   // A failure with 'thinkingConfig' likely reason indicates no support.
-    //   // If the error is unrelated to thinking, false is still a better default to return.
-    //   debugLogger.log(
-    //     'GenerateContent returned error: %s when called with thinkingConfig set.',
-    //     error,
-    //   );
-    //   return false;
+    // Default return value false.
+    return false;
   }
 }
