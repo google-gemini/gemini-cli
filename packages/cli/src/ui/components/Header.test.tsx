@@ -116,9 +116,33 @@ describe('<Header />', () => {
 
   it('renders with no gradient when theme.ui.gradient is undefined', async () => {
     vi.spyOn(semanticColors, 'theme', 'get').mockReturnValue({
-      ui: { gradient: undefined },
-      text: { accent: '#123456' },
-    } as typeof semanticColors.theme);
+      text: {
+        primary: '',
+        secondary: '',
+        link: '',
+        accent: '#123456',
+        response: '',
+      },
+      background: {
+        primary: '',
+        diff: { added: '', removed: '' },
+      },
+      border: {
+        default: '',
+        focused: '',
+      },
+      ui: {
+        comment: '',
+        symbol: '',
+        dark: '',
+        gradient: undefined,
+      },
+      status: {
+        error: '',
+        success: '',
+        warning: '',
+      },
+    });
     const Gradient = await import('ink-gradient');
     render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
