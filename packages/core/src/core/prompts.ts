@@ -341,8 +341,14 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     userMemory && userMemory.trim().length > 0
       ? `\n\n---\n\n${userMemory.trim()}`
       : '';
+  const mcpInstructions =
+    config.getMcpClientManager()?.getAllSystemInstructions() ?? [];
+  const mcpSuffix =
+    mcpInstructions.length > 0
+      ? `\n\nSystem instructions from MCP servers:\n${mcpInstructions.join('\n')}`
+      : '';
 
-  return `${basePrompt}${memorySuffix}`;
+  return `${basePrompt}${memorySuffix}${mcpSuffix}`;
 }
 
 /**

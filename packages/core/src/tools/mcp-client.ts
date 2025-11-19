@@ -212,6 +212,18 @@ export class McpClient {
   getServerConfig(): MCPServerConfig {
     return this.serverConfig;
   }
+
+  getSystemInstruction(): string | undefined {
+    if (this.status !== MCPServerStatus.CONNECTED || !this.client) {
+      return undefined;
+    }
+    if (this.serverConfig.includeSystemInstruction === false) {
+      return undefined;
+    }
+    return this.client.getServerVersion()?.['instructions'] as
+      | string
+      | undefined;
+  }
 }
 
 /**

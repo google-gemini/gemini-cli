@@ -190,6 +190,7 @@ export class MCPServerConfig {
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
+    readonly includeSystemInstruction?: boolean,
     // Metadata
     readonly description?: string,
     readonly includeTools?: string[],

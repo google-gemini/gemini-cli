@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { getCoreSystemPrompt, resolvePathFromEnv } from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
+import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 
@@ -53,6 +54,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      getMcpClientManager: vi.fn().mockReturnValue({
+        getAllSystemInstructions: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
   });
 
@@ -76,6 +80,28 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt.endsWith(expectedSuffix)).toBe(true);
     expect(prompt).toContain('You are an interactive CLI agent'); // Ensure base prompt follows
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
+  });
+
+  it('should append MCP system instructions when present', () => {
+    vi.stubEnv('SANDBOX', undefined);
+    const mcpInstructions = [
+      'Instruction from Server A',
+      'Instruction from Server B',
+    ];
+    (
+      mockConfig.getMcpClientManager as unknown as Mock<
+        () => Partial<McpClientManager>
+      >
+    ).mockReturnValue({
+      getAllSystemInstructions: vi.fn().mockReturnValue(mcpInstructions),
+    });
+
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('System instructions from MCP servers:');
+    expect(prompt).toContain('Instruction from Server A');
+    expect(prompt).toContain('Instruction from Server B');
+    expect(prompt).toMatchSnapshot();
   });
 
   it.each([
@@ -133,6 +159,9 @@ describe('Core System Prompt (prompts.ts)', () => {
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+        getMcpClientManager: vi.fn().mockReturnValue({
+          getAllSystemInstructions: vi.fn().mockReturnValue([]),
+        }),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
