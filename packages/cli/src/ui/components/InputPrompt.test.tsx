@@ -207,7 +207,6 @@ describe('InputPrompt', () => {
     );
 
     mockedUseKittyKeyboardProtocol.mockReturnValue({
-      supported: false,
       enabled: false,
       checking: false,
     });
@@ -1244,7 +1243,6 @@ describe('InputPrompt', () => {
     beforeEach(() => {
       vi.useFakeTimers();
       mockedUseKittyKeyboardProtocol.mockReturnValue({
-        supported: false,
         enabled: false,
         checking: false,
       });
@@ -1328,7 +1326,6 @@ describe('InputPrompt', () => {
         name: 'kitty',
         setup: () =>
           mockedUseKittyKeyboardProtocol.mockReturnValue({
-            supported: true,
             enabled: true,
             checking: false,
           }),
