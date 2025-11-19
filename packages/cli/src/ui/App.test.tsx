@@ -72,6 +72,10 @@ describe('App', () => {
     },
     history: [],
     pendingHistoryItems: [],
+    bannerData: {
+      defaultText: 'Mock Banner Text',
+      warningText: '',
+    },
   };
 
   const mockConfig = makeFakeConfig();
