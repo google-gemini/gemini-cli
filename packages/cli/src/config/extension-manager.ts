@@ -11,7 +11,6 @@ import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type Settings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { getCliVersion } from '../utils/version.js';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
 import {
   isWorkspaceTrusted,
@@ -66,6 +65,7 @@ interface ExtensionManagerParams {
   requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
+  clientVersion?: string;
 }
 
 /**
@@ -95,7 +95,7 @@ export class ExtensionManager extends ExtensionLoader {
       telemetry: options.settings.telemetry,
       interactive: false,
       sessionId: randomUUID(),
-      clientVersion: getCliVersion(),
+      clientVersion: options.clientVersion ?? 'unknown',
       targetDir: options.workspaceDir,
       cwd: options.workspaceDir,
       model: '',
