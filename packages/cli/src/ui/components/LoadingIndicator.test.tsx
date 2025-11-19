@@ -21,7 +21,10 @@ vi.mock('./GeminiRespondingSpinner.js', () => ({
     nonRespondingDisplay?: string;
   }) => {
     const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
+    if (
+      streamingState === StreamingState.Responding ||
+      streamingState === StreamingState.WaitingForConfirmation
+    ) {
       return <Text>MockRespondingSpinner</Text>;
     } else if (nonRespondingDisplay) {
       return <Text>{nonRespondingDisplay}</Text>;
@@ -86,7 +89,7 @@ describe('<LoadingIndicator />', () => {
       StreamingState.WaitingForConfirmation,
     );
     const output = lastFrame();
-    expect(output).toContain('⠏'); // Static char for WaitingForConfirmation
+    expect(output).toContain('MockRespondingSpinner'); // Should now use the spinner
     expect(output).toContain('Confirm action');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 10s');
@@ -172,7 +175,7 @@ describe('<LoadingIndicator />', () => {
       </StreamingContext.Provider>,
     );
     output = lastFrame();
-    expect(output).toContain('⠏');
+    expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Please Confirm');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 15s');
