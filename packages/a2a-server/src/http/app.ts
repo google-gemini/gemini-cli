@@ -8,7 +8,12 @@ import express from 'express';
 
 import type { AgentCard } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
-import { DefaultRequestHandler, InMemoryTaskStore } from '@a2a-js/sdk/server';
+import {
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  DefaultExecutionEventBus,
+  type AgentExecutionEvent,
+} from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
@@ -175,8 +180,6 @@ export async function createApp() {
             .json({ error: `Command not found: ${command}` });
         }
 
-        const result = await commandToExecute.execute(context, args ?? []);
-
         // Check if data is an async generator
         function isAsyncGenerator(
           data: unknown,
@@ -189,39 +192,67 @@ export async function createApp() {
           );
         }
 
-        const data = result.data;
-        if (isAsyncGenerator(data)) {
-          const processedChunks = [];
-          for await (const chunk of data) {
-            if (chunk.type === 'tool') {
-              const toolRegistry = context.config.getToolRegistry();
-              const tool = toolRegistry.getTool(chunk.toolName);
-              if (tool) {
-                const abortController = new AbortController();
-                const signal = abortController.signal;
-                const shellExecutionConfig = {};
-                const toolResult = await tool.buildAndExecute(
-                  chunk.toolArgs,
-                  signal,
-                  undefined,
-                  shellExecutionConfig,
-                );
-                processedChunks.push(toolResult);
+        if (commandToExecute.executeStream) {
+          const eventBus = new DefaultExecutionEventBus();
+          res.setHeader('Content-Type', 'application/json');
+          const eventHandler = (event: AgentExecutionEvent) => {
+            const jsonRpcResponse = {
+              jsonrpc: '2.0',
+              id: null,
+              result: event,
+            };
+            res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n`);
+          };
+          eventBus.on('event', eventHandler);
+
+          await commandToExecute.executeStream(
+            context,
+            args ?? [],
+            eventBus,
+            command === 'init' ? true : undefined,
+          );
+
+          eventBus.off('event', eventHandler);
+          eventBus.finished();
+          return res.end(); // Explicit return for streaming path
+        } else if (commandToExecute.execute) {
+          // Non-streaming command path (commandToExecute.execute exists)
+          const result = await commandToExecute.execute(context, args ?? []);
+
+          const data = result.data;
+          if (isAsyncGenerator(data)) {
+            const processedChunks = [];
+            for await (const chunk of data) {
+              if (chunk.type === 'tool') {
+                const toolRegistry = context.config.getToolRegistry();
+                const tool = toolRegistry.getTool(chunk.toolName);
+                if (tool) {
+                  const abortController = new AbortController();
+                  const signal = abortController.signal;
+                  const shellExecutionConfig = {};
+                  const toolResult = await tool.buildAndExecute(
+                    chunk.toolArgs,
+                    signal,
+                    undefined,
+                    shellExecutionConfig,
+                  );
+                  processedChunks.push(toolResult);
+                } else {
+                  processedChunks.push({
+                    type: 'error',
+                    message: `Tool ${chunk.toolName} not found`,
+                  });
+                }
               } else {
-                processedChunks.push({
-                  type: 'error',
-                  message: `Tool ${chunk.toolName} not found`,
-                });
+                processedChunks.push(chunk);
               }
-            } else {
-              processedChunks.push(chunk);
             }
+            return res
+              .status(200)
+              .json({ name: result.name, data: processedChunks });
           }
-          return res
-            .status(200)
-            .json({ name: result.name, data: processedChunks });
         }
-        return res.status(200).json(result);
+        return res.status(200).json({});
       } catch (e) {
         logger.error('Error executing /executeCommand:', e);
         const errorMessage =

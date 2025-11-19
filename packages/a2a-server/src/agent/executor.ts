@@ -131,6 +131,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       contextId,
       config,
       eventBus,
+      agentSettings.autoConfirm,
     );
     runtimeTask.taskState = persistedState._taskState;
     await runtimeTask.geminiClient.initialize();
@@ -149,7 +150,13 @@ export class CoderAgentExecutor implements AgentExecutor {
   ): Promise<TaskWrapper> {
     const agentSettings = agentSettingsInput || ({} as AgentSettings);
     const config = await this.getConfig(agentSettings, taskId);
-    const runtimeTask = await Task.create(taskId, contextId, config, eventBus);
+    const runtimeTask = await Task.create(
+      taskId,
+      contextId,
+      config,
+      eventBus,
+      agentSettings.autoConfirm,
+    );
     await runtimeTask.geminiClient.initialize();
 
     const wrapper = new TaskWrapper(runtimeTask, agentSettings);

@@ -75,6 +75,8 @@ export class Task {
   completedToolCalls: CompletedToolCall[];
   checkpoint?: string;
   skipFinalTrueAfterInlineEdit = false;
+  private modelInfo: string | undefined;
+  private autoConfirm: boolean;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -89,6 +91,7 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoConfirm = false,
   ) {
     this.id = id;
     this.contextId = contextId;
@@ -100,6 +103,7 @@ export class Task {
     this.eventBus = eventBus;
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
+    this.autoConfirm = autoConfirm;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
       // for future requests without retrying the current one. The 'stop'
@@ -113,8 +117,9 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoConfirm?: boolean,
   ): Promise<Task> {
-    return new Task(id, contextId, config, eventBus);
+    return new Task(id, contextId, config, eventBus, autoConfirm);
   }
 
   // Note: `getAllMCPServerStatuses` retrieves the status of all MCP servers for the entire
@@ -144,7 +149,7 @@ export class Task {
       id: this.id,
       contextId: this.contextId,
       taskState: this.taskState,
-      model: this.config.getModel(),
+      model: this.modelInfo ?? this.config.getModel(),
       mcpServers: servers,
       availableTools,
     };
@@ -410,8 +415,11 @@ export class Task {
       }
     });
 
-    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
-      logger.info('[Task] YOLO mode enabled. Auto-approving all tool calls.');
+    if (
+      this.autoConfirm ||
+      this.config.getApprovalMode() === ApprovalMode.YOLO
+    ) {
+      logger.info('[Task] Auto-approving all tool calls.');
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
           tc.confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
@@ -673,6 +681,9 @@ export class Task {
           undefined,
           traceId,
         );
+        break;
+      case GeminiEventType.ModelInfo:
+        this.modelInfo = event.value;
         break;
       case GeminiEventType.Thought:
         logger.info('[Task] Sending agent thought...');
