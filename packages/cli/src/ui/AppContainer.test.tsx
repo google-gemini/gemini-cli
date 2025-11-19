@@ -1422,7 +1422,12 @@ describe('AppContainer State Management', () => {
         pressKey({ name: 'c', ctrl: true }, 2);
 
         expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
         unmount();
       });
 
@@ -1462,7 +1467,12 @@ describe('AppContainer State Management', () => {
 
         pressKey({ name: 'd', ctrl: true }, 2);
 
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
         unmount();
       });
 
