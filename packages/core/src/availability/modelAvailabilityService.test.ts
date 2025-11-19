@@ -1,0 +1,105 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { ModelAvailabilityService } from './modelAvailabilityService.js';
+
+describe('ModelAvailabilityService', () => {
+  let service: ModelAvailabilityService;
+  const model = 'test-model';
+
+  beforeEach(() => {
+    service = new ModelAvailabilityService();
+    vi.useRealTimers();
+  });
+
+  it('returns available snapshot when no state recorded', () => {
+    expect(service.snapshot(model)).toEqual({ available: true });
+  });
+
+  it('tracks retry-once-per-turn failures', () => {
+    service.markRetryOncePerTurn(model);
+    expect(service.snapshot(model)).toEqual({ available: true });
+
+    service.consumeStickyAttempt(model);
+    expect(service.snapshot(model)).toEqual({
+      available: false,
+      reason: 'retry_once_per_turn',
+    });
+
+    service.resetTurn();
+    expect(service.snapshot(model)).toEqual({ available: true });
+  });
+
+  it('tracks terminal failures', () => {
+    service.markTerminal(model, 'quota');
+    expect(service.snapshot(model)).toEqual({
+      available: false,
+      reason: 'quota',
+    });
+  });
+
+  it('selects models respecting terminal and sticky states', () => {
+    const stickyModel = 'stick-model';
+    const healthyModel = 'healthy-model';
+
+    service.markTerminal(model, 'capacity');
+    service.markRetryOncePerTurn(stickyModel);
+
+    const first = service.selectFirstAvailable([
+      model,
+      stickyModel,
+      healthyModel,
+    ]);
+    expect(first).toEqual({
+      selected: stickyModel,
+      attempts: 1,
+      skipped: [
+        {
+          model,
+          reason: 'capacity',
+        },
+      ],
+    });
+
+    service.consumeStickyAttempt(stickyModel);
+    const second = service.selectFirstAvailable([
+      model,
+      stickyModel,
+      healthyModel,
+    ]);
+    expect(second).toEqual({
+      selected: healthyModel,
+      skipped: [
+        {
+          model,
+          reason: 'capacity',
+        },
+        {
+          model: stickyModel,
+          reason: 'retry_once_per_turn',
+        },
+      ],
+    });
+
+    service.resetTurn();
+    const third = service.selectFirstAvailable([
+      model,
+      stickyModel,
+      healthyModel,
+    ]);
+    expect(third).toEqual({
+      selected: stickyModel,
+      attempts: 1,
+      skipped: [
+        {
+          model,
+          reason: 'capacity',
+        },
+      ],
+    });
+  });
+});
