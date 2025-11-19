@@ -5,13 +5,20 @@
  */
 
 import { describe, it, expect, vi, type Mock } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../test-utils/render.js';
 import { Text, useIsScreenReaderEnabled } from 'ink';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
 import { ConfigContext } from './contexts/ConfigContext.js';
+import { AppContext, type AppState } from './contexts/AppContext.js';
+import { SettingsContext } from './contexts/SettingsContext.js';
+import {
+  type SettingScope,
+  LoadedSettings,
+  type SettingsFile,
+} from '../config/settings.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -41,6 +48,10 @@ vi.mock('./components/QuittingDisplay.js', () => ({
   QuittingDisplay: () => <Text>Quitting...</Text>,
 }));
 
+vi.mock('./components/HistoryItemDisplay.js', () => ({
+  HistoryItemDisplay: () => <Text>HistoryItemDisplay</Text>,
+}));
+
 vi.mock('./components/Footer.js', () => ({
   Footer: () => <Text>Footer</Text>,
 }));
@@ -59,15 +70,47 @@ describe('App', () => {
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
     },
+    history: [],
+    pendingHistoryItems: [],
+    bannerData: {
+      defaultText: 'Mock Banner Text',
+      warningText: '',
+    },
   };
 
   const mockConfig = makeFakeConfig();
 
+  const mockSettingsFile: SettingsFile = {
+    settings: {},
+    originalSettings: {},
+    path: '/mock/path',
+  };
+
+  const mockLoadedSettings = new LoadedSettings(
+    mockSettingsFile,
+    mockSettingsFile,
+    mockSettingsFile,
+    mockSettingsFile,
+    true,
+    new Set<SettingScope>(),
+  );
+
+  const mockAppState: AppState = {
+    version: '1.0.0',
+    startupWarnings: [],
+  };
+
   const renderWithProviders = (ui: React.ReactElement, state: UIState) =>
     render(
-      <ConfigContext.Provider value={mockConfig}>
-        <UIStateContext.Provider value={state}>{ui}</UIStateContext.Provider>
-      </ConfigContext.Provider>,
+      <AppContext.Provider value={mockAppState}>
+        <ConfigContext.Provider value={mockConfig}>
+          <SettingsContext.Provider value={mockLoadedSettings}>
+            <UIStateContext.Provider value={state}>
+              {ui}
+            </UIStateContext.Provider>
+          </SettingsContext.Provider>
+        </ConfigContext.Provider>
+      </AppContext.Provider>,
     );
 
   it('should render main content and composer when not quitting', () => {
@@ -87,6 +130,25 @@ describe('App', () => {
     const { lastFrame } = renderWithProviders(<App />, quittingUIState);
 
     expect(lastFrame()).toContain('Quitting...');
+  });
+
+  it('should render full history in alternate buffer mode when quittingMessages is set', () => {
+    const quittingUIState = {
+      ...mockUIState,
+      quittingMessages: [{ id: 1, type: 'user', text: 'test' }],
+      history: [{ id: 1, type: 'user', text: 'history item' }],
+      pendingHistoryItems: [{ type: 'user', text: 'pending item' }],
+    } as UIState;
+
+    mockLoadedSettings.merged.ui = { useAlternateBuffer: true };
+
+    const { lastFrame } = renderWithProviders(<App />, quittingUIState);
+
+    expect(lastFrame()).toContain('HistoryItemDisplay');
+    expect(lastFrame()).toContain('Quitting...');
+
+    // Reset settings
+    mockLoadedSettings.merged.ui = { useAlternateBuffer: false };
   });
 
   it('should render dialog manager when dialogs are visible', () => {

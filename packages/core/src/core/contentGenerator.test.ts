@@ -15,10 +15,16 @@ import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import { loadApiKey } from './apiKeyCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
+import { RecordingContentGenerator } from './recordingContentGenerator.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
+vi.mock('./apiKeyCredentialStorage.js', () => ({
+  loadApiKey: vi.fn(),
+}));
+
 vi.mock('./fakeContentGenerator.js');
 
 const mockConfig = {} as unknown as Config;
@@ -45,7 +51,23 @@ describe('createContentGenerator', () => {
     expect(generator).toEqual(mockGenerator);
   });
 
-  it('should create a CodeAssistContentGenerator', async () => {
+  it('should create a RecordingContentGenerator', async () => {
+    const fakeResponsesFile = 'fake/responses.yaml';
+    const recordResponsesFile = 'record/responses.yaml';
+    const mockConfigWithRecordResponses = {
+      fakeResponses: fakeResponsesFile,
+      recordResponses: recordResponsesFile,
+    } as unknown as Config;
+    const generator = await createContentGenerator(
+      {
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfigWithRecordResponses,
+    );
+    expect(generator).toBeInstanceOf(RecordingContentGenerator);
+  });
+
+  it('should create a CodeAssistContentGenerator when AuthType is LOGIN_WITH_GOOGLE', async () => {
     const mockGenerator = {} as unknown as ContentGenerator;
     vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
       mockGenerator as never,
@@ -53,6 +75,23 @@ describe('createContentGenerator', () => {
     const generator = await createContentGenerator(
       {
         authType: AuthType.LOGIN_WITH_GOOGLE,
+      },
+      mockConfig,
+    );
+    expect(createCodeAssistContentGenerator).toHaveBeenCalled();
+    expect(generator).toEqual(
+      new LoggingContentGenerator(mockGenerator, mockConfig),
+    );
+  });
+
+  it('should create a CodeAssistContentGenerator when AuthType is COMPUTE_ADC', async () => {
+    const mockGenerator = {} as unknown as ContentGenerator;
+    vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
+      mockGenerator as never,
+    );
+    const generator = await createContentGenerator(
+      {
+        authType: AuthType.COMPUTE_ADC,
       },
       mockConfig,
     );
@@ -159,6 +198,17 @@ describe('createContentGeneratorConfig', () => {
 
   it('should not configure for Gemini if GEMINI_API_KEY is empty', async () => {
     vi.stubEnv('GEMINI_API_KEY', '');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_GEMINI,
+    );
+    expect(config.apiKey).toBeUndefined();
+    expect(config.vertexai).toBeUndefined();
+  });
+
+  it('should not configure for Gemini if GEMINI_API_KEY is not set and storage is empty', async () => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+    vi.mocked(loadApiKey).mockResolvedValue(null);
     const config = await createContentGeneratorConfig(
       mockConfig,
       AuthType.USE_GEMINI,

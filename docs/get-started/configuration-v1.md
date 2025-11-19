@@ -473,21 +473,6 @@ a few things you can try in order of recommendation:
     "loadMemoryFromIncludeDirectories": true
     ```
 
-- **`chatCompression`** (object):
-  - **Description:** Controls the settings for chat history compression, both
-    automatic and when manually invoked through the /compress command.
-  - **Properties:**
-    - **`contextPercentageThreshold`** (number): A value between 0 and 1 that
-      specifies the token threshold for compression as a percentage of the
-      model's total token limit. For example, a value of `0.6` will trigger
-      compression when the chat history exceeds 60% of the token limit.
-  - **Example:**
-    ```json
-    "chatCompression": {
-      "contextPercentageThreshold": 0.6
-    }
-    ```
-
 - **`showLineNumbers`** (boolean):
   - **Description:** Controls whether line numbers are displayed in code blocks
     in the CLI output.
@@ -707,8 +692,6 @@ for that specific session.
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See
     [telemetry](../cli/telemetry.md) for more information.
-- **`--checkpointing`**:
-  - Enables [checkpointing](../cli/checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all
     available extensions are used.

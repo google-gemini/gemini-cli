@@ -35,6 +35,7 @@ import {
   promptIdContext,
   WRITE_FILE_TOOL_NAME,
   tokenLimit,
+  debugLogger,
   runInDevTraceSpan,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
@@ -43,6 +44,7 @@ import type {
   HistoryItemWithoutId,
   HistoryItemToolGroup,
   SlashCommandProcessorResult,
+  HistoryItemModel,
 } from '../types.js';
 import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
@@ -103,7 +105,7 @@ export const useGeminiStream = (
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
-  onCancelSubmit: () => void,
+  onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
   terminalHeight: number,
@@ -162,7 +164,7 @@ export const useGeminiStream = (
               completedToolCallsFromScheduler,
             );
         } catch (error) {
-          console.error(
+          debugLogger.warn(
             `Error recording completed tool call information: ${error}`,
           );
         }
@@ -322,7 +324,7 @@ export const useGeminiStream = (
       setIsResponding(false);
     }
 
-    onCancelSubmit();
+    onCancelSubmit(false);
     setShellInputFocused(false);
   }, [
     streamingState,
@@ -661,7 +663,7 @@ export const useGeminiStream = (
         {
           type: 'info',
           text:
-            `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
+            `IMPORTANT: This conversation exceeded the compress threshold. ` +
             `A compressed context will be sent for future messages (compressed from: ` +
             `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
             `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
@@ -669,7 +671,7 @@ export const useGeminiStream = (
         Date.now(),
       );
     },
-    [addItem, config, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
@@ -688,7 +690,7 @@ export const useGeminiStream = (
 
   const handleContextWindowWillOverflowEvent = useCallback(
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
-      onCancelSubmit();
+      onCancelSubmit(true);
 
       const limit = tokenLimit(config.getModel());
 
@@ -711,6 +713,26 @@ export const useGeminiStream = (
       );
     },
     [addItem, onCancelSubmit, config],
+  );
+
+  const handleChatModelEvent = useCallback(
+    (eventValue: string, userMessageTimestamp: number) => {
+      if (!settings?.merged?.ui?.showModelInfoInChat) {
+        return;
+      }
+      if (pendingHistoryItemRef.current) {
+        addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        setPendingHistoryItem(null);
+      }
+      addItem(
+        {
+          type: 'model',
+          model: eventValue,
+        } as HistoryItemModel,
+        userMessageTimestamp,
+      );
+    },
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
   );
 
   const processGeminiStreamEvents = useCallback(
@@ -767,6 +789,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.Citation:
             handleCitationEvent(event.value, userMessageTimestamp);
             break;
+          case ServerGeminiEventType.ModelInfo:
+            handleChatModelEvent(event.value, userMessageTimestamp);
+            break;
           case ServerGeminiEventType.LoopDetected:
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
@@ -798,9 +823,9 @@ export const useGeminiStream = (
       handleMaxSessionTurnsEvent,
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
+      handleChatModelEvent,
     ],
   );
-
   const submitQuery = useCallback(
     async (
       query: PartListUnion,
@@ -1004,7 +1029,7 @@ export const useGeminiStream = (
                 ToolConfirmationOutcome.ProceedOnce,
               );
             } catch (error) {
-              console.error(
+              debugLogger.warn(
                 `Failed to auto-approve tool call ${call.request.callId}:`,
                 error,
               );

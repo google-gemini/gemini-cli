@@ -99,6 +99,15 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
   WriteTodosToolParams,
   ToolResult
 > {
+  constructor(
+    params: WriteTodosToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
   getDescription(): string {
     const count = this.params.todos?.length ?? 0;
     if (count === 0) {
@@ -139,7 +148,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   constructor() {
     super(
       WriteTodosTool.Name,
-      'Write Todos',
+      'WriteTodos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
       {
@@ -164,12 +173,46 @@ export class WriteTodosTool extends BaseDeclarativeTool<
                 },
               },
               required: ['description', 'status'],
+              additionalProperties: false,
             },
           },
         },
         required: ['todos'],
+        additionalProperties: false,
       },
     );
+  }
+
+  override get schema() {
+    return {
+      name: this.name,
+      description: this.description,
+      parametersJsonSchema: this.parameterSchema,
+      responseJsonSchema: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: {
+                  type: 'string',
+                },
+                status: {
+                  type: 'string',
+                  enum: TODO_STATUSES,
+                },
+              },
+              required: ['description', 'status'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['todos'],
+        additionalProperties: false,
+      },
+    };
   }
 
   protected override validateToolParamValues(
@@ -209,6 +252,11 @@ export class WriteTodosTool extends BaseDeclarativeTool<
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
-    return new WriteTodosToolInvocation(params);
+    return new WriteTodosToolInvocation(
+      params,
+      _messageBus,
+      _toolName,
+      _displayName,
+    );
   }
 }

@@ -47,13 +47,13 @@ import {
   type EditToolParams,
   calculateReplacement,
 } from './smart-edit.js';
-import { applyReplacement } from './edit.js';
 import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { ApprovalMode, type Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+import { type Config } from '../config/config.js';
 import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
@@ -116,6 +116,7 @@ describe('SmartEditTool', () => {
       getGeminiMdFileCount: () => 0,
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any,
+      isInteractive: () => false,
     } as unknown as Config;
 
     (mockConfig.getApprovalMode as Mock).mockClear();
@@ -172,85 +173,51 @@ describe('SmartEditTool', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  describe('applyReplacement', () => {
-    it('should return newString if isNewFile is true', () => {
-      expect(applyReplacement(null, 'old', 'new', true)).toBe('new');
-      expect(applyReplacement('existing', 'old', 'new', true)).toBe('new');
-    });
-
-    it('should replace oldString with newString in currentContent', () => {
-      expect(applyReplacement('hello old world old', 'old', 'new', false)).toBe(
-        'hello new world new',
-      );
-    });
-
-    it('should treat $ literally and not as replacement pattern', () => {
-      const current = 'regex end is $ and more';
-      const oldStr = 'regex end is $';
-      const newStr = 'regex end is $ and correct';
-      const result = applyReplacement(current, oldStr, newStr, false);
-      expect(result).toBe('regex end is $ and correct and more');
-    });
-
-    it("should treat $' literally and not as a replacement pattern", () => {
-      const current = 'foo';
-      const oldStr = 'foo';
-      const newStr = "bar$'baz";
-      const result = applyReplacement(current, oldStr, newStr, false);
-      expect(result).toBe("bar$'baz");
-    });
-  });
-
   describe('calculateReplacement', () => {
     const abortSignal = new AbortController().signal;
 
-    it('should perform an exact replacement', async () => {
-      const content = 'hello world';
-      const result = await calculateReplacement(mockConfig, {
-        params: {
-          file_path: 'test.txt',
-          instruction: 'test',
-          old_string: 'world',
-          new_string: 'moon',
-        },
-        currentContent: content,
-        abortSignal,
-      });
-      expect(result.newContent).toBe('hello moon');
-      expect(result.occurrences).toBe(1);
-    });
-
-    it('should perform a flexible, whitespace-insensitive replacement', async () => {
-      const content = '  hello\n    world\n';
-      const result = await calculateReplacement(mockConfig, {
-        params: {
-          file_path: 'test.txt',
-          instruction: 'test',
-          old_string: 'hello\nworld',
-          new_string: 'goodbye\nmoon',
-        },
-        currentContent: content,
-        abortSignal,
-      });
-      expect(result.newContent).toBe('  goodbye\n  moon\n');
-      expect(result.occurrences).toBe(1);
-    });
-
-    it('should return 0 occurrences if no match is found', async () => {
-      const content = 'hello world';
-      const result = await calculateReplacement(mockConfig, {
-        params: {
-          file_path: 'test.txt',
-          instruction: 'test',
-          old_string: 'nomatch',
-          new_string: 'moon',
-        },
-        currentContent: content,
-        abortSignal,
-      });
-      expect(result.newContent).toBe(content);
-      expect(result.occurrences).toBe(0);
-    });
+    it.each([
+      {
+        name: 'perform an exact replacement',
+        content: 'hello world',
+        old_string: 'world',
+        new_string: 'moon',
+        expected: 'hello moon',
+        occurrences: 1,
+      },
+      {
+        name: 'perform a flexible, whitespace-insensitive replacement',
+        content: '  hello\n    world\n',
+        old_string: 'hello\nworld',
+        new_string: 'goodbye\nmoon',
+        expected: '  goodbye\n  moon\n',
+        occurrences: 1,
+      },
+      {
+        name: 'return 0 occurrences if no match is found',
+        content: 'hello world',
+        old_string: 'nomatch',
+        new_string: 'moon',
+        expected: 'hello world',
+        occurrences: 0,
+      },
+    ])(
+      'should $name',
+      async ({ content, old_string, new_string, expected, occurrences }) => {
+        const result = await calculateReplacement(mockConfig, {
+          params: {
+            file_path: 'test.txt',
+            instruction: 'test',
+            old_string,
+            new_string,
+          },
+          currentContent: content,
+          abortSignal,
+        });
+        expect(result.newContent).toBe(expected);
+        expect(result.occurrences).toBe(occurrences);
+      },
+    );
 
     it('should perform a regex-based replacement for flexible intra-line whitespace', async () => {
       // This case would fail with the previous exact and line-trimming flexible logic
@@ -524,60 +491,99 @@ describe('SmartEditTool', () => {
       filePath = path.join(rootDir, testFile);
     });
 
-    it('should return FILE_NOT_FOUND error', async () => {
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: 'any',
-        new_string: 'new',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.FILE_NOT_FOUND);
+    it.each([
+      {
+        name: 'FILE_NOT_FOUND',
+        setup: () => {}, // no file created
+        params: { old_string: 'any', new_string: 'new' },
+        expectedError: ToolErrorType.FILE_NOT_FOUND,
+      },
+      {
+        name: 'ATTEMPT_TO_CREATE_EXISTING_FILE',
+        setup: (fp: string) => fs.writeFileSync(fp, 'existing content', 'utf8'),
+        params: { old_string: '', new_string: 'new content' },
+        expectedError: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
+      },
+      {
+        name: 'NO_OCCURRENCE_FOUND',
+        setup: (fp: string) => fs.writeFileSync(fp, 'content', 'utf8'),
+        params: { old_string: 'not-found', new_string: 'new' },
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+      },
+      {
+        name: 'EXPECTED_OCCURRENCE_MISMATCH',
+        setup: (fp: string) => fs.writeFileSync(fp, 'one one two', 'utf8'),
+        params: { old_string: 'one', new_string: 'new' },
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+    ])(
+      'should return $name error',
+      async ({ setup, params, expectedError }) => {
+        setup(filePath);
+        const invocation = tool.build({
+          file_path: filePath,
+          instruction: 'test',
+          ...params,
+        });
+        const result = await invocation.execute(new AbortController().signal);
+        expect(result.error?.type).toBe(expectedError);
+      },
+    );
+  });
+
+  describe('expected_replacements', () => {
+    const testFile = 'replacements_test.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
     });
 
-    it('should return ATTEMPT_TO_CREATE_EXISTING_FILE error', async () => {
-      fs.writeFileSync(filePath, 'existing content', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: '',
-        new_string: 'new content',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(
-        ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
-      );
-    });
+    it.each([
+      {
+        name: 'succeed when occurrences match expected_replacements',
+        content: 'foo foo foo',
+        expected: 3,
+        shouldSucceed: true,
+        finalContent: 'bar bar bar',
+      },
+      {
+        name: 'fail when occurrences do not match expected_replacements',
+        content: 'foo foo foo',
+        expected: 2,
+        shouldSucceed: false,
+      },
+      {
+        name: 'default to 1 expected replacement if not specified',
+        content: 'foo foo',
+        expected: undefined,
+        shouldSucceed: false,
+      },
+    ])(
+      'should $name',
+      async ({ content, expected, shouldSucceed, finalContent }) => {
+        fs.writeFileSync(filePath, content, 'utf8');
+        const params: EditToolParams = {
+          file_path: filePath,
+          instruction: 'Replace all foo with bar',
+          old_string: 'foo',
+          new_string: 'bar',
+          ...(expected !== undefined && { expected_replacements: expected }),
+        };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
 
-    it('should return NO_OCCURRENCE_FOUND error', async () => {
-      fs.writeFileSync(filePath, 'content', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: 'not-found',
-        new_string: 'new',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
-    });
-
-    it('should return EXPECTED_OCCURRENCE_MISMATCH error', async () => {
-      fs.writeFileSync(filePath, 'one one two', 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'test',
-        old_string: 'one',
-        new_string: 'new',
-      };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(
-        ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-      );
-    });
+        if (shouldSucceed) {
+          expect(result.error).toBeUndefined();
+          if (finalContent)
+            expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
+        } else {
+          expect(result.error?.type).toBe(
+            ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+          );
+        }
+      },
+    );
   });
 
   describe('IDE mode', () => {
@@ -658,6 +664,93 @@ describe('SmartEditTool', () => {
       ).rejects.toBe(abortError);
 
       calculateSpy.mockRestore();
+    });
+  });
+
+  describe('multiple file edits', () => {
+    it('should perform multiple removals and report correct diff stats', async () => {
+      const numFiles = 10;
+      const files: Array<{
+        path: string;
+        initialContent: string;
+        toRemove: string;
+      }> = [];
+      const expectedLinesRemoved: number[] = [];
+      const actualLinesRemoved: number[] = [];
+
+      // 1. Create 10 files with 5-10 lines each
+      for (let i = 0; i < numFiles; i++) {
+        const fileName = `test-file-${i}.txt`;
+        const filePath = path.join(rootDir, fileName);
+        const numLines = Math.floor(Math.random() * 6) + 5; // 5 to 10 lines
+        const lines = Array.from(
+          { length: numLines },
+          (_, j) => `File ${i}, Line ${j + 1}`,
+        );
+        const content = lines.join('\n') + '\n';
+
+        // Determine which lines to remove (2 or 3 lines)
+        const numLinesToRemove = Math.floor(Math.random() * 2) + 2; // 2 or 3
+        expectedLinesRemoved.push(numLinesToRemove);
+        const startLineToRemove = 1; // Start removing from the second line
+        const linesToRemove = lines.slice(
+          startLineToRemove,
+          startLineToRemove + numLinesToRemove,
+        );
+        const toRemove = linesToRemove.join('\n') + '\n';
+
+        fs.writeFileSync(filePath, content, 'utf8');
+        files.push({
+          path: filePath,
+          initialContent: content,
+          toRemove,
+        });
+      }
+
+      // 2. Create and execute 10 tool calls for removal
+      for (const file of files) {
+        const params: EditToolParams = {
+          file_path: file.path,
+          instruction: `Remove lines from the file`,
+          old_string: file.toRemove,
+          new_string: '', // Removing the content
+          ai_proposed_string: '',
+        };
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
+
+        if (
+          result.returnDisplay &&
+          typeof result.returnDisplay === 'object' &&
+          'diffStat' in result.returnDisplay &&
+          result.returnDisplay.diffStat
+        ) {
+          actualLinesRemoved.push(
+            result.returnDisplay.diffStat?.model_removed_lines,
+          );
+        } else if (result.error) {
+          console.error(`Edit failed for ${file.path}:`, result.error);
+        }
+      }
+
+      // 3. Assert that the content was removed from each file
+      for (const file of files) {
+        const finalContent = fs.readFileSync(file.path, 'utf8');
+        const expectedContent = file.initialContent.replace(file.toRemove, '');
+        expect(finalContent).toBe(expectedContent);
+        expect(finalContent).not.toContain(file.toRemove);
+      }
+
+      // 4. Assert that the total number of removed lines matches the diffStat total
+      const totalExpectedRemoved = expectedLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      const totalActualRemoved = actualLinesRemoved.reduce(
+        (sum, current) => sum + current,
+        0,
+      );
+      expect(totalActualRemoved).toBe(totalExpectedRemoved);
     });
   });
 });

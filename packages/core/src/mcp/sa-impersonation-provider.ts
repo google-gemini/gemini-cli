@@ -14,9 +14,12 @@ import { GoogleAuth } from 'google-auth-library';
 import { OAuthUtils, FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
 import type { MCPServerConfig } from '../config/config.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import { coreEvents } from '../utils/events.js';
 
 function createIamApiUrl(targetSA: string): string {
-  return `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(targetSA)}:generateIdToken`;
+  return `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(
+    targetSA,
+  )}:generateIdToken`;
 }
 
 export class ServiceAccountImpersonationProvider
@@ -103,11 +106,18 @@ export class ServiceAccountImpersonationProvider
       idToken = res.data.token;
 
       if (!idToken || idToken.length === 0) {
-        console.error('Failed to get ID token from Google');
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to obtain authentication token.',
+        );
         return undefined;
       }
     } catch (e) {
-      console.error('Failed to fetch ID token from Google:', e);
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to obtain authentication token.',
+        e as Error,
+      );
       return undefined;
     }
 

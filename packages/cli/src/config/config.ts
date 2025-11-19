@@ -4,23 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type {
-  FileFilteringOptions,
-  MCPServerConfig,
-  OutputFormat,
-  GeminiCLIExtension,
-} from '@google/gemini-cli-core';
+import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
-  loadServerHierarchicalMemory,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -38,6 +29,7 @@ import {
   getPty,
   EDIT_TOOL_NAME,
   debugLogger,
+  loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -48,6 +40,11 @@ import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
+import { ExtensionManager } from './extension-manager.js';
+import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
+import { requestConsentNonInteractive } from './extensions/consent.js';
+import { promptForSetting } from './extensions/extensionSettings.js';
+import type { EventEmitter } from 'node:stream';
 
 export interface CliArgs {
   query: string | undefined;
@@ -64,12 +61,16 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  resume: string | 'latest' | undefined;
+  listSessions: boolean | undefined;
+  deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
+  recordResponses: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -174,6 +175,35 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'List all available extensions and exit.',
         })
+        .option('resume', {
+          alias: 'r',
+          type: 'string',
+          // `skipValidation` so that we can distinguish between it being passed with a value, without
+          // one, and not being passed at all.
+          skipValidation: true,
+          description:
+            'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+          coerce: (value: string): string => {
+            // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
+            // When --resume passed without a value (`gemini --resume`): value = "" (string)
+            // When --resume not passed at all: this `coerce` function is not called at all, and
+            //   `yargsInstance.argv.resume` is undefined.
+            if (value === '') {
+              return 'latest';
+            }
+            return value;
+          },
+        })
+        .option('list-sessions', {
+          type: 'boolean',
+          description:
+            'List available sessions for the current project and exit.',
+        })
+        .option('delete-session', {
+          type: 'string',
+          description:
+            'Delete a session by index number (use --list-sessions to see available sessions).',
+        })
         .option('include-directories', {
           type: 'array',
           string: true,
@@ -198,6 +228,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('fake-responses', {
           type: 'string',
           description: 'Path to a file with fake model responses for testing.',
+          hidden: true,
+        })
+        .option('record-responses', {
+          type: 'string',
+          description: 'Path to a file to record model responses for testing.',
+          hidden: true,
         })
         .deprecateOption(
           'prompt',
@@ -222,6 +258,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           }
           if (argv['prompt'] && argv['promptInteractive']) {
             return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+          }
+          if (argv.resume && !argv.prompt && !process.stdin.isTTY) {
+            throw new Error(
+              'When resuming a session, you must provide a message via --prompt (-p) or stdin',
+            );
           }
           if (argv.yolo && argv['approvalMode']) {
             return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
@@ -284,49 +325,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   return result as unknown as CliArgs;
 }
 
-// This function is now a thin wrapper around the server's implementation.
-// It's kept in the CLI for now as App.tsx directly calls it for memory refresh.
-// TODO: Consider if App.tsx should get memory via a server call or if Config should refresh itself.
-export async function loadHierarchicalGeminiMemory(
-  currentWorkingDirectory: string,
-  includeDirectoriesToReadGemini: readonly string[] = [],
-  debugMode: boolean,
-  fileService: FileDiscoveryService,
-  settings: Settings,
-  extensions: GeminiCLIExtension[],
-  folderTrust: boolean,
-  memoryImportFormat: 'flat' | 'tree' = 'tree',
-  fileFilteringOptions?: FileFilteringOptions,
-): Promise<{ memoryContent: string; fileCount: number; filePaths: string[] }> {
-  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = fs.realpathSync(path.resolve(currentWorkingDirectory));
-  const realHome = fs.realpathSync(path.resolve(homedir()));
-  const isHomeDirectory = realCwd === realHome;
-
-  // If it is the home directory, pass an empty string to the core memory
-  // function to signal that it should skip the workspace search.
-  const effectiveCwd = isHomeDirectory ? '' : currentWorkingDirectory;
-
-  if (debugMode) {
-    debugLogger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
-    );
-  }
-
-  // Directly call the server function with the corrected path.
-  return loadServerHierarchicalMemory(
-    effectiveCwd,
-    includeDirectoriesToReadGemini,
-    debugMode,
-    fileService,
-    extensions,
-    folderTrust,
-    memoryImportFormat,
-    fileFilteringOptions,
-    settings.context?.discoveryMaxDirs,
-  );
-}
-
 /**
  * Creates a filter function to determine if a tool should be excluded.
  *
@@ -368,7 +366,6 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export async function loadCliConfig(
   settings: Settings,
-  allExtensions: GeminiCLIExtension[],
   sessionId: string,
   argv: CliArgs,
   cwd: string = process.cwd(),
@@ -413,23 +410,30 @@ export async function loadCliConfig(
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
+  const extensionManager = new ExtensionManager({
+    settings,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    workspaceDir: cwd,
+    enabledExtensionOverrides: argv.extensions,
+    eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+  });
+  await extensionManager.loadExtensions();
+
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =
-    await loadHierarchicalGeminiMemory(
+    await loadServerHierarchicalMemory(
       cwd,
-      settings.context?.loadMemoryFromIncludeDirectories
-        ? includeDirectories
-        : [],
+      [],
       debugMode,
       fileService,
-      settings,
-      allExtensions,
+      extensionManager,
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
+      settings.context?.discoveryMaxDirs,
     );
 
-  let mcpServers = mergeMcpServers(settings, allExtensions);
   const question = argv.promptInteractive || argv.prompt || '';
 
   // Determine approval mode with backward compatibility
@@ -495,7 +499,13 @@ export async function loadCliConfig(
     throw err;
   }
 
-  const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
+  const policyEngineConfig = await createPolicyEngineConfig(
+    settings,
+    approvalMode,
+  );
+
+  const enableMessageBusIntegration =
+    settings.tools?.enableMessageBusIntegration ?? false;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -540,37 +550,8 @@ export async function loadCliConfig(
 
   const excludeTools = mergeExcludeTools(
     settings,
-    allExtensions,
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
-  const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
-
-  if (!argv.allowedMcpServerNames) {
-    if (settings.mcp?.allowed) {
-      mcpServers = allowedMcpServers(
-        mcpServers,
-        settings.mcp.allowed,
-        blockedMcpServers,
-      );
-    }
-
-    if (settings.mcp?.excluded) {
-      const excludedNames = new Set(settings.mcp.excluded.filter(Boolean));
-      if (excludedNames.size > 0) {
-        mcpServers = Object.fromEntries(
-          Object.entries(mcpServers).filter(([key]) => !excludedNames.has(key)),
-        );
-      }
-    }
-  }
-
-  if (argv.allowedMcpServerNames) {
-    mcpServers = allowedMcpServers(
-      mcpServers,
-      argv.allowedMcpServerNames,
-      blockedMcpServers,
-    );
-  }
 
   const useModelRouter = settings.experimental?.useModelRouter ?? true;
   const defaultModel = useModelRouter
@@ -600,6 +581,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
+    previewFeatures: settings.general?.previewFeatures,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -608,7 +590,11 @@ export async function loadCliConfig(
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: settings.mcp?.serverCommand,
-    mcpServers,
+    mcpServers: settings.mcpServers,
+    allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
+    blockedMcpServers: argv.allowedMcpServerNames
+      ? [] // explicitly allowed servers overrides everything
+      : settings.mcp?.excluded,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
@@ -635,13 +621,15 @@ export async function loadCliConfig(
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
+    listSessions: argv.listSessions || false,
+    deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
-    extensions: allExtensions,
-    blockedMcpServers,
+    extensionLoader: extensionManager,
+    enableExtensionReloading: settings.experimental?.extensionReloading,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
-    chatCompression: settings.model?.chatCompression,
+    compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
     trustedFolder,
@@ -660,85 +648,27 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
-    enableMessageBusIntegration:
-      settings.tools?.enableMessageBusIntegration ?? false,
+    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     fakeResponses: argv.fakeResponses,
+    recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
+    modelConfigServiceConfig: settings.modelConfigs,
+    // TODO: loading of hooks based on workspace trust
+    enableHooks: settings.tools?.enableHooks ?? false,
+    hooks: settings.hooks || {},
   });
-}
-
-function allowedMcpServers(
-  mcpServers: { [x: string]: MCPServerConfig },
-  allowMCPServers: string[],
-  blockedMcpServers: Array<{ name: string; extensionName: string }>,
-) {
-  const allowedNames = new Set(allowMCPServers.filter(Boolean));
-  if (allowedNames.size > 0) {
-    mcpServers = Object.fromEntries(
-      Object.entries(mcpServers).filter(([key, server]) => {
-        const isAllowed = allowedNames.has(key);
-        if (!isAllowed) {
-          blockedMcpServers.push({
-            name: key,
-            extensionName: server.extension?.name || '',
-          });
-        }
-        return isAllowed;
-      }),
-    );
-  } else {
-    blockedMcpServers.push(
-      ...Object.entries(mcpServers).map(([key, server]) => ({
-        name: key,
-        extensionName: server.extension?.name || '',
-      })),
-    );
-    mcpServers = {};
-  }
-  return mcpServers;
-}
-
-function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
-  const mcpServers = { ...(settings.mcpServers || {}) };
-  for (const extension of extensions) {
-    if (!extension.isActive) {
-      continue;
-    }
-    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
-        debugLogger.warn(
-          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-        );
-        return;
-      }
-      mcpServers[key] = {
-        ...server,
-        extension,
-      };
-    });
-  }
-  return mcpServers;
 }
 
 function mergeExcludeTools(
   settings: Settings,
-  extensions: GeminiCLIExtension[],
   extraExcludes?: string[] | undefined,
 ): string[] {
   const allExcludeTools = new Set([
     ...(settings.tools?.exclude || []),
     ...(extraExcludes || []),
   ]);
-  for (const extension of extensions) {
-    if (!extension.isActive) {
-      continue;
-    }
-    for (const tool of extension.excludeTools || []) {
-      allExcludeTools.add(tool);
-    }
-  }
   return [...allExcludeTools];
 }

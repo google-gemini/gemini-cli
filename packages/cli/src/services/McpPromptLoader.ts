@@ -34,11 +34,12 @@ export class McpPromptLoader implements ICommandLoader {
     if (!this.config) {
       return Promise.resolve([]);
     }
-    const mcpServers = this.config.getMcpServers() || {};
+    const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     for (const serverName in mcpServers) {
       const prompts = getMCPServerPrompts(this.config, serverName) || [];
       for (const prompt of prompts) {
-        const commandName = `${prompt.name}`;
+        // Sanitize prompt names to ensure they are valid slash commands (e.g. "Prompt Name" -> "Prompt-Name")
+        const commandName = `${prompt.name}`.trim().replace(/\s+/g, '-');
         const newPromptCommand: SlashCommand = {
           name: commandName,
           description: prompt.description || `Invoke prompt ${prompt.name}`,
@@ -101,7 +102,8 @@ export class McpPromptLoader implements ICommandLoader {
             }
 
             try {
-              const mcpServers = this.config.getMcpServers() || {};
+              const mcpServers =
+                this.config.getMcpClientManager()?.getMcpServers() || {};
               const mcpServerConfig = mcpServers[serverName];
               if (!mcpServerConfig) {
                 return {

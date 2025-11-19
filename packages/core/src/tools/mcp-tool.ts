@@ -72,11 +72,22 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     readonly trust?: boolean,
     params: ToolParams = {},
     private readonly cliConfig?: Config,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    // Use composite format for policy checks: serverName__toolName
+    // This enables server wildcards (e.g., "google-workspace__*")
+    // while still allowing specific tool rules
+
+    super(
+      params,
+      messageBus,
+      `${serverName}__${serverToolName}`,
+      displayName,
+      serverName,
+    );
   }
 
-  override async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const serverAllowListKey = this.serverName;
@@ -214,7 +225,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly trust?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
+    override readonly extensionName?: string,
     override readonly extensionId?: string,
+    messageBus?: MessageBus,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -223,10 +236,15 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       Kind.Other,
       parameterSchema,
       true, // isOutputMarkdown
-      false, // canUpdateOutput
-      undefined, // messageBus
+      false, // canUpdateOutput,
+      messageBus,
+      extensionName,
       extensionId,
     );
+  }
+
+  getFullyQualifiedPrefix(): string {
+    return `${this.serverName}__`;
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -237,9 +255,11 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.description,
       this.parameterSchema,
       this.trust,
-      `${this.serverName}__${this.serverToolName}`,
+      `${this.getFullyQualifiedPrefix()}${this.serverToolName}`,
       this.cliConfig,
+      this.extensionName,
       this.extensionId,
+      this.messageBus,
     );
   }
 
@@ -257,6 +277,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.trust,
       params,
       this.cliConfig,
+      _messageBus,
     );
   }
 }

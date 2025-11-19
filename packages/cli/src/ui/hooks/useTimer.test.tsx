@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { useTimer } from './useTimer.js';
 
 describe('useTimer', () => {

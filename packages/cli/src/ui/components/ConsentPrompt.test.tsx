@@ -6,7 +6,8 @@
 
 import { Text } from 'ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { act } from 'react';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
@@ -32,7 +33,7 @@ describe('ConsentPrompt', () => {
 
   it('renders a string prompt with MarkdownDisplay', () => {
     const prompt = 'Are you sure?';
-    render(
+    const { unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
@@ -48,11 +49,12 @@ describe('ConsentPrompt', () => {
       },
       undefined,
     );
+    unmount();
   });
 
   it('renders a ReactNode prompt directly', () => {
     const prompt = <Text>Are you sure?</Text>;
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
@@ -62,11 +64,12 @@ describe('ConsentPrompt', () => {
 
     expect(MockedMarkdownDisplay).not.toHaveBeenCalled();
     expect(lastFrame()).toContain('Are you sure?');
+    unmount();
   });
 
   it('calls onConfirm with true when "Yes" is selected', () => {
     const prompt = 'Are you sure?';
-    render(
+    const { unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
@@ -75,14 +78,17 @@ describe('ConsentPrompt', () => {
     );
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
-    onSelect(true);
+    act(() => {
+      onSelect(true);
+    });
 
     expect(onConfirm).toHaveBeenCalledWith(true);
+    unmount();
   });
 
   it('calls onConfirm with false when "No" is selected', () => {
     const prompt = 'Are you sure?';
-    render(
+    const { unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
@@ -91,14 +97,17 @@ describe('ConsentPrompt', () => {
     );
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
-    onSelect(false);
+    act(() => {
+      onSelect(false);
+    });
 
     expect(onConfirm).toHaveBeenCalledWith(false);
+    unmount();
   });
 
   it('passes correct items to RadioButtonSelect', () => {
     const prompt = 'Are you sure?';
-    render(
+    const { unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
@@ -115,5 +124,6 @@ describe('ConsentPrompt', () => {
       }),
       undefined,
     );
+    unmount();
   });
 });

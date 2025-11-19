@@ -131,7 +131,7 @@ describe('GlobTool', () => {
     });
 
     it('should find files in a specified relative path (relative to rootDir)', async () => {
-      const params: GlobToolParams = { pattern: '*.md', path: 'sub' };
+      const params: GlobToolParams = { pattern: '*.md', dir_path: 'sub' };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 2 file(s)');
@@ -220,7 +220,7 @@ describe('GlobTool', () => {
     it('should return a PATH_NOT_IN_WORKSPACE error if path is outside workspace', async () => {
       // Bypassing validation to test execute method directly
       vi.spyOn(globTool, 'validateToolParams').mockReturnValue(null);
-      const params: GlobToolParams = { pattern: '*.txt', path: '/etc' };
+      const params: GlobToolParams = { pattern: '*.txt', dir_path: '/etc' };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
@@ -249,18 +249,18 @@ describe('GlobTool', () => {
         expected: null,
       },
       {
-        name: 'should return null for valid parameters (pattern and path)',
-        params: { pattern: '*.js', path: 'sub' },
+        name: 'should return null for valid parameters (pattern and dir_path)',
+        params: { pattern: '*.js', dir_path: 'sub' },
         expected: null,
       },
       {
-        name: 'should return null for valid parameters (pattern, path, and case_sensitive)',
-        params: { pattern: '*.js', path: 'sub', case_sensitive: true },
+        name: 'should return null for valid parameters (pattern, dir_path, and case_sensitive)',
+        params: { pattern: '*.js', dir_path: 'sub', case_sensitive: true },
         expected: null,
       },
       {
         name: 'should return error if pattern is missing (schema validation)',
-        params: { path: '.' },
+        params: { dir_path: '.' },
         expected: `params must have required property 'pattern'`,
       },
       {
@@ -274,9 +274,9 @@ describe('GlobTool', () => {
         expected: "The 'pattern' parameter cannot be empty.",
       },
       {
-        name: 'should return error if path is not a string (schema validation)',
-        params: { pattern: '*.ts', path: 123 },
-        expected: 'params/path must be string',
+        name: 'should return error if dir_path is not a string (schema validation)',
+        params: { pattern: '*.ts', dir_path: 123 },
+        expected: 'params/dir_path must be string',
       },
       {
         name: 'should return error if case_sensitive is not a boolean (schema validation)',
@@ -285,17 +285,20 @@ describe('GlobTool', () => {
       },
       {
         name: "should return error if search path resolves outside the tool's root directory",
-        params: { pattern: '*.txt', path: '../../../../../../../../../../tmp' },
+        params: {
+          pattern: '*.txt',
+          dir_path: '../../../../../../../../../../tmp',
+        },
         expected: 'resolves outside the allowed workspace directories',
       },
       {
         name: 'should return error if specified search path does not exist',
-        params: { pattern: '*.txt', path: 'nonexistent_subdir' },
+        params: { pattern: '*.txt', dir_path: 'nonexistent_subdir' },
         expected: 'Search path does not exist',
       },
       {
         name: 'should return error if specified search path is a file, not a directory',
-        params: { pattern: '*.txt', path: 'fileA.txt' },
+        params: { pattern: '*.txt', dir_path: 'fileA.txt' },
         expected: 'Search path is not a directory',
       },
     ])('$name', ({ params, expected }) => {
@@ -311,8 +314,8 @@ describe('GlobTool', () => {
 
   describe('workspace boundary validation', () => {
     it('should validate search paths are within workspace boundaries', () => {
-      const validPath = { pattern: '*.ts', path: 'sub' };
-      const invalidPath = { pattern: '*.ts', path: '../..' };
+      const validPath = { pattern: '*.ts', dir_path: 'sub' };
+      const invalidPath = { pattern: '*.ts', dir_path: '../..' };
 
       expect(globTool.validateToolParams(validPath)).toBeNull();
       expect(globTool.validateToolParams(invalidPath)).toContain(
@@ -321,7 +324,7 @@ describe('GlobTool', () => {
     });
 
     it('should provide clear error messages when path is outside workspace', () => {
-      const invalidPath = { pattern: '*.ts', path: '/etc' };
+      const invalidPath = { pattern: '*.ts', dir_path: '/etc' };
       const error = globTool.validateToolParams(invalidPath);
 
       expect(error).toContain(
@@ -331,7 +334,7 @@ describe('GlobTool', () => {
     });
 
     it('should work with paths in workspace subdirectories', async () => {
-      const params: GlobToolParams = { pattern: '*.md', path: 'sub' };
+      const params: GlobToolParams = { pattern: '*.md', dir_path: 'sub' };
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
 

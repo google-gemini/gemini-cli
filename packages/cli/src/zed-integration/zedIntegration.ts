@@ -11,7 +11,6 @@ import type {
   GeminiChat,
   ToolResult,
   ToolCallConfirmationDetails,
-  GeminiCLIExtension,
   FilterFilesOptions,
 } from '@google/gemini-cli-core';
 import {
@@ -32,6 +31,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   debugLogger,
+  ReadManyFilesTool,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -63,7 +63,6 @@ export function resolveModel(model: string, isInFallbackMode: boolean): string {
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
-  extensions: GeminiCLIExtension[],
   argv: CliArgs,
 ) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;
@@ -76,8 +75,7 @@ export async function runZedIntegration(
   console.debug = console.error;
 
   new acp.AgentSideConnection(
-    (client: acp.Client) =>
-      new GeminiAgent(config, settings, extensions, argv, client),
+    (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
     stdout,
     stdin,
   );
@@ -90,7 +88,6 @@ class GeminiAgent {
   constructor(
     private config: Config,
     private settings: LoadedSettings,
-    private extensions: GeminiCLIExtension[],
     private argv: CliArgs,
     private client: acp.Client,
   ) {}
@@ -204,13 +201,7 @@ class GeminiAgent {
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
 
-    const config = await loadCliConfig(
-      settings,
-      this.extensions,
-      sessionId,
-      this.argv,
-      cwd,
-    );
+    const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
 
     await config.initialize();
     return config;
@@ -580,7 +571,7 @@ class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = toolRegistry.getTool('read_many_files');
+    const readManyFilesTool = new ReadManyFilesTool(this.config);
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {
@@ -744,7 +735,7 @@ class Session {
 
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
-        paths: pathSpecsToRead,
+        include: pathSpecsToRead,
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;

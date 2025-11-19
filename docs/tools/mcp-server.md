@@ -150,11 +150,6 @@ Each server configuration supports the following properties:
   server. Tools listed here will not be available to the model, even if they are
   exposed by the server. **Note:** `excludeTools` takes precedence over
   `includeTools` - if a tool is in both lists, it will be excluded.
-- **`allow_unscoped_id_tokens_cloud_run`** (boolean): When `true` and the MCP
-  server host is a Cloud Run service (`*.run.app`), the CLI will use Google
-  Application Default Credentials (ADC) to generate an unscoped ID token and
-  send it as `Authorization: Bearer <token>`. When using this flag, do not set
-  OAuth scopes; they are not needed.
 - **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access. Used with
   `authProviderType: 'service_account_impersonation'`.
@@ -285,26 +280,6 @@ property:
   }
 }
 ```
-
-#### Google Credential with Cloud Run ID tokens
-
-When connecting to a Cloud Run service endpoint (`*.run.app`), you must opt into
-ID token based authentication using ADC. Note that the generated ID token is
-unscoped.
-
-```json
-{
-  "mcpServers": {
-    "googleCloudServer": {
-      "url": "https://my-gcp-service.run.app/sse",
-      "authProviderType": "google_credentials",
-      "allow_unscoped_id_tokens_cloud_run": true
-    }
-  }
-}
-```
-
-Note: Only `*.run.app` hosts are supported for this flag.
 
 #### Service Account Impersonation
 
@@ -952,13 +927,13 @@ This is the default transport for running local servers.
 
 ```bash
 # Basic syntax
-gemini mcp add <name> <command> [args...]
+gemini mcp add [options] <name> <command> [args...]
 
 # Example: Adding a local server
-gemini mcp add -e API_KEY=123 my-stdio-server /path/to/server arg1 arg2 arg3
+gemini mcp add -e API_KEY=123 -e DEBUG=true my-stdio-server /path/to/server arg1 arg2 arg3
 
 # Example: Adding a local python server
-gemini mcp add python-server python server.py --port 8080
+gemini mcp add python-server python server.py -- --server-arg my-value
 ```
 
 #### Adding an HTTP server
@@ -994,7 +969,8 @@ gemini mcp add --transport sse --header "Authorization: Bearer abc123" secure-ss
 ### Listing Servers (`gemini mcp list`)
 
 To view all MCP servers currently configured, use the `list` command. It
-displays each server's name, configuration details, and connection status.
+displays each server's name, configuration details, and connection status. This
+command has no flags.
 
 **Command:**
 
@@ -1020,6 +996,10 @@ server's name.
 ```bash
 gemini mcp remove <name>
 ```
+
+**Options (Flags):**
+
+- `-s, --scope`: Configuration scope (user or project). [default: "project"]
 
 **Example:**
 

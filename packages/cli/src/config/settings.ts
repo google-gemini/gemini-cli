@@ -33,6 +33,7 @@ import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
+import { SettingPaths } from './settingPaths.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -64,7 +65,7 @@ const MIGRATION_MAP: Record<string, string> = {
   autoAccept: 'tools.autoAccept',
   autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
   bugCommand: 'advanced.bugCommand',
-  chatCompression: 'model.chatCompression',
+  chatCompression: 'model.compressionThreshold',
   checkpointing: 'general.checkpointing',
   coreTools: 'tools.core',
   contextFileName: 'context.fileName',
@@ -75,6 +76,7 @@ const MIGRATION_MAP: Record<string, string> = {
   disableUpdateNag: 'general.disableUpdateNag',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
   enableMessageBusIntegration: 'tools.enableMessageBusIntegration',
+  enableHooks: 'tools.enableHooks',
   enablePromptCompletion: 'general.enablePromptCompletion',
   enforcedAuthType: 'security.auth.enforcedType',
   excludeTools: 'tools.exclude',
@@ -107,7 +109,7 @@ const MIGRATION_MAP: Record<string, string> = {
   memoryImportFormat: 'context.importFormat',
   memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
   model: 'model.name',
-  preferredEditor: 'general.preferredEditor',
+  preferredEditor: SettingPaths.General.PreferredEditor,
   retryFetchErrors: 'general.retryFetchErrors',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',
@@ -156,6 +158,38 @@ export enum SettingScope {
   Workspace = 'Workspace',
   System = 'System',
   SystemDefaults = 'SystemDefaults',
+  // Note that this scope is not supported in the settings dialog at this time,
+  // it is only supported for extensions.
+  Session = 'Session',
+}
+
+/**
+ * A type representing the settings scopes that are supported for LoadedSettings.
+ */
+export type LoadableSettingScope =
+  | SettingScope.User
+  | SettingScope.Workspace
+  | SettingScope.System
+  | SettingScope.SystemDefaults;
+
+/**
+ * The actual values of the loadable settings scopes.
+ */
+const _loadableSettingScopes = [
+  SettingScope.User,
+  SettingScope.Workspace,
+  SettingScope.System,
+  SettingScope.SystemDefaults,
+];
+
+/**
+ * A type guard function that checks if `scope` is a loadable settings scope,
+ * and allows promotion to the `LoadableSettingsScope` type based on the result.
+ */
+export function isLoadableSettingScope(
+  scope: SettingScope,
+): scope is LoadableSettingScope {
+  return _loadableSettingScopes.includes(scope);
 }
 
 export interface CheckpointingSettings {
@@ -397,14 +431,14 @@ export class LoadedSettings {
     user: SettingsFile,
     workspace: SettingsFile,
     isTrusted: boolean,
-    migratedInMemorScopes: Set<SettingScope>,
+    migratedInMemoryScopes: Set<SettingScope>,
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
     this.user = user;
     this.workspace = workspace;
     this.isTrusted = isTrusted;
-    this.migratedInMemorScopes = migratedInMemorScopes;
+    this.migratedInMemoryScopes = migratedInMemoryScopes;
     this._merged = this.computeMergedSettings();
   }
 
@@ -413,7 +447,7 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
-  readonly migratedInMemorScopes: Set<SettingScope>;
+  readonly migratedInMemoryScopes: Set<SettingScope>;
 
   private _merged: Settings;
 
@@ -431,7 +465,7 @@ export class LoadedSettings {
     );
   }
 
-  forScope(scope: SettingScope): SettingsFile {
+  forScope(scope: LoadableSettingScope): SettingsFile {
     switch (scope) {
       case SettingScope.User:
         return this.user;
@@ -446,7 +480,7 @@ export class LoadedSettings {
     }
   }
 
-  setValue(scope: SettingScope, key: string, value: unknown): void {
+  setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     setNestedProperty(settingsFile.originalSettings, key, value);
@@ -562,7 +596,7 @@ export function loadSettings(
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
-  const migratedInMemorScopes = new Set<SettingScope>();
+  const migratedInMemoryScopes = new Set<SettingScope>();
 
   // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
@@ -617,14 +651,14 @@ export function loadSettings(
                   'utf-8',
                 );
               } catch (e) {
-                console.error(
-                  `Error migrating settings file on disk: ${getErrorMessage(
-                    e,
-                  )}`,
+                coreEvents.emitFeedback(
+                  'error',
+                  'Failed to migrate settings file.',
+                  e,
                 );
               }
             } else {
-              migratedInMemorScopes.add(scope);
+              migratedInMemoryScopes.add(scope);
             }
             settingsObject = migratedSettings;
           }
@@ -702,7 +736,7 @@ export function loadSettings(
     isTrusted,
   );
 
-  // loadEnviroment depends on settings so we have to create a temp version of
+  // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
@@ -743,7 +777,7 @@ export function loadSettings(
       rawJson: workspaceResult.rawJson,
     },
     isTrusted,
-    migratedInMemorScopes,
+    migratedInMemoryScopes,
   );
 }
 
@@ -751,7 +785,7 @@ export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
   extensionManager: ExtensionManager,
 ): void {
-  const processScope = (scope: SettingScope) => {
+  const processScope = (scope: LoadableSettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
     if (settings.extensions?.disabled) {
       debugLogger.log(
