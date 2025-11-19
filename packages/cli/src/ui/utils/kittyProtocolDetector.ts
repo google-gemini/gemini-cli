@@ -38,12 +38,22 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
     let progressiveEnhancementReceived = false;
     let timeoutId: NodeJS.Timeout | undefined;
 
-    const onTimeout = () => {
-      timeoutId = undefined;
+    const finish = () => {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
       process.stdin.removeListener('data', handleData);
       if (!originalRawMode) {
         process.stdin.setRawMode(false);
       }
+
+      if (kittySupported || sgrMouseSupported) {
+        enableSupportedProtocol();
+        process.on('exit', disableAllProtocols);
+        process.on('SIGTERM', disableAllProtocols);
+      }
+
       detectionComplete = true;
       resolve();
     };
@@ -62,19 +72,11 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
         // indication the terminal probably supports kitty and we just need to
         // wait a bit longer for a response.
         clearTimeout(timeoutId);
-        timeoutId = setTimeout(onTimeout, 1000);
+        timeoutId = setTimeout(finish, 1000);
       }
 
       // Check for device attributes response (CSI ? <attrs> c)
       if (responseBuffer.includes('\x1b[?') && responseBuffer.includes('c')) {
-        clearTimeout(timeoutId);
-        timeoutId = undefined;
-        process.stdin.removeListener('data', handleData);
-
-        if (!originalRawMode) {
-          process.stdin.setRawMode(false);
-        }
-
         if (progressiveEnhancementReceived) {
           kittySupported = true;
         }
@@ -83,13 +85,7 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
         // attribute response, which is a strong signal of a modern terminal.
         sgrMouseSupported = true;
 
-        // Set up cleanup on exit for all enabled protocols
-        process.on('exit', disableAllProtocols);
-        process.on('SIGTERM', disableAllProtocols);
-
-        enableSupportedProtocol();
-        detectionComplete = true;
-        resolve();
+        finish();
       }
     };
 
@@ -102,7 +98,7 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
     // Timeout after 200ms
     // When a iterm2 terminal does not have focus this can take over 90s on a
     // fast macbook so we need a somewhat longer threshold than would be ideal.
-    timeoutId = setTimeout(onTimeout, 200);
+    timeoutId = setTimeout(finish, 200);
   });
 }
 
