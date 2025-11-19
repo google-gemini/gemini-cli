@@ -14,16 +14,16 @@ interface BannerProps {
 }
 
 export const Banner = ({ bannerText, color, width }: BannerProps) => (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={color}
-      width={width}
-      paddingLeft={1}
-      paddingRight={1}
-    >
-      <ThemedGradient>
-        <Text>{bannerText}</Text>
-      </ThemedGradient>
-    </Box>
-  );
+  <Box
+    flexDirection="column"
+    borderStyle="round"
+    borderColor={color}
+    width={width}
+    paddingLeft={1}
+    paddingRight={1}
+  >
+    <ThemedGradient>
+      <Text>{bannerText}</Text>
+    </ThemedGradient>
+  </Box>
+);
