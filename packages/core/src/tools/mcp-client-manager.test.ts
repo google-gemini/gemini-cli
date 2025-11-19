@@ -197,13 +197,18 @@ describe('McpClientManager', () => {
   describe('getMcpInstructions', () => {
     it('should only return instructions from servers with useInstructions: true', async () => {
       // Override McpClient mock for this test to return distinct objects based on config
-      vi.mocked(McpClient).mockImplementation((name, config) => ({
-          connect: vi.fn(),
-          discover: vi.fn(),
-          disconnect: vi.fn(),
-          getServerConfig: vi.fn().mockReturnValue(config),
-          getInstructions: vi.fn().mockReturnValue(`Instructions for ${name}`),
-        } as unknown as McpClient));
+      vi.mocked(McpClient).mockImplementation(
+        (name, config) =>
+          ({
+            connect: vi.fn(),
+            discover: vi.fn(),
+            disconnect: vi.fn(),
+            getServerConfig: vi.fn().mockReturnValue(config),
+            getInstructions: vi
+              .fn()
+              .mockReturnValue(`Instructions for ${name}`),
+          }) as unknown as McpClient,
+      );
 
       const manager = new McpClientManager({} as ToolRegistry, mockConfig);
 

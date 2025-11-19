@@ -325,16 +325,18 @@ export class McpClientManager {
   }
 
   getMcpInstructions(): string {
-    let instructions = '';
+    const instructions: string[] = [];
     for (const [name, client] of this.clients) {
       // Only include instructions if explicitly enabled in config
       if (client.getServerConfig().useInstructions) {
         const clientInstructions = client.getInstructions();
         if (clientInstructions) {
-          instructions += `\n\n# Instructions for MCP Server '${name}'\n${clientInstructions}`;
+          instructions.push(
+            `# Instructions for MCP Server '${name}'\n${clientInstructions}`,
+          );
         }
       }
     }
-    return instructions;
+    return instructions.join('\n\n');
   }
 }
