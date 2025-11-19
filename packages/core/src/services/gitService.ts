@@ -73,6 +73,9 @@ export class GitService {
     } catch (error) {
       // On M1 Macs, simple-git throws an error instead of returning false.
       // We can safely ignore this error and proceed to initialize the repo.
+      if (!(error instanceof Error && error.message.includes('fatal: not a git repository'))) {
+        throw error;
+      }
     }
 
     if (!isRepoDefined) {
