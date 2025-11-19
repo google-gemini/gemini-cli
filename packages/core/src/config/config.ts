@@ -306,7 +306,6 @@ export interface ConfigParameters {
     [K in HookEventName]?: HookDefinition[];
   };
   previewFeatures?: boolean;
-  ghWorkflowName?: string;
 }
 
 export class Config {

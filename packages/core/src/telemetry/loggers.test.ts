@@ -214,8 +214,6 @@ describe('loggers', () => {
         isInteractive: () => false,
       } as unknown as Config;
 
-      vi.stubEnv('GH_WORKFLOW_NAME', 'test-workflow');
-
       const startSessionEvent = new StartSessionEvent(mockConfig);
       logCliConfiguration(mockConfig, startSessionEvent);
 
@@ -247,7 +245,6 @@ describe('loggers', () => {
           extensions_count: 2,
           extensions: 'ext-one,ext-two',
           auth_type: 'vertex-ai',
-          gh_workflow_name: 'test-workflow',
         },
       });
     });
