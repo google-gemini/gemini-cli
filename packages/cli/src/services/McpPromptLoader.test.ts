@@ -28,7 +28,7 @@ const mockPrompt = {
     { name: 'trail', required: false, description: "The animal's trail." },
   ],
   invoke: vi.fn().mockResolvedValue({
-    messages: [{ content: { text: 'Hello, world!' } }],
+    messages: [{ content: { type: 'text', text: 'Hello, world!' } }],
   }),
 };
 
