@@ -360,13 +360,13 @@ for planned features and priorities.
 
 ### Uninstall
 
-See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
+See the [Uninstall Guide](./docs/cli/uninstall.md) for removal instructions.
 
 ## 📄 Legal
 
-- **License**: [Apache License 2.0](LICENSE)
+- **License**: [Apache License 2.0](./LICENSE)
 - **Terms of Service**: [Terms & Privacy](./docs/tos-privacy.md)
-- **Security**: [Security Policy](SECURITY.md)
+- **Security**: [Security Policy](./SECURITY.md)
 
 ---
 
