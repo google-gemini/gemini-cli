@@ -29,6 +29,15 @@ export function convertSessionToHistoryFormats(
         case 'user':
           messageType = MessageType.USER;
           break;
+        case 'info':
+          messageType = MessageType.INFO;
+          break;
+        case 'error':
+          messageType = MessageType.ERROR;
+          break;
+        case 'warning':
+          messageType = MessageType.WARNING;
+          break;
         default:
           messageType = MessageType.GEMINI;
           break;
@@ -70,9 +79,9 @@ export function convertSessionToHistoryFormats(
 
   for (const msg of messages) {
     // Skip system/error messages and user slash commands
-    // if (msg.type === 'system' || msg.type === 'error') {
-    //   continue;
-    // }
+    if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
+      continue;
+    }
 
     if (msg.type === 'user') {
       // Skip user slash commands
@@ -91,8 +100,7 @@ export function convertSessionToHistoryFormats(
       });
     } else if (msg.type === 'gemini') {
       // Handle Gemini messages with potential tool calls
-      const hasToolCalls =
-        'toolCalls' in msg && msg.toolCalls && msg.toolCalls.length > 0;
+      const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
 
       if (hasToolCalls) {
         // Create model message with function calls
