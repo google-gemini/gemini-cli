@@ -487,7 +487,9 @@ describe('mcp-client', () => {
         );
 
         expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
+          new StreamableHTTPClientTransport(new URL('http://test-server'), {
+            requestInit: { headers: {} },
+          }),
         );
       });
 
@@ -521,7 +523,9 @@ describe('mcp-client', () => {
           false,
         );
         expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {}),
+          new SSEClientTransport(new URL('http://test-server'), {
+            requestInit: { headers: {} },
+          }),
         );
       });
 
