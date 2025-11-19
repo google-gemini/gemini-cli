@@ -27,6 +27,7 @@ vi.mock('vscode', () => ({
     createOutputChannel: vi.fn(() => ({
       appendLine: vi.fn(),
     })),
+    showErrorMessage: vi.fn(),
     showInformationMessage: vi.fn(),
     createTerminal: vi.fn(() => ({
       show: vi.fn(),
@@ -40,6 +41,9 @@ vi.mock('vscode', () => ({
     },
     showTextDocument: vi.fn(),
     showWorkspaceFolderPick: vi.fn(),
+    lm: {
+      tools: [],
+    },
   },
   workspace: {
     workspaceFolders: [],

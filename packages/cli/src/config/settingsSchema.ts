@@ -604,6 +604,16 @@ const SETTINGS_SCHEMA = {
         description: 'Whether the user has seen the IDE integration nudge.',
         showInDialog: false,
       },
+      enableLanguageModelTools: {
+        type: 'boolean',
+        label: 'Enable Language Model Tools ',
+        category: 'Mode',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enables any tools registered by your IDE and its extensions/plugins.',
+        showInDialog: true,
+      },
     },
   },
 
