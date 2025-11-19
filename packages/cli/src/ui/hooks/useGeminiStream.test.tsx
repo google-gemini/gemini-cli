@@ -1057,7 +1057,7 @@ describe('useGeminiStream', () => {
 
       simulateEscapeKeyPress();
 
-      expect(cancelSubmitSpy).toHaveBeenCalled();
+      expect(cancelSubmitSpy).toHaveBeenCalledWith(false);
     });
 
     it('should call setShellInputFocused(false) when escape is pressed', async () => {
@@ -1981,7 +1981,7 @@ describe('useGeminiStream', () => {
 
       // Check that onCancelSubmit was called
       await waitFor(() => {
-        expect(onCancelSubmitSpy).toHaveBeenCalled();
+        expect(onCancelSubmitSpy).toHaveBeenCalledWith(true);
       });
     });
 

@@ -106,7 +106,7 @@ export const useGeminiStream = (
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
-  onCancelSubmit: () => void = () => {},
+  onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
   terminalHeight: number,
@@ -333,7 +333,7 @@ export const useGeminiStream = (
       setIsResponding(false);
     }
 
-    onCancelSubmit();
+    onCancelSubmit(false);
     setShellInputFocused(false);
   }, [
     streamingState,
@@ -699,7 +699,7 @@ export const useGeminiStream = (
 
   const handleContextWindowWillOverflowEvent = useCallback(
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
-      onCancelSubmit();
+      onCancelSubmit(true);
 
       const limit = tokenLimit(config.getModel());
 
