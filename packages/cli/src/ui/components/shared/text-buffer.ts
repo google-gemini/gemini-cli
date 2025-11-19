@@ -20,6 +20,7 @@ import {
 import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { enableSupportedProtocol } from '../../utils/kittyProtocolDetector.js';
 
 export type Direction =
   | 'left'
@@ -1891,6 +1892,7 @@ export function useTextBuffer({
       } catch (err) {
         console.error('[useTextBuffer] external editor error', err);
       } finally {
+        enableSupportedProtocol();
         if (wasRaw) setRawMode?.(true);
         try {
           fs.unlinkSync(filePath);
@@ -2040,6 +2042,11 @@ export function useTextBuffer({
     [visualLayout],
   );
 
+  const getOffset = useCallback(
+    (): number => logicalPosToOffset(lines, cursorRow, cursorCol),
+    [lines, cursorRow, cursorCol],
+  );
+
   const returnValue: TextBuffer = useMemo(
     () => ({
       lines,
@@ -2065,6 +2072,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
       moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
@@ -2129,6 +2137,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
       moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
@@ -2283,6 +2292,7 @@ export interface TextBuffer {
     endOffset: number,
     replacementText: string,
   ) => void;
+  getOffset: () => number;
   moveToOffset(offset: number): void;
   moveToVisualPosition(visualRow: number, visualCol: number): void;
 

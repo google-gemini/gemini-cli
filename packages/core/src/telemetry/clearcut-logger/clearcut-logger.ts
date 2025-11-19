@@ -37,6 +37,7 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  LlmLoopCheckEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -92,6 +93,7 @@ export enum EventNames {
   AGENT_FINISH = 'agent_finish',
   RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
+  LLM_LOOP_CHECK = 'llm_loop_check',
 }
 
 export interface LogResponse {
@@ -145,6 +147,13 @@ function determineSurface(): string {
   } else {
     return 'SURFACE_NOT_SET';
   }
+}
+
+/**
+ * Determines the GitHub Actions workflow name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHWorkflowName(): string | undefined {
+  return process.env['GH_WORKFLOW_NAME'];
 }
 
 /**
@@ -258,31 +267,39 @@ export class ClearcutLogger {
     data: EventValue[] = [],
   ): LogEvent {
     const surface = determineSurface();
+    const ghWorkflowName = determineGHWorkflowName();
+    const baseMetadata: EventValue[] = [
+      ...data,
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+        value: CLI_VERSION,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+        value: GIT_COMMIT_INFO,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+        value: process.platform,
+      },
+    ];
+
+    if (ghWorkflowName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
+        value: ghWorkflowName,
+      });
+    }
+
     return {
       console_type: 'GEMINI_CLI',
       application: 102, // GEMINI_CLI
       event_name: eventName as string,
-      event_metadata: [
-        [
-          ...data,
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-            value: surface,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-            value: CLI_VERSION,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-            value: GIT_COMMIT_INFO,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-            value: process.platform,
-          },
-        ],
-      ],
+      event_metadata: [baseMetadata],
     };
   }
 
@@ -734,6 +751,14 @@ export class ClearcutLogger {
         value: JSON.stringify(event.loop_type),
       },
     ];
+
+    if (event.confirmed_by_model) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL,
+        value: event.confirmed_by_model,
+      });
+    }
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
     this.flushIfNeeded();
@@ -1269,6 +1294,32 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logLlmLoopCheckEvent(event: LlmLoopCheckEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: event.prompt_id,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_FLASH_CONFIDENCE,
+        value: event.flash_confidence.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL,
+        value: event.main_model,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL_CONFIDENCE,
+        value: event.main_model_confidence.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.LLM_LOOP_CHECK, data));
+    this.flushIfNeeded();
+  }
+
   /**
    * Adds default fields to data, and returns a new data array.  This fields
    * should exist on all log events.
@@ -1300,6 +1351,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: this.getConfigJson(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_INTERACTIVE,
+        value: this.config?.isInteractive().toString() ?? 'false',
       },
     ];
     return [...data, ...defaultLogMetadata];

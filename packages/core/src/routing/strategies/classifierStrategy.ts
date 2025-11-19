@@ -13,8 +13,9 @@ import type {
   RoutingStrategy,
 } from '../routingStrategy.js';
 import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_PRO,
+  resolveModel,
 } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
@@ -131,7 +132,7 @@ export class ClassifierStrategy implements RoutingStrategy {
 
   async route(
     context: RoutingContext,
-    _config: Config,
+    config: Config,
     baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
@@ -173,7 +174,10 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       if (routerResponse.model_choice === FLASH_MODEL) {
         return {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: resolveModel(
+            GEMINI_MODEL_ALIAS_FLASH,
+            config.getPreviewFeatures(),
+          ),
           metadata: {
             source: 'Classifier',
             latencyMs,
@@ -182,7 +186,10 @@ export class ClassifierStrategy implements RoutingStrategy {
         };
       } else {
         return {
-          model: DEFAULT_GEMINI_MODEL,
+          model: resolveModel(
+            GEMINI_MODEL_ALIAS_PRO,
+            config.getPreviewFeatures(),
+          ),
           metadata: {
             source: 'Classifier',
             reasoning,

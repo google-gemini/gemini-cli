@@ -22,6 +22,7 @@ import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi
@@ -112,6 +113,7 @@ vi.mock('@google/gemini-cli-core', async () => {
         return Promise.resolve({
           memoryContent: extensionPaths.join(',') || '',
           fileCount: extensionPaths?.length || 0,
+          filePaths: extensionPaths,
         });
       },
     ),
@@ -449,6 +451,50 @@ describe('parseArguments', () => {
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+  });
+
+  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '--resume', 'session-id'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    try {
+      await expect(parseArguments({} as Settings)).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
+        ),
+      );
+    } finally {
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
+  it('should return RESUME_LATEST constant when --resume is passed without a value', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = true; // Make it interactive to avoid validation error
+    process.argv = ['node', 'script.js', '--resume'];
+
+    try {
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe(RESUME_LATEST);
+      expect(argv.resume).toBe('latest');
+    } finally {
+      process.stdin.isTTY = originalIsTTY;
+    }
   });
 
   it('should support comma-separated values for --allowed-tools', async () => {
@@ -1517,11 +1563,13 @@ describe('loadCliConfig with includeDirectories', () => {
       path.join(os.homedir(), 'settings', 'path2'),
       path.join(mockCwd, 'settings', 'path3'),
     ];
-    expect(config.getWorkspaceContext().getDirectories()).toEqual(
-      expect.arrayContaining(expected),
+    const directories = config.getWorkspaceContext().getDirectories();
+    expect(directories).toEqual([mockCwd]);
+    expect(config.getPendingIncludeDirectories()).toEqual(
+      expect.arrayContaining(expected.filter((dir) => dir !== mockCwd)),
     );
-    expect(config.getWorkspaceContext().getDirectories()).toHaveLength(
-      expected.length,
+    expect(config.getPendingIncludeDirectories()).toHaveLength(
+      expected.length - 1,
     );
   });
 });

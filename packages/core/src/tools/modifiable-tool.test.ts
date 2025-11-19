@@ -235,6 +235,64 @@ describe('modifyWithEditor', () => {
     expect(result.updatedDiff).toBe('mock diff content');
   });
 
+  it('should honor override content values when provided', async () => {
+    const overrideCurrent = 'override current content';
+    const overrideProposed = 'override proposed content';
+    mockModifyContext.getCurrentContent = vi.fn();
+    mockModifyContext.getProposedContent = vi.fn();
+
+    await modifyWithEditor(
+      mockParams,
+      mockModifyContext,
+      'vscode' as EditorType,
+      abortSignal,
+      vi.fn(),
+      {
+        currentContent: overrideCurrent,
+        proposedContent: overrideProposed,
+      },
+    );
+
+    expect(mockModifyContext.getCurrentContent).not.toHaveBeenCalled();
+    expect(mockModifyContext.getProposedContent).not.toHaveBeenCalled();
+    expect(mockCreatePatch).toHaveBeenCalledWith(
+      path.basename(mockParams.filePath),
+      overrideCurrent,
+      modifiedContent,
+      'Current',
+      'Proposed',
+      expect.any(Object),
+    );
+  });
+
+  it('should treat null override as explicit empty content', async () => {
+    mockModifyContext.getCurrentContent = vi.fn();
+    mockModifyContext.getProposedContent = vi.fn();
+
+    await modifyWithEditor(
+      mockParams,
+      mockModifyContext,
+      'vscode' as EditorType,
+      abortSignal,
+      vi.fn(),
+      {
+        currentContent: null,
+        proposedContent: 'override proposed content',
+      },
+    );
+
+    expect(mockModifyContext.getCurrentContent).not.toHaveBeenCalled();
+    expect(mockModifyContext.getProposedContent).not.toHaveBeenCalled();
+    expect(mockCreatePatch).toHaveBeenCalledWith(
+      path.basename(mockParams.filePath),
+      '',
+      modifiedContent,
+      'Current',
+      'Proposed',
+      expect.any(Object),
+    );
+  });
+
   it('should clean up temp files even if editor fails', async () => {
     const editorError = new Error('Editor failed to open');
     mockOpenDiff.mockRejectedValue(editorError);
