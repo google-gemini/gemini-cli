@@ -67,7 +67,13 @@ export class GitService {
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
     const repo = simpleGit(repoDir);
-    const isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+    let isRepoDefined = false;
+    try {
+      isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
+    } catch (error) {
+      // On M1 Macs, simple-git throws an error instead of returning false.
+      // We can safely ignore this error and proceed to initialize the repo.
+    }
 
     if (!isRepoDefined) {
       await repo.init(false, {
