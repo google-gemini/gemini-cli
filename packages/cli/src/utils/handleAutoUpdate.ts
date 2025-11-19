@@ -12,6 +12,7 @@ import type { HistoryItem } from '../ui/types.js';
 import { MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
+import { relaunchApp } from './processUtils.js';
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
@@ -77,12 +78,18 @@ export function handleAutoUpdate(
   updateProcess.on('close', (code) => {
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
-        message:
-          'Update successful! The new version will be used on your next run.',
+        message: 'Update successful! Restarting...',
       });
     } else {
+      let errorMessage = `Automatic update failed. Please try updating manually. (command: ${updateCommand}, stderr: ${errorOutput.trim()})`;
+      if (
+        errorOutput.includes('EACCES') ||
+        errorOutput.includes('permission denied')
+      ) {
+        errorMessage = `Automatic update failed due to permission issues. You may need to run the update manually with sudo: sudo ${updateCommand}`;
+      }
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand}, stderr: ${errorOutput.trim()})`,
+        message: errorMessage,
       });
     }
   });
@@ -134,10 +141,13 @@ export function setUpdateHandler(
     addItem(
       {
         type: MessageType.INFO,
-        text: `Update successful! The new version will be used on your next run.`,
+        text: `Update successful! Restarting...`,
       },
       Date.now(),
     );
+    setTimeout(() => {
+      relaunchApp();
+    }, 1000);
   };
 
   const handleUpdateInfo = (data: { message: string }) => {
