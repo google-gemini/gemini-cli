@@ -695,7 +695,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: 0.7 as number,
         description:
-          'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
+          'The fraction of context usage at which to trigger context compression (e.g. 0.7).',
         showInDialog: true,
       },
       skipNextSpeakerCheck: {
