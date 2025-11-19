@@ -79,6 +79,7 @@ export * from './utils/package.js';
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';
+export * from './services/chatCompressionService.js';
 export * from './services/fileSystemService.js';
 
 // Export IDE specific logic

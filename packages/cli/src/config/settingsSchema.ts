@@ -22,6 +22,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_MODEL_CONFIGS,
+  DEFAULT_COMPRESSION_TOKEN_THRESHOLD,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -693,9 +694,8 @@ const SETTINGS_SCHEMA = {
         label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 0.7 as number,
-        description:
-          'The fraction of context usage at which to trigger context compression (e.g. 0.7).',
+        default: DEFAULT_COMPRESSION_TOKEN_THRESHOLD as number,
+        description: `The fraction of context usage at which to trigger context compression (e.g. ${DEFAULT_COMPRESSION_TOKEN_THRESHOLD}).`,
         showInDialog: true,
       },
       skipNextSpeakerCheck: {
