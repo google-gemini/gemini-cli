@@ -365,7 +365,7 @@ export function getPlanModeSystemPrompt(
 4. **Focus on analysis, planning, and explanation** rather than implementation
 
 ## Available Tools in Plan Mode:
-- **Read-only tools**: '${READ_FILE_TOOL_NAME}', '${READ_MANY_FILES_TOOL_NAME}', '${GREP_TOOL_NAME}', '${GLOB_TOOL_NAME}', '${LS_TOOL_NAME}', '${MEMORY_TOOL_NAME}'
+- **Read-only tools**: '${READ_FILE_TOOL_NAME}', '${READ_MANY_FILES_TOOL_NAME}', '${GREP_TOOL_NAME}', '${GLOB_TOOL_NAME}', '${LS_TOOL_NAME}', '${MEMORY_TOOL_NAME}', '${WEB_FETCH_TOOL_NAME}', '${WEB_SEARCH_TOOL_NAME}'
 - **Safe shell commands**: Non-destructive commands like \`ls\`, \`find\`, \`git status\`, \`git log\`, etc.
 
 ## Your Role in Plan Mode:
