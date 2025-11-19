@@ -167,6 +167,8 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
+  const [isPlanMode, setIsPlanMode] = useState<boolean>(false);
+  const [onEditorClose] = useState<() => void>(() => () => {});
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -597,6 +599,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     refreshStatic,
     toggleVimEnabled,
     setIsProcessing,
+    setIsPlanMode,
     slashCommandActions,
     extensionsUpdateStateInternal,
     isConfigInitialized,
@@ -681,9 +684,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     getPreferredEditor,
     onAuthError,
     performMemoryRefresh,
+    isPlanMode,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
-    refreshStatic,
+    onEditorClose,
     onCancelSubmit,
     setEmbeddedShellFocused,
     terminalWidth,
@@ -1385,6 +1389,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
       isTrustedFolder,
+      isPlanMode,
       constrainHeight,
       showErrorDetails,
       showFullTodos,
@@ -1475,6 +1480,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
       isTrustedFolder,
+      isPlanMode,
       constrainHeight,
       showErrorDetails,
       showFullTodos,

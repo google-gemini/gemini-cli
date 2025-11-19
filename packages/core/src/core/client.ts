@@ -19,7 +19,7 @@ import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
 import { CompressionStatus } from './turn.js';
 import { Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, getPlanModeSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
@@ -198,7 +198,9 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = this.config.getIsPlanMode()
+        ? getPlanModeSystemPrompt(this.config, userMemory)
+        : getCoreSystemPrompt(this.config, userMemory);
       const model = this.config.getModel();
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
@@ -619,7 +621,9 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = this.config.getIsPlanMode()
+        ? getPlanModeSystemPrompt(this.config, userMemory)
+        : getCoreSystemPrompt(this.config, userMemory);
 
       const apiCall = () => {
         const modelConfigToUse = this.config.isInFallbackMode()

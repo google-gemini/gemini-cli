@@ -145,9 +145,12 @@ export interface SessionStatsState {
   sessionStartTime: Date;
   metrics: SessionMetrics;
   lastPromptTokenCount: number;
+  lastCandidatesTokenCount?: number;
+  lastTotalTokenCount?: number;
   promptCount: number;
 }
 
+// For computed stats (like duration)
 export interface ComputedSessionStats {
   totalApiTime: number;
   totalToolTime: number;
@@ -155,20 +158,24 @@ export interface ComputedSessionStats {
   apiTimePercent: number;
   toolTimePercent: number;
   cacheEfficiency: number;
-  totalDecisions: number;
   successRate: number;
   agreementRate: number;
+  totalDecisions: number;
   totalCachedTokens: number;
   totalPromptTokens: number;
   totalLinesAdded: number;
   totalLinesRemoved: number;
 }
 
-// Defines the final "value" of our context, including the state
-// and the functions to update it.
 interface SessionStatsContextValue {
   stats: SessionStatsState;
   startNewPrompt: () => void;
+  startNewTurn: () => void;
+  addUsage: (usage: {
+    promptTokens?: number;
+    candidatesTokens?: number;
+    totalTokens?: number;
+  }) => void;
   getPromptCount: () => number;
 }
 
@@ -188,6 +195,8 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     sessionStartTime: new Date(),
     metrics: uiTelemetryService.getMetrics(),
     lastPromptTokenCount: 0,
+    lastCandidatesTokenCount: 0,
+    lastTotalTokenCount: 0,
     promptCount: 0,
   });
 
@@ -238,13 +247,38 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     [stats.promptCount],
   );
 
+  const startNewTurn = useCallback(() => {
+    // This can be the same as startNewPrompt for now
+    startNewPrompt();
+  }, [startNewPrompt]);
+
+  const addUsage = useCallback(
+    (usage: {
+      promptTokens?: number;
+      candidatesTokens?: number;
+      totalTokens?: number;
+    }) => {
+      setStats((prevState) => ({
+        ...prevState,
+        lastPromptTokenCount:
+          usage.promptTokens || prevState.lastPromptTokenCount,
+        lastCandidatesTokenCount:
+          usage.candidatesTokens || prevState.lastCandidatesTokenCount,
+        lastTotalTokenCount: usage.totalTokens || prevState.lastTotalTokenCount,
+      }));
+    },
+    [],
+  );
+
   const value = useMemo(
     () => ({
       stats,
       startNewPrompt,
+      startNewTurn,
+      addUsage,
       getPromptCount,
     }),
-    [stats, startNewPrompt, getPromptCount],
+    [stats, startNewPrompt, startNewTurn, addUsage, getPromptCount],
   );
 
   return (

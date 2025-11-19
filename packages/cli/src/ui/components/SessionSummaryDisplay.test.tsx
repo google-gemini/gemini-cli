@@ -28,11 +28,15 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
-      promptCount: 5,
+      lastCandidatesTokenCount: 0,
+      lastTotalTokenCount: 0,
+      promptCount: 0,
     },
 
     getPromptCount: () => 5,
     startNewPrompt: vi.fn(),
+    startNewTurn: vi.fn(),
+    addUsage: vi.fn(),
   });
 
   return render(<SessionSummaryDisplay duration="1h 23m 45s" />);

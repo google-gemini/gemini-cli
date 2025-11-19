@@ -102,10 +102,11 @@ export const useGeminiStream = (
   getPreferredEditor: () => EditorType | undefined,
   onAuthError: (error: string) => void,
   performMemoryRefresh: () => Promise<void>,
+  isPlanMode: boolean,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
-  onCancelSubmit: () => void,
+  onCancelSubmit: () => void = () => {},
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
   terminalHeight: number,
@@ -123,6 +124,14 @@ export const useGeminiStream = (
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
+
+  // Update config when plan mode changes
+  useEffect(() => {
+    if (config && config.setIsPlanMode) {
+      config.setIsPlanMode(isPlanMode);
+    }
+  }, [config, isPlanMode]);
+
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
@@ -809,7 +818,21 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
-        scheduleToolCalls(toolCallRequests, signal);
+        if (isPlanMode) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: `Tool call requests (plan mode):\n${JSON.stringify(
+                toolCallRequests,
+                null,
+                2,
+              )}`,
+            },
+            Date.now(),
+          );
+        } else {
+          scheduleToolCalls(toolCallRequests, signal);
+        }
       }
       return StreamProcessingStatus.Completed;
     },
@@ -824,6 +847,8 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      isPlanMode,
+      addItem,
     ],
   );
   const submitQuery = useCallback(

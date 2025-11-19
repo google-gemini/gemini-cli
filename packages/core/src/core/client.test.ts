@@ -199,6 +199,7 @@ describe('Gemini Client (client.ts)', () => {
       authType: AuthType.USE_GEMINI,
     };
     mockConfig = {
+      getIsPlanMode: vi.fn().mockReturnValue(false),
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),

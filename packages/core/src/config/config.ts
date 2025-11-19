@@ -338,6 +338,7 @@ export class Config {
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private approvalMode: ApprovalMode;
+  private isPlanMode: boolean = false;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
@@ -966,6 +967,14 @@ export class Config {
       );
     }
     this.approvalMode = mode;
+  }
+
+  setIsPlanMode(isPlanMode: boolean): void {
+    this.isPlanMode = isPlanMode;
+  }
+
+  getIsPlanMode(): boolean {
+    return this.isPlanMode;
   }
 
   isYoloModeDisabled(): boolean {

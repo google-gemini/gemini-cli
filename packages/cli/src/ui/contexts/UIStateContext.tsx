@@ -83,6 +83,7 @@ export interface UIState {
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
   isTrustedFolder: boolean | undefined;
+  isPlanMode: boolean;
   constrainHeight: boolean;
   showErrorDetails: boolean;
   filteredConsoleMessages: ConsoleMessageItem[];

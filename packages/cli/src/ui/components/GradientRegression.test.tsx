@@ -40,6 +40,8 @@ const mockSessionStats: SessionStatsState = {
   sessionId: 'test-session',
   sessionStartTime: new Date(),
   lastPromptTokenCount: 0,
+  lastCandidatesTokenCount: 0,
+  lastTotalTokenCount: 0,
   promptCount: 0,
   metrics: {
     models: {},
@@ -60,6 +62,8 @@ useSessionStatsMock.mockReturnValue({
   stats: mockSessionStats,
   getPromptCount: () => 0,
   startNewPrompt: vi.fn(),
+  startNewTurn: vi.fn(),
+  addUsage: vi.fn(),
 });
 
 describe('Gradient Crash Regression Tests', () => {

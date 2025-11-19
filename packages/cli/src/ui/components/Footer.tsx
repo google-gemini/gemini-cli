@@ -54,6 +54,8 @@ export const Footer: React.FC = () => {
     mainAreaWidth: uiState.mainAreaWidth,
   };
 
+  const isPlanMode = uiState.isPlanMode;
+
   const showMemoryUsage =
     config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false;
   const hideCWD = settings.merged.ui?.footer?.hideCWD || false;
@@ -144,6 +146,9 @@ export const Footer: React.FC = () => {
       {!hideModelInfo && (
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
+            <Text color={theme.text.secondary}>
+              {isPlanMode ? 'Plan Mode' : 'Agent Mode'} |{' '}
+            </Text>
             <Text color={theme.text.accent}>
               {model}
               {!hideContextPercentage && (

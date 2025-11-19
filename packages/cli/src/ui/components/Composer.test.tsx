@@ -211,8 +211,10 @@ describe('Composer', () => {
           sessionStartTime: new Date(),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           metrics: {} as any,
-          lastPromptTokenCount: 150,
-          promptCount: 5,
+          lastPromptTokenCount: 0,
+          lastCandidatesTokenCount: 0,
+          lastTotalTokenCount: 0,
+          promptCount: 0,
         },
       });
       const config = createMockConfig({
