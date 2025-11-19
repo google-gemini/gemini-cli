@@ -20,6 +20,11 @@ interface AppHeaderProps {
   version: string;
 }
 
+function hasVersionPrefix(str: string) {
+  const versionPrefixRegex = /^v\d+:/; // starts with lowercase v followed by a number followed by a colon
+  return versionPrefixRegex.test(str);
+}
+
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
@@ -28,17 +33,27 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const { defaultText, warningText } = bannerData;
 
   const [bannerCounts] = useState(
-    () => persistentState.get('bannerCounts') || {},
+    () => persistentState.get('defaultBannerShownCount') || {},
   );
 
-  const currentBannerCount = bannerCounts[defaultText] || 0;
+  let currentBannerVersion;
+  let defaultTextDelimited;
+  if (hasVersionPrefix(defaultText)) {
+    const defaultTextSplit = defaultText.split(':');
+    currentBannerVersion = defaultTextSplit[0];
+    defaultTextDelimited = defaultTextSplit.slice(1).join('').trim();
+  } else {
+    currentBannerVersion = 'v0';
+    defaultTextDelimited = defaultText;
+  }
+  const currentBannerCount = bannerCounts[currentBannerVersion] || 0;
 
   const showDefaultBanner =
     warningText === '' &&
     !config.getPreviewFeatures() &&
     currentBannerCount < 5;
 
-  const bannerText = showDefaultBanner ? defaultText : warningText;
+  const bannerText = showDefaultBanner ? defaultTextDelimited : warningText;
   const unescapedBannerText = bannerText.replace(/\\n/g, '\n');
 
   const defaultColor = Colors.AccentBlue;
@@ -51,16 +66,16 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
       if (lastIncrementedKey.current !== defaultText) {
         lastIncrementedKey.current = defaultText;
 
-        const allCounts = persistentState.get('bannerCounts') || {};
-        const current = allCounts[defaultText] || 0;
+        const allCounts = persistentState.get('defaultBannerShownCount') || {};
+        const current = allCounts[currentBannerVersion] || 0;
 
-        persistentState.set('bannerCounts', {
+        persistentState.set('defaultBannerShownCount', {
           ...allCounts,
-          [defaultText]: current + 1,
+          [currentBannerVersion]: current + 1,
         });
       }
     }
-  }, [showDefaultBanner, defaultText]);
+  }, [showDefaultBanner, defaultText, currentBannerVersion]);
 
   return (
     <Box flexDirection="column">

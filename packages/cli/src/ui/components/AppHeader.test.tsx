@@ -146,7 +146,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should increment the shown count when default banner is displayed', () => {
+  it('should increment the version count when default banner is displayed', () => {
     persistentStateMock.get.mockReturnValue({});
     const mockConfig = makeFakeConfig();
     const uiState = {
@@ -161,9 +161,36 @@ describe('<AppHeader />', () => {
       uiState,
     });
 
-    expect(persistentStateMock.set).toHaveBeenCalledWith('bannerCounts', {
-      'This is the default banner': 1,
+    expect(persistentStateMock.set).toHaveBeenCalledWith(
+      'defaultBannerShownCount',
+      {
+        v0: 1,
+      },
+    );
+    unmount();
+  });
+
+  it('should a different version count when default banner is displayed', () => {
+    persistentStateMock.get.mockReturnValue({});
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      bannerData: {
+        defaultText: 'v2: This is the default banner',
+        warningText: '',
+      },
+    };
+
+    const { unmount } = renderWithProviders(<AppHeader version="1.0.0" />, {
+      config: mockConfig,
+      uiState,
     });
+
+    expect(persistentStateMock.set).toHaveBeenCalledWith(
+      'defaultBannerShownCount',
+      {
+        v2: 1,
+      },
+    );
     unmount();
   });
 
