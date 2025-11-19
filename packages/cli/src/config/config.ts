@@ -653,6 +653,7 @@ export async function loadCliConfig(
 
   return new Config({
     sessionId,
+    clientVersion: getCliVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
