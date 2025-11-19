@@ -14,6 +14,7 @@ import type { EditorType } from '@google/gemini-cli-core';
 import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
+  getEditorDisplayName,
 } from '@google/gemini-cli-core';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
@@ -59,7 +60,7 @@ export const useEditorSettings = (
         addItem(
           {
             type: MessageType.INFO,
-            text: `Editor preference ${editorType ? `set to "${editorType}"` : 'cleared'} in ${scope} settings.`,
+            text: `Editor preference ${editorType ? `set to "${getEditorDisplayName(editorType)}"` : 'cleared'} in ${scope} settings.`,
           },
           Date.now(),
         );

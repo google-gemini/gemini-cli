@@ -122,7 +122,7 @@ describe('useEditorSettings', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       {
         type: MessageType.INFO,
-        text: 'Editor preference set to "vscode" in User settings.',
+        text: 'Editor preference set to "VS Code" in User settings.',
       },
       expect.any(Number),
     );
@@ -163,6 +163,11 @@ describe('useEditorSettings', () => {
     render(<TestComponent />);
 
     const editorTypes: EditorType[] = ['cursor', 'windsurf', 'vim'];
+    const displayNames: Record<string, string> = {
+      cursor: 'Cursor',
+      windsurf: 'Windsurf',
+      vim: 'Vim',
+    };
     const scope = SettingScope.User;
 
     editorTypes.forEach((editorType) => {
@@ -179,7 +184,7 @@ describe('useEditorSettings', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: `Editor preference set to "${editorType}" in User settings.`,
+          text: `Editor preference set to "${displayNames[editorType]}" in User settings.`,
         },
         expect.any(Number),
       );
@@ -209,7 +214,7 @@ describe('useEditorSettings', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: `Editor preference set to "vscode" in ${scope} settings.`,
+          text: `Editor preference set to "VS Code" in ${scope} settings.`,
         },
         expect.any(Number),
       );
