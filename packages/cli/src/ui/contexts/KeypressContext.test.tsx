@@ -405,11 +405,21 @@ describe('KeypressContext', () => {
 
   describe('Parameterized functional keys', () => {
     it.each([
-      // Parameterized
+      // ModifyOtherKeys
+      { sequence: `\x1b[27;2;13~`, expected: { name: 'return', shift: true } },
+      { sequence: `\x1b[27;5;13~`, expected: { name: 'return', ctrl: true } },
+      { sequence: `\x1b[27;5;9~`, expected: { name: 'tab', ctrl: true } },
+      {
+        sequence: `\x1b[27;6;9~`,
+        expected: { name: 'tab', ctrl: true, shift: true },
+      },
+      // XTerm Function Key
+      { sequence: `\x1b[1;129A`, expected: { name: 'up' } },
       { sequence: `\x1b[1;2H`, expected: { name: 'home', shift: true } },
       { sequence: `\x1b[1;5F`, expected: { name: 'end', ctrl: true } },
       { sequence: `\x1b[1;1P`, expected: { name: 'f1' } },
       { sequence: `\x1b[1;3Q`, expected: { name: 'f2', meta: true } },
+      // Tilde Function Keys
       { sequence: `\x1b[3~`, expected: { name: 'delete' } },
       { sequence: `\x1b[5~`, expected: { name: 'pageup' } },
       { sequence: `\x1b[6~`, expected: { name: 'pagedown' } },
@@ -440,6 +450,7 @@ describe('KeypressContext', () => {
         sequence: `\x1b[D`,
         expected: { name: 'left', ctrl: false, meta: false, shift: false },
       },
+
       // Legacy Home/End
       {
         sequence: `\x1b[H`,
@@ -448,6 +459,10 @@ describe('KeypressContext', () => {
       {
         sequence: `\x1b[F`,
         expected: { name: 'end', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[5H`,
+        expected: { name: 'home', ctrl: true, meta: false, shift: false },
       },
     ])(
       'should recognize sequence "$sequence" as $expected.name',
