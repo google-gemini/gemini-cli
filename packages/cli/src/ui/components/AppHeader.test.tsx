@@ -25,7 +25,7 @@ vi.mock('../utils/terminalSetup.js', () => ({
 describe('<AppHeader />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    persistentStateMock.get.mockReturnValue(0);
+    persistentStateMock.get.mockReturnValue({});
   });
 
   it('should render the banner with default text', () => {
@@ -147,7 +147,7 @@ describe('<AppHeader />', () => {
   });
 
   it('should increment the shown count when default banner is displayed', () => {
-    persistentStateMock.get.mockReturnValue(0);
+    persistentStateMock.get.mockReturnValue({});
     const mockConfig = makeFakeConfig();
     const uiState = {
       bannerData: {
@@ -161,10 +161,9 @@ describe('<AppHeader />', () => {
       uiState,
     });
 
-    expect(persistentStateMock.set).toHaveBeenCalledWith(
-      'defaultBannerShownCount',
-      1,
-    );
+    expect(persistentStateMock.set).toHaveBeenCalledWith('bannerCounts', {
+      'This is the default banner': 1,
+    });
     unmount();
   });
 

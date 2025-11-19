@@ -11,8 +11,7 @@ import * as path from 'node:path';
 const STATE_FILENAME = 'state.json';
 
 interface PersistentStateData {
-  defaultBannerShownCount?: number;
-  // Add other persistent state keys here as needed
+  bannerCounts?: Record<string, number>;
 }
 
 export class PersistentState {
@@ -40,7 +39,6 @@ export class PersistentState {
       }
     } catch (error) {
       debugLogger.warn('Failed to load persistent state:', error);
-      // If error reading (e.g. corrupt JSON), start fresh
       this.cache = {};
     }
     return this.cache!;

@@ -25,28 +25,40 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const config = useConfig();
   const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
 
-  const [defaultBannerShownCount] = useState(
-    () => persistentState.get('defaultBannerShownCount') || 0,
+  const { defaultText, warningText } = bannerData;
+
+  const [bannerCounts] = useState(
+    () => persistentState.get('bannerCounts') || {},
   );
 
-  const { defaultText, warningText } = bannerData;
+  const currentBannerCount = bannerCounts[defaultText] || 0;
 
   const showDefaultBanner =
     warningText === '' &&
     !config.getPreviewFeatures() &&
-    defaultBannerShownCount < 5;
+    currentBannerCount < 5;
+
   const bannerText = showDefaultBanner ? defaultText : warningText;
   const unescapedBannerText = bannerText.replace(/\\n/g, '\n');
 
   const defaultColor = Colors.AccentBlue;
   const fontColor = warningText === '' ? defaultColor : theme.status.warning;
 
-  const hasIncrementedRef = useRef(false);
+  const lastIncrementedKey = useRef<string | null>(null);
+
   useEffect(() => {
-    if (showDefaultBanner && defaultText && !hasIncrementedRef.current) {
-      hasIncrementedRef.current = true;
-      const current = persistentState.get('defaultBannerShownCount') || 0;
-      persistentState.set('defaultBannerShownCount', current + 1);
+    if (showDefaultBanner && defaultText) {
+      if (lastIncrementedKey.current !== defaultText) {
+        lastIncrementedKey.current = defaultText;
+
+        const allCounts = persistentState.get('bannerCounts') || {};
+        const current = allCounts[defaultText] || 0;
+
+        persistentState.set('bannerCounts', {
+          ...allCounts,
+          [defaultText]: current + 1,
+        });
+      }
     }
   }, [showDefaultBanner, defaultText]);
 
