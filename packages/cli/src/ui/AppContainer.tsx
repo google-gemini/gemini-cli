@@ -181,6 +181,10 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
+  const [defaultBannerText, setDefaultBannerText] = useState('');
+  const [warningBannerText, setWarningBannerText] = useState('');
+  const [bannerVisible, setBannerVisible] = useState(true);
+
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
   extensionManager.setRequestConsent((description) =>
@@ -596,6 +600,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     slashCommandActions,
     extensionsUpdateStateInternal,
     isConfigInitialized,
+    setBannerVisible,
     setCustomDialog,
   );
 
@@ -643,15 +648,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
     }
   }, [config, historyManager]);
 
-  const cancelHandlerRef = useRef<() => void>(() => {});
+  const cancelHandlerRef = useRef<(shouldRestorePrompt?: boolean) => void>(
+    () => {},
+  );
 
   const getPreferredEditor = useCallback(
     () => settings.merged.general?.preferredEditor as EditorType,
     [settings.merged.general?.preferredEditor],
   );
 
-  const onCancelSubmit = useCallback(() => {
-    cancelHandlerRef.current();
+  const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
+    cancelHandlerRef.current(shouldRestorePrompt);
   }, []);
 
   const {
@@ -705,36 +712,39 @@ Logging in with Google... Please restart Gemini CLI to continue.
     submitQuery,
   });
 
-  cancelHandlerRef.current = useCallback(() => {
-    const pendingHistoryItems = [
-      ...pendingSlashCommandHistoryItems,
-      ...pendingGeminiHistoryItems,
-    ];
-    if (isToolExecuting(pendingHistoryItems)) {
-      buffer.setText(''); // Just clear the prompt
-      return;
-    }
+  cancelHandlerRef.current = useCallback(
+    (shouldRestorePrompt: boolean = true) => {
+      const pendingHistoryItems = [
+        ...pendingSlashCommandHistoryItems,
+        ...pendingGeminiHistoryItems,
+      ];
+      if (isToolExecuting(pendingHistoryItems)) {
+        buffer.setText(''); // Just clear the prompt
+        return;
+      }
 
-    const lastUserMessage = userMessages.at(-1);
-    let textToSet = lastUserMessage || '';
+      const lastUserMessage = userMessages.at(-1);
+      let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
 
-    const queuedText = getQueuedMessagesText();
-    if (queuedText) {
-      textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
-      clearQueue();
-    }
+      const queuedText = getQueuedMessagesText();
+      if (queuedText) {
+        textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
+        clearQueue();
+      }
 
-    if (textToSet) {
-      buffer.setText(textToSet);
-    }
-  }, [
-    buffer,
-    userMessages,
-    getQueuedMessagesText,
-    clearQueue,
-    pendingSlashCommandHistoryItems,
-    pendingGeminiHistoryItems,
-  ]);
+      if (textToSet || !shouldRestorePrompt) {
+        buffer.setText(textToSet);
+      }
+    },
+    [
+      buffer,
+      userMessages,
+      getQueuedMessagesText,
+      clearQueue,
+      pendingSlashCommandHistoryItems,
+      pendingGeminiHistoryItems,
+    ],
+  );
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
@@ -1305,6 +1315,38 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchBannerTexts = async () => {
+      const [defaultBanner, warningBanner] = await Promise.all([
+        config.getBannerTextNoCapacityIssues(),
+        config.getBannerTextCapacityIssues(),
+      ]);
+
+      if (isMounted) {
+        setDefaultBannerText(defaultBanner);
+        setWarningBannerText(warningBanner);
+        setBannerVisible(true);
+        refreshStatic();
+        const authType = config.getContentGeneratorConfig()?.authType;
+        if (
+          authType === AuthType.USE_GEMINI ||
+          authType === AuthType.USE_VERTEX_AI
+        ) {
+          setDefaultBannerText(
+            'Gemini 3 is now available.\nTo use Gemini 3, enable "Preview features" in /settings\nLearn more at https://goo.gle/enable-preview-features',
+          );
+        }
+      }
+    };
+    fetchBannerTexts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [config, refreshStatic]);
+
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
@@ -1394,6 +1436,11 @@ Logging in with Google... Please restart Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       warningMessage,
+      bannerData: {
+        defaultText: defaultBannerText,
+        warningText: warningBannerText,
+      },
+      bannerVisible,
     }),
     [
       isThemeDialogOpen,
@@ -1482,6 +1529,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       authState,
       copyModeEnabled,
       warningMessage,
+      defaultBannerText,
+      warningBannerText,
+      bannerVisible,
     ],
   );
 
@@ -1519,6 +1569,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
+      setBannerVisible,
     }),
     [
       handleThemeSelect,
@@ -1548,6 +1599,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
+      setBannerVisible,
     ],
   );
 
