@@ -171,7 +171,7 @@ describe('checks', () => {
       };
 
       expect(handleAction('start')).toBe('Started');
-      expect(() => handleAction('stop' as never)).toThrow('Missing handler');
+      expect(() => handleAction('stop' as Action)).toThrow('Missing handler');
     });
   });
 });

@@ -107,7 +107,9 @@ describe('dialogScopeUtils', () => {
       const items = getScopeItems();
 
       items.forEach((item) => {
-        expect(SCOPE_LABELS[item.value]).toBe(item.label);
+        expect(SCOPE_LABELS[item.value as keyof typeof SCOPE_LABELS]).toBe(
+          item.label,
+        );
       });
     });
 
@@ -133,8 +135,8 @@ describe('dialogScopeUtils', () => {
     beforeEach(() => {
       mockSettings = {
         forScope: vi.fn((_scope: SettingScope) => ({
-            settings: {},
-          })),
+          settings: {},
+        })),
       } as never;
     });
 
@@ -211,7 +213,9 @@ describe('dialogScopeUtils', () => {
     });
 
     it('should exclude current scope from other scopes', () => {
-      vi.mocked(mockSettings.forScope).mockImplementation(() => ({ settings: { testSetting: 'value' } } as never));
+      vi.mocked(mockSettings.forScope).mockImplementation(
+        () => ({ settings: { testSetting: 'value' } }) as never,
+      );
 
       const message = getScopeMessageForSetting(
         'testSetting',
@@ -241,7 +245,9 @@ describe('dialogScopeUtils', () => {
     });
 
     it('should handle all scopes being modified', () => {
-      vi.mocked(mockSettings.forScope).mockImplementation(() => ({ settings: { testSetting: 'value' } } as never));
+      vi.mocked(mockSettings.forScope).mockImplementation(
+        () => ({ settings: { testSetting: 'value' } }) as never,
+      );
 
       const message = getScopeMessageForSetting(
         'testSetting',
@@ -321,7 +327,9 @@ describe('dialogScopeUtils', () => {
     });
 
     it('should handle empty settings', () => {
-      vi.mocked(mockSettings.forScope).mockImplementation(() => ({ settings: {} } as never));
+      vi.mocked(mockSettings.forScope).mockImplementation(
+        () => ({ settings: {} }) as never,
+      );
 
       const message = getScopeMessageForSetting(
         'nonexistent',
@@ -355,14 +363,15 @@ describe('dialogScopeUtils', () => {
     });
 
     it('should check all other scopes', () => {
+      const mockForScope = vi.fn(() => ({ settings: {} }) as never);
       const mockSettings = {
-        forScope: vi.fn(() => ({ settings: {} }) as never),
-      } as never;
+        forScope: mockForScope,
+      } as unknown as LoadedSettings;
 
       getScopeMessageForSetting('test', SettingScope.User, mockSettings);
 
       // Should be called 3 times (once for each scope including current)
-      expect(mockSettings.forScope).toHaveBeenCalledTimes(3);
+      expect(mockForScope).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -428,7 +437,9 @@ describe('dialogScopeUtils', () => {
       const items = getScopeItems();
 
       items.forEach((item) => {
-        expect(item.label).toBe(SCOPE_LABELS[item.value]);
+        expect(item.label).toBe(
+          SCOPE_LABELS[item.value as keyof typeof SCOPE_LABELS],
+        );
       });
     });
   });

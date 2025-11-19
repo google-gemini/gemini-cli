@@ -44,7 +44,7 @@ describe('getCliVersion', () => {
 
   it('should return "unknown" when both CLI_VERSION and package.json version are unavailable', async () => {
     delete process.env['CLI_VERSION'];
-    vi.mocked(packageModule.getPackageJson).mockResolvedValue(null);
+    vi.mocked(packageModule.getPackageJson).mockResolvedValue(undefined);
 
     const version = await getCliVersion();
     expect(version).toBe('unknown');
