@@ -20,14 +20,19 @@ detailed implementation plans rather than making direct changes.
 - **Disabled in Plan Mode:**
   - `replace` (EditTool) - File editing
   - `write_file` (WriteFileTool) - File creation/writing
+  - `write_todos` (WriteTodosTool) - Todo file creation
+  - `run_shell_command` (ShellTool) - Shell command execution
+  - All MCP server tools - Cannot verify safety of external tools
+  - All discovered tools - Cannot verify safety of custom tools
 - **Available in Plan Mode:**
   - `read_file` - Reading file contents
   - `read_many_files` - Reading multiple files
-  - `grep` - Searching file contents
+  - `search_file_content` (grep) - Searching file contents
   - `glob` - Finding files by pattern
-  - `ls` - Listing directories
+  - `list_directory` (ls) - Listing directories
   - `save_memory` - Memory operations
-  - `run_shell_command` - Safe, read-only shell commands
+  - `web_fetch` - Fetching web content
+  - `google_web_search` - Web searching
 
 ### 💬 **Enhanced Communication**
 
@@ -85,19 +90,38 @@ The specific changes would include:
 
 - `getCoreSystemPrompt()` - Standard agent mode
 - `getPlanModeSystemPrompt()` - Enhanced planning mode with restrictions
+- Prompts instruct model on tool availability and planning behavior
+
+### Tool Filtering Architecture
+
+**Primary Enforcement (Tool Registry Level):**
+
+- `packages/core/src/tools/tool-types.ts` - Defines destructive vs read-only
+  tools
+- `isDestructiveTool(toolName)` - Centralized safety classification
+- `ToolRegistry.getFunctionDeclarations()` - Filters tool declarations before
+  sending to model
+- Destructive tools not declared to model in plan mode (hard enforcement)
+- MCP and discovered tools excluded in plan mode (cannot verify safety)
+
+**Secondary Protection (UI Level):**
+
+- `useGeminiStream` - Blocks tool execution if plan mode active
+- Displays tool calls as JSON instead of executing
+- Defense-in-depth approach ensures safety
 
 ### Configuration Integration
 
 - `Config.getIsPlanMode()` - Check current mode
 - `Config.setIsPlanMode(boolean)` - Update mode
-- Tool registry automatically excludes destructive tools in plan mode
+- State synchronized between core config and UI state
 
 ### UI Integration
 
 - `/plan` slash command toggles mode
-- Footer displays current mode
+- Footer displays current mode ("Plan Mode" or "Agent Mode")
 - Tool calls shown as JSON in plan mode
-- State synchronized across components
+- State synchronized across components via UIStateContext
 
 ## Benefits
 
@@ -113,3 +137,35 @@ The specific changes would include:
 - Switch to Plan Mode before major refactoring to understand scope
 - Use for code reviews and understanding complex changes
 - Toggle to Agent Mode when ready to implement planned changes
+
+## Future Enhancements
+
+Potential improvements for future iterations:
+
+1. **Dynamic System Prompt Updates**
+   - Currently requires chat restart after toggling modes
+   - Future: Update system prompt mid-session without restart
+
+2. **Granular Shell Command Filtering**
+   - Currently blocks all shell commands in plan mode
+   - Future: Allow verified safe commands (e.g., `git status`, `ls`, `find`)
+   - Implement command pattern matching for safety verification
+
+3. **MCP Tool Safety Verification**
+   - Currently blocks all MCP tools in plan mode
+   - Future: Allow MCP servers to declare tool safety levels
+   - Support read-only MCP tool categories
+
+4. **Visual Feedback Improvements**
+   - Add toast notifications on mode toggle
+   - Show which tools are filtered in current mode
+   - Display tool availability status in help/docs
+
+5. **Persistence**
+   - Remember plan mode preference across sessions
+   - Per-project plan mode defaults
+
+6. **Advanced Planning Features**
+   - Cost estimation for planned changes
+   - Impact analysis before execution
+   - Diff preview generation
