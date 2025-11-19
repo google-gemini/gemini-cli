@@ -23,7 +23,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
-import Gradient from 'ink-gradient';
+import { ThemedGradient } from './ThemedGradient.js';
 
 interface ModelDialogProps {
   onClose: () => void;
@@ -115,9 +115,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       <Text bold>Select Model</Text>
 
       <Box marginTop={1} marginBottom={1} flexDirection="column">
-        <Gradient colors={theme.ui.gradient}>
+        <ThemedGradient>
           <Text>{header}</Text>
-        </Gradient>
+        </ThemedGradient>
         <Text>{subheader}</Text>
       </Box>
 

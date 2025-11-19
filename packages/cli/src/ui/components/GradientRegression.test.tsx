@@ -6,10 +6,13 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { Footer } from './Footer.js';
-import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
+import { Banner } from './Banner.js';
+import { Footer } from './Footer.js';
+import { Header } from './Header.js';
+import { ModelDialog } from './ModelDialog.js';
+import { StatsDisplay } from './StatsDisplay.js';
 
 // Mock the theme module
 vi.mock('../semantic-colors.js', async (importOriginal) => {
@@ -63,6 +66,36 @@ useSessionStatsMock.mockReturnValue({
 });
 
 describe('Gradient Crash Regression Tests', () => {
+  it('<Header /> should not crash when theme.ui.gradient is empty', () => {
+    const { lastFrame } = renderWithProviders(
+      <Header version="1.0.0" nightly={false} />,
+      {
+        width: 120,
+      },
+    );
+    expect(lastFrame()).toBeDefined();
+  });
+
+  it('<ModelDialog /> should not crash when theme.ui.gradient is empty', () => {
+    const { lastFrame } = renderWithProviders(
+      <ModelDialog onClose={() => {}} />,
+      {
+        width: 120,
+      },
+    );
+    expect(lastFrame()).toBeDefined();
+  });
+
+  it('<Banner /> should not crash when theme.ui.gradient is empty', () => {
+    const { lastFrame } = renderWithProviders(
+      <Banner bannerText="Test Banner" color="blue" width={80} />,
+      {
+        width: 120,
+      },
+    );
+    expect(lastFrame()).toBeDefined();
+  });
+
   it('<Footer /> should not crash when theme.ui.gradient has only one color (or empty) and nightly is true', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
