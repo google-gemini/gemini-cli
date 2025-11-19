@@ -7,7 +7,10 @@
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProviderType, type Config } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
@@ -487,9 +490,7 @@ describe('mcp-client', () => {
         );
 
         expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: { headers: {} },
-          }),
+          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
         );
       });
 
@@ -523,9 +524,7 @@ describe('mcp-client', () => {
           false,
         );
         expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
-            requestInit: { headers: {} },
-          }),
+          new StreamableHTTPClientTransport(new URL('http://test-server'), {}),
         );
       });
 
@@ -540,7 +539,7 @@ describe('mcp-client', () => {
         );
 
         expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
+          new StreamableHTTPClientTransport(new URL('http://test-server'), {
             requestInit: {
               headers: { Authorization: 'derp' },
             },
@@ -607,6 +606,7 @@ describe('mcp-client', () => {
           'test-server',
           {
             url: 'http://test.googleapis.com',
+            type: 'sse',
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
             oauth: {
               scopes: ['scope1'],
@@ -766,7 +766,10 @@ describe('connectToMcpServer with OAuth', () => {
     const wwwAuthHeader = `Bearer realm="test", resource_metadata="http://test-server.com/.well-known/oauth-protected-resource"`;
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
-      new Error(`401 Unauthorized\nwww-authenticate: ${wwwAuthHeader}`),
+      new StreamableHTTPError(
+        401,
+        `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+      ),
     );
 
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
@@ -787,7 +790,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     const client = await connectToMcpServer(
       'test-server',
-      { httpUrl: serverUrl },
+      { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
     );
@@ -807,7 +810,7 @@ describe('connectToMcpServer with OAuth', () => {
     const tokenUrl = 'http://auth.example.com/token';
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
-      new Error('401 Unauthorized'),
+      new StreamableHTTPError(401, 'Unauthorized'),
     );
 
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
@@ -831,7 +834,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     const client = await connectToMcpServer(
       'test-server',
-      { httpUrl: serverUrl },
+      { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
     );
