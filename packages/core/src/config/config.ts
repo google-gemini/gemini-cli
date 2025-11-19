@@ -42,6 +42,7 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
+import { ModelInfoService } from '../services/modelInfoService.js';
 import { coreEvents } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
@@ -320,6 +321,7 @@ export class Config {
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
+  private modelInfoService!: ModelInfoService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -642,6 +644,10 @@ export class Config {
     return this.contentGenerator;
   }
 
+  getModelInfoService(): ModelInfoService | undefined {
+    return this.modelInfoService;
+  }
+
   async refreshAuth(authMethod: AuthType) {
     this.useModelRouter = this.initialUseModelRouter;
     if (this.disableModelRouterForAuth?.includes(authMethod)) {
@@ -672,6 +678,10 @@ export class Config {
     );
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
+    this.modelInfoService = new ModelInfoService(
+      newContentGeneratorConfig.apiKey,
+      newContentGeneratorConfig.vertexai,
+    );
 
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
