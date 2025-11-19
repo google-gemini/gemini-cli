@@ -22,10 +22,12 @@ import {
   STATUS_INDICATOR_WIDTH,
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
+import type { Config } from '@google/gemini-cli-core';
 
-interface ShellToolMessageProps extends ToolMessageProps {
+export interface ShellToolMessageProps extends ToolMessageProps {
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
+  config?: Config;
 }
 
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({

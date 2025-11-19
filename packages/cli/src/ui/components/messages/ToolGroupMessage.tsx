@@ -119,7 +119,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             : toolAwaitingApproval
               ? ('low' as const)
               : ('medium' as const),
-          config,
           isFirst,
           borderColor,
           borderDimColor,
@@ -137,6 +136,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 {...commonProps}
                 activeShellPtyId={activeShellPtyId}
                 embeddedShellFocused={embeddedShellFocused}
+                config={config}
               />
             ) : (
               <ToolMessage {...commonProps} />

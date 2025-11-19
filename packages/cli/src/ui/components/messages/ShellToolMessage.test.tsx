@@ -5,8 +5,10 @@
  */
 
 import React, { act } from 'react';
-import type { ToolMessageProps } from './ToolMessage.js';
-import { ShellToolMessage } from './ShellToolMessage.js';
+import {
+  ShellToolMessage,
+  type ShellToolMessageProps,
+} from './ShellToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
 import type { Config } from '@google/gemini-cli-core';
@@ -53,7 +55,7 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
 }));
 
 describe('<ShellToolMessage />', () => {
-  const baseProps: ToolMessageProps = {
+  const baseProps: ShellToolMessageProps = {
     callId: 'tool-123',
     name: SHELL_COMMAND_NAME,
     description: 'A shell command',
@@ -90,7 +92,7 @@ describe('<ShellToolMessage />', () => {
   });
 
   describe('interactive shell focus', () => {
-    const shellProps: ToolMessageProps = {
+    const shellProps: ShellToolMessageProps = {
       ...baseProps,
     };
 
@@ -115,7 +117,7 @@ describe('<ShellToolMessage />', () => {
     });
 
     it('handles focus for SHELL_TOOL_NAME (core shell tool)', async () => {
-      const coreShellProps: ToolMessageProps = {
+      const coreShellProps: ShellToolMessageProps = {
         ...shellProps,
         name: SHELL_TOOL_NAME,
       };

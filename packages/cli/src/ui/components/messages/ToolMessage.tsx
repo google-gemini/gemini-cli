@@ -8,7 +8,6 @@ import type React from 'react';
 import { Box } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { StickyHeader } from '../StickyHeader.js';
-import type { Config } from '@google/gemini-cli-core';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import {
   ToolStatusIndicator,
@@ -27,7 +26,6 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   isFirst: boolean;
   borderColor: string;
   borderDimColor: boolean;
-  config?: Config;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
