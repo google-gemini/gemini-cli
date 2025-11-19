@@ -4,7 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
+import { ThemedGradient } from './ThemedGradient.js';
+import { theme } from '../semantic-colors.js';
+import type { ReactNode } from 'react';
+
+export function getFormattedBannerContent(
+  rawText: string,
+  isWarning: boolean,
+  subsequentLineColor: string,
+): ReactNode {
+  if (isWarning) {
+    return (
+      <Text color={theme.status.warning}>{rawText.replace(/\\n/g, '\n')}</Text>
+    );
+  }
+
+  const text = rawText.replace(/\\n/g, '\n');
+  const lines = text.split('\n');
+
+  return lines.map((line, index) => {
+    if (index === 0) {
+      return (
+        <ThemedGradient key={index}>
+          <Text>{line}</Text>
+        </ThemedGradient>
+      );
+    }
+
+    return (
+      <Text key={index} color={subsequentLineColor}>
+        {line}
+      </Text>
+    );
+  });
+}
 
 interface BannerProps {
   bannerText: React.ReactNode;

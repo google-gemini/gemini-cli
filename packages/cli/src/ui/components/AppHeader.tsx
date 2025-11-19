@@ -4,56 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 import { Header } from './Header.js';
 import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { Banner } from './Banner.js';
+import { Banner, getFormattedBannerContent } from './Banner.js';
 import { theme } from '../semantic-colors.js';
 import { Colors } from '../colors.js';
 import { persistentState } from '../../utils/persistentState.js';
-import { ThemedGradient } from './ThemedGradient.js';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-
-function getFormattedBannerContent(
-  rawText: string,
-  isWarning: boolean,
-  subsequentLineColor: string,
-): ReactNode {
-  if (isWarning) {
-    return (
-      <Text color={theme.status.warning}>{rawText.replace(/\\n/g, '\n')}</Text>
-    );
-  }
-
-  const lines = rawText.split('\\n');
-
-  if (lines.length <= 1) {
-    return (
-      <ThemedGradient>
-        <Text>{rawText.replace(/\\n/g, '\n')}</Text>
-      </ThemedGradient>
-    );
-  }
-
-  return lines.map((line, index) => {
-    if (index === 0) {
-      return (
-        <ThemedGradient key={index}>
-          <Text>{line}</Text>
-        </ThemedGradient>
-      );
-    }
-
-    return (
-      <Text key={index} color={subsequentLineColor}>
-        {line}
-      </Text>
-    );
-  });
-}
+import { useEffect, useRef, useState } from 'react';
 
 interface AppHeaderProps {
   version: string;
