@@ -15,12 +15,22 @@ export interface ModelInfo {
 
 export class ModelInfoService {
   private googleGenAI: GoogleGenAI;
+  private readonly thinkingSupportCache = new Map<string, Promise<boolean>>();
 
   constructor(apiKey?: string, vertexai?: boolean) {
     this.googleGenAI = new GoogleGenAI({ apiKey, vertexai });
   }
 
-  async isThinkingSupported(modelName: string): Promise<boolean> {
+  isThinkingSupported(modelName: string): Promise<boolean> {
+    if (this.thinkingSupportCache.has(modelName)) {
+      return this.thinkingSupportCache.get(modelName)!;
+    }
+    const supportPromise = this._checkThinkingSupport(modelName);
+    this.thinkingSupportCache.set(modelName, supportPromise);
+    return supportPromise;
+  }
+
+  private async _checkThinkingSupport(modelName: string): Promise<boolean> {
     // Ideally, we should use models.get() API call, but the returned Model object doesn't contain thinking bool.
     //   const model = await this.googleGenAI.models.get({ model: modelName });
     //   return model?.thinking;
