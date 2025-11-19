@@ -36,29 +36,36 @@ export class ModelInfoService {
     //   return model?.thinking;
     // As a workaround, we are going to try and call generateContent with thinking budget set.
     // If the model doesn't have thinking capability, it should return an error.
-    const contents = [{ role: 'user', parts: [{ text: 'Test prompt.' }] }];
-    const config = {
-      thinkingConfig: {
-        thinkingBudget: -1, // Attempt to use thinking
-      },
-    };
+    // const contents = [{ role: 'user', parts: [{ text: 'Test prompt.' }] }];
+    // const config = {
+    //   thinkingConfig: {
+    //     thinkingBudget: -1, // Attempt to use thinking
+    //   },
+    // };
 
     try {
       // Attempt to generate content with thinkingConfig
-      await this.googleGenAI.models.generateContent({
+      const model = await this.googleGenAI.models.get({
         model: modelName,
-        contents,
-        config,
       });
-      return true;
+      return model?.thinking;
     } catch (error) {
-      // A failure with 'thinkingConfig' likely reason indicates no support.
-      // If the error is unrelated to thinking, false is still a better default to return.
       debugLogger.log(
-        'GenerateContent returned error: %s when called with thinkingConfig set.',
+        'model.get returned error %s when called for model=%s',
         error,
+        modelName,
       );
       return false;
     }
+
+    //   return true;
+    // } catch (error) {
+    //   // A failure with 'thinkingConfig' likely reason indicates no support.
+    //   // If the error is unrelated to thinking, false is still a better default to return.
+    //   debugLogger.log(
+    //     'GenerateContent returned error: %s when called with thinkingConfig set.',
+    //     error,
+    //   );
+    //   return false;
   }
 }
