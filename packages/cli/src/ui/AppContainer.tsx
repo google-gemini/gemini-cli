@@ -147,7 +147,9 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
-  const historyManager = useHistory();
+  const historyManager = useHistory({
+    chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
+  });
   useMemoryMonitor(historyManager);
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
@@ -648,15 +650,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
     }
   }, [config, historyManager]);
 
-  const cancelHandlerRef = useRef<() => void>(() => {});
+  const cancelHandlerRef = useRef<(shouldRestorePrompt?: boolean) => void>(
+    () => {},
+  );
 
   const getPreferredEditor = useCallback(
     () => settings.merged.general?.preferredEditor as EditorType,
     [settings.merged.general?.preferredEditor],
   );
 
-  const onCancelSubmit = useCallback(() => {
-    cancelHandlerRef.current();
+  const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
+    cancelHandlerRef.current(shouldRestorePrompt);
   }, []);
 
   const {
@@ -710,36 +714,39 @@ Logging in with Google... Please restart Gemini CLI to continue.
     submitQuery,
   });
 
-  cancelHandlerRef.current = useCallback(() => {
-    const pendingHistoryItems = [
-      ...pendingSlashCommandHistoryItems,
-      ...pendingGeminiHistoryItems,
-    ];
-    if (isToolExecuting(pendingHistoryItems)) {
-      buffer.setText(''); // Just clear the prompt
-      return;
-    }
+  cancelHandlerRef.current = useCallback(
+    (shouldRestorePrompt: boolean = true) => {
+      const pendingHistoryItems = [
+        ...pendingSlashCommandHistoryItems,
+        ...pendingGeminiHistoryItems,
+      ];
+      if (isToolExecuting(pendingHistoryItems)) {
+        buffer.setText(''); // Just clear the prompt
+        return;
+      }
 
-    const lastUserMessage = userMessages.at(-1);
-    let textToSet = lastUserMessage || '';
+      const lastUserMessage = userMessages.at(-1);
+      let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
 
-    const queuedText = getQueuedMessagesText();
-    if (queuedText) {
-      textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
-      clearQueue();
-    }
+      const queuedText = getQueuedMessagesText();
+      if (queuedText) {
+        textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
+        clearQueue();
+      }
 
-    if (textToSet) {
-      buffer.setText(textToSet);
-    }
-  }, [
-    buffer,
-    userMessages,
-    getQueuedMessagesText,
-    clearQueue,
-    pendingSlashCommandHistoryItems,
-    pendingGeminiHistoryItems,
-  ]);
+      if (textToSet || !shouldRestorePrompt) {
+        buffer.setText(textToSet);
+      }
+    },
+    [
+      buffer,
+      userMessages,
+      getQueuedMessagesText,
+      clearQueue,
+      pendingSlashCommandHistoryItems,
+      pendingGeminiHistoryItems,
+    ],
+  );
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
@@ -1021,7 +1028,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlCPressCount > 1) {
-      handleSlashCommand('/quit');
+      handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlCTimerRef.current = setTimeout(() => {
         setCtrlCPressCount(0);
@@ -1039,7 +1046,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlDPressCount > 1) {
-      handleSlashCommand('/quit');
+      handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlDTimerRef.current = setTimeout(() => {
         setCtrlDPressCount(0);
