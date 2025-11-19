@@ -419,11 +419,10 @@ describe('useShellCommandProcessor', () => {
     });
     await act(async () => await execPromise);
 
-    const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
-    expect(finalHistoryItem.tools[0].status).toBe(ToolCallStatus.Canceled);
-    expect(finalHistoryItem.tools[0].resultDisplay).toContain(
-      'Command was cancelled.',
-    );
+    // With the new logic, cancelled commands are not added to history by this hook
+    // to avoid duplication/flickering, as they are handled by useGeminiStream.
+    expect(addItemToHistoryMock).toHaveBeenCalledTimes(1);
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
     expect(setShellInputFocusedMock).toHaveBeenCalledWith(false);
   });
 

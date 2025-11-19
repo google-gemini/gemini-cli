@@ -284,13 +284,17 @@ export const useShellCommandProcessor = (
               };
 
               // Add the complete, contextual result to the local UI history.
-              addItemToHistory(
-                {
-                  type: 'tool_group',
-                  tools: [finalToolDisplay],
-                } as HistoryItemWithoutId,
-                userMessageTimestamp,
-              );
+              // We skip this for cancelled commands because useGeminiStream handles the
+              // immediate addition of the cancelled item to history to prevent flickering/duplicates.
+              if (finalStatus !== ToolCallStatus.Canceled) {
+                addItemToHistory(
+                  {
+                    type: 'tool_group',
+                    tools: [finalToolDisplay],
+                  } as HistoryItemWithoutId,
+                  userMessageTimestamp,
+                );
+              }
 
               // Add the same complete, contextual result to the LLM's history.
               addShellCommandToGeminiHistory(
