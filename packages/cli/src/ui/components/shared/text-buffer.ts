@@ -2040,6 +2040,11 @@ export function useTextBuffer({
     [visualLayout],
   );
 
+  const getOffset = useCallback(
+    (): number => logicalPosToOffset(lines, cursorRow, cursorCol),
+    [lines, cursorRow, cursorCol],
+  );
+
   const returnValue: TextBuffer = useMemo(
     () => ({
       lines,
@@ -2065,6 +2070,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
       moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
@@ -2129,6 +2135,7 @@ export function useTextBuffer({
       replaceRange,
       replaceRangeByOffset,
       moveToOffset,
+      getOffset,
       moveToVisualPosition,
       deleteWordLeft,
       deleteWordRight,
@@ -2283,6 +2290,7 @@ export interface TextBuffer {
     endOffset: number,
     replacementText: string,
   ) => void;
+  getOffset: () => number;
   moveToOffset(offset: number): void;
   moveToVisualPosition(visualRow: number, visualCol: number): void;
 
