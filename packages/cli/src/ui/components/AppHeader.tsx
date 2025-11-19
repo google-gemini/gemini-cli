@@ -10,11 +10,9 @@ import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { Banner, getFormattedBannerContent } from './Banner.js';
-import { theme } from '../semantic-colors.js';
-import { Colors } from '../colors.js';
 import { persistentState } from '../../utils/persistentState.js';
 import { useEffect, useRef, useState } from 'react';
+import { Banner } from './Banner.js';
 
 interface AppHeaderProps {
   version: string;
@@ -37,15 +35,6 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
     defaultBannerShownCount < 5;
 
   const bannerText = showDefaultBanner ? defaultText : warningText;
-  const isWarning = warningText !== '';
-
-  const subsequentLineColor = theme.text.primary;
-
-  const formattedBannerContent = getFormattedBannerContent(
-    bannerText,
-    isWarning,
-    subsequentLineColor,
-  );
 
   const hasIncrementedRef = useRef(false);
   useEffect(() => {
@@ -64,8 +53,8 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
           {bannerVisible && bannerText && (
             <Banner
               width={mainAreaWidth}
-              bannerText={formattedBannerContent}
-              color={isWarning ? theme.status.warning : Colors.Gray}
+              bannerText={bannerText}
+              isWarning={warningText !== ''}
             />
           )}
         </>

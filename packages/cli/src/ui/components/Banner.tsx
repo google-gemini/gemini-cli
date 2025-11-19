@@ -8,6 +8,7 @@ import { Box, Text } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import type { ReactNode } from 'react';
+import { Colors } from '../colors.js';
 
 export function getFormattedBannerContent(
   rawText: string,
@@ -41,20 +42,30 @@ export function getFormattedBannerContent(
 }
 
 interface BannerProps {
-  bannerText: React.ReactNode;
-  color: string;
+  bannerText: string;
+  isWarning: boolean;
   width: number;
 }
 
-export const Banner = ({ bannerText, color, width }: BannerProps) => (
-  <Box
-    flexDirection="column"
-    borderStyle="round"
-    borderColor={color}
-    width={width}
-    paddingLeft={1}
-    paddingRight={1}
-  >
-    {bannerText}
-  </Box>
-);
+export const Banner = ({ bannerText, isWarning, width }: BannerProps) => {
+  const subsequentLineColor = theme.text.primary;
+
+  const formattedBannerContent = getFormattedBannerContent(
+    bannerText,
+    isWarning,
+    subsequentLineColor,
+  );
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={isWarning ? theme.status.warning : Colors.Gray}
+      width={width}
+      paddingLeft={1}
+      paddingRight={1}
+    >
+      {formattedBannerContent}
+    </Box>
+  );
+};
