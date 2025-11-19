@@ -187,6 +187,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [warningBannerText, setWarningBannerText] = useState('');
   const [bannerVisible, setBannerVisible] = useState(true);
 
+  const [pendingPromptRestore, setPendingPromptRestore] = useState(false);
+
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
   extensionManager.setRequestConsent((description) =>
@@ -725,8 +727,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
         return;
       }
 
-      const lastUserMessage = userMessages.at(-1);
-      let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
+      let textToSet = '';
+      if (shouldRestorePrompt) {
+        // Defer restoration to useEffect to ensure we get the latest user message
+        setPendingPromptRestore(true);
+        return;
+      }
+
+      // If we are not restoring, ensure we cancel any pending restore
+      setPendingPromptRestore(false);
 
       const queuedText = getQueuedMessagesText();
       if (queuedText) {
@@ -740,13 +749,37 @@ Logging in with Google... Please restart Gemini CLI to continue.
     },
     [
       buffer,
-      userMessages,
       getQueuedMessagesText,
       clearQueue,
       pendingSlashCommandHistoryItems,
       pendingGeminiHistoryItems,
     ],
   );
+
+  useEffect(() => {
+    if (pendingPromptRestore) {
+      // Check if userMessages is up to date with historyManager
+      const lastHistoryItem = historyManager.history.findLast(
+        (item) => item.type === 'user' && item.text,
+      );
+      const lastUserMessage = userMessages.at(-1);
+
+      if (
+        lastHistoryItem &&
+        lastHistoryItem.text === lastUserMessage &&
+        lastUserMessage
+      ) {
+        buffer.setText(lastUserMessage);
+        setPendingPromptRestore(false);
+      }
+    }
+  }, [
+    pendingPromptRestore,
+    userMessages,
+    historyManager.history,
+    buffer,
+    setPendingPromptRestore,
+  ]);
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {

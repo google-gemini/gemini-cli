@@ -1811,6 +1811,17 @@ describe('AppContainer State Management', () => {
     });
 
     it('restores the prompt when onCancelSubmit is called with shouldRestorePrompt=true (or undefined)', async () => {
+      // Mock history containing the message we want to restore
+      const mockHistory = [{ type: 'user', text: 'previous message' }];
+      mockedUseHistory.mockReturnValue({
+        history: mockHistory,
+        addItem: vi.fn(),
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      // Mock logger to return the same message so userMessages is populated
       mockedUseLogger.mockReturnValue({
         getPreviousUserMessages: vi
           .fn()
@@ -1818,6 +1829,8 @@ describe('AppContainer State Management', () => {
       });
 
       const { unmount } = renderAppContainer();
+
+      // Wait for userMessages to be populated
       await waitFor(() =>
         expect(capturedUIState.userMessages).toContain('previous message'),
       );
@@ -1826,11 +1839,15 @@ describe('AppContainer State Management', () => {
         mockedUseGeminiStream.mock.lastCall!,
       );
 
-      await act(async () => {
+      // Trigger cancel/restore
+      act(() => {
         onCancelSubmit(true);
       });
 
-      expect(mockSetText).toHaveBeenCalledWith('previous message');
+      // Wait for the effect to run and restore the text
+      await waitFor(() => {
+        expect(mockSetText).toHaveBeenCalledWith('previous message');
+      });
 
       unmount();
     });
