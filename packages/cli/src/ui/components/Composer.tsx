@@ -99,10 +99,8 @@ export const Composer = () => {
             <Text color={theme.status.warning}>
               Press Ctrl+C again to exit.
             </Text>
-          ) : uiState.selectionWarning ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl-S to enter selection mode to copy text.
-            </Text>
+          ) : uiState.warningMessage ? (
+            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
           ) : uiState.ctrlDPressedOnce ? (
             <Text color={theme.status.warning}>
               Press Ctrl+D again to exit.
@@ -159,6 +157,7 @@ export const Composer = () => {
           suggestionsWidth={uiState.suggestionsWidth}
           onSubmit={uiActions.handleFinalSubmit}
           userMessages={uiState.userMessages}
+          setBannerVisible={uiActions.setBannerVisible}
           onClearScreen={uiActions.handleClearScreen}
           config={config}
           slashCommands={uiState.slashCommands || []}

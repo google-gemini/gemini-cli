@@ -154,13 +154,10 @@ describe('isThinkingSupported', () => {
     ).toBe(true);
   });
 
-  it('should return false for other models', async () => {
+  it('should return rely on ModelInfoService value', async () => {
     vi.mocked(mockModelInfoService.isThinkingSupported).mockResolvedValue(
       false,
     );
-    expect(
-      await isThinkingSupported('gemini-1.5-flash', mockModelInfoService),
-    ).toBe(false);
     expect(
       await isThinkingSupported('some-other-model', mockModelInfoService),
     ).toBe(false);
@@ -236,6 +233,7 @@ describe('Gemini Client (client.ts)', () => {
       getIdeModeFeature: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(true),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
