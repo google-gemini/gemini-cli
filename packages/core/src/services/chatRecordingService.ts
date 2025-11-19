@@ -62,7 +62,7 @@ export interface ToolCallRecord {
  */
 export type ConversationRecordExtra =
   | {
-      type: 'user';
+      type: 'user' | 'info' | 'error' | 'warning';
     }
   | {
       type: 'gemini';
