@@ -5,8 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import Gradient from 'ink-gradient';
-import { theme } from '../semantic-colors.js';
+import { ThemedGradient } from './ThemedGradient.js';
 
 interface BannerProps {
   bannerText: string;
@@ -14,9 +13,7 @@ interface BannerProps {
   width: number;
 }
 
-export const Banner = ({ bannerText, color, width }: BannerProps) => {
-  const gradient = theme.ui.gradient;
-  return (
+export const Banner = ({ bannerText, color, width }: BannerProps) => (
     <Box
       flexDirection="column"
       borderStyle="round"
@@ -25,9 +22,8 @@ export const Banner = ({ bannerText, color, width }: BannerProps) => {
       paddingLeft={1}
       paddingRight={1}
     >
-      <Gradient colors={gradient}>
+      <ThemedGradient>
         <Text>{bannerText}</Text>
-      </Gradient>
+      </ThemedGradient>
     </Box>
   );
-};
