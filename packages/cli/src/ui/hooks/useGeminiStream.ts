@@ -453,6 +453,9 @@ export const useGeminiStream = (
               case 'handled': {
                 return { queryToSend: null, shouldProceed: false };
               }
+              case 'logout': {
+                return { queryToSend: null, shouldProceed: false };
+              }
               default: {
                 const unreachable: never = slashCommandResult;
                 throw new Error(

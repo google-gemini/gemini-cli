@@ -571,6 +571,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
+      logout: () => {
+        // Clear the selected auth type so user sees the auth selection menu
+        settings.setValue(
+          SettingScope.User,
+          'security.auth.selectedType',
+          undefined,
+        );
+        setAuthState(AuthState.Unauthenticated);
+        // Clear any current conversation history
+        historyManager.clearItems();
+      },
     }),
     [
       setAuthState,
@@ -586,6 +597,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      historyManager,
+      settings,
     ],
   );
 

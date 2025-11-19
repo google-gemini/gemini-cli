@@ -364,7 +364,10 @@ export type SlashCommandProcessorResult =
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
-  | SubmitPromptResult;
+  | SubmitPromptResult
+  | {
+      type: 'logout';
+    };
 
 export interface ShellConfirmationRequest {
   commands: string[];
