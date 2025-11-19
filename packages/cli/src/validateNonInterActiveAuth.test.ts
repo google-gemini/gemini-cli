@@ -19,6 +19,7 @@ import {
   AuthType,
   OutputFormat,
   makeFakeConfig,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import * as auth from './config/auth.js';
@@ -35,6 +36,7 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let debugLoggerErrorSpy: ReturnType<typeof vi.spyOn>;
   let processExitSpy: MockInstance;
   let refreshAuthMock: Mock;
   let mockSettings: LoadedSettings;
@@ -47,6 +49,9 @@ describe('validateNonInterActiveAuth', () => {
     delete process.env['GOOGLE_GENAI_USE_VERTEXAI'];
     delete process.env['GOOGLE_GENAI_USE_GCA'];
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    debugLoggerErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
     processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code?: string | number | null | undefined) => {
@@ -113,7 +118,7 @@ describe('validateNonInterActiveAuth', () => {
     } catch (e) {
       expect((e as Error).message).toContain('process.exit(1) called');
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Please set an Auth method'),
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -265,7 +270,7 @@ describe('validateNonInterActiveAuth', () => {
     } catch (e) {
       expect((e as Error).message).toContain('process.exit(1) called');
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Auth error!');
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith('Auth error!');
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 
@@ -287,7 +292,7 @@ describe('validateNonInterActiveAuth', () => {
     );
 
     expect(validateAuthMethodSpy).not.toHaveBeenCalled();
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
     expect(processExitSpy).not.toHaveBeenCalled();
     // We still expect refreshAuth to be called with the (invalid) type
     expect(refreshAuthMock).toHaveBeenCalledWith('invalid-auth-type');
@@ -326,7 +331,7 @@ describe('validateNonInterActiveAuth', () => {
     } catch (e) {
       expect((e as Error).message).toContain('process.exit(1) called');
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       "The enforced authentication type is 'oauth-personal', but the current type is 'gemini-api-key'. Please re-authenticate with the correct type.",
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
@@ -351,7 +356,7 @@ describe('validateNonInterActiveAuth', () => {
     } catch (e) {
       expect((e as Error).message).toContain('process.exit(1) called');
     }
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       "The enforced authentication type is 'oauth-personal', but the current type is 'gemini-api-key'. Please re-authenticate with the correct type.",
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);

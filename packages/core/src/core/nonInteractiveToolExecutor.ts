@@ -22,10 +22,6 @@ export async function executeToolCall(
     const scheduler = new CoreToolScheduler({
       config,
       getPreferredEditor: () => undefined,
-      onEditorClose: () => {},
-      onAllToolCallsComplete: async (completedToolCalls) => {
-        resolve(completedToolCalls[0]);
-      },
     });
 
     scheduler.schedule(toolCallRequest, abortSignal).catch((error) => {
