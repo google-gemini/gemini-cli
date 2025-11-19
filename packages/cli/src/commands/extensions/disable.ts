@@ -5,32 +5,36 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { disableExtension } from '../../config/extension.js';
-import { SettingScope } from '../../config/settings.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
-import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface DisableArgs {
   name: string;
   scope?: string;
 }
 
-export function handleDisable(args: DisableArgs) {
-  const extensionEnablementManager = new ExtensionEnablementManager();
+export async function handleDisable(args: DisableArgs) {
+  const workspaceDir = process.cwd();
+  const extensionManager = new ExtensionManager({
+    workspaceDir,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    settings: loadSettings(workspaceDir).merged,
+  });
+  await extensionManager.loadExtensions();
+
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      disableExtension(
+      await extensionManager.disableExtension(
         args.name,
         SettingScope.Workspace,
-        extensionEnablementManager,
       );
     } else {
-      disableExtension(
-        args.name,
-        SettingScope.User,
-        extensionEnablementManager,
-      );
+      await extensionManager.disableExtension(args.name, SettingScope.User);
     }
     debugLogger.log(
       `Extension "${args.name}" successfully disabled for scope "${args.scope}".`,
@@ -72,8 +76,8 @@ export const disableCommand: CommandModule = {
         }
         return true;
       }),
-  handler: (argv) => {
-    handleDisable({
+  handler: async (argv) => {
+    await handleDisable({
       name: argv['name'] as string,
       scope: argv['scope'] as string,
     });

@@ -9,6 +9,10 @@
       {
         "label": "Architecture Overview",
         "slug": "docs/architecture"
+      },
+      {
+        "label": "Contribution Guide",
+        "slug": "docs/contributing"
       }
     ]
   },
@@ -18,6 +22,10 @@
       {
         "label": "Gemini CLI Quickstart",
         "slug": "docs/get-started"
+      },
+      {
+        "label": "Gemini 3 Pro on Gemini CLI",
+        "slug": "docs/get-started/gemini-3"
       },
       {
         "label": "Authentication",
@@ -69,8 +77,16 @@
         "slug": "docs/cli/keyboard-shortcuts"
       },
       {
+        "label": "Model Selection",
+        "slug": "docs/cli/model"
+      },
+      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
+      },
+      {
+        "label": "Settings",
+        "slug": "docs/cli/settings"
       },
       {
         "label": "Telemetry",
@@ -112,6 +128,10 @@
       {
         "label": "Memory Import Processor",
         "slug": "docs/core/memport"
+      },
+      {
+        "label": "Policy Engine",
+        "slug": "docs/core/policy-engine"
       }
     ]
   },
@@ -125,10 +145,6 @@
       {
         "label": "File System",
         "slug": "docs/tools/file-system"
-      },
-      {
-        "label": "Multi-File Read",
-        "slug": "docs/tools/multi-file"
       },
       {
         "label": "Shell",

@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/// <reference types="vitest/globals" />
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
-import { waitFor, act } from '@testing-library/react';
+import { act } from 'react';
 import * as processUtils from '../../utils/processUtils.js';
 import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js';
 
@@ -149,10 +148,11 @@ describe('PermissionsModifyTrustDialog', () => {
     });
   });
 
-  it('should commit, restart, and exit on `r` keypress', async () => {
+  it('should commit and restart `r` keypress', async () => {
     const mockRelaunchApp = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
+    mockCommitTrustLevelChange.mockReturnValue(true);
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
       cwd: '/test/dir',
       currentTrustLevel: TrustLevel.DO_NOT_TRUST,
@@ -176,7 +176,6 @@ describe('PermissionsModifyTrustDialog', () => {
     await waitFor(() => {
       expect(mockCommitTrustLevelChange).toHaveBeenCalled();
       expect(mockRelaunchApp).toHaveBeenCalled();
-      expect(onExit).toHaveBeenCalled();
     });
 
     mockRelaunchApp.mockRestore();

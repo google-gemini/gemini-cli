@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Part } from '@google/genai';
+import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
@@ -59,15 +59,41 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   });
   const platform = process.platform;
   const directoryContext = await getDirectoryContextString(config);
+  const tempDir = config.storage.getProjectTempDir();
 
   const context = `
 This is the Gemini CLI. We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
+The project's temporary directory is: ${tempDir}
 ${directoryContext}
         `.trim();
 
   const initialParts: Part[] = [{ text: context }];
 
   return initialParts;
+}
+
+export async function getInitialChatHistory(
+  config: Config,
+  extraHistory?: Content[],
+): Promise<Content[]> {
+  const envParts = await getEnvironmentContext(config);
+  const envContextString = envParts.map((part) => part.text || '').join('\n\n');
+
+  const allSetupText = `
+${envContextString}
+
+Reminder: Do not return an empty response when a tool call is required.
+
+My setup is complete. I will provide my first command in the next turn.
+    `.trim();
+
+  return [
+    {
+      role: 'user',
+      parts: [{ text: allSetupText }],
+    },
+    ...(extraHistory ?? []),
+  ];
 }

@@ -12,6 +12,7 @@ export interface SemanticColors {
     secondary: string;
     link: string;
     accent: string;
+    response: string;
   };
   background: {
     primary: string;
@@ -27,6 +28,7 @@ export interface SemanticColors {
   ui: {
     comment: string;
     symbol: string;
+    dark: string;
     gradient: string[] | undefined;
   };
   status: {
@@ -42,6 +44,7 @@ export const lightSemanticColors: SemanticColors = {
     secondary: lightTheme.Gray,
     link: lightTheme.AccentBlue,
     accent: lightTheme.AccentPurple,
+    response: lightTheme.Foreground,
   },
   background: {
     primary: lightTheme.Background,
@@ -57,6 +60,7 @@ export const lightSemanticColors: SemanticColors = {
   ui: {
     comment: lightTheme.Comment,
     symbol: lightTheme.Gray,
+    dark: lightTheme.DarkGray,
     gradient: lightTheme.GradientColors,
   },
   status: {
@@ -72,6 +76,7 @@ export const darkSemanticColors: SemanticColors = {
     secondary: darkTheme.Gray,
     link: darkTheme.AccentBlue,
     accent: darkTheme.AccentPurple,
+    response: darkTheme.Foreground,
   },
   background: {
     primary: darkTheme.Background,
@@ -87,6 +92,7 @@ export const darkSemanticColors: SemanticColors = {
   ui: {
     comment: darkTheme.Comment,
     symbol: darkTheme.Gray,
+    dark: darkTheme.DarkGray,
     gradient: darkTheme.GradientColors,
   },
   status: {
@@ -102,6 +108,7 @@ export const ansiSemanticColors: SemanticColors = {
     secondary: ansiTheme.Gray,
     link: ansiTheme.AccentBlue,
     accent: ansiTheme.AccentPurple,
+    response: ansiTheme.Foreground,
   },
   background: {
     primary: ansiTheme.Background,
@@ -117,6 +124,7 @@ export const ansiSemanticColors: SemanticColors = {
   ui: {
     comment: ansiTheme.Comment,
     symbol: ansiTheme.Gray,
+    dark: ansiTheme.DarkGray,
     gradient: ansiTheme.GradientColors,
   },
   status: {

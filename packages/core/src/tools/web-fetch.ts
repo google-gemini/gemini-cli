@@ -19,13 +19,9 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
-import {
-  fetchWithTimeout,
-  isPrivateIp,
-  setGlobalProxy,
-} from '../utils/fetch.js';
+import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -173,10 +169,9 @@ ${textContent}
 ---
 `;
       const result = await geminiClient.generateContent(
+        { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
-        {},
         signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -205,21 +200,9 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Try message bus confirmation first if available
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false; // No confirmation needed
-      }
-      if (decision === 'DENY') {
-        throw new Error('Tool execution denied by policy.');
-      }
-      // if 'ASK_USER', fall through to legacy logic
-    }
-
     // Legacy confirmation flow (no message bus OR policy decision was ASK_USER)
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
@@ -269,10 +252,9 @@ ${textContent}
 
     try {
       const response = await geminiClient.generateContent(
+        { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
-        { tools: [{ urlContext: {} }] },
         signal, // Pass signal
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       debugLogger.debug(
@@ -427,10 +409,6 @@ export class WebFetchTool extends BaseDeclarativeTool<
       false, // canUpdateOutput
       messageBus,
     );
-    const proxy = config.getProxy();
-    if (proxy) {
-      setGlobalProxy(proxy);
-    }
   }
 
   protected override validateToolParamValues(

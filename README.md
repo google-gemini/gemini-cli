@@ -4,6 +4,7 @@
 [![Gemini CLI E2E](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml)
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
+<a href="https://codewiki.google/github.com/google-gemini/gemini-cli"><img src="https://www.gstatic.com/_/boq-sdlc-agents-ui/_/r/Mvosg4klCA4.svg" alt="Ask Code Wiki" height="20"></a>
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
@@ -27,6 +28,11 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
+### Pre-requisites before installation
+
+- Node.js version 20 or higher
+- macOS, Linux, or Windows
+
 ### Quick Install
 
 #### Run instantly with npx
@@ -47,11 +53,6 @@ npm install -g @google/gemini-cli
 ```bash
 brew install gemini-cli
 ```
-
-#### System Requirements
-
-- Node.js version 20 or higher
-- macOS, Linux, or Windows
 
 ## Release Cadence and Tags
 
@@ -306,6 +307,8 @@ gemini
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
 - [**Tools API Development**](./docs/core/tools-api.md) - Create custom tools.
+- [**Local development**](./docs/local-development.md) - Local development
+  tooling.
 
 ### Troubleshooting & Support
 

@@ -8,18 +8,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   OutputFormat,
-  type GeminiCLIExtension,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  type ExtensionLoader,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { ExtensionManager } from './extension-manager.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi
@@ -34,7 +37,7 @@ vi.mock('./sandboxConfig.js', () => ({
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
-  const mockHome = '/mock/home/user';
+  const mockHome = pathMod.resolve(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -67,7 +70,7 @@ vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
   return {
     ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
+    homedir: vi.fn(() => path.resolve(path.sep, 'mock', 'home', 'user')),
   };
 });
 
@@ -96,11 +99,23 @@ vi.mock('@google/gemini-cli-core', async () => {
     },
     loadEnvironment: vi.fn(),
     loadServerHierarchicalMemory: vi.fn(
-      (cwd, dirs, debug, fileService, extensionPaths, _maxDirs) =>
-        Promise.resolve({
-          memoryContent: extensionPaths?.join(',') || '',
+      (
+        cwd,
+        dirs,
+        debug,
+        fileService,
+        extensionLoader: ExtensionLoader,
+        _maxDirs,
+      ) => {
+        const extensionPaths = extensionLoader
+          .getExtensions()
+          .flatMap((e) => e.contextFiles);
+        return Promise.resolve({
+          memoryContent: extensionPaths.join(',') || '',
           fileCount: extensionPaths?.length || 0,
-        }),
+          filePaths: extensionPaths,
+        });
+      },
     ),
     DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: false,
@@ -113,13 +128,26 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
+vi.mock('./extension-manager.js');
+
+// Global setup to ensure clean environment for all tests in this file
+const originalArgv = process.argv;
+const originalGeminiModel = process.env['GEMINI_MODEL'];
+
+beforeEach(() => {
+  delete process.env['GEMINI_MODEL'];
+});
+
+afterEach(() => {
+  process.argv = originalArgv;
+  if (originalGeminiModel !== undefined) {
+    process.env['GEMINI_MODEL'] = originalGeminiModel;
+  } else {
+    delete process.env['GEMINI_MODEL'];
+  }
+});
+
 describe('parseArguments', () => {
-  const originalArgv = process.argv;
-
-  afterEach(() => {
-    process.argv = originalArgv;
-  });
-
   it('should throw an error when both --prompt and --prompt-interactive are used together', async () => {
     process.argv = [
       'node',
@@ -234,13 +262,13 @@ describe('parseArguments', () => {
       '@path',
       './file.md',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
     ];
     const argv = await parseArguments({} as Settings);
     expect(argv.query).toBe('@path ./file.md');
     expect(argv.prompt).toBe('@path ./file.md'); // Should map to one-shot
     expect(argv.promptInteractive).toBeUndefined();
-    expect(argv.model).toBe('gemini-1.5-pro');
+    expect(argv.model).toBe('gemini-2.5-pro');
   });
 
   it('maps unquoted positional @path + arg to prompt (one-shot)', async () => {
@@ -425,6 +453,50 @@ describe('parseArguments', () => {
     mockConsoleError.mockRestore();
   });
 
+  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '--resume', 'session-id'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    try {
+      await expect(parseArguments({} as Settings)).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
+        ),
+      );
+    } finally {
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
+  it('should return RESUME_LATEST constant when --resume is passed without a value', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = true; // Make it interactive to avoid validation error
+    process.argv = ['node', 'script.js', '--resume'];
+
+    try {
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe(RESUME_LATEST);
+      expect(argv.resume).toBe('latest');
+    } finally {
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
   it('should support comma-separated values for --allowed-tools', async () => {
     process.argv = [
       'node',
@@ -493,16 +565,14 @@ describe('parseArguments', () => {
 });
 
 describe('loadCliConfig', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -537,7 +607,7 @@ describe('loadCliConfig', () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {};
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.getProxy()).toBeFalsy();
     });
 
@@ -578,10 +648,23 @@ describe('loadCliConfig', () => {
         process.argv = ['node', 'script.js'];
         const argv = await parseArguments({} as Settings);
         const settings: Settings = {};
-        const config = await loadCliConfig(settings, [], 'test-session', argv);
+        const config = await loadCliConfig(settings, 'test-session', argv);
         expect(config.getProxy()).toBe(expected);
       });
     });
+  });
+
+  it('should use default fileFilter options when unconfigured', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getFileFilteringRespectGitIgnore()).toBe(
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+    );
+    expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+    );
   });
 });
 
@@ -599,7 +682,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
         name: 'ext1',
@@ -627,15 +710,15 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         ],
         isActive: true,
       },
-    ];
+    ]);
     const argv = await parseArguments({} as Settings);
-    await loadCliConfig(settings, extensions, 'session-id', argv);
+    await loadCliConfig(settings, 'session-id', argv);
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
       false,
       expect.any(Object),
-      extensions,
+      expect.any(ExtensionManager),
       true,
       'tree',
       {
@@ -689,7 +772,8 @@ describe('mergeMcpServers', () => {
         },
       },
     };
-    const extensions: GeminiCLIExtension[] = [
+
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
         name: 'ext1',
@@ -704,24 +788,25 @@ describe('mergeMcpServers', () => {
         contextFiles: [],
         isActive: true,
       },
-    ];
+    ]);
     const originalSettings = JSON.parse(JSON.stringify(settings));
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    await loadCliConfig(settings, extensions, 'test-session', argv);
+    await loadCliConfig(settings, 'test-session', argv);
     expect(settings).toEqual(originalSettings);
   });
 });
 
 describe('mergeExcludeTools', () => {
-  const defaultExcludes = [
+  const defaultExcludes = new Set([
     SHELL_TOOL_NAME,
     EDIT_TOOL_NAME,
     WRITE_FILE_TOOL_NAME,
-  ];
+  ]);
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
     process.stdin.isTTY = true;
   });
 
@@ -731,7 +816,7 @@ describe('mergeExcludeTools', () => {
 
   it('should merge excludeTools from settings and extensions', async () => {
     const settings: Settings = { tools: { exclude: ['tool1', 'tool2'] } };
-    const extensions: GeminiCLIExtension[] = [
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
         name: 'ext1',
@@ -750,24 +835,24 @@ describe('mergeExcludeTools', () => {
         contextFiles: [],
         isActive: true,
       },
-    ];
+    ]);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       settings,
-      extensions,
+
       'test-session',
       argv,
     );
     expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4', 'tool5']),
+      new Set(['tool1', 'tool2', 'tool3', 'tool4', 'tool5']),
     );
     expect(config.getExcludeTools()).toHaveLength(5);
   });
 
   it('should handle overlapping excludeTools between settings and extensions', async () => {
     const settings: Settings = { tools: { exclude: ['tool1', 'tool2'] } };
-    const extensions: GeminiCLIExtension[] = [
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
         name: 'ext1',
@@ -777,24 +862,19 @@ describe('mergeExcludeTools', () => {
         contextFiles: [],
         isActive: true,
       },
-    ];
+    ]);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2', 'tool3']),
+      new Set(['tool1', 'tool2', 'tool3']),
     );
     expect(config.getExcludeTools()).toHaveLength(3);
   });
 
   it('should handle overlapping excludeTools between extensions', async () => {
     const settings: Settings = { tools: { exclude: ['tool1'] } };
-    const extensions: GeminiCLIExtension[] = [
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
         name: 'ext1',
@@ -813,17 +893,12 @@ describe('mergeExcludeTools', () => {
         contextFiles: [],
         isActive: true,
       },
-    ];
+    ]);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4']),
+      new Set(['tool1', 'tool2', 'tool3', 'tool4']),
     );
     expect(config.getExcludeTools()).toHaveLength(4);
   });
@@ -831,30 +906,18 @@ describe('mergeExcludeTools', () => {
   it('should return an empty array when no excludeTools are specified and it is interactive', async () => {
     process.stdin.isTTY = true;
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
-    expect(config.getExcludeTools()).toEqual([]);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getExcludeTools()).toEqual(new Set([]));
   });
 
   it('should return default excludes when no excludeTools are specified and it is not interactive', async () => {
     process.stdin.isTTY = false;
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
     process.argv = ['node', 'script.js', '-p', 'test'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(defaultExcludes);
   });
 
@@ -862,22 +925,15 @@ describe('mergeExcludeTools', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { exclude: ['tool1', 'tool2'] } };
-    const extensions: GeminiCLIExtension[] = [];
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
-    expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2']),
-    );
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getExcludeTools()).toEqual(new Set(['tool1', 'tool2']));
     expect(config.getExcludeTools()).toHaveLength(2);
   });
 
   it('should handle extensions with excludeTools but no settings', async () => {
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext',
         name: 'ext1',
@@ -887,24 +943,17 @@ describe('mergeExcludeTools', () => {
         contextFiles: [],
         isActive: true,
       },
-    ];
+    ]);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
-    expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2']),
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getExcludeTools()).toEqual(new Set(['tool1', 'tool2']));
     expect(config.getExcludeTools()).toHaveLength(2);
   });
 
   it('should not modify the original settings object', async () => {
     const settings: Settings = { tools: { exclude: ['tool1'] } };
-    const extensions: GeminiCLIExtension[] = [
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext',
         name: 'ext1',
@@ -914,11 +963,11 @@ describe('mergeExcludeTools', () => {
         contextFiles: [],
         isActive: true,
       },
-    ];
+    ]);
     const originalSettings = JSON.parse(JSON.stringify(settings));
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    await loadCliConfig(settings, extensions, 'test-session', argv);
+    await loadCliConfig(settings, 'test-session', argv);
     expect(settings).toEqual(originalSettings);
   });
 });
@@ -932,6 +981,7 @@ describe('Approval mode tool exclusion logic', () => {
       isTrusted: true,
       source: undefined,
     });
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -942,14 +992,7 @@ describe('Approval mode tool exclusion logic', () => {
     process.argv = ['node', 'script.js', '-p', 'test'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
-
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain(SHELL_TOOL_NAME);
@@ -968,14 +1011,8 @@ describe('Approval mode tool exclusion logic', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
 
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain(SHELL_TOOL_NAME);
@@ -994,14 +1031,8 @@ describe('Approval mode tool exclusion logic', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
 
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain(SHELL_TOOL_NAME);
@@ -1020,14 +1051,8 @@ describe('Approval mode tool exclusion logic', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
 
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
@@ -1039,14 +1064,8 @@ describe('Approval mode tool exclusion logic', () => {
     process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
 
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
@@ -1069,14 +1088,8 @@ describe('Approval mode tool exclusion logic', () => {
       process.argv = testCase.args;
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {};
-      const extensions: GeminiCLIExtension[] = [];
 
-      const config = await loadCliConfig(
-        settings,
-        extensions,
-        'test-session',
-        argv,
-      );
+      const config = await loadCliConfig(settings, 'test-session', argv);
 
       const excludedTools = config.getExcludeTools();
       expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
@@ -1096,14 +1109,8 @@ describe('Approval mode tool exclusion logic', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { exclude: ['custom_tool'] } };
-    const extensions: GeminiCLIExtension[] = [];
 
-    const config = await loadCliConfig(
-      settings,
-      extensions,
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain('custom_tool'); // From settings
@@ -1120,11 +1127,8 @@ describe('Approval mode tool exclusion logic', () => {
         disableYoloMode: true,
       },
     };
-    const extensions: GeminiCLIExtension[] = [];
 
-    await expect(
-      loadCliConfig(settings, extensions, 'test-session', argv),
-    ).rejects.toThrow(
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'Cannot start in YOLO mode when it is disabled by settings',
     );
   });
@@ -1139,14 +1143,8 @@ describe('Approval mode tool exclusion logic', () => {
     };
 
     const settings: Settings = {};
-    const extensions: GeminiCLIExtension[] = [];
     await expect(
-      loadCliConfig(
-        settings,
-        extensions,
-        'test-session',
-        invalidArgv as CliArgs,
-      ),
+      loadCliConfig(settings, 'test-session', invalidArgv as CliArgs),
     ).rejects.toThrow(
       'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, default',
     );
@@ -1154,16 +1152,14 @@ describe('Approval mode tool exclusion logic', () => {
 });
 
 describe('loadCliConfig with allowed-mcp-server-names', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1179,7 +1175,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
   it('should allow all MCP servers if the flag is not provided', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
+    const config = await loadCliConfig(baseSettings, 'test-session', argv);
     expect(config.getMcpServers()).toEqual(baseSettings.mcpServers);
   });
 
@@ -1191,10 +1187,8 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       'server1',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-    });
+    const config = await loadCliConfig(baseSettings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['server1']);
   });
 
   it('should allow multiple specified MCP servers', async () => {
@@ -1207,11 +1201,8 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       'server3',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-      server3: { url: 'http://localhost:8082' },
-    });
+    const config = await loadCliConfig(baseSettings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server3']);
   });
 
   it('should handle server names that do not exist', async () => {
@@ -1224,17 +1215,15 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       'server4',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-    });
+    const config = await loadCliConfig(baseSettings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server4']);
   });
 
   it('should allow no MCP servers if the flag is provided but empty', async () => {
     process.argv = ['node', 'script.js', '--allowed-mcp-server-names', ''];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(baseSettings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({});
+    const config = await loadCliConfig(baseSettings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['']);
   });
 
   it('should read allowMCPServers from settings', async () => {
@@ -1244,11 +1233,8 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       ...baseSettings,
       mcp: { allowed: ['server1', 'server2'] },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-      server2: { url: 'http://localhost:8081' },
-    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server2']);
   });
 
   it('should read excludeMCPServers from settings', async () => {
@@ -1258,10 +1244,8 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       ...baseSettings,
       mcp: { excluded: ['server1', 'server2'] },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server3: { url: 'http://localhost:8082' },
-    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getBlockedMcpServers()).toEqual(['server1', 'server2']);
   });
 
   it('should override allowMCPServers with excludeMCPServers if overlapping', async () => {
@@ -1274,10 +1258,9 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
         allowed: ['server1', 'server2'],
       },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server2: { url: 'http://localhost:8081' },
-    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['server1', 'server2']);
+    expect(config.getBlockedMcpServers()).toEqual(['server1']);
   });
 
   it('should prioritize mcp server flag if set', async () => {
@@ -1295,10 +1278,8 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
         allowed: ['server2'],
       },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server1: { url: 'http://localhost:8080' },
-    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['server1']);
   });
 
   it('should prioritize CLI flag over both allowed and excluded settings', async () => {
@@ -1318,30 +1299,35 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
         excluded: ['server3'], // Should be ignored
       },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getMcpServers()).toEqual({
-      server2: { url: 'http://localhost:8081' },
-      server3: { url: 'http://localhost:8082' },
-    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAllowedMcpServers()).toEqual(['server2', 'server3']);
+    expect(config.getBlockedMcpServers()).toEqual([]);
   });
 });
 
 describe('loadCliConfig model selection', () => {
+  beforeEach(() => {
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('selects a model from settings.json if provided', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       {
         model: {
-          name: 'gemini-9001-ultra',
+          name: 'gemini-2.5-pro',
         },
       },
-      [],
       'test-session',
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-9001-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-pro');
   });
 
   it('uses the default gemini model if nothing is set', async () => {
@@ -1351,7 +1337,6 @@ describe('loadCliConfig model selection', () => {
       {
         // No model set.
       },
-      [],
       'test-session',
       argv,
     );
@@ -1360,39 +1345,45 @@ describe('loadCliConfig model selection', () => {
   });
 
   it('always prefers model from argv', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       {
         model: {
-          name: 'gemini-9001-ultra',
+          name: 'gemini-2.5-pro',
         },
       },
-      [],
       'test-session',
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-8675309-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 
   it('selects the model from argv if provided', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-8675309-ultra'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       {
         // No model provided via settings.
       },
-      [],
       'test-session',
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-8675309-ultra');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 });
 
 describe('loadCliConfig model selection with model router', () => {
+  beforeEach(() => {
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('should use auto model when useModelRouter is true and no model is provided', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
@@ -1402,7 +1393,6 @@ describe('loadCliConfig model selection with model router', () => {
           useModelRouter: true,
         },
       },
-      [],
       'test-session',
       argv,
     );
@@ -1419,7 +1409,6 @@ describe('loadCliConfig model selection with model router', () => {
           useModelRouter: false,
         },
       },
-      [],
       'test-session',
       argv,
     );
@@ -1436,7 +1425,6 @@ describe('loadCliConfig model selection with model router', () => {
           useModelRouter: true,
         },
       },
-      [],
       'test-session',
       argv,
     );
@@ -1456,7 +1444,6 @@ describe('loadCliConfig model selection with model router', () => {
           name: 'gemini-from-settings',
         },
       },
-      [],
       'test-session',
       argv,
     );
@@ -1474,7 +1461,6 @@ describe('loadCliConfig model selection with model router', () => {
           useModelRouter: true,
         },
       },
-      [],
       'test-session',
       argv,
     );
@@ -1484,16 +1470,14 @@ describe('loadCliConfig model selection with model router', () => {
 });
 
 describe('loadCliConfig folderTrust', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1508,7 +1492,7 @@ describe('loadCliConfig folderTrust', () => {
       },
     };
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getFolderTrust()).toBe(false);
   });
 
@@ -1522,7 +1506,7 @@ describe('loadCliConfig folderTrust', () => {
         },
       },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getFolderTrust()).toBe(true);
   });
 
@@ -1530,26 +1514,25 @@ describe('loadCliConfig folderTrust', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getFolderTrust()).toBe(false);
   });
 });
 
 describe('loadCliConfig with includeDirectories', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(
+      path.resolve(path.sep, 'mock', 'home', 'user'),
+    );
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(process, 'cwd').mockReturnValue(
       path.resolve(path.sep, 'home', 'user', 'project'),
     );
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
-    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -1571,7 +1554,7 @@ describe('loadCliConfig with includeDirectories', () => {
         ],
       },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     const expected = [
       mockCwd,
       path.resolve(path.sep, 'cli', 'path1'),
@@ -1580,66 +1563,60 @@ describe('loadCliConfig with includeDirectories', () => {
       path.join(os.homedir(), 'settings', 'path2'),
       path.join(mockCwd, 'settings', 'path3'),
     ];
-    expect(config.getWorkspaceContext().getDirectories()).toEqual(
-      expect.arrayContaining(expected),
+    const directories = config.getWorkspaceContext().getDirectories();
+    expect(directories).toEqual([mockCwd]);
+    expect(config.getPendingIncludeDirectories()).toEqual(
+      expect.arrayContaining(expected.filter((dir) => dir !== mockCwd)),
     );
-    expect(config.getWorkspaceContext().getDirectories()).toHaveLength(
-      expected.length,
+    expect(config.getPendingIncludeDirectories()).toHaveLength(
+      expected.length - 1,
     );
   });
 });
 
-describe('loadCliConfig chatCompression', () => {
-  const originalArgv = process.argv;
-
+describe('loadCliConfig compressionThreshold', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
-  it('should pass chatCompression settings to the core config', async () => {
+  it('should pass settings to the core config', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
       model: {
-        chatCompression: {
-          contextPercentageThreshold: 0.5,
-        },
+        compressionThreshold: 0.5,
       },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getChatCompression()).toEqual({
-      contextPercentageThreshold: 0.5,
-    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(await config.getCompressionThreshold()).toBe(0.5);
   });
 
-  it('should have undefined chatCompression if not in settings', async () => {
+  it('should have undefined compressionThreshold if not in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getChatCompression()).toBeUndefined();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(await config.getCompressionThreshold()).toBeUndefined();
   });
 });
 
 describe('loadCliConfig useRipgrep', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1648,7 +1625,7 @@ describe('loadCliConfig useRipgrep', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(true);
   });
 
@@ -1656,7 +1633,7 @@ describe('loadCliConfig useRipgrep', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { useRipgrep: false } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(false);
   });
 
@@ -1664,7 +1641,7 @@ describe('loadCliConfig useRipgrep', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { useRipgrep: true } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(true);
   });
 
@@ -1673,7 +1650,7 @@ describe('loadCliConfig useRipgrep', () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {};
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.getUseModelRouter()).toBe(true);
     });
 
@@ -1681,7 +1658,7 @@ describe('loadCliConfig useRipgrep', () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
       const settings: Settings = { experimental: { useModelRouter: true } };
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.getUseModelRouter()).toBe(true);
     });
 
@@ -1689,23 +1666,21 @@ describe('loadCliConfig useRipgrep', () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
       const settings: Settings = { experimental: { useModelRouter: false } };
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.getUseModelRouter()).toBe(false);
     });
   });
 });
 
 describe('screenReader configuration', () => {
-  const originalArgv = process.argv;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -1716,7 +1691,7 @@ describe('screenReader configuration', () => {
     const settings: Settings = {
       ui: { accessibility: { screenReader: true } },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getScreenReader()).toBe(true);
   });
 
@@ -1726,7 +1701,7 @@ describe('screenReader configuration', () => {
     const settings: Settings = {
       ui: { accessibility: { screenReader: false } },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getScreenReader()).toBe(false);
   });
 
@@ -1736,7 +1711,7 @@ describe('screenReader configuration', () => {
     const settings: Settings = {
       ui: { accessibility: { screenReader: false } },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getScreenReader()).toBe(true);
   });
 
@@ -1744,13 +1719,12 @@ describe('screenReader configuration', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getScreenReader()).toBe(false);
   });
 });
 
 describe('loadCliConfig tool exclusions', () => {
-  const originalArgv = process.argv;
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -1762,10 +1736,10 @@ describe('loadCliConfig tool exclusions', () => {
       isTrusted: true,
       source: undefined,
     });
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     process.stdin.isTTY = originalIsTTY;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
@@ -1775,7 +1749,7 @@ describe('loadCliConfig tool exclusions', () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
@@ -1785,7 +1759,7 @@ describe('loadCliConfig tool exclusions', () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
@@ -1795,7 +1769,7 @@ describe('loadCliConfig tool exclusions', () => {
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '-p', 'test'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).toContain('run_shell_command');
     expect(config.getExcludeTools()).toContain('replace');
     expect(config.getExcludeTools()).toContain('write_file');
@@ -1805,7 +1779,7 @@ describe('loadCliConfig tool exclusions', () => {
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '-p', 'test', '--yolo'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
@@ -1822,7 +1796,7 @@ describe('loadCliConfig tool exclusions', () => {
       'ShellTool',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
   });
 
@@ -1837,7 +1811,7 @@ describe('loadCliConfig tool exclusions', () => {
       'run_shell_command',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
   });
 
@@ -1852,13 +1826,12 @@ describe('loadCliConfig tool exclusions', () => {
       'ShellTool(wc)',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
   });
 });
 
 describe('loadCliConfig interactive', () => {
-  const originalArgv = process.argv;
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -1866,10 +1839,10 @@ describe('loadCliConfig interactive', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.stdin.isTTY = true;
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
-    process.argv = originalArgv;
     process.stdin.isTTY = originalIsTTY;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
@@ -1879,7 +1852,7 @@ describe('loadCliConfig interactive', () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(true);
   });
 
@@ -1887,7 +1860,7 @@ describe('loadCliConfig interactive', () => {
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '--prompt-interactive', 'test'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(true);
   });
 
@@ -1895,7 +1868,7 @@ describe('loadCliConfig interactive', () => {
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
   });
 
@@ -1903,15 +1876,15 @@ describe('loadCliConfig interactive', () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--prompt', 'test'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
   });
 
   it('should not be interactive if positional prompt words are provided with other flags', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro', 'Hello'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro', 'Hello'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
   });
 
@@ -1921,12 +1894,12 @@ describe('loadCliConfig interactive', () => {
       'node',
       'script.js',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
       '--yolo',
       'Hello world',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
     // Verify the question is preserved for one-shot execution
     expect(argv.prompt).toBe('Hello world');
@@ -1937,7 +1910,7 @@ describe('loadCliConfig interactive', () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '-e', 'none', 'hello'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
     expect(argv.query).toBe('hello');
     expect(argv.extensions).toEqual(['none']);
@@ -1947,7 +1920,7 @@ describe('loadCliConfig interactive', () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', 'hello world how are you'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
     expect(argv.query).toBe('hello world how are you');
     expect(argv.prompt).toBe('hello world how are you');
@@ -1959,7 +1932,7 @@ describe('loadCliConfig interactive', () => {
       'node',
       'script.js',
       '--model',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
       'write',
       'a',
       'function',
@@ -1968,17 +1941,17 @@ describe('loadCliConfig interactive', () => {
       'array',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
     expect(argv.query).toBe('write a function to sort array');
-    expect(argv.model).toBe('gemini-1.5-pro');
+    expect(argv.model).toBe('gemini-2.5-pro');
   });
 
   it('should handle empty positional arguments', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', ''];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBeUndefined();
   });
@@ -1997,7 +1970,7 @@ describe('loadCliConfig interactive', () => {
       'you',
     ];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
     expect(argv.query).toBe('hello world how are you');
     expect(argv.extensions).toEqual(['none']);
@@ -2005,9 +1978,9 @@ describe('loadCliConfig interactive', () => {
 
   it('should be interactive if no positional prompt words are provided with flags', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(true);
   });
 });
@@ -2024,6 +1997,7 @@ describe('loadCliConfig approval mode', () => {
       isTrusted: true,
       source: undefined,
     });
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -2035,42 +2009,42 @@ describe('loadCliConfig approval mode', () => {
   it('should default to DEFAULT approval mode when no flags are set', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
   it('should set YOLO approval mode when --yolo flag is used', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 
   it('should set YOLO approval mode when -y flag is used', async () => {
     process.argv = ['node', 'script.js', '-y'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 
   it('should set DEFAULT approval mode when --approval-mode=default', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'default'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
   it('should set AUTO_EDIT approval mode when --approval-mode=auto_edit', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.AUTO_EDIT);
   });
 
   it('should set YOLO approval mode when --approval-mode=yolo', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 
@@ -2081,14 +2055,14 @@ describe('loadCliConfig approval mode', () => {
     const argv = await parseArguments({} as Settings);
     // Manually set yolo to true to simulate what would happen if validation didn't prevent it
     argv.yolo = true;
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
   it('should fall back to --yolo behavior when --approval-mode is not set', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
   });
 
@@ -2104,28 +2078,28 @@ describe('loadCliConfig approval mode', () => {
     it('should override --approval-mode=yolo to DEFAULT', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
       const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig({}, [], 'test-session', argv);
+      const config = await loadCliConfig({}, 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
     it('should override --approval-mode=auto_edit to DEFAULT', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
       const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig({}, [], 'test-session', argv);
+      const config = await loadCliConfig({}, 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
     it('should override --yolo flag to DEFAULT', async () => {
       process.argv = ['node', 'script.js', '--yolo'];
       const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig({}, [], 'test-session', argv);
+      const config = await loadCliConfig({}, 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
     it('should remain DEFAULT when --approval-mode=default', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'default'];
       const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig({}, [], 'test-session', argv);
+      const config = await loadCliConfig({}, 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
   });
@@ -2139,6 +2113,7 @@ describe('loadCliConfig fileFiltering', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.argv = ['node', 'script.js']; // Reset argv for each test
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -2206,17 +2181,25 @@ describe('loadCliConfig fileFiltering', () => {
         },
       };
       const argv = await parseArguments(settings);
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      const config = await loadCliConfig(settings, 'test-session', argv);
       expect(getter(config)).toBe(value);
     },
   );
 });
 
 describe('Output format', () => {
+  beforeEach(() => {
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('should default to TEXT', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getOutputFormat()).toBe(OutputFormat.TEXT);
   });
 
@@ -2225,7 +2208,6 @@ describe('Output format', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       { output: { format: OutputFormat.JSON } },
-      [],
       'test-session',
       argv,
     );
@@ -2237,7 +2219,6 @@ describe('Output format', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       { output: { format: OutputFormat.JSON } },
-      [],
       'test-session',
       argv,
     );
@@ -2247,7 +2228,7 @@ describe('Output format', () => {
   it('should accept stream-json as a valid output format', async () => {
     process.argv = ['node', 'script.js', '--output-format', 'stream-json'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getOutputFormat()).toBe(OutputFormat.STREAM_JSON);
   });
 
@@ -2336,12 +2317,19 @@ describe('parseArguments with positional prompt', () => {
 });
 
 describe('Telemetry configuration via environment variables', () => {
+  beforeEach(() => {
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('should prioritize GEMINI_TELEMETRY_ENABLED over settings', async () => {
     vi.stubEnv('GEMINI_TELEMETRY_ENABLED', 'true');
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { telemetry: { enabled: false } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
@@ -2352,7 +2340,7 @@ describe('Telemetry configuration via environment variables', () => {
     const settings: Settings = {
       telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryTarget()).toBe('gcp');
   });
 
@@ -2363,9 +2351,7 @@ describe('Telemetry configuration via environment variables', () => {
     const settings: Settings = {
       telemetry: { target: ServerConfig.TelemetryTarget.GCP },
     };
-    await expect(
-      loadCliConfig(settings, [], 'test-session', argv),
-    ).rejects.toThrow(
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       /Invalid telemetry configuration: .*Invalid telemetry target/i,
     );
     vi.unstubAllEnvs();
@@ -2379,7 +2365,7 @@ describe('Telemetry configuration via environment variables', () => {
     const settings: Settings = {
       telemetry: { otlpEndpoint: 'http://settings.com' },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryOtlpEndpoint()).toBe('http://gemini.env.com');
   });
 
@@ -2388,7 +2374,7 @@ describe('Telemetry configuration via environment variables', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { telemetry: { otlpProtocol: 'grpc' } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryOtlpProtocol()).toBe('http');
   });
 
@@ -2397,7 +2383,7 @@ describe('Telemetry configuration via environment variables', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { telemetry: { logPrompts: true } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
 
@@ -2408,7 +2394,7 @@ describe('Telemetry configuration via environment variables', () => {
     const settings: Settings = {
       telemetry: { outfile: '/settings/telemetry.log' },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryOutfile()).toBe('/gemini/env/telemetry.log');
   });
 
@@ -2417,7 +2403,7 @@ describe('Telemetry configuration via environment variables', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { telemetry: { useCollector: false } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryUseCollector()).toBe(true);
   });
 
@@ -2426,7 +2412,7 @@ describe('Telemetry configuration via environment variables', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { telemetry: { enabled: true } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
@@ -2437,7 +2423,7 @@ describe('Telemetry configuration via environment variables', () => {
     const settings: Settings = {
       telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
     };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getTelemetryTarget()).toBe('local');
   });
 
@@ -2445,7 +2431,7 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_ENABLED', '1');
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
@@ -2455,7 +2441,6 @@ describe('Telemetry configuration via environment variables', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       { telemetry: { enabled: true } },
-      [],
       'test-session',
       argv,
     );
@@ -2466,7 +2451,7 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_LOG_PROMPTS', '1');
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
   });
 
@@ -2476,7 +2461,6 @@ describe('Telemetry configuration via environment variables', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
       { telemetry: { logPrompts: true } },
-      [],
       'test-session',
       argv,
     );

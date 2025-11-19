@@ -7,53 +7,64 @@
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { listMcpServers } from './list.js';
 import { loadSettings } from '../../config/settings.js';
-import { ExtensionStorage, loadExtensions } from '../../config/extension.js';
 import { createTransport, debugLogger } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ExtensionStorage } from '../../config/extensions/storage.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
 
 vi.mock('../../config/settings.js', () => ({
   loadSettings: vi.fn(),
 }));
-vi.mock('../../config/extension.js', () => ({
-  loadExtensions: vi.fn(),
+vi.mock('../../config/extensions/storage.js', () => ({
   ExtensionStorage: {
     getUserExtensionsDir: vi.fn(),
   },
 }));
-vi.mock('@google/gemini-cli-core', () => ({
-  createTransport: vi.fn(),
-  MCPServerStatus: {
-    CONNECTED: 'CONNECTED',
-    CONNECTING: 'CONNECTING',
-    DISCONNECTED: 'DISCONNECTED',
-  },
-  Storage: vi.fn().mockImplementation((_cwd: string) => ({
-    getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
-    getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
-    getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
-  })),
-  GEMINI_DIR: '.gemini',
-  getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
-  debugLogger: {
-    log: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+vi.mock('../../config/extension-manager.js');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    createTransport: vi.fn(),
+    MCPServerStatus: {
+      CONNECTED: 'CONNECTED',
+      CONNECTING: 'CONNECTING',
+      DISCONNECTED: 'DISCONNECTED',
+    },
+    Storage: vi.fn().mockImplementation((_cwd: string) => ({
+      getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
+      getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
+      getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
+    })),
+    GEMINI_DIR: '.gemini',
+    getErrorMessage: (e: unknown) =>
+      e instanceof Error ? e.message : String(e),
+    debugLogger: {
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
+  };
+});
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 
 const mockedGetUserExtensionsDir =
   ExtensionStorage.getUserExtensionsDir as Mock;
 const mockedLoadSettings = loadSettings as Mock;
-const mockedLoadExtensions = loadExtensions as Mock;
 const mockedCreateTransport = createTransport as Mock;
 const MockedClient = Client as Mock;
+const MockedExtensionManager = ExtensionManager as Mock;
 
 interface MockClient {
   connect: Mock;
   ping: Mock;
   close: Mock;
+}
+
+interface MockExtensionManager {
+  loadExtensions: Mock;
 }
 
 interface MockTransport {
@@ -62,6 +73,7 @@ interface MockTransport {
 
 describe('mcp list command', () => {
   let mockClient: MockClient;
+  let mockExtensionManager: MockExtensionManager;
   let mockTransport: MockTransport;
 
   beforeEach(() => {
@@ -73,10 +85,14 @@ describe('mcp list command', () => {
       ping: vi.fn(),
       close: vi.fn(),
     };
+    mockExtensionManager = {
+      loadExtensions: vi.fn(),
+    };
 
     MockedClient.mockImplementation(() => mockClient);
+    MockedExtensionManager.mockImplementation(() => mockExtensionManager);
     mockedCreateTransport.mockResolvedValue(mockTransport);
-    mockedLoadExtensions.mockReturnValue([]);
+    mockExtensionManager.loadExtensions.mockReturnValue([]);
     mockedGetUserExtensionsDir.mockReturnValue('/mocked/extensions/dir');
   });
 
@@ -149,7 +165,7 @@ describe('mcp list command', () => {
       },
     });
 
-    mockedLoadExtensions.mockReturnValue([
+    mockExtensionManager.loadExtensions.mockReturnValue([
       {
         name: 'test-extension',
         mcpServers: { 'extension-server': { command: '/ext/server' } },

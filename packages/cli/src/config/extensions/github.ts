@@ -16,11 +16,11 @@ import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
 import * as tar from 'tar';
 import extract from 'extract-zip';
 import { fetchJson, getGitHubToken } from './github_fetch.js';
-import { type ExtensionEnablementManager } from './extensionEnablement.js';
+import type { ExtensionManager } from '../extension-manager.js';
+import { EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 
 /**
  * Clones a Git repository to a specified local path.
@@ -153,23 +153,20 @@ export async function fetchReleaseFromGithub(
 
 export async function checkForExtensionUpdate(
   extension: GeminiCLIExtension,
-  extensionEnablementManager: ExtensionEnablementManager,
-  cwd: string = process.cwd(),
+  extensionManager: ExtensionManager,
 ): Promise<ExtensionUpdateState> {
   const installMetadata = extension.installMetadata;
   if (installMetadata?.type === 'local') {
-    const newExtension = loadExtension({
-      extensionDir: installMetadata.source,
-      workspaceDir: cwd,
-      extensionEnablementManager,
-    });
-    if (!newExtension) {
+    const latestConfig = extensionManager.loadExtensionConfig(
+      installMetadata.source,
+    );
+    if (!latestConfig) {
       debugLogger.error(
         `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
       );
       return ExtensionUpdateState.ERROR;
     }
-    if (newExtension.version !== extension.version) {
+    if (latestConfig.version !== extension.version) {
       return ExtensionUpdateState.UPDATE_AVAILABLE;
     }
     return ExtensionUpdateState.UP_TO_DATE;
@@ -309,8 +306,11 @@ export async function downloadFromGitHubRelease(
     let archiveUrl: string | undefined;
     let isTar = false;
     let isZip = false;
+    let fileName: string | undefined;
+
     if (asset) {
-      archiveUrl = asset.browser_download_url;
+      archiveUrl = asset.url;
+      fileName = asset.name;
     } else {
       if (releaseData.tarball_url) {
         archiveUrl = releaseData.tarball_url;
@@ -329,10 +329,10 @@ export async function downloadFromGitHubRelease(
         errorMessage: `No assets found for release with tag ${releaseData.tag_name}`,
       };
     }
-    let downloadedAssetPath = path.join(
-      destination,
-      path.basename(new URL(archiveUrl).pathname),
-    );
+    if (!fileName) {
+      fileName = path.basename(new URL(archiveUrl).pathname);
+    }
+    let downloadedAssetPath = path.join(destination, fileName);
     if (isTar && !downloadedAssetPath.endsWith('.tar.gz')) {
       downloadedAssetPath += '.tar.gz';
     } else if (isZip && !downloadedAssetPath.endsWith('.zip')) {
@@ -417,7 +417,7 @@ interface GithubReleaseData {
 
 interface Asset {
   name: string;
-  browser_download_url: string;
+  url: string;
 }
 
 export function findReleaseAsset(assets: Asset[]): Asset | undefined {
@@ -458,8 +458,13 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
-  const headers: { 'User-agent': string; Authorization?: string } = {
+  const headers: {
+    'User-agent': string;
+    Accept: string;
+    Authorization?: string;
+  } = {
     'User-agent': 'gemini-cli',
+    Accept: 'application/octet-stream',
   };
   const token = getGitHubToken();
   if (token) {

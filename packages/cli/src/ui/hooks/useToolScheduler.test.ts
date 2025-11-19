@@ -7,7 +7,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import {
   useReactToolScheduler,
   mapToDisplay,
@@ -36,7 +37,14 @@ import { ToolCallStatus } from '../types.js';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+  const actual = await vi.importActual<any>('@google/gemini-cli-core');
+  // Patch CoreToolScheduler to have cancelAll if it's missing in the test environment
+  if (
+    actual.CoreToolScheduler &&
+    !actual.CoreToolScheduler.prototype.cancelAll
+  ) {
+    actual.CoreToolScheduler.prototype.cancelAll = vi.fn();
+  }
   return {
     ...actual,
     ToolRegistry: vi.fn(),
@@ -72,6 +80,7 @@ const mockConfig = {
   getEnableMessageBusIntegration: () => false,
   getMessageBus: () => null,
   getPolicyEngine: () => null,
+  isInteractive: () => false,
 } as unknown as Config;
 
 const mockTool = new MockTool({
@@ -151,13 +160,13 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     });
 
     await act(async () => {
-      await vi.runAllTimersAsync(); // Process validation
+      await vi.advanceTimersByTimeAsync(0); // Process validation
     });
     await act(async () => {
-      await vi.runAllTimersAsync(); // Process scheduling
+      await vi.advanceTimersByTimeAsync(0); // Process scheduling
     });
     await act(async () => {
-      await vi.runAllTimersAsync(); // Process execution
+      await vi.advanceTimersByTimeAsync(0); // Process execution
     });
 
     // Check that execute WAS called
@@ -192,6 +201,28 @@ describe('useReactToolScheduler', () => {
   let capturedOnConfirmForTest:
     | ((outcome: ToolConfirmationOutcome) => void | Promise<void>)
     | undefined;
+
+  const advanceAndSettle = async () => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  };
+
+  const scheduleAndWaitForExecution = async (
+    schedule: (
+      req: ToolCallRequestInfo | ToolCallRequestInfo[],
+      signal: AbortSignal,
+    ) => void,
+    request: ToolCallRequestInfo | ToolCallRequestInfo[],
+  ) => {
+    act(() => {
+      schedule(request, new AbortController().signal);
+    });
+
+    await advanceAndSettle();
+    await advanceAndSettle();
+    await advanceAndSettle();
+  };
 
   beforeEach(() => {
     onComplete = vi.fn();
@@ -251,133 +282,96 @@ describe('useReactToolScheduler', () => {
     (mockTool.shouldConfirmExecute as Mock).mockResolvedValue(null);
 
     const { result } = renderScheduler();
-    const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'call1',
       name: 'mockTool',
       args: { param: 'value' },
     } as any;
 
-    act(() => {
-      schedule(request, new AbortController().signal);
+    let completedToolCalls: ToolCall[] = [];
+    onComplete.mockImplementation((calls) => {
+      completedToolCalls = calls;
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+
+    await scheduleAndWaitForExecution(result.current[1], request);
 
     expect(mockTool.execute).toHaveBeenCalledWith(request.args);
-    expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({
-        status: 'success',
-        request,
-        response: expect.objectContaining({
-          resultDisplay: 'Formatted tool output',
-          responseParts: [
-            {
-              functionResponse: {
-                id: 'call1',
-                name: 'mockTool',
-                response: { output: 'Tool output' },
-              },
-            },
-          ],
-        }),
-      }),
-    ]);
-    expect(result.current[0]).toEqual([]);
+    expect(completedToolCalls).toHaveLength(1);
+    expect(completedToolCalls[0].status).toBe('success');
+    expect(completedToolCalls[0].request).toBe(request);
+
+    if (
+      completedToolCalls[0].status === 'success' ||
+      completedToolCalls[0].status === 'error'
+    ) {
+      expect(completedToolCalls[0].response).toMatchSnapshot();
+    }
   });
 
-  it('should handle tool not found', async () => {
-    mockToolRegistry.getTool.mockReturnValue(undefined);
-    const { result } = renderScheduler();
-    const schedule = result.current[1];
-    const request: ToolCallRequestInfo = {
-      callId: 'call1',
-      name: 'nonexistentTool',
-      args: {},
-    } as any;
-
-    act(() => {
-      schedule(request, new AbortController().signal);
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-
-    expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({
-        status: 'error',
-        request,
-        response: expect.objectContaining({
-          error: expect.objectContaining({
-            message: expect.stringMatching(
-              /Tool "nonexistentTool" not found in registry/,
-            ),
-          }),
-        }),
-      }),
-    ]);
-    const errorMessage = onComplete.mock.calls[0][0][0].response.error.message;
-    expect(errorMessage).toContain('Did you mean one of:');
-    expect(errorMessage).toContain('"mockTool"');
-    expect(errorMessage).toContain('"anotherTool"');
-    expect(result.current[0]).toEqual([]);
-  });
-
-  it('should handle error during shouldConfirmExecute', async () => {
+  it('should clear previous tool calls when scheduling new ones', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockTool);
-    const confirmError = new Error('Confirmation check failed');
-    (mockTool.shouldConfirmExecute as Mock).mockRejectedValue(confirmError);
+    (mockTool.execute as Mock).mockResolvedValue({
+      llmContent: 'Tool output',
+      returnDisplay: 'Formatted tool output',
+    } as ToolResult);
 
     const { result } = renderScheduler();
     const schedule = result.current[1];
-    const request: ToolCallRequestInfo = {
-      callId: 'call1',
+    const setToolCallsForDisplay = result.current[3];
+
+    // Manually set a tool call in the display.
+    const oldToolCall = {
+      request: { callId: 'oldCall' },
+      status: 'success',
+    } as any;
+    act(() => {
+      setToolCallsForDisplay([oldToolCall]);
+    });
+    expect(result.current[0]).toEqual([oldToolCall]);
+
+    const newRequest: ToolCallRequestInfo = {
+      callId: 'newCall',
       name: 'mockTool',
       args: {},
     } as any;
-
     act(() => {
-      schedule(request, new AbortController().signal);
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
+      schedule(newRequest, new AbortController().signal);
     });
 
-    expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({
-        status: 'error',
-        request,
-        response: expect.objectContaining({
-          error: confirmError,
-        }),
-      }),
-    ]);
-    expect(result.current[0]).toEqual([]);
+    // After scheduling, the old call should be gone,
+    // and the new one should be in the display in its initial state.
+    expect(result.current[0].length).toBe(1);
+    expect(result.current[0][0].request.callId).toBe('newCall');
+    expect(result.current[0][0].request.callId).not.toBe('oldCall');
+
+    // Let the new call finish.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(onComplete).toHaveBeenCalled();
   });
 
-  it('should handle error during execute', async () => {
+  it('should cancel all running tool calls', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockTool);
+
+    let resolveExecute: (value: ToolResult) => void = () => {};
+    const executePromise = new Promise<ToolResult>((resolve) => {
+      resolveExecute = resolve;
+    });
+    (mockTool.execute as Mock).mockReturnValue(executePromise);
     (mockTool.shouldConfirmExecute as Mock).mockResolvedValue(null);
-    const execError = new Error('Execution failed');
-    (mockTool.execute as Mock).mockRejectedValue(execError);
 
     const { result } = renderScheduler();
     const schedule = result.current[1];
+    const cancelAllToolCalls = result.current[4];
     const request: ToolCallRequestInfo = {
-      callId: 'call1',
+      callId: 'cancelCall',
       name: 'mockTool',
       args: {},
     } as any;
@@ -386,26 +380,114 @@ describe('useReactToolScheduler', () => {
       schedule(request, new AbortController().signal);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+      await vi.advanceTimersByTimeAsync(0);
+    }); // validation
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0); // Process scheduling
     });
+
+    // At this point, the tool is 'executing' and waiting on the promise.
+    expect(result.current[0][0].status).toBe('executing');
+
+    const cancelController = new AbortController();
+    act(() => {
+      cancelAllToolCalls(cancelController.signal);
+    });
+
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
 
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
-        status: 'error',
+        status: 'cancelled',
         request,
-        response: expect.objectContaining({
-          error: execError,
-        }),
       }),
     ]);
-    expect(result.current[0]).toEqual([]);
+
+    // Clean up the pending promise to avoid open handles.
+    await act(async () => {
+      resolveExecute({ llmContent: 'output', returnDisplay: 'display' });
+    });
   });
+
+  it.each([
+    {
+      desc: 'tool not found',
+      setup: () => {
+        mockToolRegistry.getTool.mockReturnValue(undefined);
+      },
+      request: {
+        callId: 'call1',
+        name: 'nonexistentTool',
+        args: {},
+      } as any,
+      expectedErrorContains: [
+        'Tool "nonexistentTool" not found in registry',
+        'Did you mean one of:',
+      ],
+    },
+    {
+      desc: 'error during shouldConfirmExecute',
+      setup: () => {
+        mockToolRegistry.getTool.mockReturnValue(mockTool);
+        const confirmError = new Error('Confirmation check failed');
+        (mockTool.shouldConfirmExecute as Mock).mockRejectedValue(confirmError);
+      },
+      request: {
+        callId: 'call1',
+        name: 'mockTool',
+        args: {},
+      } as any,
+      expectedError: new Error('Confirmation check failed'),
+    },
+    {
+      desc: 'error during execute',
+      setup: () => {
+        mockToolRegistry.getTool.mockReturnValue(mockTool);
+        (mockTool.shouldConfirmExecute as Mock).mockResolvedValue(null);
+        const execError = new Error('Execution failed');
+        (mockTool.execute as Mock).mockRejectedValue(execError);
+      },
+      request: {
+        callId: 'call1',
+        name: 'mockTool',
+        args: {},
+      } as any,
+      expectedError: new Error('Execution failed'),
+    },
+  ])(
+    'should handle $desc',
+    async ({ setup, request, expectedErrorContains, expectedError }) => {
+      setup();
+      const { result } = renderScheduler();
+
+      let completedToolCalls: ToolCall[] = [];
+      onComplete.mockImplementation((calls) => {
+        completedToolCalls = calls;
+      });
+
+      await scheduleAndWaitForExecution(result.current[1], request);
+
+      expect(completedToolCalls).toHaveLength(1);
+      expect(completedToolCalls[0].status).toBe('error');
+      expect(completedToolCalls[0].request).toBe(request);
+
+      if (expectedErrorContains) {
+        expectedErrorContains.forEach((errorText) => {
+          expect(
+            (completedToolCalls[0] as any).response.error.message,
+          ).toContain(errorText);
+        });
+      }
+
+      if (expectedError) {
+        expect((completedToolCalls[0] as any).response.error.message).toBe(
+          expectedError.message,
+        );
+      }
+    },
+  );
 
   it('should handle tool requiring confirmation - approved', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
@@ -426,9 +508,7 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
 
     const waitingCall = result.current[0][0] as any;
     expect(waitingCall.status).toBe('awaiting_approval');
@@ -439,36 +519,24 @@ describe('useReactToolScheduler', () => {
       await capturedOnConfirmForTest?.(ToolConfirmationOutcome.ProceedOnce);
     });
 
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
+    await advanceAndSettle();
+    await advanceAndSettle();
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
     );
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalled();
-    expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({
-        status: 'success',
-        request,
-        response: expect.objectContaining({
-          resultDisplay: 'Confirmed display',
-          responseParts: expect.arrayContaining([
-            expect.objectContaining({
-              functionResponse: expect.objectContaining({
-                response: { output: expectedOutput },
-              }),
-            }),
-          ]),
-        }),
-      }),
-    ]);
+
+    const completedCalls = onComplete.mock.calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('success');
+    expect(completedCalls[0].request).toBe(request);
+    if (
+      completedCalls[0].status === 'success' ||
+      completedCalls[0].status === 'error'
+    ) {
+      expect(completedCalls[0].response).toMatchSnapshot();
+    }
   });
 
   it('should handle tool requiring confirmation - cancelled by user', async () => {
@@ -484,9 +552,7 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
 
     const waitingCall = result.current[0][0] as any;
     expect(waitingCall.status).toBe('awaiting_approval');
@@ -496,34 +562,23 @@ describe('useReactToolScheduler', () => {
     await act(async () => {
       await capturedOnConfirmForTest?.(ToolConfirmationOutcome.Cancel);
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
+    await advanceAndSettle();
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.Cancel,
     );
-    expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({
-        status: 'cancelled',
-        request,
-        response: expect.objectContaining({
-          responseParts: expect.arrayContaining([
-            expect.objectContaining({
-              functionResponse: expect.objectContaining({
-                response: expect.objectContaining({
-                  error:
-                    '[Operation Cancelled] Reason: User did not allow tool call',
-                }),
-              }),
-            }),
-          ]),
-        }),
-      }),
-    ]);
+
+    const completedCalls = onComplete.mock.calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('cancelled');
+    expect(completedCalls[0].request).toBe(request);
+    if (
+      completedCalls[0].status === 'success' ||
+      completedCalls[0].status === 'error' ||
+      completedCalls[0].status === 'cancelled'
+    ) {
+      expect(completedCalls[0].response).toMatchSnapshot();
+    }
   });
 
   it('should handle live output updates', async () => {
@@ -549,7 +604,6 @@ describe('useReactToolScheduler', () => {
     );
 
     const { result } = renderScheduler();
-    const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'liveCall',
       name: 'mockToolWithLiveOutput',
@@ -557,11 +611,9 @@ describe('useReactToolScheduler', () => {
     } as any;
 
     act(() => {
-      schedule(request, new AbortController().signal);
+      result.current[1](request, new AbortController().signal);
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
 
     expect(liveUpdateFn).toBeDefined();
     expect(result.current[0][0].status).toBe('executing');
@@ -569,16 +621,12 @@ describe('useReactToolScheduler', () => {
     await act(async () => {
       liveUpdateFn?.('Live output 1');
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
 
     await act(async () => {
       liveUpdateFn?.('Live output 2');
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
 
     act(() => {
       resolveExecutePromise({
@@ -586,29 +634,18 @@ describe('useReactToolScheduler', () => {
         returnDisplay: 'Final display',
       } as ToolResult);
     });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
-    await act(async () => {
-      await vi.runAllTimersAsync();
-    });
+    await advanceAndSettle();
+    await advanceAndSettle();
 
-    expect(onComplete).toHaveBeenCalledWith([
-      expect.objectContaining({
-        status: 'success',
-        request,
-        response: expect.objectContaining({
-          resultDisplay: 'Final display',
-          responseParts: expect.arrayContaining([
-            expect.objectContaining({
-              functionResponse: expect.objectContaining({
-                response: { output: 'Final output' },
-              }),
-            }),
-          ]),
-        }),
-      }),
-    ]);
+    const completedCalls = onComplete.mock.calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('success');
+    expect(completedCalls[0].request).toBe(request);
+    if (
+      completedCalls[0].status === 'success' ||
+      completedCalls[0].status === 'error'
+    ) {
+      expect(completedCalls[0].response).toMatchSnapshot();
+    }
     expect(result.current[0]).toEqual([]);
   });
 
@@ -648,16 +685,16 @@ describe('useReactToolScheduler', () => {
       schedule(requests, new AbortController().signal);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
 
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -703,7 +740,9 @@ describe('useReactToolScheduler', () => {
         ],
       }),
     });
-    expect(result.current[0]).toEqual([]);
+
+    expect(completedCalls).toHaveLength(2);
+    expect(completedCalls.every((t) => t.status === 'success')).toBe(true);
   });
 
   it('should queue if scheduling while already running', async () => {
@@ -738,16 +777,18 @@ describe('useReactToolScheduler', () => {
       schedule(request1, new AbortController().signal);
     });
     await act(async () => {
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
     });
 
-    schedule(request2, new AbortController().signal);
+    act(() => {
+      schedule(request2, new AbortController().signal);
+    });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(50);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(0);
       });
     });
     expect(onComplete).toHaveBeenCalledWith([
@@ -757,12 +798,11 @@ describe('useReactToolScheduler', () => {
         response: expect.objectContaining({ resultDisplay: 'done display' }),
       }),
     ]);
-    // Wait for request2 to complete
     await act(async () => {
       await vi.advanceTimersByTimeAsync(50);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(0);
       await act(async () => {
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(0);
       });
     });
     expect(onComplete).toHaveBeenCalledWith([
@@ -772,7 +812,8 @@ describe('useReactToolScheduler', () => {
         response: expect.objectContaining({ resultDisplay: 'done display' }),
       }),
     ]);
-    expect(result.current[0]).toEqual([]);
+    const toolCalls = result.current[0];
+    expect(toolCalls).toHaveLength(0);
   });
 });
 

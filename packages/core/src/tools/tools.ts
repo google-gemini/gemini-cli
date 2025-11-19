@@ -78,6 +78,7 @@ export abstract class BaseToolInvocation<
     protected readonly messageBus?: MessageBus,
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
+    readonly _serverName?: string,
   ) {}
 
   abstract getDescription(): string;
@@ -104,25 +105,41 @@ export abstract class BaseToolInvocation<
       }
 
       if (decision === 'ASK_USER') {
-        const confirmationDetails: ToolCallConfirmationDetails = {
-          type: 'info',
-          title: `Confirm: ${this._toolDisplayName || this._toolName}`,
-          prompt: this.getDescription(),
-          onConfirm: async (outcome: ToolConfirmationOutcome) => {
-            if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-              if (this.messageBus && this._toolName) {
-                this.messageBus.publish({
-                  type: MessageBusType.UPDATE_POLICY,
-                  toolName: this._toolName,
-                });
-              }
-            }
-          },
-        };
-        return confirmationDetails;
+        return this.getConfirmationDetails(abortSignal);
       }
     }
-    return false;
+    // When no message bus, use default confirmation flow
+    return this.getConfirmationDetails(abortSignal);
+  }
+
+  /**
+   * Subclasses should override this method to provide custom confirmation UI
+   * when the policy engine's decision is 'ASK_USER'.
+   * The base implementation provides a generic confirmation prompt.
+   */
+  protected async getConfirmationDetails(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (!this.messageBus) {
+      return false;
+    }
+
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'info',
+      title: `Confirm: ${this._toolDisplayName || this._toolName}`,
+      prompt: this.getDescription(),
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          if (this.messageBus && this._toolName) {
+            this.messageBus.publish({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: this._toolName,
+            });
+          }
+        }
+      },
+    };
+    return confirmationDetails;
   }
 
   protected getMessageBusDecision(
@@ -199,6 +216,7 @@ export abstract class BaseToolInvocation<
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall,
         correlationId,
+        serverName: this._serverName,
       };
 
       try {
@@ -290,6 +308,7 @@ export abstract class DeclarativeTool<
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
     readonly messageBus?: MessageBus,
+    readonly extensionName?: string,
     readonly extensionId?: string,
   ) {}
 
@@ -537,7 +556,7 @@ export function hasCycleInSchema(schema: object): boolean {
 
     if ('$ref' in node && typeof node.$ref === 'string') {
       const ref = node.$ref;
-      if (ref === '#/' || pathRefs.has(ref)) {
+      if (ref === '#' || ref === '#/' || pathRefs.has(ref)) {
         // A ref to just '#/' is always a cycle.
         return true; // Cycle detected!
       }

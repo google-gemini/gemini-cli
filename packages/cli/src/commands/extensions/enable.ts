@@ -5,31 +5,36 @@
  */
 
 import { type CommandModule } from 'yargs';
+import { loadSettings, SettingScope } from '../../config/settings.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
 import {
   debugLogger,
   FatalConfigError,
   getErrorMessage,
 } from '@google/gemini-cli-core';
-import { enableExtension } from '../../config/extension.js';
-import { SettingScope } from '../../config/settings.js';
-import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 
 interface EnableArgs {
   name: string;
   scope?: string;
 }
 
-export function handleEnable(args: EnableArgs) {
-  const extensionEnablementManager = new ExtensionEnablementManager();
+export async function handleEnable(args: EnableArgs) {
+  const workingDir = process.cwd();
+  const extensionManager = new ExtensionManager({
+    workspaceDir: workingDir,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    settings: loadSettings(workingDir).merged,
+  });
+  await extensionManager.loadExtensions();
+
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
-      enableExtension(
-        args.name,
-        SettingScope.Workspace,
-        extensionEnablementManager,
-      );
+      await extensionManager.enableExtension(args.name, SettingScope.Workspace);
     } else {
-      enableExtension(args.name, SettingScope.User, extensionEnablementManager);
+      await extensionManager.enableExtension(args.name, SettingScope.User);
     }
     if (args.scope) {
       debugLogger.log(
@@ -76,8 +81,8 @@ export const enableCommand: CommandModule = {
         }
         return true;
       }),
-  handler: (argv) => {
-    handleEnable({
+  handler: async (argv) => {
+    await handleEnable({
       name: argv['name'] as string,
       scope: argv['scope'] as string,
     });

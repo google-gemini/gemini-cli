@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThemeDialog } from './ThemeDialog.js';
 import { LoadedSettings } from '../../config/settings.js';
@@ -12,7 +13,6 @@ import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import { DEFAULT_THEME, themeManager } from '../themes/theme-manager.js';
 import { act } from 'react';
-import { waitFor } from '@testing-library/react';
 
 const createMockSettings = (
   userSettings = {},
@@ -78,7 +78,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -91,7 +91,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame, stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog {...baseProps} settings={settings} />
         </KeypressProvider>
       </SettingsContext.Provider>,
@@ -113,7 +113,7 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <ThemeDialog
             {...baseProps}
             onCancel={mockOnCancel}
