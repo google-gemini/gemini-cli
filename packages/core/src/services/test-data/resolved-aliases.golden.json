@@ -10,8 +10,29 @@
       "temperature": 1,
       "topP": 0.95,
       "thinkingConfig": {
+        "includeThoughts": true
+      },
+      "topK": 64
+    }
+  },
+  "chat-base-2.5": {
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": 8192
+      },
+      "topK": 64
+    }
+  },
+  "chat-base-3": {
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
       },
       "topK": 64
     }
@@ -23,7 +44,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": 8192
+        "thinkingLevel": "HIGH"
       },
       "topK": 64
     }
