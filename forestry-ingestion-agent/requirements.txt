@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+google-cloud-storage
+google-cloud-bigquery
+google-cloud-pubsub
+pystac-client
+planetary-computer
+odc-stac
+rasterio
+rioxarray
+xarray
+dask
+shapely
+requests

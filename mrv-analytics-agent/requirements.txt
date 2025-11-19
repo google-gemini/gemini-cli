@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+google-cloud-bigquery
+google-cloud-aiplatform
+pandas
+scikit-learn
+db-dtypes

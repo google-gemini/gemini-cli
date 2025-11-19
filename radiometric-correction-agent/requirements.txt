@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+google-cloud-storage
+rasterio
+pandas
+geopandas
+matplotlib
+numpy
+shapely
+loess

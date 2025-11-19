@@ -1,0 +1,9 @@
+streamlit
+google-cloud-bigquery
+google-cloud-storage
+pandas
+pydeck
+db-dtypes
+rasterio
+geopandas
+shapely

@@ -1,0 +1,8 @@
+google-cloud-storage
+google-cloud-bigquery
+numpy
+rasterio
+rioxarray
+xarray
+shapely
+dask

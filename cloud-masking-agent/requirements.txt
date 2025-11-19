@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+google-cloud-storage
+rasterio
+geopandas
+numpy
+shapely
+torch
+torchvision
+omnicloudmask
+torchvision

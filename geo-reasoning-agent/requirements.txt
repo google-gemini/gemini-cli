@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+google-cloud-aiplatform
+shapely
+geopy
