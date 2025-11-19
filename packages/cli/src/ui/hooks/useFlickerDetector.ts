@@ -36,8 +36,14 @@ export function useFlickerDetector(
         }
 
         recordFlickerFrame(config);
-        appEvents.emit(AppEvent.Flicker);
+        appEvents.emit(AppEvent.Flicker, {
+          message: 'UI flicker detected. Ensure the layout fits within the terminal height.',
+          details: {
+            measuredHeight: measurement.height,
+            terminalHeight,
+          },
+        });
       }
     }
-  });
+  }, [rootUiRef, terminalHeight, constrainHeight, config]);
 }

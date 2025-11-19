@@ -364,6 +364,11 @@ export function isDebugMode(argv: CliArgs): boolean {
   );
 }
 
+export interface MultilingualSettings {
+  enableMultilingualSupport: boolean;
+  defaultLanguage: string;
+}
+
 export async function loadCliConfig(
   settings: Settings,
   sessionId: string,
@@ -571,6 +576,11 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
+  const multilingualSettings: MultilingualSettings = {
+    enableMultilingualSupport: settings.general?.enableMultilingualSupport ?? true,
+    defaultLanguage: settings.general?.defaultLanguage ?? 'en',
+  };
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -659,6 +669,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
+    multilingualSettings,
   });
 }
 

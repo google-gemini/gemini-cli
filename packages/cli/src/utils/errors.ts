@@ -232,3 +232,23 @@ export function handleMaxTurnsExceededError(config: Config): never {
     process.exit(maxTurnsError.exitCode);
   }
 }
+
+/**
+ * Handles unexpected errors by providing a fallback message.
+ */
+export function handleUnexpectedError(error: unknown, config: Config): void {
+  const fallbackMessage = 'An unexpected error occurred. Please try again or contact support.';
+
+  if (config.getOutputFormat() === OutputFormat.JSON) {
+    const formatter = new JsonFormatter();
+    const formattedError = formatter.formatError(
+      error instanceof Error ? error : new Error(fallbackMessage),
+      extractErrorCode(error)
+    );
+    console.error(formattedError);
+  } else {
+    console.error(
+      error instanceof Error ? error.message : fallbackMessage
+    );
+  }
+}
