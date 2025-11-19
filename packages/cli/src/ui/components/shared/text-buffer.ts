@@ -20,6 +20,7 @@ import {
 import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { enableSupportedProtocol } from '../../utils/kittyProtocolDetector.js';
 
 export type Direction =
   | 'left'
@@ -1891,6 +1892,7 @@ export function useTextBuffer({
       } catch (err) {
         console.error('[useTextBuffer] external editor error', err);
       } finally {
+        enableSupportedProtocol();
         if (wasRaw) setRawMode?.(true);
         try {
           fs.unlinkSync(filePath);
