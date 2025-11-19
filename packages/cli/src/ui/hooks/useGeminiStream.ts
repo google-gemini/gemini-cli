@@ -54,6 +54,7 @@ import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
+import { SHELL_COMMAND_NAME } from '../constants.js';
 import {
   useReactToolScheduler,
   mapToDisplay as mapTrackedToolCallsToDisplay,
@@ -232,6 +233,22 @@ export const useGeminiStream = (
     }
   }, [activePtyId, setShellInputFocused]);
 
+  const prevActiveShellPtyIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (
+      turnCancelledRef.current &&
+      prevActiveShellPtyIdRef.current !== null &&
+      activeShellPtyId === null
+    ) {
+      addItem(
+        { type: MessageType.INFO, text: 'Request cancelled.' },
+        Date.now(),
+      );
+      setIsResponding(false);
+    }
+    prevActiveShellPtyIdRef.current = activeShellPtyId;
+  }, [activeShellPtyId, addItem]);
+
   const streamingState = useMemo(() => {
     if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
       return StreamingState.WaitingForConfirmation;
@@ -306,7 +323,33 @@ export const useGeminiStream = (
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {
-      addItem(pendingHistoryItemRef.current, Date.now());
+      const isShellCommand =
+        pendingHistoryItemRef.current.type === 'tool_group' &&
+        pendingHistoryItemRef.current.tools.some(
+          (t) => t.name === SHELL_COMMAND_NAME,
+        );
+
+      // If it is a shell command, we update the status to Canceled and clear the output
+      // to avoid artifacts, then add it to history immediately.
+      if (isShellCommand) {
+        const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
+        const updatedTools = toolGroup.tools.map((tool) => {
+          if (tool.name === SHELL_COMMAND_NAME) {
+            return {
+              ...tool,
+              status: ToolCallStatus.Canceled,
+              resultDisplay: tool.resultDisplay,
+            };
+          }
+          return tool;
+        });
+        addItem(
+          { ...toolGroup, tools: updatedTools } as HistoryItemWithoutId,
+          Date.now(),
+        );
+      } else {
+        addItem(pendingHistoryItemRef.current, Date.now());
+      }
     }
     setPendingHistoryItem(null);
 
@@ -314,14 +357,18 @@ export const useGeminiStream = (
     // Otherwise, we let handleCompletedTools figure out the next step,
     // which might involve sending partial results back to the model.
     if (isFullCancellation) {
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: 'Request cancelled.',
-        },
-        Date.now(),
-      );
-      setIsResponding(false);
+      // If shell is active, we delay this message to ensure correct ordering
+      // (Shell item first, then Info message).
+      if (!activeShellPtyId) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Request cancelled.',
+          },
+          Date.now(),
+        );
+        setIsResponding(false);
+      }
     }
 
     onCancelSubmit(false);
@@ -335,6 +382,7 @@ export const useGeminiStream = (
     setShellInputFocused,
     cancelAllToolCalls,
     toolCalls,
+    activeShellPtyId,
   ]);
 
   useKeypress(

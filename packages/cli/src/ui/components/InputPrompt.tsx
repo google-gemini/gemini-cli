@@ -7,7 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -41,7 +41,9 @@ import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
+import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -126,6 +128,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
+  const { setEmbeddedShellFocused } = useUIActions();
   const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
@@ -363,34 +366,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [buffer, config]);
 
-  const handleMouse = useCallback(
-    (event: MouseEvent) => {
-      if (event.name === 'left-press' && innerBoxRef.current) {
-        const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
-        // Terminal mouse events are 1-based, Ink layout is 0-based.
-        const mouseX = event.col - 1;
-        const mouseY = event.row - 1;
-        if (
-          mouseX >= x &&
-          mouseX < x + width &&
-          mouseY >= y &&
-          mouseY < y + height
-        ) {
-          const relX = mouseX - x;
-          const relY = mouseY - y;
-          const visualRow = buffer.visualScrollRow + relY;
-          buffer.moveToVisualPosition(visualRow, relX);
-          return true;
-        }
-      } else if (event.name === 'right-release') {
-        handleClipboardPaste();
+  useMouseClick(
+    innerBoxRef,
+    (_event, relX, relY) => {
+      if (isEmbeddedShellFocused) {
+        setEmbeddedShellFocused(false);
       }
-      return false;
+      const visualRow = buffer.visualScrollRow + relY;
+      buffer.moveToVisualPosition(visualRow, relX);
     },
-    [buffer, handleClipboardPaste],
+    { isActive: focus },
   );
 
-  useMouse(handleMouse, { isActive: focus && !isEmbeddedShellFocused });
+  useMouse(
+    (event: MouseEvent) => {
+      if (event.name === 'right-release') {
+        handleClipboardPaste();
+      }
+    },
+    { isActive: focus },
+  );
 
   const handleInput = useCallback(
     (key: Key) => {
