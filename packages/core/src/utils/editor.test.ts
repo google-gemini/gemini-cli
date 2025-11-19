@@ -72,6 +72,11 @@ describe('editor utils', () => {
       { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
+      {
+        editor: 'antigravity',
+        commands: ['agy'],
+        win32Commands: ['agy.cmd'],
+      },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -171,6 +176,11 @@ describe('editor utils', () => {
       },
       { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
+      {
+        editor: 'antigravity',
+        commands: ['agy'],
+        win32Commands: ['agy.cmd'],
+      },
     ];
 
     for (const { editor, commands, win32Commands } of guiEditors) {
@@ -430,6 +440,7 @@ describe('editor utils', () => {
         'windsurf',
         'cursor',
         'zed',
+        'antigravity',
       ];
       for (const editor of guiEditors) {
         it(`should not call onEditorClose for ${editor}`, async () => {
