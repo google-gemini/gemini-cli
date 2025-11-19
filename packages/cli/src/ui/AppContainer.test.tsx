@@ -37,12 +37,18 @@ const mockCoreEvents = vi.hoisted(() => ({
   emit: vi.fn(),
 }));
 
+// Mock IdeClient
+const mockIdeClient = vi.hoisted(() => ({
+  getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     coreEvents: mockCoreEvents,
+    IdeClient: mockIdeClient,
   };
 });
 import type { LoadedSettings } from '../config/settings.js';
@@ -313,7 +319,7 @@ describe('AppContainer State Management', () => {
       // Add other properties if AppContainer uses them
     });
     mockedUseLogger.mockReturnValue({
-      getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+      getPreviousUserMessages: vi.fn().mockReturnValue(new Promise(() => {})),
     });
     mockedUseLoadingIndicator.mockReturnValue({
       elapsedTime: '0.0s',
@@ -1775,9 +1781,6 @@ describe('AppContainer State Management', () => {
         text: '',
         setText: mockSetText,
       });
-      mockedUseLogger.mockReturnValue({
-        getPreviousUserMessages: vi.fn().mockResolvedValue([]),
-      });
     });
 
     it('clears the prompt when onCancelSubmit is called with shouldRestorePrompt=false', async () => {
@@ -1787,8 +1790,6 @@ describe('AppContainer State Management', () => {
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
         mockedUseGeminiStream.mock.lastCall!,
       );
-
-      expect(typeof onCancelSubmit).toBe('function');
 
       act(() => {
         onCancelSubmit(false);
