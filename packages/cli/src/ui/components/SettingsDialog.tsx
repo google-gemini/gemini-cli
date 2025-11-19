@@ -130,7 +130,10 @@ export function SettingsDialog({
       const definition = getSettingDefinition(key);
 
       return {
-        label: definition?.label || key,
+        label:
+          definition?.inverted && definition?.invertedLabel
+            ? definition.invertedLabel
+            : definition?.label || key,
         value: key,
         type: definition?.type,
         toggle: () => {

@@ -120,6 +120,14 @@ export interface SettingDefinition {
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
+  /**
+   * Whether the setting value is inverted for display (e.g. "Disable X" -> "Enable X").
+   */
+  inverted?: boolean;
+  /**
+   * The label to show when the setting is inverted.
+   */
+  invertedLabel?: string;
 }
 
 export interface SettingsSchema {
@@ -193,8 +201,10 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: false,
-        description: 'Disable automatic updates',
+        description: 'Toggle automatic updates.',
         showInDialog: true,
+        inverted: true,
+        invertedLabel: 'Enable Auto Update',
       },
       disableUpdateNag: {
         type: 'boolean',
@@ -247,7 +257,7 @@ const SETTINGS_SCHEMA = {
       },
       debugKeystrokeLogging: {
         type: 'boolean',
-        label: 'Debug Keystroke Logging',
+        label: 'Enable Keystroke Logging',
         category: 'General',
         requiresRestart: false,
         default: false,
@@ -368,8 +378,10 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: true,
         default: false,
-        description: 'Hide the window title bar',
+        description: 'Toggle visibility of the window title bar.',
         showInDialog: true,
+        inverted: true,
+        invertedLabel: 'Show Window Title',
       },
       showStatusInTitle: {
         type: 'boolean',
@@ -387,8 +399,10 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide helpful tips in the UI',
+        description: 'Toggle visibility of helpful tips in the UI.',
         showInDialog: true,
+        inverted: true,
+        invertedLabel: 'Show Tips',
       },
       hideBanner: {
         type: 'boolean',
@@ -396,8 +410,10 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide the application banner',
+        description: 'Toggle visibility of the application banner.',
         showInDialog: true,
+        inverted: true,
+        invertedLabel: 'Show Banner',
       },
       hideContextSummary: {
         type: 'boolean',
@@ -406,8 +422,10 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Hide the context summary (GEMINI.md, MCP servers) above the input.',
+          'Toggle visibility of the context summary (GEMINI.md, MCP servers) above the input.',
         showInDialog: true,
+        inverted: true,
+        invertedLabel: 'Show Context Summary',
       },
       footer: {
         type: 'object',
@@ -425,8 +443,10 @@ const SETTINGS_SCHEMA = {
             requiresRestart: false,
             default: false,
             description:
-              'Hide the current working directory path in the footer.',
+              'Toggle visibility of the current working directory path in the footer.',
             showInDialog: true,
+            inverted: true,
+            invertedLabel: 'Show CWD',
           },
           hideSandboxStatus: {
             type: 'boolean',
@@ -434,8 +454,11 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: false,
             default: false,
-            description: 'Hide the sandbox status indicator in the footer.',
+            description:
+              'Toggle visibility of the sandbox status indicator in the footer.',
             showInDialog: true,
+            inverted: true,
+            invertedLabel: 'Show Sandbox Status',
           },
           hideModelInfo: {
             type: 'boolean',
@@ -443,8 +466,11 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: false,
             default: false,
-            description: 'Hide the model name and context usage in the footer.',
+            description:
+              'Toggle visibility of the model name and context usage in the footer.',
             showInDialog: true,
+            inverted: true,
+            invertedLabel: 'Show Model Info',
           },
           hideContextPercentage: {
             type: 'boolean',
@@ -452,8 +478,11 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window remaining percentage.',
+            description:
+              'Toggle visibility of the context window remaining percentage.',
             showInDialog: true,
+            inverted: true,
+            invertedLabel: 'Show Context Window Percentage',
           },
         },
       },
@@ -463,8 +492,10 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide the footer from the UI',
+        description: 'Toggle visibility of the footer from the UI.',
         showInDialog: true,
+        inverted: true,
+        invertedLabel: 'Show Footer',
       },
       showMemoryUsage: {
         type: 'boolean',
@@ -559,8 +590,11 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: true,
             default: false,
-            description: 'Disable loading phrases for accessibility',
+            description:
+              'Toggle visibility of loading phrases for accessibility.',
             showInDialog: true,
+            inverted: true,
+            invertedLabel: 'Show Loading Phrases',
           },
           screenReader: {
             type: 'boolean',
@@ -850,8 +884,10 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: false,
-            description: 'Disable fuzzy search when searching for files.',
+            description: 'Toggle fuzzy search when searching for files.',
             showInDialog: true,
+            inverted: true,
+            invertedLabel: 'Enable Fuzzy Search',
           },
         },
       },
@@ -1130,6 +1166,8 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
+        inverted: true,
+        invertedLabel: 'Enable YOLO Mode',
       },
       blockGitExtensions: {
         type: 'boolean',

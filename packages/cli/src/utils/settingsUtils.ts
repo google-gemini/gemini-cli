@@ -442,6 +442,17 @@ export function getDisplayValue(
     value = getDefaultValue(key);
   }
 
+  const originalValue = value;
+
+  // Handle inversion if configured
+  if (
+    definition?.type === 'boolean' &&
+    definition.inverted &&
+    typeof value === 'boolean'
+  ) {
+    value = !value;
+  }
+
   let valueString = String(value);
 
   if (definition?.type === 'enum' && definition.options) {
@@ -451,7 +462,7 @@ export function getDisplayValue(
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes
   const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault = value !== defaultValue;
+  const isChangedFromDefault = originalValue !== defaultValue;
   const isInModifiedSettings = modifiedSettings.has(key);
 
   // Mark as modified if setting exists in current scope OR is in modified settings

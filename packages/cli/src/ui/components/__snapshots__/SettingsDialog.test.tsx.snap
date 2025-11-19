@@ -10,17 +10,17 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│   Enable Auto Update                                   true                                      │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│   Enable Keystroke Logging                             false                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│   Show Window Title                                    true                                      │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -45,17 +45,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │   Vim Mode                                             true*                                     │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│   Enable Auto Update                                   true                                      │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│   Enable Keystroke Logging                             false                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│   Show Window Title                                    true                                      │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -80,17 +80,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │   Vim Mode                                             false*                                    │
 │                                                                                                  │
-│   Disable Auto Update                                  false*                                    │
+│   Enable Auto Update                                   true*                                     │
 │                                                                                                  │
 │   Enable Prompt Completion                             false*                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false*                                    │
+│   Enable Keystroke Logging                             false*                                    │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false*                                    │
+│   Show Window Title                                    true*                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -115,17 +115,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│   Enable Auto Update                                   true                                      │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│   Enable Keystroke Logging                             false                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│   Show Window Title                                    true                                      │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -150,17 +150,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│   Enable Auto Update                                   true                                      │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│   Enable Keystroke Logging                             false                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│   Show Window Title                                    true                                      │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -185,17 +185,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│   Enable Auto Update                                   true                                      │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│   Enable Keystroke Logging                             false                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│   Show Window Title                                    true                                      │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -220,17 +220,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │   Vim Mode                                             false*                                    │
 │                                                                                                  │
-│   Disable Auto Update                                  true*                                     │
+│   Enable Auto Update                                   false*                                    │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│   Enable Keystroke Logging                             false                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false*                                    │
+│   Show Window Title                                    true*                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -255,17 +255,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │   Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│   Enable Auto Update                                   true                                      │
 │                                                                                                  │
 │   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│   Enable Keystroke Logging                             false                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│   Show Window Title                                    true                                      │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -290,17 +290,17 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │   Vim Mode                                             true*                                     │
 │                                                                                                  │
-│   Disable Auto Update                                  true*                                     │
+│   Enable Auto Update                                   false*                                    │
 │                                                                                                  │
 │   Enable Prompt Completion                             true*                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                              true*                                     │
+│   Enable Keystroke Logging                             true*                                     │
 │                                                                                                  │
 │   Enable Session Cleanup                               false                                     │
 │                                                                                                  │
 │   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Window Title                                    true*                                     │
+│   Show Window Title                                    false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
