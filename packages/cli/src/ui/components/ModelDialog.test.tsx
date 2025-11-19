@@ -54,6 +54,7 @@ const renderComponent = (
         getUseModelRouter: vi.fn(() => false),
         getProxy: vi.fn(() => undefined),
         isInteractive: vi.fn(() => false),
+        getExperiments: () => {},
 
         // --- Spread test-specific overrides ---
         ...contextValue,

@@ -66,7 +66,6 @@ expect.extend({
     received: LogEventEntry[],
     [key, value]: [EventMetadataKey, string],
   ) {
-    const { isNot } = this;
     const event = JSON.parse(received[0].source_extension_json) as LogEvent;
     const metadata = event['event_metadata'][0];
     const data = metadata.find((m) => m.gemini_cli_key === key)?.value;
@@ -75,8 +74,7 @@ expect.extend({
 
     return {
       pass,
-      message: () =>
-        `event ${received} does${isNot ? ' not' : ''} have ${value}}`,
+      message: () => `event ${received} should have: ${value}. Found: ${data}`,
     };
   },
 
@@ -779,6 +777,10 @@ describe('ClearcutLogger', () => {
       expect(events.length).toBe(1);
       expect(events[0]).toHaveEventName(EventNames.AGENT_START);
       expect(events[0]).toHaveGwsExperiments([123, 456, 789]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
+        '123,456,789',
+      ]);
     });
   });
 

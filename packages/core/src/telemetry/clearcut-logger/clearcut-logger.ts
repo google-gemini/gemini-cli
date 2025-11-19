@@ -1362,6 +1362,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_INTERACTIVE,
         value: this.config?.isInteractive().toString() ?? 'false',
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
+        value: this.config?.getExperiments()?.experimentIds.toString() ?? 'NA',
+      },
     ];
     return [...data, ...defaultLogMetadata];
   }
