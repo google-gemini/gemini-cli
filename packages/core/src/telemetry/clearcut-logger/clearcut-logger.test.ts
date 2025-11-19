@@ -96,7 +96,8 @@ expect.extend({
 
   toHaveGwsExperiments(received: LogEventEntry[], expected_exps: number[]) {
     const { isNot } = this;
-    const exps = received[0].gws_experiment;
+    const event = JSON.parse(received[0].source_extension_json) as LogEvent;
+    const exps = event.exp.gws_experiment;
 
     const pass =
       exps.length === expected_exps.length &&
@@ -593,7 +594,6 @@ describe('ClearcutLogger', () => {
           {
             event_time_ms: Date.now(),
             source_extension_json: JSON.stringify({ event_id: i }),
-            gws_experiment: [],
           },
         ]);
       }
@@ -627,7 +627,6 @@ describe('ClearcutLogger', () => {
           {
             event_time_ms: Date.now(),
             source_extension_json: JSON.stringify({ event_id: `failed_${i}` }),
-            gws_experiment: [],
           },
         ]);
       }

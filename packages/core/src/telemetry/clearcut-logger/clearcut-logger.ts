@@ -103,12 +103,15 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
-  gws_experiment: number[];
 }
 
 export interface EventValue {
   gemini_cli_key: EventMetadataKey;
   value: string;
+}
+
+export interface ActiveExperiments {
+  gws_experiment: number[];
 }
 
 export interface LogEvent {
@@ -118,6 +121,7 @@ export interface LogEvent {
   event_metadata: EventValue[][];
   client_email?: string;
   client_install_id?: string;
+  exp: ActiveExperiments;
 }
 
 export interface LogRequest {
@@ -239,7 +243,6 @@ export class ClearcutLogger {
         {
           event_time_ms: Date.now(),
           source_extension_json: safeJsonStringify(event),
-          gws_experiment: this.config?.getExperiments()?.experimentIds ?? [],
         },
       ]);
 
@@ -285,6 +288,9 @@ export class ClearcutLogger {
           },
         ],
       ],
+      exp: {
+        gws_experiment: this.config?.getExperiments()?.experimentIds ?? [0],
+      },
     };
   }
 
