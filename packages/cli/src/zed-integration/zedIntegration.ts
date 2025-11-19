@@ -318,6 +318,13 @@ class Session {
           );
         }
 
+        if (
+          pendingSend.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          return { stopReason: 'cancelled' };
+        }
+
         throw error;
       }
 
