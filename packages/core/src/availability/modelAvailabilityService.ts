@@ -48,9 +48,14 @@ export class ModelAvailabilityService {
   }
 
   markRetryOncePerTurn(model: ModelId) {
+    const currentState = this.health.get(model);
+    // Do not override a terminal failure with a transient one.
+    if (currentState?.status === 'terminal') {
+      return;
+    }
+
     // Only reset consumption if we are not already in the sticky_retry state.
     // This prevents infinite loops if the model fails repeatedly in the same turn.
-    const currentState = this.health.get(model);
     if (currentState?.status !== 'sticky_retry') {
       this.consumedSticky.delete(model);
     }
@@ -69,35 +74,28 @@ export class ModelAvailabilityService {
 
   snapshot(model: ModelId): ModelAvailabilitySnapshot {
     const state = this.health.get(model);
-    if (!state) {
-      return { available: true };
+    const isUnavailable =
+      state?.status === 'terminal' ||
+      (state?.status === 'sticky_retry' && this.consumedSticky.has(model));
+
+    if (isUnavailable) {
+      return { available: false, reason: state!.reason };
     }
-    if (state.status === 'terminal') {
-      return { available: false, reason: state.reason };
-    }
-    const available = !this.consumedSticky.has(model);
-    return available
-      ? { available: true }
-      : { available: false, reason: state.reason };
+    return { available: true };
   }
 
   selectFirstAvailable(models: ModelId[]): ModelSelectionResult {
     const skipped: ModelSelectionResult['skipped'] = [];
+
     for (const model of models) {
-      const state = this.health.get(model);
-      if (!state) {
-        return { selected: model, skipped };
-      }
-      if (state.status === 'terminal') {
-        skipped.push({ model, reason: state.reason });
-        continue;
-      }
-      if (state.status === 'sticky_retry') {
-        if (this.consumedSticky.has(model)) {
-          skipped.push({ model, reason: state.reason });
-          continue;
-        }
-        return { selected: model, attempts: 1, skipped };
+      const snapshot = this.snapshot(model);
+      if (snapshot.available) {
+        const state = this.health.get(model);
+        // A sticky model is being attempted, so note that.
+        const attempts = state?.status === 'sticky_retry' ? 1 : undefined;
+        return { selected: model, skipped, attempts };
+      } else {
+        skipped.push({ model, reason: snapshot.reason ?? 'unknown' });
       }
     }
     return { selected: null, skipped };

@@ -42,6 +42,15 @@ describe('ModelAvailabilityService', () => {
     });
   });
 
+  it('does not override terminal failure with sticky failure', () => {
+    service.markTerminal(model, 'quota');
+    service.markRetryOncePerTurn(model);
+    expect(service.snapshot(model)).toEqual({
+      available: false,
+      reason: 'quota',
+    });
+  });
+
   it('selects models respecting terminal and sticky states', () => {
     const stickyModel = 'stick-model';
     const healthyModel = 'healthy-model';
