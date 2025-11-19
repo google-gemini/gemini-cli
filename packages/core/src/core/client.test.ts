@@ -137,6 +137,7 @@ async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
 describe('isThinkingSupported', () => {
   it('should return true for gemini-2.5', () => {
     expect(isThinkingSupported('gemini-2.5')).toBe(true);
+    expect(isThinkingSupported('gemini-2.5-flash')).toBe(true);
   });
 
   it('should return true for gemini-2.5-pro', () => {
@@ -147,9 +148,13 @@ describe('isThinkingSupported', () => {
     expect(isThinkingSupported('gemini-3-pro')).toBe(true);
   });
 
-  it('should return false for other models', () => {
-    expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
-    expect(isThinkingSupported('some-other-model')).toBe(false);
+  it('should return false for gemini-2.0 models', () => {
+    expect(isThinkingSupported('gemini-2.0-flash')).toBe(false);
+    expect(isThinkingSupported('gemini-2.0-pro')).toBe(false);
+  });
+
+  it('should return true for other models', () => {
+    expect(isThinkingSupported('some-other-model')).toBe(true);
   });
 });
 
