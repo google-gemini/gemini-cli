@@ -10,9 +10,11 @@ import { Box, Text } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
+import { ShellToolMessage } from './ShellToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
+import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface ToolGroupMessageProps {
@@ -103,6 +105,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         const isFirst = index === 0;
+        const isShellTool =
+          tool.name === SHELL_COMMAND_NAME ||
+          tool.name === SHELL_NAME ||
+          tool.name === SHELL_TOOL_NAME;
+        const ToolComponent = isShellTool ? ShellToolMessage : ToolMessage;
+
         return (
           <Box
             key={tool.callId}
@@ -110,7 +118,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={terminalWidth}
           >
-            <ToolMessage
+            <ToolComponent
               {...tool}
               availableTerminalHeight={availableTerminalHeightPerToolMessage}
               terminalWidth={terminalWidth}

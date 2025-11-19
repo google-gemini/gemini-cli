@@ -41,6 +41,7 @@ import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
+import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 
@@ -365,42 +366,51 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [buffer, config]);
 
-  const handleMouse = useCallback(
-    (event: MouseEvent) => {
-      if (event.name === 'left-press' && innerBoxRef.current) {
-        const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
-        // Terminal mouse events are 1-based, Ink layout is 0-based.
-        const mouseX = event.col - 1;
-        const mouseY = event.row - 1;
-        if (
-          mouseX >= x &&
-          mouseX < x + width &&
-          mouseY >= y &&
-          mouseY < y + height
-        ) {
-          if (isEmbeddedShellFocused) {
-            setEmbeddedShellFocused(false);
-          }
-          const relX = mouseX - x;
-          const relY = mouseY - y;
-          const visualRow = buffer.visualScrollRow + relY;
-          buffer.moveToVisualPosition(visualRow, relX);
-          return true;
-        }
-      } else if (event.name === 'right-release') {
-        handleClipboardPaste();
+  useMouseClick(
+    innerBoxRef,
+    (_event, _mouseX, mouseY) => {
+      if (isEmbeddedShellFocused) {
+        setEmbeddedShellFocused(false);
       }
-      return false;
+      // The x coordinate in the handler is relative to the container (mouseX - x).
+      // but useMouseClick passes (mouseX - x) as the second argument?
+      // Let's check useMouseClick implementation:
+      // handler(event, mouseX, mouseY);
+      // wait, mouseX in useMouseClick is event.col - 1. It is NOT relative to the container.
+      // I need to check the implementation of useMouseClick I wrote.
+      // const mouseX = event.col - 1;
+      // const mouseY = event.row - 1;
+      // handler(event, mouseX, mouseY);
+      // So it passes absolute terminal coordinates (0-based).
+
+      // In the original code:
+      // const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
+      // const relX = mouseX - x;
+      // const relY = mouseY - y;
+      // const visualRow = buffer.visualScrollRow + relY;
+      // buffer.moveToVisualPosition(visualRow, relX);
+
+      // So I need to recalculate relative coordinates here because useMouseClick passes absolute ones.
+      if (innerBoxRef.current) {
+        const { x, y } = getBoundingBox(innerBoxRef.current);
+        // _mouseX and mouseY are 0-based absolute coordinates passed from useMouseClick
+        const relX = _mouseX - x;
+        const relY = mouseY - y;
+        const visualRow = buffer.visualScrollRow + relY;
+        buffer.moveToVisualPosition(visualRow, relX);
+      }
     },
-    [
-      buffer,
-      isEmbeddedShellFocused,
-      setEmbeddedShellFocused,
-      handleClipboardPaste,
-    ],
+    { isActive: focus },
   );
 
-  useMouse(handleMouse, { isActive: focus });
+  useMouse(
+    (event: MouseEvent) => {
+      if (event.name === 'right-release') {
+        handleClipboardPaste();
+      }
+    },
+    { isActive: focus },
+  );
 
   const handleInput = useCallback(
     (key: Key) => {

@@ -70,6 +70,19 @@ export const render = (
   };
 };
 
+export const simulateClick = async (
+  stdin: ReturnType<typeof inkRender>['stdin'],
+  col: number,
+  row: number,
+  button: 0 | 1 | 2 = 0, // 0 for left, 1 for middle, 2 for right
+) => {
+  // Ink mouse events are 1-based, so convert if necessary.
+  const mouseEventString = `\x1b[<${button};${col};${row}M`;
+  await act(async () => {
+    stdin.write(mouseEventString);
+  });
+};
+
 const mockConfig = {
   getModel: () => 'gemini-pro',
   getTargetDir: () =>
@@ -175,7 +188,7 @@ export const renderWithProviders = (
     useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
   } = {},
-): ReturnType<typeof render> => {
+): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
@@ -216,7 +229,7 @@ export const renderWithProviders = (
 
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
-  return render(
+  const renderResult = render(
     <ConfigContext.Provider value={config}>
       <SettingsContext.Provider value={finalSettings}>
         <UIStateContext.Provider value={finalUiState}>
@@ -247,6 +260,8 @@ export const renderWithProviders = (
     </ConfigContext.Provider>,
     terminalWidth,
   );
+
+  return { ...renderResult, simulateClick };
 };
 
 export function renderHook<Result, Props>(

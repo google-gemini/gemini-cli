@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
@@ -13,6 +13,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import {
   SHELL_COMMAND_NAME,
@@ -24,6 +25,8 @@ import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useUIActions } from '../../contexts/UIActionsContext.js';
+import { useMouseClick } from '../../hooks/useMouseClick.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -40,15 +43,15 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
-  activeShellPtyId?: number | null; // Kept for compatibility/prop spreading, but unused
-  embeddedShellFocused?: boolean; // Kept for compatibility/prop spreading, but unused
+  activeShellPtyId?: number | null;
+  embeddedShellFocused?: boolean;
   isFirst: boolean;
   borderColor: string;
   borderDimColor: boolean;
   config?: Config;
 }
 
-export const ToolMessage: React.FC<ToolMessageProps> = ({
+export const ShellToolMessage: React.FC<ToolMessageProps> = ({
   name,
   description,
   resultDisplay,
@@ -57,12 +60,86 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   terminalWidth,
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
+  activeShellPtyId,
+  embeddedShellFocused,
+  ptyId,
+  config,
   isFirst,
   borderColor,
   borderDimColor,
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+  const isThisShellFocused =
+    (name === SHELL_COMMAND_NAME ||
+      name === 'Shell' ||
+      name === SHELL_TOOL_NAME) &&
+    status === ToolCallStatus.Executing &&
+    ptyId === activeShellPtyId &&
+    embeddedShellFocused;
+
+  const { setEmbeddedShellFocused } = useUIActions();
+  const containerRef = React.useRef<DOMElement>(null);
+  // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
+  const isThisShellFocusable =
+    (name === SHELL_COMMAND_NAME ||
+      name === 'Shell' ||
+      name === SHELL_TOOL_NAME) &&
+    status === ToolCallStatus.Executing &&
+    config?.getEnableInteractiveShell();
+
+  useMouseClick(
+    containerRef,
+    () => {
+      if (isThisShellFocusable) {
+        setEmbeddedShellFocused(true);
+      }
+    },
+    { isActive: !!isThisShellFocusable },
+  );
+
+  const wasFocusedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (isThisShellFocused) {
+      wasFocusedRef.current = true;
+    } else if (wasFocusedRef.current) {
+      if (embeddedShellFocused) {
+        setEmbeddedShellFocused(false);
+      }
+      wasFocusedRef.current = false;
+    }
+  }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
+
+  const [lastUpdateTime, setLastUpdateTime] = React.useState<Date | null>(null);
+  const [userHasFocused, setUserHasFocused] = React.useState(false);
+  const [showFocusHint, setShowFocusHint] = React.useState(false);
+
+  React.useEffect(() => {
+    if (resultDisplay) {
+      setLastUpdateTime(new Date());
+    }
+  }, [resultDisplay]);
+
+  React.useEffect(() => {
+    if (!lastUpdateTime) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShowFocusHint(true);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [lastUpdateTime]);
+
+  React.useEffect(() => {
+    if (isThisShellFocused) {
+      setUserHasFocused(true);
+    }
+  }, [isThisShellFocused]);
+
+  const shouldShowFocusHint =
+    isThisShellFocusable && (showFocusHint || userHasFocused);
 
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -154,7 +231,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ]);
 
   return (
-    <Box flexDirection="column" width={terminalWidth}>
+    <Box ref={containerRef} flexDirection="column" width={terminalWidth}>
       <StickyHeader
         width={terminalWidth}
         isFirst={isFirst}
@@ -168,6 +245,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
         />
+        {shouldShowFocusHint && (
+          <Box marginLeft={1} flexShrink={0}>
+            <Text color={theme.text.accent}>
+              {isThisShellFocused ? '(Focused)' : '(ctrl+f to focus)'}
+            </Text>
+          </Box>
+        )}
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
       <Box
@@ -183,6 +267,14 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         flexDirection="column"
       >
         {renderedResult}
+        {isThisShellFocused && config && (
+          <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+            <ShellInputPrompt
+              activeShellPtyId={activeShellPtyId ?? null}
+              focus={embeddedShellFocused}
+            />
+          </Box>
+        )}
       </Box>
     </Box>
   );
