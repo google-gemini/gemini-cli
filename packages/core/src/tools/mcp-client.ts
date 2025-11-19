@@ -1275,9 +1275,10 @@ function createTransportFromConfig(
   accessToken: string | null,
   authProvider?: ServiceAccountImpersonationProvider | GoogleCredentialProvider,
 ): StreamableHTTPClientTransport | SSEClientTransport {
-  const baseTransportOptions = authProvider
-    ? { authProvider }
-    : buildTransportOptions(mcpServerConfig.headers, accessToken);
+  const baseTransportOptions = {
+    ...buildTransportOptions(mcpServerConfig.headers, accessToken),
+    ...(authProvider ? { authProvider } : {}),
+  };
 
   // Priority 1: httpUrl (deprecated)
   if (mcpServerConfig.httpUrl) {
