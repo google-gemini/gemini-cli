@@ -1214,10 +1214,6 @@
           "type": "boolean",
           "description": "Marks the server as trusted. Trusted servers may gain additional capabilities."
         },
-        "useInstructions": {
-          "type": "boolean",
-          "description": "If true, instructions from this server will be included in the system prompt."
-        },
         "description": {
           "type": "string",
           "description": "Human-readable description of the server."

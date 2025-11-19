@@ -1469,6 +1469,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description:
           'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
       },
+      useInstructions: {
+        type: 'boolean',
+        description:
+          'If true, instructions from this server will be included in the system prompt.',
+      },
     },
   },
   TelemetrySettings: {
