@@ -55,6 +55,47 @@ describe('convertSessionToHistoryFormats', () => {
     });
   });
 
+  it('should convert system, warning, and error messages to appropriate types', () => {
+    const messages: MessageRecord[] = [
+      {
+        id: 'msg-1',
+        timestamp: '2025-01-01T00:01:00Z',
+        content: 'System message',
+        type: 'info',
+      },
+      {
+        id: 'msg-2',
+        timestamp: '2025-01-01T00:02:00Z',
+        content: 'Warning message',
+        type: 'warning',
+      },
+      {
+        id: 'msg-3',
+        timestamp: '2025-01-01T00:03:00Z',
+        content: 'Error occurred',
+        type: 'error',
+      },
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory[0]).toEqual({
+      type: MessageType.INFO,
+      text: 'System message',
+    });
+    expect(result.uiHistory[1]).toEqual({
+      type: MessageType.WARNING,
+      text: 'Warning message',
+    });
+    expect(result.uiHistory[2]).toEqual({
+      type: MessageType.ERROR,
+      text: 'Error occurred',
+    });
+
+    // System, warning, and error messages should not be included in client history
+    expect(result.clientHistory).toEqual([]);
+  });
+
   it('should filter out slash commands from client history', () => {
     const messages: MessageRecord[] = [
       {
