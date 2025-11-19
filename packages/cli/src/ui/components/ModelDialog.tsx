@@ -53,7 +53,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: DEFAULT_GEMINI_MODEL_AUTO,
       },
       {
-        value: GEMINI_MODEL_ALIAS_PRO,
+        value: PREVIEW_GEMINI_MODEL,
         title: config?.getPreviewFeatures()
           ? `Pro (${PREVIEW_GEMINI_MODEL}, ${DEFAULT_GEMINI_MODEL})`
           : `Pro (${DEFAULT_GEMINI_MODEL})`,
@@ -62,13 +62,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: GEMINI_MODEL_ALIAS_PRO,
       },
       {
-        value: GEMINI_MODEL_ALIAS_FLASH,
+        value: DEFAULT_GEMINI_FLASH_MODEL,
         title: `Flash (${DEFAULT_GEMINI_FLASH_MODEL})`,
         description: 'For tasks that need a balance of speed and reasoning',
         key: GEMINI_MODEL_ALIAS_FLASH,
       },
       {
-        value: GEMINI_MODEL_ALIAS_FLASH_LITE,
+        value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
         title: `Flash-Lite (${DEFAULT_GEMINI_FLASH_LITE_MODEL})`,
         description: 'For simple tasks that need to be done quickly',
         key: GEMINI_MODEL_ALIAS_FLASH_LITE,
