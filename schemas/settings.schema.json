@@ -264,8 +264,8 @@
         "showLineNumbers": {
           "title": "Show Line Numbers",
           "description": "Show line numbers in the chat.",
-          "markdownDescription": "Show line numbers in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Show line numbers in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showCitations": {
