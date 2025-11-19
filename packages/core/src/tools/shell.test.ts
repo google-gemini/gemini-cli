@@ -90,6 +90,7 @@ describe('ShellTool', () => {
         .fn()
         .mockReturnValue(new WorkspaceContext(tempRootDir)),
       getGeminiClient: vi.fn(),
+      getContentGenerator: vi.fn(),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
     } as unknown as Config;
@@ -219,7 +220,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -244,7 +245,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         subdir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -265,7 +266,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -292,7 +293,7 @@ describe('ShellTool', () => {
           'dir',
           tempRootDir,
           expect.any(Function),
-          mockAbortSignal,
+          expect.any(AbortSignal),
           false,
           {},
         );
@@ -390,6 +391,57 @@ describe('ShellTool', () => {
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
       expect(fs.existsSync(tmpFile)).toBe(false);
+    });
+
+    it('should monitor and cancel a stuck command via LLM analysis', async () => {
+      vi.useFakeTimers();
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    action: 'cancel',
+                    reason:
+                      'The command appears to be stuck waiting for input.',
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      (mockConfig.getContentGenerator as Mock).mockReturnValue({
+        generateContent: mockGenerateContent,
+      });
+
+      const invocation = shellTool.build({ command: 'stuck-command' });
+      const executePromise = invocation.execute(mockAbortSignal);
+
+      // Advance time to trigger the timeout (60s default)
+      await vi.advanceTimersByTimeAsync(60001);
+
+      // The LLM should have been called
+      expect(mockGenerateContent).toHaveBeenCalled();
+
+      // Resolve the execution promise (simulating the abort taking effect)
+      resolveShellExecution({
+        aborted: true,
+        output: 'partial output',
+      });
+
+      const result = await executePromise;
+
+      expect(result.llmContent).toContain(
+        'Command was automatically cancelled by the model',
+      );
+      expect(result.returnDisplay).toContain(
+        'The command appears to be stuck waiting for input.',
+      );
+
+      vi.useRealTimers();
     });
 
     describe('Streaming to `updateOutput`', () => {
