@@ -366,13 +366,15 @@ function* emitKeys(
 
         // skip modifier
         if (ch === ';') {
-          ch = yield;
-          sequence += ch;
-
-          // collect as many digits as possible
-          while (ch >= '0' && ch <= '9') {
+          while (ch === ';') {
             ch = yield;
             sequence += ch;
+
+            // collect as many digits as possible
+            while (ch >= '0' && ch <= '9') {
+              ch = yield;
+              sequence += ch;
+            }
           }
         } else if (ch === '<') {
           // SGR mouse mode
@@ -401,10 +403,17 @@ function* emitKeys(
         const cmd = sequence.slice(cmdStart);
         let match;
 
-        if ((match = /^(\d+)(?:;(\d+))?([~^$u])$/.exec(cmd))) {
-          code += match[1] + match[3];
-          // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
-          modifier = parseInt(match[2] ?? '1', 10) - 1;
+        if ((match = /^(\d+)(?:;(\d+))?(?:;(\d+))?([~^$u])$/.exec(cmd))) {
+          if (match[1] === '27' && match[3] && match[4] === '~') {
+            // modifyOtherKeys format: CSI 27 ; modifier ; key ~
+            // Treat as CSI u: key + 'u'
+            code += match[3] + 'u';
+            modifier = parseInt(match[2] ?? '1', 10) - 1;
+          } else {
+            code += match[1] + match[4];
+            // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
+            modifier = parseInt(match[2] ?? '1', 10) - 1;
+          }
         } else if ((match = /^(\d+)?(?:;(\d+))?([A-Za-z])$/.exec(cmd))) {
           code += match[3];
           modifier = parseInt(match[2] ?? match[1] ?? '1', 10) - 1;
