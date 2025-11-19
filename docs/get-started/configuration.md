@@ -224,7 +224,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.showLineNumbers`** (boolean):
   - **Description:** Show line numbers in the chat.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.showCitations`** (boolean):
   - **Description:** Show citations for generated text in the chat.
