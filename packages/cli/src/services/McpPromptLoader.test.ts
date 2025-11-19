@@ -192,6 +192,23 @@ describe('McpPromptLoader', () => {
       expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
     });
 
+    it('should trim whitespace from prompt names before sanitizing', async () => {
+      const mockPromptWithWhitespace = {
+        ...mockPrompt,
+        name: '  Prompt Name  ',
+      };
+      vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+        mockPromptWithWhitespace,
+      ]);
+
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name).toBe('Prompt-Name');
+      expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
+    });
+
     it('should handle prompt invocation successfully', async () => {
       const loader = new McpPromptLoader(mockConfigWithPrompts);
       const commands = await loader.loadCommands(new AbortController().signal);
