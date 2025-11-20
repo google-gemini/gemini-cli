@@ -20,6 +20,9 @@ import type {
   Config,
   ToolRegistry,
   AnyToolInvocation,
+  ToolErrorType,
+  ToolExecuteConfirmationDetails,
+  SuccessfulToolCall,
 } from '../index.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import {
@@ -28,7 +31,6 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
-  ToolErrorType,
   Kind,
   ApprovalMode,
 } from '../index.js';
@@ -245,6 +247,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     storage: {
       getProjectTempDir: () => '/tmp',
     },
+    getEnableToolOutputTruncation: () => true,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -1424,12 +1427,17 @@ describe('CoreToolScheduler request queueing', () => {
       }),
     });
     mockConfig.getToolSandbox = () => ({ mode: 'landlock' });
+    mockConfig.isInteractive = () => true;
 
     let lastInvocation: FakeShellInvocation | undefined;
     const tool = new FakeShellTool(mockConfig);
     const createInvocationSpy = vi
       .spyOn(
-        tool as unknown as { createInvocation: () => FakeShellInvocation },
+        tool as unknown as {
+          createInvocation: (params: {
+            command: string;
+          }) => FakeShellInvocation;
+        },
         'createInvocation',
       )
       .mockImplementation((params: { command: string }) => {
@@ -1468,23 +1476,19 @@ describe('CoreToolScheduler request queueing', () => {
     );
 
     const abortController = new AbortController();
-    await scheduler.schedule(
-      [
-        {
-          callId: 'sandboxed-shell',
-          name: 'run_shell_command',
-          args: { command: 'echo 1' },
-          isClientInitiated: false,
-          prompt_id: 'prompt-sandbox',
-        },
-      ],
-      abortController.signal,
-    );
+    const request = {
+      callId: 'sandboxed-shell',
+      name: 'run_shell_command',
+      args: { command: 'echo 1' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sandbox',
+    };
+    await scheduler.schedule([request], abortController.signal);
 
     expect(lastInvocation).toBeInstanceOf(ShellToolInvocation);
 
     const statuses = statusSpy.mock.calls.map((call) => call[1]);
-    let awaitingCallSet =
+    const awaitingCallSet =
       statusSpy.mock.calls.find((call) => call[1] === 'awaiting_approval') ??
       (() => {
         const confirmationDetails: ToolCallConfirmationDetails = {
@@ -1514,14 +1518,18 @@ describe('CoreToolScheduler request queueing', () => {
               statusSpy.mock.calls.push(['sandboxed-shell', 'success']);
               onAllToolCallsComplete([
                 {
-                  callId: 'sandboxed-shell',
-                  name: 'run_shell_command',
                   status: 'success',
+                  request,
+                  tool,
                   response: {
-                    result: { llmContent: 'ok', returnDisplay: 'ok' },
+                    callId: request.callId,
+                    responseParts: [],
                     resultDisplay: 'ok',
+                    error: undefined,
+                    errorType: undefined,
                   },
-                } as ToolCall,
+                  invocation: lastInvocation!,
+                } as SuccessfulToolCall,
               ]);
             }
           },
