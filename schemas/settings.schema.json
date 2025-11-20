@@ -891,6 +891,13 @@
               "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
+            },
+            "inactivityTimeout": {
+              "title": "Inactivity Timeout",
+              "description": "The maximum time in milliseconds allowed without output from the shell command. Defaults to 5 minutes.",
+              "markdownDescription": "The maximum time in milliseconds allowed without output from the shell command. Defaults to 5 minutes.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `300000`",
+              "default": 300000,
+              "type": "number"
             }
           },
           "additionalProperties": false

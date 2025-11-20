@@ -920,6 +920,16 @@ const SETTINGS_SCHEMA = {
             description: 'Show color in shell output.',
             showInDialog: true,
           },
+          inactivityTimeout: {
+            type: 'number',
+            label: 'Inactivity Timeout',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 300000,
+            description:
+              'The maximum time in milliseconds allowed without output from the shell command. Defaults to 5 minutes.',
+            showInDialog: false,
+          },
         },
       },
       autoAccept: {

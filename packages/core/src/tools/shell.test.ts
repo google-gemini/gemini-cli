@@ -92,6 +92,7 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn(),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
+      getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -219,7 +220,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -244,7 +245,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         subdir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -265,7 +266,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -292,7 +293,7 @@ describe('ShellTool', () => {
           'dir',
           tempRootDir,
           expect.any(Function),
-          mockAbortSignal,
+          expect.any(AbortSignal),
           false,
           {},
         );
