@@ -41,11 +41,12 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
+  config?: Config;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
   onRestartRequest?: () => void;
   availableTerminalHeight?: number;
@@ -55,6 +56,7 @@ const maxItemsToShow = 8;
 
 export function SettingsDialog({
   settings,
+  config,
   onSelect,
   onRestartRequest,
   availableTerminalHeight,
@@ -75,6 +77,11 @@ export function SettingsDialog({
   // Scroll offset for settings
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
+
+  // Runtime compression threshold from experiments (OAuth users)
+  const [runtimeCompressionThreshold, setRuntimeCompressionThreshold] = useState<
+    number | undefined
+  >(undefined);
 
   // Local pending settings state for the selected scope
   const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
@@ -97,6 +104,15 @@ export function SettingsDialog({
   const [_restartRequiredSettings, setRestartRequiredSettings] = useState<
     Set<string>
   >(new Set());
+
+  // Fetch runtime compression threshold for OAuth users
+  useEffect(() => {
+    if (config && typeof config.getCompressionThreshold === 'function') {
+      config.getCompressionThreshold().then((threshold) => {
+        setRuntimeCompressionThreshold(threshold);
+      });
+    }
+  }, [config]);
 
   useEffect(() => {
     // Base settings for selected scope
@@ -800,7 +816,14 @@ export function SettingsDialog({
             const path = item.value.split('.');
             const currentValue = getNestedValue(pendingSettings, path);
 
-            const defaultValue = getDefaultValue(item.value);
+            // For compression threshold, use runtime value for OAuth users
+            let defaultValue = getDefaultValue(item.value);
+            if (
+              item.value === 'model.compressionThreshold' &&
+              runtimeCompressionThreshold !== undefined
+            ) {
+              defaultValue = runtimeCompressionThreshold;
+            }
 
             if (currentValue !== undefined && currentValue !== null) {
               displayValue = String(currentValue);

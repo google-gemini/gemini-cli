@@ -136,6 +136,7 @@ export const DialogManager = ({
       <Box flexDirection="column">
         <SettingsDialog
           settings={settings}
+          config={config}
           onSelect={() => uiActions.closeSettingsDialog()}
           onRestartRequest={() => process.exit(0)}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
