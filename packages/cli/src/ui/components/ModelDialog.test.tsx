@@ -13,6 +13,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import { ModelDialog } from './ModelDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -93,14 +94,30 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('passes all model options to DescriptiveRadioButtonSelect', () => {
-    const { unmount } = renderComponent();
+  it('passes all model options to DescriptiveRadioButtonSelect (preview OFF)', () => {
+    const { unmount } = renderComponent(
+      {},
+      { getPreviewFeatures: () => false },
+    );
     expect(mockedSelect).toHaveBeenCalledTimes(1);
 
     const props = mockedSelect.mock.calls[0][0];
     expect(props.items).toHaveLength(4);
     expect(props.items[0].value).toBe(DEFAULT_GEMINI_MODEL_AUTO);
-    expect(props.items[1].value).toBe(PREVIEW_GEMINI_MODEL);
+    expect(props.items[1].value).toBe(DEFAULT_GEMINI_MODEL); // Pro is default
+    expect(props.items[2].value).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(props.items[3].value).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(props.showNumbers).toBe(true);
+    unmount();
+  });
+  it('passes all model options to DescriptiveRadioButtonSelect (preview ON)', () => {
+    const { unmount } = renderComponent({}, { getPreviewFeatures: () => true });
+    expect(mockedSelect).toHaveBeenCalledTimes(1);
+
+    const props = mockedSelect.mock.calls[0][0];
+    expect(props.items).toHaveLength(4);
+    expect(props.items[0].value).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    expect(props.items[1].value).toBe(PREVIEW_GEMINI_MODEL); // Pro is preview
     expect(props.items[2].value).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     expect(props.items[3].value).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     expect(props.showNumbers).toBe(true);

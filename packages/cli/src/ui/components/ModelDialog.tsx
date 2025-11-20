@@ -53,7 +53,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: DEFAULT_GEMINI_MODEL_AUTO,
       },
       {
-        value: PREVIEW_GEMINI_MODEL,
+        value: config?.getPreviewFeatures()
+          ? PREVIEW_GEMINI_MODEL
+          : DEFAULT_GEMINI_MODEL,
         title: config?.getPreviewFeatures()
           ? `Pro (${PREVIEW_GEMINI_MODEL}, ${DEFAULT_GEMINI_MODEL})`
           : `Pro (${DEFAULT_GEMINI_MODEL})`,
