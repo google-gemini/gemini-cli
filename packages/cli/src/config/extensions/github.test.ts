@@ -20,6 +20,7 @@ import {
   findReleaseAsset,
   fetchReleaseFromGithub,
   tryParseGithubUrl,
+  downloadFromGitHubRelease,
 } from './github.js';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
@@ -29,6 +30,8 @@ import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import * as tar from 'tar';
 import * as archiver from 'archiver';
+import { Readable } from 'node:stream';
+import * as https from 'node:https';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../extension-manager.js';
 import { loadSettings } from '../settings.js';
@@ -53,6 +56,28 @@ vi.mock('./github_fetch.js', async (importOriginal) => {
   return {
     ...actual,
     fetchJson: fetchJsonMock,
+  };
+});
+
+const mocks = vi.hoisted(() => ({
+  tarX: vi.fn(),
+  extract: vi.fn(),
+}));
+
+vi.mock('node:https');
+vi.mock('tar', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('tar')>();
+  return {
+    ...actual,
+    x: mocks.tarX,
+  };
+});
+vi.mock('extract-zip', async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    default: mocks.extract,
   };
 });
 
@@ -411,6 +436,11 @@ describe('git extension helpers', () => {
 
     beforeEach(async () => {
       tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+      const actualTar = await vi.importActual<typeof import('tar')>('tar');
+      mocks.tarX.mockImplementation(actualTar.x);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const actualExtract = await vi.importActual<any>('extract-zip');
+      mocks.extract.mockImplementation(actualExtract.default);
     });
 
     afterEach(async () => {
@@ -482,6 +512,94 @@ describe('git extension helpers', () => {
       await expect(
         extractFile(unsupportedFilePath, extractionDest),
       ).rejects.toThrow('Unsupported file extension for extraction:');
+    });
+  });
+
+  describe('downloadFromGitHubRelease', () => {
+    let tempDir: string;
+    let mockHttpsGet: MockedFunction<typeof https.get>;
+
+    beforeEach(async () => {
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+      mocks.tarX.mockResolvedValue(undefined);
+      mocks.extract.mockResolvedValue(undefined);
+
+      mockHttpsGet = vi.mocked(https.get);
+      mockHttpsGet.mockImplementation((_url, _options, callback) => {
+        const response = new Readable();
+        response.push('dummy content');
+        response.push(null);
+        // @ts-expect-error: Mocking statusCode on Readable stream
+        response.statusCode = 200;
+        // @ts-expect-error: Mocking callback with Readable stream
+        callback(response);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return { on: vi.fn() } as any;
+      });
+    });
+
+    afterEach(async () => {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    it('should use application/octet-stream for binary assets', async () => {
+      const installMetadata = {
+        source: 'owner/repo',
+        type: 'github-release' as const,
+        ref: 'v1.0.0',
+      };
+      const githubRepoInfo = { owner: 'owner', repo: 'repo' };
+
+      fetchJsonMock.mockResolvedValue({
+        tag_name: 'v1.0.0',
+        assets: [
+          {
+            name: 'darwin.arm64.extension.tar.gz',
+            url: 'https://api.github.com/assets/1',
+          },
+        ],
+      });
+      mockPlatform.mockReturnValue('darwin');
+      mockArch.mockReturnValue('arm64');
+
+      await downloadFromGitHubRelease(installMetadata, tempDir, githubRepoInfo);
+
+      expect(mockHttpsGet).toHaveBeenCalledWith(
+        'https://api.github.com/assets/1',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Accept: 'application/octet-stream',
+          }),
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('should use application/vnd.github+json for source tarballs', async () => {
+      const installMetadata = {
+        source: 'owner/repo',
+        type: 'github-release' as const,
+        ref: 'v1.0.0',
+      };
+      const githubRepoInfo = { owner: 'owner', repo: 'repo' };
+
+      fetchJsonMock.mockResolvedValue({
+        tag_name: 'v1.0.0',
+        assets: [],
+        tarball_url: 'https://api.github.com/repos/owner/repo/tarball/v1.0.0',
+      });
+
+      await downloadFromGitHubRelease(installMetadata, tempDir, githubRepoInfo);
+
+      expect(mockHttpsGet).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/tarball/v1.0.0',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Accept: 'application/vnd.github+json',
+          }),
+        }),
+        expect.any(Function),
+      );
     });
   });
 });
