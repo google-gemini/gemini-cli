@@ -63,6 +63,16 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'Install Landlock runner dependencies'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+          rustup target add x86_64-unknown-linux-musl
+
       - name: 'Install dependencies'
         run: 'npm ci'
 
@@ -136,6 +146,16 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
+
+      - name: 'Install Landlock runner dependencies'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+          rustup target add x86_64-unknown-linux-musl
 
       - name: 'Build project'
         run: 'npm run build'

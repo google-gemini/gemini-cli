@@ -81,7 +81,7 @@ try {
 
     if (!targetAvailable) {
       try {
-        execSync('rustup --version', { stdio: 'ignore' });
+        execFileSync('rustup', ['--version'], { stdio: 'ignore' });
         execFileSync('rustup', ['target', 'add', target], { stdio: 'inherit' });
       } catch (err) {
         console.error(
