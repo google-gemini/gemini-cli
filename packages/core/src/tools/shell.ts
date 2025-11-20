@@ -30,8 +30,11 @@ import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {
   ShellExecutionConfig,
   ShellOutputEvent,
+  ShellExecutionHandle,
 } from '../services/shellExecutionService.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
+import { ensureLandlockRunner } from '../sandbox/linux/landlockRunner.js';
+import { quote } from 'shell-quote';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -56,6 +59,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ShellToolParams,
   ToolResult
 > {
+  private disableToolSandbox = false;
+
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
@@ -65,6 +70,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
+  disableSandboxForRetry(): void {
+    this.disableToolSandbox = true;
+  }
+
+  getOriginalCommand(): string {
+    return this.params.command;
   }
 
   getDescription(): string {
@@ -169,58 +182,126 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
-      const { result: resultPromise, pid } =
-        await ShellExecutionService.execute(
+      const handleShellOutput = (event: ShellOutputEvent) => {
+        if (!updateOutput) {
+          return;
+        }
+
+        let shouldUpdate = false;
+
+        switch (event.type) {
+          case 'data':
+            if (isBinaryStream) break;
+            cumulativeOutput = event.chunk;
+            shouldUpdate = true;
+            break;
+          case 'binary_detected':
+            isBinaryStream = true;
+            cumulativeOutput = '[Binary output detected. Halting stream...]';
+            shouldUpdate = true;
+            break;
+          case 'binary_progress':
+            isBinaryStream = true;
+            cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
+              event.bytesReceived,
+            )} received]`;
+            if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+              shouldUpdate = true;
+            }
+            break;
+          default: {
+            throw new Error('An unhandled ShellOutputEvent was found.');
+          }
+        }
+
+        if (shouldUpdate) {
+          updateOutput(cumulativeOutput);
+          lastUpdateTime = Date.now();
+        }
+      };
+
+      const useLandlockSandbox =
+        this.config.getToolSandbox()?.mode === 'landlock' &&
+        os.platform() === 'linux' &&
+        !process.env['SANDBOX'] &&
+        !this.disableToolSandbox;
+
+      let handle: ShellExecutionHandle;
+      if (useLandlockSandbox) {
+        const workspacePaths = this.config
+          .getWorkspaceContext()
+          .getDirectories()
+          .map((dir) => fs.realpathSync(dir));
+
+        const readWritePaths = Array.from(
+          new Set([
+            ...workspacePaths,
+            fs.realpathSync(this.config.getTargetDir()),
+            fs.realpathSync(os.tmpdir()),
+            // Allow harmless redirection targets (e.g., `> /dev/null`) inside the tool sandbox.
+            fs.realpathSync('/dev/null'),
+          ]),
+        );
+
+        const runnerPath = ensureLandlockRunner();
+        const runnerArgs = [
+          runnerPath,
+          ...readWritePaths.flatMap((p) => ['--rw', p]),
+          '--',
+          'bash',
+          '-c',
           commandToExecute,
+        ];
+
+        const sandboxedCommand = quote(runnerArgs);
+
+        handle = await ShellExecutionService.execute(
+          sandboxedCommand,
           cwd,
-          (event: ShellOutputEvent) => {
-            if (!updateOutput) {
-              return;
-            }
-
-            let shouldUpdate = false;
-
-            switch (event.type) {
-              case 'data':
-                if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
-                shouldUpdate = true;
-                break;
-              case 'binary_detected':
-                isBinaryStream = true;
-                cumulativeOutput =
-                  '[Binary output detected. Halting stream...]';
-                shouldUpdate = true;
-                break;
-              case 'binary_progress':
-                isBinaryStream = true;
-                cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
-                  event.bytesReceived,
-                )} received]`;
-                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                  shouldUpdate = true;
-                }
-                break;
-              default: {
-                throw new Error('An unhandled ShellOutputEvent was found.');
-              }
-            }
-
-            if (shouldUpdate) {
-              updateOutput(cumulativeOutput);
-              lastUpdateTime = Date.now();
-            }
-          },
+          updateOutput ? handleShellOutput : () => {},
           signal,
           this.config.getEnableInteractiveShell(),
           shellExecutionConfig ?? {},
         );
 
-      if (pid && setPidCallback) {
-        setPidCallback(pid);
+        if (handle.pid && setPidCallback) {
+          setPidCallback(handle.pid);
+        }
+      } else {
+        handle = await ShellExecutionService.execute(
+          commandToExecute,
+          cwd,
+          updateOutput ? handleShellOutput : () => {},
+          signal,
+          this.config.getEnableInteractiveShell(),
+          shellExecutionConfig ?? {},
+        );
+
+        if (handle.pid && setPidCallback) {
+          setPidCallback(handle.pid);
+        }
       }
 
-      const result = await resultPromise;
+      const result = await handle.result;
+
+      const sandboxErrorHint = () => {
+        if (!useLandlockSandbox) return undefined;
+        const output = result.output.toLowerCase();
+        const err = result.error?.message.toLowerCase() ?? '';
+        if (
+          output.includes('operation not permitted') ||
+          output.includes('permission denied') ||
+          err.includes('operation not permitted') ||
+          err.includes('permission denied')
+        ) {
+          return {
+            message:
+              'Command likely blocked by the per-tool sandbox (Landlock). You can retry with a relaxed sandbox policy (e.g., disable per-tool sandbox) if you accept the risk.',
+            type: ToolErrorType.SANDBOX_DENIED,
+          } as const;
+        }
+        return undefined;
+      };
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -298,14 +379,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
-      const executionError = result.error
-        ? {
-            error: {
-              message: result.error.message,
-              type: ToolErrorType.SHELL_EXECUTE_ERROR,
-            },
-          }
-        : {};
+      const sandboxError = sandboxErrorHint();
+      const executionError = sandboxError
+        ? { error: sandboxError }
+        : result.error
+          ? {
+              error: {
+                message: result.error.message,
+                type: ToolErrorType.SHELL_EXECUTE_ERROR,
+              },
+            }
+          : {};
       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
         const summary = await summarizeToolOutput(
           this.config,
@@ -316,14 +400,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
         );
         return {
           llmContent: summary,
-          returnDisplay: returnDisplayMessage,
+          returnDisplay: sandboxError
+            ? `${returnDisplayMessage || 'Command failed.'}\n${sandboxError.message}`
+            : returnDisplayMessage,
           ...executionError,
         };
       }
 
       return {
         llmContent,
-        returnDisplay: returnDisplayMessage,
+        returnDisplay: sandboxError
+          ? `${returnDisplayMessage || 'Command failed.'}\n${sandboxError.message}`
+          : returnDisplayMessage,
         ...executionError,
       };
     } finally {
