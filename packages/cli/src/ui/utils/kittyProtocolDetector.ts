@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
+
 let detectionComplete = false;
 
 let kittySupported = false;
-let sgrMouseSupported = false;
 
 let kittyEnabled = false;
-let sgrMouseEnabled = false;
 
 /**
  * Detects Kitty keyboard protocol support.
@@ -48,7 +48,7 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
         process.stdin.setRawMode(false);
       }
 
-      if (kittySupported || sgrMouseSupported) {
+      if (kittySupported) {
         enableSupportedProtocol();
         process.on('exit', disableAllProtocols);
         process.on('SIGTERM', disableAllProtocols);
@@ -81,19 +81,14 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
           kittySupported = true;
         }
 
-        // Broaden mouse support by enabling SGR mode if we get any device
-        // attribute response, which is a strong signal of a modern terminal.
-        sgrMouseSupported = true;
-
         finish();
       }
     };
 
     process.stdin.on('data', handleData);
 
-    // Send queries
-    process.stdout.write('\x1b[?u'); // Query progressive enhancement
-    process.stdout.write('\x1b[c'); // Query device attributes
+    // Query progressive enhancement and device attributes
+    fs.writeSync(process.stdout.fd, '\x1b[?u\x1b[c');
 
     // Timeout after 200ms
     // When a iterm2 terminal does not have focus this can take over 90s on a
@@ -107,13 +102,14 @@ export function isKittyProtocolEnabled(): boolean {
 }
 
 function disableAllProtocols() {
-  if (kittyEnabled) {
-    process.stdout.write('\x1b[<u');
-    kittyEnabled = false;
-  }
-  if (sgrMouseEnabled) {
-    process.stdout.write('\x1b[?1006l'); // Disable SGR Mouse
-    sgrMouseEnabled = false;
+  try {
+    if (kittyEnabled) {
+      // use writeSync to avoid race conditions
+      fs.writeSync(process.stdout.fd, '\x1b[<u');
+      kittyEnabled = false;
+    }
+  } catch {
+    // Ignore
   }
 }
 
@@ -122,12 +118,13 @@ function disableAllProtocols() {
  * change the mode.
  */
 export function enableSupportedProtocol(): void {
-  if (kittySupported) {
-    process.stdout.write('\x1b[>1u');
-    kittyEnabled = true;
-  }
-  if (sgrMouseSupported) {
-    process.stdout.write('\x1b[?1006h');
-    sgrMouseEnabled = true;
+  try {
+    if (kittySupported) {
+      // use writeSync to avoid race conditions
+      fs.writeSync(process.stdout.fd, '\x1b[>1u');
+      kittyEnabled = true;
+    }
+  } catch {
+    // Ignore
   }
 }
