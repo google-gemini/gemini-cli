@@ -263,19 +263,21 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       if (argv['prompt'] && argv['promptInteractive']) {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
       }
-      if (argv.resume && !argv.prompt && !process.stdin.isTTY) {
+      if (argv['resume'] && !argv['prompt'] && !process.stdin.isTTY) {
         throw new Error(
           'When resuming a session, you must provide a message via --prompt (-p) or stdin',
         );
       }
-      if (argv.yolo && argv['approvalMode']) {
+      if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
       }
       if (
-        argv.outputFormat &&
-        !['text', 'json', 'stream-json'].includes(argv.outputFormat as string)
+        argv['outputFormat'] &&
+        !['text', 'json', 'stream-json'].includes(
+          argv['outputFormat'] as string,
+        )
       ) {
-        return `Invalid values:\n  Argument: output-format, Given: "${argv.outputFormat}", Choices: "text", "json", "stream-json"`;
+        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
       }
       return true;
     });
