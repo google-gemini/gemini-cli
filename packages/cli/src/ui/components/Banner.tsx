@@ -8,7 +8,6 @@ import { Box, Text } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import type { ReactNode } from 'react';
-import { Colors } from '../colors.js';
 
 export function getFormattedBannerContent(
   rawText: string,
@@ -60,7 +59,7 @@ export const Banner = ({ bannerText, isWarning, width }: BannerProps) => {
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={isWarning ? theme.status.warning : Colors.Gray}
+      borderColor={isWarning ? theme.status.warning : theme.border.default}
       width={width}
       paddingLeft={1}
       paddingRight={1}
