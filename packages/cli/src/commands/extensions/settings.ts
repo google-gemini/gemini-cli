@@ -5,14 +5,13 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { ExtensionManager } from '../../config/extension-manager.js';
 import {
   getEnvContents,
   updateSetting,
   promptForSetting,
 } from '../../config/extensions/extensionSettings.js';
-import { loadSettings } from '../../config/settings.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { getExtensionAndManager } from './utils.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // --- SET COMMAND ---
 interface SetArgs {
@@ -45,7 +44,9 @@ const setCommand: CommandModule<object, SetArgs> = {
       extension.path,
     );
     if (!extensionConfig) {
-      console.error(`Could not find configuration for extension "${name}".`);
+      debugLogger.error(
+        `Could not find configuration for extension "${name}".`,
+      );
       return;
     }
     await updateSetting(
@@ -56,27 +57,6 @@ const setCommand: CommandModule<object, SetArgs> = {
     );
   },
 };
-
-async function getExtensionAndManager(name: string) {
-  const workspaceDir = process.cwd();
-  const extensionManager = new ExtensionManager({
-    workspaceDir,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    settings: loadSettings(workspaceDir).merged,
-  });
-  await extensionManager.loadExtensions();
-  const extension = extensionManager
-    .getExtensions()
-    .find((ext) => ext.name === name);
-
-  if (!extension) {
-    console.error(`Extension "${name}" is not installed.`);
-    return { extension: null, extensionManager: null };
-  }
-
-  return { extension, extensionManager };
-}
 
 // --- LIST COMMAND ---
 interface ListArgs {
@@ -106,13 +86,13 @@ const listCommand: CommandModule<object, ListArgs> = {
       !extensionConfig.settings ||
       extensionConfig.settings.length === 0
     ) {
-      console.log(`Extension "${name}" has no settings to configure.`);
+      debugLogger.log(`Extension "${name}" has no settings to configure.`);
       return;
     }
 
     const currentSettings = await getEnvContents(extensionConfig, extension.id);
 
-    console.log(`Settings for "${name}":`);
+    debugLogger.log(`Settings for "${name}":`);
     for (const setting of extensionConfig.settings) {
       const value = currentSettings[setting.envVar];
       let displayValue: string;
@@ -123,17 +103,17 @@ const listCommand: CommandModule<object, ListArgs> = {
       } else {
         displayValue = value;
       }
-      console.log(`
+      debugLogger.log(`
 - ${setting.name} (${setting.envVar})`);
-      console.log(`  Description: ${setting.description}`);
-      console.log(`  Value: ${displayValue}`);
+      debugLogger.log(`  Description: ${setting.description}`);
+      debugLogger.log(`  Value: ${displayValue}`);
     }
   },
 };
 
-// --- CONFIGURE COMMAND ---
-export const configureCommand: CommandModule = {
-  command: 'configure <command>',
+// --- SETTINGS COMMAND ---
+export const settingsCommand: CommandModule = {
+  command: 'settings <command>',
   describe: 'Manage extension settings.',
   builder: (yargs) =>
     yargs

@@ -14,7 +14,7 @@ import { enableCommand } from './extensions/enable.js';
 import { linkCommand } from './extensions/link.js';
 import { newCommand } from './extensions/new.js';
 import { validateCommand } from './extensions/validate.js';
-import { configureCommand } from './extensions/configure.js';
+import { settingsCommand } from './extensions/settings.js';
 
 export const extensionsCommand: CommandModule = {
   command: 'extensions <command>',
@@ -31,7 +31,7 @@ export const extensionsCommand: CommandModule = {
       .command(linkCommand)
       .command(newCommand)
       .command(validateCommand)
-      .command(configureCommand)
+      .command(settingsCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {

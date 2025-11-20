@@ -12,7 +12,7 @@ import { ExtensionStorage } from './storage.js';
 import type { ExtensionConfig } from '../extension.js';
 
 import prompts from 'prompts';
-import { KeychainTokenStorage } from '@google/gemini-cli-core';
+import { debugLogger, KeychainTokenStorage } from '@google/gemini-cli-core';
 
 export interface ExtensionSetting {
   name: string;
@@ -57,7 +57,7 @@ export async function maybePromptForSettings(
     previousExtensionConfig?.settings ?? [],
   );
 
-  const allSettings: Record<string, string> = { ...(previousSettings ?? {}) };
+  const allSettings: Record<string, string> = { ...previousSettings };
 
   for (const removedEnvSetting of settingsChanges.removeEnv) {
     delete allSettings[removedEnvSetting.envVar];
@@ -153,7 +153,7 @@ export async function updateSetting(
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
   if (!settings || settings.length === 0) {
-    console.log('This extension does not have any settings.');
+    debugLogger.log('This extension does not have any settings.');
     return;
   }
 
@@ -162,7 +162,7 @@ export async function updateSetting(
   );
 
   if (!settingToUpdate) {
-    console.log(`Setting ${settingKey} not found.`);
+    debugLogger.log(`Setting ${settingKey} not found.`);
     return;
   }
 

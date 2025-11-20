@@ -162,11 +162,11 @@ The file has the following structure:
   your extension in the CLI. Note that we expect this name to match the
   extension directory name.
 - `version`: The version of the extension.
-- `mcpServers`: A map of MCP servers to configure. The key is the name of the
+- `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers configured in a
+  loaded on startup just like MCP servers settingsd in a
   [`settings.json` file](../get-started/configuration.md). If both an extension
-  and a `settings.json` file configure an MCP server with the same name, the
+  and a `settings.json` file settings an MCP server with the same name, the
   server defined in the `settings.json` file takes precedence.
   - Note that all MCP server configuration options are supported except for
     `trust`.
@@ -225,13 +225,13 @@ key. The value will be saved to a `.env` file in the extension's directory
 You can view a list of an extension's settings by running:
 
 ```
-gemini extensions configure list <extension name>
+gemini extensions settings list <extension name>
 ```
 
 and you can update a given setting using:
 
 ```
-gemini extensions configure set <extension name> <setting name>
+gemini extensions settings set <extension name> <setting name>
 ```
 
 ### Custom commands
