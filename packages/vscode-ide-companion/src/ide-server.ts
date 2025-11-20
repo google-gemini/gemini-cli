@@ -505,11 +505,14 @@ const createMcpServer = (
     }: z.infer<typeof CreateTerminalRequestSchema>) => {
       log(`Received createTerminal request. Log file: ${logFile}`);
 
-      // Use 'script' to record the session.
-      // -f: Flush output after each write.
-      // -q: Quiet mode.
-      // The command runs a shell and records everything to logFile.
-      const shellArgs = ['-f', '-q', logFile];
+      const isMac = os.platform() === 'darwin';
+      const shellPath = '/usr/bin/script';
+      // -F: Flush output immediately (macOS)
+      // -f: Flush output after each write (Linux)
+      // -q: Quiet mode
+      const shellArgs = isMac
+        ? ['-F', '-q', logFile, '/bin/bash']
+        : ['-f', '-q', logFile, '/bin/bash'];
 
       // Ensure the log file exists
       try {
@@ -521,7 +524,7 @@ const createMcpServer = (
 
       const terminal = vscode.window.createTerminal({
         name: name ?? 'Gemini Terminal',
-        shellPath: 'script',
+        shellPath,
         shellArgs,
         cwd,
       });
