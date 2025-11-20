@@ -170,6 +170,7 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
+  const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -666,8 +667,31 @@ Logging in with Google... Please restart Gemini CLI to continue.
   );
 
   const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
-    cancelHandlerRef.current(shouldRestorePrompt);
+    if (shouldRestorePrompt) {
+      setPendingRestorePrompt(true);
+    } else {
+      setPendingRestorePrompt(false);
+      cancelHandlerRef.current(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (pendingRestorePrompt) {
+      const lastHistoryUserMsg = historyManager.history.findLast(
+        (h) => h.type === 'user',
+      );
+      const lastUserMsg = userMessages.at(-1);
+
+      if (
+        !lastHistoryUserMsg ||
+        (typeof lastHistoryUserMsg.text === 'string' &&
+          lastHistoryUserMsg.text === lastUserMsg)
+      ) {
+        cancelHandlerRef.current(true);
+        setPendingRestorePrompt(false);
+      }
+    }
+  }, [pendingRestorePrompt, userMessages, historyManager.history]);
 
   const {
     streamingState,
