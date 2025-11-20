@@ -16,6 +16,8 @@ import {
 } from 'react';
 import { getBoundingBox, type DOMElement } from 'ink';
 import { useMouse, type MouseEvent } from '../hooks/useMouse.js';
+import { useSettings } from './SettingsContext.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export interface ScrollState {
   scrollTop: number;
@@ -39,6 +41,21 @@ interface ScrollContextType {
 }
 
 const ScrollContext = createContext<ScrollContextType | null>(null);
+
+// To prevent scroll events from firing too quickly. 16ms is roughly 60fps.
+const SCROLL_RATE_LIMIT_MS = 16;
+// Determines the time window to consider a scroll "fast".
+const FAST_SCROLL_THRESHOLD_MS = 50;
+// The number of scroll events in the same direction that have to occur before
+// we change the speed.
+const MIN_CONSECUTIVE_FAST_SCROLLS = 4;
+// The number of scroll events in the same direction that have to occur while
+// scrolling fast before we reach the full scroll speed multiplier.
+const SCROLL_ACCELERATION_EVENTS = 4;
+// The duration of the smooth scroll animation.
+const SCROLL_ANIMATION_DURATION_MS = 100;
+// The time to wait before resetting the continuous scroll target.
+const SCROLL_TARGET_RESET_TIMEOUT_MS = 150;
 
 const findScrollableCandidates = (
   mouseEvent: MouseEvent,
@@ -96,8 +113,16 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     scrollablesRef.current = scrollables;
   }, [scrollables]);
 
-  const pendingScrollsRef = useRef(new Map<string, number>());
-  const flushScheduledRef = useRef(false);
+  const settings = useSettings();
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  const lastScrollRateLimitTimeRef = useRef(0);
+  const lastScrollEventTimeRef = useRef(0);
+
+  const fastScrollCounterRef = useRef(1);
+  const lastFastScrollDirectionRef = useRef<'up' | 'down' | null>(null);
+  const lastMultiplierRef = useRef(1);
 
   const dragStateRef = useRef<{
     active: boolean;
@@ -109,54 +134,114 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     offset: 0,
   });
 
-  const scheduleFlush = useCallback(() => {
-    if (!flushScheduledRef.current) {
-      flushScheduledRef.current = true;
-      setTimeout(() => {
-        flushScheduledRef.current = false;
-        for (const [id, delta] of pendingScrollsRef.current.entries()) {
-          const entry = scrollablesRef.current.get(id);
-          if (entry) {
-            entry.scrollBy(delta);
+  const scrollTargetRef = useRef<number | null>(null);
+  const scrollDirectionRef = useRef<'up' | 'down' | null>(null);
+  const scrollResetTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleScroll = useCallback(
+    (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
+      const scrollWheelSpeed =
+        settingsRef.current.merged.ui?.scrollWheelSpeed ?? 5;
+
+      const now = Date.now();
+      if (now - lastScrollRateLimitTimeRef.current < SCROLL_RATE_LIMIT_MS) {
+        return true; // Rate limit exceeded, consume event but do nothing.
+      }
+      lastScrollRateLimitTimeRef.current = now;
+
+      const candidate = findScrollableCandidates(
+        mouseEvent,
+        scrollablesRef.current,
+      )[0];
+      if (!candidate) {
+        return false;
+      }
+
+      const timeSinceLastScroll = now - lastScrollEventTimeRef.current;
+      lastScrollEventTimeRef.current = now;
+
+      if (
+        lastFastScrollDirectionRef.current === direction &&
+        timeSinceLastScroll < FAST_SCROLL_THRESHOLD_MS
+      ) {
+        fastScrollCounterRef.current++;
+      } else {
+        fastScrollCounterRef.current = 1;
+        lastFastScrollDirectionRef.current = direction;
+      }
+
+      let multiplier = 1;
+      const fastScrollCount = fastScrollCounterRef.current;
+      const startAccelThreshold = MIN_CONSECUTIVE_FAST_SCROLLS;
+
+      if (fastScrollCount >= startAccelThreshold) {
+        const accelEvents = SCROLL_ACCELERATION_EVENTS;
+        if (accelEvents > 0) {
+          const stepsIntoAccel = fastScrollCount - startAccelThreshold;
+          const progress = Math.min(1, (stepsIntoAccel + 1) / accelEvents);
+          multiplier = 1 + (scrollWheelSpeed - 1) * progress;
+        } else {
+          multiplier = scrollWheelSpeed;
+        }
+      }
+
+      if (multiplier > 1) {
+        debugLogger.log(`Scroll speed factor: ${multiplier}`);
+      } else if (lastMultiplierRef.current > 1 && multiplier === 1) {
+        debugLogger.log('Scroll speed factor reset to 1');
+      }
+      lastMultiplierRef.current = multiplier;
+
+      const scrollAmount = (direction === 'up' ? -1 : 1) * multiplier;
+
+      const isAnimatedScroll =
+        !!candidate.scrollTo && multiplier > 1 && scrollWheelSpeed > 1;
+
+      if (!isAnimatedScroll) {
+        candidate.scrollBy(scrollAmount);
+
+        if (candidate.scrollTo) {
+          // Reset animation state if we are switching back to non-animated.
+          scrollTargetRef.current = null;
+          scrollDirectionRef.current = null;
+          if (scrollResetTimerRef.current) {
+            clearTimeout(scrollResetTimerRef.current);
+            scrollResetTimerRef.current = null;
           }
         }
-        pendingScrollsRef.current.clear();
-      }, 0);
-    }
-  }, []);
-
-  const handleScroll = (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
-    const delta = direction === 'up' ? -1 : 1;
-    const candidates = findScrollableCandidates(
-      mouseEvent,
-      scrollablesRef.current,
-    );
-
-    for (const candidate of candidates) {
-      const { scrollTop, scrollHeight, innerHeight } =
-        candidate.getScrollState();
-      const pendingDelta = pendingScrollsRef.current.get(candidate.id) || 0;
-      const effectiveScrollTop = scrollTop + pendingDelta;
-
-      // Epsilon to handle floating point inaccuracies.
-      const canScrollUp = effectiveScrollTop > 0.001;
-      const canScrollDown =
-        effectiveScrollTop < scrollHeight - innerHeight - 0.001;
-
-      if (direction === 'up' && canScrollUp) {
-        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
-        scheduleFlush();
         return true;
       }
 
-      if (direction === 'down' && canScrollDown) {
-        pendingScrollsRef.current.set(candidate.id, pendingDelta + delta);
-        scheduleFlush();
-        return true;
+      if (scrollResetTimerRef.current) {
+        clearTimeout(scrollResetTimerRef.current);
       }
-    }
-    return false;
-  };
+
+      const { scrollTop } = candidate.getScrollState();
+      let currentTarget = scrollTargetRef.current;
+
+      if (scrollDirectionRef.current !== direction || currentTarget === null) {
+        currentTarget = scrollTop;
+      }
+
+      const newTarget = currentTarget + scrollAmount;
+
+      scrollTargetRef.current = newTarget;
+      scrollDirectionRef.current = direction;
+
+      // We know scrollTo is defined because of the isAnimatedScroll check.
+      if (candidate.scrollTo) {
+        candidate.scrollTo(newTarget, SCROLL_ANIMATION_DURATION_MS);
+      }
+
+      scrollResetTimerRef.current = setTimeout(() => {
+        scrollTargetRef.current = null;
+        scrollDirectionRef.current = null;
+      }, SCROLL_TARGET_RESET_TIMEOUT_MS);
+
+      return true;
+    },
+    [],
+  );
 
   const handleLeftPress = (mouseEvent: MouseEvent) => {
     // Check for scrollbar interaction first

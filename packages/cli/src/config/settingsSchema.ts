@@ -531,6 +531,16 @@ const SETTINGS_SCHEMA = {
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
+      scrollWheelSpeed: {
+        type: 'number',
+        label: 'Scroll Wheel Speed',
+        category: 'UI',
+        requiresRestart: false,
+        default: 5,
+        description:
+          'The number of lines to scroll when mouse wheel ticks occur in quick succession.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',

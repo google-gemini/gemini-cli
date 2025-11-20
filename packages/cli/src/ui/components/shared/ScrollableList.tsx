@@ -108,15 +108,11 @@ function ScrollableList<T>(
 
   const smoothScrollTo = useCallback(
     (targetScrollTop: number, duration: number = 200) => {
-      stopSmoothScroll();
+      const scrollState = virtualizedListRef.current?.getScrollState();
+      if (!scrollState) return;
 
-      const scrollState = virtualizedListRef.current?.getScrollState() ?? {
-        scrollTop: 0,
-        scrollHeight: 0,
-        innerHeight: 0,
-      };
       const {
-        scrollTop: startScrollTop,
+        scrollTop: currentScrollTop,
         scrollHeight,
         innerHeight,
       } = scrollState;
@@ -134,48 +130,49 @@ function ScrollableList<T>(
       );
 
       if (duration === 0) {
-        if (targetScrollTop === SCROLL_TO_ITEM_END) {
-          virtualizedListRef.current?.scrollTo(SCROLL_TO_ITEM_END);
-        } else {
-          virtualizedListRef.current?.scrollTo(Math.round(clampedTarget));
-        }
+        stopSmoothScroll();
+        virtualizedListRef.current?.scrollTo(Math.round(clampedTarget));
         flashScrollbar();
         return;
       }
 
-      smoothScrollState.current = {
-        active: true,
-        start: Date.now(),
-        from: startScrollTop,
-        to: clampedTarget,
-        duration,
-        timer: setInterval(() => {
+      // If an animation is not active, start a new one.
+      if (!smoothScrollState.current.active) {
+        smoothScrollState.current.from = currentScrollTop;
+        smoothScrollState.current.start = Date.now();
+        smoothScrollState.current.duration = duration;
+        smoothScrollState.current.active = true;
+
+        smoothScrollState.current.timer = setInterval(() => {
+          const state = smoothScrollState.current;
+          if (!state.active) {
+            stopSmoothScroll();
+            return;
+          }
+
           const now = Date.now();
-          const elapsed = now - smoothScrollState.current.start;
-          const progress = Math.min(elapsed / duration, 1);
+          const elapsed = now - state.start;
+          const progress = Math.min(elapsed / state.duration, 1);
 
           // Ease-in-out
           const t = progress;
           const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
-          const current =
-            smoothScrollState.current.from +
-            (smoothScrollState.current.to - smoothScrollState.current.from) *
-              ease;
+          // The target `state.to` can be updated externally by new calls to smoothScrollTo.
+          const current = state.from + (state.to - state.from) * ease;
 
           if (progress >= 1) {
-            if (targetScrollTop === SCROLL_TO_ITEM_END) {
-              virtualizedListRef.current?.scrollTo(SCROLL_TO_ITEM_END);
-            } else {
-              virtualizedListRef.current?.scrollTo(Math.round(current));
-            }
+            virtualizedListRef.current?.scrollTo(Math.round(state.to));
             stopSmoothScroll();
             flashScrollbar();
           } else {
             virtualizedListRef.current?.scrollTo(Math.round(current));
           }
-        }, ANIMATION_FRAME_DURATION_MS),
-      };
+        }, ANIMATION_FRAME_DURATION_MS);
+      }
+
+      // Always update the target, for both new and ongoing animations.
+      smoothScrollState.current.to = clampedTarget;
     },
     [stopSmoothScroll, flashScrollbar],
   );
