@@ -38,15 +38,23 @@ export function isPrivateIp(url: string): boolean {
   }
 }
 
+/**
+ * Fetch with a hard timeout. Any provided RequestInit options are used
+ * except for `signal`, which is managed internally for the timeout.
+ */
 export async function fetchWithTimeout(
   url: string,
   timeout: number,
+  options?: Omit<RequestInit, 'signal'>,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
     return response;
   } catch (error) {
     if (isNodeError(error) && error.code === 'ABORT_ERR') {
