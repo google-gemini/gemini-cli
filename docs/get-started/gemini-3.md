@@ -100,7 +100,80 @@ manage your usage limits:
 To learn more about selecting a model and routing, refer to
 [Gemini CLI Model Selection](../cli/model.md).
 
-## Need help?
+## Troubleshooting Gemini 3 Pro on Gemini CLI
+
+Having trouble? Answers for common issues.
+
+### How can I access Gemini 3 Pro today?
+
+New
+[Google AI Ultra subscribers](https://one.google.com/intl/en/about/google-ai-plans/)
+will receive access to Gemini 3 Pro, **excluding** Google AI Ultra for Business
+accounts. Other users are invited to
+[sign up for the waitlist](https://goo.gle/geminicli-waitlist-signup), which is
+being processed in batches as availability opens.
+
+### I should have access to Gemini 3 Pro but I don’t.
+
+Gemini 3 Pro access is currently available to users with the following accounts:
+
+- Gemini AI Ultra (**excluding** Gemini AI Ultra for Business).
+- **Paid** Gemini API keys.
+- **Paid** Vertex API keys.
+
+If you’re certain your account has one of the required subscriptions and you’re
+still unable to access Gemini 3 Pro, you might just need to update your settings
+or reauthenticate.
+
+Perform the following steps to troubleshoot your access:
+
+1. **Turn on Preview Features**. Run the `/setting` command in the CLI and
+   ensure that **Preview Features** is set to `true`. You can’t use Gemini 3 Pro
+   if the Preview Features setting is turned off.
+2. **Restart the CLI.** Use `/quit` to exit the CLI and reopen it with the
+   `gemini` command.
+3. **Reauthenticate.** Run the `/auth` command in the CLI to re-establish your
+   credentials.
+
+### I am receiving a 400 / 404 / 500 error when trying to access Gemini 3 Pro.
+
+Gemini CLI may return a 400, 404, or 500 error if it can’t access Gemini 3 Pro.
+This could happen if you don’t have access to the model under the current
+account you’re using—or during times of high capacity.
+
+If you’ve received one of these error codes when trying to use Gemini 3 Pro,
+first try the following:
+
+1. **Confirm your access.** Review the eligibility requirements listed above to
+   confirm that your account type should have access to Gemini 3 Pro.
+2. **(If using Google Cloud) Confirm your region.** Gemini 3 Pro is only
+   available in the Global region for Google Cloud. Close Gemini CLI and run
+   `export GOOGLE_CLOUD_LOCATION=global`. Reopen Gemini CLI.
+3. **Wait a few minutes.** During times of high use, you may hit a rate limit.
+   Wait a few minutes before submitting your prompt again.
+4. **Restart and reauthenticate**. If this issue persists, close Gemini CLI,
+   reopen the CLI, and reauthenticate using the `/auth` command.
+
+If you’re still receiving the error, you can
+[search GitHub issues](https://github.com/google-gemini/gemini-cli/issues) for
+currently active issues..
+
+### I upgraded my account from Google AI Pro to Google AI Ultra but I’m still having trouble accessing Gemini 3 Pro.
+
+If you’ve upgraded your account, you may still need to restart Gemini CLI and
+log in again to activate your new quota in your current session.
+
+1. **Restart the CLI. **Use `/quit` to exit the CLI and reopen it with the
+   `gemini` command.
+2. **Reauthenticate.** Run the `/auth` command in the CLI to re-establish your
+   credentials.
+
+You should now be able to resume working with your extra quota.
+
+If you’re still having issues after logging in again, let us know by
+[filing a GitHub issue](https://github.com/google-gemini/gemini-cli/issues).
+
+## Still need help?
 
 If you need help, we recommend searching for an existing
 [GitHub issue](https://github.com/google-gemini/gemini-cli/issues). If you
