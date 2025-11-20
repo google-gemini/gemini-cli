@@ -31,7 +31,8 @@ function normalizeOption(
 
   const normalized = option.toString().toLowerCase().trim();
   if (normalized === 'true' || normalized === '1') return 'landlock';
-  if (normalized === 'false' || normalized === '0' || normalized === '') return '';
+  if (normalized === 'false' || normalized === '0' || normalized === '')
+    return '';
 
   return normalized as ToolSandboxConfig['mode'];
 }
