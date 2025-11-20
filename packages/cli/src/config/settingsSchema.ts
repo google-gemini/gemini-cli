@@ -164,7 +164,7 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Preview Features (e.g., models)',
         category: 'General',
-        requiresRestart: true,
+        requiresRestart: false,
         default: false,
         description: 'Enable preview features (e.g., preview models).',
         showInDialog: true,

@@ -26,7 +26,7 @@
         "previewFeatures": {
           "title": "Preview Features (e.g., models)",
           "description": "Enable preview features (e.g., preview models).",
-          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
+          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
