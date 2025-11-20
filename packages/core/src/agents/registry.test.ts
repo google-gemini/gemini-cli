@@ -9,6 +9,7 @@ import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
@@ -60,14 +61,14 @@ describe('AgentRegistry', () => {
     it('should log the count of loaded agents in debug mode', async () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
-      const consoleLogSpy = vi
-        .spyOn(console, 'log')
+      const debugLogSpy = vi
+        .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
       await debugRegistry.initialize();
 
       const agentCount = debugRegistry.getAllDefinitions().length;
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(debugLogSpy).toHaveBeenCalledWith(
         `[AgentRegistry] Initialized with ${agentCount} agents.`,
       );
     });
@@ -107,28 +108,28 @@ describe('AgentRegistry', () => {
 
     it('should reject an agent definition missing a name', () => {
       const invalidAgent = { ...MOCK_AGENT_V1, name: '' };
-      const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
+      const debugWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
       registry.testRegisterAgent(invalidAgent);
 
       expect(registry.getDefinition('MockAgent')).toBeUndefined();
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(debugWarnSpy).toHaveBeenCalledWith(
         '[AgentRegistry] Skipping invalid agent definition. Missing name or description.',
       );
     });
 
     it('should reject an agent definition missing a description', () => {
       const invalidAgent = { ...MOCK_AGENT_V1, description: '' };
-      const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
+      const debugWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
       registry.testRegisterAgent(invalidAgent as AgentDefinition);
 
       expect(registry.getDefinition('MockAgent')).toBeUndefined();
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(debugWarnSpy).toHaveBeenCalledWith(
         '[AgentRegistry] Skipping invalid agent definition. Missing name or description.',
       );
     });
@@ -149,27 +150,27 @@ describe('AgentRegistry', () => {
     it('should log overwrites when in debug mode', () => {
       const debugConfig = makeFakeConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
-      const consoleLogSpy = vi
-        .spyOn(console, 'log')
+      const debugLogSpy = vi
+        .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
       debugRegistry.testRegisterAgent(MOCK_AGENT_V1);
       debugRegistry.testRegisterAgent(MOCK_AGENT_V2);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(debugLogSpy).toHaveBeenCalledWith(
         `[AgentRegistry] Overriding agent 'MockAgent'`,
       );
     });
 
     it('should not log overwrites when not in debug mode', () => {
-      const consoleLogSpy = vi
-        .spyOn(console, 'log')
+      const debugLogSpy = vi
+        .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
       registry.testRegisterAgent(MOCK_AGENT_V1);
       registry.testRegisterAgent(MOCK_AGENT_V2);
 
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect(debugLogSpy).not.toHaveBeenCalledWith(
         `[AgentRegistry] Overriding agent 'MockAgent'`,
       );
     });

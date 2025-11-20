@@ -29,10 +29,16 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
+  registerSyncCleanup,
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import type { Config, ResumedSessionData } from '@google/gemini-cli-core';
+import type {
+  Config,
+  ResumedSessionData,
+  OutputPayload,
+  ConsoleLogPayload,
+} from '@google/gemini-cli-core';
 import {
   sessionId,
   logUserPrompt,
@@ -41,6 +47,8 @@ import {
   UserPromptEvent,
   debugLogger,
   recordSlowRender,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -77,6 +85,14 @@ import { disableMouseEvents, enableMouseEvents } from './ui/utils/mouse.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import ansiEscapes from 'ansi-escapes';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+import {
+  createInkStdio,
+  patchStdio,
+  writeToStderr,
+  writeToStdout,
+} from './utils/stdio.js';
+
+import { profiler } from './ui/components/DebugProfiler.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -142,7 +158,7 @@ Stack trace:
 ${reason.stack}`
         : ''
     }`;
-    appEvents.emit(AppEvent.LogError, errorMessage);
+    debugLogger.error(errorMessage);
     if (!unhandledRejectionOccurred) {
       unhandledRejectionOccurred = true;
       appEvents.emit(AppEvent.OpenDebugConsole);
@@ -174,6 +190,17 @@ export async function startInteractiveUI(
 
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
+
+  const consolePatcher = new ConsolePatcher({
+    onNewMessage: (msg) => {
+      coreEvents.emitConsoleLog(msg.type, msg.content);
+    },
+    debugMode: config.getDebugMode(),
+  });
+  consolePatcher.patch();
+  registerCleanup(consolePatcher.cleanup);
+
+  const { stdout: inkStdout, stderr: inkStderr } = createInkStdio();
 
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
@@ -218,13 +245,18 @@ export async function startInteractiveUI(
       <AppWrapper />
     ),
     {
+      stdout: inkStdout,
+      stderr: inkStderr,
+      stdin: process.stdin,
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
         if (renderTime > SLOW_RENDER_MS) {
           recordSlowRender(config, renderTime);
         }
+        profiler.reportFrameRendered();
       },
+      patchConsole: false,
       alternateBuffer: useAlternateBuffer,
       incrementalRendering:
         settings.merged.ui?.incrementalRendering !== false &&
@@ -247,6 +279,13 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  const cleanupStdio = patchStdio();
+  registerSyncCleanup(() => {
+    // This is needed to ensure we don't lose any buffered output.
+    initializeOutputListenersAndFlush();
+    cleanupStdio();
+  });
+
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
   migrateDeprecatedSettings(
@@ -266,9 +305,10 @@ export async function main() {
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
-    debugLogger.error(
-      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
+    writeToStderr(
+      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
     );
+    await runExitCleanup();
     process.exit(1);
   }
 
@@ -276,6 +316,9 @@ export async function main() {
   const consolePatcher = new ConsolePatcher({
     stderr: true,
     debugMode: isDebugMode,
+    onNewMessage: (msg) => {
+      coreEvents.emitConsoleLog(msg.type, msg.content);
+    },
   });
   consolePatcher.patch();
   registerCleanup(consolePatcher.cleanup);
@@ -351,6 +394,7 @@ export async function main() {
           );
         } catch (err) {
           debugLogger.error('Error authenticating:', err);
+          await runExitCleanup();
           process.exit(1);
         }
       }
@@ -387,6 +431,7 @@ export async function main() {
       await relaunchOnExitCode(() =>
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
       );
+      await runExitCleanup();
       process.exit(0);
     } else {
       // Relaunch app so we always have a child process that can be internally
@@ -413,12 +458,14 @@ export async function main() {
       for (const extension of config.getExtensions()) {
         debugLogger.log(`- ${extension.name}`);
       }
+      await runExitCleanup();
       process.exit(0);
     }
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
       await listSessions(config);
+      await runExitCleanup();
       process.exit(0);
     }
 
@@ -426,6 +473,7 @@ export async function main() {
     const sessionToDelete = config.getDeleteSession();
     if (sessionToDelete) {
       await deleteSession(config, sessionToDelete);
+      await runExitCleanup();
       process.exit(0);
     }
 
@@ -436,7 +484,7 @@ export async function main() {
       process.stdin.setRawMode(true);
 
       if (isAlternateBufferEnabled(settings)) {
-        process.stdout.write(ansiEscapes.enterAlternativeScreen);
+        writeToStdout(ansiEscapes.enterAlternativeScreen);
 
         // Ink will cleanup so there is no need for us to manually cleanup.
       }
@@ -491,6 +539,7 @@ export async function main() {
         console.error(
           `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
+        await runExitCleanup();
         process.exit(1);
       }
     }
@@ -522,6 +571,7 @@ export async function main() {
       debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
+      await runExitCleanup();
       process.exit(1);
     }
 
@@ -550,6 +600,8 @@ export async function main() {
     const hasDeprecatedPromptArg = process.argv.some((arg) =>
       arg.startsWith('--prompt'),
     );
+    initializeOutputListenersAndFlush();
+
     await runNonInteractive({
       config: nonInteractiveConfig,
       settings,
@@ -567,10 +619,34 @@ export async function main() {
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.ui?.hideWindowTitle) {
     const windowTitle = computeWindowTitle(title);
-    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
+    writeToStdout(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
-      process.stdout.write(`\x1b]2;\x07`);
+      writeToStdout(`\x1b]2;\x07`);
     });
   }
+}
+
+function initializeOutputListenersAndFlush() {
+  // If there are no listeners for output, make sure we flush so output is not
+  // lost.
+  if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
+    // In non-interactive mode, ensure we drain any buffered output or logs to stderr
+    coreEvents.on(CoreEvent.Output, (payload: OutputPayload) => {
+      if (payload.isStderr) {
+        writeToStderr(payload.chunk, payload.encoding);
+      } else {
+        writeToStdout(payload.chunk, payload.encoding);
+      }
+    });
+
+    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+      if (payload.type === 'error' || payload.type === 'warn') {
+        writeToStderr(payload.content);
+      } else {
+        writeToStdout(payload.content);
+      }
+    });
+  }
+  coreEvents.drainBacklogs();
 }

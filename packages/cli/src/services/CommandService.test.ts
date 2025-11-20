@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CommandService } from './CommandService.js';
 import { type ICommandLoader } from './types.js';
 import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const createMockCommand = (name: string, kind: CommandKind): SlashCommand => ({
   name,
@@ -35,7 +36,7 @@ class MockCommandLoader implements ICommandLoader {
 
 describe('CommandService', () => {
   beforeEach(() => {
-    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -139,7 +140,7 @@ describe('CommandService', () => {
     const commands = service.getCommands();
     expect(commands).toHaveLength(1);
     expect(commands).toEqual([mockCommandA]);
-    expect(console.debug).toHaveBeenCalledWith(
+    expect(debugLogger.debug).toHaveBeenCalledWith(
       'A command loader failed:',
       error,
     );

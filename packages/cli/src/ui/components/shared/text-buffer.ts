@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { unescapePath } from '@google/gemini-cli-core';
+import { unescapePath, coreEvents, CoreEvent } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -1893,6 +1893,7 @@ export function useTextBuffer({
         console.error('[useTextBuffer] external editor error', err);
       } finally {
         enableSupportedProtocol();
+        coreEvents.emit(CoreEvent.ExternalEditorClosed);
         if (wasRaw) setRawMode?.(true);
         try {
           fs.unlinkSync(filePath);

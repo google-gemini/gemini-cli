@@ -176,7 +176,6 @@ export async function modifyWithEditor<ToolParams>(
   modifyContext: ModifyContext<ToolParams>,
   editorType: EditorType,
   _abortSignal: AbortSignal,
-  onEditorClose: () => void,
   overrides?: ModifyContentOverrides,
 ): Promise<ModifyResult<ToolParams>> {
   const hasCurrentOverride =
@@ -199,7 +198,7 @@ export async function modifyWithEditor<ToolParams>(
   );
 
   try {
-    await openDiff(oldPath, newPath, editorType, onEditorClose);
+    await openDiff(oldPath, newPath, editorType);
     const result = getUpdatedParams(
       oldPath,
       newPath,

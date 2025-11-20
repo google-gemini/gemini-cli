@@ -40,12 +40,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     GEMINI_DIR: '.gemini',
     getErrorMessage: (e: unknown) =>
       e instanceof Error ? e.message : String(e),
-    debugLogger: {
-      log: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    },
   };
 });
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -78,6 +72,7 @@ describe('mcp list command', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
 
     mockTransport = { close: vi.fn() };
     mockClient = {

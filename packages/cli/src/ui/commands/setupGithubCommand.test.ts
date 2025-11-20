@@ -18,6 +18,7 @@ import {
 } from './setupGithubCommand.js';
 import type { CommandContext, ToolActionReturn } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 vi.mock('child_process');
 
@@ -257,7 +258,9 @@ describe('updateGitignore', () => {
   });
 
   it('handles permission errors gracefully', async () => {
-    const consoleSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const consoleSpy = vi
+      .spyOn(debugLogger, 'debug')
+      .mockImplementation(() => {});
 
     const fsModule = await import('node:fs');
     const writeFileSpy = vi

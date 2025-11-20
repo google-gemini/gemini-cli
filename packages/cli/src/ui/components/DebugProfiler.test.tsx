@@ -17,6 +17,7 @@ import { debugState } from '../debug.js';
 describe('DebugProfiler', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    profiler.profilersActive = 1;
     profiler.numFrames = 0;
     profiler.totalIdleFrames = 0;
     profiler.lastFrameStartTime = 0;

@@ -7,8 +7,8 @@
 import { render as inkRender } from 'ink-testing-library';
 import { Box } from 'ink';
 import type React from 'react';
-import { act } from 'react';
 import { vi } from 'vitest';
+import { act, useState } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -318,4 +318,66 @@ export function renderHook<Result, Props>(
   }
 
   return { result, rerender, unmount };
+}
+
+export function renderHookWithProviders<Result, Props>(
+  renderCallback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    wrapper?: React.ComponentType<{ children: React.ReactNode }>;
+    // Options for renderWithProviders
+    shellFocus?: boolean;
+    settings?: LoadedSettings;
+    uiState?: Partial<UIState>;
+    width?: number;
+    mouseEventsEnabled?: boolean;
+    config?: Config;
+    useAlternateBuffer?: boolean;
+  } = {},
+): {
+  result: { current: Result };
+  rerender: (props?: Props) => void;
+  unmount: () => void;
+} {
+  const result = { current: undefined as unknown as Result };
+
+  let setPropsFn: ((props: Props) => void) | undefined;
+
+  function TestComponent({ initialProps }: { initialProps: Props }) {
+    const [props, setProps] = useState(initialProps);
+    setPropsFn = setProps;
+    result.current = renderCallback(props);
+    return null;
+  }
+
+  const Wrapper = options.wrapper || (({ children }) => <>{children}</>);
+
+  let renderResult: ReturnType<typeof render>;
+
+  act(() => {
+    renderResult = renderWithProviders(
+      <Wrapper>
+        <TestComponent initialProps={options.initialProps as Props} />
+      </Wrapper>,
+      options,
+    );
+  });
+
+  function rerender(newProps?: Props) {
+    act(() => {
+      if (setPropsFn && newProps) {
+        setPropsFn(newProps);
+      }
+    });
+  }
+
+  return {
+    result,
+    rerender,
+    unmount: () => {
+      act(() => {
+        renderResult.unmount();
+      });
+    },
+  };
 }

@@ -13,6 +13,7 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import { debugLogger } from '../utils/debugLogger.js';
 import { AgentExecutor, type ActivityCallback } from './executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -927,7 +928,7 @@ describe('AgentExecutor', () => {
       ]);
 
       const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
+        .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
       await executor.run({ goal: 'Sec test' }, signal);

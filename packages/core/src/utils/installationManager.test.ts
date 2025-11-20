@@ -12,6 +12,7 @@ import * as os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GEMINI_DIR } from './paths.js';
+import { debugLogger } from './debugLogger.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -92,7 +93,7 @@ describe('InstallationManager', () => {
         throw new Error('Read error');
       });
       const consoleWarnSpy = vi
-        .spyOn(console, 'warn')
+        .spyOn(debugLogger, 'warn')
         .mockImplementation(() => {});
 
       const id = installationManager.getInstallationId();

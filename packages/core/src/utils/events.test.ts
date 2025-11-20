@@ -46,7 +46,7 @@ describe('CoreEventEmitter', () => {
 
     // Attach listener and drain
     events.on(CoreEvent.UserFeedback, listener);
-    events.drainFeedbackBacklog();
+    events.drainBacklogs();
 
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith(expect.objectContaining(payload));
@@ -61,7 +61,7 @@ describe('CoreEventEmitter', () => {
     }
 
     events.on(CoreEvent.UserFeedback, listener);
-    events.drainFeedbackBacklog();
+    events.drainBacklogs();
 
     expect(listener).toHaveBeenCalledTimes(MAX_BACKLOG_SIZE);
     // Verify strictly that the FIRST call was Message 10 (0-9 dropped)
@@ -77,11 +77,11 @@ describe('CoreEventEmitter', () => {
     events.emitFeedback('error', 'Test error');
 
     events.on(CoreEvent.UserFeedback, listener);
-    events.drainFeedbackBacklog();
+    events.drainBacklogs();
     expect(listener).toHaveBeenCalledTimes(1);
 
     listener.mockClear();
-    events.drainFeedbackBacklog();
+    events.drainBacklogs();
     expect(listener).not.toHaveBeenCalled();
   });
 
@@ -138,7 +138,7 @@ describe('CoreEventEmitter', () => {
     });
 
     events.on(CoreEvent.UserFeedback, listener);
-    events.drainFeedbackBacklog();
+    events.drainBacklogs();
 
     // Expectation with atomic snapshot:
     // 1. loop starts with ['Buffered 1', 'Buffered 2']
@@ -155,6 +155,111 @@ describe('CoreEventEmitter', () => {
       message: 'Re-entrant message',
     });
     expect(listener.mock.calls[2][0]).toMatchObject({ message: 'Buffered 2' });
+  });
+
+  describe('ConsoleLog Event', () => {
+    it('should emit console log immediately when a listener is present', () => {
+      const listener = vi.fn();
+      events.on(CoreEvent.ConsoleLog, listener);
+
+      const payload = {
+        type: 'info' as const,
+        content: 'Test log',
+      };
+
+      events.emitConsoleLog(payload.type, payload.content);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining(payload));
+    });
+
+    it('should buffer console logs when no listener is present', () => {
+      const listener = vi.fn();
+      const payload = {
+        type: 'warn' as const,
+        content: 'Buffered log',
+      };
+
+      // Emit while no listeners attached
+      events.emitConsoleLog(payload.type, payload.content);
+      expect(listener).not.toHaveBeenCalled();
+
+      // Attach listener and drain
+      events.on(CoreEvent.ConsoleLog, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining(payload));
+    });
+
+    it('should respect the backlog size limit for console logs', () => {
+      const listener = vi.fn();
+      const MAX_BACKLOG_SIZE = 10000;
+
+      for (let i = 0; i < MAX_BACKLOG_SIZE + 10; i++) {
+        events.emitConsoleLog('debug', `Log ${i}`);
+      }
+
+      events.on(CoreEvent.ConsoleLog, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(MAX_BACKLOG_SIZE);
+      // Verify strictly that the FIRST call was Log 10 (0-9 dropped)
+      expect(listener.mock.calls[0][0]).toMatchObject({ content: 'Log 10' });
+    });
+  });
+
+  describe('Output Event', () => {
+    it('should emit output immediately when a listener is present', () => {
+      const listener = vi.fn();
+      events.on(CoreEvent.Output, listener);
+
+      const payload = {
+        isStderr: false,
+        chunk: 'Test output',
+        encoding: 'utf8' as BufferEncoding,
+      };
+
+      events.emitOutput(payload.isStderr, payload.chunk, payload.encoding);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining(payload));
+    });
+
+    it('should buffer output when no listener is present', () => {
+      const listener = vi.fn();
+      const payload = {
+        isStderr: true,
+        chunk: 'Buffered output',
+      };
+
+      // Emit while no listeners attached
+      events.emitOutput(payload.isStderr, payload.chunk);
+      expect(listener).not.toHaveBeenCalled();
+
+      // Attach listener and drain
+      events.on(CoreEvent.Output, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(expect.objectContaining(payload));
+    });
+
+    it('should respect the backlog size limit for output', () => {
+      const listener = vi.fn();
+      const MAX_BACKLOG_SIZE = 10000;
+
+      for (let i = 0; i < MAX_BACKLOG_SIZE + 10; i++) {
+        events.emitOutput(false, `Output ${i}`);
+      }
+
+      events.on(CoreEvent.Output, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(MAX_BACKLOG_SIZE);
+      // Verify strictly that the FIRST call was Output 10 (0-9 dropped)
+      expect(listener.mock.calls[0][0]).toMatchObject({ chunk: 'Output 10' });
+    });
   });
 
   describe('ModelChanged Event', () => {

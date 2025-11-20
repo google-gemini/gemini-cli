@@ -5,6 +5,7 @@
  */
 
 import { useEffect } from 'react';
+import { writeToStdout } from '../../utils/stdio.js';
 
 const ENABLE_BRACKETED_PASTE = '\x1b[?2004h';
 const DISABLE_BRACKETED_PASTE = '\x1b[?2004l';
@@ -17,11 +18,11 @@ const DISABLE_BRACKETED_PASTE = '\x1b[?2004l';
  */
 export const useBracketedPaste = () => {
   const cleanup = () => {
-    process.stdout.write(DISABLE_BRACKETED_PASTE);
+    writeToStdout(DISABLE_BRACKETED_PASTE);
   };
 
   useEffect(() => {
-    process.stdout.write(ENABLE_BRACKETED_PASTE);
+    writeToStdout(ENABLE_BRACKETED_PASTE);
 
     process.on('exit', cleanup);
     process.on('SIGINT', cleanup);
