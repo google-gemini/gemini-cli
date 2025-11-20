@@ -311,6 +311,16 @@ jobs:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           fetch-depth: 1
 
+      - name: 'Install Landlock runner dependencies'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+          rustup target add x86_64-unknown-linux-musl
+
       - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
