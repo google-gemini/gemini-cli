@@ -152,7 +152,7 @@ describe('ModelRouterService', () => {
       );
     });
 
-    it('should upgrade to Preview Model when preview features are enabled and model is 2.5 Pro', async () => {
+    it('should NOT upgrade to Preview Model when preview features are enabled and model is 2.5 Pro', async () => {
       vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue({
         model: DEFAULT_GEMINI_MODEL,
         metadata: { source: 'test', latencyMs: 0, reasoning: 'test' },
@@ -162,7 +162,7 @@ describe('ModelRouterService', () => {
 
       const decision = await service.route(mockContext);
 
-      expect(decision.model).toBe(PREVIEW_GEMINI_MODEL);
+      expect(decision.model).toBe(DEFAULT_GEMINI_MODEL);
     });
 
     it('should NOT upgrade to Preview Model when preview features are disabled', async () => {
@@ -215,7 +215,7 @@ describe('ModelRouterService', () => {
       expect(decision.model).toBe(DEFAULT_GEMINI_MODEL);
     });
 
-    it('should upgrade to Preview Model even if fallback mode is active (probing behavior)', async () => {
+    it('should NOT upgrade to Preview Model even if fallback mode is active (probing behavior)', async () => {
       vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue({
         model: DEFAULT_GEMINI_MODEL,
         metadata: { source: 'default', latencyMs: 0, reasoning: 'Default' },
@@ -225,7 +225,7 @@ describe('ModelRouterService', () => {
 
       const decision = await service.route(mockContext);
 
-      expect(decision.model).toBe(PREVIEW_GEMINI_MODEL);
+      expect(decision.model).toBe(DEFAULT_GEMINI_MODEL);
     });
   });
 });
