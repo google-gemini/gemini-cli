@@ -5,7 +5,7 @@
  */
 
 import { useEffect } from 'react';
-import { writeToStdout } from '../../utils/stdio.js';
+import { writeToStdout } from '@google/gemini-cli-core';
 
 const ENABLE_BRACKETED_PASTE = '\x1b[?2004h';
 const DISABLE_BRACKETED_PASTE = '\x1b[?2004l';

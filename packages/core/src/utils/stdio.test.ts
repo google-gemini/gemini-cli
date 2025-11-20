@@ -6,9 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { patchStdio, createInkStdio } from './stdio.js';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents } from './events.js';
 
-vi.mock('@google/gemini-cli-core', () => ({
+vi.mock('./events.js', () => ({
   coreEvents: {
     emitOutput: vi.fn(),
   },

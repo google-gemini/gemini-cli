@@ -54,6 +54,21 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     coreEvents: mockCoreEvents,
     IdeClient: mockIdeClient,
+    writeToStdout: vi.fn((...args) =>
+      process.stdout.write(
+        ...(args as Parameters<typeof process.stdout.write>),
+      ),
+    ),
+    writeToStderr: vi.fn((...args) =>
+      process.stderr.write(
+        ...(args as Parameters<typeof process.stderr.write>),
+      ),
+    ),
+    patchStdio: vi.fn(() => () => {}),
+    createInkStdio: vi.fn(() => ({
+      stdout: process.stdout,
+      stderr: process.stderr,
+    })),
   };
 });
 import type { LoadedSettings } from '../config/settings.js';
@@ -126,19 +141,6 @@ vi.mock('./utils/mouse.js', () => ({
   enableMouseEvents: vi.fn(),
   disableMouseEvents: vi.fn(),
 }));
-vi.mock('../utils/stdio.js', () => ({
-  writeToStdout: vi.fn((...args) =>
-    process.stdout.write(...(args as Parameters<typeof process.stdout.write>)),
-  ),
-  writeToStderr: vi.fn((...args) =>
-    process.stderr.write(...(args as Parameters<typeof process.stderr.write>)),
-  ),
-  patchStdio: vi.fn(() => () => {}),
-  createInkStdio: vi.fn(() => ({
-    stdout: process.stdout,
-    stderr: process.stderr,
-  })),
-}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -163,10 +165,9 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { ShellExecutionService } from '@google/gemini-cli-core';
+import { ShellExecutionService, writeToStdout } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
-import { writeToStdout } from '../utils/stdio.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
