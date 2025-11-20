@@ -44,8 +44,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     { isActive: true },
   );
 
-  const isPreviewEnabled = config?.getPreviewFeatures();
-
   const options = useMemo(
     () => [
       {
@@ -56,7 +54,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       },
       {
         value: GEMINI_MODEL_ALIAS_PRO,
-        title: isPreviewEnabled
+        title: config?.getPreviewFeatures()
           ? `Pro (${PREVIEW_GEMINI_MODEL}, ${DEFAULT_GEMINI_MODEL})`
           : `Pro (${DEFAULT_GEMINI_MODEL})`,
         description:
@@ -76,7 +74,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         key: GEMINI_MODEL_ALIAS_FLASH_LITE,
       },
     ],
-    [isPreviewEnabled],
+    [config],
   );
 
   // Calculate the initial index based on the preferred model.
