@@ -15,16 +15,13 @@ import * as useTerminalSize from '../hooks/useTerminalSize.js';
 
 // Mock GeminiRespondingSpinner
 vi.mock('./GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: ({
-    nonRespondingDisplay,
-  }: {
-    nonRespondingDisplay?: string;
-  }) => {
+  GeminiRespondingSpinner: () => {
     const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
+    if (
+      streamingState === StreamingState.Responding ||
+      streamingState === StreamingState.WaitingForConfirmation
+    ) {
       return <Text>MockRespondingSpinner</Text>;
-    } else if (nonRespondingDisplay) {
-      return <Text>{nonRespondingDisplay}</Text>;
     }
     return null;
   },
@@ -76,7 +73,7 @@ describe('<LoadingIndicator />', () => {
     expect(output).toContain('(esc to cancel, 5s)');
   });
 
-  it('should render spinner (static), phrase but no time/cancel when streamingState is WaitingForConfirmation', () => {
+  it('should render animated spinner, phrase but no time/cancel when streamingState is WaitingForConfirmation', () => {
     const props = {
       currentLoadingPhrase: 'Confirm action',
       elapsedTime: 10,
@@ -86,7 +83,7 @@ describe('<LoadingIndicator />', () => {
       StreamingState.WaitingForConfirmation,
     );
     const output = lastFrame();
-    expect(output).toContain('⠏'); // Static char for WaitingForConfirmation
+    expect(output).toContain('MockRespondingSpinner'); // Animated spinner for WaitingForConfirmation
     expect(output).toContain('Confirm action');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 10s');
@@ -172,7 +169,7 @@ describe('<LoadingIndicator />', () => {
       </StreamingContext.Provider>,
     );
     output = lastFrame();
-    expect(output).toContain('⠏');
+    expect(output).toContain('MockRespondingSpinner');
     expect(output).toContain('Please Confirm');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 15s');

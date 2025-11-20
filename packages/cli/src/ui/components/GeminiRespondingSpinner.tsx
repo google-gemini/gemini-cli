@@ -30,7 +30,10 @@ export const GeminiRespondingSpinner: React.FC<
 > = ({ nonRespondingDisplay, spinnerType = 'dots' }) => {
   const streamingState = useStreamingContext();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  if (streamingState === StreamingState.Responding) {
+  if (
+    streamingState === StreamingState.Responding ||
+    streamingState === StreamingState.WaitingForConfirmation
+  ) {
     return (
       <GeminiSpinner
         spinnerType={spinnerType}
