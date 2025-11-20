@@ -117,7 +117,7 @@ being processed in batches as availability opens.
 
 Gemini 3 Pro access is currently available to users with the following accounts:
 
-- Gemini AI Ultra (**excluding** Gemini AI Ultra for Business).
+- Google AI Ultra (**excluding** Google AI Ultra for Business).
 - **Paid** Gemini API keys.
 - **Paid** Vertex API keys.
 
@@ -139,7 +139,7 @@ Perform the following steps to troubleshoot your access:
 
 Gemini CLI may return a 400, 404, or 500 error if it can’t access Gemini 3 Pro.
 This could happen if you don’t have access to the model under the current
-account you’re using—or during times of high capacity.
+account you’re using — or during times of high capacity.
 
 If you’ve received one of these error codes when trying to use Gemini 3 Pro,
 first try the following:
@@ -163,7 +163,7 @@ currently active issues..
 If you’ve upgraded your account, you may still need to restart Gemini CLI and
 log in again to activate your new quota in your current session.
 
-1. **Restart the CLI. **Use `/quit` to exit the CLI and reopen it with the
+1. **Restart the CLI.** Use `/quit` to exit the CLI and reopen it with the
    `gemini` command.
 2. **Reauthenticate.** Run the `/auth` command in the CLI to re-establish your
    credentials.
