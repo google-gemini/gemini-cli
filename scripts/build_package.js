@@ -32,6 +32,82 @@ execSync('tsc --build', { stdio: 'inherit' });
 // copy .{md,json} files
 execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
 
+// Build optional Rust helpers for sandboxing when present (core package, Linux only)
+try {
+  const pkgPath = join(process.cwd(), 'package.json');
+  const pkg = JSON.parse(execSync(`cat ${pkgPath}`).toString());
+  const isCore = pkg.name === '@google/gemini-cli-core';
+  if (isCore && process.platform === 'linux') {
+    const runnerSource = join(
+      process.cwd(),
+      'src',
+      'sandbox',
+      'linux',
+      'landlock-runner.rs',
+    );
+    const outputDir = join(process.cwd(), 'dist', 'bin');
+    execSync(`mkdir -p ${outputDir}`);
+    const outPath = join(outputDir, 'landlock-runner');
+    console.log(
+      `[build] Compiling landlock runner (static musl) to ${outPath}`,
+    );
+    const target = 'x86_64-unknown-linux-musl';
+    // Prefer using rustc directly; fall back to rustup to install target if missing.
+    const hasRustc = (() => {
+      try {
+        execSync('rustc --version', { stdio: 'ignore' });
+        return true;
+      } catch (_e) {
+        return false;
+      }
+    })();
+    if (!hasRustc) {
+      throw new Error(
+        'rustc not found; install Rust toolchain to build the Landlock runner.',
+      );
+    }
+
+    const targetAvailable = (() => {
+      try {
+        const list = execSync('rustc --print target-list').toString();
+        return list.split('\n').includes(target);
+      } catch (_e) {
+        return false;
+      }
+    })();
+
+    if (!targetAvailable) {
+      try {
+        execSync('rustup --version', { stdio: 'ignore' });
+        execSync(`rustup target add ${target}`, { stdio: 'inherit' });
+      } catch (err) {
+        console.error(
+          '[build] Error: musl target x86_64-unknown-linux-musl not available. Install rustup and run: rustup target add x86_64-unknown-linux-musl',
+        );
+        throw err;
+      }
+    }
+
+    try {
+      execSync(
+        `rustc -O --target ${target} -C target-feature=+crt-static ${runnerSource} -o ${outPath}`,
+        { stdio: 'inherit' },
+      );
+    } catch (err) {
+      console.error(
+        '[build] Error: failed to compile static Landlock runner with musl. Ensure musl toolchain is installed (musl-gcc) and rustc supports the target.',
+      );
+      throw err;
+    }
+  }
+} catch (e) {
+  console.error(
+    '[build] Error: failed to compile landlock runner; per-tool sandboxing requires rustc and a Linux build host.',
+    e instanceof Error ? e.message : e,
+  );
+  process.exit(1);
+}
+
 // touch dist/.last_build
 writeFileSync(join(process.cwd(), 'dist', '.last_build'), '');
 process.exit(0);
