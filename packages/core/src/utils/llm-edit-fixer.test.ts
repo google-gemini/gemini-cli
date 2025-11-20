@@ -12,6 +12,7 @@ import {
 } from './llm-edit-fixer.js';
 import { promptIdContext } from './promptIdContext.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import { debugLogger } from './debugLogger.js';
 
 // Mock the BaseLlmClient
 const mockGenerateJson = vi.fn();
@@ -92,7 +93,7 @@ describe('FixLLMEditWithInstruction', () => {
   it('should generate and use a fallback promptId when context is not available', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
 
     // Run the function outside of any context

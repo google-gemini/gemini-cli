@@ -150,6 +150,13 @@ function determineSurface(): string {
 }
 
 /**
+ * Determines the GitHub Actions workflow name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHWorkflowName(): string | undefined {
+  return process.env['GH_WORKFLOW_NAME'];
+}
+
+/**
  * Clearcut URL to send logging events to.
  */
 const CLEARCUT_URL = 'https://play.googleapis.com/log?format=json&hasfast=true';
@@ -260,31 +267,39 @@ export class ClearcutLogger {
     data: EventValue[] = [],
   ): LogEvent {
     const surface = determineSurface();
+    const ghWorkflowName = determineGHWorkflowName();
+    const baseMetadata: EventValue[] = [
+      ...data,
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+        value: CLI_VERSION,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+        value: GIT_COMMIT_INFO,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+        value: process.platform,
+      },
+    ];
+
+    if (ghWorkflowName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
+        value: ghWorkflowName,
+      });
+    }
+
     return {
       console_type: 'GEMINI_CLI',
       application: 102, // GEMINI_CLI
       event_name: eventName as string,
-      event_metadata: [
-        [
-          ...data,
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-            value: surface,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-            value: CLI_VERSION,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-            value: GIT_COMMIT_INFO,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-            value: process.platform,
-          },
-        ],
-      ],
+      event_metadata: [baseMetadata],
     };
   }
 

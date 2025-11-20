@@ -116,13 +116,38 @@ describe('<Header />', () => {
 
   it('renders with no gradient when theme.ui.gradient is undefined', async () => {
     vi.spyOn(semanticColors, 'theme', 'get').mockReturnValue({
-      ui: { gradient: undefined },
-    } as typeof semanticColors.theme);
+      text: {
+        primary: '',
+        secondary: '',
+        link: '',
+        accent: '#123456',
+        response: '',
+      },
+      background: {
+        primary: '',
+        diff: { added: '', removed: '' },
+      },
+      border: {
+        default: '',
+        focused: '',
+      },
+      ui: {
+        comment: '',
+        symbol: '',
+        dark: '',
+        gradient: undefined,
+      },
+      status: {
+        error: '',
+        success: '',
+        warning: '',
+      },
+    });
     const Gradient = await import('ink-gradient');
     render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
-    expect(textCalls[0][0]).not.toHaveProperty('color');
+    expect(textCalls[0][0]).toHaveProperty('color', '#123456');
   });
 
   it('renders with a single color when theme.ui.gradient has one color', async () => {

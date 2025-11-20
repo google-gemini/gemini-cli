@@ -117,7 +117,9 @@ export class GitService {
         // If no changes are staged, return the current HEAD commit hash
         return this.getCurrentCommitHash();
       }
-      const commitResult = await repo.commit(message);
+      const commitResult = await repo.commit(message, {
+        '--no-verify': null,
+      });
       return commitResult.commit;
     } catch (error) {
       throw new Error(

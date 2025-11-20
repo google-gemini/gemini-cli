@@ -17,6 +17,12 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 
 /**
+ * Constant for the resume "latest" identifier.
+ * Used when --resume is passed without a value to select the most recent session.
+ */
+export const RESUME_LATEST = 'latest';
+
+/**
  * Session information for display and selection purposes.
  */
 export interface SessionInfo {
@@ -267,7 +273,7 @@ export class SessionSelector {
   async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
     let selectedSession: SessionInfo;
 
-    if (resumeArg === 'latest') {
+    if (resumeArg === RESUME_LATEST) {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {

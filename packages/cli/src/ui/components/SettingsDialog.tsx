@@ -43,12 +43,14 @@ import {
 } from '../../config/settingsSchema.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import type { Config } from '@google/gemini-cli-core';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
   onRestartRequest?: () => void;
   availableTerminalHeight?: number;
+  config?: Config;
 }
 
 const maxItemsToShow = 8;
@@ -58,6 +60,7 @@ export function SettingsDialog({
   onSelect,
   onRestartRequest,
   availableTerminalHeight,
+  config,
 }: SettingsDialogProps): React.JSX.Element {
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
@@ -208,6 +211,10 @@ export function SettingsDialog({
               next.delete(key);
               return next;
             });
+
+            if (key === 'general.previewFeatures') {
+              config?.setPreviewFeatures(newValue as boolean);
+            }
           } else {
             // For restart-required settings, track as modified
             setModifiedSettings((prev) => {

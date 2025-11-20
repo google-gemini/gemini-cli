@@ -550,4 +550,30 @@ describe('ModelConfigService', () => {
       ]);
     });
   });
+
+  describe('runtime aliases', () => {
+    it('should resolve a simple runtime-registered alias', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+        overrides: [],
+      };
+      const service = new ModelConfigService(config);
+
+      service.registerRuntimeModelConfig('runtime-alias', {
+        modelConfig: {
+          model: 'gemini-runtime-model',
+          generateContentConfig: {
+            temperature: 0.123,
+          },
+        },
+      });
+
+      const resolved = service.getResolvedConfig({ model: 'runtime-alias' });
+
+      expect(resolved.model).toBe('gemini-runtime-model');
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.123,
+      });
+    });
+  });
 });

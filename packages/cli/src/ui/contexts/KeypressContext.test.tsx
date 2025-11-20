@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
 import type React from 'react';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
@@ -322,17 +323,16 @@ describe('KeypressContext', () => {
   });
 
   describe('debug keystroke logging', () => {
-    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-    let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+    let debugLoggerSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      debugLoggerSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
     });
 
     afterEach(() => {
-      consoleLogSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
+      debugLoggerSpy.mockRestore();
     });
 
     it('should not log keystrokes when debugKeystrokeLogging is false', async () => {
@@ -354,7 +354,7 @@ describe('KeypressContext', () => {
       });
 
       expect(keyHandler).toHaveBeenCalled();
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect(debugLoggerSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('[DEBUG] Kitty'),
       );
     });
@@ -375,7 +375,7 @@ describe('KeypressContext', () => {
       // Send a complete kitty sequence for escape
       act(() => stdin.write('\x1b[27u'));
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(debugLoggerSpy).toHaveBeenCalledWith(
         `[DEBUG] Raw StdIn: ${JSON.stringify('\x1b[27u')}`,
       );
     });
@@ -397,7 +397,7 @@ describe('KeypressContext', () => {
       act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
 
       // Verify debug logging for accumulation
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(debugLoggerSpy).toHaveBeenCalledWith(
         `[DEBUG] Raw StdIn: ${JSON.stringify(INCOMPLETE_KITTY_SEQUENCE)}`,
       );
     });
