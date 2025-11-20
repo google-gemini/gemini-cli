@@ -37,6 +37,7 @@ import {
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -69,7 +70,7 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
-enum StreamProcessingStatus {
+export enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
@@ -112,6 +113,9 @@ export const useGeminiStream = (
   isShellFocused?: boolean,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
+  const [snapshottingMessage, setSnapshottingMessage] = useState<string | null>(
+    null,
+  );
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
@@ -787,6 +791,27 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
   );
 
+  const submitQueryRef =
+    useRef<
+      (
+        query: PartListUnion,
+        options?: { isContinuation: boolean },
+        prompt_id?: string,
+      ) => Promise<void>
+    >(null);
+  const handleCompletedToolsRef =
+    useRef<
+      (completedToolCallsFromScheduler: TrackedToolCall[]) => Promise<void>
+    >(null);
+  const processGeminiStreamEventsRef =
+    useRef<
+      (
+        stream: AsyncIterable<GeminiEvent>,
+        userMessageTimestamp: number,
+        signal: AbortSignal,
+      ) => Promise<StreamProcessingStatus>
+    >(null);
+
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -861,21 +886,197 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
+        if (config.getCheckpointingEnabled()) {
+          const restorableToolCalls = toolCallRequests.filter((toolCall) =>
+            EDIT_TOOL_NAMES.has(toolCall.name),
+          );
+
+          if (restorableToolCalls.length > 0) {
+            setSnapshottingMessage(
+              'Creating file snapshot, this may take a moment...',
+            );
+            let commitHash: string | undefined;
+            try {
+              if (!gitService) {
+                throw new Error(
+                  'Checkpointing is enabled but Git service is not available. Ensure Git is installed.',
+                );
+              }
+              commitHash = await gitService.createFileSnapshot(
+                `Snapshot for ${restorableToolCalls
+                  .map((t) => t.name)
+                  .join(', ')}`,
+              );
+            } catch (error) {
+              const errorMessage = `Failed to create file snapshot: ${getErrorMessage(
+                error,
+              )}`;
+              addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: `${errorMessage}. Aborting operation.`,
+                },
+                Date.now(),
+              );
+
+              // Inform the model that the tool calls failed due to a non-recoverable error.
+              const toolRegistry = config.getToolRegistry();
+              const erroredToolCalls: TrackedToolCall[] = toolCallRequests.map(
+                (request): TrackedCompletedToolCall => {
+                  const tool = toolRegistry.getTool(request.name);
+                  const error = new Error(
+                    'Tool call aborted due to a critical, non-recoverable file snapshot failure.',
+                  );
+
+                  return {
+                    request,
+                    status: 'error',
+                    response: {
+                      callId: request.callId,
+                      resultDisplay: error.message,
+                      error,
+                      errorType: ToolErrorType.UNKNOWN,
+                      responseParts: [
+                        {
+                          functionResponse: {
+                            name: request.name,
+                            response: { error: error.message },
+                          },
+                        },
+                      ],
+                    },
+                    responseSubmittedToGemini: false,
+                    tool,
+                  };
+                },
+              );
+
+              void handleCompletedToolsRef.current!(erroredToolCalls);
+              setSnapshottingMessage(null);
+              return StreamProcessingStatus.Completed; // Stop processing
+            }
+            if (!commitHash) {
+              const errorMessage =
+                'Failed to get a commit hash for the file snapshot. Aborting operation.';
+              addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: errorMessage,
+                },
+                Date.now(),
+              );
+
+              // Inform the model that the tool calls failed.
+              const toolRegistry = config.getToolRegistry();
+              const erroredToolCalls: TrackedToolCall[] = toolCallRequests.map(
+                (request): TrackedCompletedToolCall => {
+                  const tool = toolRegistry.getTool(request.name);
+                  const error = new Error(errorMessage);
+                  return {
+                    request,
+                    status: 'error',
+                    response: {
+                      callId: request.callId,
+                      resultDisplay: error.message,
+                      error,
+                      errorType: ToolErrorType.UNKNOWN,
+                      responseParts: [
+                        {
+                          functionResponse: {
+                            name: request.name,
+                            response: { error: error.message },
+                          },
+                        },
+                      ],
+                    },
+                    responseSubmittedToGemini: false,
+                    tool,
+                  };
+                },
+              );
+              void handleCompletedToolsRef.current!(erroredToolCalls);
+              setSnapshottingMessage(null);
+              cancelOngoingRequest();
+              return StreamProcessingStatus.Completed;
+            }
+
+            const checkpointDir = storage.getProjectTempCheckpointsDir();
+            if (checkpointDir) {
+              try {
+                await fs.mkdir(checkpointDir, { recursive: true });
+                const clientHistory = await geminiClient?.getHistory();
+                for (const toolCall of restorableToolCalls) {
+                  const filePath = toolCall.args['file_path'] as string;
+                  if (!filePath) continue;
+
+                  const timestamp = new Date()
+                    .toISOString()
+                    .replace(/:/g, '-')
+                    .replace(/\./g, '_');
+                  const fileName = path.basename(filePath);
+                  const toolCallWithSnapshotFileName = `${timestamp}-${fileName}-${toolCall.name}.json`;
+                  const toolCallWithSnapshotFilePath = path.join(
+                    checkpointDir,
+                    toolCallWithSnapshotFileName,
+                  );
+
+                  await fs.writeFile(
+                    toolCallWithSnapshotFilePath,
+                    JSON.stringify(
+                      {
+                        history,
+                        clientHistory,
+                        toolCall: {
+                          name: toolCall.name,
+                          args: toolCall.args,
+                        },
+                        commitHash,
+                        filePath,
+                      },
+                      null,
+                      2,
+                    ),
+                  );
+                }
+              } catch (error) {
+                addItem(
+                  {
+                    type: MessageType.ERROR,
+                    text: `Failed to save checkpoint file: ${getErrorMessage(
+                      error,
+                    )}. Proceeding without checkpoint.`,
+                  },
+                  Date.now(),
+                );
+              }
+            }
+            setSnapshottingMessage(null);
+          }
+        }
         scheduleToolCalls(toolCallRequests, signal);
       }
       return StreamProcessingStatus.Completed;
     },
     [
-      handleContentEvent,
-      handleUserCancelledEvent,
-      handleErrorEvent,
-      scheduleToolCalls,
+      addItem,
+      cancelOngoingRequest,
+      config,
+      geminiClient,
+      gitService,
+      handleCitationEvent,
       handleChatCompressionEvent,
+      handleChatModelEvent,
+      handleContentEvent,
+      handleErrorEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
+      handleUserCancelledEvent,
       handleContextWindowWillOverflowEvent,
-      handleCitationEvent,
-      handleChatModelEvent,
+      history,
+      scheduleToolCalls,
+      setSnapshottingMessage,
+      storage,
+      handleCompletedToolsRef,
     ],
   );
   const submitQuery = useCallback(
@@ -955,11 +1156,12 @@ export const useGeminiStream = (
                 abortSignal,
                 prompt_id!,
               );
-              const processingStatus = await processGeminiStreamEvents(
-                stream,
-                userMessageTimestamp,
-                abortSignal,
-              );
+              const processingStatus =
+                await processGeminiStreamEventsRef.current!(
+                  stream,
+                  userMessageTimestamp,
+                  abortSignal,
+                );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
                 return;
@@ -992,7 +1194,7 @@ export const useGeminiStream = (
                       );
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
-                        submitQuery(
+                        submitQueryRef.current!(
                           lastQueryRef.current,
                           { isContinuation: true },
                           lastPromptIdRef.current,
@@ -1041,7 +1243,6 @@ export const useGeminiStream = (
       streamingState,
       setModelSwitchedFromQuotaError,
       prepareQueryForGemini,
-      processGeminiStreamEvents,
       pendingHistoryItemRef,
       addItem,
       setPendingHistoryItem,
@@ -1051,6 +1252,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      submitQueryRef, // Add submitQueryRef to dependencies
     ],
   );
 
@@ -1206,7 +1408,7 @@ export const useGeminiStream = (
         return;
       }
 
-      submitQuery(
+      submitQueryRef.current!(
         responsesToSend,
         {
           isContinuation: true,
@@ -1215,7 +1417,7 @@ export const useGeminiStream = (
       );
     },
     [
-      submitQuery,
+      submitQueryRef,
       markToolsAsSubmitted,
       geminiClient,
       performMemoryRefresh,
@@ -1224,132 +1426,23 @@ export const useGeminiStream = (
     ],
   );
 
+  useEffect(() => {
+    submitQueryRef.current = submitQuery;
+    handleCompletedToolsRef.current = handleCompletedTools;
+    processGeminiStreamEventsRef.current = processGeminiStreamEvents;
+  }, [submitQuery, handleCompletedTools, processGeminiStreamEvents]);
+
   const pendingHistoryItems = useMemo(
     () =>
-      [pendingHistoryItem, pendingToolCallGroupDisplay].filter(
-        (i) => i !== undefined && i !== null,
-      ),
-    [pendingHistoryItem, pendingToolCallGroupDisplay],
+      [
+        snapshottingMessage
+          ? { type: 'info', text: snapshottingMessage }
+          : null,
+        pendingHistoryItem,
+        pendingToolCallGroupDisplay,
+      ].filter((i): i is HistoryItemWithoutId => i !== undefined && i !== null),
+    [snapshottingMessage, pendingHistoryItem, pendingToolCallGroupDisplay],
   );
-
-  useEffect(() => {
-    const saveRestorableToolCalls = async () => {
-      if (!config.getCheckpointingEnabled()) {
-        return;
-      }
-      const restorableToolCalls = toolCalls.filter(
-        (toolCall) =>
-          EDIT_TOOL_NAMES.has(toolCall.request.name) &&
-          toolCall.status === 'awaiting_approval',
-      );
-
-      if (restorableToolCalls.length > 0) {
-        const checkpointDir = storage.getProjectTempCheckpointsDir();
-
-        if (!checkpointDir) {
-          return;
-        }
-
-        try {
-          await fs.mkdir(checkpointDir, { recursive: true });
-        } catch (error) {
-          if (!isNodeError(error) || error.code !== 'EEXIST') {
-            onDebugMessage(
-              `Failed to create checkpoint directory: ${getErrorMessage(error)}`,
-            );
-            return;
-          }
-        }
-
-        for (const toolCall of restorableToolCalls) {
-          const filePath = toolCall.request.args['file_path'] as string;
-          if (!filePath) {
-            onDebugMessage(
-              `Skipping restorable tool call due to missing file_path: ${toolCall.request.name}`,
-            );
-            continue;
-          }
-
-          try {
-            if (!gitService) {
-              onDebugMessage(
-                `Checkpointing is enabled but Git service is not available. Failed to create snapshot for ${filePath}. Ensure Git is installed and working properly.`,
-              );
-              continue;
-            }
-
-            let commitHash: string | undefined;
-            try {
-              commitHash = await gitService.createFileSnapshot(
-                `Snapshot for ${toolCall.request.name}`,
-              );
-            } catch (error) {
-              onDebugMessage(
-                `Failed to create new snapshot: ${getErrorMessage(error)}. Attempting to use current commit.`,
-              );
-            }
-
-            if (!commitHash) {
-              commitHash = await gitService.getCurrentCommitHash();
-            }
-
-            if (!commitHash) {
-              onDebugMessage(
-                `Failed to create snapshot for ${filePath}. Checkpointing may not be working properly. Ensure Git is installed and the project directory is accessible.`,
-              );
-              continue;
-            }
-
-            const timestamp = new Date()
-              .toISOString()
-              .replace(/:/g, '-')
-              .replace(/\./g, '_');
-            const toolName = toolCall.request.name;
-            const fileName = path.basename(filePath);
-            const toolCallWithSnapshotFileName = `${timestamp}-${fileName}-${toolName}.json`;
-            const clientHistory = await geminiClient?.getHistory();
-            const toolCallWithSnapshotFilePath = path.join(
-              checkpointDir,
-              toolCallWithSnapshotFileName,
-            );
-
-            await fs.writeFile(
-              toolCallWithSnapshotFilePath,
-              JSON.stringify(
-                {
-                  history,
-                  clientHistory,
-                  toolCall: {
-                    name: toolCall.request.name,
-                    args: toolCall.request.args,
-                  },
-                  commitHash,
-                  filePath,
-                },
-                null,
-                2,
-              ),
-            );
-          } catch (error) {
-            onDebugMessage(
-              `Failed to create checkpoint for ${filePath}: ${getErrorMessage(
-                error,
-              )}. This may indicate a problem with Git or file system permissions.`,
-            );
-          }
-        }
-      }
-    };
-    saveRestorableToolCalls();
-  }, [
-    toolCalls,
-    config,
-    onDebugMessage,
-    gitService,
-    history,
-    geminiClient,
-    storage,
-  ]);
 
   const lastOutputTime = Math.max(lastToolOutputTime, lastShellOutputTime);
 
@@ -1365,5 +1458,6 @@ export const useGeminiStream = (
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    processGeminiStreamEvents,
   };
 };
