@@ -10,6 +10,8 @@ import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import { useInactivityTimer } from './useInactivityTimer.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
+export const INTERACTIVE_SHELL_WAITING_PHRASE =
+  'Interactive shell awaiting input... press Ctrl+f to focus shell';
 
 /**
  * Custom hook to manage cycling through loading phrases.
@@ -50,9 +52,7 @@ export const usePhraseCycler = (
     }
 
     if (isInteractiveShellWaiting && showShellFocusHint) {
-      setCurrentLoadingPhrase(
-        'Interactive shell awaiting input... press Ctrl+f to focus shell',
-      );
+      setCurrentLoadingPhrase(INTERACTIVE_SHELL_WAITING_PHRASE);
       return;
     }
 

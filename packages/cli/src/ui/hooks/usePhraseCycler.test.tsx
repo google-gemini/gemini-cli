@@ -11,6 +11,7 @@ import { Text } from 'ink';
 import {
   usePhraseCycler,
   PHRASE_CHANGE_INTERVAL_MS,
+  INTERACTIVE_SHELL_WAITING_PHRASE,
 } from './usePhraseCycler.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
@@ -88,9 +89,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
-    expect(lastFrame()).toBe(
-      'Interactive shell awaiting input... press Ctrl+f to focus shell',
-    );
+    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
   });
 
   it('should reset interactive shell waiting timer when lastOutputTime changes', async () => {
@@ -132,9 +131,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
-    expect(lastFrame()).toBe(
-      'Interactive shell awaiting input... press Ctrl+f to focus shell',
-    );
+    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
   });
 
   it('should prioritize interactive shell waiting over normal waiting after 5s', async () => {
@@ -156,9 +153,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
-    expect(lastFrame()).toBe(
-      'Interactive shell awaiting input... press Ctrl+f to focus shell',
-    );
+    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
   });
 
   it('should not cycle phrases if isActive is false and not waiting', async () => {

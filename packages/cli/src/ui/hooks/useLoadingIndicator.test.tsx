@@ -9,7 +9,10 @@ import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useLoadingIndicator } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
-import { PHRASE_CHANGE_INTERVAL_MS } from './usePhraseCycler.js';
+import {
+  PHRASE_CHANGE_INTERVAL_MS,
+  INTERACTIVE_SHELL_WAITING_PHRASE,
+} from './usePhraseCycler.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
 describe('useLoadingIndicator', () => {
@@ -93,7 +96,7 @@ describe('useLoadingIndicator', () => {
     });
 
     expect(result.current.currentLoadingPhrase).toBe(
-      'Interactive shell awaiting input... press Ctrl+f to focus shell',
+      INTERACTIVE_SHELL_WAITING_PHRASE,
     );
   });
 
