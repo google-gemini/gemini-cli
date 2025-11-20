@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { writeToStdout } from '../../utils/stdio.js';
+import { writeToStdout } from '@google/gemini-cli-core';
 import {
   SGR_MOUSE_REGEX,
   X11_MOUSE_REGEX,
