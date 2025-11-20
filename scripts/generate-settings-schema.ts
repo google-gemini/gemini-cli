@@ -117,7 +117,13 @@ function buildSchemaObject(schema: SettingsSchemaType): JsonSchema {
       'Configuration file schema for Gemini CLI settings. This schema enables IDE completion for `settings.json`.',
     type: 'object',
     additionalProperties: false,
-    properties: {},
+    properties: {
+      $schema: {
+        type: 'string',
+        description:
+          'JSON Schema reference for IDE autocomplete and validation.',
+      },
+    },
   };
 
   for (const [key, definition] of Object.entries(schema)) {
