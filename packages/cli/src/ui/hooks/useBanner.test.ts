@@ -16,6 +16,7 @@ import { renderHook } from '../../test-utils/render.js';
 import { useBanner } from './useBanner.js';
 import { persistentState } from '../../utils/persistentState.js';
 import type { Config } from '@google/gemini-cli-core';
+import crypto from 'node:crypto';
 
 vi.mock('../../utils/persistentState.js', () => ({
   persistentState: {
@@ -69,14 +70,6 @@ describe('useBanner', () => {
     mockedPersistentStateGet.mockReturnValue({});
   });
 
-  it('should return default text and blue color when conditions are met', () => {
-    const { result } = renderHook(() =>
-      useBanner(defaultBannerData, mockConfig as unknown as Config),
-    );
-
-    expect(result.current.bannerText).toBe('Standard Banner');
-  });
-
   it('should return warning text and warning color if warningText is present', () => {
     const data = { defaultText: 'Standard', warningText: 'Critical Error' };
 
@@ -99,20 +92,13 @@ describe('useBanner', () => {
     expect(result.current.bannerText).toBe('');
   });
 
-  it('should parse versioned strings with custom max counts (v1:3:Message)', () => {
-    // Format: v{Version}:{MaxCount}:{Text}
-    const data = { defaultText: 'v1:3:New Feature Available', warningText: '' };
-
-    const { result } = renderHook(() =>
-      useBanner(data, mockConfig as unknown as Config),
-    );
-
-    expect(result.current.bannerText).toBe('New Feature Available');
-  });
-
   it('should hide banner if show count exceeds max limit (Legacy format)', () => {
-    // Legacy defaults to v0 and max 5
-    mockedPersistentStateGet.mockReturnValue({ v0: 5 });
+    mockedPersistentStateGet.mockReturnValue({
+      [crypto
+        .createHash('sha256')
+        .update(defaultBannerData.defaultText)
+        .digest('hex')]: 5,
+    });
 
     const { result } = renderHook(() =>
       useBanner(defaultBannerData, mockConfig as unknown as Config),
@@ -121,25 +107,13 @@ describe('useBanner', () => {
     expect(result.current.bannerText).toBe('');
   });
 
-  it('should hide banner if show count exceeds max limit (Versioned format)', () => {
-    // Max count is 2
-    const data = { defaultText: 'v2:2:Limited Time', warningText: '' };
-
-    // Mock that we have seen 'v2' 2 times already
-    mockedPersistentStateGet.mockReturnValue({ v2: 2 });
-
-    const { result } = renderHook(() =>
-      useBanner(data, mockConfig as unknown as Config),
-    );
-
-    expect(result.current.bannerText).toBe('');
-  });
-
   it('should increment the persistent count when banner is shown', () => {
-    const data = { defaultText: 'v5:10:Tracker', warningText: '' };
+    const data = { defaultText: 'Tracker', warningText: '' };
 
     // Current count is 1
-    mockedPersistentStateGet.mockReturnValue({ v5: 1 });
+    mockedPersistentStateGet.mockReturnValue({
+      [crypto.createHash('sha256').update(data.defaultText).digest('hex')]: 1,
+    });
 
     renderHook(() => useBanner(data, mockConfig as unknown as Config));
 
@@ -147,7 +121,7 @@ describe('useBanner', () => {
     expect(mockedPersistentStateSet).toHaveBeenCalledWith(
       'defaultBannerShownCount',
       {
-        v5: 2,
+        [crypto.createHash('sha256').update(data.defaultText).digest('hex')]: 2,
       },
     );
   });

@@ -4,16 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { persistentState } from '../../utils/persistentState.js';
 import type { Config } from '@google/gemini-cli-core';
+import crypto from 'node:crypto';
 
 const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
-
-function hasVersionPrefix(str: string) {
-  const versionPrefixRegex = /^v\d+:/;
-  return versionPrefixRegex.test(str);
-}
 
 interface BannerData {
   defaultText: string;
@@ -38,32 +34,19 @@ export function useBanner(bannerData: BannerData, config: Config) {
     () => persistentState.get('defaultBannerShownCount') || {},
   );
 
-  const { currentBannerVersion, defaultTextDelimited, maxBannerShownCount } =
-    useMemo(() => {
-      if (hasVersionPrefix(defaultText)) {
-        const parts = defaultText.split(':');
-        return {
-          currentBannerVersion: parts[0],
-          maxBannerShownCount:
-            parseInt(parts[1], 10) ?? DEFAULT_MAX_BANNER_SHOWN_COUNT,
-          defaultTextDelimited: parts.slice(2).join('').trim(),
-        };
-      }
-      return {
-        currentBannerVersion: 'v0',
-        defaultTextDelimited: defaultText,
-        maxBannerShownCount: DEFAULT_MAX_BANNER_SHOWN_COUNT,
-      };
-    }, [defaultText]);
+  const hashedText = crypto
+    .createHash('sha256')
+    .update(defaultText)
+    .digest('hex');
 
-  const currentBannerCount = bannerCounts[currentBannerVersion] || 0;
+  const currentBannerCount = bannerCounts[hashedText] || 0;
 
   const showDefaultBanner =
     warningText === '' &&
     !previewEnabled &&
-    currentBannerCount < maxBannerShownCount;
+    currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
 
-  const rawBannerText = showDefaultBanner ? defaultTextDelimited : warningText;
+  const rawBannerText = showDefaultBanner ? defaultText : warningText;
   const bannerText = rawBannerText.replace(/\\n/g, '\n');
 
   const lastIncrementedKey = useRef<string | null>(null);
@@ -74,15 +57,15 @@ export function useBanner(bannerData: BannerData, config: Config) {
         lastIncrementedKey.current = defaultText;
 
         const allCounts = persistentState.get('defaultBannerShownCount') || {};
-        const current = allCounts[currentBannerVersion] || 0;
+        const current = allCounts[hashedText] || 0;
 
         persistentState.set('defaultBannerShownCount', {
           ...allCounts,
-          [currentBannerVersion]: current + 1,
+          [hashedText]: current + 1,
         });
       }
     }
-  }, [showDefaultBanner, defaultText, currentBannerVersion]);
+  }, [showDefaultBanner, defaultText, hashedText]);
 
   return {
     bannerText,
