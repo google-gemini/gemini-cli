@@ -217,10 +217,22 @@ export interface SandboxConfig {
   image: string;
 }
 
+export type ToolSandboxMode = 'landlock';
+
+/**
+ * Per-tool sandbox configuration. Unlike the global sandbox (Docker/Podman/
+ * Seatbelt) which re-launches the entire CLI, this setting allows individual
+ * tool executions to be wrapped in a lightweight sandbox.
+ */
+export interface ToolSandboxConfig {
+  mode: ToolSandboxMode;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
+  toolSandbox?: ToolSandboxConfig;
   targetDir: string;
   debugMode: boolean;
   question?: string;
@@ -322,6 +334,7 @@ export class Config {
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
+  private readonly toolSandbox: ToolSandboxConfig | undefined;
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
@@ -430,6 +443,7 @@ export class Config {
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox;
+    this.toolSandbox = params.toolSandbox;
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -815,6 +829,10 @@ export class Config {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  getToolSandbox(): ToolSandboxConfig | undefined {
+    return this.toolSandbox;
   }
 
   isRestrictiveSandbox(): boolean {
