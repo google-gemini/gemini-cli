@@ -16,12 +16,14 @@ import {
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   type ExtensionLoader,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi
@@ -36,7 +38,7 @@ vi.mock('./sandboxConfig.js', () => ({
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
-  const mockHome = '/mock/home/user';
+  const mockHome = pathMod.resolve(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
 
@@ -69,7 +71,7 @@ vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
   return {
     ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
+    homedir: vi.fn(() => path.resolve(path.sep, 'mock', 'home', 'user')),
   };
 });
 
@@ -112,6 +114,7 @@ vi.mock('@google/gemini-cli-core', async () => {
         return Promise.resolve({
           memoryContent: extensionPaths.join(',') || '',
           fileCount: extensionPaths?.length || 0,
+          filePaths: extensionPaths,
         });
       },
     ),
@@ -163,19 +166,25 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
       ),
     );
+    // yargs.showHelp() calls console.error
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should throw an error when using short flags -p and -i together', async () => {
@@ -195,19 +204,24 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
       ),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should allow --prompt without --prompt-interactive', async () => {
@@ -374,19 +388,24 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
       ),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should throw an error when using short flags -y and --approval-mode together', async () => {
@@ -399,19 +418,24 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
       ),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should allow --approval-mode without --yolo', async () => {
@@ -438,17 +462,71 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Invalid values:'),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
+  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = false;
+    process.argv = ['node', 'script.js', '--resume', 'session-id'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    try {
+      await expect(parseArguments({} as Settings)).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(debugErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
+        ),
+      );
+      expect(mockConsoleError).toHaveBeenCalled();
+    } finally {
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+      debugErrorSpy.mockRestore();
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
+  it('should return RESUME_LATEST constant when --resume is passed without a value', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = true; // Make it interactive to avoid validation error
+    process.argv = ['node', 'script.js', '--resume'];
+
+    try {
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe(RESUME_LATEST);
+      expect(argv.resume).toBe('latest');
+    } finally {
+      process.stdin.isTTY = originalIsTTY;
+    }
   });
 
   it('should support comma-separated values for --allowed-tools', async () => {
@@ -752,11 +830,11 @@ describe('mergeMcpServers', () => {
 });
 
 describe('mergeExcludeTools', () => {
-  const defaultExcludes = [
+  const defaultExcludes = new Set([
     SHELL_TOOL_NAME,
     EDIT_TOOL_NAME,
     WRITE_FILE_TOOL_NAME,
-  ];
+  ]);
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -799,7 +877,7 @@ describe('mergeExcludeTools', () => {
       argv,
     );
     expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4', 'tool5']),
+      new Set(['tool1', 'tool2', 'tool3', 'tool4', 'tool5']),
     );
     expect(config.getExcludeTools()).toHaveLength(5);
   });
@@ -821,7 +899,7 @@ describe('mergeExcludeTools', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2', 'tool3']),
+      new Set(['tool1', 'tool2', 'tool3']),
     );
     expect(config.getExcludeTools()).toHaveLength(3);
   });
@@ -852,7 +930,7 @@ describe('mergeExcludeTools', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2', 'tool3', 'tool4']),
+      new Set(['tool1', 'tool2', 'tool3', 'tool4']),
     );
     expect(config.getExcludeTools()).toHaveLength(4);
   });
@@ -863,7 +941,7 @@ describe('mergeExcludeTools', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getExcludeTools()).toEqual([]);
+    expect(config.getExcludeTools()).toEqual(new Set([]));
   });
 
   it('should return default excludes when no excludeTools are specified and it is not interactive', async () => {
@@ -881,9 +959,7 @@ describe('mergeExcludeTools', () => {
     const settings: Settings = { tools: { exclude: ['tool1', 'tool2'] } };
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2']),
-    );
+    expect(config.getExcludeTools()).toEqual(new Set(['tool1', 'tool2']));
     expect(config.getExcludeTools()).toHaveLength(2);
   });
 
@@ -903,9 +979,7 @@ describe('mergeExcludeTools', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getExcludeTools()).toEqual(
-      expect.arrayContaining(['tool1', 'tool2']),
-    );
+    expect(config.getExcludeTools()).toEqual(new Set(['tool1', 'tool2']));
     expect(config.getExcludeTools()).toHaveLength(2);
   });
 
@@ -1480,7 +1554,9 @@ describe('loadCliConfig folderTrust', () => {
 describe('loadCliConfig with includeDirectories', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(os.homedir).mockReturnValue(
+      path.resolve(path.sep, 'mock', 'home', 'user'),
+    );
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(process, 'cwd').mockReturnValue(
       path.resolve(path.sep, 'home', 'user', 'project'),
@@ -1519,11 +1595,13 @@ describe('loadCliConfig with includeDirectories', () => {
       path.join(os.homedir(), 'settings', 'path2'),
       path.join(mockCwd, 'settings', 'path3'),
     ];
-    expect(config.getWorkspaceContext().getDirectories()).toEqual(
-      expect.arrayContaining(expected),
+    const directories = config.getWorkspaceContext().getDirectories();
+    expect(directories).toEqual([mockCwd]);
+    expect(config.getPendingIncludeDirectories()).toEqual(
+      expect.arrayContaining(expected.filter((dir) => dir !== mockCwd)),
     );
-    expect(config.getWorkspaceContext().getDirectories()).toHaveLength(
-      expected.length,
+    expect(config.getPendingIncludeDirectories()).toHaveLength(
+      expected.length - 1,
     );
   });
 });
@@ -2187,21 +2265,30 @@ describe('Output format', () => {
   });
 
   it('should error on invalid --output-format argument', async () => {
-    process.argv = ['node', 'script.js', '--output-format', 'yaml'];
+    process.argv = ['node', 'script.js', '--output-format', 'invalid'];
+
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
+
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Invalid values:'),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
+
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 });
 
@@ -2229,12 +2316,15 @@ describe('parseArguments with positional prompt', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both a positional prompt and the --prompt (-p) flag together',
       ),
@@ -2242,6 +2332,7 @@ describe('parseArguments with positional prompt', () => {
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should correctly parse a positional prompt to query field', async () => {

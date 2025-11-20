@@ -26,6 +26,7 @@ import type { Config } from '../config/config.js';
 import readline from 'node:readline';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -241,7 +242,7 @@ describe('oauth2', () => {
       (readline.createInterface as Mock).mockReturnValue(mockReadline);
 
       const consoleLogSpy = vi
-        .spyOn(console, 'log')
+        .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
       const client = await getOauthClient(
@@ -318,7 +319,7 @@ describe('oauth2', () => {
       });
 
       it('should use Compute to get a client if no cached credentials exist', async () => {
-        await getOauthClient(AuthType.CLOUD_SHELL, mockConfig);
+        await getOauthClient(AuthType.COMPUTE_ADC, mockConfig);
 
         expect(Compute).toHaveBeenCalledWith({});
         expect(mockGetAccessToken).toHaveBeenCalled();
@@ -329,7 +330,7 @@ describe('oauth2', () => {
         mockComputeClient.credentials = newCredentials;
         mockGetAccessToken.mockResolvedValue({ token: 'new-adc-token' });
 
-        await getOauthClient(AuthType.CLOUD_SHELL, mockConfig);
+        await getOauthClient(AuthType.COMPUTE_ADC, mockConfig);
 
         const credsPath = path.join(
           tempHomeDir,
@@ -340,7 +341,7 @@ describe('oauth2', () => {
       });
 
       it('should return the Compute client on successful ADC authentication', async () => {
-        const client = await getOauthClient(AuthType.CLOUD_SHELL, mockConfig);
+        const client = await getOauthClient(AuthType.COMPUTE_ADC, mockConfig);
         expect(client).toBe(mockComputeClient);
       });
 
@@ -349,9 +350,9 @@ describe('oauth2', () => {
         mockGetAccessToken.mockRejectedValue(testError);
 
         await expect(
-          getOauthClient(AuthType.CLOUD_SHELL, mockConfig),
+          getOauthClient(AuthType.COMPUTE_ADC, mockConfig),
         ).rejects.toThrow(
-          'Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ADC Failed',
+          'Could not authenticate using metadata server application default credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ADC Failed',
         );
       });
     });
@@ -855,7 +856,7 @@ describe('oauth2', () => {
         } as unknown as Response);
 
         const consoleLogSpy = vi
-          .spyOn(console, 'log')
+          .spyOn(debugLogger, 'log')
           .mockImplementation(() => {});
 
         let requestCallback!: http.RequestListener;
@@ -935,10 +936,10 @@ describe('oauth2', () => {
         (readline.createInterface as Mock).mockReturnValue(mockReadline);
 
         const consoleLogSpy = vi
-          .spyOn(console, 'log')
+          .spyOn(debugLogger, 'log')
           .mockImplementation(() => {});
         const consoleErrorSpy = vi
-          .spyOn(console, 'error')
+          .spyOn(debugLogger, 'error')
           .mockImplementation(() => {});
 
         await expect(

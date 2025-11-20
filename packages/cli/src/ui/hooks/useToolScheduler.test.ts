@@ -80,6 +80,7 @@ const mockConfig = {
   getEnableMessageBusIntegration: () => false,
   getMessageBus: () => null,
   getPolicyEngine: () => null,
+  isInteractive: () => false,
 } as unknown as Config;
 
 const mockTool = new MockTool({
@@ -134,7 +135,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         onComplete,
         mockConfig as unknown as Config,
         () => undefined,
-        () => {},
       ),
     );
 
@@ -263,7 +263,6 @@ describe('useReactToolScheduler', () => {
         onComplete,
         mockConfig as unknown as Config,
         () => undefined,
-        () => {},
       ),
     );
 

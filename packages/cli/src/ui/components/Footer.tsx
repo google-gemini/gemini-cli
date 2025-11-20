@@ -10,7 +10,7 @@ import { theme } from '../semantic-colors.js';
 import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
-import Gradient from 'ink-gradient';
+import { ThemedGradient } from './ThemedGradient.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
@@ -87,12 +87,10 @@ export const Footer: React.FC = () => {
           )}
           {!hideCWD &&
             (nightly ? (
-              <Gradient colors={theme.ui.gradient}>
-                <Text>
-                  {displayPath}
-                  {branchName && <Text> ({branchName}*)</Text>}
-                </Text>
-              </Gradient>
+              <ThemedGradient>
+                {displayPath}
+                {branchName && <Text> ({branchName}*)</Text>}
+              </ThemedGradient>
             ) : (
               <Text color={theme.text.link}>
                 {displayPath}

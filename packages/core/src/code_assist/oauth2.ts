@@ -155,12 +155,15 @@ async function initOauthClient(
     }
   }
 
-  // In Google Cloud Shell, we can use Application Default Credentials (ADC)
-  // provided via its metadata server to authenticate non-interactively using
-  // the identity of the user logged into Cloud Shell.
-  if (authType === AuthType.CLOUD_SHELL) {
+  // In Google Compute Engine based environments (including Cloud Shell), we can
+  // use Application Default Credentials (ADC) provided via its metadata server
+  // to authenticate non-interactively using the identity of the logged-in user.
+  if (authType === AuthType.COMPUTE_ADC) {
     try {
-      debugLogger.log("Attempting to authenticate via Cloud Shell VM's ADC.");
+      debugLogger.log(
+        'Attempting to authenticate via metadata server application default credentials.',
+      );
+
       const computeClient = new Compute({
         // We can leave this empty, since the metadata server will provide
         // the service account email.
@@ -172,7 +175,7 @@ async function initOauthClient(
       return computeClient;
     } catch (e) {
       throw new Error(
-        `Could not authenticate using Cloud Shell credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
+        `Could not authenticate using metadata server application default credentials. Please select a different authentication method or ensure you are in a properly configured environment. Error: ${getErrorMessage(
           e,
         )}`,
       );

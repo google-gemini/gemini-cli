@@ -15,7 +15,7 @@ import {
   type Mock,
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import { AuthType, type Config } from '@google/gemini-cli-core';
+import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { AuthState } from '../types.js';
@@ -109,8 +109,41 @@ describe('AuthDialog', () => {
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items).toContainEqual({
       label: 'Use Cloud Shell user credentials',
-      value: AuthType.CLOUD_SHELL,
-      key: AuthType.CLOUD_SHELL,
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
+    });
+  });
+
+  it('does not show metadata server application default credentials option in Cloud Shell environment', () => {
+    process.env['CLOUD_SHELL'] = 'true';
+    renderWithProviders(<AuthDialog {...props} />);
+    const items = mockedRadioButtonSelect.mock.calls[0][0].items;
+    expect(items).not.toContainEqual({
+      label: 'Use metadata server application default credentials',
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
+    });
+  });
+
+  it('shows metadata server application default credentials option when GEMINI_CLI_USE_COMPUTE_ADC env var is true', () => {
+    process.env['GEMINI_CLI_USE_COMPUTE_ADC'] = 'true';
+    renderWithProviders(<AuthDialog {...props} />);
+    const items = mockedRadioButtonSelect.mock.calls[0][0].items;
+    expect(items).toContainEqual({
+      label: 'Use metadata server application default credentials',
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
+    });
+  });
+
+  it('does not show Cloud Shell option when when GEMINI_CLI_USE_COMPUTE_ADC env var is true', () => {
+    process.env['GEMINI_CLI_USE_COMPUTE_ADC'] = 'true';
+    renderWithProviders(<AuthDialog {...props} />);
+    const items = mockedRadioButtonSelect.mock.calls[0][0].items;
+    expect(items).not.toContainEqual({
+      label: 'Use Cloud Shell user credentials',
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
     });
   });
 
@@ -199,7 +232,7 @@ describe('AuthDialog', () => {
       const exitSpy = vi
         .spyOn(process, 'exit')
         .mockImplementation(() => undefined as never);
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
       vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);
       mockedValidateAuthMethod.mockReturnValue(null);
 

@@ -18,7 +18,6 @@ import type {
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ChatCompressionEvent,
   FileOperationEvent,
   InvalidChunkEvent,
@@ -38,6 +37,7 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  LlmLoopCheckEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -93,6 +93,7 @@ export enum EventNames {
   AGENT_FINISH = 'agent_finish',
   RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
+  LLM_LOOP_CHECK = 'llm_loop_check',
 }
 
 export interface LogResponse {
@@ -102,6 +103,7 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
+  gws_experiment: number[];
 }
 
 export interface EventValue {
@@ -145,6 +147,13 @@ function determineSurface(): string {
   } else {
     return 'SURFACE_NOT_SET';
   }
+}
+
+/**
+ * Determines the GitHub Actions workflow name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHWorkflowName(): string | undefined {
+  return process.env['GH_WORKFLOW_NAME'];
 }
 
 /**
@@ -237,6 +246,7 @@ export class ClearcutLogger {
         {
           event_time_ms: Date.now(),
           source_extension_json: safeJsonStringify(event),
+          gws_experiment: this.config?.getExperiments()?.experimentIds ?? [],
         },
       ]);
 
@@ -257,31 +267,39 @@ export class ClearcutLogger {
     data: EventValue[] = [],
   ): LogEvent {
     const surface = determineSurface();
+    const ghWorkflowName = determineGHWorkflowName();
+    const baseMetadata: EventValue[] = [
+      ...data,
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+        value: CLI_VERSION,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+        value: GIT_COMMIT_INFO,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+        value: process.platform,
+      },
+    ];
+
+    if (ghWorkflowName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
+        value: ghWorkflowName,
+      });
+    }
+
     return {
       console_type: 'GEMINI_CLI',
       application: 102, // GEMINI_CLI
       event_name: eventName as string,
-      event_metadata: [
-        [
-          ...data,
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-            value: surface,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-            value: CLI_VERSION,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-            value: GIT_COMMIT_INFO,
-          },
-          {
-            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-            value: process.platform,
-          },
-        ],
-      ],
+      event_metadata: [baseMetadata],
     };
   }
 
@@ -734,6 +752,14 @@ export class ClearcutLogger {
       },
     ];
 
+    if (event.confirmed_by_model) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL,
+        value: event.confirmed_by_model,
+      });
+    }
+
     this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
     this.flushIfNeeded();
   }
@@ -847,20 +873,6 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logKittySequenceOverflowEvent(event: KittySequenceOverflowEvent): void {
-    const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_SEQUENCE_LENGTH,
-        value: event.sequence_length.toString(),
-      },
-    ];
-
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.KITTY_SEQUENCE_OVERFLOW, data),
-    );
-    this.flushIfNeeded();
-  }
-
   logEndSessionEvent(): void {
     // Flush immediately on session end.
     this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, []));
@@ -940,7 +952,7 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logExtensionInstallEvent(event: ExtensionInstallEvent): void {
+  async logExtensionInstallEvent(event: ExtensionInstallEvent): Promise<void> {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
@@ -967,12 +979,14 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
-    this.flushToClearcut().catch((error) => {
+    await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
-  logExtensionUninstallEvent(event: ExtensionUninstallEvent): void {
+  async logExtensionUninstallEvent(
+    event: ExtensionUninstallEvent,
+  ): Promise<void> {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
@@ -991,12 +1005,12 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
-    this.flushToClearcut().catch((error) => {
+    await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
-  logExtensionUpdateEvent(event: ExtensionUpdateEvent): void {
+  async logExtensionUpdateEvent(event: ExtensionUpdateEvent): Promise<void> {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
@@ -1027,7 +1041,7 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
     );
-    this.flushToClearcut().catch((error) => {
+    await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
@@ -1096,7 +1110,7 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logExtensionEnableEvent(event: ExtensionEnableEvent): void {
+  async logExtensionEnableEvent(event: ExtensionEnableEvent): Promise<void> {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
@@ -1116,7 +1130,7 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createBasicLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
-    this.flushToClearcut().catch((error) => {
+    await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
@@ -1135,7 +1149,7 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logExtensionDisableEvent(event: ExtensionDisableEvent): void {
+  async logExtensionDisableEvent(event: ExtensionDisableEvent): Promise<void> {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
@@ -1155,7 +1169,7 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createBasicLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
-    this.flushToClearcut().catch((error) => {
+    await this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
@@ -1280,6 +1294,32 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logLlmLoopCheckEvent(event: LlmLoopCheckEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: event.prompt_id,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_FLASH_CONFIDENCE,
+        value: event.flash_confidence.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL,
+        value: event.main_model,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LLM_LOOP_CHECK_MAIN_MODEL_CONFIDENCE,
+        value: event.main_model_confidence.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.LLM_LOOP_CHECK, data));
+    this.flushIfNeeded();
+  }
+
   /**
    * Adds default fields to data, and returns a new data array.  This fields
    * should exist on all log events.
@@ -1311,6 +1351,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: this.getConfigJson(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_INTERACTIVE,
+        value: this.config?.isInteractive().toString() ?? 'false',
       },
     ];
     return [...data, ...defaultLogMetadata];

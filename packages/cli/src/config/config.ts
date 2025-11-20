@@ -4,21 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type {
-  FileFilteringOptions,
-  OutputFormat,
-} from '@google/gemini-cli-core';
+import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
-  loadServerHierarchicalMemory,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -36,6 +29,7 @@ import {
   getPty,
   EDIT_TOOL_NAME,
   debugLogger,
+  loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -43,17 +37,16 @@ import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
-import type {
-  ExtensionEvents,
-  ExtensionLoader,
-} from '@google/gemini-cli-core/src/utils/extensionLoader.js';
+import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { runExitCleanup } from '../utils/cleanup.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -70,6 +63,9 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
+  resume: string | typeof RESUME_LATEST | undefined;
+  listSessions: boolean | undefined;
+  deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
@@ -181,6 +177,35 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'List all available extensions and exit.',
         })
+        .option('resume', {
+          alias: 'r',
+          type: 'string',
+          // `skipValidation` so that we can distinguish between it being passed with a value, without
+          // one, and not being passed at all.
+          skipValidation: true,
+          description:
+            'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
+          coerce: (value: string): string => {
+            // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
+            // When --resume passed without a value (`gemini --resume`): value = "" (string)
+            // When --resume not passed at all: this `coerce` function is not called at all, and
+            //   `yargsInstance.argv.resume` is undefined.
+            if (value === '') {
+              return RESUME_LATEST;
+            }
+            return value;
+          },
+        })
+        .option('list-sessions', {
+          type: 'boolean',
+          description:
+            'List available sessions for the current project and exit.',
+        })
+        .option('delete-session', {
+          type: 'string',
+          description:
+            'Delete a session by index number (use --list-sessions to see available sessions).',
+        })
         .option('include-directories', {
           type: 'array',
           string: true,
@@ -215,35 +240,47 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .deprecateOption(
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
-        )
-        // Ensure validation flows through .fail() for clean UX
-        .fail((msg, err, yargs) => {
-          debugLogger.error(msg || err?.message || 'Unknown error');
-          yargs.showHelp();
-          process.exit(1);
-        })
-        .check((argv) => {
-          // The 'query' positional can be a string (for one arg) or string[] (for multiple).
-          // This guard safely checks if any positional argument was provided.
-          const query = argv['query'] as string | string[] | undefined;
-          const hasPositionalQuery = Array.isArray(query)
-            ? query.length > 0
-            : !!query;
-
-          if (argv['prompt'] && hasPositionalQuery) {
-            return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
-          }
-          if (argv['prompt'] && argv['promptInteractive']) {
-            return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
-          }
-          if (argv.yolo && argv['approvalMode']) {
-            return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
-          }
-          return true;
-        }),
+        ),
     )
     // Register MCP subcommands
-    .command(mcpCommand);
+    .command(mcpCommand)
+    // Ensure validation flows through .fail() for clean UX
+    .fail((msg, err) => {
+      if (err) throw err;
+      throw new Error(msg);
+    })
+    .check((argv) => {
+      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
+      // This guard safely checks if any positional argument was provided.
+      const query = argv['query'] as string | string[] | undefined;
+      const hasPositionalQuery = Array.isArray(query)
+        ? query.length > 0
+        : !!query;
+
+      if (argv['prompt'] && hasPositionalQuery) {
+        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
+      }
+      if (argv['prompt'] && argv['promptInteractive']) {
+        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+      }
+      if (argv['resume'] && !argv['prompt'] && !process.stdin.isTTY) {
+        throw new Error(
+          'When resuming a session, you must provide a message via --prompt (-p) or stdin',
+        );
+      }
+      if (argv['yolo'] && argv['approvalMode']) {
+        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+      if (
+        argv['outputFormat'] &&
+        !['text', 'json', 'stream-json'].includes(
+          argv['outputFormat'] as string,
+        )
+      ) {
+        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
+      }
+      return true;
+    });
 
   if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
@@ -255,10 +292,26 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .help()
     .alias('h', 'help')
     .strict()
-    .demandCommand(0, 0); // Allow base command to run with no subcommands
+    .demandCommand(0, 0) // Allow base command to run with no subcommands
+    .exitProcess(false);
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
-  const result = await yargsInstance.parse();
+  let result;
+  try {
+    result = await yargsInstance.parse();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    debugLogger.error(msg);
+    yargsInstance.showHelp();
+    await runExitCleanup();
+    process.exit(1);
+  }
+
+  // Handle help and version flags manually since we disabled exitProcess
+  if (result['help'] || result['version']) {
+    await runExitCleanup();
+    process.exit(0);
+  }
 
   // If yargs handled --help/--version it will have exited; nothing to do here.
 
@@ -269,6 +322,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     (result._[0] === 'mcp' || result._[0] === 'extensions')
   ) {
     // MCP commands handle their own execution and process exit
+    await runExitCleanup();
     process.exit(0);
   }
 
@@ -295,49 +349,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
   return result as unknown as CliArgs;
-}
-
-// This function is now a thin wrapper around the server's implementation.
-// It's kept in the CLI for now as App.tsx directly calls it for memory refresh.
-// TODO: Consider if App.tsx should get memory via a server call or if Config should refresh itself.
-export async function loadHierarchicalGeminiMemory(
-  currentWorkingDirectory: string,
-  includeDirectoriesToReadGemini: readonly string[] = [],
-  debugMode: boolean,
-  fileService: FileDiscoveryService,
-  settings: Settings,
-  extensionLoader: ExtensionLoader,
-  folderTrust: boolean,
-  memoryImportFormat: 'flat' | 'tree' = 'tree',
-  fileFilteringOptions?: FileFilteringOptions,
-): Promise<{ memoryContent: string; fileCount: number; filePaths: string[] }> {
-  // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
-  const realCwd = fs.realpathSync(path.resolve(currentWorkingDirectory));
-  const realHome = fs.realpathSync(path.resolve(homedir()));
-  const isHomeDirectory = realCwd === realHome;
-
-  // If it is the home directory, pass an empty string to the core memory
-  // function to signal that it should skip the workspace search.
-  const effectiveCwd = isHomeDirectory ? '' : currentWorkingDirectory;
-
-  if (debugMode) {
-    debugLogger.debug(
-      `CLI: Delegating hierarchical memory load to server for CWD: ${currentWorkingDirectory} (memoryImportFormat: ${memoryImportFormat})`,
-    );
-  }
-
-  // Directly call the server function with the corrected path.
-  return loadServerHierarchicalMemory(
-    effectiveCwd,
-    includeDirectoriesToReadGemini,
-    debugMode,
-    fileService,
-    extensionLoader,
-    folderTrust,
-    memoryImportFormat,
-    fileFilteringOptions,
-    settings.context?.discoveryMaxDirs,
-  );
 }
 
 /**
@@ -437,18 +448,16 @@ export async function loadCliConfig(
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount, filePaths } =
-    await loadHierarchicalGeminiMemory(
+    await loadServerHierarchicalMemory(
       cwd,
-      settings.context?.loadMemoryFromIncludeDirectories
-        ? includeDirectories
-        : [],
+      [],
       debugMode,
       fileService,
-      settings,
       extensionManager,
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
+      settings.context?.discoveryMaxDirs,
     );
 
   const question = argv.promptInteractive || argv.prompt || '';
@@ -531,10 +540,11 @@ export async function loadCliConfig(
   const hasQuery = !!argv.query;
   const interactive =
     !!argv.promptInteractive ||
+    !!argv.experimentalAcp ||
     (process.stdin.isTTY && !hasQuery && !argv.prompt);
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
-  if (!interactive && !argv.experimentalAcp) {
+  if (!interactive) {
     const defaultExcludes = [
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
@@ -598,6 +608,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
+    previewFeatures: settings.general?.previewFeatures,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -637,6 +648,8 @@ export async function loadCliConfig(
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
+    listSessions: argv.listSessions || false,
+    deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,

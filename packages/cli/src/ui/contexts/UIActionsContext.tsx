@@ -11,6 +11,7 @@ import { type FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import { type AuthType, type EditorType } from '@google/gemini-cli-core';
 import { type LoadableSettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
+import { type PermissionsDialogProps } from '../components/PermissionsModifyTrustDialog.js';
 
 export interface UIActions {
   handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
@@ -30,6 +31,7 @@ export interface UIActions {
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;
   closeModelDialog: () => void;
+  openPermissionsDialog: (props?: PermissionsDialogProps) => void;
   closePermissionsDialog: () => void;
   setShellModeActive: (value: boolean) => void;
   vimHandleInput: (key: Key) => boolean;
@@ -40,11 +42,15 @@ export interface UIActions {
   refreshStatic: () => void;
   handleFinalSubmit: (value: string) => void;
   handleClearScreen: () => void;
-  handleProQuotaChoice: (choice: 'retry_later' | 'retry') => void;
+  handleProQuotaChoice: (
+    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+  ) => void;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: (onPop: (messages: string | undefined) => void) => void;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
+  setBannerVisible: (visible: boolean) => void;
+  setEmbeddedShellFocused: (value: boolean) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

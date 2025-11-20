@@ -31,6 +31,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
   debugLogger,
+  ReadManyFilesTool,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -263,15 +264,15 @@ class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
+        const model = resolveModel(
+          this.config.getModel(),
+          this.config.isInFallbackMode(),
+        );
         const responseStream = await chat.sendMessageStream(
-          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
-          {
-            message: nextMessage?.parts ?? [],
-            config: {
-              abortSignal: pendingSend.signal,
-            },
-          },
+          { model },
+          nextMessage?.parts ?? [],
           promptId,
+          pendingSend.signal,
         );
         nextMessage = null;
 
@@ -315,6 +316,13 @@ class Session {
             429,
             'Rate limit exceeded. Try again later.',
           );
+        }
+
+        if (
+          pendingSend.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          return { stopReason: 'cancelled' };
         }
 
         throw error;
@@ -570,7 +578,7 @@ class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = toolRegistry.getTool('read_many_files');
+    const readManyFilesTool = new ReadManyFilesTool(this.config);
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {
@@ -734,7 +742,7 @@ class Session {
 
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
-        paths: pathSpecsToRead,
+        include: pathSpecsToRead,
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;
