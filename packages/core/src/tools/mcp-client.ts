@@ -16,9 +16,8 @@ import type {
   Prompt,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
-  GetPromptResultSchema,
-  ListPromptsResultSchema,
   ListRootsRequestSchema,
+  type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
@@ -27,8 +26,7 @@ import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
-import type { FunctionDeclaration } from '@google/genai';
-import { mcpToTool } from '@google/genai';
+import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
@@ -41,6 +39,9 @@ import type {
   WorkspaceContext,
 } from '../utils/workspaceContext.js';
 import type { ToolRegistry } from './tool-registry.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { coreEvents } from '../utils/events.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -118,7 +119,11 @@ export class McpClient {
           return;
         }
         if (originalOnError) originalOnError(error);
-        console.error(`MCP ERROR (${this.serverName}):`, error.toString());
+        coreEvents.emitFeedback(
+          'error',
+          `MCP ERROR (${this.serverName})`,
+          error,
+        );
         this.updateStatus(MCPServerStatus.DISCONNECTED);
       };
       this.updateStatus(MCPServerStatus.CONNECTED);
@@ -132,9 +137,7 @@ export class McpClient {
    * Discovers tools and prompts from the MCP server.
    */
   async discover(cliConfig: Config): Promise<void> {
-    if (this.status !== MCPServerStatus.CONNECTED) {
-      throw new Error('Client is not connected.');
-    }
+    this.assertConnected();
 
     const prompts = await this.discoverPrompts();
     const tools = await this.discoverTools(cliConfig);
@@ -146,6 +149,7 @@ export class McpClient {
     for (const tool of tools) {
       this.toolRegistry.registerTool(tool);
     }
+    this.toolRegistry.sortTools();
   }
 
   /**
@@ -155,6 +159,8 @@ export class McpClient {
     if (this.status !== MCPServerStatus.CONNECTED) {
       return;
     }
+    this.toolRegistry.removeMcpToolsByServer(this.serverName);
+    this.promptRegistry.removePromptsByServer(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -194,12 +200,17 @@ export class McpClient {
       this.serverConfig,
       this.client!,
       cliConfig,
+      this.toolRegistry.getMessageBus(),
     );
   }
 
   private async discoverPrompts(): Promise<Prompt[]> {
     this.assertConnected();
     return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
+  }
+
+  getServerConfig(): MCPServerConfig {
+    return this.serverConfig;
   }
 }
 
@@ -323,7 +334,7 @@ async function handleAutomaticOAuth(
   wwwAuthenticate: string,
 ): Promise<boolean> {
   try {
-    console.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
+    debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
     // Always try to parse the resource metadata URI from the www-authenticate header
     let oauthConfig;
@@ -341,8 +352,9 @@ async function handleAutomaticOAuth(
     }
 
     if (!oauthConfig) {
-      console.error(
-        `❌ Could not configure OAuth for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
+      coreEvents.emitFeedback(
+        'error',
+        `Could not configure OAuth for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
       );
       return false;
     }
@@ -360,22 +372,89 @@ async function handleAutomaticOAuth(
     // Perform OAuth authentication
     // Pass the server URL for proper discovery
     const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
-    console.log(
+    debugLogger.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
     const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
     await authProvider.authenticate(mcpServerName, oauthAuthConfig, serverUrl);
 
-    console.log(
+    debugLogger.log(
       `OAuth authentication successful for server '${mcpServerName}'`,
     );
     return true;
   } catch (error) {
-    console.error(
+    coreEvents.emitFeedback(
+      'error',
       `Failed to handle automatic OAuth for server '${mcpServerName}': ${getErrorMessage(error)}`,
+      error,
     );
     return false;
   }
+}
+
+/**
+ * Create RequestInit for TransportOptions.
+ *
+ * @param mcpServerConfig The MCP server configuration
+ * @param headers Additional headers
+ */
+function createTransportRequestInit(
+  mcpServerConfig: MCPServerConfig,
+  headers: Record<string, string>,
+): RequestInit {
+  return {
+    headers: {
+      ...mcpServerConfig.headers,
+      ...headers,
+    },
+  };
+}
+
+/**
+ * Create an AuthProvider for the MCP Transport.
+ *
+ * @param mcpServerConfig The MCP server configuration
+ */
+function createAuthProvider(mcpServerConfig: MCPServerConfig) {
+  if (
+    mcpServerConfig.authProviderType ===
+    AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
+  ) {
+    return new ServiceAccountImpersonationProvider(mcpServerConfig);
+  }
+  if (
+    mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
+  ) {
+    return new GoogleCredentialProvider(mcpServerConfig);
+  }
+  return undefined;
+}
+
+/**
+ * Create a transport for URL based servers (remote servers).
+ *
+ * @param mcpServerConfig The MCP server configuration
+ * @param transportOptions The transport options
+ */
+function createUrlTransport(
+  mcpServerConfig: MCPServerConfig,
+  transportOptions:
+    | StreamableHTTPClientTransportOptions
+    | SSEClientTransportOptions,
+): StreamableHTTPClientTransport | SSEClientTransport {
+  if (mcpServerConfig.httpUrl) {
+    return new StreamableHTTPClientTransport(
+      new URL(mcpServerConfig.httpUrl),
+      transportOptions,
+    );
+  }
+  if (mcpServerConfig.url) {
+    return new SSEClientTransport(
+      new URL(mcpServerConfig.url),
+      transportOptions,
+    );
+  }
+  throw new Error('No URL configured for MCP Server');
 }
 
 /**
@@ -392,37 +471,21 @@ async function createTransportWithOAuth(
   accessToken: string,
 ): Promise<StreamableHTTPClientTransport | SSEClientTransport | null> {
   try {
-    if (mcpServerConfig.httpUrl) {
-      // Create HTTP transport with OAuth token
-      const oauthTransportOptions: StreamableHTTPClientTransportOptions = {
-        requestInit: {
-          headers: {
-            ...mcpServerConfig.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      };
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${accessToken}`,
+    };
+    const transportOptions:
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {
+      requestInit: createTransportRequestInit(mcpServerConfig, headers),
+    };
 
-      return new StreamableHTTPClientTransport(
-        new URL(mcpServerConfig.httpUrl),
-        oauthTransportOptions,
-      );
-    } else if (mcpServerConfig.url) {
-      // Create SSE transport with OAuth token in Authorization header
-      return new SSEClientTransport(new URL(mcpServerConfig.url), {
-        requestInit: {
-          headers: {
-            ...mcpServerConfig.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      });
-    }
-
-    return null;
+    return createUrlTransport(mcpServerConfig, transportOptions);
   } catch (error) {
-    console.error(
+    coreEvents.emitFeedback(
+      'error',
       `Failed to create OAuth transport for server '${mcpServerName}': ${getErrorMessage(error)}`,
+      error,
     );
     return null;
   }
@@ -521,7 +584,7 @@ export async function connectAndDiscover(
     );
 
     mcpClient.onerror = (error) => {
-      console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
+      coreEvents.emitFeedback('error', `MCP ERROR (${mcpServerName}):`, error);
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     };
 
@@ -536,6 +599,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       mcpClient,
       cliConfig,
+      toolRegistry.getMessageBus(),
     );
 
     // If we have neither prompts nor tools, it's a failed discovery
@@ -550,14 +614,17 @@ export async function connectAndDiscover(
     for (const tool of tools) {
       toolRegistry.registerTool(tool);
     }
+    toolRegistry.sortTools();
   } catch (error) {
     if (mcpClient) {
       mcpClient.close();
     }
-    console.error(
+    coreEvents.emitFeedback(
+      'error',
       `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(
         error,
       )}`,
+      error,
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
@@ -571,6 +638,8 @@ export async function connectAndDiscover(
  * @param mcpServerName The name of the MCP server.
  * @param mcpServerConfig The configuration for the MCP server.
  * @param mcpClient The active MCP client instance.
+ * @param cliConfig The CLI configuration object.
+ * @param messageBus Optional message bus for policy engine integration.
  * @returns A promise that resolves to an array of discovered and enabled tools.
  * @throws An error if no enabled tools are found or if the server provides invalid function declarations.
  */
@@ -579,45 +648,48 @@ export async function discoverTools(
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
   cliConfig: Config,
+  messageBus?: MessageBus,
 ): Promise<DiscoveredMCPTool[]> {
   try {
     // Only request tools if the server supports them.
     if (mcpClient.getServerCapabilities()?.tools == null) return [];
 
-    const mcpCallableTool = mcpToTool(mcpClient, {
-      timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-    });
-    const tool = await mcpCallableTool.tool();
-
-    if (!Array.isArray(tool.functionDeclarations)) {
-      // This is a valid case for a prompt-only server
-      return [];
-    }
-
+    const response = await mcpClient.listTools({});
     const discoveredTools: DiscoveredMCPTool[] = [];
-    for (const funcDecl of tool.functionDeclarations) {
+    for (const toolDef of response.tools) {
       try {
-        if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
+        if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
           continue;
         }
 
-        discoveredTools.push(
-          new DiscoveredMCPTool(
-            mcpCallableTool,
-            mcpServerName,
-            funcDecl.name!,
-            funcDecl.description ?? '',
-            funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
-            mcpServerConfig.trust,
-            undefined,
-            cliConfig,
-          ),
+        const mcpCallableTool = new McpCallableTool(
+          mcpClient,
+          toolDef,
+          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
         );
+
+        const tool = new DiscoveredMCPTool(
+          mcpCallableTool,
+          mcpServerName,
+          toolDef.name,
+          toolDef.description ?? '',
+          toolDef.inputSchema ?? { type: 'object', properties: {} },
+          mcpServerConfig.trust,
+          undefined,
+          cliConfig,
+          mcpServerConfig.extension?.name,
+          mcpServerConfig.extension?.id,
+          messageBus,
+        );
+
+        discoveredTools.push(tool);
       } catch (error) {
-        console.error(
+        coreEvents.emitFeedback(
+          'error',
           `Error discovering tool: '${
-            funcDecl.name
+            toolDef.name
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
+          error,
         );
       }
     }
@@ -627,13 +699,78 @@ export async function discoverTools(
       error instanceof Error &&
       !error.message?.includes('Method not found')
     ) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
           error,
         )}`,
+        error,
       );
     }
     return [];
+  }
+}
+
+class McpCallableTool implements CallableTool {
+  constructor(
+    private readonly client: Client,
+    private readonly toolDef: McpTool,
+    private readonly timeout: number,
+  ) {}
+
+  async tool(): Promise<Tool> {
+    return {
+      functionDeclarations: [
+        {
+          name: this.toolDef.name,
+          description: this.toolDef.description,
+          parametersJsonSchema: this.toolDef.inputSchema,
+        },
+      ],
+    };
+  }
+
+  async callTool(functionCalls: FunctionCall[]): Promise<Part[]> {
+    // We only expect one function call at a time for MCP tools in this context
+    if (functionCalls.length !== 1) {
+      throw new Error('McpCallableTool only supports single function call');
+    }
+    const call = functionCalls[0];
+
+    try {
+      const result = await this.client.callTool(
+        {
+          name: call.name!,
+          arguments: call.args as Record<string, unknown>,
+        },
+        undefined,
+        { timeout: this.timeout },
+      );
+
+      return [
+        {
+          functionResponse: {
+            name: call.name,
+            response: result,
+          },
+        },
+      ];
+    } catch (error) {
+      // Return error in the format expected by DiscoveredMCPTool
+      return [
+        {
+          functionResponse: {
+            name: call.name,
+            response: {
+              error: {
+                message: error instanceof Error ? error.message : String(error),
+                isError: true,
+              },
+            },
+          },
+        },
+      ];
+    }
   }
 }
 
@@ -653,10 +790,7 @@ export async function discoverPrompts(
     // Only request prompts if the server supports them.
     if (mcpClient.getServerCapabilities()?.prompts == null) return [];
 
-    const response = await mcpClient.request(
-      { method: 'prompts/list', params: {} },
-      ListPromptsResultSchema,
-    );
+    const response = await mcpClient.listPrompts({});
 
     for (const prompt of response.prompts) {
       promptRegistry.registerPrompt({
@@ -674,10 +808,12 @@ export async function discoverPrompts(
       error instanceof Error &&
       !error.message?.includes('Method not found')
     ) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
           error,
         )}`,
+        error,
       );
     }
     return [];
@@ -700,16 +836,17 @@ export async function invokeMcpPrompt(
   promptParams: Record<string, unknown>,
 ): Promise<GetPromptResult> {
   try {
-    const response = await mcpClient.request(
-      {
-        method: 'prompts/get',
-        params: {
-          name: promptName,
-          arguments: promptParams,
-        },
-      },
-      GetPromptResultSchema,
-    );
+    const sanitizedParams: Record<string, string> = {};
+    for (const [key, value] of Object.entries(promptParams)) {
+      if (value !== undefined && value !== null) {
+        sanitizedParams[key] = String(value);
+      }
+    }
+
+    const response = await mcpClient.getPrompt({
+      name: promptName,
+      arguments: sanitizedParams,
+    });
 
     return response;
   } catch (error) {
@@ -717,10 +854,12 @@ export async function invokeMcpPrompt(
       error instanceof Error &&
       !error.message?.includes('Method not found')
     ) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `Error invoking prompt '${promptName}' from ${mcpServerName} ${promptParams}: ${getErrorMessage(
           error,
         )}`,
+        error,
       );
     }
     throw error;
@@ -842,12 +981,14 @@ export async function connectToMcpServer(
             },
           );
           if (hasStoredTokens) {
-            console.log(
+            coreEvents.emitFeedback(
+              'error',
               `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
                 `Please re-authenticate using: /mcp auth ${mcpServerName}`,
             );
           } else {
-            console.log(
+            coreEvents.emitFeedback(
+              'error',
               `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
                 `Please authenticate using: /mcp auth ${mcpServerName}`,
             );
@@ -864,7 +1005,7 @@ export async function connectToMcpServer(
 
       // If we didn't get the header from the error string, try to get it from the server
       if (!wwwAuthenticate && hasNetworkTransport(mcpServerConfig)) {
-        console.log(
+        debugLogger.log(
           `No www-authenticate header in error, trying to fetch it from server...`,
         );
         try {
@@ -882,13 +1023,13 @@ export async function connectToMcpServer(
           if (response.status === 401) {
             wwwAuthenticate = response.headers.get('www-authenticate');
             if (wwwAuthenticate) {
-              console.log(
+              debugLogger.log(
                 `Found www-authenticate header from server: ${wwwAuthenticate}`,
               );
             }
           }
         } catch (fetchError) {
-          console.debug(
+          debugLogger.debug(
             `Failed to fetch www-authenticate header: ${getErrorMessage(
               fetchError,
             )}`,
@@ -897,7 +1038,7 @@ export async function connectToMcpServer(
       }
 
       if (wwwAuthenticate) {
-        console.log(
+        debugLogger.log(
           `Received 401 with www-authenticate header: ${wwwAuthenticate}`,
         );
 
@@ -909,7 +1050,7 @@ export async function connectToMcpServer(
         );
         if (oauthSuccess) {
           // Retry connection with OAuth token
-          console.log(
+          debugLogger.log(
             `Retrying connection to '${mcpServerName}' with OAuth token...`,
           );
 
@@ -935,49 +1076,27 @@ export async function connectToMcpServer(
                 accessToken,
               );
               if (oauthTransport) {
-                try {
-                  await mcpClient.connect(oauthTransport, {
-                    timeout:
-                      mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-                  });
-                  // Connection successful with OAuth
-                  return mcpClient;
-                } catch (retryError) {
-                  console.error(
-                    `Failed to connect with OAuth token: ${getErrorMessage(
-                      retryError,
-                    )}`,
-                  );
-                  throw retryError;
-                }
+                await mcpClient.connect(oauthTransport, {
+                  timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+                });
+                // Connection successful with OAuth
+                return mcpClient;
               } else {
-                console.error(
-                  `Failed to create OAuth transport for server '${mcpServerName}'`,
-                );
                 throw new Error(
                   `Failed to create OAuth transport for server '${mcpServerName}'`,
                 );
               }
             } else {
-              console.error(
-                `Failed to get OAuth token for server '${mcpServerName}'`,
-              );
               throw new Error(
                 `Failed to get OAuth token for server '${mcpServerName}'`,
               );
             }
           } else {
-            console.error(
-              `Failed to get credentials for server '${mcpServerName}' after successful OAuth authentication`,
-            );
             throw new Error(
               `Failed to get credentials for server '${mcpServerName}' after successful OAuth authentication`,
             );
           }
         } else {
-          console.error(
-            `Failed to handle automatic OAuth for server '${mcpServerName}'`,
-          );
           throw new Error(
             `Failed to handle automatic OAuth for server '${mcpServerName}'`,
           );
@@ -1002,12 +1121,14 @@ export async function connectToMcpServer(
               },
             );
             if (hasStoredTokens) {
-              console.log(
+              coreEvents.emitFeedback(
+                'error',
                 `Stored OAuth token for SSE server '${mcpServerName}' was rejected. ` +
                   `Please re-authenticate using: /mcp auth ${mcpServerName}`,
               );
             } else {
-              console.log(
+              coreEvents.emitFeedback(
+                'error',
                 `401 error received for SSE server '${mcpServerName}' without OAuth configuration. ` +
                   `Please authenticate using: /mcp auth ${mcpServerName}`,
               );
@@ -1020,7 +1141,9 @@ export async function connectToMcpServer(
         }
 
         // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
-        console.log(`🔍 Attempting OAuth discovery for '${mcpServerName}'...`);
+        debugLogger.log(
+          `🔍 Attempting OAuth discovery for '${mcpServerName}'...`,
+        );
 
         if (hasNetworkTransport(mcpServerConfig)) {
           const serverUrl = new URL(
@@ -1028,116 +1151,85 @@ export async function connectToMcpServer(
           );
           const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
 
-          try {
-            // Try to discover OAuth configuration from the base URL
-            const oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
-            if (oauthConfig) {
-              console.log(
-                `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
-              );
+          // Try to discover OAuth configuration from the base URL
+          const oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
+          if (oauthConfig) {
+            debugLogger.log(
+              `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
+            );
 
-              // Create OAuth configuration for authentication
-              const oauthAuthConfig = {
-                enabled: true,
-                authorizationUrl: oauthConfig.authorizationUrl,
-                tokenUrl: oauthConfig.tokenUrl,
-                scopes: oauthConfig.scopes || [],
-              };
+            // Create OAuth configuration for authentication
+            const oauthAuthConfig = {
+              enabled: true,
+              authorizationUrl: oauthConfig.authorizationUrl,
+              tokenUrl: oauthConfig.tokenUrl,
+              scopes: oauthConfig.scopes || [],
+            };
 
-              // Perform OAuth authentication
-              // Pass the server URL for proper discovery
-              const authServerUrl =
-                mcpServerConfig.httpUrl || mcpServerConfig.url;
-              console.log(
-                `Starting OAuth authentication for server '${mcpServerName}'...`,
-              );
-              const authProvider = new MCPOAuthProvider(
-                new MCPOAuthTokenStorage(),
-              );
-              await authProvider.authenticate(
+            // Perform OAuth authentication
+            // Pass the server URL for proper discovery
+            const authServerUrl =
+              mcpServerConfig.httpUrl || mcpServerConfig.url;
+            debugLogger.log(
+              `Starting OAuth authentication for server '${mcpServerName}'...`,
+            );
+            const authProvider = new MCPOAuthProvider(
+              new MCPOAuthTokenStorage(),
+            );
+            await authProvider.authenticate(
+              mcpServerName,
+              oauthAuthConfig,
+              authServerUrl,
+            );
+
+            // Retry connection with OAuth token
+            const tokenStorage = new MCPOAuthTokenStorage();
+            const credentials =
+              await tokenStorage.getCredentials(mcpServerName);
+            if (credentials) {
+              const authProvider = new MCPOAuthProvider(tokenStorage);
+              const accessToken = await authProvider.getValidToken(
                 mcpServerName,
-                oauthAuthConfig,
-                authServerUrl,
+                {
+                  // Pass client ID if available
+                  clientId: credentials.clientId,
+                },
               );
-
-              // Retry connection with OAuth token
-              const tokenStorage = new MCPOAuthTokenStorage();
-              const credentials =
-                await tokenStorage.getCredentials(mcpServerName);
-              if (credentials) {
-                const authProvider = new MCPOAuthProvider(tokenStorage);
-                const accessToken = await authProvider.getValidToken(
+              if (accessToken) {
+                // Create transport with OAuth token
+                const oauthTransport = await createTransportWithOAuth(
                   mcpServerName,
-                  {
-                    // Pass client ID if available
-                    clientId: credentials.clientId,
-                  },
+                  mcpServerConfig,
+                  accessToken,
                 );
-                if (accessToken) {
-                  // Create transport with OAuth token
-                  const oauthTransport = await createTransportWithOAuth(
-                    mcpServerName,
-                    mcpServerConfig,
-                    accessToken,
-                  );
-                  if (oauthTransport) {
-                    try {
-                      await mcpClient.connect(oauthTransport, {
-                        timeout:
-                          mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-                      });
-                      // Connection successful with OAuth
-                      return mcpClient;
-                    } catch (retryError) {
-                      console.error(
-                        `Failed to connect with OAuth token: ${getErrorMessage(
-                          retryError,
-                        )}`,
-                      );
-                      throw retryError;
-                    }
-                  } else {
-                    console.error(
-                      `Failed to create OAuth transport for server '${mcpServerName}'`,
-                    );
-                    throw new Error(
-                      `Failed to create OAuth transport for server '${mcpServerName}'`,
-                    );
-                  }
+                if (oauthTransport) {
+                  await mcpClient.connect(oauthTransport, {
+                    timeout:
+                      mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+                  });
+                  // Connection successful with OAuth
+                  return mcpClient;
                 } else {
-                  console.error(
-                    `Failed to get OAuth token for server '${mcpServerName}'`,
-                  );
                   throw new Error(
-                    `Failed to get OAuth token for server '${mcpServerName}'`,
+                    `Failed to create OAuth transport for server '${mcpServerName}'`,
                   );
                 }
               } else {
-                console.error(
-                  `Failed to get stored credentials for server '${mcpServerName}'`,
-                );
                 throw new Error(
-                  `Failed to get stored credentials for server '${mcpServerName}'`,
+                  `Failed to get OAuth token for server '${mcpServerName}'`,
                 );
               }
             } else {
-              console.error(
-                `❌ Could not configure OAuth for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
-              );
               throw new Error(
-                `OAuth configuration failed for '${mcpServerName}'. Please authenticate manually with /mcp auth ${mcpServerName}`,
+                `Failed to get stored credentials for server '${mcpServerName}'`,
               );
             }
-          } catch (discoveryError) {
-            console.error(
-              `❌ OAuth discovery failed for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
+          } else {
+            throw new Error(
+              `OAuth configuration failed for '${mcpServerName}'. Please authenticate manually with /mcp auth ${mcpServerName}`,
             );
-            throw discoveryError;
           }
         } else {
-          console.error(
-            `❌ '${mcpServerName}' requires authentication but no OAuth configuration found`,
-          );
           throw new Error(
             `MCP server '${mcpServerName}' requires authentication. Please configure OAuth or check server settings.`,
           );
@@ -1166,148 +1258,85 @@ export async function connectToMcpServer(
     }
   }
 }
-
 /** Visible for Testing */
 export async function createTransport(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
 ): Promise<Transport> {
-  if (
-    mcpServerConfig.authProviderType ===
-    AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
-  ) {
-    const provider = new ServiceAccountImpersonationProvider(mcpServerConfig);
-    const transportOptions:
-      | StreamableHTTPClientTransportOptions
-      | SSEClientTransportOptions = {
-      authProvider: provider,
-    };
-
-    if (mcpServerConfig.httpUrl) {
-      return new StreamableHTTPClientTransport(
-        new URL(mcpServerConfig.httpUrl),
-        transportOptions,
-      );
-    } else if (mcpServerConfig.url) {
-      // Default to SSE if only url is provided
-      return new SSEClientTransport(
-        new URL(mcpServerConfig.url),
-        transportOptions,
-      );
-    }
-    throw new Error(
-      'No URL configured for ServiceAccountImpersonation MCP Server',
-    );
-  }
-
-  if (
-    mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
-  ) {
-    const provider = new GoogleCredentialProvider(mcpServerConfig);
-    const transportOptions:
-      | StreamableHTTPClientTransportOptions
-      | SSEClientTransportOptions = {
-      authProvider: provider,
-    };
-    if (mcpServerConfig.httpUrl) {
-      return new StreamableHTTPClientTransport(
-        new URL(mcpServerConfig.httpUrl),
-        transportOptions,
-      );
-    } else if (mcpServerConfig.url) {
-      return new SSEClientTransport(
-        new URL(mcpServerConfig.url),
-        transportOptions,
-      );
-    }
-    throw new Error('No URL configured for Google Credentials MCP server');
-  }
-
-  // Check if we have OAuth configuration or stored tokens
-  let accessToken: string | null = null;
-  let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
-
-  if (hasOAuthConfig && mcpServerConfig.oauth) {
-    const tokenStorage = new MCPOAuthTokenStorage();
-    const authProvider = new MCPOAuthProvider(tokenStorage);
-    accessToken = await authProvider.getValidToken(
-      mcpServerName,
-      mcpServerConfig.oauth,
-    );
-
-    if (!accessToken) {
-      console.error(
-        `MCP server '${mcpServerName}' requires OAuth authentication. ` +
-          `Please authenticate using the /mcp auth command.`,
-      );
+  const noUrl = !mcpServerConfig.url && !mcpServerConfig.httpUrl;
+  if (noUrl) {
+    if (
+      mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
+    ) {
       throw new Error(
-        `MCP server '${mcpServerName}' requires OAuth authentication. ` +
-          `Please authenticate using the /mcp auth command.`,
+        `URL must be provided in the config for Google Credentials provider`,
       );
     }
-  } else {
-    // Check if we have stored OAuth tokens for this server (from previous authentication)
-    const tokenStorage = new MCPOAuthTokenStorage();
-    const credentials = await tokenStorage.getCredentials(mcpServerName);
-    if (credentials) {
-      const authProvider = new MCPOAuthProvider(tokenStorage);
-      accessToken = await authProvider.getValidToken(mcpServerName, {
-        // Pass client ID if available
-        clientId: credentials.clientId,
-      });
+    if (
+      mcpServerConfig.authProviderType ===
+      AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
+    ) {
+      throw new Error(
+        `No URL configured for ServiceAccountImpersonation MCP Server`,
+      );
+    }
+  }
 
-      if (accessToken) {
-        hasOAuthConfig = true;
-        console.log(`Found stored OAuth token for server '${mcpServerName}'`);
+  if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
+    const authProvider = createAuthProvider(mcpServerConfig);
+
+    const headers: Record<string, string> = {};
+    if (authProvider === undefined) {
+      // Check if we have OAuth configuration or stored tokens
+      let accessToken: string | null = null;
+      let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
+      if (hasOAuthConfig && mcpServerConfig.oauth) {
+        const tokenStorage = new MCPOAuthTokenStorage();
+        const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
+        accessToken = await mcpAuthProvider.getValidToken(
+          mcpServerName,
+          mcpServerConfig.oauth,
+        );
+
+        if (!accessToken) {
+          throw new Error(
+            `MCP server '${mcpServerName}' requires OAuth authentication. ` +
+              `Please authenticate using the /mcp auth command.`,
+          );
+        }
+      } else {
+        // Check if we have stored OAuth tokens for this server (from previous authentication)
+        const tokenStorage = new MCPOAuthTokenStorage();
+        const credentials = await tokenStorage.getCredentials(mcpServerName);
+        if (credentials) {
+          const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
+          accessToken = await mcpAuthProvider.getValidToken(mcpServerName, {
+            // Pass client ID if available
+            clientId: credentials.clientId,
+          });
+
+          if (accessToken) {
+            hasOAuthConfig = true;
+            debugLogger.log(
+              `Found stored OAuth token for server '${mcpServerName}'`,
+            );
+          }
+        }
+      }
+      if (hasOAuthConfig && accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
       }
     }
-  }
 
-  if (mcpServerConfig.httpUrl) {
-    const transportOptions: StreamableHTTPClientTransportOptions = {};
+    const transportOptions:
+      | StreamableHTTPClientTransportOptions
+      | SSEClientTransportOptions = {
+      requestInit: createTransportRequestInit(mcpServerConfig, headers),
+      authProvider,
+    };
 
-    // Set up headers with OAuth token if available
-    if (hasOAuthConfig && accessToken) {
-      transportOptions.requestInit = {
-        headers: {
-          ...mcpServerConfig.headers,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      };
-    } else if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        headers: mcpServerConfig.headers,
-      };
-    }
-
-    return new StreamableHTTPClientTransport(
-      new URL(mcpServerConfig.httpUrl),
-      transportOptions,
-    );
-  }
-
-  if (mcpServerConfig.url) {
-    const transportOptions: SSEClientTransportOptions = {};
-
-    // Set up headers with OAuth token if available
-    if (hasOAuthConfig && accessToken) {
-      transportOptions.requestInit = {
-        headers: {
-          ...mcpServerConfig.headers,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      };
-    } else if (mcpServerConfig.headers) {
-      transportOptions.requestInit = {
-        headers: mcpServerConfig.headers,
-      };
-    }
-
-    return new SSEClientTransport(
-      new URL(mcpServerConfig.url),
-      transportOptions,
-    );
+    return createUrlTransport(mcpServerConfig, transportOptions);
   }
 
   if (mcpServerConfig.command) {
@@ -1324,7 +1353,10 @@ export async function createTransport(
     if (debugMode) {
       transport.stderr!.on('data', (data) => {
         const stderrStr = data.toString().trim();
-        console.debug(`[DEBUG] [MCP STDERR (${mcpServerName})]: `, stderrStr);
+        debugLogger.debug(
+          `[DEBUG] [MCP STDERR (${mcpServerName})]: `,
+          stderrStr,
+        );
       });
     }
     return transport;
@@ -1335,14 +1367,18 @@ export async function createTransport(
   );
 }
 
+interface NamedTool {
+  name?: string;
+}
+
 /** Visible for testing */
 export function isEnabled(
-  funcDecl: FunctionDeclaration,
+  funcDecl: NamedTool,
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
 ): boolean {
   if (!funcDecl.name) {
-    console.warn(
+    debugLogger.warn(
       `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
     );
     return false;

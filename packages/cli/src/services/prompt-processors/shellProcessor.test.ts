@@ -9,8 +9,7 @@ import { ConfirmationRequiredError, ShellProcessor } from './shellProcessor.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from '../../ui/commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
-import os from 'node:os';
+import { ApprovalMode, getShellConfiguration } from '@google/gemini-cli-core';
 import { quote } from 'shell-quote';
 import { createPartFromText } from '@google/genai';
 import type { PromptPipelineContent } from './types.js';
@@ -18,18 +17,16 @@ import type { PromptPipelineContent } from './types.js';
 // Helper function to determine the expected escaped string based on the current OS,
 // mirroring the logic in the actual `escapeShellArg` implementation.
 function getExpectedEscapedArgForPlatform(arg: string): string {
-  if (os.platform() === 'win32') {
-    const comSpec = (process.env['ComSpec'] || 'cmd.exe').toLowerCase();
-    const isPowerShell =
-      comSpec.endsWith('powershell.exe') || comSpec.endsWith('pwsh.exe');
+  const { shell } = getShellConfiguration();
 
-    if (isPowerShell) {
+  switch (shell) {
+    case 'powershell':
       return `'${arg.replace(/'/g, "''")}'`;
-    } else {
+    case 'cmd':
       return `"${arg.replace(/"/g, '""')}"`;
-    }
-  } else {
-    return quote([arg]);
+    case 'bash':
+    default:
+      return quote([arg]);
   }
 }
 

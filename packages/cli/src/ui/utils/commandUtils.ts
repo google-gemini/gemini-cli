@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SpawnOptions } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { debugLogger } from '@google/gemini-cli-core';
+import clipboardy from 'clipboardy';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -44,89 +44,9 @@ export const isSlashCommand = (query: string): boolean => {
   return true;
 };
 
-// Copies a string snippet to the clipboard for different platforms
+// Copies a string snippet to the clipboard
 export const copyToClipboard = async (text: string): Promise<void> => {
-  const run = (cmd: string, args: string[], options?: SpawnOptions) =>
-    new Promise<void>((resolve, reject) => {
-      const child = options ? spawn(cmd, args, options) : spawn(cmd, args);
-      let stderr = '';
-      if (child.stderr) {
-        child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
-      }
-      child.on('error', reject);
-      child.on('close', (code) => {
-        if (code === 0) return resolve();
-        const errorMsg = stderr.trim();
-        reject(
-          new Error(
-            `'${cmd}' exited with code ${code}${errorMsg ? `: ${errorMsg}` : ''}`,
-          ),
-        );
-      });
-      if (child.stdin) {
-        child.stdin.on('error', reject);
-        child.stdin.write(text);
-        child.stdin.end();
-      } else {
-        reject(new Error('Child process has no stdin stream to write to.'));
-      }
-    });
-
-  // Configure stdio for Linux clipboard commands.
-  // - stdin: 'pipe' to write the text that needs to be copied.
-  // - stdout: 'inherit' since we don't need to capture the command's output on success.
-  // - stderr: 'pipe' to capture error messages (e.g., "command not found") for better error handling.
-  const linuxOptions: SpawnOptions = { stdio: ['pipe', 'inherit', 'pipe'] };
-
-  switch (process.platform) {
-    case 'win32':
-      return run('clip', []);
-    case 'darwin':
-      return run('pbcopy', []);
-    case 'linux':
-      try {
-        await run('xclip', ['-selection', 'clipboard'], linuxOptions);
-      } catch (primaryError) {
-        try {
-          // If xclip fails for any reason, try xsel as a fallback.
-          await run('xsel', ['--clipboard', '--input'], linuxOptions);
-        } catch (fallbackError) {
-          const xclipNotFound =
-            primaryError instanceof Error &&
-            (primaryError as NodeJS.ErrnoException).code === 'ENOENT';
-          const xselNotFound =
-            fallbackError instanceof Error &&
-            (fallbackError as NodeJS.ErrnoException).code === 'ENOENT';
-          if (xclipNotFound && xselNotFound) {
-            throw new Error(
-              'Please ensure xclip or xsel is installed and configured.',
-            );
-          }
-
-          let primaryMsg =
-            primaryError instanceof Error
-              ? primaryError.message
-              : String(primaryError);
-          if (xclipNotFound) {
-            primaryMsg = `xclip not found`;
-          }
-          let fallbackMsg =
-            fallbackError instanceof Error
-              ? fallbackError.message
-              : String(fallbackError);
-          if (xselNotFound) {
-            fallbackMsg = `xsel not found`;
-          }
-
-          throw new Error(
-            `All copy commands failed. "${primaryMsg}", "${fallbackMsg}". `,
-          );
-        }
-      }
-      return;
-    default:
-      throw new Error(`Unsupported platform: ${process.platform}`);
-  }
+  await clipboardy.write(text);
 };
 
 export const getUrlOpenCommand = (): string => {
@@ -145,7 +65,7 @@ export const getUrlOpenCommand = (): string => {
     default:
       // Default to xdg-open, which appears to be supported for the less popular operating systems.
       openCmd = 'xdg-open';
-      console.warn(
+      debugLogger.warn(
         `Unknown platform: ${process.platform}. Attempting to open URLs with: ${openCmd}.`,
       );
       break;

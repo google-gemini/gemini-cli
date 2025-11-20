@@ -11,8 +11,12 @@ import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 export class MessageBus extends EventEmitter {
-  constructor(private readonly policyEngine: PolicyEngine) {
+  constructor(
+    private readonly policyEngine: PolicyEngine,
+    private readonly debug = false,
+  ) {
     super();
+    this.debug = debug;
   }
 
   private isValidMessage(message: Message): boolean {
@@ -34,7 +38,10 @@ export class MessageBus extends EventEmitter {
     this.emit(message.type, message);
   }
 
-  publish(message: Message): void {
+  async publish(message: Message): Promise<void> {
+    if (this.debug) {
+      console.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+    }
     try {
       if (!this.isValidMessage(message)) {
         throw new Error(
@@ -43,7 +50,10 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const decision = this.policyEngine.check(message.toolCall);
+        const { decision } = await this.policyEngine.check(
+          message.toolCall,
+          message.serverName,
+        );
 
         switch (decision) {
           case PolicyDecision.ALLOW:

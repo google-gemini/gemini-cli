@@ -5,7 +5,7 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig, type, printDebugInfo } from './test-helper.js';
+import { TestRig } from './test-helper.js';
 
 describe('Interactive file system', () => {
   let rig: TestRig;
@@ -18,44 +18,43 @@ describe('Interactive file system', () => {
     await rig.cleanup();
   });
 
-  it.skip('should perform a read-then-write sequence', async () => {
+  it('should perform a read-then-write sequence', async () => {
     const fileName = 'version.txt';
-    rig.setup('interactive-read-then-write');
+    await rig.setup('interactive-read-then-write', {
+      settings: {
+        security: {
+          auth: {
+            selectedType: 'gemini-api-key',
+          },
+          disableYoloMode: false,
+        },
+      },
+    });
     rig.createFile(fileName, '1.0.0');
 
-    const ptyProcess = await rig.runInteractive();
+    const run = await rig.runInteractive();
 
     // Step 1: Read the file
     const readPrompt = `Read the version from ${fileName}`;
-    await type(ptyProcess, readPrompt);
-    await type(ptyProcess, '\r');
+    await run.type(readPrompt);
+    await run.sendKeys('\r');
 
     const readCall = await rig.waitForToolCall('read_file', 30000);
     expect(readCall, 'Expected to find a read_file tool call').toBe(true);
 
-    await rig.waitForText('1.0.0', 30000);
-
     // Step 2: Write the file
     const writePrompt = `now change the version to 1.0.1 in the file`;
-    await type(ptyProcess, writePrompt);
-    await type(ptyProcess, '\r');
+    await run.type(writePrompt);
+    await run.sendKeys('\r');
 
-    const toolCall = await rig.waitForAnyToolCall(
+    // Check tool calls made with right args
+    await rig.expectToolCallSuccess(
       ['write_file', 'replace'],
       30000,
+      (args) => args.includes('1.0.1') && args.includes(fileName),
     );
 
-    if (!toolCall) {
-      printDebugInfo(rig, rig._interactiveOutput, {
-        toolCall,
-      });
-    }
-
-    expect(toolCall, 'Expected to find a write_file or replace tool call').toBe(
-      true,
-    );
-
-    const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe('1.0.1');
+    // Wait for telemetry to flush and file system to sync, especially in sandboxed environments
+    await rig.waitForTelemetryReady();
   });
 });

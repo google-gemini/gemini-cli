@@ -10,12 +10,11 @@ import { theme } from '../semantic-colors.js';
 import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
-import Gradient from 'ink-gradient';
+import { ThemedGradient } from './ThemedGradient.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
-
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -41,7 +40,7 @@ export const Footer: React.FC = () => {
     isTrustedFolder,
     mainAreaWidth,
   } = {
-    model: config.getModel(),
+    model: uiState.currentModel,
     targetDir: config.getTargetDir(),
     debugMode: config.getDebugMode(),
     branchName: uiState.branchName,
@@ -61,6 +60,8 @@ export const Footer: React.FC = () => {
   const hideSandboxStatus =
     settings.merged.ui?.footer?.hideSandboxStatus || false;
   const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo || false;
+  const hideContextPercentage =
+    settings.merged.ui?.footer?.hideContextPercentage ?? true;
 
   const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
@@ -86,12 +87,10 @@ export const Footer: React.FC = () => {
           )}
           {!hideCWD &&
             (nightly ? (
-              <Gradient colors={theme.ui.gradient}>
-                <Text>
-                  {displayPath}
-                  {branchName && <Text> ({branchName}*)</Text>}
-                </Text>
-              </Gradient>
+              <ThemedGradient>
+                {displayPath}
+                {branchName && <Text> ({branchName}*)</Text>}
+              </ThemedGradient>
             ) : (
               <Text color={theme.text.link}>
                 {displayPath}
@@ -146,12 +145,17 @@ export const Footer: React.FC = () => {
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
             <Text color={theme.text.accent}>
-              {model}{' '}
-              <ContextUsageDisplay
-                promptTokenCount={promptTokenCount}
-                model={model}
-                terminalWidth={mainAreaWidth}
-              />
+              {model}
+              {!hideContextPercentage && (
+                <>
+                  {' '}
+                  <ContextUsageDisplay
+                    promptTokenCount={promptTokenCount}
+                    model={model}
+                    terminalWidth={mainAreaWidth}
+                  />
+                </>
+              )}
             </Text>
             {showMemoryUsage && <MemoryUsageDisplay />}
           </Box>
@@ -170,7 +174,7 @@ export const Footer: React.FC = () => {
             )}
             {!showErrorDetails && errorCount > 0 && (
               <Box paddingLeft={1} flexDirection="row">
-                <Text color={theme.ui.symbol}>| </Text>
+                <Text color={theme.ui.comment}>| </Text>
                 <ConsoleSummaryDisplay errorCount={errorCount} />
               </Box>
             )}

@@ -202,6 +202,26 @@ allowlisting with `coreTools`, as it relies on blocking known-bad commands, and
 clever users may find ways to bypass simple string-based blocks. **Allowlisting
 is the recommended approach.**
 
+### Disabling YOLO Mode
+
+To ensure that users cannot bypass the confirmation prompt for tool execution,
+you can disable YOLO mode at the policy level. This adds a critical layer of
+safety, as it prevents the model from executing tools without explicit user
+approval.
+
+**Example:** Force all tool executions to require user confirmation.
+
+```json
+{
+  "security": {
+    "disableYoloMode": true
+  }
+}
+```
+
+This setting is highly recommended in an enterprise environment to prevent
+unintended tool execution.
+
 ## Managing Custom Tools (MCP Servers)
 
 If your organization uses custom tools via
@@ -343,9 +363,8 @@ containerized environment.
 }
 ```
 
-You can also specify a custom, hardened Docker image for the sandbox using the
-`--sandbox-image` command-line argument or by building a custom
-`sandbox.Dockerfile` as described in the
+You can also specify a custom, hardened Docker image for the sandbox by building
+a custom `sandbox.Dockerfile` as described in the
 [Sandboxing documentation](./sandbox.md).
 
 ## Controlling Network Access via Proxy

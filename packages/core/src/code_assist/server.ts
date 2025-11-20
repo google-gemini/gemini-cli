@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { OAuth2Client } from 'google-auth-library';
+import type { AuthClient } from 'google-auth-library';
 import type {
   CodeAssistGlobalUserSettingResponse,
   GoogleRpcResponse,
@@ -13,7 +13,12 @@ import type {
   LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
 } from './types.js';
+import type {
+  ListExperimentsRequest,
+  ListExperimentsResponse,
+} from './experiments/types.js';
 import type {
   CountTokensParameters,
   CountTokensResponse,
@@ -47,7 +52,7 @@ export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
-    readonly client: OAuth2Client,
+    readonly client: AuthClient,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
@@ -149,6 +154,23 @@ export class CodeAssistServer implements ContentGenerator {
     throw Error();
   }
 
+  async listExperiments(
+    metadata: ClientMetadata,
+  ): Promise<ListExperimentsResponse> {
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
+    const req: ListExperimentsRequest = {
+      project: projectId,
+      metadata: { ...metadata, duetProject: projectId },
+    };
+    return await this.requestPost<ListExperimentsResponse>(
+      'listExperiments',
+      req,
+    );
+  }
+
   async requestPost<T>(
     method: string,
     req: object,
@@ -210,18 +232,16 @@ export class CodeAssistServer implements ContentGenerator {
 
       let bufferedLines: string[] = [];
       for await (const line of rl) {
-        // blank lines are used to separate JSON objects in the stream
-        if (line === '') {
+        if (line.startsWith('data: ')) {
+          bufferedLines.push(line.slice(6).trim());
+        } else if (line === '') {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
           yield JSON.parse(bufferedLines.join('\n')) as T;
           bufferedLines = []; // Reset the buffer after yielding
-        } else if (line.startsWith('data: ')) {
-          bufferedLines.push(line.slice(6).trim());
-        } else {
-          throw new Error(`Unexpected line format in response: ${line}`);
         }
+        // Ignore other lines like comments or id fields
       }
     })();
   }

@@ -3,6 +3,200 @@
 Wondering what's new in Gemini CLI? This document provides key highlights and
 notable changes to Gemini CLI.
 
+## v0.15.0 - Gemini CLI weekly update - 2025-11-03
+
+- **🎉 Seamless scrollable UI & mouse support:** We’ve given Gemini CLI a major
+  facelift to make your terminal experience smoother and much more polished. You
+  now get a flicker-free display with sticky headers that keep important context
+  visible and a stable input prompt that doesn't jump around. We even added
+  mouse support so you can click right where you need to type!
+  ([gif](https://imgur.com/a/O6qc7bx),
+  [@jacob314](https://github.com/jacob314)).
+  - **Announcement:**
+    [https://developers.googleblog.com/en/making-the-terminal-beautiful-one-pixel-at-a-time/](https://developers.googleblog.com/en/making-the-terminal-beautiful-one-pixel-at-a-time/)
+- **🎉 New partner extensions:**
+  - **Arize:** Seamlessly instrument AI applications with Arize AX and grant
+    direct access to Arize support:
+
+    `gemini extensions install https://github.com/Arize-ai/arize-tracing-assistant`
+
+  - **Chronosphere:** Retrieve logs, metrics, traces, events, and specific
+    entities:
+
+    `gemini extensions install https://github.com/chronosphereio/chronosphere-mcp`
+
+  - **Transmit:** Comprehensive context, validation, and automated fixes for
+    creating production-ready authentication and identity workflows:
+
+    `gemini extensions install https://github.com/TransmitSecurity/transmit-security-journey-builder`
+
+- **Todo planning:** Complex questions now get broken down into todo lists that
+  the model can manage and check off. ([gif](https://imgur.com/a/EGDfNlZ),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/12905) by
+  [@anj-s](https://github.com/anj-s))
+- **Disable GitHub extensions:** Users can now prevent the installation and
+  loading of extensions from GitHub.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/12838) by
+  [@kevinjwang1](https://github.com/kevinjwang1)).
+- **Extensions restart:** Users can now explicitly restart extensions using the
+  `/extensions restart` command.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/12739) by
+  [@jakemac53](https://github.com/jakemac53)).
+- **Better Angular support:** Angular workflows should now be more seamless
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10252) by
+  [@MarkTechson](https://github.com/MarkTechson)).
+- **Validate command:** Users can now check that local extensions are formatted
+  correctly. ([pr](https://github.com/google-gemini/gemini-cli/pull/12186) by
+  [@kevinjwang1](https://github.com/kevinjwang1)).
+
+## v0.12.0 - Gemini CLI weekly update - 2025-10-27
+
+![Codebase investigator subagent in Gemini CLI.](https://i.imgur.com/4J1njsx.png)
+
+- **🎉 New partner extensions:**
+  - **🤗 Hugging Face extension:** Access the Hugging Face hub.
+    ([gif](https://drive.google.com/file/d/1LEzIuSH6_igFXq96_tWev11svBNyPJEB/view?usp=sharing&resourcekey=0-LtPTzR1woh-rxGtfPzjjfg))
+
+    `gemini extensions install https://github.com/huggingface/hf-mcp-server`
+
+  - **Monday.com extension**: Analyze your sprints, update your task boards,
+    etc.
+    ([gif](https://drive.google.com/file/d/1cO0g6kY1odiBIrZTaqu5ZakaGZaZgpQv/view?usp=sharing&resourcekey=0-xEr67SIjXmAXRe1PKy7Jlw))
+
+    `gemini extensions install https://github.com/mondaycom/mcp`
+
+  - **Data Commons extension:** Query public datasets or ground responses on
+    data from Data Commons
+    ([gif](https://drive.google.com/file/d/1cuj-B-vmUkeJnoBXrO_Y1CuqphYc6p-O/view?usp=sharing&resourcekey=0-0adXCXDQEd91ZZW63HbW-Q)).
+
+    `gemini extensions install https://github.com/gemini-cli-extensions/datacommons`
+
+- **Model selection:** Choose the Gemini model for your session with `/model`.
+  ([pic](https://imgur.com/a/ABFcWWw),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/8940) by
+  [@abhipatel12](https://github.com/abhipatel12)).
+- **Model routing:** Gemini CLI will now intelligently pick the best model for
+  the task. Simple queries will be sent to Flash while complex analytical or
+  creative tasks will still use the power of Pro. This ensures your quota will
+  last for a longer period of time. You can always opt-out of this via `/model`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/9262) by
+  [@abhipatel12](https://github.com/abhipatel12)).
+  - Discussion:
+    [https://github.com/google-gemini/gemini-cli/discussions/12375](https://github.com/google-gemini/gemini-cli/discussions/12375)
+- **Codebase investigator subagent:** We now have a new built-in subagent that
+  will explore your workspace and resolve relevant information to improve
+  overall performance.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/9988) by
+  [@abhipatel12](https://github.com/abhipatel12),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/10282) by
+  [@silviojr](https://github.com/silviojr)).
+  - Enable, disable, or limit turns in `/settings`, plus advanced configs in
+    `settings.json` ([pic](https://imgur.com/a/yJiggNO),
+    [pr](https://github.com/google-gemini/gemini-cli/pull/10844) by
+    [@silviojr](https://github.com/silviojr)).
+- **Explore extensions with `/extension`:** Users can now open the extensions
+  page in their default browser directly from the CLI using the `/extension`
+  explore command. ([pr](https://github.com/google-gemini/gemini-cli/pull/11846)
+  by [@JayadityaGit](https://github.com/JayadityaGit)).
+- **Configurable compression:** Users can modify the compression threshold in
+  `/settings`. The default has been made more proactive
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/12317) by
+  [@scidomino](https://github.com/scidomino)).
+- **API key authentication:** Users can now securely enter and store their
+  Gemini API key via a new dialog, eliminating the need for environment
+  variables and repeated entry.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/11760) by
+  [@galz10](https://github.com/galz10)).
+- **Sequential approval:** Users can now approve multiple tool calls
+  sequentially during execution.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/11593) by
+  [@joshualitt](https://github.com/joshualitt)).
+
+## v0.11.0 - Gemini CLI weekly update - 2025-10-20
+
+![Gemini CLI and Jules](https://storage.googleapis.com/gweb-developer-goog-blog-assets/images/Jules_Extension_-_Blog_Header_O346JNt.original.png)
+
+- 🎉 **Gemini CLI Jules Extension:** Use Gemini CLI to orchestrate Jules. Spawn
+  remote workers, delegate tedious tasks, or check in on running jobs!
+  - Install:
+    `gemini extensions install https://github.com/gemini-cli-extensions/jules`
+  - Announcement:
+    [https://developers.googleblog.com/en/introducing-the-jules-extension-for-gemini-cli/](https://developers.googleblog.com/en/introducing-the-jules-extension-for-gemini-cli/)
+- **Stream JSON output:** Stream real-time JSONL events with
+  `--output-format stream-json` to monitor AI agent progress when run
+  headlessly. ([gif](https://imgur.com/a/0UCE81X),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/10883) by
+  [@anj-s](https://github.com/anj-s))
+- **Markdown toggle:** Users can now switch between rendered and raw markdown
+  display using `alt+m `or` ctrl+m`. ([gif](https://imgur.com/a/lDNdLqr),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/10383) by
+  [@srivatsj](https://github.com/srivatsj))
+- **Queued message editing:** Users can now quickly edit queued messages by
+  pressing the up arrow key when the input is empty.
+  ([gif](https://imgur.com/a/ioRslLd),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/10392) by
+  [@akhil29](https://github.com/akhil29))
+- **JSON web fetch**: Non-HTML content like JSON APIs or raw source code are now
+  properly shown to the model (previously only supported HTML)
+  ([gif](https://imgur.com/a/Q58U4qJ),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/11284) by
+  [@abhipatel12](https://github.com/abhipatel12))
+- **Non-interactive MCP commands:** Users can now run MCP slash commands in
+  non-interactive mode `gemini "/some-mcp-prompt"`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10194) by
+  [@capachino](https://github.com/capachino))
+- **Removal of deprecated flags:** We’ve finally removed a number of deprecated
+  flags to cleanup Gemini CLI’s invocation profile:
+  - `--all-files` / `-a` in favor of `@` from within Gemini CLI.
+    ([pr](https://github.com/google-gemini/gemini-cli/pull/11228) by
+    [@allenhutchison](https://github.com/allenhutchison))
+  - `--telemetry-*` flags in favor of
+    [environment variables](https://github.com/google-gemini/gemini-cli/pull/11318)
+    ([pr](https://github.com/google-gemini/gemini-cli/pull/11318) by
+    [@allenhutchison](https://github.com/allenhutchison))
+
+## v0.10.0 - Gemini CLI weekly update - 2025-10-13
+
+- **Polish:** The team has been heads down bug fixing and investing heavily into
+  polishing existing flows, tools, and interactions.
+- **Interactive Shell Tool calling:** Gemini CLI can now also execute
+  interactive tools if needed
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/11225) by
+  [@galz10](https://github.com/galz10)).
+- **Alt+Key support:** Enables broader support for Alt+Key keyboard shortcuts
+  across different terminals.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10767) by
+  [@srivatsj](https://github.com/srivatsj)).
+- **Telemetry Diff stats:** Track line changes made by the model and user during
+  file operations via OTEL.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10819) by
+  [@jerop](https://github.com/jerop)).
+
+## v0.9.0 - Gemini CLI weekly update - 2025-10-06
+
+- 🎉 **Interactive Shell:** Run interactive commands like `vim`, `rebase -i`, or
+  even `gemini` 😎 directly in Gemini CLI:
+  - Blog:
+    [https://developers.googleblog.com/en/say-hello-to-a-new-level-of-interactivity-in-gemini-cli/](https://developers.googleblog.com/en/say-hello-to-a-new-level-of-interactivity-in-gemini-cli/)
+- **Install pre-release extensions:** Install the latest `--pre-release`
+  versions of extensions. Used for when an extension’s release hasn’t been
+  marked as "latest".
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10752) by
+  [@jakemac53](https://github.com/jakemac53))
+- **Simplified extension creation:** Create a new, empty extension. Templates
+  are no longer required.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10629) by
+  [@chrstnb](https://github.com/chrstnb))
+- **OpenTelemetry GenAI metrics:** Aligns telemetry with industry-standard
+  semantic conventions for improved interoperability.
+  ([spec](https://opentelemetry.io/docs/concepts/semantic-conventions/),
+  [pr](https://github.com/google-gemini/gemini-cli/pull/10343) by
+  [@jerop](https://github.com/jerop))
+- **List memory files:** Quickly find the location of your long-term memory
+  files with `/memory list`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/10108) by
+  [@sgnagnarella](https://github.com/sgnagnarella))
+
 ## v0.8.0 - Gemini CLI weekly update - 2025-09-29
 
 - 🎉 **Announcing Gemini CLI Extensions** 🎉
@@ -246,7 +440,7 @@ notable changes to Gemini CLI.
   `"showCitations": true`
   ([pr](https://github.com/google-gemini/gemini-cli/pull/7350) by
   [@scidomino](https://github.com/scidomino))
-- **Pro Quota Ddalog:** Handle daily Pro model usage limits with an interactive
+- **Pro Quota Dialog:** Handle daily Pro model usage limits with an interactive
   dialog that lets you immediately switch auth or fallback.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/7094) by
   [@JayadityaGit](https://github.com/JayadityaGit))

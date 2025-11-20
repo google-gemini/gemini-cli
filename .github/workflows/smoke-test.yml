@@ -20,9 +20,10 @@ on:
 
 jobs:
   smoke-test:
-    runs-on: 'self-hosted'
+    runs-on: 'ubuntu-latest'
     permissions:
-      contents: 'read'
+      contents: 'write'
+      packages: 'write'
       issues: 'write'
     steps:
       - name: 'Checkout'

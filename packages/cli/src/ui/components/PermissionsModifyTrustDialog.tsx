@@ -6,6 +6,8 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
+import * as process from 'node:process';
+import * as path from 'node:path';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js';
@@ -14,33 +16,42 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
-interface PermissionsModifyTrustDialogProps {
+export interface PermissionsDialogProps {
+  targetDirectory?: string;
+}
+
+interface PermissionsModifyTrustDialogProps extends PermissionsDialogProps {
   onExit: () => void;
   addItem: UseHistoryManagerReturn['addItem'];
 }
 
-const TRUST_LEVEL_ITEMS = [
-  {
-    label: 'Trust this folder',
-    value: TrustLevel.TRUST_FOLDER,
-    key: TrustLevel.TRUST_FOLDER,
-  },
-  {
-    label: 'Trust parent folder',
-    value: TrustLevel.TRUST_PARENT,
-    key: TrustLevel.TRUST_PARENT,
-  },
-  {
-    label: "Don't trust",
-    value: TrustLevel.DO_NOT_TRUST,
-    key: TrustLevel.DO_NOT_TRUST,
-  },
-];
-
 export function PermissionsModifyTrustDialog({
   onExit,
   addItem,
+  targetDirectory,
 }: PermissionsModifyTrustDialogProps): React.JSX.Element {
+  const currentDirectory = targetDirectory ?? process.cwd();
+  const dirName = path.basename(currentDirectory);
+  const parentFolder = path.basename(path.dirname(currentDirectory));
+
+  const TRUST_LEVEL_ITEMS = [
+    {
+      label: `Trust this folder (${dirName})`,
+      value: TrustLevel.TRUST_FOLDER,
+      key: TrustLevel.TRUST_FOLDER,
+    },
+    {
+      label: `Trust parent folder (${parentFolder})`,
+      value: TrustLevel.TRUST_PARENT,
+      key: TrustLevel.TRUST_PARENT,
+    },
+    {
+      label: "Don't trust",
+      value: TrustLevel.DO_NOT_TRUST,
+      key: TrustLevel.DO_NOT_TRUST,
+    },
+  ];
+
   const {
     cwd,
     currentTrustLevel,
@@ -49,7 +60,7 @@ export function PermissionsModifyTrustDialog({
     needsRestart,
     updateTrustLevel,
     commitTrustLevelChange,
-  } = usePermissionsModifyTrust(onExit, addItem);
+  } = usePermissionsModifyTrust(onExit, addItem, currentDirectory);
 
   useKeypress(
     (key) => {
@@ -57,9 +68,12 @@ export function PermissionsModifyTrustDialog({
         onExit();
       }
       if (needsRestart && key.name === 'r') {
-        commitTrustLevelChange();
-        relaunchApp();
-        onExit();
+        const success = commitTrustLevelChange();
+        if (success) {
+          relaunchApp();
+        } else {
+          onExit();
+        }
       }
     },
     { isActive: true },
@@ -109,7 +123,9 @@ export function PermissionsModifyTrustDialog({
           initialIndex={initialIndex}
         />
         <Box marginTop={1}>
-          <Text color={theme.text.secondary}>(Use Enter to select)</Text>
+          <Text color={theme.text.secondary}>
+            (Use Enter to select, Esc to close)
+          </Text>
         </Box>
       </Box>
       {needsRestart && (

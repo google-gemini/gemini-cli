@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isValidColor,
   resolveColor,
+  interpolateColor,
   CSS_NAME_TO_HEX_MAP,
   INK_SUPPORTED_NAMES,
 } from './color-utils.js';
@@ -216,6 +217,42 @@ describe('Color Utils', () => {
         expect(isValidColor(color)).toBe(false);
         expect(resolveColor(color)).toBeUndefined();
       }
+    });
+  });
+
+  describe('interpolateColor', () => {
+    it('should interpolate between two colors', () => {
+      // Midpoint between black (#000000) and white (#ffffff) should be gray
+      expect(interpolateColor('#000000', '#ffffff', 0.5)).toBe('#7f7f7f');
+    });
+
+    it('should return start color when factor is 0', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', 0)).toBe('#ff0000');
+    });
+
+    it('should return end color when factor is 1', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', 1)).toBe('#0000ff');
+    });
+
+    it('should return start color when factor is < 0', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', -0.5)).toBe('#ff0000');
+    });
+
+    it('should return end color when factor is > 1', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', 1.5)).toBe('#0000ff');
+    });
+
+    it('should return valid color if one is empty but factor selects the valid one', () => {
+      expect(interpolateColor('', '#ffffff', 1)).toBe('#ffffff');
+      expect(interpolateColor('#ffffff', '', 0)).toBe('#ffffff');
+    });
+
+    it('should return empty string if either color is empty and factor does not select the valid one', () => {
+      expect(interpolateColor('', '#ffffff', 0.5)).toBe('');
+      expect(interpolateColor('#ffffff', '', 0.5)).toBe('');
+      expect(interpolateColor('', '', 0.5)).toBe('');
+      expect(interpolateColor('', '#ffffff', 0)).toBe('');
+      expect(interpolateColor('#ffffff', '', 1)).toBe('');
     });
   });
 });

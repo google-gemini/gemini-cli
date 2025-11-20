@@ -5,13 +5,14 @@
  */
 
 import React from 'react';
-import { render } from 'ink-testing-library';
 import type { ToolMessageProps } from './ToolMessage.js';
 import { ToolMessage } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
+import { renderWithProviders } from '../../../test-utils/render.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
@@ -66,19 +67,6 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
   },
 }));
 
-// Helper to render with context
-const renderWithContext = (
-  ui: React.ReactElement,
-  streamingState: StreamingState,
-) => {
-  const contextValue: StreamingState = streamingState;
-  return render(
-    <StreamingContext.Provider value={contextValue}>
-      {ui}
-    </StreamingContext.Provider>,
-  );
-};
-
 describe('<ToolMessage />', () => {
   const baseProps: ToolMessageProps = {
     callId: 'tool-123',
@@ -89,7 +77,29 @@ describe('<ToolMessage />', () => {
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
+    isFirst: true,
+    borderColor: 'green',
+    borderDimColor: false,
   };
+
+  const mockSetEmbeddedShellFocused = vi.fn();
+  const uiActions = {
+    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
+  };
+
+  // Helper to render with context
+  const renderWithContext = (
+    ui: React.ReactElement,
+    streamingState: StreamingState,
+  ) =>
+    renderWithProviders(ui, {
+      uiActions,
+      uiState: { streamingState },
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('renders basic tool information', () => {
     const { lastFrame } = renderWithContext(

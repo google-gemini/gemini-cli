@@ -62,6 +62,10 @@ describe('executeToolCall', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
+      isInteractive: () => false,
     } as unknown as Config;
 
     abortController = new AbortController();
@@ -82,7 +86,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
     executeFn.mockResolvedValue(toolResult);
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,
@@ -126,7 +130,7 @@ describe('executeToolCall', () => {
       'anotherTool',
     ]);
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,
@@ -167,7 +171,7 @@ describe('executeToolCall', () => {
       throw new Error('Invalid parameters');
     });
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,
@@ -212,7 +216,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
     executeFn.mockResolvedValue(executionErrorResult);
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,
@@ -248,7 +252,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
     executeFn.mockRejectedValue(new Error('Something went very wrong'));
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,
@@ -290,7 +294,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
     executeFn.mockResolvedValue(toolResult);
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,
@@ -333,7 +337,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
     executeFn.mockResolvedValue(toolResult);
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,
@@ -361,7 +365,7 @@ describe('executeToolCall', () => {
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
     executeFn.mockResolvedValue(toolResult);
 
-    const response = await executeToolCall(
+    const { response } = await executeToolCall(
       mockConfig,
       request,
       abortController.signal,

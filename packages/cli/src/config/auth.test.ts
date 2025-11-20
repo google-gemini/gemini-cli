@@ -32,8 +32,8 @@ describe('validateAuthMethod', () => {
     expect(validateAuthMethod(AuthType.LOGIN_WITH_GOOGLE)).toBeNull();
   });
 
-  it('should return null for CLOUD_SHELL', () => {
-    expect(validateAuthMethod(AuthType.CLOUD_SHELL)).toBeNull();
+  it('should return null for COMPUTE_ADC', () => {
+    expect(validateAuthMethod(AuthType.COMPUTE_ADC)).toBeNull();
   });
 
   describe('USE_GEMINI', () => {
@@ -44,9 +44,7 @@ describe('validateAuthMethod', () => {
 
     it('should return an error message if GEMINI_API_KEY is not set', () => {
       vi.stubEnv('GEMINI_API_KEY', undefined);
-      expect(validateAuthMethod(AuthType.USE_GEMINI)).toBe(
-        'GEMINI_API_KEY environment variable not found. Add that to your environment and try again (no reload needed if using .env)!',
-      );
+      expect(validateAuthMethod(AuthType.USE_GEMINI)).toBeNull();
     });
   });
 

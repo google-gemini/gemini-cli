@@ -30,8 +30,9 @@ Slash commands provide meta-level control over the CLI itself.
         checkpoints are:
         - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
         - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
-        - When you run `/chat list`, the CLI only scans these specific
-          directories to find available checkpoints.
+        - **Behavior:** Chats are saved into a project-specific directory,
+          determined by where you run the CLI. Consequently, saved chats are
+          only accessible when working within that same project.
         - **Note:** These checkpoints are for manually saving and resuming
           conversation states. For automatic checkpoints created before file
           modifications, see the
@@ -39,8 +40,14 @@ Slash commands provide meta-level control over the CLI itself.
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
+      - **Note:** You can only resume chats that were saved within the current
+        project. To resume a chat from a different project, you must run the
+        Gemini CLI from that project's directory.
     - **`list`**
       - **Description:** Lists available tags for chat state resumption.
+      - **Note:** This command only lists chats saved within the current
+        project. Because chat history is project-scoped, chats saved in other
+        project directories will not be displayed.
     - **`delete`**
       - **Description:** Deletes a saved conversation checkpoint.
       - **Usage:** `/chat delete <tag>`
@@ -100,18 +107,29 @@ Slash commands provide meta-level control over the CLI itself.
     available commands and their usage.
 
 - **`/mcp`**
-  - **Description:** List configured Model Context Protocol (MCP) servers, their
-    connection status, server details, and available tools.
+  - **Description:** Manage configured Model Context Protocol (MCP) servers.
   - **Sub-commands:**
-    - **`desc`** or **`descriptions`**:
-      - **Description:** Show detailed descriptions for MCP servers and tools.
-    - **`nodesc`** or **`nodescriptions`**:
-      - **Description:** Hide tool descriptions, showing only the tool names.
+    - **`list`** or **`ls`**:
+      - **Description:** List configured MCP servers and tools. This is the
+        default action if no subcommand is specified.
+    - **`desc`**
+      - **Description:** List configured MCP servers and tools with
+        descriptions.
     - **`schema`**:
-      - **Description:** Show the full JSON schema for the tool's configured
-        parameters.
-  - **Keyboard Shortcut:** Press **Ctrl+T** at any time to toggle between
-    showing and hiding tool descriptions.
+      - **Description:** List configured MCP servers and tools with descriptions
+        and schemas.
+    - **`auth`**:
+      - **Description:** Authenticate with an OAuth-enabled MCP server.
+      - **Usage:** `/mcp auth <server-name>`
+      - **Details:** If `<server-name>` is provided, it initiates the OAuth flow
+        for that server. If no server name is provided, it lists all configured
+        servers that support OAuth authentication.
+    - **`refresh`**:
+      - **Description:** Restarts all MCP servers and re-discovers their
+        available tools.
+
+- [**`/model`**](./model.md)
+  - **Description:** Opens a dialog to choose your Gemini model.
 
 - **`/memory`**
   - **Description:** Manage the AI's instructional context (hierarchical memory
@@ -143,17 +161,19 @@ Slash commands provide meta-level control over the CLI itself.
     edits made by a tool. If run without a tool call ID, it will list available
     checkpoints to restore from.
   - **Usage:** `/restore [tool_call_id]`
-  - **Note:** Only available if the CLI is invoked with the `--checkpointing`
-    option or configured via [settings](../get-started/configuration.md). See
+  - **Note:** Only available if checkpointing is configured via
+    [settings](../get-started/configuration.md). See
     [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
-- **`/settings`**
+- [**`/settings`**](./settings.md)
   - **Description:** Open the settings editor to view and modify Gemini CLI
     settings.
   - **Details:** This command provides a user-friendly interface for changing
     settings that control the behavior and appearance of Gemini CLI. It is
     equivalent to manually editing the `.gemini/settings.json` file, but with
-    validation and guidance to prevent errors.
+    validation and guidance to prevent errors. See the
+    [settings documentation](./settings.md) for a full list of available
+    settings.
   - **Usage:** Simply run `/settings` and the editor will open. You can then
     browse or search for specific settings, view their current values, and
     modify them as desired. Changes to some settings are applied immediately,
@@ -292,8 +312,9 @@ Gemini CLI.
 
 - **`!<shell_command>`**
   - **Description:** Execute the given `<shell_command>` using `bash` on
-    Linux/macOS or `cmd.exe` on Windows. Any output or errors from the command
-    are displayed in the terminal.
+    Linux/macOS or `powershell.exe -NoProfile -Command` on Windows (unless you
+    override `ComSpec`). Any output or errors from the command are displayed in
+    the terminal.
   - **Examples:**
     - `!ls -la` (executes `ls -la` and returns to Gemini CLI)
     - `!git status` (executes `git status` and returns to Gemini CLI)

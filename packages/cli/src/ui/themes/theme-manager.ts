@@ -25,6 +25,7 @@ import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
 import process from 'node:process';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export interface ThemeDisplay {
   name: string;
@@ -75,7 +76,7 @@ class ThemeManager {
       const validation = validateCustomTheme(customThemeConfig);
       if (validation.isValid) {
         if (validation.warning) {
-          console.warn(`Theme "${name}": ${validation.warning}`);
+          debugLogger.warn(`Theme "${name}": ${validation.warning}`);
         }
         const themeWithDefaults: CustomTheme = {
           ...DEFAULT_THEME.colors,
@@ -88,10 +89,10 @@ class ThemeManager {
           const theme = createCustomTheme(themeWithDefaults);
           this.customThemes.set(name, theme);
         } catch (error) {
-          console.warn(`Failed to load custom theme "${name}":`, error);
+          debugLogger.warn(`Failed to load custom theme "${name}":`, error);
         }
       } else {
-        console.warn(`Invalid custom theme "${name}": ${validation.error}`);
+        debugLogger.warn(`Invalid custom theme "${name}": ${validation.error}`);
       }
     }
     // If the current active theme is a custom theme, keep it if still valid
@@ -246,7 +247,7 @@ class ThemeManager {
       // 2. Perform security check.
       const homeDir = path.resolve(os.homedir());
       if (!canonicalPath.startsWith(homeDir)) {
-        console.warn(
+        debugLogger.warn(
           `Theme file at "${themePath}" is outside your home directory. ` +
             `Only load themes from trusted sources.`,
         );
@@ -259,14 +260,14 @@ class ThemeManager {
 
       const validation = validateCustomTheme(customThemeConfig);
       if (!validation.isValid) {
-        console.warn(
+        debugLogger.warn(
           `Invalid custom theme from file "${themePath}": ${validation.error}`,
         );
         return undefined;
       }
 
       if (validation.warning) {
-        console.warn(`Theme from "${themePath}": ${validation.warning}`);
+        debugLogger.warn(`Theme from "${themePath}": ${validation.warning}`);
       }
 
       // 4. Create and cache the theme.
@@ -286,7 +287,10 @@ class ThemeManager {
       if (
         !(error instanceof Error && 'code' in error && error.code === 'ENOENT')
       ) {
-        console.warn(`Could not load theme from file "${themePath}":`, error);
+        debugLogger.warn(
+          `Could not load theme from file "${themePath}":`,
+          error,
+        );
       }
       return undefined;
     }
