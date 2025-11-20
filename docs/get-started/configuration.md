@@ -101,7 +101,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.previewFeatures`** (boolean):
   - **Description:** Enable preview features (e.g., preview models).
   - **Default:** `false`
-  - **Requires restart:** Yes
 
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in.
