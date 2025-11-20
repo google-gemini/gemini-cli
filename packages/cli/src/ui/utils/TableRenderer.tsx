@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Text, Box } from 'ink';
+import type React from 'react';
+import { Text, Box, type TextProps } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
@@ -25,135 +25,134 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   terminalWidth,
 }) => {
   // Calculate column widths using actual display width after markdown processing
+  const maxRowWidthInColumn = headers.map((_, index) =>
+    Math.max(...rows.map((row) => getPlainTextLength(row[index] ?? ''))),
+  );
   const columnWidths = headers.map((header, index) => {
     const headerWidth = getPlainTextLength(header);
-    const maxRowWidth = Math.max(
-      ...rows.map((row) => getPlainTextLength(row[index] || '')),
-    );
-    return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
+    const maxRowWidth = maxRowWidthInColumn[index];
+    return Math.max(headerWidth, maxRowWidth);
   });
 
-  // Ensure table fits within terminal width
-  const totalWidth = columnWidths.reduce((sum, width) => sum + width + 1, 1);
+  // Ensure table fits within terminal width.
+  const totalWidth =
+    columnWidths.reduce(
+      // content width + padding on both sides + only the (shared) left border
+      (sum, width) => sum + width + 2 * CELL_PADDING_X + 1,
+      1,
+    ) + 1; // + 1 for the rightmost border
   const scaleFactor =
     totalWidth > terminalWidth ? terminalWidth / totalWidth : 1;
   const adjustedWidths = columnWidths.map((width) =>
     Math.floor(width * scaleFactor),
   );
 
-  // Helper function to render a cell with proper width
-  const renderCell = (
-    content: string,
-    width: number,
-    isHeader = false,
-  ): React.ReactNode => {
-    const contentWidth = Math.max(0, width - 2);
-    const displayWidth = getPlainTextLength(content);
-
-    let cellContent = content;
-    if (displayWidth > contentWidth) {
-      if (contentWidth <= 3) {
-        // Just truncate by character count
-        cellContent = content.substring(
-          0,
-          Math.min(content.length, contentWidth),
-        );
-      } else {
-        // Truncate preserving markdown formatting using binary search
-        let left = 0;
-        let right = content.length;
-        let bestTruncated = content;
-
-        // Binary search to find the optimal truncation point
-        while (left <= right) {
-          const mid = Math.floor((left + right) / 2);
-          const candidate = content.substring(0, mid);
-          const candidateWidth = getPlainTextLength(candidate);
-
-          if (candidateWidth <= contentWidth - 3) {
-            bestTruncated = candidate;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-        }
-
-        cellContent = bestTruncated + '...';
-      }
-    }
-
-    // Calculate exact padding needed
-    const actualDisplayWidth = getPlainTextLength(cellContent);
-    const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
-
-    return (
-      <Text>
-        {isHeader ? (
-          <Text bold color={theme.text.link}>
-            <RenderInline text={cellContent} />
-          </Text>
-        ) : (
-          <RenderInline text={cellContent} />
-        )}
-        {' '.repeat(paddingNeeded)}
-      </Text>
-    );
-  };
-
-  // Helper function to render border
-  const renderBorder = (type: 'top' | 'middle' | 'bottom'): React.ReactNode => {
-    const chars = {
-      top: { left: '┌', middle: '┬', right: '┐', horizontal: '─' },
-      middle: { left: '├', middle: '┼', right: '┤', horizontal: '─' },
-      bottom: { left: '└', middle: '┴', right: '┘', horizontal: '─' },
-    };
-
-    const char = chars[type];
-    const borderParts = adjustedWidths.map((w) => char.horizontal.repeat(w));
-    const border = char.left + borderParts.join(char.middle) + char.right;
-
-    return <Text color={theme.border.default}>{border}</Text>;
-  };
-
-  // Helper function to render a table row
-  const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
-    const renderedCells = cells.map((cell, index) => {
-      const width = adjustedWidths[index] || 0;
-      return renderCell(cell || '', width, isHeader);
-    });
-
-    return (
-      <Text color={theme.text.primary}>
-        │{' '}
-        {renderedCells.map((cell, index) => (
-          <React.Fragment key={index}>
-            {cell}
-            {index < renderedCells.length - 1 ? ' │ ' : ''}
-          </React.Fragment>
-        ))}{' '}
-        │
-      </Text>
-    );
-  };
+  const hasRowOverflow = maxRowWidthInColumn.some(
+    (maxWidth, index) => maxWidth > adjustedWidths[index],
+  );
 
   return (
     <Box flexDirection="column" marginY={1}>
-      {/* Top border */}
-      {renderBorder('top')}
-
-      {/* Header row */}
-      {renderRow(headers, true)}
-
-      {/* Middle border */}
-      {renderBorder('middle')}
-
-      {/* Data rows */}
+      <Row
+        cellContents={headers}
+        columnWidths={adjustedWidths}
+        top={true}
+        bottom={rows.length === 0}
+        includeRowSeparators={true}
+        textProps={{ bold: true, color: theme.text.link }}
+      />
       {rows.map((row, index) => (
-        <React.Fragment key={index}>{renderRow(row)}</React.Fragment>
+        <Row
+          key={index}
+          cellContents={row}
+          columnWidths={adjustedWidths}
+          top={false}
+          bottom={index === rows.length - 1}
+          includeRowSeparators={hasRowOverflow}
+          textProps={{ color: theme.text.primary }}
+        />
       ))}
-
-      {/* Bottom border */}
-      {renderBorder('bottom')}
     </Box>
   );
 };
+
+const Row: React.FC<{
+  cellContents: string[];
+  columnWidths: number[];
+  top: boolean;
+  bottom: boolean;
+  includeRowSeparators: boolean;
+  textProps: TextProps;
+}> = ({
+  cellContents,
+  columnWidths,
+  top,
+  bottom,
+  includeRowSeparators,
+  textProps,
+}) => (
+  <Box margin={0}>
+    {cellContents.map((contents, index) => (
+      <Cell
+        key={index}
+        contents={contents}
+        width={columnWidths[index] ?? 0}
+        top={top}
+        bottom={bottom}
+        left={index === 0}
+        right={index === cellContents.length - 1}
+        includeRowSeparators={includeRowSeparators}
+        textProps={textProps}
+      />
+    ))}
+  </Box>
+);
+
+const CELL_PADDING_X = 1;
+
+const Cell: React.FC<{
+  contents: string;
+  width: number;
+  top: boolean;
+  bottom: boolean;
+  left: boolean;
+  right: boolean;
+  includeRowSeparators: boolean;
+  textProps: TextProps;
+}> = ({
+  contents,
+  width,
+  top,
+  bottom,
+  left,
+  right,
+  includeRowSeparators,
+  textProps,
+}) => (
+  // Cells share borders, so each cell leaves rendering its top and left borders
+  // to its neighbors when possible.
+  // Abouth the width calculation: ink seems to include the border in the width
+  // (box-sizing: border-box), so we have to add in padding and border.
+  <Box
+    width={width + 2 * CELL_PADDING_X + (left ? 2 : 1)}
+    paddingX={CELL_PADDING_X}
+    borderColor={theme.border.default}
+    borderLeft={left}
+    borderTop={top}
+    borderBottom={bottom || includeRowSeparators}
+    borderStyle={{
+      topLeft: top ? (left ? '┌' : '┬') : left ? '├' : '┼',
+      top: '─',
+      topRight: top ? (right ? '┐' : '┬') : right ? '┤' : '┼',
+      left: '│',
+      bottomLeft: bottom ? (left ? '└' : '┴') : left ? '├' : '┼',
+      bottom: '─',
+      bottomRight: bottom ? (right ? '┘' : '┴') : right ? '┤' : '┼',
+      right: '│',
+    }}
+  >
+    <Text {...textProps}>
+      <RenderInline text={contents} />
+    </Text>
+  </Box>
+);
