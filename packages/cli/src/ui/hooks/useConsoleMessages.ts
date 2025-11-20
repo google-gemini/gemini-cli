@@ -12,10 +12,14 @@ import {
   useTransition,
 } from 'react';
 import type { ConsoleMessageItem } from '../types.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type ConsoleLogPayload,
+} from '@google/gemini-cli-core';
 
 export interface UseConsoleMessagesReturn {
   consoleMessages: ConsoleMessageItem[];
-  handleNewMessage: (message: ConsoleMessageItem) => void;
   clearConsoleMessages: () => void;
 }
 
@@ -85,6 +89,37 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
     [processQueue],
   );
 
+  useEffect(() => {
+    const handleConsoleLog = (payload: ConsoleLogPayload) => {
+      handleNewMessage({
+        type: payload.type,
+        content: payload.content,
+        count: 1,
+      });
+    };
+
+    const handleOutput = (payload: {
+      isStderr: boolean;
+      chunk: Uint8Array | string;
+    }) => {
+      const content =
+        typeof payload.chunk === 'string'
+          ? payload.chunk
+          : new TextDecoder().decode(payload.chunk);
+      // It would be nice if we could show stderr as 'warn' but unfortunately
+      // we log non warning info to stderr before the app starts so that would
+      // be misleading.
+      handleNewMessage({ type: 'log', content, count: 1 });
+    };
+
+    coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
+    coreEvents.on(CoreEvent.Output, handleOutput);
+    return () => {
+      coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
+      coreEvents.off(CoreEvent.Output, handleOutput);
+    };
+  }, [handleNewMessage]);
+
   const clearConsoleMessages = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -106,5 +141,5 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
     [],
   );
 
-  return { consoleMessages, handleNewMessage, clearConsoleMessages };
+  return { consoleMessages, clearConsoleMessages };
 }

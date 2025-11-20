@@ -251,6 +251,15 @@ describe('GitService', () => {
   });
 
   describe('createFileSnapshot', () => {
+    it('should commit with --no-verify flag', async () => {
+      const service = new GitService(projectRoot, storage);
+      await service.initialize();
+      await service.createFileSnapshot('test commit');
+      expect(hoistedMockCommit).toHaveBeenCalledWith('test commit', {
+        '--no-verify': null,
+      });
+    });
+    
     it('should create a new commit if there are staged changes', async () => {
       hoistedMockStatus.mockResolvedValue({ isClean: () => false });
       hoistedMockCommit.mockResolvedValue({ commit: 'new-commit-hash' });

@@ -337,7 +337,7 @@ describe('SettingsSchema', () => {
       ).toBe(false);
       expect(
         getSettingsSchema().general.properties.previewFeatures.requiresRestart,
-      ).toBe(true);
+      ).toBe(false);
       expect(
         getSettingsSchema().general.properties.previewFeatures.showInDialog,
       ).toBe(true);

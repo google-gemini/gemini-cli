@@ -13,6 +13,7 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import { format } from 'node:util';
 import { type CommandModule, type Argv } from 'yargs';
 import { handleLink, linkCommand } from './link.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -20,20 +21,31 @@ import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
 // Mock dependencies
-vi.mock('../../config/extension-manager.js');
-vi.mock('../../config/settings.js');
-vi.mock('../../utils/errors.js');
+const emitConsoleLog = vi.hoisted(() => vi.fn());
+const debugLogger = vi.hoisted(() => ({
+  log: vi.fn((message, ...args) => {
+    emitConsoleLog('log', format(message, ...args));
+  }),
+  error: vi.fn((message, ...args) => {
+    emitConsoleLog('error', format(message, ...args));
+  }),
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    debugLogger: {
-      log: vi.fn(),
-      error: vi.fn(),
+    coreEvents: {
+      emitConsoleLog,
     },
+    debugLogger,
   };
 });
+
+vi.mock('../../config/extension-manager.js');
+vi.mock('../../config/settings.js');
+vi.mock('../../utils/errors.js');
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: vi.fn(),
 }));
@@ -45,16 +57,9 @@ describe('extensions link command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockGetErrorMessage = vi.mocked(getErrorMessage);
   const mockExtensionManager = vi.mocked(ExtensionManager);
-  interface MockDebugLogger {
-    log: Mock;
-    error: Mock;
-  }
-  let mockDebugLogger: MockDebugLogger;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockDebugLogger = (await import('@google/gemini-cli-core'))
-      .debugLogger as unknown as MockDebugLogger;
     mockLoadSettings.mockReturnValue({
       merged: {},
     } as unknown as LoadedSettings);
@@ -87,7 +92,8 @@ describe('extensions link command', () => {
         source: '/local/path/to/extension',
         type: 'link',
       });
-      expect(mockDebugLogger.log).toHaveBeenCalledWith(
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
         'Extension "my-linked-extension" linked successfully and enabled.',
       );
       mockCwd.mockRestore();
@@ -107,7 +113,10 @@ describe('extensions link command', () => {
 
       await handleLink({ path: '/local/path/to/extension' });
 
-      expect(mockDebugLogger.error).toHaveBeenCalledWith('Link failed message');
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'error',
+        'Link failed message',
+      );
       expect(mockProcessExit).toHaveBeenCalledWith(1);
       mockProcessExit.mockRestore();
     });

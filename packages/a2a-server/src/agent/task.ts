@@ -468,7 +468,6 @@ export class Task {
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
       getPreferredEditor: () => 'vscode',
       config: this.config,
-      onEditorClose: () => {},
     });
     return scheduler;
   }

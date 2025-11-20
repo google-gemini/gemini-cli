@@ -72,7 +72,7 @@ export class ModelRouterService {
       if (
         decision.model === DEFAULT_GEMINI_MODEL &&
         this.config.getPreviewFeatures() &&
-        decision.metadata.source !== 'override'
+        !decision.metadata.source.includes('override')
       ) {
         // We ALWAYS attempt to upgrade to Preview Model here.
         // If we are in fallback mode, the 'previewModelBypassMode' flag (handled in handler.ts/geminiChat.ts)

@@ -1020,6 +1020,17 @@ export class Config {
     return this.geminiClient;
   }
 
+  /**
+   * Updates the system instruction with the latest user memory.
+   * Whenever the user memory (GEMINI.md files) is updated.
+   */
+  async updateSystemInstructionIfInitialized(): Promise<void> {
+    const geminiClient = this.getGeminiClient();
+    if (geminiClient?.isInitialized()) {
+      await geminiClient.updateSystemInstruction();
+    }
+  }
+
   getModelRouterService(): ModelRouterService {
     return this.modelRouterService;
   }

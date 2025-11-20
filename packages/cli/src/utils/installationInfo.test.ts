@@ -11,15 +11,14 @@ import * as path from 'node:path';
 import * as childProcess from 'node:child_process';
 import { isGitRepository, debugLogger } from '@google/gemini-cli-core';
 
-vi.mock('@google/gemini-cli-core', () => ({
-  isGitRepository: vi.fn(),
-  debugLogger: {
-    log: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    isGitRepository: vi.fn(),
+  };
+});
 
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();
@@ -52,6 +51,7 @@ describe('getInstallationInfo', () => {
     originalArgv = [...process.argv];
     // Mock process.cwd() for isGitRepository
     vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
+    vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
