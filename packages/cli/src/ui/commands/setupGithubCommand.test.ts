@@ -57,26 +57,16 @@ describe('setupGithubCommand', async () => {
     const fakeReleaseVersion = 'v1.2.3';
 
     const workflows = GITHUB_WORKFLOW_PATHS.map((p) => path.basename(p));
-    for (const workflow of workflows) {
-      vi.mocked(global.fetch).mockResolvedValueOnce(
-        new Response(workflow, {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'Content-Type': 'text/plain' },
-        }),
-      );
-    }
-
     const commands = GITHUB_COMMANDS_PATHS.map((p) => path.basename(p));
-    for (const command of commands) {
-      vi.mocked(global.fetch).mockResolvedValueOnce(
-        new Response(command, {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'Content-Type': 'text/plain' },
-        }),
-      );
-    }
+
+    vi.mocked(global.fetch).mockImplementation(async (url) => {
+      const filename = path.basename(url.toString());
+      return new Response(filename, {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    });
 
     vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
     vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
@@ -116,6 +106,12 @@ describe('setupGithubCommand', async () => {
       );
       const contents = await fs.readFile(workflowFile, 'utf8');
       expect(contents).toContain(workflow);
+    }
+
+    for (const command of commands) {
+      const commandFile = path.join(scratchDir, '.github', 'commands', command);
+      const contents = await fs.readFile(commandFile, 'utf8');
+      expect(contents).toContain(command);
     }
 
     // Verify that .gitignore was created with the expected entries
