@@ -1555,7 +1555,7 @@ describe('CoreToolScheduler request queueing', () => {
         const details = call[3] as ToolCallConfirmationDetails | undefined;
         if (!details || details.type !== 'exec') return false;
         const exec = details as ToolExecuteConfirmationDetails;
-        return exec.details?.includes('Operation not permitted');
+        return Boolean(exec.danger && exec.hideAlways && exec.defaultToNo);
       });
     expect(sandboxPromptCall).toBeDefined();
 
