@@ -162,4 +162,29 @@ describe('ToolConfirmationMessage', () => {
       });
     });
   });
+
+  it('renders sandbox-denied exec prompt with details and defaults to cancel', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: '⚠️ Sandbox blocked tool call',
+      command: 'echo 1',
+      rootCommand: 'echo',
+      danger: true,
+      hideAlways: true,
+      defaultToNo: true,
+      details: 'Operation not permitted',
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    expect(lastFrame()).toMatchSnapshot();
+  });
 });

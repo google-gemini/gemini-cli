@@ -136,7 +136,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedOnce,
         key: 'Yes, allow once',
       });
-      if (isTrustedFolder) {
+      if (isTrustedFolder && !executionProps.hideAlways) {
         options.push({
           label: `Yes, allow always ...`,
           value: ToolConfirmationOutcome.ProceedAlways,
@@ -242,6 +242,26 @@ export const ToolConfirmationMessage: React.FC<
         bodyContentHeight -= 2; // Account for padding;
       }
 
+      const detailBox =
+        executionProps.details && executionProps.details.trim().length > 0 ? (
+          <Box
+            flexDirection="column"
+            borderStyle="round"
+            borderColor={theme.status.error}
+            paddingX={1}
+            paddingY={0}
+            marginBottom={1}
+          >
+            <Text color={theme.status.error}>Blocked output:</Text>
+            <Text color={theme.text.primary}>
+              <RenderInline
+                text={executionProps.details}
+                defaultColor={theme.text.primary}
+              />
+            </Text>
+          </Box>
+        ) : null;
+
       const commandBox = (
         <Box>
           <Text color={theme.text.link}>{executionProps.command}</Text>
@@ -249,13 +269,19 @@ export const ToolConfirmationMessage: React.FC<
       );
 
       bodyContent = isAlternateBuffer ? (
-        commandBox
+        <Box flexDirection="column">
+          {detailBox}
+          {commandBox}
+        </Box>
       ) : (
         <MaxSizedBox
           maxHeight={bodyContentHeight}
           maxWidth={Math.max(terminalWidth, 1)}
         >
-          {commandBox}
+          <Box flexDirection="column">
+            {detailBox}
+            {commandBox}
+          </Box>
         </MaxSizedBox>
       );
     } else if (confirmationDetails.type === 'info') {
@@ -310,6 +336,19 @@ export const ToolConfirmationMessage: React.FC<
     isAlternateBuffer,
   ]);
 
+  const initialSelectIndex = useMemo(() => {
+    if (
+      confirmationDetails.type === 'exec' &&
+      (confirmationDetails as ToolExecuteConfirmationDetails).defaultToNo
+    ) {
+      const cancelIdx = options.findIndex(
+        (o) => o.value === ToolConfirmationOutcome.Cancel,
+      );
+      if (cancelIdx >= 0) return cancelIdx;
+    }
+    return 0;
+  }, [confirmationDetails, options]);
+
   if (confirmationDetails.type === 'edit') {
     if (confirmationDetails.isModifying) {
       return (
@@ -332,7 +371,20 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
+    <Box
+      flexDirection="column"
+      paddingTop={0}
+      paddingBottom={1}
+      borderStyle="round"
+      borderColor={
+        confirmationDetails.type === 'exec' &&
+        (confirmationDetails as ToolExecuteConfirmationDetails).danger
+          ? theme.status.error
+          : theme.border.default
+      }
+      paddingLeft={1}
+      paddingRight={1}
+    >
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
       <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
@@ -350,6 +402,7 @@ export const ToolConfirmationMessage: React.FC<
           items={options}
           onSelect={handleSelect}
           isFocused={isFocused}
+          initialIndex={initialSelectIndex}
         />
       </Box>
     </Box>

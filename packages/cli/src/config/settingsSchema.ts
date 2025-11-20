@@ -880,6 +880,17 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: false,
       },
+      toolSandbox: {
+        type: 'string',
+        label: 'Per-Tool Sandbox',
+        category: 'Tools',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: oneLine`
+          Sandbox individual tool executions. Currently, only the 'landlock' mode (Linux) is supported.
+        `,
+        showInDialog: false,
+      },
       shell: {
         type: 'object',
         label: 'Shell',
