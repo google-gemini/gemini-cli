@@ -102,29 +102,17 @@ export async function updateGitignore(gitRepoRoot: string): Promise<void> {
 
 async function downloadFiles({
   paths,
-  gitRepoRoot,
   releaseTag,
-  targetSubDir,
+  targetDir,
   proxy,
   abortController,
 }: {
   paths: string[];
-  gitRepoRoot: string;
   releaseTag: string;
-  targetSubDir: 'workflows' | 'commands';
+  targetDir: string;
   proxy: string | undefined;
   abortController: AbortController;
 }): Promise<void> {
-  const targetDir = path.join(gitRepoRoot, '.github', targetSubDir);
-  try {
-    await fs.promises.mkdir(targetDir, { recursive: true });
-  } catch (_error) {
-    debugLogger.debug(`Failed to create ${targetDir} directory:`, _error);
-    throw new Error(
-      `Unable to create ${targetDir} directory. Do you have file permissions in the current directory?`,
-    );
-  }
-
   const downloads = [];
   for (const fileBasename of paths) {
     downloads.push(
@@ -201,6 +189,28 @@ export const setupGithubCommand: SlashCommand = {
     const releaseTag = await getLatestGitHubRelease(proxy);
     const readmeUrl = `https://github.com/google-github-actions/run-gemini-cli/blob/${releaseTag}/README.md#quick-start`;
 
+    //Create workflows directory
+    const workflowsDir = path.join(gitRepoRoot, '.github', 'workflows');
+    try {
+      await fs.promises.mkdir(workflowsDir, { recursive: true });
+    } catch (_error) {
+      debugLogger.debug(`Failed to create ${workflowsDir} directory:`, _error);
+      throw new Error(
+        `Unable to create ${workflowsDir} directory. Do you have file permissions in the current directory?`,
+      );
+    }
+
+    //Create commands directory
+    const commandsDir = path.join(gitRepoRoot, '.github', 'commands');
+    try {
+      await fs.promises.mkdir(commandsDir, { recursive: true });
+    } catch (_error) {
+      debugLogger.debug(`Failed to create ${commandsDir} directory:`, _error);
+      throw new Error(
+        `Unable to create ${commandsDir} directory. Do you have file permissions in the current directory?`,
+      );
+    }
+
     try {
       const workflowAbortController = new AbortController();
       const commandsAbortController = new AbortController();
@@ -208,17 +218,15 @@ export const setupGithubCommand: SlashCommand = {
       await Promise.all([
         downloadFiles({
           paths: GITHUB_WORKFLOW_PATHS,
-          gitRepoRoot,
           releaseTag,
-          targetSubDir: 'workflows',
+          targetDir: workflowsDir,
           proxy,
           abortController: workflowAbortController,
         }),
         downloadFiles({
           paths: GITHUB_COMMANDS_PATHS,
-          gitRepoRoot,
           releaseTag,
-          targetSubDir: 'commands',
+          targetDir: commandsDir,
           proxy,
           abortController: commandsAbortController,
         }),
