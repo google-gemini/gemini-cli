@@ -146,13 +146,13 @@ first try the following:
 
 1. **Confirm your access.** Review the eligibility requirements listed above to
    confirm that your account type should have access to Gemini 3 Pro.
-2. **(If using Google Cloud) Confirm your region.** Gemini 3 Pro is only
-   available in the Global region for Google Cloud. Close Gemini CLI and run
-   `export GOOGLE_CLOUD_LOCATION=global`. Reopen Gemini CLI.
-3. **Wait a few minutes.** During times of high use, you may hit a rate limit.
+2. **Wait a few minutes.** During times of high use, you may hit a rate limit.
    Wait a few minutes before submitting your prompt again.
-4. **Restart and reauthenticate**. If this issue persists, close Gemini CLI,
+3. **Restart and reauthenticate**. If this issue persists, close Gemini CLI,
    reopen the CLI, and reauthenticate using the `/auth` command.
+
+**Note:** If you are using Gemini CLI with Google Cloud, be aware that Gemini 3
+Pro is currently only available in the Global region for Google Cloud.
 
 If you’re still receiving the error, you can
 [search GitHub issues](https://github.com/google-gemini/gemini-cli/issues) for
