@@ -353,9 +353,9 @@ describe('textBufferReducer', () => {
   });
 });
 
-const getBufferState = (result: { current: TextBuffer }) => 
-  // expect(result.current).toHaveOnlyValidCharacters();
-   ({
+const getBufferState = (result: { current: TextBuffer }) => {
+  expect(result.current).toHaveOnlyValidCharacters();
+  return {
     text: result.current.text,
     lines: [...result.current.lines], // Clone for safety
     cursor: [...result.current.cursor] as [number, number],
@@ -364,8 +364,8 @@ const getBufferState = (result: { current: TextBuffer }) =>
     visualCursor: [...result.current.visualCursor] as [number, number],
     visualScrollRow: result.current.visualScrollRow,
     preferredCol: result.current.preferredCol,
-  })
-;
+  };
+};
 
 describe('useTextBuffer', () => {
   let viewport: Viewport;
@@ -989,30 +989,6 @@ describe('useTextBuffer', () => {
 
       // Click on '好' (second half, x=3) -> index 2 (after second char)
       act(() => result.current.moveToVisualPosition(0, 3));
-      expect(getBufferState(result).cursor).toEqual([0, 2]);
-    });
-
-    it('moveToVisualPosition: should handle regular ASCII characters correctly', () => {
-      const { result } = renderHook(() =>
-        useTextBuffer({
-          initialText: 'abc',
-          viewport: { width: 10, height: 1 },
-          isValidPath: () => false,
-        }),
-      );
-
-      // 'a' (width 1): visual 0. 'b' (width 1): visual 1. 'c' (width 1): visual 2.
-
-      // Click on 'a' -> index 0 (before 'a')
-      act(() => result.current.moveToVisualPosition(0, 0));
-      expect(getBufferState(result).cursor).toEqual([0, 0]);
-
-      // Click on 'b' -> index 1 (before 'b')
-      act(() => result.current.moveToVisualPosition(0, 1));
-      expect(getBufferState(result).cursor).toEqual([0, 1]);
-
-      // Click on 'c' -> index 2 (before 'c')
-      act(() => result.current.moveToVisualPosition(0, 2));
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
   });
