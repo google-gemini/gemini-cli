@@ -1834,5 +1834,62 @@ describe('AppContainer State Management', () => {
 
       unmount();
     });
+
+    it('correctly restores prompt even if userMessages is stale (race condition fix)', async () => {
+      // Setup initial history with one message
+      const initialHistory = [{ type: 'user', text: 'Previous Prompt' }];
+      mockedUseHistory.mockReturnValue({
+        history: initialHistory,
+        addItem: vi.fn(),
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      // Mock logger to resolve so userMessages gets populated
+      mockedUseLogger.mockReturnValue({
+        getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+      });
+
+      const { unmount, rerender } = renderAppContainer();
+
+      // Wait for userMessages to be populated with 'Previous Prompt'
+      await waitFor(() =>
+        expect(capturedUIState.userMessages).toContain('Previous Prompt'),
+      );
+
+      // Simulate a new prompt being added (e.g., user sent it, but it overflowed)
+      const newPrompt = 'Current Prompt that Overflowed';
+      const newHistory = [...initialHistory, { type: 'user', text: newPrompt }];
+
+      mockedUseHistory.mockReturnValue({
+        history: newHistory,
+        addItem: vi.fn(),
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      // Rerender to reflect the history change.
+      // This triggers the effect to update userMessages, but it's async.
+      rerender(getAppContainer());
+
+      const { onCancelSubmit } = extractUseGeminiStreamArgs(
+        mockedUseGeminiStream.mock.lastCall!,
+      );
+
+      // Call onCancelSubmit immediately (simulating the race condition where
+      // the overflow event comes in before the effect updates userMessages)
+      act(() => {
+        onCancelSubmit(true);
+      });
+
+      // With the fix, it should wait for userMessages to update and then set the new prompt
+      await waitFor(() => {
+        expect(mockSetText).toHaveBeenCalledWith(newPrompt);
+      });
+
+      unmount();
+    });
   });
 });
