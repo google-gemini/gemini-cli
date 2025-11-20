@@ -25,14 +25,7 @@ export function ensureLandlockRunner(): string {
     path.resolve(__dirname, '..', '..', 'bin', 'landlock-runner'), // dist runtime
     path.resolve(__dirname, '..', '..', '..', 'dist', 'bin', 'landlock-runner'), // src runtime
     path.resolve(process.cwd(), 'dist', 'bin', 'landlock-runner'), // running from pkg cwd
-    path.resolve(
-      process.cwd(),
-      'packages',
-      'core',
-      'dist',
-      'bin',
-      'landlock-runner',
-    ), // repo root
+    path.resolve(process.cwd(), 'packages', 'core', 'dist', 'bin', 'landlock-runner'), // repo root
   ];
 
   const runnerPath = firstExisting(candidates);

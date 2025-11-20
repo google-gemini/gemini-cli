@@ -38,19 +38,11 @@ try {
   const pkg = JSON.parse(execSync(`cat ${pkgPath}`).toString());
   const isCore = pkg.name === '@google/gemini-cli-core';
   if (isCore && process.platform === 'linux') {
-    const runnerSource = join(
-      process.cwd(),
-      'src',
-      'sandbox',
-      'linux',
-      'landlock-runner.rs',
-    );
+    const runnerSource = join(process.cwd(), 'src', 'sandbox', 'linux', 'landlock-runner.rs');
     const outputDir = join(process.cwd(), 'dist', 'bin');
     execSync(`mkdir -p ${outputDir}`);
     const outPath = join(outputDir, 'landlock-runner');
-    console.log(
-      `[build] Compiling landlock runner (static musl) to ${outPath}`,
-    );
+    console.log(`[build] Compiling landlock runner (static musl) to ${outPath}`);
     const target = 'x86_64-unknown-linux-musl';
     // Prefer using rustc directly; fall back to rustup to install target if missing.
     const hasRustc = (() => {
@@ -62,9 +54,7 @@ try {
       }
     })();
     if (!hasRustc) {
-      throw new Error(
-        'rustc not found; install Rust toolchain to build the Landlock runner.',
-      );
+      throw new Error('rustc not found; install Rust toolchain to build the Landlock runner.');
     }
 
     const targetAvailable = (() => {

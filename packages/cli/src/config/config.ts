@@ -35,6 +35,7 @@ import type { Settings } from './settings.js';
 
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
+import { loadToolSandboxConfig } from './toolSandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
@@ -51,6 +52,7 @@ export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
   sandbox: boolean | string | undefined;
+  toolSandbox: boolean | string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
@@ -118,6 +120,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 's',
           type: 'boolean',
           description: 'Run in sandbox?',
+        })
+        .option('tool-sandbox', {
+          type: 'string',
+          description:
+            'Sandbox individual tool calls (platform-specific; linux currently uses landlock). Set to "landlock" to enable.',
         })
 
         .option('yolo', {
@@ -565,6 +572,7 @@ export async function loadCliConfig(
     defaultModel;
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
+  const toolSandboxConfig = loadToolSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined
       ? argv.screenReader
@@ -576,6 +584,7 @@ export async function loadCliConfig(
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
+    toolSandbox: toolSandboxConfig,
     targetDir: cwd,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
