@@ -40,6 +40,28 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     recordSlowRender: vi.fn(),
+    writeToStdout: vi.fn((...args) =>
+      process.stdout.write(
+        ...(args as Parameters<typeof process.stdout.write>),
+      ),
+    ),
+    patchStdio: vi.fn(() => () => {}),
+    createInkStdio: vi.fn(() => ({
+      stdout: {
+        write: vi.fn((...args) =>
+          process.stdout.write(
+            ...(args as Parameters<typeof process.stdout.write>),
+          ),
+        ),
+        columns: 80,
+        rows: 24,
+        on: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      stderr: {
+        write: vi.fn(),
+      },
+    })),
   };
 });
 
@@ -148,35 +170,6 @@ vi.mock('./ui/utils/mouse.js', () => ({
   parseMouseEvent: vi.fn(),
   isIncompleteMouseSequence: vi.fn(),
 }));
-
-vi.mock('./utils/stdio.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./utils/stdio.js')>();
-  return {
-    ...actual,
-    writeToStdout: vi.fn((...args) =>
-      process.stdout.write(
-        ...(args as Parameters<typeof process.stdout.write>),
-      ),
-    ),
-    patchStdio: vi.fn(() => () => {}),
-    createInkStdio: vi.fn(() => ({
-      stdout: {
-        write: vi.fn((...args) =>
-          process.stdout.write(
-            ...(args as Parameters<typeof process.stdout.write>),
-          ),
-        ),
-        columns: 80,
-        rows: 24,
-        on: vi.fn(),
-        removeListener: vi.fn(),
-      },
-      stderr: {
-        write: vi.fn(),
-      },
-    })),
-  };
-});
 
 describe('gemini.tsx main function', () => {
   let originalEnvGeminiSandbox: string | undefined;
