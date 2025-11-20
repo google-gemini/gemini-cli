@@ -5,6 +5,7 @@
  */
 
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import { DEFAULT_THINKING_MODE } from './models.js';
 
 // The default model configs. We use `base` as the parent for all of our model
 // configs, while `chat-base`, a child of `base`, is the parent of the models
@@ -25,7 +26,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         generateContentConfig: {
           thinkingConfig: {
             includeThoughts: true,
-            thinkingBudget: -1,
+            // TODO(joshualitt): Introduce new bases for Gemini 3 models to use
+            // thinkingLevel instead.
+            thinkingBudget: DEFAULT_THINKING_MODE,
           },
           temperature: 1,
           topP: 0.95,
@@ -38,6 +41,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     // ensure these model configs can be used interactively.
     // TODO(joshualitt): Introduce internal base configs for the various models,
     // note: we will have to think carefully about names.
+    'gemini-3-pro-preview': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'gemini-3-pro-preview',
+      },
+    },
     'gemini-2.5-pro': {
       extends: 'chat-base',
       modelConfig: {
