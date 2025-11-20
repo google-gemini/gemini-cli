@@ -27,6 +27,7 @@ import { debugLogger } from '../utils/debugLogger.js';
  */
 export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
+  private readonly clientVersion: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
   // If we have ongoing MCP client discovery, this completes once that is done.
@@ -39,10 +40,12 @@ export class McpClientManager {
   }> = [];
 
   constructor(
+    clientVersion: string,
     toolRegistry: ToolRegistry,
     cliConfig: Config,
     eventEmitter?: EventEmitter,
   ) {
+    this.clientVersion = clientVersion;
     this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
     this.eventEmitter = eventEmitter;
@@ -175,6 +178,7 @@ export class McpClientManager {
               this.cliConfig.getPromptRegistry(),
               this.cliConfig.getWorkspaceContext(),
               this.cliConfig.getDebugMode(),
+              this.clientVersion,
             );
           if (!existing) {
             this.clients.set(name, client);
