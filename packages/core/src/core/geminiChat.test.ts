@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Content, GenerateContentResponse } from '@google/genai';
-import { ApiError } from '@google/genai';
+import { ApiError, ThinkingLevel } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
@@ -135,6 +135,9 @@ describe('GeminiChat', () => {
           model: modelConfigKey.model,
           generateContentConfig: {
             temperature: 0,
+            thinkingConfig: {
+              thinkingBudget: 1000,
+            },
           },
         })),
       },
@@ -972,10 +975,52 @@ describe('GeminiChat', () => {
             systemInstruction: '',
             tools: [],
             temperature: 0,
+            thinkingConfig: {
+              thinkingBudget: 1000,
+            },
             abortSignal: expect.any(AbortSignal),
           },
         },
         'prompt-id-1',
+      );
+    });
+
+    it('should use thinkingLevel and remove thinkingBudget for gemini-3 models', async () => {
+      const response = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'response' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-test-only-model-string-for-testing' },
+        'hello',
+        'prompt-id-thinking-level',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-3-test-only-model-string-for-testing',
+          config: expect.objectContaining({
+            thinkingConfig: {
+              thinkingBudget: undefined,
+              thinkingLevel: ThinkingLevel.HIGH,
+            },
+          }),
+        }),
+        'prompt-id-thinking-level',
       );
     });
   });

@@ -15,6 +15,7 @@ import type {
   PartListUnion,
   GenerateContentConfig,
 } from '@google/genai';
+import { ThinkingLevel } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
@@ -412,6 +413,22 @@ export class GeminiChat {
       }
 
       effectiveModel = modelToUse;
+      const config = {
+        ...generateContentConfig,
+        // TODO(12622): Ensure we don't overrwrite these when they are
+        // passed via config.
+        systemInstruction: this.systemInstruction,
+        tools: this.tools,
+      };
+
+      // TODO(joshualitt): Clean this up with model configs.
+      if (modelToUse.startsWith('gemini-3')) {
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          thinkingLevel: ThinkingLevel.HIGH,
+        };
+        delete config.thinkingConfig?.thinkingBudget;
+      }
 
       return this.config.getContentGenerator().generateContentStream(
         {
@@ -420,13 +437,7 @@ export class GeminiChat {
             modelToUse === PREVIEW_GEMINI_MODEL
               ? contentsForPreviewModel
               : requestContents,
-          config: {
-            ...generateContentConfig,
-            // TODO(12622): Ensure we don't overrwrite these when they are
-            // passed via config.
-            systemInstruction: this.systemInstruction,
-            tools: this.tools,
-          },
+          config,
         },
         prompt_id,
       );
