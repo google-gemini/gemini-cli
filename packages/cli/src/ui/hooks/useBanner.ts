@@ -10,6 +10,8 @@ import { Colors } from '../colors.js';
 import { persistentState } from '../../utils/persistentState.js';
 import type { Config } from '@google/gemini-cli-core';
 
+const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
+
 function hasVersionPrefix(str: string) {
   const versionPrefixRegex = /^v\d+:/;
   return versionPrefixRegex.test(str);
@@ -44,14 +46,15 @@ export function useBanner(bannerData: BannerData, config: Config) {
         const parts = defaultText.split(':');
         return {
           currentBannerVersion: parts[0],
-          maxBannerShownCount: parseInt(parts[1], 10),
+          maxBannerShownCount:
+            parseInt(parts[1], 10) ?? DEFAULT_MAX_BANNER_SHOWN_COUNT,
           defaultTextDelimited: parts.slice(2).join('').trim(),
         };
       }
       return {
         currentBannerVersion: 'v0',
         defaultTextDelimited: defaultText,
-        maxBannerShownCount: 5,
+        maxBannerShownCount: DEFAULT_MAX_BANNER_SHOWN_COUNT,
       };
     }, [defaultText]);
 

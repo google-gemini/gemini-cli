@@ -175,7 +175,7 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       bannerData: {
-        defaultText: 'v2: This is the default banner',
+        defaultText: 'v2:5:This is the default banner',
         warningText: '',
       },
     };
