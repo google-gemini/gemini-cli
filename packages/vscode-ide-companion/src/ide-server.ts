@@ -7,8 +7,10 @@
 import * as vscode from 'vscode';
 import {
   CloseDiffRequestSchema,
+  CreateTerminalRequestSchema,
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
+  ReadTerminalOutputRequestSchema,
 } from '@google/gemini-cli-core/src/ide/types.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -488,5 +490,88 @@ const createMcpServer = (
       };
     },
   );
+
+  server.registerTool(
+    'createTerminal',
+    {
+      description:
+        '(IDE Tool) Launch a terminal in the IDE that records the session to a file.',
+      inputSchema: CreateTerminalRequestSchema.shape,
+    },
+    async ({
+      cwd,
+      name,
+      logFile,
+    }: z.infer<typeof CreateTerminalRequestSchema>) => {
+      log(`Received createTerminal request. Log file: ${logFile}`);
+
+      // Use 'script' to record the session.
+      // -f: Flush output after each write.
+      // -q: Quiet mode.
+      // The command runs a shell and records everything to logFile.
+      const shellArgs = ['-f', '-q', logFile];
+
+      // Ensure the log file exists
+      try {
+        await fs.appendFile(logFile, '');
+      } catch (e) {
+        log(`Failed to create log file: ${e}`);
+        throw e;
+      }
+
+      const terminal = vscode.window.createTerminal({
+        name: name ?? 'Gemini Terminal',
+        shellPath: 'script',
+        shellArgs,
+        cwd,
+      });
+
+      terminal.show();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Terminal launched. Session recording to: ${logFile}`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    'readTerminalOutput',
+    {
+      description:
+        '(IDE Tool) Read the output of a terminal session from a log file.',
+      inputSchema: ReadTerminalOutputRequestSchema.shape,
+    },
+    async ({ logFile }: z.infer<typeof ReadTerminalOutputRequestSchema>) => {
+      // log(`Received readTerminalOutput request for: ${logFile}`);
+      try {
+        const content = await fs.readFile(logFile, 'utf8');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: content,
+            },
+          ],
+        };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `Failed to read log file: ${message}`,
+            },
+          ],
+        };
+      }
+    },
+  );
+
   return server;
 };

@@ -515,6 +515,13 @@ export const useSlashCommandProcessor = (
                   setCustomDialog(result.component);
                   return { type: 'handled' };
                 }
+                case 'execute_shell': {
+                  return {
+                    type: 'execute_shell',
+                    command: result.command,
+                    forcePty: result.forcePty,
+                  };
+                }
                 default: {
                   const unhandled: never = result;
                   throw new Error(

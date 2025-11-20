@@ -146,3 +146,31 @@ export const CloseDiffRequestSchema = z.object({
    */
   suppressNotification: z.boolean().optional(),
 });
+
+/**
+ * The request to create a terminal in the IDE.
+ */
+export const CreateTerminalRequestSchema = z.object({
+  /**
+   * The working directory for the terminal.
+   */
+  cwd: z.string().optional(),
+  /**
+   * The name of the terminal.
+   */
+  name: z.string().optional(),
+  /**
+   * The absolute path to the file where the terminal session will be recorded.
+   */
+  logFile: z.string(),
+});
+
+/**
+ * The request to read the output of a terminal session from the log file.
+ */
+export const ReadTerminalOutputRequestSchema = z.object({
+  /**
+   * The absolute path to the log file.
+   */
+  logFile: z.string(),
+});

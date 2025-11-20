@@ -364,7 +364,12 @@ export type SlashCommandProcessorResult =
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
-  | SubmitPromptResult;
+  | SubmitPromptResult
+  | {
+      type: 'execute_shell';
+      command: string;
+      forcePty?: boolean;
+    };
 
 export interface ShellConfirmationRequest {
   commands: string[];

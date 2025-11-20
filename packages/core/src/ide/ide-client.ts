@@ -284,6 +284,80 @@ export class IdeClient {
   }
 
   /**
+   * Launches a terminal in the IDE that records the session to a file.
+   *
+   * @param logFile The absolute path to the file where the session will be recorded.
+   * @param options Optional parameters for the terminal.
+   */
+  async createTerminal(
+    logFile: string,
+    options?: { cwd?: string; name?: string },
+  ): Promise<void> {
+    if (!this.client) {
+      throw new Error('IDE client is not connected.');
+    }
+
+    const result = await this.client.request(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'createTerminal',
+          arguments: {
+            logFile,
+            cwd: options?.cwd,
+            name: options?.name,
+          },
+        },
+      },
+      CallToolResultSchema,
+      { timeout: IDE_REQUEST_TIMEOUT_MS },
+    );
+
+    if (result.isError) {
+      const textPart = result.content.find((part) => part.type === 'text');
+      throw new Error(
+        textPart?.text ?? `Tool 'createTerminal' reported an error.`,
+      );
+    }
+  }
+
+  /**
+   * Reads the output of a terminal session from the log file via the IDE.
+   *
+   * @param logFile The absolute path to the log file.
+   * @returns The content of the log file.
+   */
+  async readTerminalOutput(logFile: string): Promise<string> {
+    if (!this.client) {
+      throw new Error('IDE client is not connected.');
+    }
+
+    const result = await this.client.request(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'readTerminalOutput',
+          arguments: {
+            logFile,
+          },
+        },
+      },
+      CallToolResultSchema,
+      { timeout: IDE_REQUEST_TIMEOUT_MS },
+    );
+
+    if (result.isError) {
+      const textPart = result.content.find((part) => part.type === 'text');
+      throw new Error(
+        textPart?.text ?? `Tool 'readTerminalOutput' reported an error.`,
+      );
+    }
+
+    const textPart = result.content.find((part) => part.type === 'text');
+    return textPart?.text ?? '';
+  }
+
+  /**
    * Acquires a lock to ensure sequential execution of critical sections.
    *
    * This method implements a promise-based mutex. It works by chaining promises.

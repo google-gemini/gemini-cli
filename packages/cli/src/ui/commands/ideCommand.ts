@@ -19,13 +19,16 @@ import {
   GEMINI_CLI_COMPANION_EXTENSION_NAME,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
+import fs from 'node:fs';
 import type {
   CommandContext,
   SlashCommand,
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
+import { MessageType } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
+import { stripAnsi } from '../utils/textUtils.js';
 
 function getIdeStatusMessage(ideClient: IdeClient): {
   messageType: 'info' | 'error';
@@ -291,16 +294,109 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     },
   };
 
+  const terminalCommand: SlashCommand = {
+    name: 'terminal',
+    description: 'Launch a terminal in the IDE',
+    kind: CommandKind.BUILT_IN,
+    action: async (context: CommandContext) => {
+      if (
+        ideClient.getConnectionStatus().status !== IDEConnectionStatus.Connected
+      ) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content:
+            'IDE integration is not connected. Run /ide enable to connect.',
+        } as const;
+      }
+
+      const logFile = path.join(
+        context.services.config!.getProjectRoot()!,
+        '.gemini',
+        'tmp',
+        `gemini-ide-terminal-${Date.now()}.log`,
+      );
+
+      try {
+        const logFileDir = path.dirname(logFile);
+        // Ensure the log directory exists
+        fs.mkdirSync(logFileDir, { recursive: true });
+
+        // Create an empty log file
+        fs.writeFileSync(logFile, '');
+
+        await ideClient.createTerminal(logFile);
+
+        context.ui.addItem(
+          {
+            type: MessageType.INFO,
+            text: `Terminal launched in IDE. Mirroring output from: ${logFile}\nPress Ctrl+C to stop mirroring (terminal will remain open).`,
+          },
+          Date.now(),
+        );
+
+        let lastSize = 0;
+        // Poll for output for 5 minutes max for this demo
+        const checkInterval = setInterval(async () => {
+          try {
+            const content = await ideClient.readTerminalOutput(logFile);
+            if (content.length > lastSize) {
+              const newContent = stripAnsi(content.substring(lastSize));
+              if (newContent.trim()) {
+                // 1. Update UI
+                context.ui.addItem(
+                  {
+                    type: MessageType.INFO,
+                    text: `[IDE Terminal]\n${newContent}`,
+                  },
+                  Date.now(),
+                );
+
+                // 2. Update LLM Context
+                const client = context.services.config?.getGeminiClient();
+                if (client) {
+                  client.addHistory({
+                    role: 'user',
+                    parts: [{ text: `[IDE Terminal Output]:\n${newContent}` }],
+                  });
+                }
+              }
+              lastSize = content.length;
+            }
+          } catch (e) {
+            console.log(e);
+          }
+        }, 1000);
+
+        // Stop mirroring after 5 minutes
+        setTimeout(() => clearInterval(checkInterval), 300000);
+        return;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Failed to launch terminal: ${message}`,
+        } as const;
+      }
+    },
+  };
+
   const { status } = ideClient.getConnectionStatus();
   const isConnected = status === IDEConnectionStatus.Connected;
 
   if (isConnected) {
-    ideSlashCommand.subCommands = [statusCommand, disableCommand];
+    ideSlashCommand.subCommands = [
+      statusCommand,
+      disableCommand,
+      terminalCommand,
+    ];
   } else {
     ideSlashCommand.subCommands = [
       enableCommand,
       statusCommand,
       installCommand,
+      terminalCommand,
     ];
   }
 

@@ -77,7 +77,12 @@ export const useShellCommandProcessor = (
 ) => {
   const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
   const handleShellCommand = useCallback(
-    (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
+    (
+      rawQuery: PartListUnion,
+      abortSignal: AbortSignal,
+      forcePty: boolean = false,
+      blocking: boolean = true,
+    ): boolean => {
       if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
         return false;
       }
@@ -159,7 +164,7 @@ export const useShellCommandProcessor = (
                   if (isBinaryStream) break;
                   // PTY provides the full screen state, so we just replace.
                   // Child process provides chunks, so we append.
-                  if (config.getEnableInteractiveShell()) {
+                  if (config.getEnableInteractiveShell() || forcePty) {
                     cumulativeStdout = event.chunk;
                     shouldUpdate = true;
                   } else if (
@@ -218,7 +223,7 @@ export const useShellCommandProcessor = (
               }
             },
             abortSignal,
-            config.getEnableInteractiveShell(),
+            config.getEnableInteractiveShell() || forcePty,
             shellExecutionConfig,
           );
 
@@ -346,7 +351,9 @@ export const useShellCommandProcessor = (
         executeCommand(resolve);
       });
 
-      onExec(execPromise);
+      if (blocking) {
+        onExec(execPromise);
+      }
       return true;
     },
     [

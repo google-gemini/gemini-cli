@@ -402,6 +402,15 @@ export const useGeminiStream = (
                   shouldProceed: true,
                 };
               }
+              case 'execute_shell': {
+                handleShellCommand(
+                  slashCommandResult.command,
+                  abortSignal,
+                  slashCommandResult.forcePty,
+                  false,
+                );
+                return { queryToSend: null, shouldProceed: false };
+              }
               case 'handled': {
                 return { queryToSend: null, shouldProceed: false };
               }

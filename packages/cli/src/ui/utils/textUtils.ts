@@ -5,6 +5,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
+export { stripAnsi };
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';

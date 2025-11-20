@@ -175,6 +175,16 @@ export interface OpenCustomDialogActionReturn {
   component: ReactNode;
 }
 
+/**
+ * The return type for a command action that wants to run a shell command
+ * directly (e.g. /terminal).
+ */
+export interface ExecuteShellActionReturn {
+  type: 'execute_shell';
+  command: string;
+  forcePty?: boolean;
+}
+
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
@@ -184,7 +194,8 @@ export type SlashCommandActionReturn =
   | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
-  | OpenCustomDialogActionReturn;
+  | OpenCustomDialogActionReturn
+  | ExecuteShellActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
