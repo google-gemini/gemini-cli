@@ -233,15 +233,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
           .getDirectories()
           .map((dir) => fs.realpathSync(dir));
 
-        const readWritePaths = Array.from(
-          new Set([
-            ...workspacePaths,
-            fs.realpathSync(this.config.getTargetDir()),
-            fs.realpathSync(os.tmpdir()),
-            // Allow harmless redirection targets (e.g., `> /dev/null`) inside the tool sandbox.
-            fs.realpathSync('/dev/null'),
-          ]),
-        );
+        const pathsForSet = [
+          ...workspacePaths,
+          fs.realpathSync(this.config.getTargetDir()),
+          fs.realpathSync(os.tmpdir()),
+        ];
+        // Allow harmless redirection targets (e.g., `> /dev/null`) inside the tool sandbox.
+        try {
+          pathsForSet.push(fs.realpathSync('/dev/null'));
+        } catch {
+          // Some environments might not expose /dev/null (or it may be inaccessible).
+          // Failing to resolve it should not crash the tool.
+        }
+        const readWritePaths = Array.from(new Set(pathsForSet));
 
         const runnerPath = ensureLandlockRunner();
         const runnerArgs = [

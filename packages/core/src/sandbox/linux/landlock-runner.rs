@@ -165,8 +165,21 @@ fn main() {
     // Build argv for execvp
     let cstrings: Vec<CString> = args
         .iter()
-        .map(|a| CString::new(a.clone().into_vec()).unwrap_or_default())
-        .collect();
+        .map(|a| {
+            CString::new(a.clone().into_vec()).map_err(|e| {
+                let display = a.to_string_lossy().into_owned();
+                (e, display)
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|(e, arg)| {
+            eprintln!(
+                "[landlock-runner] Invalid argument for execvp (contains null byte): {} ({})",
+                arg,
+                e
+            );
+            exit(126);
+        });
     let mut argv: Vec<*const c_char> = cstrings.iter().map(|s| s.as_ptr()).collect();
     argv.push(std::ptr::null());
 

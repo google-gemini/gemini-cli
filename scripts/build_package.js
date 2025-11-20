@@ -17,8 +17,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { execFileSync, execSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 if (!process.cwd().includes('packages')) {
@@ -35,7 +35,7 @@ execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
 // Build optional Rust helpers for sandboxing when present (core package, Linux only)
 try {
   const pkgPath = join(process.cwd(), 'package.json');
-  const pkg = JSON.parse(execSync(`cat ${pkgPath}`).toString());
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   const isCore = pkg.name === '@google/gemini-cli-core';
   if (isCore && process.platform === 'linux') {
     const runnerSource = join(
@@ -46,7 +46,7 @@ try {
       'landlock-runner.rs',
     );
     const outputDir = join(process.cwd(), 'dist', 'bin');
-    execSync(`mkdir -p ${outputDir}`);
+    mkdirSync(outputDir, { recursive: true });
     const outPath = join(outputDir, 'landlock-runner');
     console.log(
       `[build] Compiling landlock runner (static musl) to ${outPath}`,
@@ -69,7 +69,10 @@ try {
 
     const targetAvailable = (() => {
       try {
-        const list = execSync('rustc --print target-list').toString();
+        const list = execFileSync('rustc', [
+          '--print',
+          'target-list',
+        ]).toString();
         return list.split('\n').includes(target);
       } catch (_e) {
         return false;
@@ -79,7 +82,7 @@ try {
     if (!targetAvailable) {
       try {
         execSync('rustup --version', { stdio: 'ignore' });
-        execSync(`rustup target add ${target}`, { stdio: 'inherit' });
+        execFileSync('rustup', ['target', 'add', target], { stdio: 'inherit' });
       } catch (err) {
         console.error(
           '[build] Error: musl target x86_64-unknown-linux-musl not available. Install rustup and run: rustup target add x86_64-unknown-linux-musl',
@@ -89,8 +92,18 @@ try {
     }
 
     try {
-      execSync(
-        `rustc -O --target ${target} -C target-feature=+crt-static ${runnerSource} -o ${outPath}`,
+      execFileSync(
+        'rustc',
+        [
+          '-O',
+          '--target',
+          target,
+          '-C',
+          'target-feature=+crt-static',
+          runnerSource,
+          '-o',
+          outPath,
+        ],
         { stdio: 'inherit' },
       );
     } catch (err) {
