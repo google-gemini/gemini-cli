@@ -151,8 +151,8 @@ first try the following:
 3. **Restart and reauthenticate**. If this issue persists, close Gemini CLI,
    reopen the CLI, and reauthenticate using the `/auth` command.
 
-**Note:** If you are using Gemini CLI with Google Cloud, be aware that Gemini 3
-Pro is currently only available in the Global region for Google Cloud.
+**Note:** If you are using Gemini CLI with Google Cloud, be aware that your
+region may affect Gemini 3 Pro availability.
 
 If you’re still receiving the error, you can
 [search GitHub issues](https://github.com/google-gemini/gemini-cli/issues) for
