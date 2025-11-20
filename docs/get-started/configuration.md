@@ -101,7 +101,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.previewFeatures`** (boolean):
   - **Description:** Enable preview features (e.g., preview models).
   - **Default:** `false`
-  - **Requires restart:** Yes
 
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in.
@@ -305,7 +304,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`model.compressionThreshold`** (number):
   - **Description:** The fraction of context usage at which to trigger context
     compression (e.g. 0.2, 0.3).
-  - **Default:** `0.7`
+  - **Default:** `0.5`
   - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
