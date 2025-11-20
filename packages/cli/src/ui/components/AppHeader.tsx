@@ -10,9 +10,8 @@ import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { persistentState } from '../../utils/persistentState.js';
-import { useEffect, useRef, useState } from 'react';
 import { Banner } from './Banner.js';
+import { useBanner } from '../hooks/useBanner.js';
 
 interface AppHeaderProps {
   version: string;
@@ -23,27 +22,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const config = useConfig();
   const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
 
-  const [defaultBannerShownCount] = useState(
-    () => persistentState.get('defaultBannerShownCount') || 0,
-  );
-
-  const { defaultText, warningText } = bannerData;
-
-  const showDefaultBanner =
-    warningText === '' &&
-    !config.getPreviewFeatures() &&
-    defaultBannerShownCount < 5;
-
-  const bannerText = showDefaultBanner ? defaultText : warningText;
-
-  const hasIncrementedRef = useRef(false);
-  useEffect(() => {
-    if (showDefaultBanner && defaultText && !hasIncrementedRef.current) {
-      hasIncrementedRef.current = true;
-      const current = persistentState.get('defaultBannerShownCount') || 0;
-      persistentState.set('defaultBannerShownCount', current + 1);
-    }
-  }, [showDefaultBanner, defaultText]);
+  const { bannerText } = useBanner(bannerData, config);
 
   return (
     <Box flexDirection="column">
@@ -54,7 +33,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
             <Banner
               width={mainAreaWidth}
               bannerText={bannerText}
-              isWarning={warningText !== ''}
+              isWarning={bannerData.warningText !== ''}
             />
           )}
         </>
