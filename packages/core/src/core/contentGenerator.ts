@@ -4,18 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   CountTokensResponse,
   GenerateContentResponse,
   GenerateContentParameters,
   CountTokensParameters,
   EmbedContentResponse,
   EmbedContentParameters,
-  GoogleGenAI,
 } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
-import { getEffectiveModel } from './modelCheck.js';
+import type { Config } from '../config/config.js';
+import { loadApiKey } from './apiKeyCredentialStorage.js';
+
+import type { UserTierId } from '../code_assist/types.js';
+import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import { InstallationManager } from '../utils/installationManager.js';
+import { FakeContentGenerator } from './fakeContentGenerator.js';
+import { RecordingContentGenerator } from './recordingContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -23,76 +29,75 @@ import { getEffectiveModel } from './modelCheck.js';
 export interface ContentGenerator {
   generateContent(
     request: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<GenerateContentResponse>;
 
   generateContentStream(
     request: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>>;
 
   countTokens(request: CountTokensParameters): Promise<CountTokensResponse>;
 
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
+
+  userTier?: UserTierId;
 }
 
 export enum AuthType {
-  LOGIN_WITH_GOOGLE_PERSONAL = 'oauth-personal',
+  LOGIN_WITH_GOOGLE = 'oauth-personal',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
+  LEGACY_CLOUD_SHELL = 'cloud-shell',
+  COMPUTE_ADC = 'compute-default-credentials',
 }
 
 export type ContentGeneratorConfig = {
-  model: string;
   apiKey?: string;
   vertexai?: boolean;
-  authType?: AuthType | undefined;
+  authType?: AuthType;
+  proxy?: string;
 };
 
 export async function createContentGeneratorConfig(
-  model: string | undefined,
+  config: Config,
   authType: AuthType | undefined,
-  config?: { getModel?: () => string },
 ): Promise<ContentGeneratorConfig> {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  const googleApiKey = process.env.GOOGLE_API_KEY;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
-
-  // Use runtime model from config if available, otherwise fallback to parameter or default
-  const effectiveModel = config?.getModel?.() || model || DEFAULT_GEMINI_MODEL;
+  const geminiApiKey =
+    (await loadApiKey()) || process.env['GEMINI_API_KEY'] || undefined;
+  const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
+  const googleCloudProject =
+    process.env['GOOGLE_CLOUD_PROJECT'] ||
+    process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+    undefined;
+  const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
-    model: effectiveModel,
     authType,
+    proxy: config?.getProxy(),
   };
 
-  // if we are using google auth nothing else to validate for now
-  if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
+  if (
+    authType === AuthType.LOGIN_WITH_GOOGLE ||
+    authType === AuthType.COMPUTE_ADC
+  ) {
     return contentGeneratorConfig;
   }
 
-  //
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
-    contentGeneratorConfig.model = await getEffectiveModel(
-      contentGeneratorConfig.apiKey,
-      contentGeneratorConfig.model,
-    );
+    contentGeneratorConfig.vertexai = false;
 
     return contentGeneratorConfig;
   }
 
   if (
     authType === AuthType.USE_VERTEX_AI &&
-    !!googleApiKey &&
-    googleCloudProject &&
-    googleCloudLocation
+    (googleApiKey || (googleCloudProject && googleCloudLocation))
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
-    contentGeneratorConfig.model = await getEffectiveModel(
-      contentGeneratorConfig.apiKey,
-      contentGeneratorConfig.model,
-    );
 
     return contentGeneratorConfig;
   }
@@ -102,31 +107,64 @@ export async function createContentGeneratorConfig(
 
 export async function createContentGenerator(
   config: ContentGeneratorConfig,
+  gcConfig: Config,
+  sessionId?: string,
 ): Promise<ContentGenerator> {
-  const version = process.env.CLI_VERSION || process.version;
-  const httpOptions = {
-    headers: {
-      'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
-    },
-  };
-  if (config.authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
-    return createCodeAssistContentGenerator(httpOptions, config.authType);
+  const generator = await (async () => {
+    if (gcConfig.fakeResponses) {
+      return FakeContentGenerator.fromFile(gcConfig.fakeResponses);
+    }
+    const version = process.env['CLI_VERSION'] || process.version;
+    const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
+    const baseHeaders: Record<string, string> = {
+      'User-Agent': userAgent,
+    };
+    if (
+      config.authType === AuthType.LOGIN_WITH_GOOGLE ||
+      config.authType === AuthType.COMPUTE_ADC
+    ) {
+      const httpOptions = { headers: baseHeaders };
+      return new LoggingContentGenerator(
+        await createCodeAssistContentGenerator(
+          httpOptions,
+          config.authType,
+          gcConfig,
+          sessionId,
+        ),
+        gcConfig,
+      );
+    }
+
+    if (
+      config.authType === AuthType.USE_GEMINI ||
+      config.authType === AuthType.USE_VERTEX_AI
+    ) {
+      let headers: Record<string, string> = { ...baseHeaders };
+      if (gcConfig?.getUsageStatisticsEnabled()) {
+        const installationManager = new InstallationManager();
+        const installationId = installationManager.getInstallationId();
+        headers = {
+          ...headers,
+          'x-gemini-api-privileged-user-id': `${installationId}`,
+        };
+      }
+      const httpOptions = { headers };
+
+      const googleGenAI = new GoogleGenAI({
+        apiKey: config.apiKey === '' ? undefined : config.apiKey,
+        vertexai: config.vertexai,
+        httpOptions,
+      });
+      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+    }
+    throw new Error(
+      `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
+    );
+  })();
+
+  if (gcConfig.recordResponses) {
+    return new RecordingContentGenerator(generator, gcConfig.recordResponses);
   }
 
-  if (
-    config.authType === AuthType.USE_GEMINI ||
-    config.authType === AuthType.USE_VERTEX_AI
-  ) {
-    const googleGenAI = new GoogleGenAI({
-      apiKey: config.apiKey === '' ? undefined : config.apiKey,
-      vertexai: config.vertexai,
-      httpOptions,
-    });
-
-    return googleGenAI.models;
-  }
-
-  throw new Error(
-    `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
-  );
+  return generator;
 }

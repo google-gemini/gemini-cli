@@ -7,9 +7,9 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch CLI",
+      "name": "Build & Launch CLI",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
+      "runtimeArgs": ["run", "build-and-start"],
       "skipFiles": ["<node_internals>/**"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -18,13 +18,16 @@
       }
     },
     {
-      "type": "node",
+      "name": "Launch Companion VS Code Extension",
+      "type": "extensionHost",
       "request": "launch",
-      "name": "Launch E2E",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "test:e2e", "read_many_files"],
-      "skipFiles": ["<node_internals>/**"],
-      "cwd": "${workspaceFolder}"
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-ide-companion"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/packages/vscode-ide-companion/dist/**/*.js"
+      ],
+      "preLaunchTask": "npm: build: vscode-ide-companion"
     },
     {
       "name": "Attach",
@@ -64,6 +67,27 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug Integration Test File",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vitest",
+        "run",
+        "--root",
+        "./integration-tests",
+        "--inspect-brk=9229",
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "GEMINI_SANDBOX": "false"
+      }
     }
   ],
   "inputs": [

@@ -1,54 +1,72 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.5",
+  "version": "0.18.0-nightly.20251120.2231497b1",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "type": "module",
   "workspaces": [
     "packages/*"
   ],
-  "repository": "google-gemini/gemini-cli",
+  "private": "true",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+  },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.4"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.18.0-nightly.20251120.2231497b1"
   },
   "scripts": {
-    "generate": "node scripts/generate-git-commit-info.js",
-    "build": "node scripts/build.js",
-    "build:sandbox": "node scripts/build_sandbox.js",
-    "build:all": "npm run build && npm run build:sandbox",
-    "clean": "node scripts/clean.js",
-    "prepare": "npm run bundle",
-    "test": "npm run test --workspaces",
-    "test:ci": "npm run test:ci --workspaces --if-present",
-    "test:e2e": "npm run test:integration:sandbox:none -- --verbose --keep-output",
-    "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
-    "test:integration:sandbox:none": "GEMINI_SANDBOX=false node integration-tests/run-tests.js",
-    "test:integration:sandbox:docker": "GEMINI_SANDBOX=docker node integration-tests/run-tests.js",
-    "test:integration:sandbox:podman": "GEMINI_SANDBOX=podman node integration-tests/run-tests.js",
-    "start": "node scripts/start.js",
+    "start": "cross-env NODE_ENV=development node scripts/start.js",
+    "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
-    "lint:fix": "eslint . --fix && eslint integration-tests --fix",
-    "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
-    "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "format": "prettier --write .",
-    "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
+    "deflake": "node scripts/deflake.js",
+    "deflake:test:integration:sandbox:none": "npm run deflake -- --command=\"npm run test:integration:sandbox:none -- --retry=0\"",
+    "deflake:test:integration:sandbox:docker": "npm run deflake -- --command=\"npm run test:integration:sandbox:docker -- --retry=0\"",
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
-    "prerelease:dev": "npm run prerelease:version --workspaces && npm run prerelease:deps --workspaces",
+    "generate": "node scripts/generate-git-commit-info.js",
+    "predocs:settings": "npm run build --workspace @google/gemini-cli-core",
+    "schema:settings": "tsx ./scripts/generate-settings-schema.ts",
+    "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
+    "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
+    "build": "node scripts/build.js",
+    "build-and-start": "npm run build && npm run start",
+    "build:vscode": "node scripts/build_vscode_companion.js",
+    "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
+    "build:packages": "npm run build --workspaces",
+    "build:sandbox": "node scripts/build_sandbox.js",
     "bundle": "npm run generate && node esbuild.config.js && node scripts/copy_bundle_assets.js",
-    "build:cli": "npm run build --workspace packages/cli",
-    "build:core": "npm run build --workspace packages/core",
-    "build:packages": "npm run build:core && npm run build:cli",
-    "build:sandbox:fast": "node scripts/build_sandbox.js --skip-npm-install-build",
-    "prepare:cli-packagejson": "node scripts/prepare-cli-packagejson.js",
-    "publish:sandbox": "node scripts/publish-sandbox.js",
-    "publish:npm": "npm publish --workspaces ${NPM_PUBLISH_TAG:+--tag=$NPM_PUBLISH_TAG} ${NPM_DRY_RUN:+--dry-run}",
-    "publish:release": "npm run build:packages && npm run prepare:cli-packagejson && npm run build:sandbox:fast && npm run publish:sandbox && npm run publish:npm",
+    "test": "npm run test --workspaces --if-present",
+    "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts",
+    "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
+    "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
+    "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
+    "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
+    "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
+    "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
+    "lint": "eslint . --ext .ts,.tsx && eslint integration-tests && eslint scripts",
+    "lint:fix": "eslint . --fix --ext .ts,.tsx && eslint integration-tests --fix && eslint scripts --fix && npm run format",
+    "lint:ci": "npm run lint:all",
+    "lint:all": "node scripts/lint.js",
+    "format": "prettier --experimental-cli --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
+    "prepare": "husky && npm run bundle",
+    "prepare:package": "node scripts/prepare-package.js",
+    "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
-    "start:gcp": "concurrently --raw --kill-others \"npm run telemetry -- --target=gcp\" \"npm start\""
+    "check:lockfile": "node scripts/check-lockfile.js",
+    "clean": "node scripts/clean.js",
+    "pre-commit": "node scripts/pre-commit.js"
+  },
+  "overrides": {
+    "ink": "npm:@jrichman/ink@6.4.5",
+    "wrap-ansi": "9.0.2",
+    "cliui": {
+      "wrap-ansi": "7.0.0"
+    }
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -59,30 +77,71 @@
     "LICENSE"
   ],
   "devDependencies": {
-    "@types/micromatch": "^4.0.9",
-    "@types/mime-types": "^2.1.4",
+    "@octokit/rest": "^22.0.0",
+    "@types/marked": "^5.0.2",
+    "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
+    "@types/mock-fs": "^4.13.4",
+    "@types/prompts": "^2.4.9",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/shell-quote": "^1.7.5",
     "@vitest/coverage-v8": "^3.1.1",
-    "concurrently": "^9.2.0",
+    "@vitest/eslint-plugin": "^1.3.4",
     "cross-env": "^7.0.3",
     "esbuild": "^0.25.0",
+    "esbuild-plugin-wasm": "^1.1.0",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-license-header": "^0.8.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "glob": "^10.4.5",
+    "glob": "^12.0.0",
     "globals": "^16.0.0",
+    "google-artifactregistry-auth": "^3.4.0",
+    "husky": "^9.1.7",
+    "ink-testing-library": "^4.0.0",
     "json": "^11.0.0",
-    "lodash": "^4.17.21",
-    "memfs": "^4.17.2",
+    "lint-staged": "^16.1.6",
+    "memfs": "^4.42.0",
+    "mnemonist": "^0.40.3",
+    "mock-fs": "^5.5.0",
+    "msw": "^2.10.4",
+    "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
-    "react-devtools-core": "^4.28.5",
+    "react-devtools-core": "^6.1.2",
+    "semver": "^7.7.2",
+    "strip-ansi": "^7.1.2",
+    "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
+    "vitest": "^3.2.4",
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@google/gemini-cli": "^0.1.1"
+    "ink": "npm:@jrichman/ink@6.4.5",
+    "latest-version": "^9.0.0",
+    "simple-git": "^3.28.0"
+  },
+  "optionalDependencies": {
+    "@lydell/node-pty": "1.1.0",
+    "@lydell/node-pty-darwin-arm64": "1.1.0",
+    "@lydell/node-pty-darwin-x64": "1.1.0",
+    "@lydell/node-pty-linux-x64": "1.1.0",
+    "@lydell/node-pty-win32-arm64": "1.1.0",
+    "@lydell/node-pty-win32-x64": "1.1.0",
+    "node-pty": "^1.0.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings 0 --no-warn-ignored"
+    ],
+    "eslint.config.js": [
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }

@@ -4,84 +4,142 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ConsoleMessageItem } from '../types.js';
+import {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useTransition,
+} from 'react';
+import type { ConsoleMessageItem } from '../types.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type ConsoleLogPayload,
+} from '@google/gemini-cli-core';
 
 export interface UseConsoleMessagesReturn {
   consoleMessages: ConsoleMessageItem[];
-  handleNewMessage: (message: ConsoleMessageItem) => void;
   clearConsoleMessages: () => void;
 }
 
-export function useConsoleMessages(): UseConsoleMessagesReturn {
-  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessageItem[]>(
-    [],
-  );
-  const messageQueueRef = useRef<ConsoleMessageItem[]>([]);
-  const messageQueueTimeoutRef = useRef<number | null>(null);
+type Action =
+  | { type: 'ADD_MESSAGES'; payload: ConsoleMessageItem[] }
+  | { type: 'CLEAR' };
 
-  const processMessageQueue = useCallback(() => {
-    if (messageQueueRef.current.length === 0) {
-      return;
-    }
-
-    setConsoleMessages((prevMessages) => {
-      const newMessages = [...prevMessages];
-      messageQueueRef.current.forEach((queuedMessage) => {
+function consoleMessagesReducer(
+  state: ConsoleMessageItem[],
+  action: Action,
+): ConsoleMessageItem[] {
+  switch (action.type) {
+    case 'ADD_MESSAGES': {
+      const newMessages = [...state];
+      for (const queuedMessage of action.payload) {
+        const lastMessage = newMessages[newMessages.length - 1];
         if (
-          newMessages.length > 0 &&
-          newMessages[newMessages.length - 1].type === queuedMessage.type &&
-          newMessages[newMessages.length - 1].content === queuedMessage.content
+          lastMessage &&
+          lastMessage.type === queuedMessage.type &&
+          lastMessage.content === queuedMessage.content
         ) {
-          newMessages[newMessages.length - 1].count =
-            (newMessages[newMessages.length - 1].count || 1) + 1;
+          // Create a new object for the last message to ensure React detects
+          // the change, preventing mutation of the existing state object.
+          newMessages[newMessages.length - 1] = {
+            ...lastMessage,
+            count: lastMessage.count + 1,
+          };
         } else {
           newMessages.push({ ...queuedMessage, count: 1 });
         }
-      });
+      }
       return newMessages;
-    });
-
-    messageQueueRef.current = [];
-    messageQueueTimeoutRef.current = null; // Allow next scheduling
-  }, []);
-
-  const scheduleQueueProcessing = useCallback(() => {
-    if (messageQueueTimeoutRef.current === null) {
-      messageQueueTimeoutRef.current = setTimeout(
-        processMessageQueue,
-        0,
-      ) as unknown as number;
     }
-  }, [processMessageQueue]);
+    case 'CLEAR':
+      return [];
+    default:
+      return state;
+  }
+}
+
+export function useConsoleMessages(): UseConsoleMessagesReturn {
+  const [consoleMessages, dispatch] = useReducer(consoleMessagesReducer, []);
+  const messageQueueRef = useRef<ConsoleMessageItem[]>([]);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [, startTransition] = useTransition();
+
+  const processQueue = useCallback(() => {
+    if (messageQueueRef.current.length > 0) {
+      const messagesToProcess = messageQueueRef.current;
+      messageQueueRef.current = [];
+      startTransition(() => {
+        dispatch({ type: 'ADD_MESSAGES', payload: messagesToProcess });
+      });
+    }
+    timeoutRef.current = null;
+  }, []);
 
   const handleNewMessage = useCallback(
     (message: ConsoleMessageItem) => {
       messageQueueRef.current.push(message);
-      scheduleQueueProcessing();
+      if (!timeoutRef.current) {
+        // Batch updates using a timeout. 16ms is a reasonable delay to batch
+        // rapid-fire messages without noticeable lag.
+        timeoutRef.current = setTimeout(processQueue, 16);
+      }
     },
-    [scheduleQueueProcessing],
+    [processQueue],
   );
 
+  useEffect(() => {
+    const handleConsoleLog = (payload: ConsoleLogPayload) => {
+      handleNewMessage({
+        type: payload.type,
+        content: payload.content,
+        count: 1,
+      });
+    };
+
+    const handleOutput = (payload: {
+      isStderr: boolean;
+      chunk: Uint8Array | string;
+    }) => {
+      const content =
+        typeof payload.chunk === 'string'
+          ? payload.chunk
+          : new TextDecoder().decode(payload.chunk);
+      // It would be nice if we could show stderr as 'warn' but unfortunately
+      // we log non warning info to stderr before the app starts so that would
+      // be misleading.
+      handleNewMessage({ type: 'log', content, count: 1 });
+    };
+
+    coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
+    coreEvents.on(CoreEvent.Output, handleOutput);
+    return () => {
+      coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
+      coreEvents.off(CoreEvent.Output, handleOutput);
+    };
+  }, [handleNewMessage]);
+
   const clearConsoleMessages = useCallback(() => {
-    setConsoleMessages([]);
-    if (messageQueueTimeoutRef.current !== null) {
-      clearTimeout(messageQueueTimeoutRef.current);
-      messageQueueTimeoutRef.current = null;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
     messageQueueRef.current = [];
+    startTransition(() => {
+      dispatch({ type: 'CLEAR' });
+    });
   }, []);
 
+  // Cleanup on unmount
   useEffect(
-    () =>
-      // Cleanup on unmount
-      () => {
-        if (messageQueueTimeoutRef.current !== null) {
-          clearTimeout(messageQueueTimeoutRef.current);
-        }
-      },
+    () => () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    },
     [],
   );
 
-  return { consoleMessages, handleNewMessage, clearConsoleMessages };
+  return { consoleMessages, clearConsoleMessages };
 }

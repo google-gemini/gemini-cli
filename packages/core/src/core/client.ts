@@ -4,78 +4,98 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  EmbedContentParameters,
+import type {
   GenerateContentConfig,
-  Part,
-  SchemaUnion,
   PartListUnion,
   Content,
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
-import { getFolderStructure } from '../utils/getFolderStructure.js';
 import {
-  Turn,
-  ServerGeminiStreamEvent,
-  GeminiEventType,
-  ChatCompressionInfo,
-} from './turn.js';
-import { Config } from '../config/config.js';
+  getDirectoryContextString,
+  getInitialChatHistory,
+} from '../utils/environmentContext.js';
+import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
+import { CompressionStatus } from './turn.js';
+import { Turn, GeminiEventType } from './turn.js';
+import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
+import type {
+  ChatRecordingService,
+  ResumedSessionData,
+} from '../services/chatRecordingService.js';
+import type { ContentGenerator } from './contentGenerator.js';
 import {
-  ContentGenerator,
-  ContentGeneratorConfig,
-  createContentGenerator,
-} from './contentGenerator.js';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
-import { AuthType } from './contentGenerator.js';
+  DEFAULT_GEMINI_FLASH_MODEL,
+  getEffectiveModel,
+} from '../config/models.js';
+import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { ideContextStore } from '../ide/ideContext.js';
+import {
+  logContentRetryFailure,
+  logNextSpeakerCheck,
+} from '../telemetry/loggers.js';
+import {
+  ContentRetryFailureEvent,
+  NextSpeakerCheckEvent,
+} from '../telemetry/types.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import type { IdeContext, File } from '../ide/types.js';
+import { handleFallback } from '../fallback/handler.js';
+import type { RoutingContext } from '../routing/routingStrategy.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
 
-function isThinkingSupported(model: string) {
-  if (model.startsWith('gemini-2.5')) return true;
-  return false;
-}
+const MAX_TURNS = 100;
 
 export class GeminiClient {
   private chat?: GeminiChat;
-  private contentGenerator?: ContentGenerator;
-  private model: string;
-  private embeddingModel: string;
-  private generateContentConfig: GenerateContentConfig = {
-    temperature: 0,
-    topP: 1,
-  };
-  private readonly MAX_TURNS = 100;
+  private sessionTurnCount = 0;
 
-  constructor(private config: Config) {
-    if (config.getProxy()) {
-      setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
+  private readonly loopDetector: LoopDetectionService;
+  private readonly compressionService: ChatCompressionService;
+  private lastPromptId: string;
+  private currentSequenceModel: string | null = null;
+  private lastSentIdeContext: IdeContext | undefined;
+  private forceFullIdeContext = true;
+
+  /**
+   * At any point in this conversation, was compression triggered without
+   * being forced and did it fail?
+   */
+  private hasFailedCompressionAttempt = false;
+
+  constructor(private readonly config: Config) {
+    this.loopDetector = new LoopDetectionService(config);
+    this.compressionService = new ChatCompressionService();
+    this.lastPromptId = this.config.getSessionId();
+  }
+
+  private updateTelemetryTokenCount() {
+    if (this.chat) {
+      uiTelemetryService.setLastPromptTokenCount(
+        this.chat.getLastPromptTokenCount(),
+      );
     }
-
-    this.model = config.getModel();
-    this.embeddingModel = config.getEmbeddingModel();
   }
 
-  async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
-    this.contentGenerator = await createContentGenerator(
-      contentGeneratorConfig,
-    );
+  async initialize() {
     this.chat = await this.startChat();
+    this.updateTelemetryTokenCount();
   }
-  private getContentGenerator(): ContentGenerator {
-    if (!this.contentGenerator) {
+
+  private getContentGeneratorOrFail(): ContentGenerator {
+    if (!this.config.getContentGenerator()) {
       throw new Error('Content generator not initialized');
     }
-    return this.contentGenerator;
+    return this.config.getContentGenerator();
   }
 
   async addHistory(content: Content) {
@@ -89,119 +109,97 @@ export class GeminiClient {
     return this.chat;
   }
 
-  async getHistory(): Promise<Content[]> {
+  isInitialized(): boolean {
+    return this.chat !== undefined;
+  }
+
+  getHistory(): Content[] {
     return this.getChat().getHistory();
   }
 
-  async setHistory(history: Content[]): Promise<void> {
+  stripThoughtsFromHistory() {
+    this.getChat().stripThoughtsFromHistory();
+  }
+
+  setHistory(history: Content[]) {
     this.getChat().setHistory(history);
+    this.forceFullIdeContext = true;
+  }
+
+  async setTools(): Promise<void> {
+    const toolRegistry = this.config.getToolRegistry();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    this.getChat().setTools(tools);
   }
 
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
-    await this.chat;
+    this.updateTelemetryTokenCount();
   }
 
-  private async getEnvironment(): Promise<Part[]> {
-    const cwd = this.config.getWorkingDir();
-    const today = new Date().toLocaleDateString(undefined, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const platform = process.platform;
-    const folderStructure = await getFolderStructure(cwd, {
-      fileService: this.config.getFileService(),
-    });
-    const context = `
-  Okay, just setting up the context for our chat.
-  Today is ${today}.
-  My operating system is: ${platform}
-  I'm currently working in the directory: ${cwd}
-  ${folderStructure}
-          `.trim();
+  async resumeChat(
+    history: Content[],
+    resumedSessionData?: ResumedSessionData,
+  ): Promise<void> {
+    this.chat = await this.startChat(history, resumedSessionData);
+  }
 
-    const initialParts: Part[] = [{ text: context }];
-    const toolRegistry = await this.config.getToolRegistry();
+  getChatRecordingService(): ChatRecordingService | undefined {
+    return this.chat?.getChatRecordingService();
+  }
 
-    // Add full file context if the flag is set
-    if (this.config.getFullContext()) {
-      try {
-        const readManyFilesTool = toolRegistry.getTool(
-          'read_many_files',
-        ) as ReadManyFilesTool;
-        if (readManyFilesTool) {
-          // Read all files in the target directory
-          const result = await readManyFilesTool.execute(
-            {
-              paths: ['**/*'], // Read everything recursively
-              useDefaultExcludes: true, // Use default excludes
-            },
-            AbortSignal.timeout(30000),
-          );
-          if (result.llmContent) {
-            initialParts.push({
-              text: `\n--- Full File Context ---\n${result.llmContent}`,
-            });
-          } else {
-            console.warn(
-              'Full context requested, but read_many_files returned no content.',
-            );
-          }
-        } else {
-          console.warn(
-            'Full context requested, but read_many_files tool not found.',
-          );
-        }
-      } catch (error) {
-        // Not using reportError here as it's a startup/config phase, not a chat/generation phase error.
-        console.error('Error reading full file context:', error);
-        initialParts.push({
-          text: '\n--- Error reading full file context ---',
-        });
-      }
+  getLoopDetectionService(): LoopDetectionService {
+    return this.loopDetector;
+  }
+
+  getCurrentSequenceModel(): string | null {
+    return this.currentSequenceModel;
+  }
+
+  async addDirectoryContext(): Promise<void> {
+    if (!this.chat) {
+      return;
     }
 
-    return initialParts;
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: await getDirectoryContextString(this.config) }],
+    });
   }
 
-  private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
-    const envParts = await this.getEnvironment();
-    const toolRegistry = await this.config.getToolRegistry();
+  async updateSystemInstruction(): Promise<void> {
+    if (!this.isInitialized()) {
+      return;
+    }
+
+    const userMemory = this.config.getUserMemory();
+    const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+    this.getChat().setSystemInstruction(systemInstruction);
+  }
+
+  async startChat(
+    extraHistory?: Content[],
+    resumedSessionData?: ResumedSessionData,
+  ): Promise<GeminiChat> {
+    this.forceFullIdeContext = true;
+    this.hasFailedCompressionAttempt = false;
+
+    const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
-    const initialHistory: Content[] = [
-      {
-        role: 'user',
-        parts: envParts,
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the context!' }],
-      },
-    ];
-    const history = initialHistory.concat(extraHistory ?? []);
+
+    const history = await getInitialChatHistory(this.config, extraHistory);
+
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(this.model)
-        ? {
-            ...this.generateContentConfig,
-            thinkingConfig: {
-              includeThoughts: true,
-            },
-          }
-        : this.generateContentConfig;
+      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
       return new GeminiChat(
         this.config,
-        this.getContentGenerator(),
-        {
-          systemInstruction,
-          ...generateContentConfigWithThinking,
-          tools,
-        },
+        systemInstruction,
+        tools,
         history,
+        resumedSessionData,
       );
     } catch (error) {
       await reportError(
@@ -214,159 +212,427 @@ export class GeminiClient {
     }
   }
 
+  private getIdeContextParts(forceFullContext: boolean): {
+    contextParts: string[];
+    newIdeContext: IdeContext | undefined;
+  } {
+    const currentIdeContext = ideContextStore.get();
+    if (!currentIdeContext) {
+      return { contextParts: [], newIdeContext: undefined };
+    }
+
+    if (forceFullContext || !this.lastSentIdeContext) {
+      // Send full context as JSON
+      const openFiles = currentIdeContext.workspaceState?.openFiles || [];
+      const activeFile = openFiles.find((f) => f.isActive);
+      const otherOpenFiles = openFiles
+        .filter((f) => !f.isActive)
+        .map((f) => f.path);
+
+      const contextData: Record<string, unknown> = {};
+
+      if (activeFile) {
+        contextData['activeFile'] = {
+          path: activeFile.path,
+          cursor: activeFile.cursor
+            ? {
+                line: activeFile.cursor.line,
+                character: activeFile.cursor.character,
+              }
+            : undefined,
+          selectedText: activeFile.selectedText || undefined,
+        };
+      }
+
+      if (otherOpenFiles.length > 0) {
+        contextData['otherOpenFiles'] = otherOpenFiles;
+      }
+
+      if (Object.keys(contextData).length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      const jsonString = JSON.stringify(contextData, null, 2);
+      const contextParts = [
+        "Here is the user's editor context as a JSON object. This is for your information only.",
+        '```json',
+        jsonString,
+        '```',
+      ];
+
+      if (this.config.getDebugMode()) {
+        debugLogger.log(contextParts.join('\n'));
+      }
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    } else {
+      // Calculate and send delta as JSON
+      const delta: Record<string, unknown> = {};
+      const changes: Record<string, unknown> = {};
+
+      const lastFiles = new Map(
+        (this.lastSentIdeContext.workspaceState?.openFiles || []).map(
+          (f: File) => [f.path, f],
+        ),
+      );
+      const currentFiles = new Map(
+        (currentIdeContext.workspaceState?.openFiles || []).map((f: File) => [
+          f.path,
+          f,
+        ]),
+      );
+
+      const openedFiles: string[] = [];
+      for (const [path] of currentFiles.entries()) {
+        if (!lastFiles.has(path)) {
+          openedFiles.push(path);
+        }
+      }
+      if (openedFiles.length > 0) {
+        changes['filesOpened'] = openedFiles;
+      }
+
+      const closedFiles: string[] = [];
+      for (const [path] of lastFiles.entries()) {
+        if (!currentFiles.has(path)) {
+          closedFiles.push(path);
+        }
+      }
+      if (closedFiles.length > 0) {
+        changes['filesClosed'] = closedFiles;
+      }
+
+      const lastActiveFile = (
+        this.lastSentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+      const currentActiveFile = (
+        currentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+
+      if (currentActiveFile) {
+        if (!lastActiveFile || lastActiveFile.path !== currentActiveFile.path) {
+          changes['activeFileChanged'] = {
+            path: currentActiveFile.path,
+            cursor: currentActiveFile.cursor
+              ? {
+                  line: currentActiveFile.cursor.line,
+                  character: currentActiveFile.cursor.character,
+                }
+              : undefined,
+            selectedText: currentActiveFile.selectedText || undefined,
+          };
+        } else {
+          const lastCursor = lastActiveFile.cursor;
+          const currentCursor = currentActiveFile.cursor;
+          if (
+            currentCursor &&
+            (!lastCursor ||
+              lastCursor.line !== currentCursor.line ||
+              lastCursor.character !== currentCursor.character)
+          ) {
+            changes['cursorMoved'] = {
+              path: currentActiveFile.path,
+              cursor: {
+                line: currentCursor.line,
+                character: currentCursor.character,
+              },
+            };
+          }
+
+          const lastSelectedText = lastActiveFile.selectedText || '';
+          const currentSelectedText = currentActiveFile.selectedText || '';
+          if (lastSelectedText !== currentSelectedText) {
+            changes['selectionChanged'] = {
+              path: currentActiveFile.path,
+              selectedText: currentSelectedText,
+            };
+          }
+        }
+      } else if (lastActiveFile) {
+        changes['activeFileChanged'] = {
+          path: null,
+          previousPath: lastActiveFile.path,
+        };
+      }
+
+      if (Object.keys(changes).length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      delta['changes'] = changes;
+      const jsonString = JSON.stringify(delta, null, 2);
+      const contextParts = [
+        "Here is a summary of changes in the user's editor context, in JSON format. This is for your information only.",
+        '```json',
+        jsonString,
+        '```',
+      ];
+
+      if (this.config.getDebugMode()) {
+        debugLogger.log(contextParts.join('\n'));
+      }
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    }
+  }
+
+  private _getEffectiveModelForCurrentTurn(): string {
+    if (this.currentSequenceModel) {
+      return this.currentSequenceModel;
+    }
+
+    const configModel = this.config.getModel();
+    return getEffectiveModel(
+      this.config.isInFallbackMode(),
+      configModel,
+      this.config.getPreviewFeatures(),
+    );
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
-    turns: number = this.MAX_TURNS,
+    prompt_id: string,
+    turns: number = MAX_TURNS,
+    isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    if (!turns) {
-      return new Turn(this.getChat());
+    if (this.lastPromptId !== prompt_id) {
+      this.loopDetector.reset(prompt_id);
+      this.lastPromptId = prompt_id;
+      this.currentSequenceModel = null;
+    }
+    this.sessionTurnCount++;
+    if (
+      this.config.getMaxSessionTurns() > 0 &&
+      this.sessionTurnCount > this.config.getMaxSessionTurns()
+    ) {
+      yield { type: GeminiEventType.MaxSessionTurns };
+      return new Turn(this.getChat(), prompt_id);
+    }
+    // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
+    const boundedTurns = Math.min(turns, MAX_TURNS);
+    if (!boundedTurns) {
+      return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat();
-    if (compressed) {
+    // Check for context window overflow
+    const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
+
+    const estimatedRequestTokenCount = Math.floor(
+      JSON.stringify(request).length / 4,
+    );
+
+    const remainingTokenCount =
+      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
+
+    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+      yield {
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: { estimatedRequestTokenCount, remainingTokenCount },
+      };
+      return new Turn(this.getChat(), prompt_id);
+    }
+
+    const compressed = await this.tryCompressChat(prompt_id, false);
+
+    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
-    const turn = new Turn(this.getChat());
-    const resultStream = turn.run(request, signal);
+
+    // Prevent context updates from being sent while a tool call is
+    // waiting for a response. The Gemini API requires that a functionResponse
+    // part from the user immediately follows a functionCall part from the model
+    // in the conversation history . The IDE context is not discarded; it will
+    // be included in the next regular message sent to the model.
+    const history = this.getHistory();
+    const lastMessage =
+      history.length > 0 ? history[history.length - 1] : undefined;
+    const hasPendingToolCall =
+      !!lastMessage &&
+      lastMessage.role === 'model' &&
+      (lastMessage.parts?.some((p) => 'functionCall' in p) || false);
+
+    if (this.config.getIdeMode() && !hasPendingToolCall) {
+      const { contextParts, newIdeContext } = this.getIdeContextParts(
+        this.forceFullIdeContext || history.length === 0,
+      );
+      if (contextParts.length > 0) {
+        this.getChat().addHistory({
+          role: 'user',
+          parts: [{ text: contextParts.join('\n') }],
+        });
+      }
+      this.lastSentIdeContext = newIdeContext;
+      this.forceFullIdeContext = false;
+    }
+
+    const turn = new Turn(this.getChat(), prompt_id);
+
+    const controller = new AbortController();
+    const linkedSignal = AbortSignal.any([signal, controller.signal]);
+
+    const loopDetected = await this.loopDetector.turnStarted(signal);
+    if (loopDetected) {
+      yield { type: GeminiEventType.LoopDetected };
+      return turn;
+    }
+
+    const routingContext: RoutingContext = {
+      history: this.getChat().getHistory(/*curated=*/ true),
+      request,
+      signal,
+    };
+
+    let modelToUse: string;
+
+    // Determine Model (Stickiness vs. Routing)
+    if (this.currentSequenceModel) {
+      modelToUse = this.currentSequenceModel;
+    } else {
+      const router = await this.config.getModelRouterService();
+      const decision = await router.route(routingContext);
+      modelToUse = decision.model;
+      // Lock the model for the rest of the sequence
+      this.currentSequenceModel = modelToUse;
+      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+    }
+
+    const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
+      if (this.loopDetector.addAndCheck(event)) {
+        yield { type: GeminiEventType.LoopDetected };
+        controller.abort();
+        return turn;
+      }
       yield event;
+
+      this.updateTelemetryTokenCount();
+
+      if (event.type === GeminiEventType.InvalidStream) {
+        if (this.config.getContinueOnFailedApiCall()) {
+          if (isInvalidStreamRetry) {
+            // We already retried once, so stop here.
+            logContentRetryFailure(
+              this.config,
+              new ContentRetryFailureEvent(
+                4, // 2 initial + 2 after injections
+                'FAILED_AFTER_PROMPT_INJECTION',
+                modelToUse,
+              ),
+            );
+            return turn;
+          }
+          const nextRequest = [{ text: 'System: Please continue.' }];
+          yield* this.sendMessageStream(
+            nextRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+            true, // Set isInvalidStreamRetry to true
+          );
+          return turn;
+        }
+      }
+      if (event.type === GeminiEventType.Error) {
+        return turn;
+      }
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+      // Check if next speaker check is needed
+      if (this.config.getQuotaErrorOccurred()) {
+        return turn;
+      }
+
+      if (this.config.getSkipNextSpeakerCheck()) {
+        return turn;
+      }
+
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
-        this,
+        this.config.getBaseLlmClient(),
         signal,
+        prompt_id,
+      );
+      logNextSpeakerCheck(
+        this.config,
+        new NextSpeakerCheckEvent(
+          prompt_id,
+          turn.finishReason?.toString() || '',
+          nextSpeakerCheck?.next_speaker || '',
+        ),
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
         // This recursive call's events will be yielded out, but the final
         // turn object will be from the top-level call.
-        yield* this.sendMessageStream(nextRequest, signal, turns - 1);
+        yield* this.sendMessageStream(
+          nextRequest,
+          signal,
+          prompt_id,
+          boundedTurns - 1,
+          // isInvalidStreamRetry is false here, as this is a next speaker check
+        );
       }
     }
     return turn;
   }
 
-  async generateJson(
-    contents: Content[],
-    schema: SchemaUnion,
-    abortSignal: AbortSignal,
-    model: string = DEFAULT_GEMINI_FLASH_MODEL,
-    config: GenerateContentConfig = {},
-  ): Promise<Record<string, unknown>> {
-    try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
-      const requestConfig = {
-        abortSignal,
-        ...this.generateContentConfig,
-        ...config,
-      };
-
-      const apiCall = () =>
-        this.getContentGenerator().generateContent({
-          model,
-          config: {
-            ...requestConfig,
-            systemInstruction,
-            responseSchema: schema,
-            responseMimeType: 'application/json',
-          },
-          contents,
-        });
-
-      const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
-
-      const text = getResponseText(result);
-      if (!text) {
-        const error = new Error(
-          'API returned an empty response for generateJson.',
-        );
-        await reportError(
-          error,
-          'Error in generateJson: API returned an empty response.',
-          contents,
-          'generateJson-empty-response',
-        );
-        throw error;
-      }
-      try {
-        return JSON.parse(text);
-      } catch (parseError) {
-        await reportError(
-          parseError,
-          'Failed to parse JSON response from generateJson.',
-          {
-            responseTextFailedToParse: text,
-            originalRequestContents: contents,
-          },
-          'generateJson-parse',
-        );
-        throw new Error(
-          `Failed to parse API response as JSON: ${getErrorMessage(parseError)}`,
-        );
-      }
-    } catch (error) {
-      if (abortSignal.aborted) {
-        throw error;
-      }
-
-      // Avoid double reporting for the empty response case handled above
-      if (
-        error instanceof Error &&
-        error.message === 'API returned an empty response for generateJson.'
-      ) {
-        throw error;
-      }
-
-      await reportError(
-        error,
-        'Error generating JSON content via API.',
-        contents,
-        'generateJson-api',
-      );
-      throw new Error(
-        `Failed to generate JSON content: ${getErrorMessage(error)}`,
-      );
-    }
-  }
-
   async generateContent(
+    modelConfigKey: ModelConfigKey,
     contents: Content[],
-    generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = this.model;
-    const configToUse: GenerateContentConfig = {
-      ...this.generateContentConfig,
-      ...generationConfig,
-    };
+    const desiredModelConfig =
+      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+    let {
+      model: currentAttemptModel,
+      generateContentConfig: currentAttemptGenerateContentConfig,
+    } = desiredModelConfig;
+    const fallbackModelConfig =
+      this.config.modelConfigService.getResolvedConfig({
+        ...modelConfigKey,
+        model: DEFAULT_GEMINI_FLASH_MODEL,
+      });
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
 
-      const requestConfig = {
-        abortSignal,
-        ...configToUse,
-        systemInstruction,
+      const apiCall = () => {
+        const modelConfigToUse = this.config.isInFallbackMode()
+          ? fallbackModelConfig
+          : desiredModelConfig;
+        currentAttemptModel = modelConfigToUse.model;
+        currentAttemptGenerateContentConfig =
+          modelConfigToUse.generateContentConfig;
+        const requestConfig: GenerateContentConfig = {
+          ...currentAttemptGenerateContentConfig,
+          abortSignal,
+          systemInstruction,
+        };
+
+        return this.getContentGeneratorOrFail().generateContent(
+          {
+            model: currentAttemptModel,
+            config: requestConfig,
+            contents,
+          },
+          this.lastPromptId,
+        );
       };
-
-      const apiCall = () =>
-        this.getContentGenerator().generateContent({
-          model: modelToUse,
-          config: requestConfig,
-          contents,
-        });
+      const onPersistent429Callback = async (
+        authType?: string,
+        error?: unknown,
+      ) =>
+        // Pass the captured model to the centralized handler.
+        await handleFallback(this.config, currentAttemptModel, authType, error);
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string) =>
-          await this.handleFlashFallback(authType),
+        onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
       return result;
@@ -377,160 +643,50 @@ export class GeminiClient {
 
       await reportError(
         error,
-        `Error generating content via API with model ${modelToUse}.`,
+        `Error generating content via API with model ${currentAttemptModel}.`,
         {
           requestContents: contents,
-          requestConfig: configToUse,
+          requestConfig: currentAttemptGenerateContentConfig,
         },
         'generateContent-api',
       );
       throw new Error(
-        `Failed to generate content with model ${modelToUse}: ${getErrorMessage(error)}`,
+        `Failed to generate content with model ${currentAttemptModel}: ${getErrorMessage(error)}`,
       );
     }
-  }
-
-  async generateEmbedding(texts: string[]): Promise<number[][]> {
-    if (!texts || texts.length === 0) {
-      return [];
-    }
-    const embedModelParams: EmbedContentParameters = {
-      model: this.embeddingModel,
-      contents: texts,
-    };
-
-    const embedContentResponse =
-      await this.getContentGenerator().embedContent(embedModelParams);
-    if (
-      !embedContentResponse.embeddings ||
-      embedContentResponse.embeddings.length === 0
-    ) {
-      throw new Error('No embeddings found in API response.');
-    }
-
-    if (embedContentResponse.embeddings.length !== texts.length) {
-      throw new Error(
-        `API returned a mismatched number of embeddings. Expected ${texts.length}, got ${embedContentResponse.embeddings.length}.`,
-      );
-    }
-
-    return embedContentResponse.embeddings.map((embedding, index) => {
-      const values = embedding.values;
-      if (!values || values.length === 0) {
-        throw new Error(
-          `API returned an empty embedding for input text at index ${index}: "${texts[index]}"`,
-        );
-      }
-      return values;
-    });
   }
 
   async tryCompressChat(
+    prompt_id: string,
     force: boolean = false,
-  ): Promise<ChatCompressionInfo | null> {
-    const history = this.getChat().getHistory(true); // Get curated history
+  ): Promise<ChatCompressionInfo> {
+    // If the model is 'auto', we will use a placeholder model to check.
+    // Compression occurs before we choose a model, so calling `count_tokens`
+    // before the model is chosen would result in an error.
+    const model = this._getEffectiveModelForCurrentTurn();
 
-    // Regardless of `force`, don't do anything if the history is empty.
-    if (history.length === 0) {
-      return null;
-    }
+    const { newHistory, info } = await this.compressionService.compress(
+      this.getChat(),
+      prompt_id,
+      force,
+      model,
+      this.config,
+      this.hasFailedCompressionAttempt,
+    );
 
-    const { totalTokens: originalTokenCount } =
-      await this.getContentGenerator().countTokens({
-        model: this.model,
-        contents: history,
-      });
-
-    // If not forced, check if we should compress based on context size.
-    if (!force) {
-      if (originalTokenCount === undefined) {
-        // If token count is undefined, we can't determine if we need to compress.
-        console.warn(
-          `Could not determine token count for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-      const tokenCount = originalTokenCount; // Now guaranteed to be a number
-
-      const limit = tokenLimit(this.model);
-      if (!limit) {
-        // If no limit is defined for the model, we can't compress.
-        console.warn(
-          `No token limit defined for model ${this.model}. Skipping compression check.`,
-        );
-        return null;
-      }
-
-      if (tokenCount < 0.95 * limit) {
-        return null;
+    if (
+      info.compressionStatus ===
+      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
+    ) {
+      this.hasFailedCompressionAttempt = !force && true;
+    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+      if (newHistory) {
+        this.chat = await this.startChat(newHistory);
+        this.updateTelemetryTokenCount();
+        this.forceFullIdeContext = true;
       }
     }
 
-    const summarizationRequestMessage = {
-      text: 'Summarize our conversation up to this point. The summary should be a concise yet comprehensive overview of all key topics, questions, answers, and important details discussed. This summary will replace the current chat history to conserve tokens, so it must capture everything essential to understand the context and continue our conversation effectively as if no information was lost.',
-    };
-    const response = await this.getChat().sendMessage({
-      message: summarizationRequestMessage,
-    });
-    const newHistory = [
-      {
-        role: 'user',
-        parts: [summarizationRequestMessage],
-      },
-      {
-        role: 'model',
-        parts: [{ text: response.text }],
-      },
-    ];
-    this.chat = await this.startChat(newHistory);
-    const newTokenCount = (
-      await this.getContentGenerator().countTokens({
-        model: this.model,
-        contents: newHistory,
-      })
-    ).totalTokens;
-
-    return originalTokenCount && newTokenCount
-      ? {
-          originalTokenCount,
-          newTokenCount,
-        }
-      : null;
-  }
-
-  /**
-   * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config, otherwise returns null.
-   */
-  private async handleFlashFallback(authType?: string): Promise<string | null> {
-    // Only handle fallback for OAuth users
-    if (authType !== AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
-      return null;
-    }
-
-    const currentModel = this.model;
-    const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-
-    // Don't fallback if already using Flash model
-    if (currentModel === fallbackModel) {
-      return null;
-    }
-
-    // Check if config has a fallback handler (set by CLI package)
-    const fallbackHandler = this.config.flashFallbackHandler;
-    if (typeof fallbackHandler === 'function') {
-      try {
-        const accepted = await fallbackHandler(currentModel, fallbackModel);
-        if (accepted) {
-          this.config.setModel(fallbackModel);
-          this.model = fallbackModel;
-          return fallbackModel;
-        }
-      } catch (error) {
-        console.warn('Flash fallback handler failed:', error);
-      }
-    }
-
-    return null;
+    return info;
   }
 }

@@ -6,26 +6,25 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
+import { TableRenderer } from './TableRenderer.js';
+import { RenderInline } from './InlineMarkdownRenderer.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 interface MarkdownDisplayProps {
   text: string;
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  renderMarkdown?: boolean;
 }
 
 // Constants for Markdown parsing and rendering
-const BOLD_MARKER_LENGTH = 2; // For "**"
-const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
-const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~"
-const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
-const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
-const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
 
 const EMPTY_LINE_HEIGHT = 1;
-const CODE_BLOCK_PADDING = 1;
+const CODE_BLOCK_PREFIX_PADDING = 1;
 const LIST_ITEM_PREFIX_PADDING = 1;
 const LIST_ITEM_TEXT_FLEX_GROW = 1;
 
@@ -34,21 +33,57 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   isPending,
   availableTerminalHeight,
   terminalWidth,
+  renderMarkdown = true,
 }) => {
+  const settings = useSettings();
+  const isAlternateBuffer = useAlternateBuffer();
+  const responseColor = theme.text.response ?? theme.text.primary;
+
   if (!text) return <></>;
 
-  const lines = text.split('\n');
+  // Raw markdown mode - display syntax-highlighted markdown without rendering
+  if (!renderMarkdown) {
+    // Hide line numbers in raw markdown mode as they are confusing due to chunked output
+    const colorizedMarkdown = colorizeCode({
+      code: text,
+      language: 'markdown',
+      availableHeight: isAlternateBuffer ? undefined : availableTerminalHeight,
+      maxWidth: terminalWidth - CODE_BLOCK_PREFIX_PADDING,
+      settings,
+      hideLineNumbers: true,
+    });
+    return (
+      <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">
+        {colorizedMarkdown}
+      </Box>
+    );
+  }
+
+  const lines = text.split(/\r?\n/);
   const headerRegex = /^ *(#{1,4}) +(.*)/;
   const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
   const olItemRegex = /^([ \t]*)(\d+)\. +(.*)/;
   const hrRegex = /^ *([-*_] *){3,} *$/;
+  const tableRowRegex = /^\s*\|(.+)\|\s*$/;
+  const tableSeparatorRegex = /^\s*\|?\s*(:?-+:?)\s*(\|\s*(:?-+:?)\s*)+\|?\s*$/;
 
   const contentBlocks: React.ReactNode[] = [];
   let inCodeBlock = false;
+  let lastLineEmpty = true;
   let codeBlockContent: string[] = [];
   let codeBlockLang: string | null = null;
   let codeBlockFence = '';
+  let inTable = false;
+  let tableRows: string[][] = [];
+  let tableHeaders: string[] = [];
+
+  function addContentBlock(block: React.ReactNode) {
+    if (block) {
+      contentBlocks.push(block);
+      lastLineEmpty = false;
+    }
+  }
 
   lines.forEach((line, index) => {
     const key = `line-${index}`;
@@ -60,13 +95,15 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         fenceMatch[1].startsWith(codeBlockFence[0]) &&
         fenceMatch[1].length >= codeBlockFence.length
       ) {
-        contentBlocks.push(
+        addContentBlock(
           <RenderCodeBlock
             key={key}
             content={codeBlockContent}
             lang={codeBlockLang}
             isPending={isPending}
-            availableTerminalHeight={availableTerminalHeight}
+            availableTerminalHeight={
+              isAlternateBuffer ? undefined : availableTerminalHeight
+            }
             terminalWidth={terminalWidth}
           />,
         );
@@ -85,13 +122,73 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     const ulMatch = line.match(ulItemRegex);
     const olMatch = line.match(olItemRegex);
     const hrMatch = line.match(hrRegex);
+    const tableRowMatch = line.match(tableRowRegex);
+    const tableSeparatorMatch = line.match(tableSeparatorRegex);
 
     if (codeFenceMatch) {
       inCodeBlock = true;
       codeBlockFence = codeFenceMatch[1];
       codeBlockLang = codeFenceMatch[2] || null;
+    } else if (tableRowMatch && !inTable) {
+      // Potential table start - check if next line is separator
+      if (
+        index + 1 < lines.length &&
+        lines[index + 1].match(tableSeparatorRegex)
+      ) {
+        inTable = true;
+        tableHeaders = tableRowMatch[1].split('|').map((cell) => cell.trim());
+        tableRows = [];
+      } else {
+        // Not a table, treat as regular text
+        addContentBlock(
+          <Box key={key}>
+            <Text wrap="wrap" color={responseColor}>
+              <RenderInline text={line} defaultColor={responseColor} />
+            </Text>
+          </Box>,
+        );
+      }
+    } else if (inTable && tableSeparatorMatch) {
+      // Skip separator line - already handled
+    } else if (inTable && tableRowMatch) {
+      // Add table row
+      const cells = tableRowMatch[1].split('|').map((cell) => cell.trim());
+      // Ensure row has same column count as headers
+      while (cells.length < tableHeaders.length) {
+        cells.push('');
+      }
+      if (cells.length > tableHeaders.length) {
+        cells.length = tableHeaders.length;
+      }
+      tableRows.push(cells);
+    } else if (inTable && !tableRowMatch) {
+      // End of table
+      if (tableHeaders.length > 0 && tableRows.length > 0) {
+        addContentBlock(
+          <RenderTable
+            key={`table-${contentBlocks.length}`}
+            headers={tableHeaders}
+            rows={tableRows}
+            terminalWidth={terminalWidth}
+          />,
+        );
+      }
+      inTable = false;
+      tableRows = [];
+      tableHeaders = [];
+
+      // Process current line as normal
+      if (line.trim().length > 0) {
+        addContentBlock(
+          <Box key={key}>
+            <Text wrap="wrap" color={responseColor}>
+              <RenderInline text={line} defaultColor={responseColor} />
+            </Text>
+          </Box>,
+        );
+      }
     } else if (hrMatch) {
-      contentBlocks.push(
+      addContentBlock(
         <Box key={key}>
           <Text dimColor>---</Text>
         </Box>,
@@ -103,46 +200,49 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       switch (level) {
         case 1:
           headerNode = (
-            <Text bold color={Colors.AccentCyan}>
-              <RenderInline text={headerText} />
+            <Text bold color={theme.text.link}>
+              <RenderInline text={headerText} defaultColor={theme.text.link} />
             </Text>
           );
           break;
         case 2:
           headerNode = (
-            <Text bold color={Colors.AccentBlue}>
-              <RenderInline text={headerText} />
+            <Text bold color={theme.text.link}>
+              <RenderInline text={headerText} defaultColor={theme.text.link} />
             </Text>
           );
           break;
         case 3:
           headerNode = (
-            <Text bold>
-              <RenderInline text={headerText} />
+            <Text bold color={responseColor}>
+              <RenderInline text={headerText} defaultColor={responseColor} />
             </Text>
           );
           break;
         case 4:
           headerNode = (
-            <Text italic color={Colors.Gray}>
-              <RenderInline text={headerText} />
+            <Text italic color={theme.text.secondary}>
+              <RenderInline
+                text={headerText}
+                defaultColor={theme.text.secondary}
+              />
             </Text>
           );
           break;
         default:
           headerNode = (
-            <Text>
-              <RenderInline text={headerText} />
+            <Text color={responseColor}>
+              <RenderInline text={headerText} defaultColor={responseColor} />
             </Text>
           );
           break;
       }
-      if (headerNode) contentBlocks.push(<Box key={key}>{headerNode}</Box>);
+      if (headerNode) addContentBlock(<Box key={key}>{headerNode}</Box>);
     } else if (ulMatch) {
       const leadingWhitespace = ulMatch[1];
       const marker = ulMatch[2];
       const itemText = ulMatch[3];
-      contentBlocks.push(
+      addContentBlock(
         <RenderListItem
           key={key}
           itemText={itemText}
@@ -155,7 +255,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       const leadingWhitespace = olMatch[1];
       const marker = olMatch[2];
       const itemText = olMatch[3];
-      contentBlocks.push(
+      addContentBlock(
         <RenderListItem
           key={key}
           itemText={itemText}
@@ -165,15 +265,18 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         />,
       );
     } else {
-      if (line.trim().length === 0) {
-        if (contentBlocks.length > 0 && !inCodeBlock) {
-          contentBlocks.push(<Box key={key} height={EMPTY_LINE_HEIGHT} />);
+      if (line.trim().length === 0 && !inCodeBlock) {
+        if (!lastLineEmpty) {
+          contentBlocks.push(
+            <Box key={`spacer-${index}`} height={EMPTY_LINE_HEIGHT} />,
+          );
+          lastLineEmpty = true;
         }
       } else {
-        contentBlocks.push(
+        addContentBlock(
           <Box key={key}>
-            <Text wrap="wrap">
-              <RenderInline text={line} />
+            <Text wrap="wrap" color={responseColor}>
+              <RenderInline text={line} defaultColor={responseColor} />
             </Text>
           </Box>,
         );
@@ -182,13 +285,27 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   });
 
   if (inCodeBlock) {
-    contentBlocks.push(
+    addContentBlock(
       <RenderCodeBlock
         key="line-eof"
         content={codeBlockContent}
         lang={codeBlockLang}
         isPending={isPending}
-        availableTerminalHeight={availableTerminalHeight}
+        availableTerminalHeight={
+          isAlternateBuffer ? undefined : availableTerminalHeight
+        }
+        terminalWidth={terminalWidth}
+      />,
+    );
+  }
+
+  // Handle table at end of content
+  if (inTable && tableHeaders.length > 0 && tableRows.length > 0) {
+    addContentBlock(
+      <RenderTable
+        key={`table-${contentBlocks.length}`}
+        headers={tableHeaders}
+        rows={tableRows}
         terminalWidth={terminalWidth}
       />,
     );
@@ -198,143 +315,6 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
 };
 
 // Helper functions (adapted from static methods of MarkdownRenderer)
-
-interface RenderInlineProps {
-  text: string;
-}
-
-const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>)/g;
-  let match;
-
-  while ((match = inlineRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(
-        <Text key={`t-${lastIndex}`}>
-          {text.slice(lastIndex, match.index)}
-        </Text>,
-      );
-    }
-
-    const fullMatch = match[0];
-    let renderedNode: React.ReactNode = null;
-    const key = `m-${match.index}`;
-
-    try {
-      if (
-        fullMatch.startsWith('**') &&
-        fullMatch.endsWith('**') &&
-        fullMatch.length > BOLD_MARKER_LENGTH * 2
-      ) {
-        renderedNode = (
-          <Text key={key} bold>
-            {fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH)}
-          </Text>
-        );
-      } else if (
-        fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
-        ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
-          (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
-        !/\w/.test(text.substring(match.index - 1, match.index)) &&
-        !/\w/.test(
-          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
-        ) &&
-        !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
-        !/[./\\]\S/.test(
-          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
-        )
-      ) {
-        renderedNode = (
-          <Text key={key} italic>
-            {fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH)}
-          </Text>
-        );
-      } else if (
-        fullMatch.startsWith('~~') &&
-        fullMatch.endsWith('~~') &&
-        fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
-      ) {
-        renderedNode = (
-          <Text key={key} strikethrough>
-            {fullMatch.slice(
-              STRIKETHROUGH_MARKER_LENGTH,
-              -STRIKETHROUGH_MARKER_LENGTH,
-            )}
-          </Text>
-        );
-      } else if (
-        fullMatch.startsWith('`') &&
-        fullMatch.endsWith('`') &&
-        fullMatch.length > INLINE_CODE_MARKER_LENGTH
-      ) {
-        const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
-        if (codeMatch && codeMatch[2]) {
-          renderedNode = (
-            <Text key={key} color={Colors.AccentPurple}>
-              {codeMatch[2]}
-            </Text>
-          );
-        } else {
-          renderedNode = (
-            <Text key={key} color={Colors.AccentPurple}>
-              {fullMatch.slice(
-                INLINE_CODE_MARKER_LENGTH,
-                -INLINE_CODE_MARKER_LENGTH,
-              )}
-            </Text>
-          );
-        }
-      } else if (
-        fullMatch.startsWith('[') &&
-        fullMatch.includes('](') &&
-        fullMatch.endsWith(')')
-      ) {
-        const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
-        if (linkMatch) {
-          const linkText = linkMatch[1];
-          const url = linkMatch[2];
-          renderedNode = (
-            <Text key={key}>
-              {linkText}
-              <Text color={Colors.AccentBlue}> ({url})</Text>
-            </Text>
-          );
-        }
-      } else if (
-        fullMatch.startsWith('<u>') &&
-        fullMatch.endsWith('</u>') &&
-        fullMatch.length >
-          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1 // -1 because length is compared to combined length of start and end tags
-      ) {
-        renderedNode = (
-          <Text key={key} underline>
-            {fullMatch.slice(
-              UNDERLINE_TAG_START_LENGTH,
-              -UNDERLINE_TAG_END_LENGTH,
-            )}
-          </Text>
-        );
-      }
-    } catch (e) {
-      console.error('Error parsing inline markdown part:', fullMatch, e);
-      renderedNode = null;
-    }
-
-    nodes.push(renderedNode ?? <Text key={key}>{fullMatch}</Text>);
-    lastIndex = inlineRegex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(<Text key={`t-${lastIndex}`}>{text.slice(lastIndex)}</Text>);
-  }
-
-  return <>{nodes.filter((node) => node !== null)}</>;
-};
-
-const RenderInline = React.memo(RenderInlineInternal);
 
 interface RenderCodeBlockProps {
   content: string[];
@@ -351,52 +331,64 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const settings = useSettings();
+  const isAlternateBuffer = useAlternateBuffer();
   const MIN_LINES_FOR_MESSAGE = 1; // Minimum lines to show before the "generating more" message
   const RESERVED_LINES = 2; // Lines reserved for the message itself and potential padding
 
-  if (isPending && availableTerminalHeight !== undefined) {
+  // When not in alternate buffer mode we need to be careful that we don't
+  // trigger flicker when the pending code is to long to fit in the terminal
+  if (
+    !isAlternateBuffer &&
+    isPending &&
+    availableTerminalHeight !== undefined
+  ) {
     const MAX_CODE_LINES_WHEN_PENDING = Math.max(
       0,
-      availableTerminalHeight - CODE_BLOCK_PADDING * 2 - RESERVED_LINES,
+      availableTerminalHeight - RESERVED_LINES,
     );
 
     if (content.length > MAX_CODE_LINES_WHEN_PENDING) {
       if (MAX_CODE_LINES_WHEN_PENDING < MIN_LINES_FOR_MESSAGE) {
         // Not enough space to even show the message meaningfully
         return (
-          <Box padding={CODE_BLOCK_PADDING}>
-            <Text color={Colors.Gray}>... code is being written ...</Text>
+          <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING}>
+            <Text color={theme.text.secondary}>
+              ... code is being written ...
+            </Text>
           </Box>
         );
       }
       const truncatedContent = content.slice(0, MAX_CODE_LINES_WHEN_PENDING);
-      const colorizedTruncatedCode = colorizeCode(
-        truncatedContent.join('\n'),
-        lang,
-        availableTerminalHeight,
-        terminalWidth - CODE_BLOCK_PADDING * 2,
-      );
+      const colorizedTruncatedCode = colorizeCode({
+        code: truncatedContent.join('\n'),
+        language: lang,
+        availableHeight: availableTerminalHeight,
+        maxWidth: terminalWidth - CODE_BLOCK_PREFIX_PADDING,
+        settings,
+      });
       return (
-        <Box flexDirection="column" padding={CODE_BLOCK_PADDING}>
+        <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">
           {colorizedTruncatedCode}
-          <Text color={Colors.Gray}>... generating more ...</Text>
+          <Text color={theme.text.secondary}>... generating more ...</Text>
         </Box>
       );
     }
   }
 
   const fullContent = content.join('\n');
-  const colorizedCode = colorizeCode(
-    fullContent,
-    lang,
-    availableTerminalHeight,
-    terminalWidth - CODE_BLOCK_PADDING * 2,
-  );
+  const colorizedCode = colorizeCode({
+    code: fullContent,
+    language: lang,
+    availableHeight: isAlternateBuffer ? undefined : availableTerminalHeight,
+    maxWidth: terminalWidth - CODE_BLOCK_PREFIX_PADDING,
+    settings,
+  });
 
   return (
     <Box
+      paddingLeft={CODE_BLOCK_PREFIX_PADDING}
       flexDirection="column"
-      padding={CODE_BLOCK_PADDING}
       width={terminalWidth}
       flexShrink={0}
     >
@@ -423,6 +415,7 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
   const prefix = type === 'ol' ? `${marker}. ` : `${marker} `;
   const prefixWidth = prefix.length;
   const indentation = leadingWhitespace.length;
+  const listResponseColor = theme.text.response ?? theme.text.primary;
 
   return (
     <Box
@@ -430,11 +423,11 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
       flexDirection="row"
     >
       <Box width={prefixWidth}>
-        <Text>{prefix}</Text>
+        <Text color={listResponseColor}>{prefix}</Text>
       </Box>
       <Box flexGrow={LIST_ITEM_TEXT_FLEX_GROW}>
-        <Text wrap="wrap">
-          <RenderInline text={itemText} />
+        <Text wrap="wrap" color={listResponseColor}>
+          <RenderInline text={itemText} defaultColor={listResponseColor} />
         </Text>
       </Box>
     </Box>
@@ -442,5 +435,21 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
 };
 
 const RenderListItem = React.memo(RenderListItemInternal);
+
+interface RenderTableProps {
+  headers: string[];
+  rows: string[][];
+  terminalWidth: number;
+}
+
+const RenderTableInternal: React.FC<RenderTableProps> = ({
+  headers,
+  rows,
+  terminalWidth,
+}) => (
+  <TableRenderer headers={headers} rows={rows} terminalWidth={terminalWidth} />
+);
+
+const RenderTable = React.memo(RenderTableInternal);
 
 export const MarkdownDisplay = React.memo(MarkdownDisplayInternal);

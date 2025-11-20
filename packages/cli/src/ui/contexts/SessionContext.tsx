@@ -4,44 +4,172 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, {
+import type React from 'react';
+import {
   createContext,
+  useCallback,
   useContext,
   useState,
   useMemo,
-  useCallback,
+  useEffect,
 } from 'react';
 
-import { type GenerateContentResponseUsageMetadata } from '@google/genai';
+import type {
+  SessionMetrics,
+  ModelMetrics,
+  ToolCallStats,
+} from '@google/gemini-cli-core';
+import { uiTelemetryService, sessionId } from '@google/gemini-cli-core';
 
-// --- Interface Definitions ---
-
-export interface CumulativeStats {
-  turnCount: number;
-  promptTokenCount: number;
-  candidatesTokenCount: number;
-  totalTokenCount: number;
-  cachedContentTokenCount: number;
-  toolUsePromptTokenCount: number;
-  thoughtsTokenCount: number;
-  apiTimeMs: number;
+export enum ToolCallDecision {
+  ACCEPT = 'accept',
+  REJECT = 'reject',
+  MODIFY = 'modify',
+  AUTO_ACCEPT = 'auto_accept',
 }
 
-interface SessionStatsState {
+function areModelMetricsEqual(a: ModelMetrics, b: ModelMetrics): boolean {
+  if (
+    a.api.totalRequests !== b.api.totalRequests ||
+    a.api.totalErrors !== b.api.totalErrors ||
+    a.api.totalLatencyMs !== b.api.totalLatencyMs
+  ) {
+    return false;
+  }
+  if (
+    a.tokens.prompt !== b.tokens.prompt ||
+    a.tokens.candidates !== b.tokens.candidates ||
+    a.tokens.total !== b.tokens.total ||
+    a.tokens.cached !== b.tokens.cached ||
+    a.tokens.thoughts !== b.tokens.thoughts ||
+    a.tokens.tool !== b.tokens.tool
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function areToolCallStatsEqual(a: ToolCallStats, b: ToolCallStats): boolean {
+  if (
+    a.count !== b.count ||
+    a.success !== b.success ||
+    a.fail !== b.fail ||
+    a.durationMs !== b.durationMs
+  ) {
+    return false;
+  }
+  if (
+    a.decisions[ToolCallDecision.ACCEPT] !==
+      b.decisions[ToolCallDecision.ACCEPT] ||
+    a.decisions[ToolCallDecision.REJECT] !==
+      b.decisions[ToolCallDecision.REJECT] ||
+    a.decisions[ToolCallDecision.MODIFY] !==
+      b.decisions[ToolCallDecision.MODIFY] ||
+    a.decisions[ToolCallDecision.AUTO_ACCEPT] !==
+      b.decisions[ToolCallDecision.AUTO_ACCEPT]
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function areMetricsEqual(a: SessionMetrics, b: SessionMetrics): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  // Compare files
+  if (
+    a.files.totalLinesAdded !== b.files.totalLinesAdded ||
+    a.files.totalLinesRemoved !== b.files.totalLinesRemoved
+  ) {
+    return false;
+  }
+
+  // Compare tools
+  const toolsA = a.tools;
+  const toolsB = b.tools;
+  if (
+    toolsA.totalCalls !== toolsB.totalCalls ||
+    toolsA.totalSuccess !== toolsB.totalSuccess ||
+    toolsA.totalFail !== toolsB.totalFail ||
+    toolsA.totalDurationMs !== toolsB.totalDurationMs
+  ) {
+    return false;
+  }
+
+  // Compare tool decisions
+  if (
+    toolsA.totalDecisions[ToolCallDecision.ACCEPT] !==
+      toolsB.totalDecisions[ToolCallDecision.ACCEPT] ||
+    toolsA.totalDecisions[ToolCallDecision.REJECT] !==
+      toolsB.totalDecisions[ToolCallDecision.REJECT] ||
+    toolsA.totalDecisions[ToolCallDecision.MODIFY] !==
+      toolsB.totalDecisions[ToolCallDecision.MODIFY] ||
+    toolsA.totalDecisions[ToolCallDecision.AUTO_ACCEPT] !==
+      toolsB.totalDecisions[ToolCallDecision.AUTO_ACCEPT]
+  ) {
+    return false;
+  }
+
+  // Compare tools.byName
+  const toolsByNameAKeys = Object.keys(toolsA.byName);
+  const toolsByNameBKeys = Object.keys(toolsB.byName);
+  if (toolsByNameAKeys.length !== toolsByNameBKeys.length) return false;
+
+  for (const key of toolsByNameAKeys) {
+    const toolA = toolsA.byName[key];
+    const toolB = toolsB.byName[key];
+    if (!toolB || !areToolCallStatsEqual(toolA, toolB)) {
+      return false;
+    }
+  }
+
+  // Compare models
+  const modelsAKeys = Object.keys(a.models);
+  const modelsBKeys = Object.keys(b.models);
+  if (modelsAKeys.length !== modelsBKeys.length) return false;
+
+  for (const key of modelsAKeys) {
+    if (!b.models[key] || !areModelMetricsEqual(a.models[key], b.models[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export type { SessionMetrics, ModelMetrics };
+
+export interface SessionStatsState {
+  sessionId: string;
   sessionStartTime: Date;
-  cumulative: CumulativeStats;
-  currentTurn: CumulativeStats;
-  currentResponse: CumulativeStats;
+  metrics: SessionMetrics;
+  lastPromptTokenCount: number;
+  promptCount: number;
+}
+
+export interface ComputedSessionStats {
+  totalApiTime: number;
+  totalToolTime: number;
+  agentActiveTime: number;
+  apiTimePercent: number;
+  toolTimePercent: number;
+  cacheEfficiency: number;
+  totalDecisions: number;
+  successRate: number;
+  agreementRate: number;
+  totalCachedTokens: number;
+  totalPromptTokens: number;
+  totalLinesAdded: number;
+  totalLinesRemoved: number;
 }
 
 // Defines the final "value" of our context, including the state
 // and the functions to update it.
 interface SessionStatsContextValue {
   stats: SessionStatsState;
-  startNewTurn: () => void;
-  addUsage: (
-    metadata: GenerateContentResponseUsageMetadata & { apiTimeMs?: number },
-  ) => void;
+  startNewPrompt: () => void;
+  getPromptCount: () => number;
 }
 
 // --- Context Definition ---
@@ -50,138 +178,73 @@ const SessionStatsContext = createContext<SessionStatsContextValue | undefined>(
   undefined,
 );
 
-// --- Helper Functions ---
-
-/**
- * A small, reusable helper function to sum token counts.
- * It unconditionally adds all token values from the source to the target.
- * @param target The object to add the tokens to (e.g., cumulative, currentTurn).
- * @param source The metadata object from the API response.
- */
-const addTokens = (
-  target: CumulativeStats,
-  source: GenerateContentResponseUsageMetadata & { apiTimeMs?: number },
-) => {
-  target.candidatesTokenCount += source.candidatesTokenCount ?? 0;
-  target.thoughtsTokenCount += source.thoughtsTokenCount ?? 0;
-  target.totalTokenCount += source.totalTokenCount ?? 0;
-  target.apiTimeMs += source.apiTimeMs ?? 0;
-  target.promptTokenCount += source.promptTokenCount ?? 0;
-  target.cachedContentTokenCount += source.cachedContentTokenCount ?? 0;
-  target.toolUsePromptTokenCount += source.toolUsePromptTokenCount ?? 0;
-};
-
 // --- Provider Component ---
 
 export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [stats, setStats] = useState<SessionStatsState>({
+    sessionId,
     sessionStartTime: new Date(),
-    cumulative: {
-      turnCount: 0,
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0,
-      cachedContentTokenCount: 0,
-      toolUsePromptTokenCount: 0,
-      thoughtsTokenCount: 0,
-      apiTimeMs: 0,
-    },
-    currentTurn: {
-      turnCount: 0,
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0,
-      cachedContentTokenCount: 0,
-      toolUsePromptTokenCount: 0,
-      thoughtsTokenCount: 0,
-      apiTimeMs: 0,
-    },
-    currentResponse: {
-      turnCount: 0,
-      promptTokenCount: 0,
-      candidatesTokenCount: 0,
-      totalTokenCount: 0,
-      cachedContentTokenCount: 0,
-      toolUsePromptTokenCount: 0,
-      thoughtsTokenCount: 0,
-      apiTimeMs: 0,
-    },
+    metrics: uiTelemetryService.getMetrics(),
+    lastPromptTokenCount: 0,
+    promptCount: 0,
   });
 
-  // A single, internal worker function to handle all metadata aggregation.
-  const aggregateTokens = useCallback(
-    (
-      metadata: GenerateContentResponseUsageMetadata & { apiTimeMs?: number },
-    ) => {
+  useEffect(() => {
+    const handleUpdate = ({
+      metrics,
+      lastPromptTokenCount,
+    }: {
+      metrics: SessionMetrics;
+      lastPromptTokenCount: number;
+    }) => {
       setStats((prevState) => {
-        const newCumulative = { ...prevState.cumulative };
-        const newCurrentTurn = { ...prevState.currentTurn };
-        const newCurrentResponse = {
-          turnCount: 0,
-          promptTokenCount: 0,
-          candidatesTokenCount: 0,
-          totalTokenCount: 0,
-          cachedContentTokenCount: 0,
-          toolUsePromptTokenCount: 0,
-          thoughtsTokenCount: 0,
-          apiTimeMs: 0,
-        };
-
-        // Add all tokens to the current turn's stats as well as cumulative stats.
-        addTokens(newCurrentTurn, metadata);
-        addTokens(newCumulative, metadata);
-        addTokens(newCurrentResponse, metadata);
-
+        if (
+          prevState.lastPromptTokenCount === lastPromptTokenCount &&
+          areMetricsEqual(prevState.metrics, metrics)
+        ) {
+          return prevState;
+        }
         return {
           ...prevState,
-          cumulative: newCumulative,
-          currentTurn: newCurrentTurn,
-          currentResponse: newCurrentResponse,
+          metrics,
+          lastPromptTokenCount,
         };
       });
-    },
-    [],
-  );
+    };
 
-  const startNewTurn = useCallback(() => {
+    uiTelemetryService.on('update', handleUpdate);
+    // Set initial state
+    handleUpdate({
+      metrics: uiTelemetryService.getMetrics(),
+      lastPromptTokenCount: uiTelemetryService.getLastPromptTokenCount(),
+    });
+
+    return () => {
+      uiTelemetryService.off('update', handleUpdate);
+    };
+  }, []);
+
+  const startNewPrompt = useCallback(() => {
     setStats((prevState) => ({
       ...prevState,
-      cumulative: {
-        ...prevState.cumulative,
-        turnCount: prevState.cumulative.turnCount + 1,
-      },
-      currentTurn: {
-        turnCount: 0, // Reset for the new turn's accumulation.
-        promptTokenCount: 0,
-        candidatesTokenCount: 0,
-        totalTokenCount: 0,
-        cachedContentTokenCount: 0,
-        toolUsePromptTokenCount: 0,
-        thoughtsTokenCount: 0,
-        apiTimeMs: 0,
-      },
-      currentResponse: {
-        turnCount: 0,
-        promptTokenCount: 0,
-        candidatesTokenCount: 0,
-        totalTokenCount: 0,
-        cachedContentTokenCount: 0,
-        toolUsePromptTokenCount: 0,
-        thoughtsTokenCount: 0,
-        apiTimeMs: 0,
-      },
+      promptCount: prevState.promptCount + 1,
     }));
   }, []);
+
+  const getPromptCount = useCallback(
+    () => stats.promptCount,
+    [stats.promptCount],
+  );
 
   const value = useMemo(
     () => ({
       stats,
-      startNewTurn,
-      addUsage: aggregateTokens,
+      startNewPrompt,
+      getPromptCount,
     }),
-    [stats, startNewTurn, aggregateTokens],
+    [stats, startNewPrompt, getPromptCount],
   );
 
   return (

@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`LoopDetectionConfirmation > renders correctly 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ?  A potential loop was detected                                                                 │
+ │                                                                                                  │
+ │ This can happen due to repetitive tool calls or other model behavior. Do you want to keep loop   │
+ │ detection enabled or disable it for this session?                                                │
+ │                                                                                                  │
+ │ ● 1. Keep loop detection enabled (esc)                                                           │
+ │   2. Disable loop detection for this session                                                     │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

@@ -4,22 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Text, Box } from 'ink';
-import SelectInput, {
-  type ItemProps as InkSelectItemProps,
-  type IndicatorProps as InkSelectIndicatorProps,
-} from 'ink-select-input';
-import { Colors } from '../../colors.js';
+import type React from 'react';
+import { Text } from 'ink';
+import { theme } from '../../semantic-colors.js';
+import { BaseSelectionList } from './BaseSelectionList.js';
+import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
 /**
  * Represents a single option for the RadioButtonSelect.
  * Requires a label for display and a value to be returned on selection.
  */
-export interface RadioSelectItem<T> {
+export interface RadioSelectItem<T> extends SelectionListItem<T> {
   label: string;
-  value: T;
-  disabled?: boolean;
+  themeNameDisplay?: string;
+  themeTypeDisplay?: string;
 }
 
 /**
@@ -28,115 +26,66 @@ export interface RadioSelectItem<T> {
  */
 export interface RadioButtonSelectProps<T> {
   /** An array of items to display as radio options. */
-  items: Array<
-    RadioSelectItem<T> & {
-      themeNameDisplay?: string;
-      themeTypeDisplay?: string;
-    }
-  >;
-
+  items: Array<RadioSelectItem<T>>;
   /** The initial index selected */
   initialIndex?: number;
-
   /** Function called when an item is selected. Receives the `value` of the selected item. */
   onSelect: (value: T) => void;
-
   /** Function called when an item is highlighted. Receives the `value` of the selected item. */
   onHighlight?: (value: T) => void;
-
   /** Whether this select input is currently focused and should respond to input. */
   isFocused?: boolean;
+  /** Whether to show the scroll arrows. */
+  showScrollArrows?: boolean;
+  /** The maximum number of items to show at once. */
+  maxItemsToShow?: number;
+  /** Whether to show numbers next to items. */
+  showNumbers?: boolean;
 }
 
 /**
- * A specialized SelectInput component styled to look like radio buttons.
- * It uses '◉' for selected and '○' for unselected items.
+ * A custom component that displays a list of items with radio buttons,
+ * supporting scrolling and keyboard navigation.
  *
  * @template T The type of the value associated with each radio item.
  */
 export function RadioButtonSelect<T>({
   items,
-  initialIndex,
+  initialIndex = 0,
   onSelect,
   onHighlight,
-  isFocused, // This prop indicates if the current RadioButtonSelect group is focused
+  isFocused = true,
+  showScrollArrows = false,
+  maxItemsToShow = 10,
+  showNumbers = true,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
-  const handleSelect = (item: RadioSelectItem<T>) => {
-    onSelect(item.value);
-  };
-  const handleHighlight = (item: RadioSelectItem<T>) => {
-    if (onHighlight) {
-      onHighlight(item.value);
-    }
-  };
-
-  /**
-   * Custom indicator component displaying radio button style (◉/○).
-   * Color changes based on whether the item is selected and if its group is focused.
-   */
-  function DynamicRadioIndicator({
-    isSelected = false,
-  }: InkSelectIndicatorProps): React.JSX.Element {
-    return (
-      <Box minWidth={2} flexShrink={0}>
-        <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
-          {isSelected ? '●' : '○'}
-        </Text>
-      </Box>
-    );
-  }
-
-  /**
-   * Custom item component for displaying the label.
-   * Color changes based on whether the item is selected and if its group is focused.
-   * Now also handles displaying theme type with custom color.
-   */
-  function CustomThemeItemComponent(
-    props: InkSelectItemProps,
-  ): React.JSX.Element {
-    const { isSelected = false, label } = props;
-    const itemWithThemeProps = props as typeof props & {
-      themeNameDisplay?: string;
-      themeTypeDisplay?: string;
-      disabled?: boolean;
-    };
-
-    let textColor = Colors.Foreground;
-    if (isSelected) {
-      textColor = Colors.AccentGreen;
-    } else if (itemWithThemeProps.disabled === true) {
-      textColor = Colors.Gray;
-    }
-
-    if (
-      itemWithThemeProps.themeNameDisplay &&
-      itemWithThemeProps.themeTypeDisplay
-    ) {
-      return (
-        <Text color={textColor} wrap="truncate">
-          {itemWithThemeProps.themeNameDisplay}{' '}
-          <Text color={Colors.Gray}>{itemWithThemeProps.themeTypeDisplay}</Text>
-        </Text>
-      );
-    }
-
-    return (
-      <Text color={textColor} wrap="truncate">
-        {label}
-      </Text>
-    );
-  }
-
-  initialIndex = initialIndex ?? 0;
   return (
-    <SelectInput
-      indicatorComponent={DynamicRadioIndicator}
-      itemComponent={CustomThemeItemComponent}
+    <BaseSelectionList<T, RadioSelectItem<T>>
       items={items}
       initialIndex={initialIndex}
-      onSelect={handleSelect}
-      onHighlight={handleHighlight}
+      onSelect={onSelect}
+      onHighlight={onHighlight}
       isFocused={isFocused}
+      showNumbers={showNumbers}
+      showScrollArrows={showScrollArrows}
+      maxItemsToShow={maxItemsToShow}
+      renderItem={(item, { titleColor }) => {
+        // Handle special theme display case for ThemeDialog compatibility
+        if (item.themeNameDisplay && item.themeTypeDisplay) {
+          return (
+            <Text color={titleColor} wrap="truncate" key={item.key}>
+              {item.themeNameDisplay}{' '}
+              <Text color={theme.text.secondary}>{item.themeTypeDisplay}</Text>
+            </Text>
+          );
+        }
+        // Regular label display
+        return (
+          <Text color={titleColor} wrap="truncate">
+            {item.label}
+          </Text>
+        );
+      }}
     />
   );
 }

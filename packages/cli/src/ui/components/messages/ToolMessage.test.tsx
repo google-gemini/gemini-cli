@@ -5,11 +5,38 @@
  */
 
 import React from 'react';
-import { render } from 'ink-testing-library';
-import { ToolMessage, ToolMessageProps } from './ToolMessage.js';
+import type { ToolMessageProps } from './ToolMessage.js';
+import { ToolMessage } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
+import type { AnsiOutput } from '@google/gemini-cli-core';
+import { renderWithProviders } from '../../../test-utils/render.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../TerminalOutput.js', () => ({
+  TerminalOutput: function MockTerminalOutput({
+    cursor,
+  }: {
+    cursor: { x: number; y: number } | null;
+  }) {
+    return (
+      <Text>
+        MockCursor:({cursor?.x},{cursor?.y})
+      </Text>
+    );
+  },
+}));
+
+vi.mock('../AnsiOutput.js', () => ({
+  AnsiOutputText: function MockAnsiOutputText({ data }: { data: AnsiOutput }) {
+    // Simple serialization for snapshot stability
+    const serialized = data
+      .map((line) => line.map((token) => token.text || '').join(''))
+      .join('\n');
+    return <Text>MockAnsiOutput:{serialized}</Text>;
+  },
+}));
 
 // Mock child components or utilities if they are complex or have side effects
 vi.mock('../GeminiRespondingSpinner.js', () => ({
@@ -40,19 +67,6 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
   },
 }));
 
-// Helper to render with context
-const renderWithContext = (
-  ui: React.ReactElement,
-  streamingState: StreamingState,
-) => {
-  const contextValue: StreamingState = streamingState;
-  return render(
-    <StreamingContext.Provider value={contextValue}>
-      {ui}
-    </StreamingContext.Provider>,
-  );
-};
-
 describe('<ToolMessage />', () => {
   const baseProps: ToolMessageProps = {
     callId: 'tool-123',
@@ -63,7 +77,29 @@ describe('<ToolMessage />', () => {
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
+    isFirst: true,
+    borderColor: 'green',
+    borderDimColor: false,
   };
+
+  const mockSetEmbeddedShellFocused = vi.fn();
+  const uiActions = {
+    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
+  };
+
+  // Helper to render with context
+  const renderWithContext = (
+    ui: React.ReactElement,
+    streamingState: StreamingState,
+  ) =>
+    renderWithProviders(ui, {
+      uiActions,
+      uiState: { streamingState },
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('renders basic tool information', () => {
     const { lastFrame } = renderWithContext(
@@ -71,19 +107,19 @@ describe('<ToolMessage />', () => {
       StreamingState.Idle,
     );
     const output = lastFrame();
-    expect(output).toContain('✔'); // Success indicator
+    expect(output).toContain('✓'); // Success indicator
     expect(output).toContain('test-tool');
     expect(output).toContain('A tool for testing');
     expect(output).toContain('MockMarkdown:Test result');
   });
 
   describe('ToolStatusIndicator rendering', () => {
-    it('shows ✔ for Success status', () => {
+    it('shows ✓ for Success status', () => {
       const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Success} />,
         StreamingState.Idle,
       );
-      expect(lastFrame()).toContain('✔');
+      expect(lastFrame()).toContain('✓');
     });
 
     it('shows o for Pending status', () => {
@@ -118,24 +154,24 @@ describe('<ToolMessage />', () => {
       expect(lastFrame()).toContain('x');
     });
 
-    it('shows paused spiner for Executing status when streamingState is Idle', () => {
+    it('shows paused spinner for Executing status when streamingState is Idle', () => {
       const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.Idle,
       );
       expect(lastFrame()).toContain('⊷');
       expect(lastFrame()).not.toContain('MockRespondingSpinner');
-      expect(lastFrame()).not.toContain('✔');
+      expect(lastFrame()).not.toContain('✓');
     });
 
-    it('shows paused spiner for Executing status when streamingState is WaitingForConfirmation', () => {
+    it('shows paused spinner for Executing status when streamingState is WaitingForConfirmation', () => {
       const { lastFrame } = renderWithContext(
         <ToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
         StreamingState.WaitingForConfirmation,
       );
       expect(lastFrame()).toContain('⊷');
       expect(lastFrame()).not.toContain('MockRespondingSpinner');
-      expect(lastFrame()).not.toContain('✔');
+      expect(lastFrame()).not.toContain('✓');
     });
 
     it('shows MockRespondingSpinner for Executing status when streamingState is Responding', () => {
@@ -144,7 +180,7 @@ describe('<ToolMessage />', () => {
         StreamingState.Responding, // Simulate app still responding
       );
       expect(lastFrame()).toContain('MockRespondingSpinner');
-      expect(lastFrame()).not.toContain('✔');
+      expect(lastFrame()).not.toContain('✓');
     });
   });
 
@@ -152,6 +188,8 @@ describe('<ToolMessage />', () => {
     const diffResult = {
       fileDiff: '--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new',
       fileName: 'file.txt',
+      originalContent: 'old',
+      newContent: 'new',
     };
     const { lastFrame } = renderWithContext(
       <ToolMessage {...baseProps} resultDisplay={diffResult} />,
@@ -177,5 +215,27 @@ describe('<ToolMessage />', () => {
     // This is harder to assert directly in text output without color checks.
     // We can at least ensure it doesn't have the high emphasis indicator.
     expect(lowEmphasisFrame()).not.toContain('←');
+  });
+
+  it('renders AnsiOutputText for AnsiOutput results', () => {
+    const ansiResult: AnsiOutput = [
+      [
+        {
+          text: 'hello',
+          fg: '#ffffff',
+          bg: '#000000',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+    ];
+    const { lastFrame } = renderWithContext(
+      <ToolMessage {...baseProps} resultDisplay={ansiResult} />,
+      StreamingState.Idle,
+    );
+    expect(lastFrame()).toContain('MockAnsiOutput:hello');
   });
 });

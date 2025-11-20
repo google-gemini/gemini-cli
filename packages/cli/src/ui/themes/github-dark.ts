@@ -5,11 +5,12 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const githubDarkColors: ColorsTheme = {
   type: 'dark',
   Background: '#24292e',
-  Foreground: '#d1d5da',
+  Foreground: '#c0c4c8',
   LightBlue: '#79B8FF',
   AccentBlue: '#79B8FF',
   AccentPurple: '#B392F0',
@@ -17,8 +18,11 @@ const githubDarkColors: ColorsTheme = {
   AccentGreen: '#85E89D',
   AccentYellow: '#FFAB70',
   AccentRed: '#F97583',
+  DiffAdded: '#3C4636',
+  DiffRemoved: '#502125',
   Comment: '#6A737D',
   Gray: '#6A737D',
+  DarkGray: interpolateColor('#6A737D', '#24292e', 0.5),
   GradientColors: ['#79B8FF', '#85E89D'],
 };
 

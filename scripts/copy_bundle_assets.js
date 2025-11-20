@@ -17,9 +17,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, join, basename } from 'path';
-import { fileURLToPath } from 'url';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join, basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,16 +30,6 @@ const bundleDir = join(root, 'bundle');
 if (!existsSync(bundleDir)) {
   mkdirSync(bundleDir);
 }
-
-// Copy specific shell files to the root of the bundle directory
-copyFileSync(
-  join(root, 'packages/core/src/tools/shell.md'),
-  join(bundleDir, 'shell.md'),
-);
-copyFileSync(
-  join(root, 'packages/core/src/tools/shell.json'),
-  join(bundleDir, 'shell.json'),
-);
 
 // Find and copy all .sb files from packages to the root of the bundle directory
 const sbFiles = glob.sync('packages/**/*.sb', { cwd: root });

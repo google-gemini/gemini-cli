@@ -21,7 +21,8 @@ export type ClientMetadataIdeType =
   | 'INTELLIJ'
   | 'VSCODE_CLOUD_WORKSTATION'
   | 'INTELLIJ_CLOUD_WORKSTATION'
-  | 'CLOUD_SHELL';
+  | 'CLOUD_SHELL'
+  | 'GEMINI_CLI';
 export type ClientMetadataPlatform =
   | 'PLATFORM_UNSPECIFIED'
   | 'DARWIN_AMD64'
@@ -57,8 +58,8 @@ export interface LoadCodeAssistResponse {
  */
 export interface GeminiUserTier {
   id: UserTierId;
-  name: string;
-  description: string;
+  name?: string;
+  description?: string;
   // This value is used to declare whether a given tier requires the user to configure the project setting on the IDE settings or not.
   userDefinedCloudaicompanionProject?: boolean | null;
   isDefault?: boolean;
@@ -127,10 +128,10 @@ export interface OnboardUserRequest {
 }
 
 /**
- * Represents LongrunningOperation proto
+ * Represents LongRunningOperation proto
  * http://google3/google/longrunning/operations.proto;rcl=698857719;l=107
  */
-export interface LongrunningOperationResponse {
+export interface LongRunningOperationResponse {
   name: string;
   done?: boolean;
   response?: OnboardUserResponse;
@@ -172,4 +173,30 @@ export interface OnboardUserStatus {
 export interface HelpLinkUrl {
   description: string;
   url: string;
+}
+
+export interface SetCodeAssistGlobalUserSettingRequest {
+  cloudaicompanionProject?: string;
+  freeTierDataCollectionOptin: boolean;
+}
+
+export interface CodeAssistGlobalUserSettingResponse {
+  cloudaicompanionProject?: string;
+  freeTierDataCollectionOptin: boolean;
+}
+
+/**
+ * Relevant fields that can be returned from a Google RPC response
+ */
+export interface GoogleRpcResponse {
+  error?: {
+    details?: GoogleRpcErrorInfo[];
+  };
+}
+
+/**
+ * Relevant fields that can be returned in the details of an error returned from GoogleRPCs
+ */
+interface GoogleRpcErrorInfo {
+  reason?: string;
 }

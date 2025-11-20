@@ -1,58 +1,96 @@
-# Gemini CLI: Terms of Service and Privacy Notice
+# Gemini CLI: License, Terms of Service, and Privacy Notices
 
-Gemini CLI is an open-source tool that allows you to interact with Google's powerful language models directly from your command-line interface. The terms of service and privacy notices that apply to your usage of Gemini CLI depend on the type of account you use to authenticate with Google.
+Gemini CLI is an open-source tool that lets you interact with Google's powerful
+AI services directly from your command-line interface. The Gemini CLI software
+is licensed under the
+[Apache 2.0 license](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE).
+When you use Gemini CLI to access or use Google’s services, the Terms of Service
+and Privacy Notices applicable to those services apply to such access and use.
 
-This article outlines the specific terms and privacy policies applicable for different auth methods.
+Your Gemini CLI Usage Statistics are handled in accordance with Google's Privacy
+Policy.
 
-## 1. Login with Google (Gemini Code Assist for [individuals](https://developers.google.com/gemini-code-assist/docs/overview#supported-features-gca))
+**Note:** See [quotas and pricing](/docs/quota-and-pricing.md) for the quota and
+pricing details that apply to your usage of the Gemini CLI.
 
-For users who authenticate using their Google account to access Gemini Code Assist for individuals:
+## Supported authentication methods
 
-- Terms of Service: Your use of Gemini CLI is governed by the general [Google Terms of Service](https://policies.google.com/terms?hl=en-US).
-- Privacy Notice: The collection and use of your data are described in the [Gemini Code Assist Privacy Notice for Individuals](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals).
+Your authentication method refers to the method you use to log into and access
+Google’s services with Gemini CLI. Supported authentication methods include:
 
-## 2. Gemini API Key (Using Gemini Developer [API](https://ai.google.dev/gemini-api/docs) a: Unpaid Service, b: Paid Service)
+- Logging in with your Google account to Gemini Code Assist.
+- Using an API key with Gemini Developer API.
+- Using an API key with Vertex AI GenAI API.
 
-If you are using a Gemini API key for authentication, the following terms apply:
+The Terms of Service and Privacy Notices applicable to the aforementioned Google
+services are set forth in the table below.
 
-- Terms of Service: Your use is subject to the [Gemini API Terms of Service](https://ai.google.dev/gemini-api/terms). For a. [Unpaid Service](https://ai.google.dev/gemini-api/terms#unpaid-services) or b. [Paid Service](https://ai.google.dev/gemini-api/terms#paid-services)
-- Privacy Notice: Information regarding data handling and privacy is detailed in the general [Google Privacy Policy](https://policies.google.com/privacy).
+If you log in with your Google account and you do not already have a Gemini Code
+Assist account associated with your Google account, you will be directed to the
+sign up flow for Gemini Code Assist for individuals. If your Google account is
+managed by your organization, your administrator may not permit access to Gemini
+Code Assist for individuals. Please see the
+[Gemini Code Assist for individuals FAQs](https://developers.google.com/gemini-code-assist/resources/faqs)
+for further information.
 
-## 3. Login with Google (for Workspace or Licensed Code Assist users)
+| Authentication Method    | Service(s)                   | Terms of Service                                                                                        | Privacy Notice                                                                                |
+| :----------------------- | :--------------------------- | :------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------- |
+| Google Account           | Gemini Code Assist services  | [Terms of Service](https://developers.google.com/gemini-code-assist/resources/privacy-notices)          | [Privacy Notices](https://developers.google.com/gemini-code-assist/resources/privacy-notices) |
+| Gemini Developer API Key | Gemini API - Unpaid Services | [Gemini API Terms of Service - Unpaid Services](https://ai.google.dev/gemini-api/terms#unpaid-services) | [Google Privacy Policy](https://policies.google.com/privacy)                                  |
+| Gemini Developer API Key | Gemini API - Paid Services   | [Gemini API Terms of Service - Paid Services](https://ai.google.dev/gemini-api/terms#paid-services)     | [Google Privacy Policy](https://policies.google.com/privacy)                                  |
+| Vertex AI GenAI API Key  | Vertex AI GenAI API          | [Google Cloud Platform Terms of Service](https://cloud.google.com/terms/service-terms/)                 | [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice)            |
 
-For users of Standard or Enterprise [edition](https://cloud.google.com/gemini/docs/codeassist/overview#editions-overview) of Gemini Code Assist :
+## 1. If you have logged in with your Google account to Gemini Code Assist
 
-- Terms of Service: The [Google Cloud Platform Terms of Service](https://cloud.google.com/terms) govern your use of the service.
-- Privacy Notice: The handling of your data is outlined in the [Gemini Code Assist Privacy Notices](https://developers.google.com/gemini-code-assist/resources/privacy-notices).
+For users who use their Google account to access
+[Gemini Code Assist](https://codeassist.google), these Terms of Service and
+Privacy Notice documents apply:
 
-## 4. Vertex AI (Using Vertex AI Gen [API](https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rest))
+- Gemini Code Assist for individuals:
+  [Google Terms of Service](https://policies.google.com/terms) and
+  [Gemini Code Assist for individuals Privacy Notice](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals).
+- Gemini Code Assist with Google AI Pro or Ultra subscription:
+  [Google Terms of Service](https://policies.google.com/terms),
+  [Google One Additional Terms of Service](https://one.google.com/terms-of-service)
+  and [Google Privacy Policy\*](https://policies.google.com/privacy).
+- Gemini Code Assist Standard and Enterprise editions:
+  [Google Cloud Platform Terms of Service](https://cloud.google.com/terms) and
+  [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice).
 
-If you are using an API key with a Vertex AI Gen API backend:
+_\* If your account is also associated with an active subscription to Gemini
+Code Assist Standard or Enterprise edition, the terms and privacy policy of
+Gemini Code Assist Standard or Enterprise edition will apply to all your use of
+Gemini Code Assist._
 
-- Terms of Service: Your usage is governed by the [Google Cloud Platform Service Terms](https://cloud.google.com/terms/service-terms/).
-- Privacy Notice: The [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice) describes how your data is collected and managed.
+## 2. If you have logged in with a Gemini API key to the Gemini Developer API
 
-### Usage Statistics Opt-Out
+If you are using a Gemini API key for authentication with the
+[Gemini Developer API](https://ai.google.dev/gemini-api/docs), these Terms of
+Service and Privacy Notice documents apply:
 
-You may opt-out from sending Usage Statistics to Google data by following the instructions available here: [Usage Statistics Configuration](./cli/configuration.md#usage-statistics).
+- Terms of Service: Your use of the Gemini CLI is governed by the
+  [Gemini API Terms of Service](https://ai.google.dev/gemini-api/terms). These
+  terms may differ depending on whether you are using an unpaid or paid service:
+  - For unpaid services, refer to the
+    [Gemini API Terms of Service - Unpaid Services](https://ai.google.dev/gemini-api/terms#unpaid-services).
+  - For paid services, refer to the
+    [Gemini API Terms of Service - Paid Services](https://ai.google.dev/gemini-api/terms#paid-services).
+- Privacy Notice: The collection and use of your data is described in the
+  [Google Privacy Policy](https://policies.google.com/privacy).
 
-## Frequently Asked Questions (FAQ) for Gemini CLI
+## 3. If you have logged in with a Gemini API key to the Vertex AI GenAI API
 
-### 1. Is my code, including prompts and answers, used to train Google's models?
+If you are using a Gemini API key for authentication with a
+[Vertex AI GenAI API](https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rest)
+backend, these Terms of Service and Privacy Notice documents apply:
 
-This depends entirely on the type of auth method you use.
+- Terms of Service: Your use of the Gemini CLI is governed by the
+  [Google Cloud Platform Service Terms](https://cloud.google.com/terms/service-terms/).
+- Privacy Notice: The collection and use of your data is described in the
+  [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice).
 
-- **Auth method 1:** Yes. When you use your personal Google account, the Gemini Code Assist Privacy Notice for Individuals applies. Under this notice, your **prompts, answers, and related code are collected** and may be used to improve Google's products, which includes model training.
-- **Auth method 2a:** Yes, When you use the Gemini API key Gemini API (Unpaid Service) terms apply. Under this notice , your **prompts, answers, and related code are collected** and may be used to improve Google's products, which includes model training.
-- **Auth method 2b, 3 & 4:** No. For these accounts, your data is governed by the Google Cloud or Gemini API (Paid Service) terms, which treat your inputs as confidential. Your code, prompts, and other inputs are **not** used to train models.
+## Usage statistics opt-out
 
-### 2. What are "Usage Statistics" and what does the opt-out control?
-
-The "Usage Statistics" setting is the single control for all optional data collection in the Gemini CLI. The data it collects depends on your account type:
-
-- **Auth method 1:** When enabled, this setting allows Google to collect both anonymous telemetry (like commands run and performance metrics) and **your prompts and answers** for model improvement.
-- **Auth method 2a:** When enabled, this setting allows Google to collect both anonymous telemetry (like commands run and performance metrics) and **your prompts and answers** for model improvement. When disabled we will use your data as described in the [How Google Uses Your Data](https://ai.google.dev/gemini-api/terms#data-use-unpaid).
-- **Auth method 2b:** This setting only controls the collection of anonymous telemetry. Google logs prompts and responses for a limited period of time, solely for the purpose of detecting violations of the Prohibited Use Policy and any required legal or regulatory disclosures
-- **Auth methods 3 & 4:** This setting only controls the collection of anonymous telemetry. Your prompts and answers are never collected, regardless of this setting.
-
-You can disable Usage Statistics for any account type by following the instructions in the [Usage Statistics Configuration](./cli/configuration.md#usage-statistics) documentation.
+You may opt-out from sending Gemini CLI Usage Statistics to Google by following
+the instructions available here:
+[Usage Statistics Configuration](https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/configuration.md#usage-statistics).

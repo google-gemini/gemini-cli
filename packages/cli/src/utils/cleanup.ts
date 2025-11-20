@@ -4,12 +4,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'fs';
-import { join } from 'path';
-import { getProjectTempDir } from '@google/gemini-cli-core';
+import { promises as fs } from 'node:fs';
+import { join } from 'node:path';
+import { Storage } from '@google/gemini-cli-core';
+
+const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];
+const syncCleanupFunctions: Array<() => void> = [];
+
+export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
+  cleanupFunctions.push(fn);
+}
+
+export function registerSyncCleanup(fn: () => void) {
+  syncCleanupFunctions.push(fn);
+}
+
+export function runSyncCleanup() {
+  for (const fn of syncCleanupFunctions) {
+    try {
+      fn();
+    } catch (_) {
+      // Ignore errors during cleanup.
+    }
+  }
+  syncCleanupFunctions.length = 0;
+}
+
+export async function runExitCleanup() {
+  runSyncCleanup();
+  for (const fn of cleanupFunctions) {
+    try {
+      await fn();
+    } catch (_) {
+      // Ignore errors during cleanup.
+    }
+  }
+  cleanupFunctions.length = 0; // Clear the array
+}
 
 export async function cleanupCheckpoints() {
-  const tempDir = getProjectTempDir(process.cwd());
+  const storage = new Storage(process.cwd());
+  const tempDir = storage.getProjectTempDir();
   const checkpointsDir = join(tempDir, 'checkpoints');
   try {
     await fs.rm(checkpointsDir, { recursive: true, force: true });

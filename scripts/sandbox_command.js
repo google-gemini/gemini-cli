@@ -17,14 +17,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import stripJsonComments from 'strip-json-comments';
-import os from 'os';
+import os from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import dotenv from 'dotenv';
+import { GEMINI_DIR } from '@google/gemini-cli-core';
 
 const argv = yargs(hideBin(process.argv)).option('q', {
   alias: 'quiet',
@@ -35,7 +36,7 @@ const argv = yargs(hideBin(process.argv)).option('q', {
 let geminiSandbox = process.env.GEMINI_SANDBOX;
 
 if (!geminiSandbox) {
-  const userSettingsFile = join(os.homedir(), '.gemini', 'settings.json');
+  const userSettingsFile = join(os.homedir(), GEMINI_DIR, 'settings.json');
   if (existsSync(userSettingsFile)) {
     const settings = JSON.parse(
       stripJsonComments(readFileSync(userSettingsFile, 'utf-8')),
@@ -48,17 +49,21 @@ if (!geminiSandbox) {
 
 if (!geminiSandbox) {
   let currentDir = process.cwd();
-  while (currentDir !== '/') {
-    const geminiEnv = join(currentDir, '.gemini', '.env');
+  while (true) {
+    const geminiEnv = join(currentDir, GEMINI_DIR, '.env');
     const regularEnv = join(currentDir, '.env');
     if (existsSync(geminiEnv)) {
-      dotenv.config({ path: geminiEnv });
+      dotenv.config({ path: geminiEnv, quiet: true });
       break;
     } else if (existsSync(regularEnv)) {
-      dotenv.config({ path: regularEnv });
+      dotenv.config({ path: regularEnv, quiet: true });
       break;
     }
-    currentDir = dirname(currentDir);
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
   }
   geminiSandbox = process.env.GEMINI_SANDBOX;
 }

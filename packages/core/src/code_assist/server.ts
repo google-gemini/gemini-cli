@@ -4,32 +4,42 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthClient } from 'google-auth-library';
-import {
-  LoadCodeAssistResponse,
+import type { AuthClient } from 'google-auth-library';
+import type {
+  CodeAssistGlobalUserSettingResponse,
+  GoogleRpcResponse,
   LoadCodeAssistRequest,
+  LoadCodeAssistResponse,
+  LongRunningOperationResponse,
   OnboardUserRequest,
-  LongrunningOperationResponse,
+  SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
 } from './types.js';
-import {
-  GenerateContentResponse,
-  GenerateContentParameters,
+import type {
+  ListExperimentsRequest,
+  ListExperimentsResponse,
+} from './experiments/types.js';
+import type {
   CountTokensParameters,
-  EmbedContentResponse,
   CountTokensResponse,
   EmbedContentParameters,
+  EmbedContentResponse,
+  GenerateContentParameters,
+  GenerateContentResponse,
 } from '@google/genai';
-import * as readline from 'readline';
-import { ContentGenerator } from '../core/contentGenerator.js';
-import {
+import * as readline from 'node:readline';
+import type { ContentGenerator } from '../core/contentGenerator.js';
+import { UserTierId } from './types.js';
+import type {
+  CaCountTokenResponse,
   CaGenerateContentResponse,
-  toGenerateContentRequest,
+} from './converter.js';
+import {
+  fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,
-  fromCountTokenResponse,
-  CaCountTokenResponse,
+  toGenerateContentRequest,
 } from './converter.js';
-import { PassThrough } from 'node:stream';
 
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
@@ -37,24 +47,30 @@ export interface HttpOptions {
   headers?: Record<string, string>;
 }
 
-// TODO: Use production endpoint once it supports our methods.
-export const CODE_ASSIST_ENDPOINT =
-  process.env.CODE_ASSIST_ENDPOINT ?? 'https://cloudcode-pa.googleapis.com';
+export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
-    readonly auth: AuthClient,
+    readonly client: AuthClient,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
+    readonly sessionId?: string,
+    readonly userTier?: UserTierId,
   ) {}
 
   async generateContentStream(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const resps = await this.streamEndpoint<CaGenerateContentResponse>(
+    const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
       'streamGenerateContent',
-      toGenerateContentRequest(req, this.projectId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
@@ -66,10 +82,16 @@ export class CodeAssistServer implements ContentGenerator {
 
   async generateContent(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<GenerateContentResponse> {
-    const resp = await this.callEndpoint<CaGenerateContentResponse>(
+    const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
-      toGenerateContentRequest(req, this.projectId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return fromGenerateContentResponse(resp);
@@ -77,8 +99,8 @@ export class CodeAssistServer implements ContentGenerator {
 
   async onboardUser(
     req: OnboardUserRequest,
-  ): Promise<LongrunningOperationResponse> {
-    return await this.callEndpoint<LongrunningOperationResponse>(
+  ): Promise<LongRunningOperationResponse> {
+    return await this.requestPost<LongRunningOperationResponse>(
       'onboardUser',
       req,
     );
@@ -87,14 +109,39 @@ export class CodeAssistServer implements ContentGenerator {
   async loadCodeAssist(
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
-    return await this.callEndpoint<LoadCodeAssistResponse>(
-      'loadCodeAssist',
+    try {
+      return await this.requestPost<LoadCodeAssistResponse>(
+        'loadCodeAssist',
+        req,
+      );
+    } catch (e) {
+      if (isVpcScAffectedUser(e)) {
+        return {
+          currentTier: { id: UserTierId.STANDARD },
+        };
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
+    return await this.requestGet<CodeAssistGlobalUserSettingResponse>(
+      'getCodeAssistGlobalUserSetting',
+    );
+  }
+
+  async setCodeAssistGlobalUserSetting(
+    req: SetCodeAssistGlobalUserSettingRequest,
+  ): Promise<CodeAssistGlobalUserSettingResponse> {
+    return await this.requestPost<CodeAssistGlobalUserSettingResponse>(
+      'setCodeAssistGlobalUserSetting',
       req,
     );
   }
 
   async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
-    const resp = await this.callEndpoint<CaCountTokenResponse>(
+    const resp = await this.requestPost<CaCountTokenResponse>(
       'countTokens',
       toCountTokenRequest(req),
     );
@@ -107,13 +154,30 @@ export class CodeAssistServer implements ContentGenerator {
     throw Error();
   }
 
-  async callEndpoint<T>(
+  async listExperiments(
+    metadata: ClientMetadata,
+  ): Promise<ListExperimentsResponse> {
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
+    const req: ListExperimentsRequest = {
+      project: projectId,
+      metadata: { ...metadata, duetProject: projectId },
+    };
+    return await this.requestPost<ListExperimentsResponse>(
+      'listExperiments',
+      req,
+    );
+  }
+
+  async requestPost<T>(
     method: string,
     req: object,
     signal?: AbortSignal,
   ): Promise<T> {
-    const res = await this.auth.request({
-      url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
+    const res = await this.client.request({
+      url: this.getMethodUrl(method),
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -126,13 +190,27 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
-  async streamEndpoint<T>(
+  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+    const res = await this.client.request({
+      url: this.getMethodUrl(method),
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.httpOptions.headers,
+      },
+      responseType: 'json',
+      signal,
+    });
+    return res.data as T;
+  }
+
+  async requestStreamingPost<T>(
     method: string,
     req: object,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
-    const res = await this.auth.request({
-      url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:${method}`,
+    const res = await this.client.request({
+      url: this.getMethodUrl(method),
       method: 'POST',
       params: {
         alt: 'sse',
@@ -148,25 +226,48 @@ export class CodeAssistServer implements ContentGenerator {
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
-        input: res.data as PassThrough,
+        input: res.data as NodeJS.ReadableStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
       let bufferedLines: string[] = [];
       for await (const line of rl) {
-        // blank lines are used to separate JSON objects in the stream
-        if (line === '') {
+        if (line.startsWith('data: ')) {
+          bufferedLines.push(line.slice(6).trim());
+        } else if (line === '') {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
           yield JSON.parse(bufferedLines.join('\n')) as T;
           bufferedLines = []; // Reset the buffer after yielding
-        } else if (line.startsWith('data: ')) {
-          bufferedLines.push(line.slice(6).trim());
-        } else {
-          throw new Error(`Unexpected line format in response: ${line}`);
         }
+        // Ignore other lines like comments or id fields
       }
     })();
   }
+
+  getMethodUrl(method: string): string {
+    const endpoint =
+      process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
+    return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
+  }
+}
+
+function isVpcScAffectedUser(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const gaxiosError = error as {
+      response?: {
+        data?: unknown;
+      };
+    };
+    const response = gaxiosError.response?.data as
+      | GoogleRpcResponse
+      | undefined;
+    if (Array.isArray(response?.error?.details)) {
+      return response.error.details.some(
+        (detail) => detail.reason === 'SECURITY_POLICY_VIOLATED',
+      );
+    }
+  }
+  return false;
 }

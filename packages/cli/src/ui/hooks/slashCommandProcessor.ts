@@ -4,56 +4,62 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
-import open from 'open';
 import process from 'node:process';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { useStateAndRef } from './useStateAndRef.js';
-import {
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type {
   Config,
+  ExtensionsStartingEvent,
+  ExtensionsStoppingEvent,
+} from '@google/gemini-cli-core';
+import {
   GitService,
   Logger,
-  MCPDiscoveryState,
-  MCPServerStatus,
-  getMCPDiscoveryState,
-  getMCPServerStatus,
+  logSlashCommand,
+  makeSlashCommandEvent,
+  SlashCommandStatus,
+  ToolConfirmationOutcome,
+  Storage,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import {
+import type {
   Message,
-  MessageType,
   HistoryItemWithoutId,
+  SlashCommandProcessorResult,
   HistoryItem,
+  ConfirmationRequest,
 } from '../types.js';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { createShowMemoryAction } from './useShowMemoryCommand.js';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatDuration, formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { MessageType } from '../types.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { type CommandContext, type SlashCommand } from '../commands/types.js';
+import { CommandService } from '../../services/CommandService.js';
+import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
+import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import { parseSlashCommand } from '../../utils/commands.js';
+import {
+  type ExtensionUpdateAction,
+  type ExtensionUpdateStatus,
+} from '../state/extensions.js';
+import { appEvents } from '../../utils/events.js';
+import { useAlternateBuffer } from './useAlternateBuffer.js';
 
-export interface SlashCommandActionReturn {
-  shouldScheduleTool?: boolean;
-  toolName?: string;
-  toolArgs?: Record<string, unknown>;
-  message?: string; // For simple messages or errors
-}
-
-export interface SlashCommand {
-  name: string;
-  altName?: string;
-  description?: string;
-  completion?: () => Promise<string[]>;
-  action: (
-    mainCommand: string,
-    subCommand?: string,
-    args?: string,
-  ) =>
-    | void
-    | SlashCommandActionReturn
-    | Promise<void | SlashCommandActionReturn>; // Action can now return this object
+interface SlashCommandProcessorActions {
+  openAuthDialog: () => void;
+  openThemeDialog: () => void;
+  openEditorDialog: () => void;
+  openPrivacyNotice: () => void;
+  openSettingsDialog: () => void;
+  openModelDialog: () => void;
+  openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
+  quit: (messages: HistoryItem[]) => void;
+  setDebugMessage: (message: string) => void;
+  toggleCorgiMode: () => void;
+  toggleDebugProfiler: () => void;
+  dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
+  addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
 
 /**
@@ -62,35 +68,72 @@ export interface SlashCommand {
 export const useSlashCommandProcessor = (
   config: Config | null,
   settings: LoadedSettings,
-  history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
   refreshStatic: () => void,
-  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
-  onDebugMessage: (message: string) => void,
-  openThemeDialog: () => void,
-  openAuthDialog: () => void,
-  openEditorDialog: () => void,
-  performMemoryRefresh: () => Promise<void>,
-  toggleCorgiMode: () => void,
-  showToolDescriptions: boolean = false,
-  setQuittingMessages: (message: HistoryItem[]) => void,
+  toggleVimEnabled: () => Promise<boolean>,
+  setIsProcessing: (isProcessing: boolean) => void,
+  actions: SlashCommandProcessorActions,
+  extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
+  isConfigInitialized: boolean,
+  setBannerVisible: (visible: boolean) => void,
+  setCustomDialog: (dialog: React.ReactNode | null) => void,
 ) => {
   const session = useSessionStats();
+  const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
+    undefined,
+  );
+  const alternateBuffer = useAlternateBuffer();
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+
+  const reloadCommands = useCallback(() => {
+    setReloadTrigger((v) => v + 1);
+  }, []);
+  const [shellConfirmationRequest, setShellConfirmationRequest] =
+    useState<null | {
+      commands: string[];
+      onConfirm: (
+        outcome: ToolConfirmationOutcome,
+        approvedCommands?: string[],
+      ) => void;
+    }>(null);
+  const [confirmationRequest, setConfirmationRequest] = useState<null | {
+    prompt: React.ReactNode;
+    onConfirm: (confirmed: boolean) => void;
+  }>(null);
+
+  const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
+    new Set<string>(),
+  );
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot());
+    return new GitService(config.getProjectRoot(), config.storage);
   }, [config]);
 
-  const pendingHistoryItems: HistoryItemWithoutId[] = [];
-  const [pendingCompressionItemRef, setPendingCompressionItem] =
-    useStateAndRef<HistoryItemWithoutId | null>(null);
-  if (pendingCompressionItemRef.current != null) {
-    pendingHistoryItems.push(pendingCompressionItemRef.current);
-  }
+  const logger = useMemo(() => {
+    const l = new Logger(
+      config?.getSessionId() || '',
+      config?.storage ?? new Storage(process.cwd()),
+    );
+    // The logger's initialize is async, but we can create the instance
+    // synchronously. Commands that use it will await its initialization.
+    return l;
+  }, [config]);
+
+  const [pendingItem, setPendingItem] = useState<HistoryItemWithoutId | null>(
+    null,
+  );
+
+  const pendingHistoryItems = useMemo(() => {
+    const items: HistoryItemWithoutId[] = [];
+    if (pendingItem != null) {
+      items.push(pendingItem);
+    }
+    return items;
+  }, [pendingItem]);
 
   const addMessage = useCallback(
     (message: Message) => {
@@ -103,18 +146,31 @@ export const useSlashCommandProcessor = (
           osVersion: message.osVersion,
           sandboxEnv: message.sandboxEnv,
           modelVersion: message.modelVersion,
+          selectedAuthType: message.selectedAuthType,
+          gcpProject: message.gcpProject,
+          ideClient: message.ideClient,
+        };
+      } else if (message.type === MessageType.HELP) {
+        historyItemContent = {
+          type: 'help',
+          timestamp: message.timestamp,
         };
       } else if (message.type === MessageType.STATS) {
         historyItemContent = {
           type: 'stats',
-          stats: message.stats,
-          lastTurnStats: message.lastTurnStats,
           duration: message.duration,
+        };
+      } else if (message.type === MessageType.MODEL_STATS) {
+        historyItemContent = {
+          type: 'model_stats',
+        };
+      } else if (message.type === MessageType.TOOL_STATS) {
+        historyItemContent = {
+          type: 'tool_stats',
         };
       } else if (message.type === MessageType.QUIT) {
         historyItemContent = {
           type: 'quit',
-          stats: message.stats,
           duration: message.duration,
         };
       } else if (message.type === MessageType.COMPRESSION) {
@@ -124,10 +180,7 @@ export const useSlashCommandProcessor = (
         };
       } else {
         historyItemContent = {
-          type: message.type as
-            | MessageType.INFO
-            | MessageType.ERROR
-            | MessageType.USER,
+          type: message.type,
           text: message.content,
         };
       }
@@ -135,932 +188,422 @@ export const useSlashCommandProcessor = (
     },
     [addItem],
   );
-
-  const showMemoryAction = useCallback(async () => {
-    const actionFn = createShowMemoryAction(config, settings, addMessage);
-    await actionFn();
-  }, [config, settings, addMessage]);
-
-  const addMemoryAction = useCallback(
-    (
-      _mainCommand: string,
-      _subCommand?: string,
-      args?: string,
-    ): SlashCommandActionReturn | void => {
-      if (!args || args.trim() === '') {
-        addMessage({
-          type: MessageType.ERROR,
-          content: 'Usage: /memory add <text to remember>',
-          timestamp: new Date(),
-        });
-        return;
-      }
-      // UI feedback for attempting to schedule
-      addMessage({
-        type: MessageType.INFO,
-        content: `Attempting to save to memory: "${args.trim()}"`,
-        timestamp: new Date(),
-      });
-      // Return info for scheduling the tool call
-      return {
-        shouldScheduleTool: true,
-        toolName: 'save_memory',
-        toolArgs: { fact: args.trim() },
-      };
-    },
-    [addMessage],
+  const commandContext = useMemo(
+    (): CommandContext => ({
+      services: {
+        config,
+        settings,
+        git: gitService,
+        logger,
+      },
+      ui: {
+        addItem,
+        clear: () => {
+          clearItems();
+          if (!alternateBuffer) {
+            console.clear();
+          }
+          refreshStatic();
+          setBannerVisible(false);
+        },
+        loadHistory,
+        setDebugMessage: actions.setDebugMessage,
+        pendingItem,
+        setPendingItem,
+        toggleCorgiMode: actions.toggleCorgiMode,
+        toggleDebugProfiler: actions.toggleDebugProfiler,
+        toggleVimEnabled,
+        reloadCommands,
+        extensionsUpdateState,
+        dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
+        addConfirmUpdateExtensionRequest:
+          actions.addConfirmUpdateExtensionRequest,
+        removeComponent: () => setCustomDialog(null),
+      },
+      session: {
+        stats: session.stats,
+        sessionShellAllowlist,
+      },
+    }),
+    [
+      alternateBuffer,
+      config,
+      settings,
+      gitService,
+      logger,
+      loadHistory,
+      addItem,
+      clearItems,
+      refreshStatic,
+      session.stats,
+      actions,
+      pendingItem,
+      setPendingItem,
+      toggleVimEnabled,
+      sessionShellAllowlist,
+      reloadCommands,
+      extensionsUpdateState,
+      setBannerVisible,
+      setCustomDialog,
+    ],
   );
 
-  const savedChatTags = useCallback(async () => {
-    const geminiDir = config?.getProjectTempDir();
-    if (!geminiDir) {
-      return [];
+  useEffect(() => {
+    if (!config) {
+      return;
     }
-    try {
-      const files = await fs.readdir(geminiDir);
-      return files
-        .filter(
-          (file) => file.startsWith('checkpoint-') && file.endsWith('.json'),
-        )
-        .map((file) => file.replace('checkpoint-', '').replace('.json', ''));
-    } catch (_err) {
-      return [];
-    }
-  }, [config]);
 
-  const slashCommands: SlashCommand[] = useMemo(() => {
-    const commands: SlashCommand[] = [
-      {
-        name: 'help',
-        altName: '?',
-        description: 'for help on gemini-cli',
-        action: (_mainCommand, _subCommand, _args) => {
-          onDebugMessage('Opening help.');
-          setShowHelp(true);
-        },
-      },
-      {
-        name: 'docs',
-        description: 'open full Gemini CLI documentation in your browser',
-        action: async (_mainCommand, _subCommand, _args) => {
-          const docsUrl = 'https://goo.gle/gemini-cli-docs';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-            addMessage({
-              type: MessageType.INFO,
-              content: `Please open the following URL in your browser to view the documentation:\n${docsUrl}`,
-              timestamp: new Date(),
-            });
-          } else {
-            addMessage({
-              type: MessageType.INFO,
-              content: `Opening documentation in your browser: ${docsUrl}`,
-              timestamp: new Date(),
-            });
-            await open(docsUrl);
-          }
-        },
-      },
-      {
-        name: 'clear',
-        description: 'clear the screen and conversation history',
-        action: async (_mainCommand, _subCommand, _args) => {
-          onDebugMessage('Clearing terminal and resetting chat.');
-          clearItems();
-          await config?.getGeminiClient()?.resetChat();
-          console.clear();
-          refreshStatic();
-        },
-      },
-      {
-        name: 'theme',
-        description: 'change the theme',
-        action: (_mainCommand, _subCommand, _args) => {
-          openThemeDialog();
-        },
-      },
-      {
-        name: 'auth',
-        description: 'change the auth method',
-        action: (_mainCommand, _subCommand, _args) => {
-          openAuthDialog();
-        },
-      },
-      {
-        name: 'editor',
-        description: 'set external editor preference',
-        action: (_mainCommand, _subCommand, _args) => {
-          openEditorDialog();
-        },
-      },
-      {
-        name: 'stats',
-        altName: 'usage',
-        description: 'check session stats',
-        action: (_mainCommand, _subCommand, _args) => {
-          const now = new Date();
-          const { sessionStartTime, cumulative, currentTurn } = session.stats;
-          const wallDuration = now.getTime() - sessionStartTime.getTime();
+    const listener = () => {
+      reloadCommands();
+    };
 
-          addMessage({
-            type: MessageType.STATS,
-            stats: cumulative,
-            lastTurnStats: currentTurn,
-            duration: formatDuration(wallDuration),
-            timestamp: new Date(),
-          });
-        },
-      },
-      {
-        name: 'mcp',
-        description: 'list configured MCP servers and tools',
-        action: async (_mainCommand, _subCommand, _args) => {
-          // Check if the _subCommand includes a specific flag to control description visibility
-          let useShowDescriptions = showToolDescriptions;
-          if (_subCommand === 'desc' || _subCommand === 'descriptions') {
-            useShowDescriptions = true;
-          } else if (
-            _subCommand === 'nodesc' ||
-            _subCommand === 'nodescriptions'
-          ) {
-            useShowDescriptions = false;
-          } else if (_args === 'desc' || _args === 'descriptions') {
-            useShowDescriptions = true;
-          } else if (_args === 'nodesc' || _args === 'nodescriptions') {
-            useShowDescriptions = false;
-          }
-          // Check if the _subCommand includes a specific flag to show detailed tool schema
-          let useShowSchema = false;
-          if (_subCommand === 'schema' || _args === 'schema') {
-            useShowSchema = true;
-          }
+    (async () => {
+      const ideClient = await IdeClient.getInstance();
+      ideClient.addStatusChangeListener(listener);
+    })();
 
-          const toolRegistry = await config?.getToolRegistry();
-          if (!toolRegistry) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'Could not retrieve tool registry.',
-              timestamp: new Date(),
-            });
-            return;
-          }
+    // TODO: Ideally this would happen more directly inside the ExtensionLoader,
+    // but the CommandService today is not conducive to that since it isn't a
+    // long lived service but instead gets fully re-created based on reload
+    // events within this hook.
+    const extensionEventListener = (
+      _event: ExtensionsStartingEvent | ExtensionsStoppingEvent,
+    ) => {
+      // We only care once at least one extension has completed
+      // starting/stopping
+      reloadCommands();
+    };
+    appEvents.on('extensionsStarting', extensionEventListener);
+    appEvents.on('extensionsStopping', extensionEventListener);
 
-          const mcpServers = config?.getMcpServers() || {};
-          const serverNames = Object.keys(mcpServers);
+    return () => {
+      (async () => {
+        const ideClient = await IdeClient.getInstance();
+        ideClient.removeStatusChangeListener(listener);
+      })();
+      appEvents.off('extensionsStarting', extensionEventListener);
+      appEvents.off('extensionsStopping', extensionEventListener);
+    };
+  }, [config, reloadCommands]);
 
-          if (serverNames.length === 0) {
-            const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
-            if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-              addMessage({
-                type: MessageType.INFO,
-                content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
-                timestamp: new Date(),
-              });
-            } else {
-              addMessage({
-                type: MessageType.INFO,
-                content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
-                timestamp: new Date(),
-              });
-              await open(docsUrl);
-            }
-            return;
-          }
+  useEffect(() => {
+    const controller = new AbortController();
 
-          // Check if any servers are still connecting
-          const connectingServers = serverNames.filter(
-            (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
-          );
-          const discoveryState = getMCPDiscoveryState();
+    (async () => {
+      const commandService = await CommandService.create(
+        [
+          new McpPromptLoader(config),
+          new BuiltinCommandLoader(config),
+          new FileCommandLoader(config),
+        ],
+        controller.signal,
+      );
+      setCommands(commandService.getCommands());
+    })();
 
-          let message = '';
-
-          // Add overall discovery status message if needed
-          if (
-            discoveryState === MCPDiscoveryState.IN_PROGRESS ||
-            connectingServers.length > 0
-          ) {
-            message += `\u001b[33m⏳ MCP servers are starting up (${connectingServers.length} initializing)...\u001b[0m\n`;
-            message += `\u001b[90mNote: First startup may take longer. Tool availability will update automatically.\u001b[0m\n\n`;
-          }
-
-          message += 'Configured MCP servers:\n\n';
-
-          for (const serverName of serverNames) {
-            const serverTools = toolRegistry.getToolsByServer(serverName);
-            const status = getMCPServerStatus(serverName);
-
-            // Add status indicator with descriptive text
-            let statusIndicator = '';
-            let statusText = '';
-            switch (status) {
-              case MCPServerStatus.CONNECTED:
-                statusIndicator = '🟢';
-                statusText = 'Ready';
-                break;
-              case MCPServerStatus.CONNECTING:
-                statusIndicator = '🔄';
-                statusText = 'Starting... (first startup may take longer)';
-                break;
-              case MCPServerStatus.DISCONNECTED:
-              default:
-                statusIndicator = '🔴';
-                statusText = 'Disconnected';
-                break;
-            }
-
-            // Get server description if available
-            const server = mcpServers[serverName];
-
-            // Format server header with bold formatting and status
-            message += `${statusIndicator} \u001b[1m${serverName}\u001b[0m - ${statusText}`;
-
-            // Add tool count with conditional messaging
-            if (status === MCPServerStatus.CONNECTED) {
-              message += ` (${serverTools.length} tools)`;
-            } else if (status === MCPServerStatus.CONNECTING) {
-              message += ` (tools will appear when ready)`;
-            } else {
-              message += ` (${serverTools.length} tools cached)`;
-            }
-
-            // Add server description with proper handling of multi-line descriptions
-            if ((useShowDescriptions || useShowSchema) && server?.description) {
-              const greenColor = '\u001b[32m';
-              const resetColor = '\u001b[0m';
-
-              const descLines = server.description.trim().split('\n');
-              if (descLines) {
-                message += ':\n';
-                for (let i = 0; i < descLines.length; i++) {
-                  message += `    ${greenColor}${descLines[i]}${resetColor}\n`;
-                }
-              } else {
-                message += '\n';
-              }
-            } else {
-              message += '\n';
-            }
-
-            // Reset formatting after server entry
-            message += '\u001b[0m';
-
-            if (serverTools.length > 0) {
-              serverTools.forEach((tool) => {
-                if (
-                  (useShowDescriptions || useShowSchema) &&
-                  tool.description
-                ) {
-                  // Format tool name in cyan using simple ANSI cyan color
-                  message += `  - \u001b[36m${tool.name}\u001b[0m`;
-
-                  // Apply green color to the description text
-                  const greenColor = '\u001b[32m';
-                  const resetColor = '\u001b[0m';
-
-                  // Handle multi-line descriptions by properly indenting and preserving formatting
-                  const descLines = tool.description.trim().split('\n');
-                  if (descLines) {
-                    message += ':\n';
-                    for (let i = 0; i < descLines.length; i++) {
-                      message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
-                    }
-                  } else {
-                    message += '\n';
-                  }
-                  // Reset is handled inline with each line now
-                } else {
-                  // Use cyan color for the tool name even when not showing descriptions
-                  message += `  - \u001b[36m${tool.name}\u001b[0m\n`;
-                }
-                if (useShowSchema) {
-                  // Prefix the parameters in cyan
-                  message += `    \u001b[36mParameters:\u001b[0m\n`;
-                  // Apply green color to the parameter text
-                  const greenColor = '\u001b[32m';
-                  const resetColor = '\u001b[0m';
-
-                  const paramsLines = JSON.stringify(
-                    tool.schema.parameters,
-                    null,
-                    2,
-                  )
-                    .trim()
-                    .split('\n');
-                  if (paramsLines) {
-                    for (let i = 0; i < paramsLines.length; i++) {
-                      message += `      ${greenColor}${paramsLines[i]}${resetColor}\n`;
-                    }
-                  }
-                }
-              });
-            } else {
-              message += '  No tools available\n';
-            }
-            message += '\n';
-          }
-
-          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
-          message += '\u001b[0m';
-
-          addMessage({
-            type: MessageType.INFO,
-            content: message,
-            timestamp: new Date(),
-          });
-        },
-      },
-      {
-        name: 'memory',
-        description:
-          'manage memory. Usage: /memory <show|refresh|add> [text for add]',
-        action: (mainCommand, subCommand, args) => {
-          switch (subCommand) {
-            case 'show':
-              showMemoryAction();
-              return; // Explicitly return void
-            case 'refresh':
-              performMemoryRefresh();
-              return; // Explicitly return void
-            case 'add':
-              return addMemoryAction(mainCommand, subCommand, args); // Return the object
-            default:
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Unknown /memory command: ${subCommand}. Available: show, refresh, add`,
-                timestamp: new Date(),
-              });
-              return; // Explicitly return void
-          }
-        },
-      },
-      {
-        name: 'tools',
-        description: 'list available Gemini CLI tools',
-        action: async (_mainCommand, _subCommand, _args) => {
-          // Check if the _subCommand includes a specific flag to control description visibility
-          let useShowDescriptions = showToolDescriptions;
-          if (_subCommand === 'desc' || _subCommand === 'descriptions') {
-            useShowDescriptions = true;
-          } else if (
-            _subCommand === 'nodesc' ||
-            _subCommand === 'nodescriptions'
-          ) {
-            useShowDescriptions = false;
-          } else if (_args === 'desc' || _args === 'descriptions') {
-            useShowDescriptions = true;
-          } else if (_args === 'nodesc' || _args === 'nodescriptions') {
-            useShowDescriptions = false;
-          }
-
-          const toolRegistry = await config?.getToolRegistry();
-          const tools = toolRegistry?.getAllTools();
-          if (!tools) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'Could not retrieve tools.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-
-          // Filter out MCP tools by checking if they have a serverName property
-          const geminiTools = tools.filter((tool) => !('serverName' in tool));
-
-          let message = 'Available Gemini CLI tools:\n\n';
-
-          if (geminiTools.length > 0) {
-            geminiTools.forEach((tool) => {
-              if (useShowDescriptions && tool.description) {
-                // Format tool name in cyan using simple ANSI cyan color
-                message += `  - \u001b[36m${tool.displayName} (${tool.name})\u001b[0m:\n`;
-
-                // Apply green color to the description text
-                const greenColor = '\u001b[32m';
-                const resetColor = '\u001b[0m';
-
-                // Handle multi-line descriptions by properly indenting and preserving formatting
-                const descLines = tool.description.trim().split('\n');
-
-                // If there are multiple lines, add proper indentation for each line
-                if (descLines) {
-                  for (let i = 0; i < descLines.length; i++) {
-                    message += `      ${greenColor}${descLines[i]}${resetColor}\n`;
-                  }
-                }
-              } else {
-                // Use cyan color for the tool name even when not showing descriptions
-                message += `  - \u001b[36m${tool.displayName}\u001b[0m\n`;
-              }
-            });
-          } else {
-            message += '  No tools available\n';
-          }
-          message += '\n';
-
-          // Make sure to reset any ANSI formatting at the end to prevent it from affecting the terminal
-          message += '\u001b[0m';
-
-          addMessage({
-            type: MessageType.INFO,
-            content: message,
-            timestamp: new Date(),
-          });
-        },
-      },
-      {
-        name: 'corgi',
-        action: (_mainCommand, _subCommand, _args) => {
-          toggleCorgiMode();
-        },
-      },
-      {
-        name: 'about',
-        description: 'show version info',
-        action: async (_mainCommand, _subCommand, _args) => {
-          const osVersion = process.platform;
-          let sandboxEnv = 'no sandbox';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-            sandboxEnv = process.env.SANDBOX;
-          } else if (process.env.SANDBOX === 'sandbox-exec') {
-            sandboxEnv = `sandbox-exec (${
-              process.env.SEATBELT_PROFILE || 'unknown'
-            })`;
-          }
-          const modelVersion = config?.getModel() || 'Unknown';
-          const cliVersion = await getCliVersion();
-          addMessage({
-            type: MessageType.ABOUT,
-            timestamp: new Date(),
-            cliVersion,
-            osVersion,
-            sandboxEnv,
-            modelVersion,
-          });
-        },
-      },
-      {
-        name: 'bug',
-        description: 'submit a bug report',
-        action: async (_mainCommand, _subCommand, args) => {
-          let bugDescription = _subCommand || '';
-          if (args) {
-            bugDescription += ` ${args}`;
-          }
-          bugDescription = bugDescription.trim();
-
-          const osVersion = `${process.platform} ${process.version}`;
-          let sandboxEnv = 'no sandbox';
-          if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-            sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
-          } else if (process.env.SANDBOX === 'sandbox-exec') {
-            sandboxEnv = `sandbox-exec (${
-              process.env.SEATBELT_PROFILE || 'unknown'
-            })`;
-          }
-          const modelVersion = config?.getModel() || 'Unknown';
-          const cliVersion = await getCliVersion();
-          const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
-
-          const info = `
-*   **CLI Version:** ${cliVersion}
-*   **Git Commit:** ${GIT_COMMIT_INFO}
-*   **Operating System:** ${osVersion}
-*   **Sandbox Environment:** ${sandboxEnv}
-*   **Model Version:** ${modelVersion}
-*   **Memory Usage:** ${memoryUsage}
-`;
-
-          let bugReportUrl =
-            'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
-          const bugCommand = config?.getBugCommand();
-          if (bugCommand?.urlTemplate) {
-            bugReportUrl = bugCommand.urlTemplate;
-          }
-          bugReportUrl = bugReportUrl
-            .replace('{title}', encodeURIComponent(bugDescription))
-            .replace('{info}', encodeURIComponent(info));
-
-          addMessage({
-            type: MessageType.INFO,
-            content: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
-            timestamp: new Date(),
-          });
-          (async () => {
-            try {
-              await open(bugReportUrl);
-            } catch (error) {
-              const errorMessage =
-                error instanceof Error ? error.message : String(error);
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Could not open URL in browser: ${errorMessage}`,
-                timestamp: new Date(),
-              });
-            }
-          })();
-        },
-      },
-      {
-        name: 'chat',
-        description:
-          'Manage conversation history. Usage: /chat <list|save|resume> [tag]',
-        action: async (_mainCommand, subCommand, args) => {
-          const tag = (args || '').trim();
-          const logger = new Logger(config?.getSessionId() || '');
-          await logger.initialize();
-          const chat = await config?.getGeminiClient()?.getChat();
-          if (!chat) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'No chat client available for conversation status.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-          switch (subCommand) {
-            case 'save': {
-              const history = chat.getHistory();
-              if (history.length > 0) {
-                await logger.saveCheckpoint(chat?.getHistory() || [], tag);
-                addMessage({
-                  type: MessageType.INFO,
-                  content: `Conversation checkpoint saved${tag ? ' with tag: ' + tag : ''}.`,
-                  timestamp: new Date(),
-                });
-              } else {
-                addMessage({
-                  type: MessageType.INFO,
-                  content: 'No conversation found to save.',
-                  timestamp: new Date(),
-                });
-              }
-              return;
-            }
-            case 'resume':
-            case 'restore':
-            case 'load': {
-              const conversation = await logger.loadCheckpoint(tag);
-              if (conversation.length === 0) {
-                addMessage({
-                  type: MessageType.INFO,
-                  content: `No saved checkpoint found${tag ? ' with tag: ' + tag : ''}.`,
-                  timestamp: new Date(),
-                });
-                return;
-              }
-
-              clearItems();
-              chat.clearHistory();
-              const rolemap: { [key: string]: MessageType } = {
-                user: MessageType.USER,
-                model: MessageType.GEMINI,
-              };
-              let hasSystemPrompt = false;
-              let i = 0;
-              for (const item of conversation) {
-                i += 1;
-
-                // Add each item to history regardless of whether we display
-                // it.
-                chat.addHistory(item);
-
-                const text =
-                  item.parts
-                    ?.filter((m) => !!m.text)
-                    .map((m) => m.text)
-                    .join('') || '';
-                if (!text) {
-                  // Parsing Part[] back to various non-text output not yet implemented.
-                  continue;
-                }
-                if (i === 1 && text.match(/context for our chat/)) {
-                  hasSystemPrompt = true;
-                }
-                if (i > 2 || !hasSystemPrompt) {
-                  addItem(
-                    {
-                      type:
-                        (item.role && rolemap[item.role]) || MessageType.GEMINI,
-                      text,
-                    } as HistoryItemWithoutId,
-                    i,
-                  );
-                }
-              }
-              console.clear();
-              refreshStatic();
-              return;
-            }
-            case 'list':
-              addMessage({
-                type: MessageType.INFO,
-                content:
-                  'list of saved conversations: ' +
-                  (await savedChatTags()).join(', '),
-                timestamp: new Date(),
-              });
-              return;
-            default:
-              addMessage({
-                type: MessageType.ERROR,
-                content: `Unknown /chat command: ${subCommand}. Available: list, save, resume`,
-                timestamp: new Date(),
-              });
-              return;
-          }
-        },
-        completion: async () =>
-          (await savedChatTags()).map((tag) => 'resume ' + tag),
-      },
-      {
-        name: 'quit',
-        altName: 'exit',
-        description: 'exit the cli',
-        action: async (mainCommand, _subCommand, _args) => {
-          const now = new Date();
-          const { sessionStartTime, cumulative } = session.stats;
-          const wallDuration = now.getTime() - sessionStartTime.getTime();
-
-          setQuittingMessages([
-            {
-              type: 'user',
-              text: `/${mainCommand}`,
-              id: now.getTime() - 1,
-            },
-            {
-              type: 'quit',
-              stats: cumulative,
-              duration: formatDuration(wallDuration),
-              id: now.getTime(),
-            },
-          ]);
-
-          setTimeout(() => {
-            process.exit(0);
-          }, 100);
-        },
-      },
-      {
-        name: 'compress',
-        altName: 'summarize',
-        description: 'Compresses the context by replacing it with a summary.',
-        action: async (_mainCommand, _subCommand, _args) => {
-          if (pendingCompressionItemRef.current !== null) {
-            addMessage({
-              type: MessageType.ERROR,
-              content:
-                'Already compressing, wait for previous request to complete',
-              timestamp: new Date(),
-            });
-            return;
-          }
-          setPendingCompressionItem({
-            type: MessageType.COMPRESSION,
-            compression: {
-              isPending: true,
-              originalTokenCount: null,
-              newTokenCount: null,
-            },
-          });
-          try {
-            const compressed = await config!
-              .getGeminiClient()!
-              .tryCompressChat(true);
-            if (compressed) {
-              addMessage({
-                type: MessageType.COMPRESSION,
-                compression: {
-                  isPending: false,
-                  originalTokenCount: compressed.originalTokenCount,
-                  newTokenCount: compressed.newTokenCount,
-                },
-                timestamp: new Date(),
-              });
-            } else {
-              addMessage({
-                type: MessageType.ERROR,
-                content: 'Failed to compress chat history.',
-                timestamp: new Date(),
-              });
-            }
-          } catch (e) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: `Failed to compress chat history: ${e instanceof Error ? e.message : String(e)}`,
-              timestamp: new Date(),
-            });
-          }
-          setPendingCompressionItem(null);
-        },
-      },
-    ];
-
-    if (config?.getCheckpointingEnabled()) {
-      commands.push({
-        name: 'restore',
-        description:
-          'restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
-        completion: async () => {
-          const checkpointDir = config?.getProjectTempDir()
-            ? path.join(config.getProjectTempDir(), 'checkpoints')
-            : undefined;
-          if (!checkpointDir) {
-            return [];
-          }
-          try {
-            const files = await fs.readdir(checkpointDir);
-            return files
-              .filter((file) => file.endsWith('.json'))
-              .map((file) => file.replace('.json', ''));
-          } catch (_err) {
-            return [];
-          }
-        },
-        action: async (_mainCommand, subCommand, _args) => {
-          const checkpointDir = config?.getProjectTempDir()
-            ? path.join(config.getProjectTempDir(), 'checkpoints')
-            : undefined;
-
-          if (!checkpointDir) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: 'Could not determine the .gemini directory path.',
-              timestamp: new Date(),
-            });
-            return;
-          }
-
-          try {
-            // Ensure the directory exists before trying to read it.
-            await fs.mkdir(checkpointDir, { recursive: true });
-            const files = await fs.readdir(checkpointDir);
-            const jsonFiles = files.filter((file) => file.endsWith('.json'));
-
-            if (!subCommand) {
-              if (jsonFiles.length === 0) {
-                addMessage({
-                  type: MessageType.INFO,
-                  content: 'No restorable tool calls found.',
-                  timestamp: new Date(),
-                });
-                return;
-              }
-              const truncatedFiles = jsonFiles.map((file) => {
-                const components = file.split('.');
-                if (components.length <= 1) {
-                  return file;
-                }
-                components.pop();
-                return components.join('.');
-              });
-              const fileList = truncatedFiles.join('\n');
-              addMessage({
-                type: MessageType.INFO,
-                content: `Available tool calls to restore:\n\n${fileList}`,
-                timestamp: new Date(),
-              });
-              return;
-            }
-
-            const selectedFile = subCommand.endsWith('.json')
-              ? subCommand
-              : `${subCommand}.json`;
-
-            if (!jsonFiles.includes(selectedFile)) {
-              addMessage({
-                type: MessageType.ERROR,
-                content: `File not found: ${selectedFile}`,
-                timestamp: new Date(),
-              });
-              return;
-            }
-
-            const filePath = path.join(checkpointDir, selectedFile);
-            const data = await fs.readFile(filePath, 'utf-8');
-            const toolCallData = JSON.parse(data);
-
-            if (toolCallData.history) {
-              loadHistory(toolCallData.history);
-            }
-
-            if (toolCallData.clientHistory) {
-              await config
-                ?.getGeminiClient()
-                ?.setHistory(toolCallData.clientHistory);
-            }
-
-            if (toolCallData.commitHash) {
-              await gitService?.restoreProjectFromSnapshot(
-                toolCallData.commitHash,
-              );
-              addMessage({
-                type: MessageType.INFO,
-                content: `Restored project to the state before the tool call.`,
-                timestamp: new Date(),
-              });
-            }
-
-            return {
-              shouldScheduleTool: true,
-              toolName: toolCallData.toolCall.name,
-              toolArgs: toolCallData.toolCall.args,
-            };
-          } catch (error) {
-            addMessage({
-              type: MessageType.ERROR,
-              content: `Could not read restorable tool calls. This is the error: ${error}`,
-              timestamp: new Date(),
-            });
-          }
-        },
-      });
-    }
-    return commands;
-  }, [
-    onDebugMessage,
-    setShowHelp,
-    refreshStatic,
-    openThemeDialog,
-    openAuthDialog,
-    openEditorDialog,
-    clearItems,
-    performMemoryRefresh,
-    showMemoryAction,
-    addMemoryAction,
-    addMessage,
-    toggleCorgiMode,
-    savedChatTags,
-    config,
-    showToolDescriptions,
-    session,
-    gitService,
-    loadHistory,
-    addItem,
-    setQuittingMessages,
-    pendingCompressionItemRef,
-    setPendingCompressionItem,
-  ]);
+    return () => {
+      controller.abort();
+    };
+  }, [config, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,
-    ): Promise<SlashCommandActionReturn | boolean> => {
+      oneTimeShellAllowlist?: Set<string>,
+      overwriteConfirmed?: boolean,
+      addToHistory: boolean = true,
+    ): Promise<SlashCommandProcessorResult | false> => {
+      if (!commands) {
+        return false;
+      }
       if (typeof rawQuery !== 'string') {
         return false;
       }
+
       const trimmed = rawQuery.trim();
       if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
         return false;
       }
-      const userMessageTimestamp = Date.now();
-      if (trimmed !== '/quit' && trimmed !== '/exit') {
+
+      setIsProcessing(true);
+
+      if (addToHistory) {
+        const userMessageTimestamp = Date.now();
         addItem(
           { type: MessageType.USER, text: trimmed },
           userMessageTimestamp,
         );
       }
 
-      let subCommand: string | undefined;
-      let args: string | undefined;
+      let hasError = false;
+      const {
+        commandToExecute,
+        args,
+        canonicalPath: resolvedCommandPath,
+      } = parseSlashCommand(trimmed, commands);
 
-      const commandToMatch = (() => {
-        if (trimmed.startsWith('?')) {
-          return 'help';
-        }
-        const parts = trimmed.substring(1).trim().split(/\s+/);
-        if (parts.length > 1) {
-          subCommand = parts[1];
-        }
-        if (parts.length > 2) {
-          args = parts.slice(2).join(' ');
-        }
-        return parts[0];
-      })();
+      const subcommand =
+        resolvedCommandPath.length > 1
+          ? resolvedCommandPath.slice(1).join(' ')
+          : undefined;
 
-      const mainCommand = commandToMatch;
+      try {
+        if (commandToExecute) {
+          if (commandToExecute.action) {
+            const fullCommandContext: CommandContext = {
+              ...commandContext,
+              invocation: {
+                raw: trimmed,
+                name: commandToExecute.name,
+                args,
+              },
+              overwriteConfirmed,
+            };
 
-      for (const cmd of slashCommands) {
-        if (mainCommand === cmd.name || mainCommand === cmd.altName) {
-          const actionResult = await cmd.action(mainCommand, subCommand, args);
-          if (
-            typeof actionResult === 'object' &&
-            actionResult?.shouldScheduleTool
-          ) {
-            return actionResult; // Return the object for useGeminiStream
+            // If a one-time list is provided for a "Proceed" action, temporarily
+            // augment the session allowlist for this single execution.
+            if (oneTimeShellAllowlist && oneTimeShellAllowlist.size > 0) {
+              fullCommandContext.session = {
+                ...fullCommandContext.session,
+                sessionShellAllowlist: new Set([
+                  ...fullCommandContext.session.sessionShellAllowlist,
+                  ...oneTimeShellAllowlist,
+                ]),
+              };
+            }
+            const result = await commandToExecute.action(
+              fullCommandContext,
+              args,
+            );
+
+            if (result) {
+              switch (result.type) {
+                case 'tool':
+                  return {
+                    type: 'schedule_tool',
+                    toolName: result.toolName,
+                    toolArgs: result.toolArgs,
+                  };
+                case 'message':
+                  addItem(
+                    {
+                      type:
+                        result.messageType === 'error'
+                          ? MessageType.ERROR
+                          : MessageType.INFO,
+                      text: result.content,
+                    },
+                    Date.now(),
+                  );
+                  return { type: 'handled' };
+                case 'dialog':
+                  switch (result.dialog) {
+                    case 'auth':
+                      actions.openAuthDialog();
+                      return { type: 'handled' };
+                    case 'theme':
+                      actions.openThemeDialog();
+                      return { type: 'handled' };
+                    case 'editor':
+                      actions.openEditorDialog();
+                      return { type: 'handled' };
+                    case 'privacy':
+                      actions.openPrivacyNotice();
+                      return { type: 'handled' };
+                    case 'settings':
+                      actions.openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'model':
+                      actions.openModelDialog();
+                      return { type: 'handled' };
+                    case 'permissions':
+                      actions.openPermissionsDialog(
+                        result.props as { targetDirectory?: string },
+                      );
+                      return { type: 'handled' };
+                    case 'help':
+                      return { type: 'handled' };
+                    default: {
+                      const unhandled: never = result.dialog;
+                      throw new Error(
+                        `Unhandled slash command result: ${unhandled}`,
+                      );
+                    }
+                  }
+                case 'load_history': {
+                  config?.getGeminiClient()?.setHistory(result.clientHistory);
+                  fullCommandContext.ui.clear();
+                  result.history.forEach((item, index) => {
+                    fullCommandContext.ui.addItem(item, index);
+                  });
+                  return { type: 'handled' };
+                }
+                case 'quit':
+                  actions.quit(result.messages);
+                  return { type: 'handled' };
+
+                case 'submit_prompt':
+                  return {
+                    type: 'submit_prompt',
+                    content: result.content,
+                  };
+                case 'confirm_shell_commands': {
+                  const { outcome, approvedCommands } = await new Promise<{
+                    outcome: ToolConfirmationOutcome;
+                    approvedCommands?: string[];
+                  }>((resolve) => {
+                    setShellConfirmationRequest({
+                      commands: result.commandsToConfirm,
+                      onConfirm: (
+                        resolvedOutcome,
+                        resolvedApprovedCommands,
+                      ) => {
+                        setShellConfirmationRequest(null); // Close the dialog
+                        resolve({
+                          outcome: resolvedOutcome,
+                          approvedCommands: resolvedApprovedCommands,
+                        });
+                      },
+                    });
+                  });
+
+                  if (
+                    outcome === ToolConfirmationOutcome.Cancel ||
+                    !approvedCommands ||
+                    approvedCommands.length === 0
+                  ) {
+                    return { type: 'handled' };
+                  }
+
+                  if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+                    setSessionShellAllowlist(
+                      (prev) => new Set([...prev, ...approvedCommands]),
+                    );
+                  }
+
+                  return await handleSlashCommand(
+                    result.originalInvocation.raw,
+                    // Pass the approved commands as a one-time grant for this execution.
+                    new Set(approvedCommands),
+                  );
+                }
+                case 'confirm_action': {
+                  const { confirmed } = await new Promise<{
+                    confirmed: boolean;
+                  }>((resolve) => {
+                    setConfirmationRequest({
+                      prompt: result.prompt,
+                      onConfirm: (resolvedConfirmed) => {
+                        setConfirmationRequest(null);
+                        resolve({ confirmed: resolvedConfirmed });
+                      },
+                    });
+                  });
+
+                  if (!confirmed) {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Operation cancelled.',
+                      },
+                      Date.now(),
+                    );
+                    return { type: 'handled' };
+                  }
+
+                  return await handleSlashCommand(
+                    result.originalInvocation.raw,
+                    undefined,
+                    true,
+                  );
+                }
+                case 'custom_dialog': {
+                  setCustomDialog(result.component);
+                  return { type: 'handled' };
+                }
+                default: {
+                  const unhandled: never = result;
+                  throw new Error(
+                    `Unhandled slash command result: ${unhandled}`,
+                  );
+                }
+              }
+            }
+
+            return { type: 'handled' };
+          } else if (commandToExecute.subCommands) {
+            const helpText = `Command '/${commandToExecute.name}' requires a subcommand. Available:\n${commandToExecute.subCommands
+              .map((sc) => `  - ${sc.name}: ${sc.description || ''}`)
+              .join('\n')}`;
+            addMessage({
+              type: MessageType.INFO,
+              content: helpText,
+              timestamp: new Date(),
+            });
+            return { type: 'handled' };
           }
-          return true; // Command was handled, but no tool to schedule
         }
-      }
 
-      addMessage({
-        type: MessageType.ERROR,
-        content: `Unknown command: ${trimmed}`,
-        timestamp: new Date(),
-      });
-      return true; // Indicate command was processed (even if unknown)
+        addMessage({
+          type: MessageType.ERROR,
+          content: `Unknown command: ${trimmed}`,
+          timestamp: new Date(),
+        });
+
+        return { type: 'handled' };
+      } catch (e: unknown) {
+        hasError = true;
+        if (config) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.ERROR,
+            extension_id: commandToExecute?.extensionId,
+          });
+          logSlashCommand(config, event);
+        }
+        addItem(
+          {
+            type: MessageType.ERROR,
+            text: e instanceof Error ? e.message : String(e),
+          },
+          Date.now(),
+        );
+        return { type: 'handled' };
+      } finally {
+        if (config && resolvedCommandPath[0] && !hasError) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.SUCCESS,
+            extension_id: commandToExecute?.extensionId,
+          });
+          logSlashCommand(config, event);
+        }
+        setIsProcessing(false);
+      }
     },
-    [addItem, slashCommands, addMessage],
+    [
+      config,
+      addItem,
+      actions,
+      commands,
+      commandContext,
+      addMessage,
+      setShellConfirmationRequest,
+      setSessionShellAllowlist,
+      setIsProcessing,
+      setConfirmationRequest,
+      setCustomDialog,
+    ],
   );
 
-  return { handleSlashCommand, slashCommands, pendingHistoryItems };
+  return {
+    handleSlashCommand,
+    slashCommands: commands,
+    pendingHistoryItems,
+    commandContext,
+    shellConfirmationRequest,
+    confirmationRequest,
+  };
 };

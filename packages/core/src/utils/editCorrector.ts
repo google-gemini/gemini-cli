@@ -4,23 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Content } from '@google/genai';
+import type { GeminiClient } from '../core/client.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import type { EditToolParams } from '../tools/edit.js';
 import {
-  Content,
-  GenerateContentConfig,
-  SchemaUnion,
-  Type,
-} from '@google/genai';
-import { GeminiClient } from '../core/client.js';
-import { EditToolParams } from '../tools/edit.js';
+  EDIT_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  isFunctionResponse,
+  isFunctionCall,
+} from '../utils/messageInspectors.js';
+import * as fs from 'node:fs';
+import { promptIdContext } from './promptIdContext.js';
 
-const EditModel = DEFAULT_GEMINI_FLASH_MODEL;
-const EditConfig: GenerateContentConfig = {
-  thinkingConfig: {
-    thinkingBudget: 0,
-  },
-};
+const CODE_CORRECTION_SYSTEM_PROMPT = `
+You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
+The correction should be as minimal as possible, staying very close to the original.
+Focus ONLY on fixing issues like whitespace, indentation, line endings, or incorrect escaping.
+Do NOT invent a completely new edit. Your job is to fix the provided parameters to make the edit succeed.
+Return ONLY the corrected snippet in the specified JSON format.
+`.trim();
+
+function getPromptId(): string {
+  return promptIdContext.getStore() ?? `edit-corrector-${Date.now()}`;
+}
 
 const MAX_CACHE_SIZE = 50;
 
@@ -50,6 +63,96 @@ export interface CorrectedEditResult {
 }
 
 /**
+ * Extracts the timestamp from the .id value, which is in format
+ * <tool.name>-<timestamp>-<uuid>
+ * @param fcnId the ID value of a functionCall or functionResponse object
+ * @returns -1 if the timestamp could not be extracted, else the timestamp (as a number)
+ */
+function getTimestampFromFunctionId(fcnId: string): number {
+  const idParts = fcnId.split('-');
+  if (idParts.length > 2) {
+    const timestamp = parseInt(idParts[1], 10);
+    if (!isNaN(timestamp)) {
+      return timestamp;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Will look through the gemini client history and determine when the most recent
+ * edit to a target file occurred. If no edit happened, it will return -1
+ * @param filePath the path to the file
+ * @param client the geminiClient, so that we can get the history
+ * @returns a DateTime (as a number) of when the last edit occurred, or -1 if no edit was found.
+ */
+async function findLastEditTimestamp(
+  filePath: string,
+  client: GeminiClient,
+): Promise<number> {
+  const history = (await client.getHistory()) ?? [];
+
+  // Tools that may reference the file path in their FunctionResponse `output`.
+  const toolsInResp = new Set([
+    WRITE_FILE_TOOL_NAME,
+    EDIT_TOOL_NAME,
+    READ_MANY_FILES_TOOL_NAME,
+    GREP_TOOL_NAME,
+  ]);
+  // Tools that may reference the file path in their FunctionCall `args`.
+  const toolsInCall = new Set([...toolsInResp, READ_FILE_TOOL_NAME]);
+
+  // Iterate backwards to find the most recent relevant action.
+  for (const entry of history.slice().reverse()) {
+    if (!entry.parts) continue;
+
+    for (const part of entry.parts) {
+      let id: string | undefined;
+      let content: unknown;
+
+      // Check for a relevant FunctionCall with the file path in its arguments.
+      if (
+        isFunctionCall(entry) &&
+        part.functionCall?.name &&
+        toolsInCall.has(part.functionCall.name)
+      ) {
+        id = part.functionCall.id;
+        content = part.functionCall.args;
+      }
+      // Check for a relevant FunctionResponse with the file path in its output.
+      else if (
+        isFunctionResponse(entry) &&
+        part.functionResponse?.name &&
+        toolsInResp.has(part.functionResponse.name)
+      ) {
+        const { response } = part.functionResponse;
+        if (response && !('error' in response) && 'output' in response) {
+          id = part.functionResponse.id;
+          content = response['output'];
+        }
+      }
+
+      if (!id || content === undefined) continue;
+
+      // Use the "blunt hammer" approach to find the file path in the content.
+      // Note that the tool response data is inconsistent in their formatting
+      // with successes and errors - so, we just check for the existence
+      // as the best guess to if error/failed occurred with the response.
+      const stringified = JSON.stringify(content);
+      if (
+        !stringified.includes('Error') && // only applicable for functionResponse
+        !stringified.includes('Failed') && // only applicable for functionResponse
+        stringified.includes(filePath)
+      ) {
+        return getTimestampFromFunctionId(id);
+      }
+    }
+  }
+
+  return -1;
+}
+
+/**
  * Attempts to correct edit parameters if the original old_string is not found.
  * It tries unescaping, and then LLM-based correction.
  * Results are cached to avoid redundant processing.
@@ -61,9 +164,11 @@ export interface CorrectedEditResult {
  *          EditToolParams (as CorrectedEditParams) and the final occurrences count.
  */
 export async function ensureCorrectEdit(
+  filePath: string,
   currentContent: string,
   originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
-  client: GeminiClient,
+  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<CorrectedEditResult> {
   const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
@@ -85,7 +190,7 @@ export async function ensureCorrectEdit(
   if (occurrences === expectedReplacements) {
     if (newStringPotentiallyEscaped) {
       finalNewString = await correctNewStringEscaping(
-        client,
+        baseLlmClient,
         finalOldString,
         originalParams.new_string,
         abortSignal,
@@ -132,7 +237,7 @@ export async function ensureCorrectEdit(
       finalOldString = unescapedOldStringAttempt;
       if (newStringPotentiallyEscaped) {
         finalNewString = await correctNewString(
-          client,
+          baseLlmClient,
           originalParams.old_string, // original old
           unescapedOldStringAttempt, // corrected old
           originalParams.new_string, // original new (which is potentially escaped)
@@ -140,8 +245,36 @@ export async function ensureCorrectEdit(
         );
       }
     } else if (occurrences === 0) {
+      if (filePath) {
+        // In order to keep from clobbering edits made outside our system,
+        // let's check if there was a more recent edit to the file than what
+        // our system has done
+        const lastEditedByUsTime = await findLastEditTimestamp(
+          filePath,
+          geminiClient,
+        );
+
+        // Add a 1-second buffer to account for timing inaccuracies. If the file
+        // was modified more than a second after the last edit tool was run, we
+        // can assume it was modified by something else.
+        if (lastEditedByUsTime > 0) {
+          const stats = fs.statSync(filePath);
+          const diff = stats.mtimeMs - lastEditedByUsTime;
+          if (diff > 2000) {
+            // Hard coded for 2 seconds
+            // This file was edited sooner
+            const result: CorrectedEditResult = {
+              params: { ...originalParams },
+              occurrences: 0, // Explicitly 0 as LLM failed
+            };
+            editCorrectionCache.set(cacheKey, result);
+            return result;
+          }
+        }
+      }
+
       const llmCorrectedOldString = await correctOldStringMismatch(
-        client,
+        baseLlmClient,
         currentContent,
         unescapedOldStringAttempt,
         abortSignal,
@@ -160,7 +293,7 @@ export async function ensureCorrectEdit(
             originalParams.new_string,
           );
           finalNewString = await correctNewString(
-            client,
+            baseLlmClient,
             originalParams.old_string, // original old
             llmCorrectedOldString, // corrected old
             baseNewStringForLLMCorrection, // base new for correction
@@ -177,7 +310,7 @@ export async function ensureCorrectEdit(
         return result;
       }
     } else {
-      // Unescaping old_string resulted in > 1 occurrences
+      // Unescaping old_string resulted in > 1 occurrence
       const result: CorrectedEditResult = {
         params: { ...originalParams },
         occurrences, // This will be > 1
@@ -211,7 +344,7 @@ export async function ensureCorrectEdit(
 
 export async function ensureCorrectFileContent(
   content: string,
-  client: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<string> {
   const cachedResult = fileContentCorrectionCache.get(content);
@@ -228,7 +361,7 @@ export async function ensureCorrectFileContent(
 
   const correctedContent = await correctStringEscaping(
     content,
-    client,
+    baseLlmClient,
     abortSignal,
   );
   fileContentCorrectionCache.set(content, correctedContent);
@@ -236,11 +369,11 @@ export async function ensureCorrectFileContent(
 }
 
 // Define the expected JSON schema for the LLM response for old_string correction
-const OLD_STRING_CORRECTION_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const OLD_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_target_snippet: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The corrected version of the target snippet that exactly and uniquely matches a segment within the provided file content.',
     },
@@ -249,7 +382,7 @@ const OLD_STRING_CORRECTION_SCHEMA: SchemaUnion = {
 };
 
 export async function correctOldStringMismatch(
-  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   fileContent: string,
   problematicSnippet: string,
   abortSignal: AbortSignal,
@@ -278,20 +411,21 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await geminiClient.generateJson(
+    const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
-      OLD_STRING_CORRECTION_SCHEMA,
+      schema: OLD_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&
-      typeof result.corrected_target_snippet === 'string' &&
-      result.corrected_target_snippet.length > 0
+      typeof result['corrected_target_snippet'] === 'string' &&
+      result['corrected_target_snippet'].length > 0
     ) {
-      return result.corrected_target_snippet;
+      return result['corrected_target_snippet'];
     } else {
       return problematicSnippet;
     }
@@ -310,11 +444,11 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
 }
 
 // Define the expected JSON schema for the new_string correction LLM response
-const NEW_STRING_CORRECTION_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const NEW_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_new_string: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The original_new_string adjusted to be a suitable replacement for the corrected_old_string, while maintaining the original intent of the change.',
     },
@@ -326,7 +460,7 @@ const NEW_STRING_CORRECTION_SCHEMA: SchemaUnion = {
  * Adjusts the new_string to align with a corrected old_string, maintaining the original intent.
  */
 export async function correctNewString(
-  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   originalOldString: string,
   correctedOldString: string,
   originalNewString: string,
@@ -366,20 +500,21 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await geminiClient.generateJson(
+    const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
-      NEW_STRING_CORRECTION_SCHEMA,
+      schema: NEW_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&
-      typeof result.corrected_new_string === 'string' &&
-      result.corrected_new_string.length > 0
+      typeof result['corrected_new_string'] === 'string' &&
+      result['corrected_new_string'].length > 0
     ) {
-      return result.corrected_new_string;
+      return result['corrected_new_string'];
     } else {
       return originalNewString;
     }
@@ -393,11 +528,11 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
-const CORRECT_NEW_STRING_ESCAPING_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const CORRECT_NEW_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_new_string_escaping: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The new_string with corrected escaping, ensuring it is a proper replacement for the old_string, especially considering potential over-escaping issues from previous LLM generations.',
     },
@@ -406,7 +541,7 @@ const CORRECT_NEW_STRING_ESCAPING_SCHEMA: SchemaUnion = {
 };
 
 export async function correctNewStringEscaping(
-  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   oldString: string,
   potentiallyProblematicNewString: string,
   abortSignal: AbortSignal,
@@ -435,20 +570,21 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await geminiClient.generateJson(
+    const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
-      CORRECT_NEW_STRING_ESCAPING_SCHEMA,
+      schema: CORRECT_NEW_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&
-      typeof result.corrected_new_string_escaping === 'string' &&
-      result.corrected_new_string_escaping.length > 0
+      typeof result['corrected_new_string_escaping'] === 'string' &&
+      result['corrected_new_string_escaping'].length > 0
     ) {
-      return result.corrected_new_string_escaping;
+      return result['corrected_new_string_escaping'];
     } else {
       return potentiallyProblematicNewString;
     }
@@ -465,11 +601,11 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
-const CORRECT_STRING_ESCAPING_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const CORRECT_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_string_escaping: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The string with corrected escaping, ensuring it is valid, specially considering potential over-escaping issues from previous LLM generations.',
     },
@@ -479,7 +615,7 @@ const CORRECT_STRING_ESCAPING_SCHEMA: SchemaUnion = {
 
 export async function correctStringEscaping(
   potentiallyProblematicString: string,
-  client: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<string> {
   const prompt = `
@@ -501,20 +637,21 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await client.generateJson(
+    const result = await baseLlmClient.generateJson({
+      modelConfigKey: { model: 'edit-corrector' },
       contents,
-      CORRECT_STRING_ESCAPING_SCHEMA,
+      schema: CORRECT_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&
-      typeof result.corrected_string_escaping === 'string' &&
-      result.corrected_string_escaping.length > 0
+      typeof result['corrected_string_escaping'] === 'string' &&
+      result['corrected_string_escaping'].length > 0
     ) {
-      return result.corrected_string_escaping;
+      return result['corrected_string_escaping'];
     } else {
       return potentiallyProblematicString;
     }
