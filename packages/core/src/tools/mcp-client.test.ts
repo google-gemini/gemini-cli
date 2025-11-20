@@ -40,6 +40,7 @@ vi.mock('../mcp/oauth-utils.js');
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
+    emitConsoleLog: vi.fn(),
   },
 }));
 

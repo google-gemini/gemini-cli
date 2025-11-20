@@ -33,7 +33,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
             <Banner
               width={mainAreaWidth}
               bannerText={bannerText}
-              color={bannerColor}
+              isWarning={warningText !== ''}
             />
           )}
         </>

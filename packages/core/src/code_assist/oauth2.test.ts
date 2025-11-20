@@ -26,6 +26,7 @@ import type { Config } from '../config/config.js';
 import readline from 'node:readline';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR } from '../utils/paths.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -241,7 +242,7 @@ describe('oauth2', () => {
       (readline.createInterface as Mock).mockReturnValue(mockReadline);
 
       const consoleLogSpy = vi
-        .spyOn(console, 'log')
+        .spyOn(debugLogger, 'log')
         .mockImplementation(() => {});
 
       const client = await getOauthClient(
@@ -855,7 +856,7 @@ describe('oauth2', () => {
         } as unknown as Response);
 
         const consoleLogSpy = vi
-          .spyOn(console, 'log')
+          .spyOn(debugLogger, 'log')
           .mockImplementation(() => {});
 
         let requestCallback!: http.RequestListener;
@@ -935,10 +936,10 @@ describe('oauth2', () => {
         (readline.createInterface as Mock).mockReturnValue(mockReadline);
 
         const consoleLogSpy = vi
-          .spyOn(console, 'log')
+          .spyOn(debugLogger, 'log')
           .mockImplementation(() => {});
         const consoleErrorSpy = vi
-          .spyOn(console, 'error')
+          .spyOn(debugLogger, 'error')
           .mockImplementation(() => {});
 
         await expect(
