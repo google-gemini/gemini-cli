@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { StickyHeader } from '../StickyHeader.js';
@@ -16,9 +17,7 @@ import {
   type TextEmphasis,
   STATUS_INDICATOR_WIDTH,
 } from './ToolShared.js';
-import {
-  SHELL_COMMAND_NAME,
-} from '../../constants.js';
+import { SHELL_COMMAND_NAME } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
@@ -35,9 +34,9 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   isFirst: boolean;
   borderColor: string;
   borderDimColor: boolean;
-  activeShellPtyId?: string;
+  activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
-  ptyId?: string;
+  ptyId?: number;
   config?: Config;
 }
 
