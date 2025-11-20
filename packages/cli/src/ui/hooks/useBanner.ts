@@ -5,8 +5,6 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { theme } from '../semantic-colors.js';
-import { Colors } from '../colors.js';
 import { persistentState } from '../../utils/persistentState.js';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -68,9 +66,6 @@ export function useBanner(bannerData: BannerData, config: Config) {
   const rawBannerText = showDefaultBanner ? defaultTextDelimited : warningText;
   const bannerText = rawBannerText.replace(/\\n/g, '\n');
 
-  const defaultColor = Colors.AccentBlue;
-  const bannerColor = warningText === '' ? defaultColor : theme.status.warning;
-
   const lastIncrementedKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -91,6 +86,5 @@ export function useBanner(bannerData: BannerData, config: Config) {
 
   return {
     bannerText,
-    bannerColor,
   };
 }

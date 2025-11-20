@@ -75,7 +75,6 @@ describe('useBanner', () => {
     );
 
     expect(result.current.bannerText).toBe('Standard Banner');
-    expect(result.current.bannerColor).toBe('mock-accent-blue');
   });
 
   it('should return warning text and warning color if warningText is present', () => {
@@ -86,7 +85,6 @@ describe('useBanner', () => {
     );
 
     expect(result.current.bannerText).toBe('Critical Error');
-    expect(result.current.bannerColor).toBe('mock-warning-color');
   });
 
   it('should NOT show default banner if preview features are enabled in config', () => {
