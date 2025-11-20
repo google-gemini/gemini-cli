@@ -8,10 +8,12 @@ import { render } from '../../test-utils/render.js';
 import { cleanup } from 'ink-testing-library';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  GEMINI_MODEL_ALIAS_FLASH_LITE,
-  GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_PRO,
   DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import { ModelDialog } from './ModelDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -51,9 +53,9 @@ const renderComponent = (
         getDebugMode: vi.fn(() => false),
         getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
         getUseSmartEdit: vi.fn(() => false),
+        getUseModelRouter: vi.fn(() => false),
         getProxy: vi.fn(() => undefined),
         isInteractive: vi.fn(() => false),
-        getExperiments: () => {},
 
         // --- Spread test-specific overrides ---
         ...contextValue,
@@ -92,22 +94,38 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('passes all model options to DescriptiveRadioButtonSelect', () => {
-    const { unmount } = renderComponent();
+  it('passes all model options to DescriptiveRadioButtonSelect (preview OFF)', () => {
+    const { unmount } = renderComponent(
+      {},
+      { getPreviewFeatures: () => false },
+    );
     expect(mockedSelect).toHaveBeenCalledTimes(1);
 
     const props = mockedSelect.mock.calls[0][0];
     expect(props.items).toHaveLength(4);
     expect(props.items[0].value).toBe(DEFAULT_GEMINI_MODEL_AUTO);
-    expect(props.items[1].value).toBe(GEMINI_MODEL_ALIAS_PRO);
-    expect(props.items[2].value).toBe(GEMINI_MODEL_ALIAS_FLASH);
-    expect(props.items[3].value).toBe(GEMINI_MODEL_ALIAS_FLASH_LITE);
+    expect(props.items[1].value).toBe(DEFAULT_GEMINI_MODEL); // Pro is default
+    expect(props.items[2].value).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(props.items[3].value).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    expect(props.showNumbers).toBe(true);
+    unmount();
+  });
+  it('passes all model options to DescriptiveRadioButtonSelect (preview ON)', () => {
+    const { unmount } = renderComponent({}, { getPreviewFeatures: () => true });
+    expect(mockedSelect).toHaveBeenCalledTimes(1);
+
+    const props = mockedSelect.mock.calls[0][0];
+    expect(props.items).toHaveLength(4);
+    expect(props.items[0].value).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    expect(props.items[1].value).toBe(PREVIEW_GEMINI_MODEL); // Pro is preview
+    expect(props.items[2].value).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    expect(props.items[3].value).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     expect(props.showNumbers).toBe(true);
     unmount();
   });
 
   it('initializes with the model from ConfigContext', () => {
-    const mockGetModel = vi.fn(() => GEMINI_MODEL_ALIAS_FLASH);
+    const mockGetModel = vi.fn(() => DEFAULT_GEMINI_FLASH_MODEL);
     const { unmount } = renderComponent({}, { getModel: mockGetModel });
 
     expect(mockGetModel).toHaveBeenCalled();
@@ -222,7 +240,7 @@ describe('<ModelDialog />', () => {
 
     expect(mockedSelect.mock.calls[0][0].initialIndex).toBe(0);
 
-    mockGetModel.mockReturnValue(GEMINI_MODEL_ALIAS_FLASH_LITE);
+    mockGetModel.mockReturnValue(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     const newMockConfig = {
       getModel: mockGetModel,
       getPreviewFeatures: vi.fn(() => false),
