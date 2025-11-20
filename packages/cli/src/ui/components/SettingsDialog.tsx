@@ -213,8 +213,7 @@ export function SettingsDialog({
             });
 
             if (key === 'general.previewFeatures') {
-              const current = config?.getPreviewFeatures();
-              config?.setPreviewFeatures(!current);
+              config?.setPreviewFeatures(newValue as boolean);
             }
           } else {
             // For restart-required settings, track as modified
