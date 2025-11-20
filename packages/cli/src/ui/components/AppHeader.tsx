@@ -11,10 +11,14 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { Banner } from './Banner.js';
+<<<<<<< HEAD
 import { theme } from '../semantic-colors.js';
 import { Colors } from '../colors.js';
 import { persistentState } from '../../utils/persistentState.js';
 import { useState, useEffect, useRef } from 'react';
+=======
+import { useBanner } from '../hooks/useBanner.js';
+>>>>>>> 3e50be165 (Update persistence state to track counts of messages instead of times banner has been displayed (#13428))
 
 interface AppHeaderProps {
   version: string;
@@ -25,6 +29,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const config = useConfig();
   const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
 
+<<<<<<< HEAD
   const [defaultBannerShownCount] = useState(
     () => persistentState.get('defaultBannerShownCount') || 0,
   );
@@ -49,6 +54,9 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
       persistentState.set('defaultBannerShownCount', current + 1);
     }
   }, [showDefaultBanner, defaultText]);
+=======
+  const { bannerText } = useBanner(bannerData, config);
+>>>>>>> 3e50be165 (Update persistence state to track counts of messages instead of times banner has been displayed (#13428))
 
   return (
     <Box flexDirection="column">
@@ -58,8 +66,13 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
           {bannerVisible && unescapedBannerText && (
             <Banner
               width={mainAreaWidth}
+<<<<<<< HEAD
               bannerText={unescapedBannerText}
               color={fontColor}
+=======
+              bannerText={bannerText}
+              isWarning={bannerData.warningText !== ''}
+>>>>>>> 3e50be165 (Update persistence state to track counts of messages instead of times banner has been displayed (#13428))
             />
           )}
         </>
