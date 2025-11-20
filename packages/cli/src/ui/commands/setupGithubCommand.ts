@@ -20,7 +20,6 @@ import {
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
-import { debugLogger } from '@google/gemini-cli-core';
 
 export const GITHUB_WORKFLOW_PATHS = [
   'gemini-dispatch/gemini-dispatch.yml',
@@ -30,6 +29,18 @@ export const GITHUB_WORKFLOW_PATHS = [
   'pr-review/gemini-review.yml',
 ];
 
+export const GITHUB_COMMANDS_PATHS = [
+  'gemini-invoke.toml',
+  'gemini-issue-fixer.toml',
+  'gemini-review.toml',
+  'gemini-scheduled-triage.toml',
+  'gemini-triage.toml',
+];
+
+const REPO_DOWNLOAD_URL =
+  'https://raw.githubusercontent.com/google-github-actions/run-gemini-cli';
+const WORKFLOWS_SOURCE_DIR = 'examples/workflows';
+const COMMANDS_SOURCE_DIR = '.github/commands';
 // Generate OS-specific commands to open the GitHub pages needed for setup.
 function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
@@ -85,9 +96,83 @@ export async function updateGitignore(gitRepoRoot: string): Promise<void> {
       }
     }
   } catch (error) {
-    debugLogger.debug('Failed to update .gitignore:', error);
+    console.debug('Failed to update .gitignore:', error);
     // Continue without failing the whole command
   }
+}
+
+async function downloadFiles({
+  paths,
+  gitRepoRoot,
+  releaseTag,
+  sourceSubDir,
+  targetSubDir,
+  proxy,
+  abortController,
+}: {
+  paths: string[];
+  gitRepoRoot: string;
+  releaseTag: string;
+  sourceSubDir: typeof WORKFLOWS_SOURCE_DIR | typeof COMMANDS_SOURCE_DIR;
+  targetSubDir: 'workflows' | 'commands';
+  proxy: string | undefined;
+  abortController: AbortController;
+}): Promise<void> {
+  const targetDir = path.join(gitRepoRoot, '.github', targetSubDir);
+  try {
+    await fs.promises.mkdir(targetDir, { recursive: true });
+  } catch (_error) {
+    console.debug(`Failed to create ${targetDir} directory:`, _error);
+    throw new Error(
+      `Unable to create ${targetDir} directory. Do you have file permissions in the current directory?`,
+    );
+  }
+
+  const downloads = [];
+  for (const fileBasename of paths) {
+    downloads.push(
+      (async () => {
+        const endpoint = `${REPO_DOWNLOAD_URL}/refs/tags/${releaseTag}/${sourceSubDir}/${fileBasename}`;
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
+          signal: AbortSignal.any([
+            AbortSignal.timeout(30_000),
+            abortController.signal,
+          ]),
+        } as RequestInit);
+
+        if (!response.ok) {
+          throw new Error(
+            `Invalid response code downloading ${endpoint}: ${response.status} - ${response.statusText}`,
+          );
+        }
+        const body = response.body;
+        if (!body) {
+          throw new Error(
+            `Empty body while downloading ${endpoint}: ${response.status} - ${response.statusText}`,
+          );
+        }
+
+        const destination = path.resolve(
+          targetDir,
+          path.basename(fileBasename),
+        );
+
+        const fileStream = fs.createWriteStream(destination, {
+          mode: 0o644, // -rw-r--r--, user(rw), group(r), other(r)
+          flags: 'w', // write and overwrite
+          flush: true,
+        });
+
+        await body.pipeTo(Writable.toWeb(fileStream));
+      })(),
+    );
+  }
+
+  await Promise.all(downloads).finally(() => {
+    abortController.abort();
+  });
 }
 
 export const setupGithubCommand: SlashCommand = {
@@ -97,8 +182,6 @@ export const setupGithubCommand: SlashCommand = {
   action: async (
     context: CommandContext,
   ): Promise<SlashCommandActionReturn> => {
-    const abortController = new AbortController();
-
     if (!isGitHubRepository()) {
       throw new Error(
         'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
@@ -110,7 +193,7 @@ export const setupGithubCommand: SlashCommand = {
     try {
       gitRepoRoot = getGitRepoRoot();
     } catch (_error) {
-      debugLogger.debug(`Failed to get git repo root:`, _error);
+      console.debug(`Failed to get git repo root:`, _error);
       throw new Error(
         'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
       );
@@ -126,7 +209,7 @@ export const setupGithubCommand: SlashCommand = {
     try {
       await fs.promises.mkdir(githubWorkflowsDir, { recursive: true });
     } catch (_error) {
-      debugLogger.debug(
+      console.debug(
         `Failed to create ${githubWorkflowsDir} directory:`,
         _error,
       );
@@ -135,55 +218,45 @@ export const setupGithubCommand: SlashCommand = {
       );
     }
 
-    // Download each workflow in parallel - there aren't enough files to warrant
-    // a full workerpool model here.
-    const downloads = [];
-    for (const workflow of GITHUB_WORKFLOW_PATHS) {
-      downloads.push(
-        (async () => {
-          const endpoint = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/${releaseTag}/examples/workflows/${workflow}`;
-          const response = await fetch(endpoint, {
-            method: 'GET',
-            dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
-            signal: AbortSignal.any([
-              AbortSignal.timeout(30_000),
-              abortController.signal,
-            ]),
-          } as RequestInit);
-
-          if (!response.ok) {
-            throw new Error(
-              `Invalid response code downloading ${endpoint}: ${response.status} - ${response.statusText}`,
-            );
-          }
-          const body = response.body;
-          if (!body) {
-            throw new Error(
-              `Empty body while downloading ${endpoint}: ${response.status} - ${response.statusText}`,
-            );
-          }
-
-          const destination = path.resolve(
-            githubWorkflowsDir,
-            path.basename(workflow),
-          );
-
-          const fileStream = fs.createWriteStream(destination, {
-            mode: 0o644, // -rw-r--r--, user(rw), group(r), other(r)
-            flags: 'w', // write and overwrite
-            flush: true,
-          });
-
-          await body.pipeTo(Writable.toWeb(fileStream));
-        })(),
+    const githubCommandsDir = path.join(gitRepoRoot, '.github', 'commands');
+    try {
+      await fs.promises.mkdir(githubCommandsDir, { recursive: true });
+    } catch (_error) {
+      console.debug(`Failed to create ${githubCommandsDir} directory:`, _error);
+      throw new Error(
+        `Unable to create ${githubCommandsDir} directory. Do you have file permissions in the current directory?`,
       );
     }
+    try {
+      const workflowAbortController = new AbortController();
+      // Download Workflows
+      await downloadFiles({
+        paths: GITHUB_WORKFLOW_PATHS,
+        gitRepoRoot,
+        releaseTag,
+        sourceSubDir: WORKFLOWS_SOURCE_DIR,
+        targetSubDir: 'workflows',
+        proxy,
+        abortController: workflowAbortController,
+      });
 
-    // Wait for all downloads to complete
-    await Promise.all(downloads).finally(() => {
-      // Stop existing downloads
-      abortController.abort();
-    });
+      // Download Commands
+      const commandsAbortController = new AbortController();
+      await downloadFiles({
+        paths: GITHUB_COMMANDS_PATHS,
+        gitRepoRoot,
+        releaseTag,
+        sourceSubDir: COMMANDS_SOURCE_DIR,
+        targetSubDir: 'commands',
+        proxy,
+        abortController: commandsAbortController,
+      });
+    } catch (_error) {
+      console.debug('Failed to download required setup files:', _error);
+      throw new Error(
+        `Failed to download required setup files. Check the logs for details.`,
+      );
+    }
 
     // Add entries to .gitignore file
     await updateGitignore(gitRepoRoot);
@@ -192,7 +265,7 @@ export const setupGithubCommand: SlashCommand = {
     const commands = [];
     commands.push('set -eEuo pipefail');
     commands.push(
-      `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
+      `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows , ${GITHUB_COMMANDS_PATHS.length} commands and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
     );
     commands.push(...getOpenUrlsCommands(readmeUrl));
 

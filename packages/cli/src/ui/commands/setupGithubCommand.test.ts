@@ -14,6 +14,7 @@ import {
   setupGithubCommand,
   updateGitignore,
   GITHUB_WORKFLOW_PATHS,
+  GITHUB_COMMANDS_PATHS,
 } from './setupGithubCommand.js';
 import type { CommandContext, ToolActionReturn } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
@@ -57,8 +58,23 @@ describe('setupGithubCommand', async () => {
 
     const workflows = GITHUB_WORKFLOW_PATHS.map((p) => path.basename(p));
     for (const workflow of workflows) {
-      vi.mocked(global.fetch).mockReturnValueOnce(
-        Promise.resolve(new Response(workflow)),
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(workflow, {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'text/plain' },
+        }),
+      );
+    }
+
+    const commands = GITHUB_COMMANDS_PATHS.map((p) => path.basename(p));
+    for (const command of commands) {
+      vi.mocked(global.fetch).mockResolvedValueOnce(
+        new Response(command, {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'text/plain' },
+        }),
       );
     }
 
