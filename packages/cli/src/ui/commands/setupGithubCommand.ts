@@ -231,11 +231,9 @@ export const setupGithubCommand: SlashCommand = {
           abortController: commandsAbortController,
         }),
       ]);
-    } catch (_error) {
-      debugLogger.debug('Failed to download required setup files:', _error);
-      throw new Error(
-        `Failed to download required setup files. Check the logs for details.`,
-      );
+    } catch (error) {
+      debugLogger.debug('Failed to download required setup files: ', error);
+      throw error;
     }
 
     // Add entries to .gitignore file

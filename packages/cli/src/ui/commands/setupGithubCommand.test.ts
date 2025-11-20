@@ -128,6 +128,32 @@ describe('setupGithubCommand', async () => {
       expect(gitignoreContent).toContain('gha-creds-*.json');
     }
   });
+
+  it('throws an error when download fails', async () => {
+    const fakeRepoRoot = scratchDir;
+    const fakeReleaseVersion = 'v1.2.3';
+
+    vi.mocked(global.fetch).mockResolvedValue(
+      new Response('Not Found', {
+        status: 404,
+        statusText: 'Not Found',
+      }),
+    );
+
+    vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
+    vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
+    vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce(
+      fakeReleaseVersion,
+    );
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: 'fake',
+      repo: 'repo',
+    });
+
+    await expect(
+      setupGithubCommand.action?.({} as CommandContext, ''),
+    ).rejects.toThrow(/Invalid response code downloading.*404 - Not Found/);
+  });
 });
 
 describe('updateGitignore', () => {
