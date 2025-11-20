@@ -1,6 +1,5 @@
 version: 2
 updates:
-  # Maintain npm dependencies
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -8,14 +7,24 @@ updates:
       day: "monday"
     open-pull-requests-limit: 10
     groups:
-      dependencies:
+      npm-dependencies:
         patterns:
           - "*"
+        # Safety: Only group non-breaking changes.
+        update-types:
+          - "minor"
+          - "patch"
 
-  # Maintain GitHub Actions workflows
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
+    groups:
+      actions-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
