@@ -112,7 +112,9 @@ export class GitService {
     try {
       const repo = this.shadowGitRepository;
       await repo.add('.');
-      const commitResult = await repo.commit(message);
+      const commitResult = await repo.commit(message, {
+        '--no-verify': null,
+      });
       return commitResult.commit;
     } catch (error) {
       throw new Error(
