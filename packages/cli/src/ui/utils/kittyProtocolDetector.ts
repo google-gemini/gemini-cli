@@ -9,10 +9,8 @@ import * as fs from 'node:fs';
 let detectionComplete = false;
 
 let kittySupported = false;
-let sgrMouseSupported = false;
 
 let kittyEnabled = false;
-let sgrMouseEnabled = false;
 
 /**
  * Detects Kitty keyboard protocol support.
@@ -50,7 +48,7 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
         process.stdin.setRawMode(false);
       }
 
-      if (kittySupported || sgrMouseSupported) {
+      if (kittySupported) {
         enableSupportedProtocol();
         process.on('exit', disableAllProtocols);
         process.on('SIGTERM', disableAllProtocols);
@@ -83,10 +81,6 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
           kittySupported = true;
         }
 
-        // Broaden mouse support by enabling SGR mode if we get any device
-        // attribute response, which is a strong signal of a modern terminal.
-        sgrMouseSupported = true;
-
         finish();
       }
     };
@@ -110,12 +104,9 @@ export function isKittyProtocolEnabled(): boolean {
 function disableAllProtocols() {
   try {
     if (kittyEnabled) {
+      // use writeSync to avoid race conditions
       fs.writeSync(process.stdout.fd, '\x1b[<u');
       kittyEnabled = false;
-    }
-    if (sgrMouseEnabled) {
-      fs.writeSync(process.stdout.fd, '\x1b[?1006l');
-      sgrMouseEnabled = false;
     }
   } catch {
     // Ignore
@@ -129,12 +120,9 @@ function disableAllProtocols() {
 export function enableSupportedProtocol(): void {
   try {
     if (kittySupported) {
+      // use writeSync to avoid race conditions
       fs.writeSync(process.stdout.fd, '\x1b[>1u');
       kittyEnabled = true;
-    }
-    if (sgrMouseSupported) {
-      fs.writeSync(process.stdout.fd, '\x1b[?1006h');
-      sgrMouseEnabled = true;
     }
   } catch {
     // Ignore
