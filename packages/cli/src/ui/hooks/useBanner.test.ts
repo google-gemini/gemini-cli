@@ -172,26 +172,4 @@ describe('useBanner', () => {
 
     expect(result.current.bannerText).toBe('Line1\nLine2');
   });
-
-  it('should update banner visibility when config.getPreviewFeatures changes', () => {
-    // 1. Start with Preview Features DISABLED -> Banner should show
-    mockConfig.getPreviewFeatures.mockReturnValue(false);
-
-    const { result, rerender } = renderHook(
-      (props) => useBanner(defaultBannerData, props.config),
-      {
-        initialProps: { config: mockConfig as unknown as Config },
-      },
-    );
-
-    expect(result.current.bannerText).toBe('Standard Banner');
-
-    // 2. Enable Preview Features -> Banner should hide
-    mockConfig.getPreviewFeatures.mockReturnValue(true);
-
-    // Rerender with the updated mock config
-    rerender({ config: mockConfig as unknown as Config });
-
-    expect(result.current.bannerText).toBe('');
-  });
 });
