@@ -86,6 +86,7 @@ import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { FatalConfigError } from '../utils/errors.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -537,6 +538,16 @@ export class Config {
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
+<<<<<<< HEAD
+=======
+    this.simpleTaskModel =
+      params.modelRouter?.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
+    this.complexTaskModel =
+      params.modelRouter?.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
+    this.validateModel('simpleTaskModel', this.simpleTaskModel);
+    this.validateModel('complexTaskModel', this.complexTaskModel);
+    this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
+>>>>>>> 446e448d (refactor(config): improve router and path configuration)
     this.enableHooks = params.enableHooks ?? false;
 
     // Enable MessageBus integration if:
@@ -1596,6 +1607,14 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  private validateModel(settingName: string, modelName: string) {
+    if (!modelName || modelName.trim().length === 0) {
+      throw new FatalConfigError(
+        `Invalid model configuration: The setting "experimental.modelRouter.${settingName}" cannot be empty.`,
+      );
+    }
   }
 }
 // Export model constants for use in CLI
