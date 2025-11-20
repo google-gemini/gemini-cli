@@ -66,12 +66,12 @@ jobs:
       - name: 'Install Landlock runner dependencies'
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools
-          if ! command -v rustup >/dev/null 2>&1; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          sudo apt-get install -y musl-tools rustup
+          if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            rustup-init -y --default-toolchain stable --profile minimal --no-modify-path
           fi
-          rustup target add x86_64-unknown-linux-musl
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" target add x86_64-unknown-linux-musl
 
       - name: 'Install dependencies'
         run: 'npm ci'
@@ -150,12 +150,12 @@ jobs:
       - name: 'Install Landlock runner dependencies'
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools
-          if ! command -v rustup >/dev/null 2>&1; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          sudo apt-get install -y musl-tools rustup
+          if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            rustup-init -y --default-toolchain stable --profile minimal --no-modify-path
           fi
-          rustup target add x86_64-unknown-linux-musl
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" target add x86_64-unknown-linux-musl
 
       - name: 'Build project'
         run: 'npm run build'
@@ -314,12 +314,12 @@ jobs:
       - name: 'Install Landlock runner dependencies'
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools
-          if ! command -v rustup >/dev/null 2>&1; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          sudo apt-get install -y musl-tools rustup
+          if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
+            rustup-init -y --default-toolchain stable --profile minimal --no-modify-path
           fi
-          rustup target add x86_64-unknown-linux-musl
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" target add x86_64-unknown-linux-musl
 
       - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
         with:

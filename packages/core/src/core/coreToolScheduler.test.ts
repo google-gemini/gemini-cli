@@ -1548,8 +1548,19 @@ describe('CoreToolScheduler request queueing', () => {
       );
     }
 
+    const sandboxPromptCall = [...statusSpy.mock.calls]
+      .reverse()
+      .find((call) => {
+        if (call[1] !== 'awaiting_approval') return false;
+        const details = call[3] as ToolCallConfirmationDetails | undefined;
+        if (!details || details.type !== 'exec') return false;
+        const exec = details as ToolExecuteConfirmationDetails;
+        return exec.details?.includes('Operation not permitted');
+      });
+    expect(sandboxPromptCall).toBeDefined();
+
     const confirmationDetails =
-      awaitingCallSet?.[3] as ToolCallConfirmationDetails;
+      sandboxPromptCall?.[3] as ToolCallConfirmationDetails;
     expect(confirmationDetails?.type).toBe('exec');
     const execDetails = confirmationDetails as ToolExecuteConfirmationDetails;
     expect(execDetails.danger).toBe(true);
