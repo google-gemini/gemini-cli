@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="plugin" group="system" method="upgrade">
+    <name>System - AI Builder</name>
+    <author>AI Builder Team</author>
+    <creationDate>2025-11-13</creationDate>
+    <copyright>Copyright (C) 2025. All rights reserved.</copyright>
+    <license>GNU General Public License version 2 or later</license>
+    <authorEmail>support@aibuilder.com</authorEmail>
+    <authorUrl>https://aibuilder.com</authorUrl>
+    <version>8.2.4</version>
+    <description>
+        <![CDATA[
+        <h3>YOOtheme AI Builder v8.0.0 - The Complete Chameleon's Toolset</h3>
+        <p>🚀 <strong>THE VISION IS COMPLETE:</strong> This version integrates the full suite of Chameleon's advanced tools, transforming the AI Builder into a comprehensive web development and automation powerhouse.</p>
+
+        <p><strong>🎯 NEW in v8.0 - The Full Toolset is Here:</strong></p>
+        <ul>
+            <li><strong>Direct API Control:</strong> The core of the system. A fast, robust, and reliable integration with the YOOtheme builder.</li>
+            <li><strong>Action Recorder:</strong> Teach the AI by example! Press "Record," perform actions on your site, and save the entire sequence as a new, reusable "skill."</li>
+            <li><strong>Skill Manager & Catalog:</strong> The AI now has a memory. It catalogs every skill it learns, and can be commanded to execute complex, multi-step tasks it has previously observed.</li>
+            <li><strong>API Tracer & Mocker:</strong> A powerful debugging tool that lets you monitor all website network requests (Fetch/XHR), view their contents, and even mock responses to test any scenario.</li>
+            <li><strong>Full Undo/Redo:</strong> A rock-solid history system built on the Direct API, allowing for 100% accurate reversal of any action.</li>
+        </ul>
+
+        <p><strong>This is more than an assistant; it's a learning, evolving development partner.</strong></p>
+
+        <p><strong>Example Commands:</strong></p>
+        <ul>
+            <li>"record start" ... (perform actions) ... "record stop and save as create_contact_form"</li>
+            <li>"run skill create_contact_form"</li>
+            <li>"list skills"</li>
+            <li>"trace api start"</li>
+            <li>"trace api log"</li>
+            <li>"mock api /api/user with {'name': 'Mock User'}"</li>
+        </ul>
+
+        <p><strong>See UPGRADE_TO_V8.md for full details.</strong></p>
+        ]]>
+    </description>
+
+    <namespace path="src">Joomla\Plugin\System\AiBuilder</namespace>
+
+    <files>
+        <filename plugin="ai_builder">ai_builder.php</filename>
+        <folder>services</folder>
+        <folder>src</folder>
+    </files>
+
+    <media destination="plg_system_ai_builder" folder="media">
+        <folder>js</folder>
+    </media>
+
+    <scriptfile>script.php</scriptfile>
+
+    <config>
+        <fields name="params">
+            <fieldset name="basic" label="PLG_SYSTEM_AI_BUILDER_BASIC_FIELDSET_LABEL">
+                <field
+                    name="ai_provider"
+                    type="list"
+                    label="AI Provider"
+                    description="Select which AI service to use for natural language understanding and vision"
+                    default="google"
+                    >
+                    <option value="anthropic">Anthropic Claude (Recommended) - Best understanding + Vision</option>
+                    <option value="google">Google Gemini (Cheapest) - Great understanding + Vision</option>
+                    <option value="openai">OpenAI GPT-4 - Excellent understanding + Vision</option>
+                    <option value="xai">xAI Grok - Good understanding</option>
+                    <option value="local">Local Model (Ollama/LM Studio) - Free but limited</option>
+                </field>
+
+                <!-- Anthropic Claude Configuration -->
+                <field
+                    name="anthropic_api_key"
+                    type="password"
+                    label="Anthropic API Key"
+                    description="Your API key from console.anthropic.com - RECOMMENDED for best results"
+                    filter="raw"
+                    showon="ai_provider:anthropic"
+                    />
+
+                <!-- Google AI Configuration -->
+                <field
+                    name="google_api_key"
+                    type="password"
+                    label="Google AI API Key"
+                    description="Your API key from aistudio.google.com - Great for vision + cheapest option"
+                    filter="raw"
+                    showon="ai_provider:google"
+                    />
+
+                <!-- OpenAI Configuration -->
+                <field
+                    name="openai_api_key"
+                    type="password"
+                    label="OpenAI API Key"
+                    description="Your API key from platform.openai.com"
+                    filter="raw"
+                    showon="ai_provider:openai"
+                    />
+
+                <!-- xAI Configuration -->
+                <field
+                    name="xai_api_key"
+                    type="password"
+                    label="xAI API Key"
+                    description="Your API key from console.x.ai"
+                    filter="raw"
+                    showon="ai_provider:xai"
+                    />
+
+                <!-- Local Model Configuration -->
+                <field
+                    name="local_endpoint"
+                    type="text"
+                    label="Local Endpoint URL"
+                    description="Ollama: http://localhost:11434/api/generate"
+                    default="http://localhost:11434/api/generate"
+                    filter="url"
+                    showon="ai_provider:local"
+                    />
+
+                <field
+                    name="model_name"
+                    type="text"
+                    label="Model Name"
+                    description="Specific model to use. Anthropic: claude-3-5-sonnet-20241022 | Google: gemini-2.0-flash-exp | OpenAI: gpt-4 | xAI: grok-2-1212 | Local: llama3.1:70b"
+                    default="gemini-2.0-flash-exp"
+                    filter="string"
+                    hint="Leave empty for provider default"
+                    />
+
+                <field
+                    name="debug_mode"
+                    type="radio"
+                    label="Debug Mode"
+                    description="Enable detailed logging for troubleshooting"
+                    default="0"
+                    class="btn-group btn-group-yesno"
+                    >
+                    <option value="0">JNO</option>
+                    <option value="1">JYES</option>
+                </field>
+
+                <field
+                    name="allowed_users"
+                    type="text"
+                    label="Allowed User IDs"
+                    description="Comma-separated list of user IDs allowed to use AI Builder (leave empty for all admins)"
+                    filter="string"
+                    />
+            </fieldset>
+        </fields>
+    </config>
+
+    <updateservers>
+        <server type="extension" priority="1" name="AI Builder Updates">
+            https://updates.aibuilder.com/ai_builder.xml
+        </server>
+    </updateservers>
+</extension>

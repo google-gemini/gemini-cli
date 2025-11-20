@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AI Builder - Direct Load Test</title>
+</head>
+<body>
+    <h1>AI Builder Direct Load Test</h1>
+    <p>Open browser console (F12) to see if scripts load.</p>
+    <p>This loads AI Builder directly without going through Joomla.</p>
+
+    <div id="test-area" style="margin: 20px; padding: 20px; border: 2px solid #ccc;">
+        <h2>Instructions:</h2>
+        <ol>
+            <li>Open this file in your browser</li>
+            <li>Open Developer Tools (F12)</li>
+            <li>Check Console tab for AI Builder messages</li>
+            <li>If you see "AI Builder UI loaded" - the scripts work</li>
+            <li>If not - there's an issue with the JavaScript files</li>
+        </ol>
+    </div>
+
+    <!-- Load AI Builder Scripts Directly -->
+    <script>
+        console.log('[Test] Loading AI Builder scripts directly...');
+
+        // Simulate YOOtheme customizer being present
+        window.$customizer = {
+            $data: {},
+            data: {},
+            styleId: 12
+        };
+        console.log('[Test] Simulated $customizer created');
+
+        // Now load the AI Builder UI script
+        const script = document.createElement('script');
+        script.src = '/media/plg_system_ai_builder/js/ai-builder-ui.js';
+        script.onload = function() {
+            console.log('[Test] ✅ AI Builder UI script loaded successfully');
+        };
+        script.onerror = function() {
+            console.error('[Test] ❌ Failed to load AI Builder UI script');
+            console.error('[Test] Check if file exists at: /media/plg_system_ai_builder/js/ai-builder-ui.js');
+        };
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>
