@@ -175,8 +175,8 @@ export interface OpenCustomDialogActionReturn {
   component: ReactNode;
 }
 
-export interface LogoutActionReturn {
-  type: 'logout';
+export interface HandledActionReturn {
+  type: 'handled';
 }
 
 export type SlashCommandActionReturn =
@@ -189,7 +189,7 @@ export type SlashCommandActionReturn =
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
   | OpenCustomDialogActionReturn
-  | LogoutActionReturn;
+  | HandledActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

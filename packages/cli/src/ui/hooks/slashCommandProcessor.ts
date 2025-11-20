@@ -60,7 +60,6 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
-  logout: () => void;
 }
 
 /**
@@ -522,9 +521,8 @@ export const useSlashCommandProcessor = (
                   setCustomDialog(result.component);
                   return { type: 'handled' };
                 }
-                case 'logout': {
-                  actions.logout();
-                  return { type: 'logout' };
+                case 'handled': {
+                  return { type: 'handled' };
                 }
                 default: {
                   const unhandled: never = result;
