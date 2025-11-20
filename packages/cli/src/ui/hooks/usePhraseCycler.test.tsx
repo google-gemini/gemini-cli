@@ -83,8 +83,10 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    // Should still be showing a witty phrase initially
-    expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
+    // Should still be showing a witty phrase or tip initially
+    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
+      lastFrame(),
+    );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
@@ -107,8 +109,10 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3000);
     });
-    // Should still be witty phrase
-    expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
+    // Should still be witty phrase or tip
+    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
+      lastFrame(),
+    );
 
     // Update lastOutputTime
     rerender(
@@ -124,8 +128,10 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3000);
     });
-    // Should STILL be witty phrase because timer reset
-    expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
+    // Should STILL be witty phrase or tip because timer reset
+    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
+      lastFrame(),
+    );
 
     // Advance another 2 seconds (total 5s from last output)
     await act(async () => {

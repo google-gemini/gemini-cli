@@ -14,6 +14,7 @@ import {
   INTERACTIVE_SHELL_WAITING_PHRASE,
 } from './usePhraseCycler.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
+import { INFORMATIVE_TIPS } from '../constants/tips.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -86,8 +87,8 @@ describe('useLoadingIndicator', () => {
       true,
     );
 
-    // Initially should be witty phrase
-    expect(WITTY_LOADING_PHRASES).toContain(
+    // Initially should be witty phrase or tip
+    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
       result.current.currentLoadingPhrase,
     );
 
