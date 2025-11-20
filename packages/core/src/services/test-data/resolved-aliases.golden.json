@@ -11,7 +11,19 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
+      },
+      "topK": 64
+    }
+  },
+  "gemini-3-pro-preview": {
+    "model": "gemini-3-pro-preview",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -23,7 +35,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -35,7 +47,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }
@@ -47,7 +59,7 @@
       "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
+        "thinkingBudget": 8192
       },
       "topK": 64
     }

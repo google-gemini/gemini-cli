@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AgentRegistry } from './registry.js';
+import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition } from './types.js';
 import type { Config } from '../config/config.js';
@@ -77,6 +77,21 @@ describe('AgentRegistry', () => {
     it('should register a valid agent definition', () => {
       registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')).toEqual(MOCK_AGENT_V1);
+      expect(
+        mockConfig.modelConfigService.getResolvedConfig({
+          model: getModelConfigAlias(MOCK_AGENT_V1),
+        }),
+      ).toStrictEqual({
+        model: MOCK_AGENT_V1.modelConfig.model,
+        generateContentConfig: {
+          temperature: MOCK_AGENT_V1.modelConfig.temp,
+          topP: MOCK_AGENT_V1.modelConfig.top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: -1,
+          },
+        },
+      });
     });
 
     it('should handle special characters in agent names', () => {

@@ -264,15 +264,15 @@ class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
+        const model = resolveModel(
+          this.config.getModel(),
+          this.config.isInFallbackMode(),
+        );
         const responseStream = await chat.sendMessageStream(
-          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
-          {
-            message: nextMessage?.parts ?? [],
-            config: {
-              abortSignal: pendingSend.signal,
-            },
-          },
+          { model },
+          nextMessage?.parts ?? [],
           promptId,
+          pendingSend.signal,
         );
         nextMessage = null;
 
