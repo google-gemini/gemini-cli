@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import process from 'node:process';
+import { writeToStdout } from '../../utils/stdio.js';
 import {
   SGR_MOUSE_REGEX,
   X11_MOUSE_REGEX,
@@ -234,10 +234,10 @@ export function enableMouseEvents() {
   // Enable mouse tracking with SGR format
   // ?1002h = button event tracking (clicks + drags + scroll wheel)
   // ?1006h = SGR extended mouse mode (better coordinate handling)
-  process.stdout.write('\u001b[?1002h\u001b[?1006h');
+  writeToStdout('\u001b[?1002h\u001b[?1006h');
 }
 
 export function disableMouseEvents() {
   // Disable mouse tracking with SGR format
-  process.stdout.write('\u001b[?1006l\u001b[?1002l');
+  writeToStdout('\u001b[?1006l\u001b[?1002l');
 }
