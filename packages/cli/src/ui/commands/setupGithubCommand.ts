@@ -32,9 +32,9 @@ export const GITHUB_WORKFLOW_PATHS = [
 
 export const GITHUB_COMMANDS_PATHS = [
   'gemini-assistant/gemini-invoke.toml',
-  'pr-review/gemini-review.toml',
   'issue-triage/gemini-scheduled-triage.toml',
   'issue-triage/gemini-triage.toml',
+  'pr-review/gemini-review.toml',
 ];
 
 const REPO_DOWNLOAD_URL =
@@ -160,6 +160,45 @@ async function downloadFiles({
   });
 }
 
+async function createDirectory(dirPath: string): Promise<void> {
+  try {
+    await fs.promises.mkdir(dirPath, { recursive: true });
+  } catch (_error) {
+    debugLogger.debug(`Failed to create ${dirPath} directory:`, _error);
+    throw new Error(
+      `Unable to create ${dirPath} directory. Do you have file permissions in the current directory?`,
+    );
+  }
+}
+
+async function downloadSetupFiles({
+  configs,
+  releaseTag,
+  proxy,
+}: {
+  configs: Array<{ paths: string[]; targetDir: string }>;
+  releaseTag: string;
+  proxy: string | undefined;
+}): Promise<void> {
+  try {
+    await Promise.all(
+      configs.map(({ paths, targetDir }) => {
+        const abortController = new AbortController();
+        return downloadFiles({
+          paths,
+          releaseTag,
+          targetDir,
+          proxy,
+          abortController,
+        });
+      }),
+    );
+  } catch (error) {
+    debugLogger.debug('Failed to download required setup files: ', error);
+    throw error;
+  }
+}
+
 export const setupGithubCommand: SlashCommand = {
   name: 'setup-github',
   description: 'Set up GitHub Actions',
@@ -189,52 +228,22 @@ export const setupGithubCommand: SlashCommand = {
     const releaseTag = await getLatestGitHubRelease(proxy);
     const readmeUrl = `https://github.com/google-github-actions/run-gemini-cli/blob/${releaseTag}/README.md#quick-start`;
 
-    //Create workflows directory
+    // Create workflows directory
     const workflowsDir = path.join(gitRepoRoot, '.github', 'workflows');
-    try {
-      await fs.promises.mkdir(workflowsDir, { recursive: true });
-    } catch (_error) {
-      debugLogger.debug(`Failed to create ${workflowsDir} directory:`, _error);
-      throw new Error(
-        `Unable to create ${workflowsDir} directory. Do you have file permissions in the current directory?`,
-      );
-    }
+    await createDirectory(workflowsDir);
 
-    //Create commands directory
+    // Create commands directory
     const commandsDir = path.join(gitRepoRoot, '.github', 'commands');
-    try {
-      await fs.promises.mkdir(commandsDir, { recursive: true });
-    } catch (_error) {
-      debugLogger.debug(`Failed to create ${commandsDir} directory:`, _error);
-      throw new Error(
-        `Unable to create ${commandsDir} directory. Do you have file permissions in the current directory?`,
-      );
-    }
+    await createDirectory(commandsDir);
 
-    try {
-      const workflowAbortController = new AbortController();
-      const commandsAbortController = new AbortController();
-
-      await Promise.all([
-        downloadFiles({
-          paths: GITHUB_WORKFLOW_PATHS,
-          releaseTag,
-          targetDir: workflowsDir,
-          proxy,
-          abortController: workflowAbortController,
-        }),
-        downloadFiles({
-          paths: GITHUB_COMMANDS_PATHS,
-          releaseTag,
-          targetDir: commandsDir,
-          proxy,
-          abortController: commandsAbortController,
-        }),
-      ]);
-    } catch (error) {
-      debugLogger.debug('Failed to download required setup files: ', error);
-      throw error;
-    }
+    await downloadSetupFiles({
+      configs: [
+        { paths: GITHUB_WORKFLOW_PATHS, targetDir: workflowsDir },
+        { paths: GITHUB_COMMANDS_PATHS, targetDir: commandsDir },
+      ],
+      releaseTag,
+      proxy,
+    });
 
     // Add entries to .gitignore file
     await updateGitignore(gitRepoRoot);
