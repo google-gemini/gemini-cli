@@ -16,12 +16,14 @@ import {
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   type ExtensionLoader,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi
@@ -164,19 +166,25 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
       ),
     );
+    // yargs.showHelp() calls console.error
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should throw an error when using short flags -p and -i together', async () => {
@@ -196,19 +204,24 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
       ),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should allow --prompt without --prompt-interactive', async () => {
@@ -375,19 +388,24 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
       ),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should throw an error when using short flags -y and --approval-mode together', async () => {
@@ -400,19 +418,24 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
       ),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should allow --approval-mode without --yolo', async () => {
@@ -439,17 +462,22 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Invalid values:'),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
@@ -464,20 +492,39 @@ describe('parseArguments', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     try {
       await expect(parseArguments({} as Settings)).rejects.toThrow(
         'process.exit called',
       );
 
-      expect(mockConsoleError).toHaveBeenCalledWith(
+      expect(debugErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           'When resuming a session, you must provide a message via --prompt (-p) or stdin',
         ),
       );
+      expect(mockConsoleError).toHaveBeenCalled();
     } finally {
       mockExit.mockRestore();
       mockConsoleError.mockRestore();
+      debugErrorSpy.mockRestore();
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
+  it('should return RESUME_LATEST constant when --resume is passed without a value', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = true; // Make it interactive to avoid validation error
+    process.argv = ['node', 'script.js', '--resume'];
+
+    try {
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe(RESUME_LATEST);
+      expect(argv.resume).toBe('latest');
+    } finally {
       process.stdin.isTTY = originalIsTTY;
     }
   });
@@ -2218,21 +2265,30 @@ describe('Output format', () => {
   });
 
   it('should error on invalid --output-format argument', async () => {
-    process.argv = ['node', 'script.js', '--output-format', 'yaml'];
+    process.argv = ['node', 'script.js', '--output-format', 'invalid'];
+
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
     });
+
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Invalid values:'),
     );
+    expect(mockConsoleError).toHaveBeenCalled();
+
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 });
 
@@ -2260,12 +2316,15 @@ describe('parseArguments with positional prompt', () => {
     const mockConsoleError = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
 
     await expect(parseArguments({} as Settings)).rejects.toThrow(
       'process.exit called',
     );
 
-    expect(mockConsoleError).toHaveBeenCalledWith(
+    expect(debugErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Cannot use both a positional prompt and the --prompt (-p) flag together',
       ),
@@ -2273,6 +2332,7 @@ describe('parseArguments with positional prompt', () => {
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
   });
 
   it('should correctly parse a positional prompt to query field', async () => {

@@ -6,6 +6,7 @@
 
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
+import { coreEvents, CoreEvent } from './events.js';
 
 export type EditorType =
   | 'vscode'
@@ -189,7 +190,6 @@ export async function openDiff(
   oldPath: string,
   newPath: string,
   editor: EditorType,
-  onEditorClose: () => void,
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
@@ -211,7 +211,7 @@ export async function openDiff(
         throw new Error(`${editor} exited with code ${result.status}`);
       }
     } finally {
-      onEditorClose();
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
     }
     return;
   }
