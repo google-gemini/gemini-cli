@@ -80,6 +80,7 @@ const mockConfig = {
   getMessageBus: () => null,
   getPolicyEngine: () => null,
   isInteractive: () => false,
+  getExperiments: () => {},
 } as unknown as Config;
 
 const mockTool = new MockTool({

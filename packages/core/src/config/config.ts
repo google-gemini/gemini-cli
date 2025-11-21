@@ -689,6 +689,17 @@ export class Config {
     this.inFallbackMode = false;
   }
 
+  async getExperimentsAsync(): Promise<Experiments | undefined> {
+    if (this.experiments) {
+      return this.experiments;
+    }
+    const codeAssistServer = getCodeAssistServer(this);
+    if (codeAssistServer) {
+      return getExperiments(codeAssistServer);
+    }
+    return undefined;
+  }
+
   getUserTier(): UserTierId | undefined {
     return this.contentGenerator?.userTier;
   }
