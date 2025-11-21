@@ -175,10 +175,6 @@ export interface OpenCustomDialogActionReturn {
   component: ReactNode;
 }
 
-export interface HandledActionReturn {
-  type: 'handled';
-}
-
 export type SlashCommandActionReturn =
   | ToolActionReturn
   | MessageActionReturn
@@ -188,8 +184,7 @@ export type SlashCommandActionReturn =
   | SubmitPromptActionReturn
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
-  | OpenCustomDialogActionReturn
-  | HandledActionReturn;
+  | OpenCustomDialogActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

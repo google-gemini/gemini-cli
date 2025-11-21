@@ -521,9 +521,6 @@ export const useSlashCommandProcessor = (
                   setCustomDialog(result.component);
                   return { type: 'handled' };
                 }
-                case 'handled': {
-                  return { type: 'handled' };
-                }
                 default: {
                   const unhandled: never = result;
                   throw new Error(
