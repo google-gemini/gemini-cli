@@ -22,7 +22,6 @@ import type {
   AnyToolInvocation,
   ToolErrorType,
   ToolExecuteConfirmationDetails,
-  SuccessfulToolCall,
 } from '../index.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import {
@@ -1487,66 +1486,11 @@ describe('CoreToolScheduler request queueing', () => {
 
     expect(lastInvocation).toBeInstanceOf(ShellToolInvocation);
 
-    const statuses = statusSpy.mock.calls.map((call) => call[1]);
-    const awaitingCallSet =
-      statusSpy.mock.calls.find((call) => call[1] === 'awaiting_approval') ??
-      (() => {
-        const confirmationDetails: ToolCallConfirmationDetails = {
-          type: 'exec',
-          title: '⚠️ Sandbox blocked tool call',
-          command:
-            'Command was blocked by the sandbox. Please review carefully.',
-          rootCommand:
-            lastInvocation?.getOriginalCommand() ?? 'run_shell_command',
-          danger: true,
-          hideAlways: true,
-          defaultToNo: true,
-          details: 'Operation not permitted',
-          onConfirm: async (outcome: ToolConfirmationOutcome) => {
-            if (outcome === ToolConfirmationOutcome.ProceedOnce) {
-              if (!lastInvocation) {
-                lastInvocation = new FakeShellInvocation(
-                  mockConfig,
-                  { command: 'echo 1' },
-                  new Set(),
-                );
-              }
-              lastInvocation.disableSandboxForRetry();
-              lastInvocation.attempts = 2; // simulate retry
-              statusSpy.mock.calls.push(['sandboxed-shell', 'scheduled']);
-              // simulate successful retry
-              statusSpy.mock.calls.push(['sandboxed-shell', 'success']);
-              onAllToolCallsComplete([
-                {
-                  status: 'success',
-                  request,
-                  tool,
-                  response: {
-                    callId: request.callId,
-                    responseParts: [],
-                    resultDisplay: 'ok',
-                    error: undefined,
-                    errorType: undefined,
-                  },
-                  invocation: lastInvocation!,
-                } as SuccessfulToolCall,
-              ]);
-            }
-          },
-        };
-        return [
-          'sandboxed-shell',
-          'awaiting_approval',
-          undefined,
-          confirmationDetails,
-        ];
-      })();
-
-    if (awaitingCallSet !== undefined) {
-      expect(statuses, `statuses: ${statuses.join(',')}`).toContain(
-        'awaiting_approval',
-      );
-    }
+    await vi.waitFor(() => {
+      expect(
+        statusSpy.mock.calls.some((call) => call[1] === 'awaiting_approval'),
+      ).toBe(true);
+    });
 
     const sandboxPromptCall = [...statusSpy.mock.calls]
       .reverse()
@@ -1570,12 +1514,15 @@ describe('CoreToolScheduler request queueing', () => {
 
     await confirmationDetails!.onConfirm(ToolConfirmationOutcome.ProceedOnce);
 
-    const successCallSet = statusSpy.mock.calls.find(
-      (call) => call[1] === 'success',
-    );
-    expect(successCallSet).toBeDefined();
-    expect(onAllToolCallsComplete).toHaveBeenCalled();
-    expect(lastInvocation?.attempts ?? 0).toBeGreaterThanOrEqual(1);
+    await vi.waitFor(() => {
+      expect(statusSpy.mock.calls.some((call) => call[1] === 'success')).toBe(
+        true,
+      );
+    });
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+    expect(lastInvocation?.attempts ?? 0).toBeGreaterThanOrEqual(2);
     createInvocationSpy.mockRestore();
   }, 20000);
 
