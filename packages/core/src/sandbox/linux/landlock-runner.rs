@@ -73,8 +73,18 @@ fn main() {
         }
     };
 
-    // Allow read access to root for binaries/libs
-    ruleset = add_path_rule(ruleset, OsString::from("/"), ro_access);
+    // Provide read-only access to common system locations needed to load binaries, libs, and configs.
+    for sys_path in [
+        "/usr",
+        "/bin",
+        "/sbin",
+        "/lib",
+        "/lib64",
+        "/etc",
+        "/dev",
+    ] {
+        ruleset = add_path_rule(ruleset, OsString::from(sys_path), ro_access);
+    }
 
     for p in ro_paths {
         let (path, access) = normalize_path_and_access(p, false, abi);

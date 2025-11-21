@@ -228,23 +228,30 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       let handle: ShellExecutionHandle;
       if (useLandlockSandbox) {
+        const safeRealpath = (p?: string) => {
+          if (!p) return undefined;
+          try {
+            return fs.realpathSync(p);
+          } catch {
+            return undefined;
+          }
+        };
+
         const workspacePaths = this.config
           .getWorkspaceContext()
           .getDirectories()
-          .map((dir) => fs.realpathSync(dir));
+          .map((dir) => safeRealpath(dir))
+          .filter(Boolean) as string[];
 
         const pathsForSet = [
           ...workspacePaths,
-          fs.realpathSync(this.config.getTargetDir()),
-          fs.realpathSync(os.tmpdir()),
-        ];
+          safeRealpath(this.config.getTargetDir()),
+          safeRealpath(os.tmpdir()),
+        ].filter(Boolean) as string[];
         // Allow harmless redirection targets (e.g., `> /dev/null`) inside the tool sandbox.
-        try {
-          pathsForSet.push(fs.realpathSync('/dev/null'));
-        } catch {
-          // Some environments might not expose /dev/null (or it may be inaccessible).
-          // Failing to resolve it should not crash the tool.
-        }
+        const devNull = safeRealpath('/dev/null');
+        if (devNull) pathsForSet.push(devNull);
+
         const readWritePaths = Array.from(new Set(pathsForSet));
 
         const runnerPath = ensureLandlockRunner();
