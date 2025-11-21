@@ -124,6 +124,12 @@ describe('github.ts', () => {
         cloneFromGit({ type: 'git', source: 'src' }, '/dest'),
       ).rejects.toThrow('Failed to clone Git repository');
     });
+
+    it('should throw if source starts with a dash', async () => {
+      await expect(
+        cloneFromGit({ type: 'git', source: '-option' }, '/dest'),
+      ).rejects.toThrow('Invalid repository source');
+    });
   });
 
   describe('tryParseGithubUrl', () => {

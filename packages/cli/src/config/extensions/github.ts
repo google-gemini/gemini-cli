@@ -34,6 +34,9 @@ export async function cloneFromGit(
   try {
     const git = simpleGit(destination);
     let sourceUrl = installMetadata.source;
+    if (sourceUrl.startsWith('-')) {
+      throw new Error(`Invalid repository source: ${sourceUrl}`);
+    }
     const token = getGitHubToken();
     if (token) {
       try {
