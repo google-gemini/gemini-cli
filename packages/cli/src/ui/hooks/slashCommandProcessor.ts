@@ -321,7 +321,12 @@ export const useSlashCommandProcessor = (
       }
 
       const trimmed = rawQuery.trim();
-      if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
+      const isExitOrQuit = ['exit', 'quit'].includes(trimmed.toLowerCase());
+      if (
+        !trimmed.startsWith('/') &&
+        !trimmed.startsWith('?') &&
+        !isExitOrQuit
+      ) {
         return false;
       }
 
@@ -336,11 +341,12 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
+      const commandToParse = isExitOrQuit ? `/${trimmed}` : trimmed;
       const {
         commandToExecute,
         args,
         canonicalPath: resolvedCommandPath,
-      } = parseSlashCommand(trimmed, commands);
+      } = parseSlashCommand(commandToParse, commands);
 
       const subcommand =
         resolvedCommandPath.length > 1
