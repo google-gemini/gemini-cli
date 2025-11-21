@@ -555,6 +555,57 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('should render clipboard images with a friendly label', async () => {
+      const clipboardToken = '@.gemini-clipboard/image-5.png';
+      props.buffer.text = clipboardToken;
+      props.buffer.lines = [clipboardToken];
+      props.buffer.viewportVisualLines = [clipboardToken];
+      props.buffer.allVisualLines = [clipboardToken];
+      props.buffer.visualToLogicalMap = [[0, 0]];
+      props.buffer.visualCursor = [0, clipboardToken.length];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await waitFor(() => {
+        const frame = clean(stdout.lastFrame());
+        expect(frame).toContain('[image #5]');
+        expect(frame).not.toContain('.gemini-clipboard');
+      });
+
+      unmount();
+    });
+
+    it('should render clipboard images with backslash paths', async () => {
+      const clipboardToken = '@.gemini-clipboard\\image-7.png';
+      props.buffer.text = clipboardToken;
+      props.buffer.lines = [clipboardToken];
+      props.buffer.viewportVisualLines = [clipboardToken];
+      props.buffer.allVisualLines = [clipboardToken];
+      props.buffer.visualToLogicalMap = [[0, 0]];
+      props.buffer.visualCursor = [0, clipboardToken.length];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await waitFor(() => {
+        const frame = clean(stdout.lastFrame());
+        expect(frame).toContain('[image #7]');
+        expect(frame).not.toContain('.gemini-clipboard');
+        expect(frame).not.toContain('\\image-7.png');
+      });
+
+      unmount();
+    });
+
     it('should handle errors during clipboard operations', async () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
