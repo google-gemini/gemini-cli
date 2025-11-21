@@ -162,6 +162,8 @@ async function initOauthClient(
           }
         }
         debugLogger.log('Loaded cached credentials.');
+        await ensureADCFileExists(credentials as Credentials);
+
         return client;
       }
     } catch (error) {
@@ -570,19 +572,6 @@ async function fetchCachedCredentials(): Promise<
   return null;
 }
 
-async function cacheCredentials(credentials: Credentials) {
-  const filePath = Storage.getOAuthCredsPath();
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-
-  const credString = JSON.stringify(credentials, null, 2);
-  await fs.writeFile(filePath, credString, { mode: 0o600 });
-  try {
-    await fs.chmod(filePath, 0o600);
-  } catch {
-    /* empty */
-  }
-}
-
 export function clearOauthClientCache() {
   oauthClientPromises.clear();
 }
@@ -594,6 +583,7 @@ export async function clearCachedCredentialFile() {
       await OAuthCredentialStorage.clearCredentials();
     } else {
       await fs.rm(Storage.getOAuthCredsPath(), { force: true });
+      await fs.rm(Storage.getADCPath(), { force: true });
     }
     // Clear the Google Account ID cache when credentials are cleared
     await userAccountManager.clearCachedGoogleAccount();
@@ -639,4 +629,54 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
 // Helper to ensure test isolation
 export function resetOauthClientForTesting() {
   oauthClientPromises.clear();
+}
+
+async function cacheCredentials(credentials: Credentials) {
+  const filePath = Storage.getOAuthCredsPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  const credString = JSON.stringify(credentials, null, 2);
+  await fs.writeFile(filePath, credString, { mode: 0o600 });
+  try {
+    await fs.chmod(filePath, 0o600);
+  } catch {
+    /* empty */
+  }
+
+  await ensureADCFileExists(credentials);
+}
+
+async function ensureADCFileExists(credentials: Credentials) {
+  const adcPath = Storage.getADCPath();
+  const credsPath = Storage.getOAuthCredsPath();
+
+  let shouldWrite = false;
+
+  try {
+    const adcStats = await fs.stat(adcPath);
+    const credsStats = await fs.stat(credsPath);
+    if (adcStats.mtimeMs < credsStats.mtimeMs) {
+      shouldWrite = true;
+    }
+  } catch {
+    // ADC file doesn't exist or we can't read it or the creds file
+    shouldWrite = true;
+  }
+
+  if (shouldWrite) {
+    const adcContent = {
+      client_id: OAUTH_CLIENT_ID,
+      client_secret: OAUTH_CLIENT_SECRET,
+      refresh_token: credentials.refresh_token,
+      type: 'authorized_user',
+    };
+    await fs.writeFile(adcPath, JSON.stringify(adcContent, null, 2), {
+      mode: 0o600,
+    });
+    try {
+      await fs.chmod(adcPath, 0o600);
+    } catch {
+      /* empty */
+    }
+  }
 }

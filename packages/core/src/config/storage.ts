@@ -15,6 +15,8 @@ export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
 
+export const ADC_FILE = 'oauth_creds_adc.json';
+
 export class Storage {
   private readonly targetDir: string;
 
@@ -99,6 +101,10 @@ export class Storage {
 
   static getOAuthCredsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), OAUTH_FILE);
+  }
+
+  static getADCPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), ADC_FILE);
   }
 
   getProjectRoot(): string {

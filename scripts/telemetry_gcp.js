@@ -7,7 +7,7 @@
  */
 
 import path from 'node:path';
-import fs from 'node:fs';
+import * as fs from 'node:fs';
 import { spawn, execSync } from 'node:child_process';
 import {
   OTEL_DIR,
@@ -132,11 +132,20 @@ async function main() {
   fs.writeFileSync(OTEL_CONFIG_FILE, getOtelConfigContent(projectId));
   console.log(`📄 Wrote OTEL collector config to ${OTEL_CONFIG_FILE}`);
 
+  const spawnEnv = { ...process.env };
+  if (process.env.GEMINI_CLI_CREDENTIALS_PATH) {
+    spawnEnv['GOOGLE_APPLICATION_CREDENTIALS'] =
+      process.env.GEMINI_CLI_CREDENTIALS_PATH;
+    console.log(
+      `\n🔑 Using CLI credentials for telemetry: ${process.env.GEMINI_CLI_CREDENTIALS_PATH}`,
+    );
+  }
+
   console.log(`🚀 Starting OTEL collector for GCP... Logs: ${OTEL_LOG_FILE}`);
   collectorLogFd = fs.openSync(OTEL_LOG_FILE, 'a');
   collectorProcess = spawn(otelcolPath, ['--config', OTEL_CONFIG_FILE], {
     stdio: ['ignore', collectorLogFd, collectorLogFd],
-    env: { ...process.env },
+    env: spawnEnv,
   });
 
   console.log(

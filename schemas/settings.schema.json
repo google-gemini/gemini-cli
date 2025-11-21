@@ -1503,6 +1503,12 @@
         "useCollector": {
           "type": "boolean",
           "description": "Whether to forward telemetry to an OTLP collector."
+        },
+        "useCliAuth": {
+          "type": "boolean",
+          "description": "Use the same credentials as the CLI for telemetry.",
+          "markdownDescription": "Use the same credentials as the CLI for telemetry.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false
         }
       }
     },

@@ -109,13 +109,18 @@ describe('oauth2', () => {
       const mockGetAccessToken = vi
         .fn()
         .mockResolvedValue({ token: 'mock-access-token' });
+      let tokensListener: ((tokens: Credentials) => void) | undefined;
       const mockOAuth2Client = {
         generateAuthUrl: mockGenerateAuthUrl,
         getToken: mockGetToken,
         setCredentials: mockSetCredentials,
         getAccessToken: mockGetAccessToken,
         credentials: mockTokens,
-        on: vi.fn(),
+        on: vi.fn((event, listener) => {
+          if (event === 'tokens') {
+            tokensListener = listener;
+          }
+        }),
       } as unknown as OAuth2Client;
       vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
@@ -195,6 +200,11 @@ describe('oauth2', () => {
       });
       expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
+      // Manually trigger the 'tokens' event listener
+      if (tokensListener) {
+        await tokensListener(mockTokens);
+      }
+
       // Verify Google Account was cached
       const googleAccountPath = path.join(
         tempHomeDir,
@@ -213,6 +223,112 @@ describe('oauth2', () => {
       expect(userAccountManager.getCachedGoogleAccount()).toBe(
         'test-google-account@gmail.com',
       );
+
+      // Verify ADC file was created
+      const adcPath = path.join(
+        tempHomeDir,
+        GEMINI_DIR,
+        'oauth_creds_adc.json',
+      );
+      expect(fs.existsSync(adcPath)).toBe(true);
+      const adcContent = JSON.parse(fs.readFileSync(adcPath, 'utf-8'));
+      expect(adcContent).toEqual({
+        client_id: expect.any(String),
+        client_secret: expect.any(String),
+        refresh_token: mockTokens.refresh_token,
+        type: 'authorized_user',
+      });
+    });
+
+    it('should clear ADC file when clearing credentials', async () => {
+      // Setup initial state with files
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      const adcPath = path.join(
+        tempHomeDir,
+        GEMINI_DIR,
+        'oauth_creds_adc.json',
+      );
+
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, '{}');
+      await fs.promises.writeFile(adcPath, '{}');
+
+      await clearCachedCredentialFile();
+
+      expect(fs.existsSync(credsPath)).toBe(false);
+      expect(fs.existsSync(adcPath)).toBe(false);
+    });
+
+    it('should create ADC file if missing when loading cached credentials', async () => {
+      const cachedCreds = { refresh_token: 'cached-token' };
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      // Ensure ADC file does not exist
+      const adcPath = path.join(
+        tempHomeDir,
+        GEMINI_DIR,
+        'oauth_creds_adc.json',
+      );
+      if (fs.existsSync(adcPath)) {
+        fs.rmSync(adcPath);
+      }
+
+      const mockClient = {
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn(),
+      };
+      vi.mocked(OAuth2Client).mockImplementation(
+        () => mockClient as unknown as OAuth2Client,
+      );
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+      expect(fs.existsSync(adcPath)).toBe(true);
+      const adcContent = JSON.parse(fs.readFileSync(adcPath, 'utf-8'));
+      expect(adcContent.refresh_token).toBe('cached-token');
+    });
+
+    it('should update ADC file if older than cached credentials', async () => {
+      const cachedCreds = { refresh_token: 'new-token' };
+      const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      // Set mtime of creds file to now
+      const now = new Date();
+      await fs.promises.utimes(credsPath, now, now);
+
+      // Create older ADC file
+      const oldAdcContent = { refresh_token: 'old-token' };
+      const adcPath = path.join(
+        tempHomeDir,
+        GEMINI_DIR,
+        'oauth_creds_adc.json',
+      );
+      await fs.promises.writeFile(adcPath, JSON.stringify(oldAdcContent));
+
+      // Set mtime of ADC file to past
+      const past = new Date(now.getTime() - 10000);
+      await fs.promises.utimes(adcPath, past, past);
+
+      const mockClient = {
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'test-token' }),
+        getTokenInfo: vi.fn().mockResolvedValue({}),
+        on: vi.fn(),
+      };
+      vi.mocked(OAuth2Client).mockImplementation(
+        () => mockClient as unknown as OAuth2Client,
+      );
+
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+      const updatedAdcContent = JSON.parse(fs.readFileSync(adcPath, 'utf-8'));
+      expect(updatedAdcContent.refresh_token).toBe('new-token');
     });
 
     it('should perform login with user code', async () => {
