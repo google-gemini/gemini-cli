@@ -1544,7 +1544,6 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
-      getUseModelRouter: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1595,7 +1594,6 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
-      getUseModelRouter: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1648,7 +1646,6 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       getUseSmartEdit: () => null,
-      getUseModelRouter: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
