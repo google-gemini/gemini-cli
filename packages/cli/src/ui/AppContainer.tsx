@@ -52,6 +52,12 @@ import {
   refreshServerHierarchicalMemory,
   type ModelChangedPayload,
   type MemoryChangedPayload,
+  writeToStdout,
+  disableMouseEvents,
+  enterAlternateScreen,
+  enableMouseEvents,
+  disableLineWrapping,
+  shouldEnterAlternateScreen,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -68,7 +74,7 @@ import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
-import { useStdout, useStdin } from 'ink';
+import { useApp, useStdout, useStdin } from 'ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
@@ -91,8 +97,8 @@ import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
+import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -107,9 +113,9 @@ import { type ExtensionManager } from '../config/extension-manager.js';
 import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
-import { disableMouseEvents, enableMouseEvents } from './utils/mouse.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
+import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -147,7 +153,9 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
-  const historyManager = useHistory();
+  const historyManager = useHistory({
+    chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
+  });
   useMemoryMonitor(historyManager);
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
@@ -168,7 +176,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [isPlanMode, setIsPlanMode] = useState<boolean>(false);
-  const [onEditorClose] = useState<() => void>(() => () => {});
+  const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -248,6 +256,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
+  const app = useApp();
 
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
@@ -302,20 +311,8 @@ export const AppContainer = (props: AppContainerProps) => {
     };
   }, [getEffectiveModel]);
 
-  const {
-    consoleMessages,
-    handleNewMessage,
-    clearConsoleMessages: clearConsoleMessagesState,
-  } = useConsoleMessages();
-
-  useEffect(() => {
-    const consolePatcher = new ConsolePatcher({
-      onNewMessage: handleNewMessage,
-      debugMode: config.getDebugMode(),
-    });
-    consolePatcher.patch();
-    registerCleanup(consolePatcher.cleanup);
-  }, [handleNewMessage, config]);
+  const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
+    useConsoleMessages();
 
   const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
   // Derive widths for InputPrompt using shared helper
@@ -379,7 +376,28 @@ export const AppContainer = (props: AppContainerProps) => {
       stdout.write(ansiEscapes.clearTerminal);
     }
     setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, stdout, isAlternateBuffer]);
+  }, [setHistoryRemountKey, isAlternateBuffer, stdout]);
+  const handleEditorClose = useCallback(() => {
+    if (
+      shouldEnterAlternateScreen(isAlternateBuffer, config.getScreenReader())
+    ) {
+      // The editor may have exited alternate buffer mode so we need to
+      // enter it again to be safe.
+      enterAlternateScreen();
+      enableMouseEvents();
+      disableLineWrapping();
+      app.rerender();
+    }
+    enableSupportedProtocol();
+    refreshStatic();
+  }, [refreshStatic, isAlternateBuffer, app, config]);
+
+  useEffect(() => {
+    coreEvents.on(CoreEvent.ExternalEditorClosed, handleEditorClose);
+    return () => {
+      coreEvents.off(CoreEvent.ExternalEditorClosed, handleEditorClose);
+    };
+  }, [handleEditorClose]);
 
   const {
     isThemeDialogOpen,
@@ -449,12 +467,12 @@ export const AppContainer = (props: AppContainerProps) => {
           config.isBrowserLaunchSuppressed()
         ) {
           await runExitCleanup();
-          debugLogger.log(`
+          writeToStdout(`
 ----------------------------------------------------------------
-Logging in with Google... Please restart Gemini CLI to continue.
+Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          process.exit(0);
+          process.exit(RELAUNCH_EXIT_CODE);
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -661,8 +679,31 @@ Logging in with Google... Please restart Gemini CLI to continue.
   );
 
   const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
-    cancelHandlerRef.current(shouldRestorePrompt);
+    if (shouldRestorePrompt) {
+      setPendingRestorePrompt(true);
+    } else {
+      setPendingRestorePrompt(false);
+      cancelHandlerRef.current(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (pendingRestorePrompt) {
+      const lastHistoryUserMsg = historyManager.history.findLast(
+        (h) => h.type === 'user',
+      );
+      const lastUserMsg = userMessages.at(-1);
+
+      if (
+        !lastHistoryUserMsg ||
+        (typeof lastHistoryUserMsg.text === 'string' &&
+          lastHistoryUserMsg.text === lastUserMsg)
+      ) {
+        cancelHandlerRef.current(true);
+        setPendingRestorePrompt(false);
+      }
+    }
+  }, [pendingRestorePrompt, userMessages, historyManager.history]);
 
   const {
     streamingState,
@@ -689,7 +730,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isPlanMode,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
-    onEditorClose,
     onCancelSubmit,
     setEmbeddedShellFocused,
     terminalWidth,
@@ -1006,20 +1046,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     };
     appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
 
-    const logErrorHandler = (errorMessage: unknown) => {
-      handleNewMessage({
-        type: 'error',
-        content: String(errorMessage),
-        count: 1,
-      });
-    };
-    appEvents.on(AppEvent.LogError, logErrorHandler);
-
     return () => {
       appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
-      appEvents.off(AppEvent.LogError, logErrorHandler);
     };
-  }, [handleNewMessage, config]);
+  }, [config]);
 
   useEffect(() => {
     if (ctrlCTimerRef.current) {
@@ -1030,7 +1060,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlCPressCount > 1) {
-      handleSlashCommand('/quit');
+      handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlCTimerRef.current = setTimeout(() => {
         setCtrlCPressCount(0);
@@ -1048,7 +1078,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       recordExitFail(config);
     }
     if (ctrlDPressCount > 1) {
-      handleSlashCommand('/quit');
+      handleSlashCommand('/quit', undefined, undefined, false);
     } else {
       ctrlDTimerRef.current = setTimeout(() => {
         setCtrlDPressCount(0);
@@ -1255,7 +1285,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
     // Flush any messages that happened during startup before this component
     // mounted.
-    coreEvents.drainFeedbackBacklog();
+    coreEvents.drainBacklogs();
 
     return () => {
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
@@ -1576,6 +1606,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setEmbeddedShellFocused,
     }),
     [
       handleThemeSelect,
@@ -1606,6 +1637,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setEmbeddedShellFocused,
     ],
   );
 

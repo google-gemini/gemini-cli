@@ -34,7 +34,6 @@ import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_THINKING_MODE,
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -67,11 +66,6 @@ const MAX_TURNS = 100;
 
 export class GeminiClient {
   private chat?: GeminiChat;
-  private readonly generateContentConfig: GenerateContentConfig = {
-    temperature: 1,
-    topP: 0.95,
-    topK: 64,
-  };
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
@@ -183,6 +177,16 @@ export class GeminiClient {
     });
   }
 
+  async updateSystemInstruction(): Promise<void> {
+    if (!this.isInitialized()) {
+      return;
+    }
+
+    const userMemory = this.config.getUserMemory();
+    const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+    this.getChat().setSystemInstruction(systemInstruction);
+  }
+
   async startChat(
     extraHistory?: Content[],
     resumedSessionData?: ResumedSessionData,
@@ -201,24 +205,11 @@ export class GeminiClient {
       const systemInstruction = this.config.getIsPlanMode()
         ? getPlanModeSystemPrompt(this.config, userMemory)
         : getCoreSystemPrompt(this.config, userMemory);
-      const model = this.config.getModel();
-
-      const config: GenerateContentConfig = { ...this.generateContentConfig };
-
-      if (isThinkingSupported(model)) {
-        config.thinkingConfig = {
-          includeThoughts: true,
-          thinkingBudget: DEFAULT_THINKING_MODE,
-        };
-      }
 
       return new GeminiChat(
         this.config,
-        {
-          systemInstruction,
-          ...config,
-          tools,
-        },
+        systemInstruction,
+        tools,
         history,
         resumedSessionData,
       );
@@ -522,7 +513,7 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
 
-    const resultStream = turn.run(modelToUse, request, linkedSignal);
+    const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
