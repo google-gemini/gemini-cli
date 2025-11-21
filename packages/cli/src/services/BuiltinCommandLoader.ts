@@ -73,7 +73,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       initCommand,
       mcpCommand,
       memoryCommand,
-      ...(this.config?.getUseModelRouter() ? [modelCommand] : []),
+      modelCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       privacyCommand,
       ...(this.config?.getEnableMessageBusIntegration()

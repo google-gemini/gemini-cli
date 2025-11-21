@@ -345,21 +345,6 @@ describe('SettingsSchema', () => {
         getSettingsSchema().general.properties.previewFeatures.description,
       ).toBe('Enable preview features (e.g., preview models).');
     });
-
-    it('should have useModelRouter setting in schema', () => {
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter,
-      ).toBeDefined();
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter.type,
-      ).toBe('boolean');
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter.category,
-      ).toBe('Experimental');
-      expect(
-        getSettingsSchema().experimental.properties.useModelRouter.default,
-      ).toBe(true);
-    });
   });
 
   it('has JSON schema definitions for every referenced ref', () => {

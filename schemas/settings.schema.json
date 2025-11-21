@@ -1201,13 +1201,6 @@
           "default": false,
           "type": "boolean"
         },
-        "useModelRouter": {
-          "title": "Use Model Router",
-          "description": "Enable model routing to route requests to the best model based on complexity.",
-          "markdownDescription": "Enable model routing to route requests to the best model based on complexity.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "codebaseInvestigatorSettings": {
           "title": "Codebase Investigator Settings",
           "description": "Configuration for Codebase Investigator.",

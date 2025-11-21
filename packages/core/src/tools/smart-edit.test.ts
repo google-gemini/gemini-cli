@@ -90,7 +90,6 @@ describe('SmartEditTool', () => {
       getSessionId: vi.fn(() => 'mock-session-id'),
       getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
       getUseSmartEdit: vi.fn(() => false),
-      getUseModelRouter: vi.fn(() => false),
       getProxy: vi.fn(() => undefined),
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),

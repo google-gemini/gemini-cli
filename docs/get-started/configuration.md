@@ -563,12 +563,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.useModelRouter`** (boolean):
-  - **Description:** Enable model routing to route requests to the best model
-    based on complexity.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
   - **Default:** `true`
