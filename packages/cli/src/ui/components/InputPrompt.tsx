@@ -323,8 +323,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardPaste = useCallback(async () => {
     try {
-      if (await clipboardHasImage()) {
+      console.log('[DEBUG] Ctrl+V pressed - checking for clipboard image...');
+      const hasImage = await clipboardHasImage();
+      console.log('[DEBUG] Clipboard has image:', hasImage);
+
+      if (hasImage) {
+        console.log('[DEBUG] Attempting to save clipboard image...');
         const imagePath = await saveClipboardImage(config.getTargetDir());
+        console.log('[DEBUG] Image saved to:', imagePath);
+
         if (imagePath) {
           // Clean up old images
           cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
@@ -333,6 +340,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Get relative path from current directory
           const relativePath = path.relative(config.getTargetDir(), imagePath);
+          console.log('[DEBUG] Relative path:', relativePath);
 
           // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
@@ -352,17 +360,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             textToInsert = textToInsert + ' ';
           }
 
+          console.log('[DEBUG] Inserting text:', textToInsert);
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          console.log('[DEBUG] Image path inserted successfully!');
           return;
+        } else {
+          console.log('[DEBUG] Failed to save clipboard image');
         }
+      } else {
+        console.log('[DEBUG] No image in clipboard, pasting text instead...');
       }
 
       const textToInsert = await clipboardy.read();
+      console.log('[DEBUG] Pasting text from clipboard');
       const offset = buffer.getOffset();
       buffer.replaceRangeByOffset(offset, offset, textToInsert);
     } catch (error) {
-      console.error('Error handling clipboard image:', error);
+      console.error('[ERROR] Error handling clipboard paste:', error);
+      console.error(
+        '[ERROR] Stack trace:',
+        error instanceof Error ? error.stack : 'No stack trace',
+      );
     }
   }, [buffer, config]);
 
