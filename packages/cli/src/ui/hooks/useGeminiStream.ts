@@ -105,7 +105,6 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
-  onEditorClose: () => void,
   onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
@@ -179,7 +178,6 @@ export const useGeminiStream = (
     },
     config,
     getPreferredEditor,
-    onEditorClose,
   );
 
   const pendingToolCallGroupDisplay = useMemo(

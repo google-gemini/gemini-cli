@@ -5,6 +5,12 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import type {
+  jsonSchemaValidator,
+  JsonSchemaType,
+  JsonSchemaValidator,
+} from '@modelcontextprotocol/sdk/validation/types.js';
 import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -533,6 +539,38 @@ export async function discoverMcpTools(
   }
 }
 
+/**
+ * A tolerant JSON Schema validator for MCP tool output schemas.
+ *
+ * Some MCP servers (e.g. third‑party extensions) return complex schemas that
+ * include `$defs` / `$ref` chains which can occasionally trip AJV's resolver,
+ * causing discovery to fail. This wrapper keeps the default AJV validator for
+ * normal operation but falls back to a no‑op validator any time schema
+ * compilation throws, so we can still list and use the tool while emitting a
+ * debug log.
+ */
+class LenientJsonSchemaValidator implements jsonSchemaValidator {
+  private readonly ajvValidator = new AjvJsonSchemaValidator();
+
+  getValidator<T>(schema: JsonSchemaType): JsonSchemaValidator<T> {
+    try {
+      return this.ajvValidator.getValidator<T>(schema);
+    } catch (error) {
+      debugLogger.warn(
+        `Failed to compile MCP tool output schema (${
+          (schema as Record<string, unknown>)?.['$id'] ?? '<no $id>'
+        }): ${error instanceof Error ? error.message : String(error)}. ` +
+          'Skipping output validation for this tool.',
+      );
+      return (input: unknown) => ({
+        valid: true as const,
+        data: input as T,
+        errorMessage: undefined,
+      });
+    }
+  }
+}
+
 /** Visible for Testing */
 export function populateMcpServerCommand(
   mcpServers: Record<string, MCPServerConfig>,
@@ -892,10 +930,16 @@ export async function connectToMcpServer(
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
 ): Promise<Client> {
-  const mcpClient = new Client({
-    name: 'gemini-cli-mcp-client',
-    version: '0.0.1',
-  });
+  const mcpClient = new Client(
+    {
+      name: 'gemini-cli-mcp-client',
+      version: '0.0.1',
+    },
+    {
+      // Use a tolerant validator so bad output schemas don't block discovery.
+      jsonSchemaValidator: new LenientJsonSchemaValidator(),
+    },
+  );
 
   mcpClient.registerCapabilities({
     roots: {
