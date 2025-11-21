@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execFileSync, execSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 if (!process.cwd().includes('packages')) {
@@ -38,12 +38,12 @@ try {
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   const isCore = pkg.name === '@google/gemini-cli-core';
   if (isCore && process.platform === 'linux') {
-    const runnerSource = join(
+    const runnerManifest = join(
       process.cwd(),
       'src',
       'sandbox',
       'linux',
-      'landlock-runner.rs',
+      'Cargo.toml',
     );
     const outputDir = join(process.cwd(), 'dist', 'bin');
     mkdirSync(outputDir, { recursive: true });
@@ -64,6 +64,19 @@ try {
     if (!hasRustc) {
       throw new Error(
         'rustc not found; install Rust toolchain to build the Landlock runner.',
+      );
+    }
+    const hasCargo = (() => {
+      try {
+        execSync('cargo --version', { stdio: 'ignore' });
+        return true;
+      } catch (_e) {
+        return false;
+      }
+    })();
+    if (!hasCargo) {
+      throw new Error(
+        'cargo not found; install Rust toolchain to build the Landlock runner.',
       );
     }
 
@@ -91,24 +104,30 @@ try {
       }
     }
 
+    const targetDir = join(process.cwd(), 'dist', 'rust-target');
     try {
       execFileSync(
-        'rustc',
+        'cargo',
         [
-          '-O',
+          'build',
+          '--release',
           '--target',
           target,
-          '-C',
-          'target-feature=+crt-static',
-          runnerSource,
-          '-o',
-          outPath,
+          '--manifest-path',
+          runnerManifest,
+          '--target-dir',
+          targetDir,
         ],
-        { stdio: 'inherit' },
+        {
+          stdio: 'inherit',
+          env: { ...process.env, RUSTFLAGS: '-C target-feature=+crt-static' },
+        },
       );
+      const builtPath = join(targetDir, target, 'release', 'landlock-runner');
+      copyFileSync(builtPath, outPath);
     } catch (err) {
       console.error(
-        '[build] Error: failed to compile static Landlock runner with musl. Ensure musl toolchain is installed (musl-gcc) and rustc supports the target.',
+        '[build] Error: failed to compile static Landlock runner with musl via cargo. Ensure musl toolchain is installed (musl-gcc) and rustc supports the target.',
       );
       throw err;
     }
