@@ -259,8 +259,9 @@ export class ClearcutLogger {
     eventName: EventNames,
     data: EventValue[] = [],
   ): LogEvent {
+    const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
-    return {
+    const logEvent: LogEvent = {
       console_type: 'GEMINI_CLI',
       application: 102, // GEMINI_CLI
       event_name: eventName as string,
@@ -286,19 +287,6 @@ export class ClearcutLogger {
         ],
       ],
     };
-  }
-
-  createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
-    const email = this.userAccountManager.getCachedGoogleAccount();
-
-    if (eventName !== EventNames.START_SESSION) {
-      data.push(...this.sessionData);
-    }
-    const totalAccounts = this.userAccountManager.getLifetimeGoogleAccounts();
-
-    data = this.addDefaultFields(data, totalAccounts);
-
-    const logEvent = this.createBasicLogEvent(eventName, data);
 
     // Should log either email or install ID, not both. See go/cloudmill-1p-oss-instrumentation#define-sessionable-id
     if (email) {
@@ -308,6 +296,17 @@ export class ClearcutLogger {
     }
 
     return logEvent;
+  }
+
+  createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
+    if (eventName !== EventNames.START_SESSION) {
+      data.push(...this.sessionData);
+    }
+    const totalAccounts = this.userAccountManager.getLifetimeGoogleAccounts();
+
+    data = this.addDefaultFields(data, totalAccounts);
+
+    return this.createBasicLogEvent(eventName, data);
   }
 
   flushIfNeeded(): void {
