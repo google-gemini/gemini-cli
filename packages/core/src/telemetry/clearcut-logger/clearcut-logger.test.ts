@@ -91,22 +91,6 @@ expect.extend({
         `event ${received} ${isNot ? 'has' : 'does not have'} the metadata key ${key}`,
     };
   },
-
-  toHaveGwsExperiments(received: LogEventEntry[], expected_exps: number[]) {
-    const { isNot } = this;
-    const event = JSON.parse(received[0].source_extension_json) as LogEvent;
-    const exps = event.exp.gws_experiment;
-
-    const pass =
-      exps.length === expected_exps.length &&
-      exps.every((value, index) => value === expected_exps[index]);
-
-    return {
-      pass,
-      message: () =>
-        `event ${received} ${isNot ? 'has' : 'does not have'} expected exp ids: ${expected_exps.join(',')}`,
-    };
-  },
 });
 
 vi.mock('../../utils/userAccountManager.js');
@@ -776,7 +760,6 @@ describe('ClearcutLogger', () => {
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
       expect(events[0]).toHaveEventName(EventNames.AGENT_START);
-      expect(events[0]).toHaveGwsExperiments([123, 456, 789]);
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
         '123,456,789',
