@@ -27,10 +27,9 @@ import {
   DiscoveredMCPTool,
   StreamEventType,
   ToolCallEvent,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_GEMINI_FLASH_MODEL,
   debugLogger,
+  ReadManyFilesTool,
+  getEffectiveModel,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -45,19 +44,6 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
-
-/**
- * Resolves the model to use based on the current configuration.
- *
- * If the model is set to "auto", it will use the flash model if in fallback
- * mode, otherwise it will use the default model.
- */
-export function resolveModel(model: string, isInFallbackMode: boolean): string {
-  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
-    return isInFallbackMode ? DEFAULT_GEMINI_FLASH_MODEL : DEFAULT_GEMINI_MODEL;
-  }
-  return model;
-}
 
 export async function runZedIntegration(
   config: Config,
@@ -263,15 +249,16 @@ class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
+        const model = getEffectiveModel(
+          this.config.isInFallbackMode(),
+          this.config.getModel(),
+          this.config.getPreviewFeatures(),
+        );
         const responseStream = await chat.sendMessageStream(
-          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
-          {
-            message: nextMessage?.parts ?? [],
-            config: {
-              abortSignal: pendingSend.signal,
-            },
-          },
+          { model },
+          nextMessage?.parts ?? [],
           promptId,
+          pendingSend.signal,
         );
         nextMessage = null;
 
@@ -315,6 +302,13 @@ class Session {
             429,
             'Rate limit exceeded. Try again later.',
           );
+        }
+
+        if (
+          pendingSend.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          return { stopReason: 'cancelled' };
         }
 
         throw error;
@@ -570,7 +564,7 @@ class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = toolRegistry.getTool('read_many_files');
+    const readManyFilesTool = new ReadManyFilesTool(this.config);
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {
@@ -734,7 +728,7 @@ class Session {
 
     if (pathSpecsToRead.length > 0) {
       const toolArgs = {
-        paths: pathSpecsToRead,
+        include: pathSpecsToRead,
       };
 
       const callId = `${readManyFilesTool.name}-${Date.now()}`;

@@ -7,45 +7,82 @@
   },
   "chat-base": {
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true
+      },
+      "topK": 64
+    }
+  },
+  "chat-base-2.5": {
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
-      }
+        "thinkingBudget": 8192
+      },
+      "topK": 64
+    }
+  },
+  "chat-base-3": {
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
+      "topK": 64
+    }
+  },
+  "gemini-3-pro-preview": {
+    "model": "gemini-3-pro-preview",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-pro": {
     "model": "gemini-2.5-pro",
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
-      }
+        "thinkingBudget": 8192
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-flash": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
-      }
+        "thinkingBudget": 8192
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-flash-lite": {
     "model": "gemini-2.5-flash-lite",
     "generateContentConfig": {
-      "temperature": 0,
-      "topP": 1,
+      "temperature": 1,
+      "topP": 0.95,
       "thinkingConfig": {
         "includeThoughts": true,
-        "thinkingBudget": -1
-      }
+        "thinkingBudget": 8192
+      },
+      "topK": 64
     }
   },
   "gemini-2.5-flash-base": {
@@ -103,7 +140,7 @@
       "maxOutputTokens": 2000
     }
   },
-  "web-search-tool": {
+  "web-search": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
       "temperature": 0,
@@ -115,7 +152,7 @@
       ]
     }
   },
-  "web-fetch-tool": {
+  "web-fetch": {
     "model": "gemini-2.5-flash",
     "generateContentConfig": {
       "temperature": 0,
@@ -127,8 +164,22 @@
       ]
     }
   },
+  "web-fetch-fallback": {
+    "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
   "loop-detection": {
     "model": "gemini-2.5-flash",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
+  "loop-detection-double-check": {
+    "model": "gemini-2.5-pro",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
