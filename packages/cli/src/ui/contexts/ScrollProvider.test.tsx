@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { render, mockSettings } from '../../test-utils/render.js';
 import {
   ScrollProvider,
   useScrollable,
   type ScrollState,
 } from './ScrollProvider.js';
+import { SettingsContext } from './SettingsContext.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useRef, useImperativeHandle, forwardRef, type RefObject } from 'react';
 import { Box, type DOMElement } from 'ink';
@@ -71,6 +72,13 @@ const TestScrollable = forwardRef(
 );
 TestScrollable.displayName = 'TestScrollable';
 
+const renderWithSettings = (ui: React.ReactElement) =>
+  render(
+    <SettingsContext.Provider value={mockSettings}>
+      {ui}
+    </SettingsContext.Provider>,
+  );
+
 describe('ScrollProvider', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -90,7 +98,7 @@ describe('ScrollProvider', () => {
         innerHeight: 10,
       }));
 
-      render(
+      renderWithSettings(
         <ScrollProvider>
           <TestScrollable
             id="test-scrollable"
@@ -119,7 +127,7 @@ describe('ScrollProvider', () => {
       expect(handled).toBe(true);
     });
 
-    it('returns false when scroll event is ignored (cannot scroll further)', () => {
+    it('returns true when scroll event is ignored (cannot scroll further)', () => {
       const scrollBy = vi.fn();
       // Already at bottom
       const getScrollState = vi.fn(() => ({
@@ -128,7 +136,7 @@ describe('ScrollProvider', () => {
         innerHeight: 10,
       }));
 
-      render(
+      renderWithSettings(
         <ScrollProvider>
           <TestScrollable
             id="test-scrollable"
@@ -154,7 +162,7 @@ describe('ScrollProvider', () => {
           handled = true;
         }
       }
-      expect(handled).toBe(false);
+      expect(handled).toBe(true);
     });
   });
 
@@ -167,7 +175,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -211,7 +219,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -244,7 +252,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -270,15 +278,15 @@ describe('ScrollProvider', () => {
       callback(mouseEvent);
     }
 
-    // Should not have called scrollBy yet
-    expect(scrollBy).not.toHaveBeenCalled();
+    // First event handled immediately, others rate limited
+    expect(scrollBy).toHaveBeenCalledTimes(1);
+    expect(scrollBy).toHaveBeenCalledWith(1);
 
     // Advance timers to trigger the batched update
     await vi.runAllTimersAsync();
 
-    // Should have called scrollBy once with accumulated delta (3)
+    // No additional calls expected (rate limited events are dropped)
     expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(3);
   });
 
   it('handles mixed direction scroll events in batch', async () => {
@@ -289,7 +297,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -330,12 +338,14 @@ describe('ScrollProvider', () => {
       });
     }
 
-    expect(scrollBy).not.toHaveBeenCalled();
+    // First event handled
+    expect(scrollBy).toHaveBeenCalledTimes(1);
+    expect(scrollBy).toHaveBeenCalledWith(1);
 
     await vi.runAllTimersAsync();
 
+    // Subsequent events dropped
     expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(1); // 1 + 1 - 1 = 1
   });
 
   it('respects scroll limits during batching', async () => {
@@ -347,7 +357,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -408,7 +418,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -470,7 +480,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"

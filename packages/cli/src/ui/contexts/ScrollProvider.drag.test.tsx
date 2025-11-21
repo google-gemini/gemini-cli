@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { render, mockSettings } from '../../test-utils/render.js';
 import {
   ScrollProvider,
   useScrollable,
   type ScrollState,
 } from './ScrollProvider.js';
+import { SettingsContext } from './SettingsContext.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useRef, useImperativeHandle, forwardRef, type RefObject } from 'react';
 import { Box, type DOMElement } from 'ink';
@@ -69,6 +70,13 @@ const TestScrollable = forwardRef(
 );
 TestScrollable.displayName = 'TestScrollable';
 
+const renderWithSettings = (ui: React.ReactElement) =>
+  render(
+    <SettingsContext.Provider value={mockSettings}>
+      {ui}
+    </SettingsContext.Provider>,
+  );
+
 describe('ScrollProvider Drag', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -87,7 +95,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -190,7 +198,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -253,7 +261,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -291,7 +299,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -329,7 +337,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -397,7 +405,7 @@ describe('ScrollProvider Drag', () => {
     );
     TestScrollableWithScrollTo.displayName = 'TestScrollableWithScrollTo';
 
-    render(
+    renderWithSettings(
       <ScrollProvider>
         <TestScrollableWithScrollTo
           id="test-scrollable-scrollto"

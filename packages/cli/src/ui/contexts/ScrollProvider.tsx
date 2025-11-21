@@ -45,17 +45,19 @@ const ScrollContext = createContext<ScrollContextType | null>(null);
 // To prevent scroll events from firing too quickly. 16ms is roughly 60fps.
 const SCROLL_RATE_LIMIT_MS = 16;
 // Determines the time window to consider a scroll "fast".
-const FAST_SCROLL_THRESHOLD_MS = 50;
+const FAST_SCROLL_THRESHOLD_MS = 200;
 // The number of scroll events in the same direction that have to occur before
 // we change the speed.
-const MIN_CONSECUTIVE_FAST_SCROLLS = 4;
+const MIN_CONSECUTIVE_FAST_SCROLLS = 12;
 // The number of scroll events in the same direction that have to occur while
 // scrolling fast before we reach the full scroll speed multiplier.
-const SCROLL_ACCELERATION_EVENTS = 4;
+const SCROLL_ACCELERATION_EVENTS = 128;
 // The duration of the smooth scroll animation.
 const SCROLL_ANIMATION_DURATION_MS = 100;
 // The time to wait before resetting the continuous scroll target.
 const SCROLL_TARGET_RESET_TIMEOUT_MS = 150;
+// The duration of fast scrolling required before acceleration starts.
+const ACCELERATION_DELAY_MS = 200;
 
 const findScrollableCandidates = (
   mouseEvent: MouseEvent,
@@ -121,6 +123,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   const lastScrollEventTimeRef = useRef(0);
 
   const fastScrollCounterRef = useRef(1);
+  const firstFastScrollTimeRef = useRef(0);
   const lastFastScrollDirectionRef = useRef<'up' | 'down' | null>(null);
   const lastMultiplierRef = useRef(1);
 
@@ -140,8 +143,11 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const handleScroll = useCallback(
     (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
+      if (settingsRef.current.merged.ui?.debugMouseLogging) {
+        debugLogger.log(`handleScroll: direction=${direction}`);
+      }
       const scrollWheelSpeed =
-        settingsRef.current.merged.ui?.scrollWheelSpeed ?? 5;
+        settingsRef.current.merged.ui?.scrollWheelSpeed ?? 10;
 
       const now = Date.now();
       if (now - lastScrollRateLimitTimeRef.current < SCROLL_RATE_LIMIT_MS) {
@@ -168,34 +174,63 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       } else {
         fastScrollCounterRef.current = 1;
         lastFastScrollDirectionRef.current = direction;
+        firstFastScrollTimeRef.current = now;
       }
 
       let multiplier = 1;
       const fastScrollCount = fastScrollCounterRef.current;
       const startAccelThreshold = MIN_CONSECUTIVE_FAST_SCROLLS;
+      const fastScrollDuration = now - firstFastScrollTimeRef.current;
 
-      if (fastScrollCount >= startAccelThreshold) {
+      if (
+        fastScrollCount >= startAccelThreshold &&
+        fastScrollDuration > ACCELERATION_DELAY_MS
+      ) {
+        const maxMultiplier = Math.max(1, scrollWheelSpeed);
         const accelEvents = SCROLL_ACCELERATION_EVENTS;
-        if (accelEvents > 0) {
+
+        if (accelEvents > 0 && maxMultiplier > 1) {
           const stepsIntoAccel = fastScrollCount - startAccelThreshold;
+          // Calculate linear progress from 0 to 1.
           const progress = Math.min(1, (stepsIntoAccel + 1) / accelEvents);
-          multiplier = 1 + (scrollWheelSpeed - 1) * progress;
-        } else {
-          multiplier = scrollWheelSpeed;
+
+          // Apply a quadratic (ease-in) tween for smoother acceleration.
+          // This makes the initial acceleration slower to make the transition
+          // to fast scolling less jumpy.
+          const easedProgress = progress ** 2;
+
+          const speedRange = maxMultiplier - 1;
+          const calculatedMultiplier = 1 + speedRange * easedProgress;
+
+          // Floor to get an integer scroll multiplier and clamp to the max
+          // speed. Clamping is a safeguard against floating point issues to
+          // ensure we never exceed maxMultiplier.
+          multiplier = Math.max(
+            1,
+            Math.min(Math.floor(calculatedMultiplier), maxMultiplier),
+          );
+        } else if (maxMultiplier > 1) {
+          // If acceleration is disabled or not applicable,
+          // jump straight to the max multiplier.
+          multiplier = maxMultiplier;
         }
       }
 
-      if (multiplier > 1) {
-        debugLogger.log(`Scroll speed factor: ${multiplier}`);
-      } else if (lastMultiplierRef.current > 1 && multiplier === 1) {
-        debugLogger.log('Scroll speed factor reset to 1');
+      if (settingsRef.current.merged.ui?.debugMouseLogging) {
+        if (multiplier > 1) {
+          debugLogger.log(`Scroll speed factor: ${multiplier}`);
+        } else if (lastMultiplierRef.current > 1 && multiplier === 1) {
+          debugLogger.log('Scroll speed factor reset to 1');
+        }
       }
       lastMultiplierRef.current = multiplier;
 
       const scrollAmount = (direction === 'up' ? -1 : 1) * multiplier;
 
+      // Intentionally only start to animate at multiplier >= 2 as there
+      // is no point doing animations of small changes in speed.
       const isAnimatedScroll =
-        !!candidate.scrollTo && multiplier > 1 && scrollWheelSpeed > 1;
+        !!candidate.scrollTo && multiplier > 2 && scrollWheelSpeed > 1;
 
       if (!isAnimatedScroll) {
         candidate.scrollBy(scrollAmount);

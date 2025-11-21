@@ -536,9 +536,19 @@ const SETTINGS_SCHEMA = {
         label: 'Scroll Wheel Speed',
         category: 'UI',
         requiresRestart: false,
-        default: 5,
+        default: 10,
         description:
           'The number of lines to scroll when mouse wheel ticks occur in quick succession.',
+        showInDialog: true,
+      },
+      debugMouseLogging: {
+        type: 'boolean',
+        label: 'Debug Mouse Logging',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable logging of mouse events for debugging scroll behavior.',
         showInDialog: true,
       },
       customWittyPhrases: {
