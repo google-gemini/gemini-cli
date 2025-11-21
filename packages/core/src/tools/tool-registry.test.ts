@@ -92,6 +92,72 @@ const createMockCallableTool = (
   callTool: vi.fn(),
 });
 
+// Helper to create a DiscoveredMCPTool
+const createMCPTool = (
+  serverName: string,
+  toolName: string,
+  description: string,
+  mockCallable: CallableTool = {} as CallableTool,
+) => new DiscoveredMCPTool(mockCallable, serverName, toolName, description, {});
+
+// Helper to create a mock spawn process for tool discovery
+const createDiscoveryProcess = (toolDeclarations: FunctionDeclaration[]) => {
+  const mockProcess = {
+    stdout: { on: vi.fn(), removeListener: vi.fn() },
+    stderr: { on: vi.fn(), removeListener: vi.fn() },
+    on: vi.fn(),
+  };
+
+  mockProcess.stdout.on.mockImplementation((event, callback) => {
+    if (event === 'data') {
+      callback(
+        Buffer.from(
+          JSON.stringify([{ functionDeclarations: toolDeclarations }]),
+        ),
+      );
+    }
+    return mockProcess as any;
+  });
+
+  mockProcess.on.mockImplementation((event, callback) => {
+    if (event === 'close') {
+      callback(0);
+    }
+    return mockProcess as any;
+  });
+
+  return mockProcess;
+};
+
+// Helper to create a mock spawn process for tool execution
+const createExecutionProcess = (exitCode: number, stderrMessage?: string) => {
+  const mockProcess = {
+    stdout: { on: vi.fn(), removeListener: vi.fn() },
+    stderr: { on: vi.fn(), removeListener: vi.fn() },
+    stdin: { write: vi.fn(), end: vi.fn() },
+    on: vi.fn(),
+    connected: true,
+    disconnect: vi.fn(),
+    removeListener: vi.fn(),
+  };
+
+  if (stderrMessage) {
+    mockProcess.stderr.on.mockImplementation((event, callback) => {
+      if (event === 'data') {
+        callback(Buffer.from(stderrMessage));
+      }
+    });
+  }
+
+  mockProcess.on.mockImplementation((event, callback) => {
+    if (event === 'close') {
+      callback(exitCode);
+    }
+  });
+
+  return mockProcess;
+};
+
 const baseConfigParams: ConfigParameters = {
   cwd: '/tmp',
   model: 'test-model',
@@ -165,13 +231,10 @@ describe('ToolRegistry', () => {
       name: 'excluded-tool-class',
       displayName: 'Excluded Tool Class',
     });
-    const mockCallable = {} as CallableTool;
-    const mcpTool = new DiscoveredMCPTool(
-      mockCallable,
+    const mcpTool = createMCPTool(
       'mcp-server',
       'excluded-mcp-tool',
       'description',
-      {},
     );
     const allowedTool = new MockTool({
       name: 'allowed-tool',
@@ -271,36 +334,10 @@ describe('ToolRegistry', () => {
     it('should return only tools matching the server name, sorted by name', async () => {
       const server1Name = 'mcp-server-uno';
       const server2Name = 'mcp-server-dos';
-      const mockCallable = {} as CallableTool;
-      const mcpTool1_c = new DiscoveredMCPTool(
-        mockCallable,
-        server1Name,
-        'zebra-tool',
-        'd1',
-        {},
-      );
-      const mcpTool1_a = new DiscoveredMCPTool(
-        mockCallable,
-        server1Name,
-        'apple-tool',
-        'd2',
-        {},
-      );
-      const mcpTool1_b = new DiscoveredMCPTool(
-        mockCallable,
-        server1Name,
-        'banana-tool',
-        'd3',
-        {},
-      );
-
-      const mcpTool2 = new DiscoveredMCPTool(
-        mockCallable,
-        server2Name,
-        'tool-on-server2',
-        'd4',
-        {},
-      );
+      const mcpTool1_c = createMCPTool(server1Name, 'zebra-tool', 'd1');
+      const mcpTool1_a = createMCPTool(server1Name, 'apple-tool', 'd2');
+      const mcpTool1_b = createMCPTool(server1Name, 'banana-tool', 'd3');
+      const mcpTool2 = createMCPTool(server2Name, 'tool-on-server2', 'd4');
       const nonMcpTool = new MockTool({ name: 'regular-tool' });
 
       toolRegistry.registerTool(mcpTool1_c);
@@ -339,21 +376,8 @@ describe('ToolRegistry', () => {
         'desc',
         {},
       );
-      const mockCallable = {} as CallableTool;
-      const mcpZebra = new DiscoveredMCPTool(
-        mockCallable,
-        'zebra-server',
-        'mcp-zebra',
-        'desc',
-        {},
-      );
-      const mcpApple = new DiscoveredMCPTool(
-        mockCallable,
-        'apple-server',
-        'mcp-apple',
-        'desc',
-        {},
-      );
+      const mcpZebra = createMCPTool('zebra-server', 'mcp-zebra', 'desc');
+      const mcpApple = createMCPTool('apple-server', 'mcp-apple', 'desc');
 
       // Register in mixed order
       toolRegistry.registerTool(mcpZebra);
@@ -394,34 +418,9 @@ describe('ToolRegistry', () => {
       };
 
       const mockSpawn = vi.mocked(spawn);
-      const mockChildProcess = {
-        stdout: { on: vi.fn() },
-        stderr: { on: vi.fn() },
-        on: vi.fn(),
-      };
-      mockSpawn.mockReturnValue(mockChildProcess as any);
-
-      // Simulate stdout data
-      mockChildProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
-          callback(
-            Buffer.from(
-              JSON.stringify([
-                { function_declarations: [unsanitizedToolDeclaration] },
-              ]),
-            ),
-          );
-        }
-        return mockChildProcess as any;
-      });
-
-      // Simulate process close
-      mockChildProcess.on.mockImplementation((event, callback) => {
-        if (event === 'close') {
-          callback(0);
-        }
-        return mockChildProcess as any;
-      });
+      mockSpawn.mockReturnValue(
+        createDiscoveryProcess([unsanitizedToolDeclaration]) as any,
+      );
 
       await toolRegistry.discoverAllTools();
 
@@ -458,28 +457,9 @@ describe('ToolRegistry', () => {
       };
 
       const mockSpawn = vi.mocked(spawn);
-      // --- Discovery Mock ---
-      const discoveryProcess = {
-        stdout: { on: vi.fn(), removeListener: vi.fn() },
-        stderr: { on: vi.fn(), removeListener: vi.fn() },
-        on: vi.fn(),
-      };
-      mockSpawn.mockReturnValueOnce(discoveryProcess as any);
-
-      discoveryProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
-          callback(
-            Buffer.from(
-              JSON.stringify([{ functionDeclarations: [toolDeclaration] }]),
-            ),
-          );
-        }
-      });
-      discoveryProcess.on.mockImplementation((event, callback) => {
-        if (event === 'close') {
-          callback(0);
-        }
-      });
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
 
       await toolRegistry.discoverAllTools();
       const discoveredTool = toolRegistry.getTool(
@@ -487,28 +467,9 @@ describe('ToolRegistry', () => {
       );
       expect(discoveredTool).toBeDefined();
 
-      // --- Execution Mock ---
-      const executionProcess = {
-        stdout: { on: vi.fn(), removeListener: vi.fn() },
-        stderr: { on: vi.fn(), removeListener: vi.fn() },
-        stdin: { write: vi.fn(), end: vi.fn() },
-        on: vi.fn(),
-        connected: true,
-        disconnect: vi.fn(),
-        removeListener: vi.fn(),
-      };
-      mockSpawn.mockReturnValueOnce(executionProcess as any);
-
-      executionProcess.stderr.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
-          callback(Buffer.from('Something went wrong'));
-        }
-      });
-      executionProcess.on.mockImplementation((event, callback) => {
-        if (event === 'close') {
-          callback(1); // Non-zero exit code
-        }
-      });
+      mockSpawn.mockReturnValueOnce(
+        createExecutionProcess(1, 'Something went wrong') as any,
+      );
 
       const invocation = (discoveredTool as DiscoveredTool).build({});
       const result = await invocation.execute(new AbortController().signal);
@@ -524,7 +485,6 @@ describe('ToolRegistry', () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
 
-      // Mock MessageBus
       const mockMessageBus = {
         publish: vi.fn(),
         subscribe: vi.fn(),
@@ -539,41 +499,18 @@ describe('ToolRegistry', () => {
       };
 
       const mockSpawn = vi.mocked(spawn);
-      const discoveryProcess = {
-        stdout: { on: vi.fn(), removeListener: vi.fn() },
-        stderr: { on: vi.fn(), removeListener: vi.fn() },
-        on: vi.fn(),
-        kill: vi.fn(),
-      };
-      mockSpawn.mockReturnValueOnce(discoveryProcess as any);
-
-      discoveryProcess.stdout.on.mockImplementation((event, callback) => {
-        if (event === 'data') {
-          callback(
-            Buffer.from(
-              JSON.stringify([{ functionDeclarations: [toolDeclaration] }]),
-            ),
-          );
-        }
-      });
-      discoveryProcess.on.mockImplementation((event, callback) => {
-        if (event === 'close') {
-          callback(0);
-        }
-      });
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
 
       await toolRegistry.discoverAllTools();
       const tool = toolRegistry.getTool(
         DISCOVERED_TOOL_PREFIX + 'policy-test-tool',
       );
       expect(tool).toBeDefined();
-
-      // Verify DiscoveredTool has the message bus
       expect((tool as any).messageBus).toBe(mockMessageBus);
 
       const invocation = tool!.build({});
-
-      // Verify DiscoveredToolInvocation has the message bus
       expect((invocation as any).messageBus).toBe(mockMessageBus);
     });
   });

@@ -5,7 +5,7 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateAuthMethod } from './auth.js';
 
 vi.mock('./settings.js', () => ({
@@ -17,7 +17,6 @@ vi.mock('./settings.js', () => ({
 
 describe('validateAuthMethod', () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.stubEnv('GEMINI_API_KEY', undefined);
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
     vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
@@ -28,53 +27,73 @@ describe('validateAuthMethod', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should return null for LOGIN_WITH_GOOGLE', () => {
-    expect(validateAuthMethod(AuthType.LOGIN_WITH_GOOGLE)).toBeNull();
-  });
-
-  it('should return null for CLOUD_SHELL', () => {
-    expect(validateAuthMethod(AuthType.CLOUD_SHELL)).toBeNull();
-  });
-
-  describe('USE_GEMINI', () => {
-    it('should return null if GEMINI_API_KEY is set', () => {
-      vi.stubEnv('GEMINI_API_KEY', 'test-key');
-      expect(validateAuthMethod(AuthType.USE_GEMINI)).toBeNull();
-    });
-
-    it('should return an error message if GEMINI_API_KEY is not set', () => {
-      vi.stubEnv('GEMINI_API_KEY', undefined);
-      expect(validateAuthMethod(AuthType.USE_GEMINI)).toBeNull();
-    });
-  });
-
-  describe('USE_VERTEX_AI', () => {
-    it('should return null if GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are set', () => {
-      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
-      vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'test-location');
-      expect(validateAuthMethod(AuthType.USE_VERTEX_AI)).toBeNull();
-    });
-
-    it('should return null if GOOGLE_API_KEY is set', () => {
-      vi.stubEnv('GOOGLE_API_KEY', 'test-api-key');
-      expect(validateAuthMethod(AuthType.USE_VERTEX_AI)).toBeNull();
-    });
-
-    it('should return an error message if no required environment variables are set', () => {
-      vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
-      vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
-      expect(validateAuthMethod(AuthType.USE_VERTEX_AI)).toBe(
+  it.each([
+    {
+      description: 'should return null for LOGIN_WITH_GOOGLE',
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+      envs: {},
+      expected: null,
+    },
+    {
+      description: 'should return null for COMPUTE_ADC',
+      authType: AuthType.COMPUTE_ADC,
+      envs: {},
+      expected: null,
+    },
+    {
+      description: 'should return null for USE_GEMINI if GEMINI_API_KEY is set',
+      authType: AuthType.USE_GEMINI,
+      envs: { GEMINI_API_KEY: 'test-key' },
+      expected: null,
+    },
+    {
+      description:
+        'should return an error message for USE_GEMINI if GEMINI_API_KEY is not set',
+      authType: AuthType.USE_GEMINI,
+      envs: {},
+      expected:
+        'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
+        'Update your environment and try again (no reload needed if using .env)!',
+    },
+    {
+      description:
+        'should return null for USE_VERTEX_AI if GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are set',
+      authType: AuthType.USE_VERTEX_AI,
+      envs: {
+        GOOGLE_CLOUD_PROJECT: 'test-project',
+        GOOGLE_CLOUD_LOCATION: 'test-location',
+      },
+      expected: null,
+    },
+    {
+      description:
+        'should return null for USE_VERTEX_AI if GOOGLE_API_KEY is set',
+      authType: AuthType.USE_VERTEX_AI,
+      envs: { GOOGLE_API_KEY: 'test-api-key' },
+      expected: null,
+    },
+    {
+      description:
+        'should return an error message for USE_VERTEX_AI if no required environment variables are set',
+      authType: AuthType.USE_VERTEX_AI,
+      envs: {},
+      expected:
         'When using Vertex AI, you must specify either:\n' +
-          '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
-          '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
-          'Update your environment and try again (no reload needed if using .env)!',
-      );
-    });
-  });
-
-  it('should return an error message for an invalid auth method', () => {
-    expect(validateAuthMethod('invalid-method')).toBe(
-      'Invalid auth method selected.',
-    );
+        '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
+        '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
+        'Update your environment and try again (no reload needed if using .env)!',
+    },
+    {
+      description: 'should return an error message for an invalid auth method',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      authType: 'invalid-method' as any,
+      envs: {},
+      expected: 'Invalid auth method selected.',
+    },
+  ])('$description', ({ authType, envs, expected }) => {
+    for (const [key, value] of Object.entries(envs)) {
+      vi.stubEnv(key, value as string);
+    }
+    expect(validateAuthMethod(authType)).toBe(expected);
   });
 });

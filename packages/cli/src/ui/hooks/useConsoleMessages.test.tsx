@@ -8,28 +8,56 @@ import { act, useCallback } from 'react';
 import { vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { useConsoleMessages } from './useConsoleMessages.js';
+import { CoreEvent, type ConsoleLogPayload } from '@google/gemini-cli-core';
+
+// Mock coreEvents
+let consoleLogHandler: ((payload: ConsoleLogPayload) => void) | undefined;
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    coreEvents: {
+      on: vi.fn((event, handler) => {
+        if (event === CoreEvent.ConsoleLog) {
+          consoleLogHandler = handler;
+        }
+      }),
+      off: vi.fn((event) => {
+        if (event === CoreEvent.ConsoleLog) {
+          consoleLogHandler = undefined;
+        }
+      }),
+      emitConsoleLog: vi.fn(),
+    },
+  };
+});
 
 describe('useConsoleMessages', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    consoleLogHandler = undefined;
   });
 
   afterEach(() => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   const useTestableConsoleMessages = () => {
-    const { handleNewMessage, ...rest } = useConsoleMessages();
-    const log = useCallback(
-      (content: string) => handleNewMessage({ type: 'log', content, count: 1 }),
-      [handleNewMessage],
-    );
-    const error = useCallback(
-      (content: string) =>
-        handleNewMessage({ type: 'error', content, count: 1 }),
-      [handleNewMessage],
-    );
+    const { ...rest } = useConsoleMessages();
+    const log = useCallback((content: string) => {
+      if (consoleLogHandler) {
+        consoleLogHandler({ type: 'log', content });
+      }
+    }, []);
+    const error = useCallback((content: string) => {
+      if (consoleLogHandler) {
+        consoleLogHandler({ type: 'error', content });
+      }
+    }, []);
     return {
       ...rest,
       log,
@@ -145,7 +173,7 @@ describe('useConsoleMessages', () => {
     });
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
-    clearTimeoutSpy.mockRestore();
+    // clearTimeoutSpy.mockRestore() is handled by afterEach restoreAllMocks
   });
 
   it('should clean up the timeout on unmount', () => {
@@ -159,6 +187,5 @@ describe('useConsoleMessages', () => {
     unmount();
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
-    clearTimeoutSpy.mockRestore();
   });
 });

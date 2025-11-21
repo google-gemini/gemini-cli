@@ -33,6 +33,7 @@ import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import type { ExtensionManager } from './extension-manager.js';
+import { SettingPaths } from './settingPaths.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -108,7 +109,7 @@ const MIGRATION_MAP: Record<string, string> = {
   memoryImportFormat: 'context.importFormat',
   memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
   model: 'model.name',
-  preferredEditor: 'general.preferredEditor',
+  preferredEditor: SettingPaths.General.PreferredEditor,
   retryFetchErrors: 'general.retryFetchErrors',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',

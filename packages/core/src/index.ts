@@ -7,6 +7,7 @@
 // Export config
 export * from './config/config.js';
 export * from './config/defaultModelConfigs.js';
+export * from './config/models.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
@@ -53,6 +54,7 @@ export * from './utils/gitIgnoreParser.js';
 export * from './utils/gitUtils.js';
 export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
+export * from './utils/userAccountManager.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
@@ -142,3 +144,7 @@ export * from './test-utils/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
+
+// Export stdio utils
+export * from './utils/stdio.js';
+export * from './utils/terminal.js';

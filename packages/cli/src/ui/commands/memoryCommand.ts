@@ -86,6 +86,8 @@ export const memoryCommand: SlashCommand = {
             const { memoryContent, fileCount } =
               await refreshServerHierarchicalMemory(config);
 
+            await config.updateSystemInstructionIfInitialized();
+
             const successMessage =
               memoryContent.length > 0
                 ? `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`

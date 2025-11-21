@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import * as path from 'node:path';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock dependencies
 const mockOpenDiff = vi.hoisted(() => vi.fn());
@@ -104,7 +105,6 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
-        vi.fn(),
       );
 
       expect(mockModifyContext.getCurrentContent).toHaveBeenCalledWith(
@@ -171,7 +171,6 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
-        vi.fn(),
       );
     });
   });
@@ -187,7 +186,6 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
-      vi.fn(),
     );
 
     expect(mockCreatePatch).toHaveBeenCalledWith(
@@ -216,7 +214,6 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
-      vi.fn(),
     );
 
     expect(mockCreatePatch).toHaveBeenCalledWith(
@@ -246,7 +243,6 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
-      vi.fn(),
       {
         currentContent: overrideCurrent,
         proposedContent: overrideProposed,
@@ -274,7 +270,6 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
-      vi.fn(),
       {
         currentContent: null,
         proposedContent: 'override proposed content',
@@ -305,7 +300,6 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
-        vi.fn(),
       ),
     ).rejects.toThrow('Editor failed to open');
 
@@ -321,7 +315,7 @@ describe('modifyWithEditor', () => {
 
   it('should handle temp file cleanup errors gracefully', async () => {
     const consoleErrorSpy = vi
-      .spyOn(console, 'error')
+      .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
     vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {
       throw new Error('Failed to delete file');
@@ -335,7 +329,6 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
-      vi.fn(),
     );
 
     expect(consoleErrorSpy).toHaveBeenCalledTimes(3);
@@ -362,7 +355,6 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
-      vi.fn(),
     );
 
     expect(mockOpenDiff).toHaveBeenCalledOnce();
@@ -384,7 +376,6 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
-      vi.fn(),
     );
 
     expect(mockOpenDiff).toHaveBeenCalledOnce();

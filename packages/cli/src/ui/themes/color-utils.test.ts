@@ -233,5 +233,26 @@ describe('Color Utils', () => {
     it('should return end color when factor is 1', () => {
       expect(interpolateColor('#ff0000', '#0000ff', 1)).toBe('#0000ff');
     });
+
+    it('should return start color when factor is < 0', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', -0.5)).toBe('#ff0000');
+    });
+
+    it('should return end color when factor is > 1', () => {
+      expect(interpolateColor('#ff0000', '#0000ff', 1.5)).toBe('#0000ff');
+    });
+
+    it('should return valid color if one is empty but factor selects the valid one', () => {
+      expect(interpolateColor('', '#ffffff', 1)).toBe('#ffffff');
+      expect(interpolateColor('#ffffff', '', 0)).toBe('#ffffff');
+    });
+
+    it('should return empty string if either color is empty and factor does not select the valid one', () => {
+      expect(interpolateColor('', '#ffffff', 0.5)).toBe('');
+      expect(interpolateColor('#ffffff', '', 0.5)).toBe('');
+      expect(interpolateColor('', '', 0.5)).toBe('');
+      expect(interpolateColor('', '#ffffff', 0)).toBe('');
+      expect(interpolateColor('#ffffff', '', 1)).toBe('');
+    });
   });
 });

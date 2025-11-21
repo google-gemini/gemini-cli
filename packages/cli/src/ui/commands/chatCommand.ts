@@ -128,11 +128,14 @@ const saveCommand: SlashCommand = {
 
     const history = chat.getHistory();
     if (history.length > 2) {
-      await logger.saveCheckpoint(history, tag);
+      const authType = config?.getContentGeneratorConfig()?.authType;
+      await logger.saveCheckpoint({ history, authType }, tag);
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(
+          tag,
+        )}.`,
       };
     } else {
       return {
@@ -160,15 +163,29 @@ const resumeCommand: SlashCommand = {
       };
     }
 
-    const { logger } = context.services;
+    const { logger, config } = context.services;
     await logger.initialize();
-    const conversation = await logger.loadCheckpoint(tag);
+    const checkpoint = await logger.loadCheckpoint(tag);
+    const conversation = checkpoint.history;
 
     if (conversation.length === 0) {
       return {
         type: 'message',
         messageType: 'info',
         content: `No saved checkpoint found with tag: ${decodeTagName(tag)}.`,
+      };
+    }
+
+    const currentAuthType = config?.getContentGeneratorConfig()?.authType;
+    if (
+      checkpoint.authType &&
+      currentAuthType &&
+      checkpoint.authType !== currentAuthType
+    ) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Cannot resume chat. It was saved with a different authentication method (${checkpoint.authType}) than the current one (${currentAuthType}).`,
       };
     }
 

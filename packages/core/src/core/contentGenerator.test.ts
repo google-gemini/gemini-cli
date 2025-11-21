@@ -67,7 +67,7 @@ describe('createContentGenerator', () => {
     expect(generator).toBeInstanceOf(RecordingContentGenerator);
   });
 
-  it('should create a CodeAssistContentGenerator', async () => {
+  it('should create a CodeAssistContentGenerator when AuthType is LOGIN_WITH_GOOGLE', async () => {
     const mockGenerator = {} as unknown as ContentGenerator;
     vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
       mockGenerator as never,
@@ -75,6 +75,23 @@ describe('createContentGenerator', () => {
     const generator = await createContentGenerator(
       {
         authType: AuthType.LOGIN_WITH_GOOGLE,
+      },
+      mockConfig,
+    );
+    expect(createCodeAssistContentGenerator).toHaveBeenCalled();
+    expect(generator).toEqual(
+      new LoggingContentGenerator(mockGenerator, mockConfig),
+    );
+  });
+
+  it('should create a CodeAssistContentGenerator when AuthType is COMPUTE_ADC', async () => {
+    const mockGenerator = {} as unknown as ContentGenerator;
+    vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
+      mockGenerator as never,
+    );
+    const generator = await createContentGenerator(
+      {
+        authType: AuthType.COMPUTE_ADC,
       },
       mockConfig,
     );

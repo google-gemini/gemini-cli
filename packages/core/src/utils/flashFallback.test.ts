@@ -54,7 +54,7 @@ describe('Retry Utility Fallback Integration', () => {
   // This test validates the Config's ability to store and execute the handler contract.
   it('should execute the injected FallbackHandler contract correctly', async () => {
     // Set up a minimal handler for testing, ensuring it matches the new type.
-    const fallbackHandler: FallbackModelHandler = async () => 'retry';
+    const fallbackHandler: FallbackModelHandler = async () => 'retry_always';
 
     // Use the generalized setter
     config.setFallbackModelHandler(fallbackHandler);
@@ -67,7 +67,7 @@ describe('Retry Utility Fallback Integration', () => {
     );
 
     // Verify it returns the correct intent
-    expect(result).toBe('retry');
+    expect(result).toBe('retry_always');
   });
 
   // This test validates the retry utility's logic for triggering the callback.

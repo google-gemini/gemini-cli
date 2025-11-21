@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe('read_many_files', () => {
-  it('should be able to read multiple files', async () => {
+  it.skip('should be able to read multiple files', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to read multiple files');
     rig.createFile('file1.txt', 'file 1 content');

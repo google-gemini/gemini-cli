@@ -101,11 +101,13 @@ describe('useSessionResume', () => {
         1,
         { type: 'user', text: 'Hello' },
         0,
+        true,
       );
       expect(mockHistoryManager.addItem).toHaveBeenNthCalledWith(
         2,
         { type: 'gemini', text: 'Hi there!' },
         1,
+        true,
       );
       expect(mockRefreshStatic).toHaveBeenCalled();
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith(
@@ -328,11 +330,13 @@ describe('useSessionResume', () => {
         1,
         { type: 'user', text: 'Hello from resumed session' },
         0,
+        true,
       );
       expect(mockHistoryManager.addItem).toHaveBeenNthCalledWith(
         2,
         { type: 'gemini', text: 'Welcome back!' },
         1,
+        true,
       );
       expect(mockGeminiClient.resumeChat).toHaveBeenCalled();
     });

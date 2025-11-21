@@ -5,7 +5,10 @@
  */
 
 import type { Config } from '../../config/config.js';
-import { DEFAULT_GEMINI_MODEL_AUTO } from '../../config/models.js';
+import {
+  DEFAULT_GEMINI_MODEL_AUTO,
+  resolveModel,
+} from '../../config/models.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type {
   RoutingContext,
@@ -31,7 +34,7 @@ export class OverrideStrategy implements RoutingStrategy {
 
     // Return the overridden model name.
     return {
-      model: overrideModel,
+      model: resolveModel(overrideModel, config.getPreviewFeatures()),
       metadata: {
         source: this.name,
         latencyMs: 0,

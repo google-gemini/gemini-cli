@@ -15,7 +15,7 @@ import {
   type Mock,
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import { AuthType, type Config } from '@google/gemini-cli-core';
+import { AuthType, type Config, debugLogger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { AuthState } from '../types.js';
@@ -25,6 +25,7 @@ import { validateAuthMethodWithSettings } from './useAuth.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { Text } from 'ink';
+import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -109,8 +110,41 @@ describe('AuthDialog', () => {
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items).toContainEqual({
       label: 'Use Cloud Shell user credentials',
-      value: AuthType.CLOUD_SHELL,
-      key: AuthType.CLOUD_SHELL,
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
+    });
+  });
+
+  it('does not show metadata server application default credentials option in Cloud Shell environment', () => {
+    process.env['CLOUD_SHELL'] = 'true';
+    renderWithProviders(<AuthDialog {...props} />);
+    const items = mockedRadioButtonSelect.mock.calls[0][0].items;
+    expect(items).not.toContainEqual({
+      label: 'Use metadata server application default credentials',
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
+    });
+  });
+
+  it('shows metadata server application default credentials option when GEMINI_CLI_USE_COMPUTE_ADC env var is true', () => {
+    process.env['GEMINI_CLI_USE_COMPUTE_ADC'] = 'true';
+    renderWithProviders(<AuthDialog {...props} />);
+    const items = mockedRadioButtonSelect.mock.calls[0][0].items;
+    expect(items).toContainEqual({
+      label: 'Use metadata server application default credentials',
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
+    });
+  });
+
+  it('does not show Cloud Shell option when when GEMINI_CLI_USE_COMPUTE_ADC env var is true', () => {
+    process.env['GEMINI_CLI_USE_COMPUTE_ADC'] = 'true';
+    renderWithProviders(<AuthDialog {...props} />);
+    const items = mockedRadioButtonSelect.mock.calls[0][0].items;
+    expect(items).not.toContainEqual({
+      label: 'Use Cloud Shell user credentials',
+      value: AuthType.COMPUTE_ADC,
+      key: AuthType.COMPUTE_ADC,
     });
   });
 
@@ -196,10 +230,11 @@ describe('AuthDialog', () => {
     });
 
     it('exits process for Login with Google when browser is suppressed', async () => {
+      vi.useFakeTimers();
       const exitSpy = vi
         .spyOn(process, 'exit')
         .mockImplementation(() => undefined as never);
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
       vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);
       mockedValidateAuthMethod.mockReturnValue(null);
 
@@ -208,14 +243,14 @@ describe('AuthDialog', () => {
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
 
+      await vi.runAllTimersAsync();
+
       expect(mockedRunExitCleanup).toHaveBeenCalled();
-      expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Please restart Gemini CLI'),
-      );
-      expect(exitSpy).toHaveBeenCalledWith(0);
+      expect(exitSpy).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
 
       exitSpy.mockRestore();
       logSpy.mockRestore();
+      vi.useRealTimers();
     });
   });
 

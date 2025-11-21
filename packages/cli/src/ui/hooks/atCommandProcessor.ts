@@ -13,6 +13,7 @@ import {
   getErrorMessage,
   isNodeError,
   unescapePath,
+  ReadManyFilesTool,
 } from '@google/gemini-cli-core';
 import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
 import { ToolCallStatus } from '../types.js';
@@ -153,7 +154,7 @@ export async function handleAtCommand({
   };
 
   const toolRegistry = config.getToolRegistry();
-  const readManyFilesTool = toolRegistry.getTool('read_many_files');
+  const readManyFilesTool = new ReadManyFilesTool(config);
   const globTool = toolRegistry.getTool('glob');
 
   if (!readManyFilesTool) {

@@ -8,10 +8,14 @@ import type React from 'react';
 import { useCallback, useContext, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import {
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+  GEMINI_MODEL_ALIAS_PRO,
   ModelSlashCommandEvent,
   logModelSlashCommand,
 } from '@google/gemini-cli-core';
@@ -19,37 +23,11 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
+import { ThemedGradient } from './ThemedGradient.js';
 
 interface ModelDialogProps {
   onClose: () => void;
 }
-
-const MODEL_OPTIONS = [
-  {
-    value: DEFAULT_GEMINI_MODEL_AUTO,
-    title: 'Auto (recommended)',
-    description: 'Let the system choose the best model for your task',
-    key: DEFAULT_GEMINI_MODEL_AUTO,
-  },
-  {
-    value: DEFAULT_GEMINI_MODEL,
-    title: 'Pro',
-    description: 'For complex tasks that require deep reasoning and creativity',
-    key: DEFAULT_GEMINI_MODEL,
-  },
-  {
-    value: DEFAULT_GEMINI_FLASH_MODEL,
-    title: 'Flash',
-    description: 'For tasks that need a balance of speed and reasoning',
-    key: DEFAULT_GEMINI_FLASH_MODEL,
-  },
-  {
-    value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-    title: 'Flash-Lite',
-    description: 'For simple tasks that need to be done quickly',
-    key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  },
-];
 
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
@@ -66,10 +44,43 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     { isActive: true },
   );
 
+  const options = useMemo(
+    () => [
+      {
+        value: DEFAULT_GEMINI_MODEL_AUTO,
+        title: 'Auto',
+        description: 'Let the system choose the best model for your task.',
+        key: DEFAULT_GEMINI_MODEL_AUTO,
+      },
+      {
+        value: GEMINI_MODEL_ALIAS_PRO,
+        title: config?.getPreviewFeatures()
+          ? `Pro (${PREVIEW_GEMINI_MODEL}, ${DEFAULT_GEMINI_MODEL})`
+          : `Pro (${DEFAULT_GEMINI_MODEL})`,
+        description:
+          'For complex tasks that require deep reasoning and creativity',
+        key: GEMINI_MODEL_ALIAS_PRO,
+      },
+      {
+        value: GEMINI_MODEL_ALIAS_FLASH,
+        title: `Flash (${DEFAULT_GEMINI_FLASH_MODEL})`,
+        description: 'For tasks that need a balance of speed and reasoning',
+        key: GEMINI_MODEL_ALIAS_FLASH,
+      },
+      {
+        value: GEMINI_MODEL_ALIAS_FLASH_LITE,
+        title: `Flash-Lite (${DEFAULT_GEMINI_FLASH_LITE_MODEL})`,
+        description: 'For simple tasks that need to be done quickly',
+        key: GEMINI_MODEL_ALIAS_FLASH_LITE,
+      },
+    ],
+    [config],
+  );
+
   // Calculate the initial index based on the preferred model.
   const initialIndex = useMemo(
-    () => MODEL_OPTIONS.findIndex((option) => option.value === preferredModel),
-    [preferredModel],
+    () => options.findIndex((option) => option.value === preferredModel),
+    [preferredModel, options],
   );
 
   // Handle selection internally (Autonomous Dialog).
@@ -85,6 +96,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     [config, onClose],
   );
 
+  const header = config?.getPreviewFeatures()
+    ? 'Gemini 3 is now enabled.'
+    : 'Gemini 3 is now available.';
+
+  const subheader = config?.getPreviewFeatures()
+    ? `To disable Gemini 3, disable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features\n\nWhen you select Auto or Pro, Gemini CLI will attempt to use ${PREVIEW_GEMINI_MODEL} first, before falling back to ${DEFAULT_GEMINI_MODEL}.`
+    : `To use Gemini 3, enable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features`;
+
   return (
     <Box
       borderStyle="round"
@@ -94,17 +113,25 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       width="100%"
     >
       <Text bold>Select Model</Text>
+
+      <Box marginTop={1} marginBottom={1} flexDirection="column">
+        <ThemedGradient>
+          <Text>{header}</Text>
+        </ThemedGradient>
+        <Text>{subheader}</Text>
+      </Box>
+
       <Box marginTop={1}>
         <DescriptiveRadioButtonSelect
-          items={MODEL_OPTIONS}
+          items={options}
           onSelect={handleSelect}
           initialIndex={initialIndex}
           showNumbers={true}
         />
       </Box>
-      <Box flexDirection="column">
+      <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
-          {'> To use a specific Gemini model on startup, use the --model flag.'}
+          {'To use a specific Gemini model on startup, use the --model flag.'}
         </Text>
       </Box>
       <Box marginTop={1} flexDirection="column">

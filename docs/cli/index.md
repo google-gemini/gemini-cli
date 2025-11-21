@@ -7,11 +7,14 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
 ## Basic features
 
 - **[Commands](./commands.md):** A reference for all built-in slash commands
-  (e.g., `/help`, `/chat`, `/tools`).
 - **[Custom Commands](./custom-commands.md):** Create your own commands and
   shortcuts for frequently used prompts.
 - **[Headless Mode](./headless.md):** Use Gemini CLI programmatically for
   scripting and automation.
+- **[Model Selection](./model.md):** Configure the Gemini AI model used by the
+  CLI.
+- **[Settings](./settings.md):** Configure various aspects of the CLI's behavior
+  and appearance.
 - **[Themes](./themes.md):** Customizing the CLI's appearance with different
   themes.
 - **[Keyboard Shortcuts](./keyboard-shortcuts.md):** A reference for all

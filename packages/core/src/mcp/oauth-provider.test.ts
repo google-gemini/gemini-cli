@@ -30,6 +30,7 @@ vi.mock('./oauth-token-storage.js', () => {
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
+    emitConsoleLog: vi.fn(),
   },
 }));
 

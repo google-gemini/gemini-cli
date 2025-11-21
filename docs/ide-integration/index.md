@@ -4,8 +4,8 @@ Gemini CLI can integrate with your IDE to provide a more seamless and
 context-aware experience. This integration allows the CLI to understand your
 workspace better and enables powerful features like native in-editor diffing.
 
-Currently, the only supported IDE is
-[Visual Studio Code](https://code.visualstudio.com/) and other editors that
+Currently, the supported IDEs are [Antigravity](https://antigravity.google),
+[Visual Studio Code](https://code.visualstudio.com/), and other editors that
 support VS Code extensions. To build support for other editors, see the
 [IDE Companion Extension Spec](./ide-companion-spec.md).
 
@@ -191,7 +191,7 @@ messages and how to resolve them.
   - **Cause:** You are running Gemini CLI in a terminal or environment that is
     not a supported IDE.
   - **Solution:** Run Gemini CLI from the integrated terminal of a supported
-    IDE, like VS Code.
+    IDE, like Antigravity or VS Code.
 
 - **Message:**
   `No installer is available for IDE. Please install the Gemini CLI Companion extension manually from the marketplace.`

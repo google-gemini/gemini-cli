@@ -25,6 +25,7 @@ import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
 import { CoreEvent, coreEvents } from './events.js';
+import { debugLogger } from './debugLogger.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -439,7 +440,7 @@ My code memory
 
   it('should respect the maxDirs parameter during downward scan', async () => {
     const consoleDebugSpy = vi
-      .spyOn(console, 'debug')
+      .spyOn(debugLogger, 'debug')
       .mockImplementation(() => {});
 
     // Create directories in parallel for better performance
@@ -469,7 +470,7 @@ My code memory
       expect.stringContaining('Scanning [1/1]:'),
     );
 
-    vi.mocked(console.debug).mockRestore();
+    consoleDebugSpy.mockRestore();
 
     const result = await loadServerHierarchicalMemory(
       cwd,

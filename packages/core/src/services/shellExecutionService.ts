@@ -768,11 +768,13 @@ export class ShellExecutionService {
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
-        if (
-          e instanceof Error &&
-          (('code' in e && e.code === 'ESRCH') ||
-            e.message.includes('Cannot resize a pty that has already exited'))
-        ) {
+        const err = e as { code?: string; message?: string };
+        const isEsrch = err.code === 'ESRCH';
+        const isWindowsPtyError = err.message?.includes(
+          'Cannot resize a pty that has already exited',
+        );
+
+        if (isEsrch || isWindowsPtyError) {
           // On Unix, we get an ESRCH error.
           // On Windows, we get a message-based error.
           // In both cases, it's safe to ignore.

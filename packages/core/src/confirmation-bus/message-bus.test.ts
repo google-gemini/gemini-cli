@@ -26,12 +26,12 @@ describe('MessageBus', () => {
   });
 
   describe('publish', () => {
-    it('should emit error for invalid message', () => {
+    it('should emit error for invalid message', async () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
       // @ts-expect-error - Testing invalid message
-      messageBus.publish({ invalid: 'message' });
+      await messageBus.publish({ invalid: 'message' });
 
       expect(errorHandler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -40,12 +40,12 @@ describe('MessageBus', () => {
       );
     });
 
-    it('should validate tool confirmation requests have correlationId', () => {
+    it('should validate tool confirmation requests have correlationId', async () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
       // @ts-expect-error - Testing missing correlationId
-      messageBus.publish({
+      await messageBus.publish({
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall: { name: 'test' },
       });
@@ -53,8 +53,10 @@ describe('MessageBus', () => {
       expect(errorHandler).toHaveBeenCalled();
     });
 
-    it('should emit confirmation response when policy allows', () => {
-      vi.spyOn(policyEngine, 'check').mockReturnValue(PolicyDecision.ALLOW);
+    it('should emit confirmation response when policy allows', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
 
       const responseHandler = vi.fn();
       messageBus.subscribe(
@@ -68,7 +70,7 @@ describe('MessageBus', () => {
         correlationId: '123',
       };
 
-      messageBus.publish(request);
+      await messageBus.publish(request);
 
       const expectedResponse: ToolConfirmationResponse = {
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
@@ -78,8 +80,10 @@ describe('MessageBus', () => {
       expect(responseHandler).toHaveBeenCalledWith(expectedResponse);
     });
 
-    it('should emit rejection and response when policy denies', () => {
-      vi.spyOn(policyEngine, 'check').mockReturnValue(PolicyDecision.DENY);
+    it('should emit rejection and response when policy denies', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.DENY,
+      });
 
       const responseHandler = vi.fn();
       const rejectionHandler = vi.fn();
@@ -98,7 +102,7 @@ describe('MessageBus', () => {
         correlationId: '123',
       };
 
-      messageBus.publish(request);
+      await messageBus.publish(request);
 
       const expectedRejection: ToolPolicyRejection = {
         type: MessageBusType.TOOL_POLICY_REJECTION,
@@ -114,8 +118,10 @@ describe('MessageBus', () => {
       expect(responseHandler).toHaveBeenCalledWith(expectedResponse);
     });
 
-    it('should pass through to UI when policy says ASK_USER', () => {
-      vi.spyOn(policyEngine, 'check').mockReturnValue(PolicyDecision.ASK_USER);
+    it('should pass through to UI when policy says ASK_USER', async () => {
+      vi.spyOn(policyEngine, 'check').mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+      });
 
       const requestHandler = vi.fn();
       messageBus.subscribe(
@@ -129,12 +135,12 @@ describe('MessageBus', () => {
         correlationId: '123',
       };
 
-      messageBus.publish(request);
+      await messageBus.publish(request);
 
       expect(requestHandler).toHaveBeenCalledWith(request);
     });
 
-    it('should emit other message types directly', () => {
+    it('should emit other message types directly', async () => {
       const successHandler = vi.fn();
       messageBus.subscribe(
         MessageBusType.TOOL_EXECUTION_SUCCESS,
@@ -147,14 +153,14 @@ describe('MessageBus', () => {
         result: 'success',
       };
 
-      messageBus.publish(message);
+      await messageBus.publish(message);
 
       expect(successHandler).toHaveBeenCalledWith(message);
     });
   });
 
   describe('subscribe/unsubscribe', () => {
-    it('should allow subscribing to specific message types', () => {
+    it('should allow subscribing to specific message types', async () => {
       const handler = vi.fn();
       messageBus.subscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler);
 
@@ -164,12 +170,12 @@ describe('MessageBus', () => {
         result: 'test',
       };
 
-      messageBus.publish(message);
+      await messageBus.publish(message);
 
       expect(handler).toHaveBeenCalledWith(message);
     });
 
-    it('should allow unsubscribing from message types', () => {
+    it('should allow unsubscribing from message types', async () => {
       const handler = vi.fn();
       messageBus.subscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler);
       messageBus.unsubscribe(MessageBusType.TOOL_EXECUTION_SUCCESS, handler);
@@ -180,12 +186,12 @@ describe('MessageBus', () => {
         result: 'test',
       };
 
-      messageBus.publish(message);
+      await messageBus.publish(message);
 
       expect(handler).not.toHaveBeenCalled();
     });
 
-    it('should support multiple subscribers for the same message type', () => {
+    it('should support multiple subscribers for the same message type', async () => {
       const handler1 = vi.fn();
       const handler2 = vi.fn();
 
@@ -198,7 +204,7 @@ describe('MessageBus', () => {
         result: 'test',
       };
 
-      messageBus.publish(message);
+      await messageBus.publish(message);
 
       expect(handler1).toHaveBeenCalledWith(message);
       expect(handler2).toHaveBeenCalledWith(message);
@@ -206,12 +212,12 @@ describe('MessageBus', () => {
   });
 
   describe('error handling', () => {
-    it('should not crash on errors during message processing', () => {
+    it('should not crash on errors during message processing', async () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
 
       // Mock policyEngine to throw an error
-      vi.spyOn(policyEngine, 'check').mockImplementation(() => {
+      vi.spyOn(policyEngine, 'check').mockImplementation(async () => {
         throw new Error('Policy check failed');
       });
 
@@ -222,7 +228,7 @@ describe('MessageBus', () => {
       };
 
       // Should not throw
-      expect(() => messageBus.publish(request)).not.toThrow();
+      await expect(messageBus.publish(request)).resolves.not.toThrow();
 
       // Should emit error
       expect(errorHandler).toHaveBeenCalledWith(

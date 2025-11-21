@@ -9,7 +9,6 @@ import { useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
-  EDITOR_DISPLAY_NAMES,
   editorSettingsManager,
   type EditorDisplay,
 } from '../editors/editorSettingsManager.js';
@@ -19,8 +18,11 @@ import type {
   LoadedSettings,
 } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
-import type { EditorType } from '@google/gemini-cli-core';
-import { isEditorAvailable } from '@google/gemini-cli-core';
+import {
+  type EditorType,
+  isEditorAvailable,
+  EDITOR_DISPLAY_NAMES,
+} from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 
 interface EditorDialogProps {

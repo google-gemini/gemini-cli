@@ -436,7 +436,6 @@ export class Task {
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
       getPreferredEditor: () => 'vscode',
       config: this.config,
-      onEditorClose: () => {},
     });
     return scheduler;
   }
@@ -461,7 +460,7 @@ export class Task {
   ): Message {
     const messageParts: Part[] = [];
 
-    // Create a serializable version of the ToolCall (pick necesssary
+    // Create a serializable version of the ToolCall (pick necessary
     // properties/avoid methods causing circular reference errors)
     const serializableToolCall: Partial<ToolCall> = this._pickFields(
       tc,

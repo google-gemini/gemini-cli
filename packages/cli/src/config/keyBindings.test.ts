@@ -6,7 +6,12 @@
 
 import { describe, it, expect } from 'vitest';
 import type { KeyBindingConfig } from './keyBindings.js';
-import { Command, defaultKeyBindings } from './keyBindings.js';
+import {
+  Command,
+  commandCategories,
+  commandDescriptions,
+  defaultKeyBindings,
+} from './keyBindings.js';
 
 describe('keyBindings config', () => {
   describe('defaultKeyBindings', () => {
@@ -16,6 +21,7 @@ describe('keyBindings config', () => {
       for (const command of commands) {
         expect(defaultKeyBindings[command]).toBeDefined();
         expect(Array.isArray(defaultKeyBindings[command])).toBe(true);
+        expect(defaultKeyBindings[command]?.length).toBeGreaterThan(0);
       }
     });
 
@@ -76,6 +82,37 @@ describe('keyBindings config', () => {
       // Verify physical home/end keys
       expect(defaultKeyBindings[Command.HOME]).toContainEqual({ key: 'home' });
       expect(defaultKeyBindings[Command.END]).toContainEqual({ key: 'end' });
+    });
+  });
+
+  describe('command metadata', () => {
+    const commandValues = Object.values(Command);
+
+    it('has a description entry for every command', () => {
+      const describedCommands = Object.keys(commandDescriptions);
+      expect(describedCommands.sort()).toEqual([...commandValues].sort());
+
+      for (const command of commandValues) {
+        expect(typeof commandDescriptions[command]).toBe('string');
+        expect(commandDescriptions[command]?.trim()).not.toHaveLength(0);
+      }
+    });
+
+    it('categorizes each command exactly once', () => {
+      const seen = new Set<Command>();
+
+      for (const category of commandCategories) {
+        expect(typeof category.title).toBe('string');
+        expect(Array.isArray(category.commands)).toBe(true);
+
+        for (const command of category.commands) {
+          expect(commandValues).toContain(command);
+          expect(seen.has(command)).toBe(false);
+          seen.add(command);
+        }
+      }
+
+      expect(seen.size).toBe(commandValues.length);
     });
   });
 });
