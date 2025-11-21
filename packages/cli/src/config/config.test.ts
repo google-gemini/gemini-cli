@@ -149,307 +149,264 @@ afterEach(() => {
 });
 
 describe('parseArguments', () => {
-  it('should throw an error when both --prompt and --prompt-interactive are used together', async () => {
-    process.argv = [
-      'node',
-      'script.js',
-      '--prompt',
-      'test prompt',
-      '--prompt-interactive',
-      'interactive prompt',
-    ];
+  it.each([
+    {
+      description: 'long flags',
+      argv: [
+        'node',
+        'script.js',
+        '--prompt',
+        'test prompt',
+        '--prompt-interactive',
+        'interactive prompt',
+      ],
+    },
+    {
+      description: 'short flags',
+      argv: [
+        'node',
+        'script.js',
+        '-p',
+        'test prompt',
+        '-i',
+        'interactive prompt',
+      ],
+    },
+  ])(
+    'should throw an error when using conflicting prompt flags ($description)',
+    async ({ argv }) => {
+      process.argv = argv;
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
 
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const debugErrorSpy = vi
-      .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
+      const mockConsoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
-    await expect(parseArguments({} as Settings)).rejects.toThrow(
-      'process.exit called',
+      await expect(parseArguments({} as Settings)).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+        ),
+      );
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    },
+  );
+
+  it.each([
+    {
+      description: 'should allow --prompt without --prompt-interactive',
+      argv: ['node', 'script.js', '--prompt', 'test prompt'],
+      expected: { prompt: 'test prompt', promptInteractive: undefined },
+    },
+    {
+      description: 'should allow --prompt-interactive without --prompt',
+      argv: ['node', 'script.js', '--prompt-interactive', 'interactive prompt'],
+      expected: { prompt: undefined, promptInteractive: 'interactive prompt' },
+    },
+    {
+      description: 'should allow -i flag as alias for --prompt-interactive',
+      argv: ['node', 'script.js', '-i', 'interactive prompt'],
+      expected: { prompt: undefined, promptInteractive: 'interactive prompt' },
+    },
+  ])('$description', async ({ argv, expected }) => {
+    process.argv = argv;
+    const parsedArgs = await parseArguments({} as Settings);
+    expect(parsedArgs.prompt).toBe(expected.prompt);
+    expect(parsedArgs.promptInteractive).toBe(expected.promptInteractive);
+  });
+
+  describe('positional arguments and @commands', () => {
+    it.each([
+      {
+        description:
+          'should convert positional query argument to prompt by default',
+        argv: ['node', 'script.js', 'Hi Gemini'],
+        expectedQuery: 'Hi Gemini',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description:
+          'should map @path to prompt (one-shot) when it starts with @',
+        argv: ['node', 'script.js', '@path ./file.md'],
+        expectedQuery: '@path ./file.md',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description:
+          'should map @path to prompt even when config flags are present',
+        argv: [
+          'node',
+          'script.js',
+          '@path',
+          './file.md',
+          '--model',
+          'gemini-2.5-pro',
+        ],
+        expectedQuery: '@path ./file.md',
+        expectedModel: 'gemini-2.5-pro',
+        debug: false,
+      },
+      {
+        description:
+          'maps unquoted positional @path + arg to prompt (one-shot)',
+        argv: ['node', 'script.js', '@path', './file.md'],
+        expectedQuery: '@path ./file.md',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description:
+          'should handle multiple @path arguments in a single command (one-shot)',
+        argv: [
+          'node',
+          'script.js',
+          '@path',
+          './file1.md',
+          '@path',
+          './file2.md',
+        ],
+        expectedQuery: '@path ./file1.md @path ./file2.md',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description:
+          'should handle mixed quoted and unquoted @path arguments (one-shot)',
+        argv: [
+          'node',
+          'script.js',
+          '@path ./file1.md',
+          '@path',
+          './file2.md',
+          'additional text',
+        ],
+        expectedQuery: '@path ./file1.md @path ./file2.md additional text',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description: 'should map @path to prompt with ambient flags (debug)',
+        argv: ['node', 'script.js', '@path', './file.md', '--debug'],
+        expectedQuery: '@path ./file.md',
+        expectedModel: undefined,
+        debug: true,
+      },
+      {
+        description: 'should map @include to prompt (one-shot)',
+        argv: ['node', 'script.js', '@include src/'],
+        expectedQuery: '@include src/',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description: 'should map @search to prompt (one-shot)',
+        argv: ['node', 'script.js', '@search pattern'],
+        expectedQuery: '@search pattern',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description: 'should map @web to prompt (one-shot)',
+        argv: ['node', 'script.js', '@web query'],
+        expectedQuery: '@web query',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description: 'should map @git to prompt (one-shot)',
+        argv: ['node', 'script.js', '@git status'],
+        expectedQuery: '@git status',
+        expectedModel: undefined,
+        debug: false,
+      },
+      {
+        description: 'should handle @command with leading whitespace',
+        argv: ['node', 'script.js', '  @path ./file.md'],
+        expectedQuery: '  @path ./file.md',
+        expectedModel: undefined,
+        debug: false,
+      },
+    ])(
+      '$description',
+      async ({ argv, expectedQuery, expectedModel, debug }) => {
+        process.argv = argv;
+        const parsedArgs = await parseArguments({} as Settings);
+        expect(parsedArgs.query).toBe(expectedQuery);
+        expect(parsedArgs.prompt).toBe(expectedQuery);
+        expect(parsedArgs.promptInteractive).toBeUndefined();
+        if (expectedModel) {
+          expect(parsedArgs.model).toBe(expectedModel);
+        }
+        if (debug) {
+          expect(parsedArgs.debug).toBe(true);
+        }
+      },
     );
-
-    expect(debugErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
-      ),
-    );
-    // yargs.showHelp() calls console.error
-    expect(mockConsoleError).toHaveBeenCalled();
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-    debugErrorSpy.mockRestore();
   });
 
-  it('should throw an error when using short flags -p and -i together', async () => {
-    process.argv = [
-      'node',
-      'script.js',
-      '-p',
-      'test prompt',
-      '-i',
-      'interactive prompt',
-    ];
+  it.each([
+    {
+      description: 'long flags',
+      argv: ['node', 'script.js', '--yolo', '--approval-mode', 'default'],
+    },
+    {
+      description: 'short flags',
+      argv: ['node', 'script.js', '-y', '--approval-mode', 'yolo'],
+    },
+  ])(
+    'should throw an error when using conflicting yolo/approval-mode flags ($description)',
+    async ({ argv }) => {
+      process.argv = argv;
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
 
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const debugErrorSpy = vi
-      .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
+      const mockConsoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
-    await expect(parseArguments({} as Settings)).rejects.toThrow(
-      'process.exit called',
-    );
+      await expect(parseArguments({} as Settings)).rejects.toThrow(
+        'process.exit called',
+      );
 
-    expect(debugErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
-      ),
-    );
-    expect(mockConsoleError).toHaveBeenCalled();
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
+        ),
+      );
 
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-    debugErrorSpy.mockRestore();
-  });
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    },
+  );
 
-  it('should allow --prompt without --prompt-interactive', async () => {
-    process.argv = ['node', 'script.js', '--prompt', 'test prompt'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.prompt).toBe('test prompt');
-    expect(argv.promptInteractive).toBeUndefined();
-  });
-
-  it('should allow --prompt-interactive without --prompt', async () => {
-    process.argv = [
-      'node',
-      'script.js',
-      '--prompt-interactive',
-      'interactive prompt',
-    ];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.promptInteractive).toBe('interactive prompt');
-    expect(argv.prompt).toBeUndefined();
-  });
-
-  it('should allow -i flag as alias for --prompt-interactive', async () => {
-    process.argv = ['node', 'script.js', '-i', 'interactive prompt'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.promptInteractive).toBe('interactive prompt');
-    expect(argv.prompt).toBeUndefined();
-  });
-
-  it('should convert positional query argument to prompt by default', async () => {
-    process.argv = ['node', 'script.js', 'Hi Gemini'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.query).toBe('Hi Gemini');
-    expect(argv.prompt).toBe('Hi Gemini');
-    expect(argv.promptInteractive).toBeUndefined();
-  });
-
-  it('should map @path to prompt (one-shot) when it starts with @', async () => {
-    process.argv = ['node', 'script.js', '@path ./file.md'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.query).toBe('@path ./file.md');
-    expect(argv.prompt).toBe('@path ./file.md');
-    expect(argv.promptInteractive).toBeUndefined();
-  });
-
-  it('should map @path to prompt even when config flags are present', async () => {
-    // @path queries should now go to one-shot mode regardless of other flags
-    process.argv = [
-      'node',
-      'script.js',
-      '@path',
-      './file.md',
-      '--model',
-      'gemini-2.5-pro',
-    ];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.query).toBe('@path ./file.md');
-    expect(argv.prompt).toBe('@path ./file.md'); // Should map to one-shot
-    expect(argv.promptInteractive).toBeUndefined();
-    expect(argv.model).toBe('gemini-2.5-pro');
-  });
-
-  it('maps unquoted positional @path + arg to prompt (one-shot)', async () => {
-    // Simulate: gemini @path ./file.md
-    process.argv = ['node', 'script.js', '@path', './file.md'];
-    const argv = await parseArguments({} as Settings);
-    // After normalization, query is a single string
-    expect(argv.query).toBe('@path ./file.md');
-    // And it's mapped to one-shot prompt when no -p/-i flags are set
-    expect(argv.prompt).toBe('@path ./file.md');
-    expect(argv.promptInteractive).toBeUndefined();
-  });
-
-  it('should handle multiple @path arguments in a single command (one-shot)', async () => {
-    // Simulate: gemini @path ./file1.md @path ./file2.md
-    process.argv = [
-      'node',
-      'script.js',
-      '@path',
-      './file1.md',
-      '@path',
-      './file2.md',
-    ];
-    const argv = await parseArguments({} as Settings);
-    // After normalization, all arguments are joined with spaces
-    expect(argv.query).toBe('@path ./file1.md @path ./file2.md');
-    // And it's mapped to one-shot prompt
-    expect(argv.prompt).toBe('@path ./file1.md @path ./file2.md');
-    expect(argv.promptInteractive).toBeUndefined();
-  });
-
-  it('should handle mixed quoted and unquoted @path arguments (one-shot)', async () => {
-    // Simulate: gemini "@path ./file1.md" @path ./file2.md "additional text"
-    process.argv = [
-      'node',
-      'script.js',
-      '@path ./file1.md',
-      '@path',
-      './file2.md',
-      'additional text',
-    ];
-    const argv = await parseArguments({} as Settings);
-    // After normalization, all arguments are joined with spaces
-    expect(argv.query).toBe(
-      '@path ./file1.md @path ./file2.md additional text',
-    );
-    // And it's mapped to one-shot prompt
-    expect(argv.prompt).toBe(
-      '@path ./file1.md @path ./file2.md additional text',
-    );
-    expect(argv.promptInteractive).toBeUndefined();
-  });
-
-  it('should map @path to prompt with ambient flags (debug)', async () => {
-    // Ambient flags like debug should NOT affect routing
-    process.argv = ['node', 'script.js', '@path', './file.md', '--debug'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.query).toBe('@path ./file.md');
-    expect(argv.prompt).toBe('@path ./file.md'); // Should map to one-shot
-    expect(argv.promptInteractive).toBeUndefined();
-    expect(argv.debug).toBe(true);
-  });
-
-  it('should map any @command to prompt (one-shot)', async () => {
-    // Test that all @commands now go to one-shot mode
-    const testCases = [
-      '@path ./file.md',
-      '@include src/',
-      '@search pattern',
-      '@web query',
-      '@git status',
-    ];
-
-    for (const testQuery of testCases) {
-      process.argv = ['node', 'script.js', testQuery];
-      const argv = await parseArguments({} as Settings);
-      expect(argv.query).toBe(testQuery);
-      expect(argv.prompt).toBe(testQuery);
-      expect(argv.promptInteractive).toBeUndefined();
-    }
-  });
-
-  it('should handle @command with leading whitespace', async () => {
-    // Test that trim() + routing handles leading whitespace correctly
-    process.argv = ['node', 'script.js', '  @path ./file.md'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.query).toBe('  @path ./file.md');
-    expect(argv.prompt).toBe('  @path ./file.md');
-    expect(argv.promptInteractive).toBeUndefined();
-  });
-
-  it('should throw an error when both --yolo and --approval-mode are used together', async () => {
-    process.argv = [
-      'node',
-      'script.js',
-      '--yolo',
-      '--approval-mode',
-      'default',
-    ];
-
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const debugErrorSpy = vi
-      .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
-
-    await expect(parseArguments({} as Settings)).rejects.toThrow(
-      'process.exit called',
-    );
-
-    expect(debugErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
-      ),
-    );
-    expect(mockConsoleError).toHaveBeenCalled();
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-    debugErrorSpy.mockRestore();
-  });
-
-  it('should throw an error when using short flags -y and --approval-mode together', async () => {
-    process.argv = ['node', 'script.js', '-y', '--approval-mode', 'yolo'];
-
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-    const debugErrorSpy = vi
-      .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
-
-    await expect(parseArguments({} as Settings)).rejects.toThrow(
-      'process.exit called',
-    );
-
-    expect(debugErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
-      ),
-    );
-    expect(mockConsoleError).toHaveBeenCalled();
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-    debugErrorSpy.mockRestore();
-  });
-
-  it('should allow --approval-mode without --yolo', async () => {
-    process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.approvalMode).toBe('auto_edit');
-    expect(argv.yolo).toBe(false);
-  });
-
-  it('should allow --yolo without --approval-mode', async () => {
-    process.argv = ['node', 'script.js', '--yolo'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.yolo).toBe(true);
-    expect(argv.approvalMode).toBeUndefined();
+  it.each([
+    {
+      description: 'should allow --approval-mode without --yolo',
+      argv: ['node', 'script.js', '--approval-mode', 'auto_edit'],
+      expected: { approvalMode: 'auto_edit', yolo: false },
+    },
+    {
+      description: 'should allow --yolo without --approval-mode',
+      argv: ['node', 'script.js', '--yolo'],
+      expected: { approvalMode: undefined, yolo: true },
+    },
+  ])('$description', async ({ argv, expected }) => {
+    process.argv = argv;
+    const parsedArgs = await parseArguments({} as Settings);
+    expect(parsedArgs.approvalMode).toBe(expected.approvalMode);
+    expect(parsedArgs.yolo).toBe(expected.yolo);
   });
 
   it('should reject invalid --approval-mode values', async () => {
