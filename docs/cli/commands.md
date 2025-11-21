@@ -337,3 +337,57 @@ Gemini CLI.
   the `GEMINI_CLI=1` environment variable is set in the subprocess's
   environment. This allows scripts or tools to detect if they are being run from
   within the Gemini CLI.
+
+
+### Understanding `/stats` output
+Run `/stats` after any prompt to see detailed token usage and efficiency.
+
+**Example output** (real output from current CLI version):
+
+Model Stats For Nerds
+┌───────────────────────────────────────────────────────────────┐
+│ Metric                  gemini-2.5-flash-lite   gemini-2.5-flash    │
+├───────────────────────────────────────────────────────────────┤
+│ API                                                             │
+│   Requests              3                       12                │
+│   Errors                0 (0.0%)                0 (0.0%)          │
+│   Avg Latency           2.1s                    4.8s              │
+│                                                                 │
+│ Tokens                                                          │
+│   Total                 4,821                   68,342            │
+│   ├ Prompt              4,512                   67,890            │
+│   ├ Completion          309                     452               │
+│   └ Thoughts            0                       0                 │
+│                                                                 │
+│ Caching (paid tier only)                                        │
+│   Cached Tokens         —                       24,567 (36% saved)│
+│                                                                 │
+│ Quota Usage                                                     │
+│   Today                 312 / 1,000 reqs        (free tier)      │
+│   Minute                18 / 60 reqs                              │
+└───────────────────────────────────────────────────────────────┘
+
+**Key metrics**:
+- **Requests / Errors / Latency** — API performance
+- **Tokens** — Full breakdown (prompt + completion)
+- **Cached Tokens** — Money saved on paid tier
+- **Quota Usage** — Free vs paid tier limits
+- **Pro Tip for Devs** — Watch "Prompt Tokens" during multi-file gens (<5k for Next.js route + tests). Paid key = caching savings (e.g., 36% on repeated GEMINI.md rules).
+
+Run `/stats` regularly to optimize prompts and avoid hitting daily limits.
+
+### Controlling reasoning depth
+While Gemini 3 Pro's full Deep Think mode is rolling out, you can already control reasoning with prefixes:
+
+- `Deep Think:` → maximum step-by-step reasoning (use for debugging, security, architecture)
+- `Quick:` → fastest response (use for boilerplate, simple components)
+
+**Examples**:
+Deep Think: Refactor this auth flow for PKCE + token rotation security
+Quick: Generate a Tailwind button with hover states
+
+**Related**: See the official [Thinking in Gemini API docs](https://ai.google.dev/gemini-api/docs/thinking) for full parameter details (CLI prefixes are prompt-based workarounds).
+
+### Minor improvements
+- Fixed typo: “exhaustived” → “exhausted”
+- Consistent formatting in command tables
