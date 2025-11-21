@@ -44,6 +44,7 @@ import {
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
 import { appEvents } from '../../utils/events.js';
+import { useAlternateBuffer } from './useAlternateBuffer.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -52,7 +53,7 @@ interface SlashCommandProcessorActions {
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
   openModelDialog: () => void;
-  openPermissionsDialog: () => void;
+  openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
@@ -76,11 +77,14 @@ export const useSlashCommandProcessor = (
   actions: SlashCommandProcessorActions,
   extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
   isConfigInitialized: boolean,
+  setBannerVisible: (visible: boolean) => void,
+  setCustomDialog: (dialog: React.ReactNode | null) => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
+  const alternateBuffer = useAlternateBuffer();
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
@@ -196,8 +200,11 @@ export const useSlashCommandProcessor = (
         addItem,
         clear: () => {
           clearItems();
-          console.clear();
+          if (!alternateBuffer) {
+            console.clear();
+          }
           refreshStatic();
+          setBannerVisible(false);
         },
         loadHistory,
         setDebugMessage: actions.setDebugMessage,
@@ -211,6 +218,7 @@ export const useSlashCommandProcessor = (
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
+        removeComponent: () => setCustomDialog(null),
       },
       session: {
         stats: session.stats,
@@ -218,6 +226,7 @@ export const useSlashCommandProcessor = (
       },
     }),
     [
+      alternateBuffer,
       config,
       settings,
       gitService,
@@ -234,6 +243,8 @@ export const useSlashCommandProcessor = (
       sessionShellAllowlist,
       reloadCommands,
       extensionsUpdateState,
+      setBannerVisible,
+      setCustomDialog,
     ],
   );
 
@@ -300,6 +311,7 @@ export const useSlashCommandProcessor = (
       rawQuery: PartListUnion,
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
+      addToHistory: boolean = true,
     ): Promise<SlashCommandProcessorResult | false> => {
       if (!commands) {
         return false;
@@ -315,8 +327,13 @@ export const useSlashCommandProcessor = (
 
       setIsProcessing(true);
 
-      const userMessageTimestamp = Date.now();
-      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
+      if (addToHistory) {
+        const userMessageTimestamp = Date.now();
+        addItem(
+          { type: MessageType.USER, text: trimmed },
+          userMessageTimestamp,
+        );
+      }
 
       let hasError = false;
       const {
@@ -400,7 +417,9 @@ export const useSlashCommandProcessor = (
                       actions.openModelDialog();
                       return { type: 'handled' };
                     case 'permissions':
-                      actions.openPermissionsDialog();
+                      actions.openPermissionsDialog(
+                        result.props as { targetDirectory?: string },
+                      );
                       return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };
@@ -413,7 +432,6 @@ export const useSlashCommandProcessor = (
                   }
                 case 'load_history': {
                   config?.getGeminiClient()?.setHistory(result.clientHistory);
-                  config?.getGeminiClient()?.stripThoughtsFromHistory();
                   fullCommandContext.ui.clear();
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
@@ -499,6 +517,10 @@ export const useSlashCommandProcessor = (
                     true,
                   );
                 }
+                case 'custom_dialog': {
+                  setCustomDialog(result.component);
+                  return { type: 'handled' };
+                }
                 default: {
                   const unhandled: never = result;
                   throw new Error(
@@ -572,6 +594,7 @@ export const useSlashCommandProcessor = (
       setSessionShellAllowlist,
       setIsProcessing,
       setConfirmationRequest,
+      setCustomDialog,
     ],
   );
 

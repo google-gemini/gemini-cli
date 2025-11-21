@@ -109,7 +109,7 @@ export function toFinishReasons(candidates?: Candidate[]): OTelFinishReason[] {
 
 export function toOutputType(requested_mime?: string): string | undefined {
   switch (requested_mime) {
-    // explictly support the known good values of responseMimeType
+    // explicitly support the known good values of responseMimeType
     case 'text/plain':
       return OTelOutputType.TEXT;
     case 'application/json':

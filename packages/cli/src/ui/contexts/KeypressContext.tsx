@@ -18,10 +18,11 @@ import {
 import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
-export const PASTE_TIMEOUT = 50;
+export const PASTE_TIMEOUT = 30_000;
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -211,7 +212,12 @@ function bufferPaste(
         key = yield;
         clearTimeout(timeoutId);
 
-        if (key === null || key.name === 'paste-end') {
+        if (key === null) {
+          appEvents.emit(AppEvent.PasteTimeout);
+          break;
+        }
+
+        if (key.name === 'paste-end') {
           break;
         }
         buffer += key.sequence;
@@ -360,13 +366,15 @@ function* emitKeys(
 
         // skip modifier
         if (ch === ';') {
-          ch = yield;
-          sequence += ch;
-
-          // collect as many digits as possible
-          while (ch >= '0' && ch <= '9') {
+          while (ch === ';') {
             ch = yield;
             sequence += ch;
+
+            // collect as many digits as possible
+            while (ch >= '0' && ch <= '9') {
+              ch = yield;
+              sequence += ch;
+            }
           }
         } else if (ch === '<') {
           // SGR mouse mode
@@ -395,13 +403,20 @@ function* emitKeys(
         const cmd = sequence.slice(cmdStart);
         let match;
 
-        if ((match = /^(\d+)(?:;(\d+))?([~^$u])$/.exec(cmd))) {
-          code += match[1] + match[3];
-          // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
-          modifier = parseInt(match[2] ?? '1', 10) - 1;
-        } else if ((match = /^((\d;)?(\d))?([A-Za-z])$/.exec(cmd))) {
-          code += match[4];
-          modifier = parseInt(match[3] ?? '1', 10) - 1;
+        if ((match = /^(\d+)(?:;(\d+))?(?:;(\d+))?([~^$u])$/.exec(cmd))) {
+          if (match[1] === '27' && match[3] && match[4] === '~') {
+            // modifyOtherKeys format: CSI 27 ; modifier ; key ~
+            // Treat as CSI u: key + 'u'
+            code += match[3] + 'u';
+            modifier = parseInt(match[2] ?? '1', 10) - 1;
+          } else {
+            code += match[1] + match[4];
+            // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
+            modifier = parseInt(match[2] ?? '1', 10) - 1;
+          }
+        } else if ((match = /^(\d+)?(?:;(\d+))?([A-Za-z])$/.exec(cmd))) {
+          code += match[3];
+          modifier = parseInt(match[2] ?? match[1] ?? '1', 10) - 1;
         } else {
           code += cmd;
         }
@@ -593,16 +608,8 @@ export function KeypressProvider({
     }
 
     stdin.on('data', dataListener);
-
     return () => {
-      // flush buffers by sending null key
-      backslashBufferer(null);
-      pasteBufferer(null);
-      // flush by sending empty string to the data listener
-      dataListener('');
       stdin.removeListener('data', dataListener);
-
-      // Restore the terminal to its original state.
       if (wasRaw === false) {
         setRawMode(false);
       }

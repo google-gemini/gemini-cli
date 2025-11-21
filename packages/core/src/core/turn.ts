@@ -30,6 +30,7 @@ import type { GeminiChat } from './geminiChat.js';
 import { InvalidStreamError } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -62,6 +63,7 @@ export enum GeminiEventType {
   Retry = 'retry',
   ContextWindowWillOverflow = 'context_window_will_overflow',
   InvalidStream = 'invalid_stream',
+  ModelInfo = 'model_info',
 }
 
 export type ServerGeminiRetryEvent = {
@@ -78,6 +80,11 @@ export type ServerGeminiContextWindowWillOverflowEvent = {
 
 export type ServerGeminiInvalidStreamEvent = {
   type: GeminiEventType.InvalidStream;
+};
+
+export type ServerGeminiModelInfoEvent = {
+  type: GeminiEventType.ModelInfo;
+  value: string;
 };
 
 export interface StructuredError {
@@ -212,7 +219,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiUserCancelledEvent
   | ServerGeminiRetryEvent
   | ServerGeminiContextWindowWillOverflowEvent
-  | ServerGeminiInvalidStreamEvent;
+  | ServerGeminiInvalidStreamEvent
+  | ServerGeminiModelInfoEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
@@ -225,9 +233,10 @@ export class Turn {
     private readonly chat: GeminiChat,
     private readonly prompt_id: string,
   ) {}
+
   // The run method yields simpler events suitable for server logic
   async *run(
-    model: string,
+    modelConfigKey: ModelConfigKey,
     req: PartListUnion,
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
@@ -235,14 +244,10 @@ export class Turn {
       // Note: This assumes `sendMessageStream` yields events like
       // { type: StreamEventType.RETRY } or { type: StreamEventType.CHUNK, value: GenerateContentResponse }
       const responseStream = await this.chat.sendMessageStream(
-        model,
-        {
-          message: req,
-          config: {
-            abortSignal: signal,
-          },
-        },
+        modelConfigKey,
+        req,
         this.prompt_id,
+        signal,
       );
 
       for await (const streamEvent of responseStream) {
