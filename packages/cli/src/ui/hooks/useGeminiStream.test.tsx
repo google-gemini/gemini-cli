@@ -222,7 +222,6 @@ describe('useGeminiStream', () => {
         .fn()
         .mockReturnValue(contentGeneratorConfig),
       getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
       isInteractive: () => false,
       getExperiments: () => {},
     } as unknown as Config;
