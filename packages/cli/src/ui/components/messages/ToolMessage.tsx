@@ -17,7 +17,10 @@ import {
   type TextEmphasis,
   STATUS_INDICATOR_WIDTH,
 } from './ToolShared.js';
-import { SHELL_COMMAND_NAME } from '../../constants.js';
+import {
+  SHELL_COMMAND_NAME,
+  SHELL_FOCUS_HINT_DELAY_MS,
+} from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
@@ -68,7 +71,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const showFocusHint = useInactivityTimer(
     !!lastUpdateTime,
     lastUpdateTime ? lastUpdateTime.getTime() : 0,
-    5000,
+    SHELL_FOCUS_HINT_DELAY_MS,
   );
 
   useEffect(() => {

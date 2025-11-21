@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { SHELL_FOCUS_HINT_DELAY_MS } from '../constants.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import { useInactivityTimer } from './useInactivityTimer.js';
@@ -39,7 +40,7 @@ export const usePhraseCycler = (
   const showShellFocusHint = useInactivityTimer(
     isInteractiveShellWaiting,
     lastOutputTime,
-    5000,
+    SHELL_FOCUS_HINT_DELAY_MS,
   );
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstRequestTipRef = useRef(false);
