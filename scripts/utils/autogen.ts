@@ -57,7 +57,7 @@ export function formatDefaultValue(
       return '[]';
     }
     try {
-      return JSON.stringify(value);
+      return JSON.stringify(value, null, 2);
     } catch {
       return String(value);
     }
@@ -65,7 +65,7 @@ export function formatDefaultValue(
 
   if (typeof value === 'object') {
     try {
-      const json = JSON.stringify(value);
+      const json = JSON.stringify(value, null, 2);
       if (json === '{}') {
         return '{}';
       }
