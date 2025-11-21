@@ -17,12 +17,12 @@ export type PackageJson = BasePackageJson & {
 
 /**
  * Reads package.json from the current directory or any parent directory.
- * 
+ *
  * @param cwd - The directory to start searching from (searches upward to filesystem root)
  * @returns The package.json object if found, or `undefined` if no package.json exists
  *          in the directory hierarchy. This is expected behavior when called from
  *          directories outside of a Node.js project.
- * 
+ *
  * @example
  * ```ts
  * const pkg = await getPackageJson(__dirname);
