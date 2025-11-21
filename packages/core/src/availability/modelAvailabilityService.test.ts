@@ -111,4 +111,55 @@ describe('ModelAvailabilityService', () => {
       ],
     });
   });
+
+  it('preserves consumed state when marking retry-once-per-turn again', () => {
+    service.markRetryOncePerTurn(model);
+    service.consumeStickyAttempt(model);
+
+    // It is currently consumed
+    expect(service.snapshot(model).available).toBe(false);
+
+    // Marking it again should not reset the consumed flag
+    service.markRetryOncePerTurn(model);
+    expect(service.snapshot(model).available).toBe(false);
+  });
+
+  it('clears consumed state when marked healthy', () => {
+    service.markRetryOncePerTurn(model);
+    service.consumeStickyAttempt(model);
+    expect(service.snapshot(model).available).toBe(false);
+
+    service.markHealthy(model);
+    expect(service.snapshot(model).available).toBe(true);
+
+    // If we mark it sticky again, it should be fresh (not consumed)
+    service.markRetryOncePerTurn(model);
+    expect(service.snapshot(model).available).toBe(true);
+  });
+
+  it('resetTurn resets consumed state for multiple sticky models', () => {
+    const model2 = 'model-2';
+    service.markRetryOncePerTurn(model);
+    service.markRetryOncePerTurn(model2);
+
+    service.consumeStickyAttempt(model);
+    service.consumeStickyAttempt(model2);
+
+    expect(service.snapshot(model).available).toBe(false);
+    expect(service.snapshot(model2).available).toBe(false);
+
+    service.resetTurn();
+
+    expect(service.snapshot(model).available).toBe(true);
+    expect(service.snapshot(model2).available).toBe(true);
+  });
+
+  it('resetTurn does not affect terminal models', () => {
+    service.markTerminal(model, 'quota');
+    service.resetTurn();
+    expect(service.snapshot(model)).toEqual({
+      available: false,
+      reason: 'quota',
+    });
+  });
 });

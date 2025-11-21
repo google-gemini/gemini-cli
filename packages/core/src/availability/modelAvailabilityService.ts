@@ -6,21 +6,25 @@
 
 export type ModelId = string;
 
-export type TerminalAvailabilityReason = 'quota' | 'capacity';
-export type TurnAvailabilityReason = 'retry_once_per_turn';
+export type TerminalUnavailabilityReason = 'quota' | 'capacity';
+export type TurnUnavailabilityReason = 'retry_once_per_turn';
 
-export type AvailabilityReason =
-  | TerminalAvailabilityReason
-  | TurnAvailabilityReason
+export type UnavailabilityReason =
+  | TerminalUnavailabilityReason
+  | TurnUnavailabilityReason
   | 'unknown';
 
 type HealthState =
-  | { status: 'terminal'; reason: TerminalAvailabilityReason }
-  | { status: 'sticky_retry'; reason: TurnAvailabilityReason };
+  | { status: 'terminal'; reason: TerminalUnavailabilityReason }
+  | {
+      status: 'sticky_retry';
+      reason: TurnUnavailabilityReason;
+      consumed: boolean;
+    };
 
 export interface ModelAvailabilitySnapshot {
   available: boolean;
-  reason?: AvailabilityReason;
+  reason?: UnavailabilityReason;
 }
 
 export interface ModelSelectionResult {
@@ -28,15 +32,14 @@ export interface ModelSelectionResult {
   attempts?: number;
   skipped: Array<{
     model: ModelId;
-    reason: AvailabilityReason;
+    reason: UnavailabilityReason;
   }>;
 }
 
 export class ModelAvailabilityService {
   private readonly health = new Map<ModelId, HealthState>();
-  private readonly consumedSticky = new Set<ModelId>();
 
-  markTerminal(model: ModelId, reason: TerminalAvailabilityReason) {
+  markTerminal(model: ModelId, reason: TerminalUnavailabilityReason) {
     this.setState(model, {
       status: 'terminal',
       reason,
@@ -56,31 +59,40 @@ export class ModelAvailabilityService {
 
     // Only reset consumption if we are not already in the sticky_retry state.
     // This prevents infinite loops if the model fails repeatedly in the same turn.
-    if (currentState?.status !== 'sticky_retry') {
-      this.consumedSticky.delete(model);
+    let consumed = false;
+    if (currentState?.status === 'sticky_retry') {
+      consumed = currentState.consumed;
     }
 
     this.setState(model, {
       status: 'sticky_retry',
       reason: 'retry_once_per_turn',
+      consumed,
     });
   }
 
   consumeStickyAttempt(model: ModelId) {
-    if (this.health.get(model)?.status === 'sticky_retry') {
-      this.consumedSticky.add(model);
+    const state = this.health.get(model);
+    if (state?.status === 'sticky_retry') {
+      this.setState(model, { ...state, consumed: true });
     }
   }
 
   snapshot(model: ModelId): ModelAvailabilitySnapshot {
     const state = this.health.get(model);
-    const isUnavailable =
-      state?.status === 'terminal' ||
-      (state?.status === 'sticky_retry' && this.consumedSticky.has(model));
 
-    if (isUnavailable) {
-      return { available: false, reason: state!.reason };
+    if (!state) {
+      return { available: true };
     }
+
+    if (state.status === 'terminal') {
+      return { available: false, reason: state.reason };
+    }
+
+    if (state.status === 'sticky_retry' && state.consumed) {
+      return { available: false, reason: state.reason };
+    }
+
     return { available: true };
   }
 
@@ -102,7 +114,11 @@ export class ModelAvailabilityService {
   }
 
   resetTurn() {
-    this.consumedSticky.clear();
+    for (const [model, state] of this.health.entries()) {
+      if (state.status === 'sticky_retry') {
+        this.setState(model, { ...state, consumed: false });
+      }
+    }
   }
 
   private setState(model: ModelId, nextState: HealthState) {
@@ -111,6 +127,5 @@ export class ModelAvailabilityService {
 
   private clearState(model: ModelId) {
     this.health.delete(model);
-    this.consumedSticky.delete(model);
   }
 }
