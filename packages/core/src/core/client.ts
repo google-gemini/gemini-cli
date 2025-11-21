@@ -74,8 +74,12 @@ function estimateTextOnlyLength(request: PartListUnion): number {
 
   let textLength = 0;
   for (const part of request) {
-    // Type guard: ensure part is an object before checking properties
-    if (
+    // Handle string elements in the array
+    if (typeof part === 'string') {
+      textLength += part.length;
+    }
+    // Handle object elements with text property
+    else if (
       typeof part === 'object' &&
       part !== null &&
       'text' in part &&
