@@ -28,7 +28,6 @@ import { SmartEditTool } from '../tools/smart-edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
@@ -164,7 +163,6 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
-import { READ_MANY_FILES_TOOL_NAME } from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -307,6 +305,7 @@ export interface ConfigParameters {
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
+  previewFeatures?: boolean;
 }
 
 export class Config {
@@ -359,6 +358,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
+  private previewFeatures: boolean | undefined;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -413,12 +413,16 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
+
+  private previewModelFallbackMode = false;
+  private previewModelBypassMode = false;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -427,10 +431,9 @@ export class Config {
     this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
-    this.workspaceContext = new WorkspaceContext(
-      this.targetDir,
-      params.includeDirectories ?? [],
-    );
+    this.folderTrust = params.folderTrust ?? false;
+    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+    this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
 
@@ -477,6 +480,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.previewFeatures = params.previewFeatures ?? undefined;
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -514,7 +518,7 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
     this.disableModelRouterForAuth = params.disableModelRouterForAuth ?? [];
@@ -632,32 +636,6 @@ export class Config {
     ]);
 
     await this.geminiClient.initialize();
-
-    this.checkDeprecatedTools();
-  }
-
-  private checkDeprecatedTools(): void {
-    const deprecatedTools = [
-      {
-        name: READ_MANY_FILES_TOOL_NAME,
-        alternateName: 'ReadManyFilesTool',
-      },
-    ];
-
-    const checkList = (list: string[] | undefined, listName: string) => {
-      if (!list) return;
-      for (const tool of deprecatedTools) {
-        if (list.includes(tool.name) || list.includes(tool.alternateName)) {
-          coreEvents.emitFeedback(
-            'warning',
-            `The tool '${tool.name}' (or '${tool.alternateName}') specified in '${listName}' is deprecated and will be removed in v0.14.0.`,
-          );
-        }
-      }
-    };
-
-    checkList(this.coreTools, 'tools.core');
-    checkList(this.allowedTools, 'tools.allowed');
   }
 
   getContentGenerator(): ContentGenerator {
@@ -677,7 +655,7 @@ export class Config {
     // thoughtSignature from Genai to Vertex will fail, we need to strip them
     if (
       this.contentGeneratorConfig?.authType === AuthType.USE_GEMINI &&
-      authMethod === AuthType.LOGIN_WITH_GOOGLE
+      authMethod !== AuthType.USE_GEMINI
     ) {
       // Restore the conversation history to the new client
       this.geminiClient.stripThoughtsFromHistory();
@@ -698,11 +676,22 @@ export class Config {
     // Initialize BaseLlmClient now that the ContentGenerator is available
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
+    const previewFeatures = this.getPreviewFeatures();
+
     const codeAssistServer = getCodeAssistServer(this);
     if (codeAssistServer) {
       this.experimentsPromise = getExperiments(codeAssistServer)
         .then((experiments) => {
           this.setExperiments(experiments);
+
+          // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
+          if (previewFeatures === undefined) {
+            const remotePreviewFeatures =
+              experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
+            if (remotePreviewFeatures === true) {
+              this.setPreviewFeatures(remotePreviewFeatures);
+            }
+          }
         })
         .catch((e) => {
           debugLogger.error('Failed to fetch experiments', e);
@@ -769,12 +758,11 @@ export class Config {
   }
 
   setModel(newModel: string): void {
-    this.setFallbackMode(false);
-
-    if (this.model !== newModel) {
+    if (this.model !== newModel || this.inFallbackMode) {
       this.model = newModel;
       coreEvents.emitModelChanged(newModel);
     }
+    this.setFallbackMode(false);
   }
 
   isInFallbackMode(): boolean {
@@ -787,6 +775,26 @@ export class Config {
 
   setFallbackModelHandler(handler: FallbackModelHandler): void {
     this.fallbackModelHandler = handler;
+  }
+
+  getFallbackModelHandler(): FallbackModelHandler | undefined {
+    return this.fallbackModelHandler;
+  }
+
+  isPreviewModelFallbackMode(): boolean {
+    return this.previewModelFallbackMode;
+  }
+
+  setPreviewModelFallbackMode(active: boolean): void {
+    this.previewModelFallbackMode = active;
+  }
+
+  isPreviewModelBypassMode(): boolean {
+    return this.previewModelBypassMode;
+  }
+
+  setPreviewModelBypassMode(active: boolean): void {
+    this.previewModelBypassMode = active;
   }
 
   getMaxSessionTurns(): number {
@@ -849,6 +857,14 @@ export class Config {
   }
   getQuestion(): string | undefined {
     return this.question;
+  }
+
+  getPreviewFeatures(): boolean | undefined {
+    return this.previewFeatures;
+  }
+
+  setPreviewFeatures(previewFeatures: boolean) {
+    this.previewFeatures = previewFeatures;
   }
 
   getCoreTools(): string[] | undefined {
@@ -956,6 +972,14 @@ export class Config {
     return this.disableYoloMode || !this.isTrustedFolder();
   }
 
+  getPendingIncludeDirectories(): string[] {
+    return this.pendingIncludeDirectories;
+  }
+
+  clearPendingIncludeDirectories(): void {
+    this.pendingIncludeDirectories = [];
+  }
+
   getShowMemoryUsage(): boolean {
     return this.showMemoryUsage;
   }
@@ -994,6 +1018,17 @@ export class Config {
 
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
+  }
+
+  /**
+   * Updates the system instruction with the latest user memory.
+   * Whenever the user memory (GEMINI.md files) is updated.
+   */
+  async updateSystemInstructionIfInitialized(): Promise<void> {
+    const geminiClient = this.getGeminiClient();
+    if (geminiClient?.isInitialized()) {
+      await geminiClient.updateSystemInstruction();
+    }
   }
 
   getModelRouterService(): ModelRouterService {
@@ -1188,6 +1223,22 @@ export class Config {
     await this.ensureExperimentsLoaded();
 
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
+  }
+
+  async getBannerTextNoCapacityIssues(): Promise<string> {
+    await this.ensureExperimentsLoaded();
+    return (
+      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES]
+        ?.stringValue ?? ''
+    );
+  }
+
+  async getBannerTextCapacityIssues(): Promise<string> {
+    await this.ensureExperimentsLoaded();
+    return (
+      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
+        ?.stringValue ?? ''
+    );
   }
 
   private async ensureExperimentsLoaded(): Promise<void> {
@@ -1397,7 +1448,6 @@ export class Config {
     }
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
@@ -1455,8 +1505,8 @@ export class Config {
     this.experiments = experiments;
     const flagSummaries = Object.entries(experiments.flags ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, flag]) => {
-        const summary: Record<string, unknown> = { name };
+      .map(([flagId, flag]) => {
+        const summary: Record<string, unknown> = { flagId };
         if (flag.boolValue !== undefined) {
           summary['boolValue'] = flag.boolValue;
         }

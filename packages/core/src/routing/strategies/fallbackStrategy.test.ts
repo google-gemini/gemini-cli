@@ -24,6 +24,7 @@ describe('FallbackStrategy', () => {
     const mockConfig = {
       isInFallbackMode: () => false,
       getModel: () => DEFAULT_GEMINI_MODEL,
+      getPreviewFeatures: () => false,
     } as Config;
 
     const decision = await strategy.route(mockContext, mockConfig, mockClient);
@@ -35,6 +36,7 @@ describe('FallbackStrategy', () => {
       const mockConfig = {
         isInFallbackMode: () => true,
         getModel: () => DEFAULT_GEMINI_MODEL,
+        getPreviewFeatures: () => false,
       } as Config;
 
       const decision = await strategy.route(
@@ -53,6 +55,7 @@ describe('FallbackStrategy', () => {
       const mockConfig = {
         isInFallbackMode: () => true,
         getModel: () => DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        getPreviewFeatures: () => false,
       } as Config;
 
       const decision = await strategy.route(
@@ -70,6 +73,7 @@ describe('FallbackStrategy', () => {
       const mockConfig = {
         isInFallbackMode: () => true,
         getModel: () => DEFAULT_GEMINI_FLASH_MODEL,
+        getPreviewFeatures: () => false,
       } as Config;
 
       const decision = await strategy.route(

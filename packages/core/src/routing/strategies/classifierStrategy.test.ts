@@ -20,6 +20,7 @@ import {
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 vi.mock('../../core/baseLlmClient.js');
 vi.mock('../../utils/promptIdContext.js');
@@ -40,6 +41,7 @@ describe('ClassifierStrategy', () => {
       request: [{ text: 'simple task' }],
       signal: new AbortController().signal,
     };
+
     mockResolvedConfig = {
       model: 'classifier',
       generateContentConfig: {},
@@ -48,6 +50,7 @@ describe('ClassifierStrategy', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
+      getPreviewFeatures: () => false,
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
@@ -130,7 +133,7 @@ describe('ClassifierStrategy', () => {
 
   it('should return null if the classifier API call fails', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const testError = new Error('API Failure');
     vi.mocked(mockBaseLlmClient.generateJson).mockRejectedValue(testError);
@@ -148,7 +151,7 @@ describe('ClassifierStrategy', () => {
 
   it('should return null if the classifier returns a malformed JSON object', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const malformedApiResponse = {
       reasoning: 'This is a simple task.',
@@ -250,7 +253,7 @@ describe('ClassifierStrategy', () => {
 
   it('should use a fallback promptId if not found in context', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     vi.mocked(promptIdContext.getStore).mockReturnValue(undefined);
     const mockApiResponse = {

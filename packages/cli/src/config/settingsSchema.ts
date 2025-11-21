@@ -160,6 +160,15 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
+      previewFeatures: {
+        type: 'boolean',
+        label: 'Preview Features (e.g., models)',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable preview features (e.g., preview models).',
+        showInDialog: true,
+      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -251,6 +260,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: undefined as SessionRetentionSettings | undefined,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
@@ -470,7 +480,7 @@ const SETTINGS_SCHEMA = {
         label: 'Show Line Numbers',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Show line numbers in the chat.',
         showInDialog: true,
       },
@@ -481,6 +491,15 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Show citations for generated text in the chat.',
+        showInDialog: true,
+      },
+      showModelInfoInChat: {
+        type: 'boolean',
+        label: 'Show Model Info In Chat',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show the model name in the chat for each model turn.',
         showInDialog: true,
       },
       useFullWidth: {
@@ -497,9 +516,19 @@ const SETTINGS_SCHEMA = {
         label: 'Use Alternate Screen Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
+        showInDialog: true,
+      },
+      incrementalRendering: {
+        type: 'boolean',
+        label: 'Incremental Rendering',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
       customWittyPhrases: {
@@ -664,7 +693,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 0.2 as number,
+        default: 0.5 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
@@ -1080,8 +1109,8 @@ const SETTINGS_SCHEMA = {
     label: 'Use WriteTodos',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
-    description: 'Enable the write_todos_list tool.',
+    default: true,
+    description: 'Enable the write_todos tool.',
     showInDialog: false,
   },
   security: {
