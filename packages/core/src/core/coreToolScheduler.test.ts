@@ -1373,7 +1373,7 @@ describe('CoreToolScheduler request queueing', () => {
     expect(statusUpdates).toContain('awaiting_approval');
     expect(executeFn).not.toHaveBeenCalled();
     expect(onAllToolCallsComplete).not.toHaveBeenCalled();
-  }, 20000);
+  });
 
   it('should prompt to relax per-tool sandbox and retry shell tool once', async () => {
     class FakeShellInvocation extends ShellToolInvocation {
