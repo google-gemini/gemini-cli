@@ -334,13 +334,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // Get relative path from current directory
           const relativePath = path.relative(config.getTargetDir(), imagePath);
 
-          // Extract image number from filename (e.g., "image-1.png" -> 1)
-          const filename = path.basename(imagePath);
-          const imageNumberMatch = filename.match(/image-(\d+)\./);
-          const imageNumber = imageNumberMatch ? imageNumberMatch[1] : '?';
-
-          // Insert with friendly label: [image #1] @path
-          const insertText = `[image #${imageNumber}] @${relativePath}`;
+          // Insert @path reference
+          const insertText = `@${relativePath}`;
           const currentText = buffer.text;
           const offset = buffer.getOffset();
 
