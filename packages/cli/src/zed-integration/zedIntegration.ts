@@ -66,7 +66,7 @@ export async function runZedIntegration(
   );
 }
 
-class GeminiAgent {
+export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
 
@@ -209,7 +209,7 @@ class GeminiAgent {
   }
 }
 
-class Session {
+export class Session {
   private pendingPrompt: AbortController | null = null;
 
   constructor(
@@ -295,6 +295,10 @@ class Session {
           if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
             functionCalls.push(...resp.value.functionCalls);
           }
+        }
+
+        if (pendingSend.signal.aborted) {
+          return { stopReason: 'cancelled' };
         }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
