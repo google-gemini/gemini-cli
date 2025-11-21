@@ -1490,11 +1490,14 @@ describe('CoreToolScheduler request queueing', () => {
         return Boolean(exec.danger && exec.hideAlways && exec.defaultToNo);
       });
 
-    const sandboxPromptCall = await vi.waitFor(() => {
-      const call = getSandboxPromptCall();
-      expect(call).toBeDefined();
-      return call;
-    });
+    const sandboxPromptCall = await vi.waitFor(
+      () => {
+        const call = getSandboxPromptCall();
+        expect(call).toBeDefined();
+        return call;
+      },
+      { timeout: 5000 },
+    );
 
     const confirmationDetails =
       sandboxPromptCall?.[3] as ToolCallConfirmationDetails;
