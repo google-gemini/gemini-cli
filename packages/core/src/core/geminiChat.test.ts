@@ -20,6 +20,7 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
@@ -131,15 +132,22 @@ describe('GeminiChat', () => {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       modelConfigService: {
-        getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => ({
-          model: modelConfigKey.model,
-          generateContentConfig: {
-            temperature: 0,
-            thinkingConfig: {
-              thinkingBudget: 1000,
+        getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
+          const thinkingConfig = modelConfigKey.model.startsWith('gemini-3')
+            ? {
+                thinkingLevel: ThinkingLevel.HIGH,
+              }
+            : {
+                thinkingBudget: DEFAULT_THINKING_MODE,
+              };
+          return {
+            model: modelConfigKey.model,
+            generateContentConfig: {
+              temperature: 0,
+              thinkingConfig,
             },
-          },
-        })),
+          };
+        }),
       },
       isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
       setPreviewModelBypassMode: vi.fn(),
@@ -976,7 +984,7 @@ describe('GeminiChat', () => {
             tools: [],
             temperature: 0,
             thinkingConfig: {
-              thinkingBudget: 1000,
+              thinkingBudget: DEFAULT_THINKING_MODE,
             },
             abortSignal: expect.any(AbortSignal),
           },
@@ -1021,6 +1029,45 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-thinking-level',
+      );
+    });
+
+    it('should use thinkingBudget and remove thinkingLevel for non-gemini-3 models', async () => {
+      const response = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'response' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'hello',
+        'prompt-id-thinking-budget',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-2.0-flash',
+          config: expect.objectContaining({
+            thinkingConfig: {
+              thinkingBudget: DEFAULT_THINKING_MODE,
+              thinkingLevel: undefined,
+            },
+          }),
+        }),
+        'prompt-id-thinking-budget',
       );
     });
   });
@@ -1900,6 +1947,92 @@ describe('GeminiChat', () => {
       const history = chat.getHistory();
       const modelTurn = history[1]!;
       expect(modelTurn.parts![0]!.text).toBe('Success on retry');
+    });
+
+    it('should switch to DEFAULT_GEMINI_FLASH_MODEL and use thinkingBudget when falling back from a gemini-3 model', async () => {
+      // ARRANGE
+      const authType = AuthType.LOGIN_WITH_GOOGLE;
+      vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+        authType,
+      });
+
+      // Initial state: Not in fallback mode
+      const isInFallbackModeSpy = vi.spyOn(mockConfig, 'isInFallbackMode');
+      isInFallbackModeSpy.mockReturnValue(false);
+
+      // Mock API calls:
+      // 1. Fails with 429 (simulating gemini-3 failure)
+      // 2. Succeeds (simulating fallback success)
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockRejectedValueOnce(error429)
+        .mockResolvedValueOnce(
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Fallback success' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      // Mock handleFallback to enable fallback mode and signal retry
+      mockHandleFallback.mockImplementation(async () => {
+        isInFallbackModeSpy.mockReturnValue(true); // Next call will see fallback mode = true
+        return true;
+      });
+
+      // ACT
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-test-model' }, // Start with a gemini-3 model
+        'test fallback thinking',
+        'prompt-id-fb3',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // ASSERT
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      // First call: gemini-3 model, thinkingLevel set
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          model: 'gemini-3-test-model',
+          config: expect.objectContaining({
+            thinkingConfig: {
+              thinkingBudget: undefined,
+              thinkingLevel: ThinkingLevel.HIGH,
+            },
+          }),
+        }),
+        'prompt-id-fb3',
+      );
+
+      // Second call: DEFAULT_GEMINI_FLASH_MODEL (due to fallback), thinkingBudget set (due to fix)
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          config: expect.objectContaining({
+            thinkingConfig: {
+              thinkingBudget: DEFAULT_THINKING_MODE,
+              thinkingLevel: undefined,
+            },
+          }),
+        }),
+        'prompt-id-fb3',
+      );
     });
 
     it('should stop retrying if handleFallback returns false (e.g., auth intent)', async () => {
