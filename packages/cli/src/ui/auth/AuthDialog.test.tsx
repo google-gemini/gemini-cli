@@ -25,6 +25,7 @@ import { validateAuthMethodWithSettings } from './useAuth.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { Text } from 'ink';
+import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -229,6 +230,7 @@ describe('AuthDialog', () => {
     });
 
     it('exits process for Login with Google when browser is suppressed', async () => {
+      vi.useFakeTimers();
       const exitSpy = vi
         .spyOn(process, 'exit')
         .mockImplementation(() => undefined as never);
@@ -241,14 +243,14 @@ describe('AuthDialog', () => {
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
 
+      await vi.runAllTimersAsync();
+
       expect(mockedRunExitCleanup).toHaveBeenCalled();
-      expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Please restart Gemini CLI'),
-      );
-      expect(exitSpy).toHaveBeenCalledWith(0);
+      expect(exitSpy).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
 
       exitSpy.mockRestore();
       logSpy.mockRestore();
+      vi.useRealTimers();
     });
   });
 

@@ -69,6 +69,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       stdout: process.stdout,
       stderr: process.stderr,
     })),
+    enableMouseEvents: vi.fn(),
+    disableMouseEvents: vi.fn(),
   };
 });
 import type { LoadedSettings } from '../config/settings.js';
@@ -137,10 +139,6 @@ vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
-vi.mock('./utils/mouse.js', () => ({
-  enableMouseEvents: vi.fn(),
-  disableMouseEvents: vi.fn(),
-}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -165,9 +163,13 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { ShellExecutionService, writeToStdout } from '@google/gemini-cli-core';
+import {
+  ShellExecutionService,
+  writeToStdout,
+  enableMouseEvents,
+  disableMouseEvents,
+} from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
-import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
