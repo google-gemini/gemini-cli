@@ -35,6 +35,17 @@ available combinations.
 | -------------------------------------------- | ---------- |
 | Clear the terminal screen and redraw the UI. | `Ctrl + L` |
 
+#### Scrolling
+
+| Action                   | Keys                 |
+| ------------------------ | -------------------- |
+| Scroll content up.       | `Shift + Up Arrow`   |
+| Scroll content down.     | `Shift + Down Arrow` |
+| Scroll to the top.       | `Home`               |
+| Scroll to the bottom.    | `End`                |
+| Scroll up by one page.   | `Page Up`            |
+| Scroll down by one page. | `Page Down`          |
+
 #### History & Search
 
 | Action                                       | Keys                  |
@@ -76,7 +87,7 @@ available combinations.
 | Action                                         | Keys       |
 | ---------------------------------------------- | ---------- |
 | Open the current prompt in an external editor. | `Ctrl + X` |
-| Paste an image from the clipboard.             | `Ctrl + V` |
+| Paste from the clipboard.                      | `Ctrl + V` |
 
 #### App Controls
 

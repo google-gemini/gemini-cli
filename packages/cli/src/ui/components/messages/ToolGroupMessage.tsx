@@ -10,9 +10,11 @@ import { Box, Text } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
+import { ShellToolMessage } from './ShellToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
+import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface ToolGroupMessageProps {
@@ -103,7 +105,25 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         const isFirst = index === 0;
-        const isLast = index === toolCalls.length - 1;
+        const isShellTool =
+          tool.name === SHELL_COMMAND_NAME ||
+          tool.name === SHELL_NAME ||
+          tool.name === SHELL_TOOL_NAME;
+
+        const commonProps = {
+          ...tool,
+          availableTerminalHeight: availableTerminalHeightPerToolMessage,
+          terminalWidth,
+          emphasis: isConfirming
+            ? ('high' as const)
+            : toolAwaitingApproval
+              ? ('low' as const)
+              : ('medium' as const),
+          isFirst,
+          borderColor,
+          borderDimColor,
+        };
+
         return (
           <Box
             key={tool.callId}
@@ -111,25 +131,21 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={terminalWidth}
           >
-            <ToolMessage
-              {...tool}
-              availableTerminalHeight={availableTerminalHeightPerToolMessage}
-              terminalWidth={terminalWidth}
-              emphasis={
-                isConfirming ? 'high' : toolAwaitingApproval ? 'low' : 'medium'
-              }
-              activeShellPtyId={activeShellPtyId}
-              embeddedShellFocused={embeddedShellFocused}
-              config={config}
-              isFirst={isFirst}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-            />
+            {isShellTool ? (
+              <ShellToolMessage
+                {...commonProps}
+                activeShellPtyId={activeShellPtyId}
+                embeddedShellFocused={embeddedShellFocused}
+                config={config}
+              />
+            ) : (
+              <ToolMessage {...commonProps} />
+            )}
             <Box
               borderLeft={true}
               borderRight={true}
               borderTop={false}
-              borderBottom={isLast}
+              borderBottom={false}
               borderColor={borderColor}
               borderDimColor={borderDimColor}
               flexDirection="column"
@@ -161,6 +177,25 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           </Box>
         );
       })}
+      {
+        /*
+              We have to keep the bottom border separate so it doesn't get
+              drawn over by the sticky header directly inside it.
+             */
+        toolCalls.length > 0 && (
+          <Box
+            height={0}
+            width={terminalWidth}
+            borderLeft={true}
+            borderRight={true}
+            borderTop={false}
+            borderBottom={true}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
+            borderStyle="round"
+          />
+        )
+      }
     </Box>
   );
 };

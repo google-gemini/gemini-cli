@@ -9,10 +9,8 @@ import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useLoadingIndicator } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
-import {
-  WITTY_LOADING_PHRASES,
-  PHRASE_CHANGE_INTERVAL_MS,
-} from './usePhraseCycler.js';
+import { PHRASE_CHANGE_INTERVAL_MS } from './usePhraseCycler.js';
+import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -61,20 +59,18 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reflect values when Responding', async () => {
-    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty for subsequent phrases
     const { result } = renderLoadingIndicatorHook(StreamingState.Responding);
 
-    // Initial state before timers advance
+    // Initial phrase on first activation will be a tip, not necessarily from witty phrases
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    // On first activation, it may show a tip, so we can't guarantee it's in WITTY_LOADING_PHRASES
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS + 1);
     });
 
-    // Phrase should cycle if PHRASE_CHANGE_INTERVAL_MS has passed
+    // Phrase should cycle if PHRASE_CHANGE_INTERVAL_MS has passed, now it should be witty since first activation already happened
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
     );

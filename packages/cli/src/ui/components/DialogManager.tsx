@@ -53,8 +53,13 @@ export const DialogManager = ({
   if (uiState.proQuotaRequest) {
     return (
       <ProQuotaDialog
+        failedModel={uiState.proQuotaRequest.failedModel}
         fallbackModel={uiState.proQuotaRequest.fallbackModel}
+        message={uiState.proQuotaRequest.message}
+        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
+        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
+        userTier={uiState.userTier}
       />
     );
   }
@@ -134,6 +139,7 @@ export const DialogManager = ({
           onSelect={() => uiActions.closeSettingsDialog()}
           onRestartRequest={() => process.exit(0)}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
+          config={config}
         />
       </Box>
     );
@@ -205,6 +211,7 @@ export const DialogManager = ({
       <PermissionsModifyTrustDialog
         onExit={uiActions.closePermissionsDialog}
         addItem={addItem}
+        targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
       />
     );
   }

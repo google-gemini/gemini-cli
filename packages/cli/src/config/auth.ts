@@ -11,7 +11,7 @@ export function validateAuthMethod(authMethod: string): string | null {
   loadEnvironment(loadSettings().merged);
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
-    authMethod === AuthType.CLOUD_SHELL
+    authMethod === AuthType.COMPUTE_ADC
   ) {
     return null;
   }
