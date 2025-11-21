@@ -279,16 +279,12 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
-  const isExtensionsCommand =
-    process.argv.includes('extension') || process.argv.includes('extensions');
-  if (!isExtensionsCommand) {
-    const cleanupStdio = patchStdio();
-    registerSyncCleanup(() => {
-      // This is needed to ensure we don't lose any buffered output.
-      initializeOutputListenersAndFlush();
-      cleanupStdio();
-    });
-  }
+  const cleanupStdio = patchStdio();
+  registerSyncCleanup(() => {
+    // This is needed to ensure we don't lose any buffered output.
+    initializeOutputListenersAndFlush();
+    cleanupStdio();
+  });
 
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
@@ -306,6 +302,23 @@ export async function main() {
   await cleanupCheckpoints();
 
   const argv = await parseArguments(settings.merged);
+
+  if (
+    process.argv.includes('extension') ||
+    process.argv.includes('extensions')
+  ) {
+    const config = await loadCliConfig(settings.merged, sessionId, argv);
+    await runNonInteractive({
+      config,
+      settings,
+      input: '',
+      prompt_id: '',
+      hasDeprecatedPromptArg: false,
+      resumedSessionData: undefined,
+    });
+    await runExitCleanup();
+    process.exit(0);
+  }
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
