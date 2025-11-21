@@ -136,7 +136,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         onComplete,
         mockConfig as unknown as Config,
         () => undefined,
-        () => {},
       ),
     );
 
@@ -265,7 +264,6 @@ describe('useReactToolScheduler', () => {
         onComplete,
         mockConfig as unknown as Config,
         () => undefined,
-        () => {},
       ),
     );
 
