@@ -152,6 +152,23 @@ export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
 };
 
+export type HistoryItemContext = HistoryItemBase & {
+  type: 'context';
+  breakdown: {
+    model: string;
+    currentTokens: number;
+    maxTokens: number;
+    systemPromptTokens: number;
+    toolsTokens: number;
+    mcpToolsTokens: number;
+    memoryTokens: number;
+    messagesTokens: number;
+    mcpTools: Array<{ name: string; server: string; tokens: number }>;
+    memoryFiles: Array<{ path: string; tokens: number }>;
+    slashCommands: number;
+  } | null;
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -256,6 +273,7 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemContext
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -277,6 +295,7 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  CONTEXT = 'context',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',

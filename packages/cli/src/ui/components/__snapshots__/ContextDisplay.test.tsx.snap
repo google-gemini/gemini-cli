@@ -1,0 +1,28 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ContextDisplay /> > should match snapshot for complete breakdown 1`] = `
+"
+Context Usage
+
+▓▓▓▓▓▓░░░░░░░░░░░░░░ gemini-2.5-pro • 60.0k/200.0k tokens (30%)
+
+□ System prompt: 2.9k tokens (1.5%)
+□ System tools: 13.3k tokens (6.7%)
+□ MCP tools: 16.8k tokens (8.4%)
+□ Memory files: 27.0k tokens (13.5%)
+□ Messages: 8 tokens (0.0%)
+□ Free space: 140.0k (70.0%)
+
+MCP tools • /ide, /playwright
+
+└ ide_getDiagnostics (ide): 428 tokens
+└ playwright_browserClose (playwright): 390 tokens
+
+Memory files • /memory
+
+└ /project/memory.md: 2200 tokens
+
+SlashCommand Tool • 681 commands
+└ Total: 681 tokens
+"
+`;
