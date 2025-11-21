@@ -78,6 +78,7 @@ describe('usePhraseCycler', () => {
         isActive={true}
         isWaiting={false}
         isInteractiveShellWaiting={true}
+        lastOutputTime={1}
       />,
     );
     await act(async () => {
@@ -154,6 +155,7 @@ describe('usePhraseCycler', () => {
         isActive={true}
         isWaiting={true}
         isInteractiveShellWaiting={true}
+        lastOutputTime={1}
       />,
     );
     await act(async () => {

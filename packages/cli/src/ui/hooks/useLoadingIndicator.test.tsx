@@ -85,6 +85,7 @@ describe('useLoadingIndicator', () => {
     const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       true,
+      1,
     );
 
     // Initially should be witty phrase or tip
