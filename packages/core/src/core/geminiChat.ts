@@ -22,6 +22,7 @@ import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_MODEL,
   getEffectiveModel,
   isGemini2Model,
@@ -428,6 +429,14 @@ export class GeminiChat {
           thinkingLevel: ThinkingLevel.HIGH,
         };
         delete config.thinkingConfig?.thinkingBudget;
+      } else {
+        // The `gemini-3` configs use thinkingLevel, so we have to invert the
+        // change above.
+        config.thinkingConfig = {
+          ...config.thinkingConfig,
+          thinkingBudget: DEFAULT_THINKING_MODE,
+        };
+        delete config.thinkingConfig?.thinkingLevel;
       }
 
       return this.config.getContentGenerator().generateContentStream(
