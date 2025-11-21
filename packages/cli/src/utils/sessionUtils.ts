@@ -132,7 +132,7 @@ export const extractFirstUserMessage = (messages: MessageRecord[]): string => {
     content = cleanMessage(partListUnionToString(userMessage.content));
   }
 
-  return content.length > 100 ? content.slice(0, 97) + '...' : content;
+  return content;
 };
 
 /**

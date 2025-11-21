@@ -26,9 +26,9 @@ export interface SessionBrowserProps {
   /** Application configuration object */
   config: Config;
   /** Callback when user selects a session to resume */
-  onResumeSession: (sessionId: string) => void;
+  onResumeSession: (session: SessionInfo) => void;
   /** Callback when user deletes a session */
-  onDeleteSession?: (sessionId: string) => void;
+  onDeleteSession?: (session: SessionInfo) => void;
   /** Callback when user exits the session browser */
   onExit: () => void;
 }
@@ -636,7 +636,14 @@ export const useSessionBrowserState = (
  * Hook to load sessions on mount.
  */
 const useLoadSessions = (config: Config, state: SessionBrowserState) => {
-  const { setSessions, setLoading, setError } = state;
+  const {
+    setSessions,
+    setLoading,
+    setError,
+    isSearchMode,
+    hasLoadedFullContent,
+    setHasLoadedFullContent,
+  } = state;
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -645,7 +652,6 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
         const sessionData = await getSessionFiles(
           chatsDir,
           config.getSessionId(),
-          { includeFullContent: true },
         );
         setSessions(sessionData);
         setLoading(false);
@@ -659,6 +665,41 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
 
     loadSessions();
   }, [config, setSessions, setLoading, setError]);
+
+  useEffect(() => {
+    const loadFullContent = async () => {
+      if (isSearchMode && !hasLoadedFullContent) {
+        try {
+          const chatsDir = path.join(
+            config.storage.getProjectTempDir(),
+            'chats',
+          );
+          const sessionData = await getSessionFiles(
+            chatsDir,
+            config.getSessionId(),
+            { includeFullContent: true },
+          );
+          setSessions(sessionData);
+          setHasLoadedFullContent(true);
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to load full session content',
+          );
+        }
+      }
+    };
+
+    loadFullContent();
+  }, [
+    isSearchMode,
+    hasLoadedFullContent,
+    config,
+    setSessions,
+    setHasLoadedFullContent,
+    setError,
+  ]);
 };
 
 /**
@@ -717,8 +758,8 @@ export const useSessionBrowserInput = (
   state: SessionBrowserState,
   moveSelection: (delta: number) => void,
   cycleSortOrder: () => void,
-  onResumeSession: (sessionId: string) => void,
-  onDeleteSession: ((sessionId: string) => void) | undefined,
+  onResumeSession: (session: SessionInfo) => void,
+  onDeleteSession: ((session: SessionInfo) => void) | undefined,
   onExit: () => void,
 ) => {
   useKeypress(
@@ -782,7 +823,7 @@ export const useSessionBrowserInput = (
             onDeleteSession
           ) {
             try {
-              onDeleteSession(selectedSession.file);
+              onDeleteSession(selectedSession);
               // Remove the session from the state
               state.setSessions(
                 state.sessions.filter((s) => s.id !== selectedSession.id),
@@ -821,7 +862,7 @@ export const useSessionBrowserInput = (
           state.filteredAndSortedSessions[state.activeIndex];
         // Don't allow resuming the current session
         if (!selectedSession.isCurrentSession) {
-          onResumeSession(selectedSession.id);
+          onResumeSession(selectedSession);
         }
       } else if (key.name === 'up') {
         moveSelection(-1);

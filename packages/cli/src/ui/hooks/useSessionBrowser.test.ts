@@ -68,9 +68,11 @@ describe('useSessionBrowser', () => {
       messages: [{ type: 'user', content: 'Hello' } as MessageRecord],
     } as ConversationRecord;
 
-    mockedGetSessionFiles.mockResolvedValue([
-      { id: MOCKED_SESSION_ID, fileName: MOCKED_FILENAME } as SessionInfo,
-    ]);
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
+    mockedGetSessionFiles.mockResolvedValue([mockSession]);
     mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
     const { result } = renderHook(() =>
@@ -78,13 +80,8 @@ describe('useSessionBrowser', () => {
     );
 
     await act(async () => {
-      await result.current.handleResumeSession(MOCKED_SESSION_ID);
+      await result.current.handleResumeSession(mockSession);
     });
-
-    expect(mockedGetSessionFiles).toHaveBeenCalledWith(
-      MOCKED_CHATS_DIR,
-      MOCKED_CURRENT_SESSION_ID,
-    );
     expect(mockedFs.readFile).toHaveBeenCalledWith(
       `${MOCKED_CHATS_DIR}/${MOCKED_FILENAME}`,
       'utf8',
@@ -96,8 +93,13 @@ describe('useSessionBrowser', () => {
     expect(mockOnLoadHistory).toHaveBeenCalled();
   });
 
-  it('should handle session not found error', async () => {
-    mockedGetSessionFiles.mockResolvedValue([]);
+  it('should handle file read error', async () => {
+    const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.json';
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
+    mockedFs.readFile.mockRejectedValue(new Error('File not found'));
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
@@ -107,22 +109,20 @@ describe('useSessionBrowser', () => {
     );
 
     await act(async () => {
-      await result.current.handleResumeSession(MOCKED_SESSION_ID);
+      await result.current.handleResumeSession(mockSession);
     });
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Error resuming session:',
-      new Error(`Could not find session with ID: ${MOCKED_SESSION_ID}`),
-    );
+    expect(consoleErrorSpy).toHaveBeenCalled();
     expect(result.current.isSessionBrowserOpen).toBe(false);
     consoleErrorSpy.mockRestore();
   });
 
   it('should handle JSON parse error', async () => {
     const MOCKED_FILENAME = 'invalid.json';
-    mockedGetSessionFiles.mockResolvedValue([
-      { id: MOCKED_SESSION_ID, fileName: MOCKED_FILENAME } as SessionInfo,
-    ]);
+    const mockSession = {
+      id: MOCKED_SESSION_ID,
+      fileName: MOCKED_FILENAME,
+    } as SessionInfo;
     mockedFs.readFile.mockResolvedValue('invalid json');
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -133,7 +133,7 @@ describe('useSessionBrowser', () => {
     );
 
     await act(async () => {
-      await result.current.handleResumeSession(MOCKED_SESSION_ID);
+      await result.current.handleResumeSession(mockSession);
     });
 
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -143,11 +143,121 @@ describe('useSessionBrowser', () => {
 });
 
 // The convertSessionToHistoryFormats tests are self-contained and do not need changes.
-// To keep the change minimal, I am only including the top-level describe block.
 describe('convertSessionToHistoryFormats', () => {
   it('should convert empty messages array', () => {
     const result = convertSessionToHistoryFormats([]);
     expect(result.uiHistory).toEqual([]);
     expect(result.clientHistory).toEqual([]);
+  });
+
+  it('should convert basic user and model messages', () => {
+    const messages: MessageRecord[] = [
+      { type: 'user', content: 'Hello' } as MessageRecord,
+      { type: 'gemini', content: 'Hi there' } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({ type: 'user', text: 'Hello' });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'gemini',
+      text: 'Hi there',
+    });
+
+    expect(result.clientHistory).toHaveLength(2);
+    expect(result.clientHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Hello' }],
+    });
+    expect(result.clientHistory[1]).toEqual({
+      role: 'model',
+      parts: [{ text: 'Hi there' }],
+    });
+  });
+
+  it('should filter out slash commands from client history but keep in UI', () => {
+    const messages: MessageRecord[] = [
+      { type: 'user', content: '/help' } as MessageRecord,
+      { type: 'info', content: 'Help text' } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({ type: 'user', text: '/help' });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'info',
+      text: 'Help text',
+    });
+
+    expect(result.clientHistory).toHaveLength(0);
+  });
+
+  it('should handle tool calls and responses', () => {
+    const messages: MessageRecord[] = [
+      { type: 'user', content: 'What time is it?' } as MessageRecord,
+      {
+        type: 'gemini',
+        content: '',
+        toolCalls: [
+          {
+            id: 'call_1',
+            name: 'get_time',
+            args: {},
+            status: 'success',
+            result: '12:00',
+          },
+        ],
+      } as unknown as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'user',
+      text: 'What time is it?',
+    });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'tool_group',
+      tools: [
+        expect.objectContaining({
+          callId: 'call_1',
+          name: 'get_time',
+          status: 'Success',
+        }),
+      ],
+    });
+
+    expect(result.clientHistory).toHaveLength(3); // User, Model (call), User (response)
+    expect(result.clientHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'What time is it?' }],
+    });
+    expect(result.clientHistory[1]).toEqual({
+      role: 'model',
+      parts: [
+        {
+          functionCall: {
+            name: 'get_time',
+            args: {},
+            id: 'call_1',
+          },
+        },
+      ],
+    });
+    expect(result.clientHistory[2]).toEqual({
+      role: 'user',
+      parts: [
+        {
+          functionResponse: {
+            id: 'call_1',
+            name: 'get_time',
+            response: { output: '12:00' },
+          },
+        },
+      ],
+    });
   });
 });

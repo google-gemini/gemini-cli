@@ -306,8 +306,8 @@ describe('SessionBrowser component', () => {
     triggerKey({ name: 'return', sequence: '\r' });
 
     expect(onResumeSession).toHaveBeenCalledTimes(1);
-    const [resumedId] = onResumeSession.mock.calls[0];
-    expect(resumedId).toBe('two');
+    const [resumedSession] = onResumeSession.mock.calls[0];
+    expect(resumedSession).toEqual(session2);
   });
 
   it('does not allow resuming or deleting the current session', () => {

@@ -15,7 +15,7 @@ import type {
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { partListUnionToString } from '@google/gemini-cli-core';
-import { getSessionFiles } from '../../utils/sessionUtils.js';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { MessageType, ToolCallStatus } from '../types.js';
 
 export const useSessionBrowser = (
@@ -43,25 +43,16 @@ export const useSessionBrowser = (
      * Loads a conversation by ID, and reinitializes the chat recording service with it.
      */
     handleResumeSession: useCallback(
-      async (sessionId: string) => {
+      async (session: SessionInfo) => {
         try {
           const chatsDir = path.join(
             config.storage.getProjectTempDir(),
             'chats',
           );
 
-          // Find the session file name from the session ID.
-          const sessions = await getSessionFiles(
-            chatsDir,
-            config.getSessionId(),
-          );
-          const sessionInfo = sessions.find((s) => s.id === sessionId);
+          const fileName = session.fileName;
 
-          if (!sessionInfo) {
-            throw new Error(`Could not find session with ID: ${sessionId}`);
-          }
-
-          const originalFilePath = path.join(chatsDir, sessionInfo.fileName);
+          const originalFilePath = path.join(chatsDir, fileName);
 
           // Load up the conversation.
           const conversation: ConversationRecord = JSON.parse(
@@ -99,13 +90,13 @@ export const useSessionBrowser = (
      * Deletes a session by ID using the ChatRecordingService.
      */
     handleDeleteSession: useCallback(
-      (sessionId: string) => {
+      (session: SessionInfo) => {
         try {
           const chatRecordingService = config
             .getGeminiClient()
             ?.getChatRecordingService();
           if (chatRecordingService) {
-            chatRecordingService.deleteSession(sessionId);
+            chatRecordingService.deleteSession(session.id);
           }
         } catch (error) {
           console.error('Error deleting session:', error);

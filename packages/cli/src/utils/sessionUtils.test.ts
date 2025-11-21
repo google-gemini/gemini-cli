@@ -360,7 +360,7 @@ describe('extractFirstUserMessage', () => {
     expect(extractFirstUserMessage(messages)).toBe('Hello world');
   });
 
-  it('should truncate long messages', () => {
+  it('should not truncate long messages', () => {
     const longMessage = 'a'.repeat(150);
     const messages = [
       {
@@ -372,8 +372,7 @@ describe('extractFirstUserMessage', () => {
     ] as MessageRecord[];
 
     const result = extractFirstUserMessage(messages);
-    expect(result).toBe('a'.repeat(97) + '...');
-    expect(result.length).toBe(100);
+    expect(result).toBe(longMessage);
   });
 
   it('should return "Empty conversation" for no user messages', () => {
