@@ -74,6 +74,7 @@ describe('github.ts', () => {
       checkout: ReturnType<typeof vi.fn>;
       listRemote: ReturnType<typeof vi.fn>;
       revparse: ReturnType<typeof vi.fn>;
+      raw: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
@@ -84,12 +85,14 @@ describe('github.ts', () => {
         checkout: vi.fn(),
         listRemote: vi.fn(),
         revparse: vi.fn(),
+        raw: vi.fn(),
       };
       vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
     });
 
     it('should clone, fetch and checkout a repo', async () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      mockGit.raw.mockResolvedValue(undefined);
 
       await cloneFromGit(
         {
@@ -100,25 +103,29 @@ describe('github.ts', () => {
         '/dest',
       );
 
-      expect(mockGit.clone).toHaveBeenCalledWith(
+      expect(mockGit.raw).toHaveBeenCalledWith([
+        'clone',
+        '--depth',
+        '1',
+        '--',
         'https://github.com/owner/repo.git',
         './',
-        ['--depth', '1'],
-      );
+      ]);
       expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'v1.0.0');
       expect(mockGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
     });
 
     it('should throw if no remotes found', async () => {
       mockGit.getRemotes.mockResolvedValue([]);
+      mockGit.raw.mockResolvedValue(undefined);
 
       await expect(
         cloneFromGit({ type: 'git', source: 'src' }, '/dest'),
-      ).rejects.toThrow('Unable to find any remotes');
+      ).rejects.toThrow('Unable to find any remotes for repo src');
     });
 
     it('should throw on clone error', async () => {
-      mockGit.clone.mockRejectedValue(new Error('Clone failed'));
+      mockGit.raw.mockRejectedValue(new Error('Clone failed'));
 
       await expect(
         cloneFromGit({ type: 'git', source: 'src' }, '/dest'),

@@ -55,7 +55,7 @@ export async function cloneFromGit(
         // We let git handle the source as is.
       }
     }
-    await git.clone(sourceUrl, './', ['--depth', '1']);
+    await git.raw(['clone', '--depth', '1', '--', sourceUrl, './']);
 
     const remotes = await git.getRemotes(true);
     if (remotes.length === 0) {
