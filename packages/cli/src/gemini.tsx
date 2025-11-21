@@ -303,23 +303,6 @@ export async function main() {
 
   const argv = await parseArguments(settings.merged);
 
-  if (
-    process.argv.includes('extension') ||
-    process.argv.includes('extensions')
-  ) {
-    const config = await loadCliConfig(settings.merged, sessionId, argv);
-    await runNonInteractive({
-      config,
-      settings,
-      input: '',
-      prompt_id: '',
-      hasDeprecatedPromptArg: false,
-      resumedSessionData: undefined,
-    });
-    await runExitCleanup();
-    process.exit(0);
-  }
-
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     writeToStderr(
@@ -644,7 +627,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
   }
 }
 
-function initializeOutputListenersAndFlush() {
+export function initializeOutputListenersAndFlush() {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
