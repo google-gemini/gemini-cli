@@ -76,7 +76,7 @@ describe('<TableRenderer />', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('truncates overflowing headers', () => {
+  it('wraps overflowing headers', () => {
     const headers = [
       'Column 1',
       'Column 2',
@@ -98,9 +98,10 @@ describe('<TableRenderer />', () => {
     );
 
     expect(lastFrame()).toMatchSnapshot();
+    expect(getTableWidth(lastFrame())).toBe(terminalWidth);
   });
 
-  it('truncates overflowing table cells', () => {
+  it('wraps overflowing table cells', () => {
     const headers = ['Column 1', 'Column 2', 'Column 3', 'Column 4'];
     const rows = [
       [
@@ -122,5 +123,10 @@ describe('<TableRenderer />', () => {
     );
 
     expect(lastFrame()).toMatchSnapshot();
+    expect(getTableWidth(lastFrame())).toBe(terminalWidth);
   });
 });
+
+function getTableWidth(frame: string | undefined): number {
+  return (frame ?? '').trim().indexOf('┐') + 1;
+}

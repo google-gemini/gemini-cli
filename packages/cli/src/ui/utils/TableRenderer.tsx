@@ -25,37 +25,31 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   terminalWidth,
 }) => {
   // Calculate column widths using actual display width after markdown processing
-  const maxRowWidthInColumn = headers.map((_, index) =>
+  const maxRowContentWidths = headers.map((_, index) =>
     Math.max(...rows.map((row) => getPlainTextLength(row[index] ?? ''))),
   );
-  const columnWidths = headers.map((header, index) => {
+  const contentWidths = headers.map((header, index) => {
     const headerWidth = getPlainTextLength(header);
-    const maxRowWidth = maxRowWidthInColumn[index];
+    const maxRowWidth = maxRowContentWidths[index];
     return Math.max(headerWidth, maxRowWidth);
   });
 
-  // Ensure table fits within terminal width.
-  const totalWidth =
-    columnWidths.reduce(
-      // content width + padding on both sides + only the (shared) left border
-      (sum, width) => sum + width + 2 * CELL_PADDING_X + 1,
-      1,
-    ) + 1; // + 1 for the rightmost border
-  const scaleFactor =
-    totalWidth > terminalWidth ? terminalWidth / totalWidth : 1;
-  const adjustedWidths = columnWidths.map((width) =>
-    Math.floor(width * scaleFactor),
+  const borderAndPaddingWidth = headers.length * (2 * CELL_PADDING_X + 1) + 1;
+  const availableContentWidth = terminalWidth - borderAndPaddingWidth;
+  const columnWidths = calculateColumnWidths(
+    availableContentWidth,
+    contentWidths,
   );
 
-  const hasRowOverflow = maxRowWidthInColumn.some(
-    (maxWidth, index) => maxWidth > adjustedWidths[index],
+  const hasRowOverflow = maxRowContentWidths.some(
+    (maxWidth, index) => maxWidth > columnWidths[index],
   );
 
   return (
     <Box flexDirection="column" marginY={1}>
       <Row
         cellContents={headers}
-        columnWidths={adjustedWidths}
+        columnWidths={columnWidths}
         top={true}
         bottom={rows.length === 0}
         includeRowSeparators={true}
@@ -65,7 +59,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         <Row
           key={index}
           cellContents={row}
-          columnWidths={adjustedWidths}
+          columnWidths={columnWidths}
           top={false}
           bottom={index === rows.length - 1}
           includeRowSeparators={hasRowOverflow}
@@ -75,6 +69,42 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     </Box>
   );
 };
+
+function calculateColumnWidths(
+  availableWidth: number,
+  contentWidths: number[],
+): number[] {
+  // Distribute width to the columns as evenly as possible. This avoids wrapping
+  // of already narrow columns, and approximately fairly distributes width among
+  // the columns that are forced to wrap.
+  const columnWidths = contentWidths.map(() => 0);
+  let overflowingColumns = contentWidths.map((_, i) => i);
+  while (availableWidth > 0 && overflowingColumns.length > 0) {
+    let share = Math.floor(availableWidth / overflowingColumns.length);
+    let columnsToGrow = overflowingColumns;
+    if (share === 0) {
+      // availableWidth < overflowingColumns.length, so fairly distribute the
+      // remaining width arbitrarily to the leftmost overflowing columns.
+      share = 1;
+      columnsToGrow = columnsToGrow.slice(0, availableWidth);
+    }
+
+    overflowingColumns = [];
+    for (const index of columnsToGrow) {
+      const contentWidth = contentWidths[index];
+      const oldWidth = columnWidths[index];
+      let newWidth = oldWidth + share;
+      if (newWidth > contentWidth) {
+        newWidth = contentWidth;
+      } else {
+        overflowingColumns.push(index);
+      }
+      columnWidths[index] = newWidth;
+      availableWidth -= newWidth - oldWidth;
+    }
+  }
+  return columnWidths;
+}
 
 const Row: React.FC<{
   cellContents: string[];
