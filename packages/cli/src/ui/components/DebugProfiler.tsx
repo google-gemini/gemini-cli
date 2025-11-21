@@ -185,7 +185,7 @@ export const DebugProfiler = () => {
       return;
     }
     // Only update the UX infrequently as updating the UX itself will cause
-    // frames to run so can disturb what we are measuing.
+    // frames to run so can disturb what we are measuring.
     const forceRefreshInterval = setInterval(() => {
       setForceRefresh((f) => f + 1);
       profiler.reportAction();

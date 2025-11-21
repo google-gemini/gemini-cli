@@ -453,7 +453,7 @@ const createMcpServer = (
     'openDiff',
     {
       description:
-        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
+        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejected.',
       inputSchema: OpenDiffRequestSchema.shape,
     },
     async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {

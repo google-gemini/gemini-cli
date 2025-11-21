@@ -460,7 +460,7 @@ export class Task {
   ): Message {
     const messageParts: Part[] = [];
 
-    // Create a serializable version of the ToolCall (pick necesssary
+    // Create a serializable version of the ToolCall (pick necessary
     // properties/avoid methods causing circular reference errors)
     const serializableToolCall: Partial<ToolCall> = this._pickFields(
       tc,

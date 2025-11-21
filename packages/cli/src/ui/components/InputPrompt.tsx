@@ -708,7 +708,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // newline that was part of the paste.
             // This has the added benefit that in the worst case at least users
             // get some feedback that their keypress was handled rather than
-            // wondering why it was completey ignored.
+            // wondering why it was completely ignored.
             buffer.newline();
             return;
           }
