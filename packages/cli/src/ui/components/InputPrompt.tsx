@@ -36,6 +36,7 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -322,15 +323,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardPaste = useCallback(async () => {
+    const debugLog = (msg: string) => {
+      const logPath = path.join(config.getTargetDir(), '.gemini-debug.log');
+      const timestamp = new Date().toISOString();
+      fs.appendFileSync(logPath, `${timestamp} ${msg}\n`);
+    };
+
     try {
-      console.log('[DEBUG] Ctrl+V pressed - checking for clipboard image...');
+      debugLog('[DEBUG] Ctrl+V pressed - checking for clipboard image...');
       const hasImage = await clipboardHasImage();
-      console.log('[DEBUG] Clipboard has image:', hasImage);
+      debugLog(`[DEBUG] Clipboard has image: ${hasImage}`);
 
       if (hasImage) {
-        console.log('[DEBUG] Attempting to save clipboard image...');
+        debugLog('[DEBUG] Attempting to save clipboard image...');
         const imagePath = await saveClipboardImage(config.getTargetDir());
-        console.log('[DEBUG] Image saved to:', imagePath);
+        debugLog(`[DEBUG] Image saved to: ${imagePath}`);
 
         if (imagePath) {
           // Clean up old images
@@ -340,7 +347,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Get relative path from current directory
           const relativePath = path.relative(config.getTargetDir(), imagePath);
-          console.log('[DEBUG] Relative path:', relativePath);
+          debugLog(`[DEBUG] Relative path: ${relativePath}`);
 
           // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
@@ -360,27 +367,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             textToInsert = textToInsert + ' ';
           }
 
-          console.log('[DEBUG] Inserting text:', textToInsert);
+          debugLog(`[DEBUG] Inserting text: ${textToInsert}`);
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
-          console.log('[DEBUG] Image path inserted successfully!');
+          debugLog('[DEBUG] Image path inserted successfully!');
           return;
         } else {
-          console.log('[DEBUG] Failed to save clipboard image');
+          debugLog('[DEBUG] Failed to save clipboard image');
         }
       } else {
-        console.log('[DEBUG] No image in clipboard, pasting text instead...');
+        debugLog('[DEBUG] No image in clipboard, pasting text instead...');
       }
 
       const textToInsert = await clipboardy.read();
-      console.log('[DEBUG] Pasting text from clipboard');
+      debugLog('[DEBUG] Pasting text from clipboard');
       const offset = buffer.getOffset();
       buffer.replaceRangeByOffset(offset, offset, textToInsert);
     } catch (error) {
-      console.error('[ERROR] Error handling clipboard paste:', error);
-      console.error(
-        '[ERROR] Stack trace:',
-        error instanceof Error ? error.stack : 'No stack trace',
+      debugLog(`[ERROR] Error handling clipboard paste: ${error}`);
+      debugLog(
+        `[ERROR] Stack trace: ${error instanceof Error ? error.stack : 'No stack trace'}`,
       );
     }
   }, [buffer, config]);
