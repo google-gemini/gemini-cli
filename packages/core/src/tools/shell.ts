@@ -253,10 +253,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (devNull) pathsForSet.push(devNull);
 
         const readWritePaths = Array.from(new Set(pathsForSet));
+        const readOnlyPaths = Array.from(
+          new Set(
+            ['/usr', '/bin', '/sbin', '/lib', '/lib64', '/etc', '/dev']
+              .map((p) => safeRealpath(p))
+              .filter(Boolean),
+          ),
+        );
 
         const runnerPath = ensureLandlockRunner();
         const runnerArgs = [
           runnerPath,
+          ...readOnlyPaths.flatMap((p) => ['--ro', p]),
           ...readWritePaths.flatMap((p) => ['--rw', p]),
           '--',
           'bash',
