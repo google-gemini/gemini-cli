@@ -329,7 +329,7 @@ interface CoreToolSchedulerOptions {
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
-  onEditorClose: () => void;
+  onEditorClose?: () => void;
 }
 
 export class CoreToolScheduler {
@@ -365,7 +365,7 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.onEditorClose = options.onEditorClose;
+    this.onEditorClose = options.onEditorClose ?? (() => {});
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
