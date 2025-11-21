@@ -116,6 +116,7 @@ import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { enableSupportedProtocol } from './utils/kittyProtocolDetector.js';
+import { enableBracketedPaste } from './utils/bracketedPaste.js';
 
 const WARNING_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -387,6 +388,7 @@ export const AppContainer = (props: AppContainerProps) => {
       disableLineWrapping();
       app.rerender();
     }
+    enableBracketedPaste();
     enableSupportedProtocol();
     refreshStatic();
   }, [refreshStatic, isAlternateBuffer, app, config]);
