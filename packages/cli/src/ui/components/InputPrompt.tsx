@@ -101,6 +101,15 @@ export const calculatePromptWidths = (mainContentWidth: number) => {
   } as const;
 };
 
+const CLIPBOARD_IMAGE_TOKEN_REGEX =
+  /^@\.gemini-clipboard[\\/](?:clipboard|image)-(\d+)\.(?:png|jpe?g|gif|bmp|webp|tiff)$/i;
+
+const getClipboardImageLabel = (tokenText: string): string | null => {
+  const match = CLIPBOARD_IMAGE_TOKEN_REGEX.exec(tokenText);
+  if (!match) return null;
+  return `[image #${match[1]}]`;
+};
+
 export const InputPrompt: React.FC<InputPromptProps> = ({
   buffer,
   onSubmit,
@@ -1074,17 +1083,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 let charCount = 0;
                 segments.forEach((seg, segIdx) => {
                   const segLen = cpLen(seg.text);
-                  let display = seg.text;
+                  const clipboardLabel = getClipboardImageLabel(seg.text);
+                  let display = clipboardLabel ?? seg.text;
 
                   if (isOnCursorLine) {
                     const relativeVisualColForHighlight =
                       cursorVisualColAbsolute;
                     const segStart = charCount;
                     const segEnd = segStart + segLen;
-                    if (
+
+                    const cursorInSegment =
                       relativeVisualColForHighlight >= segStart &&
-                      relativeVisualColForHighlight < segEnd
-                    ) {
+                      relativeVisualColForHighlight < segEnd;
+
+                    if (clipboardLabel) {
+                      display =
+                        cursorInSegment && showCursor
+                          ? chalk.inverse(clipboardLabel)
+                          : clipboardLabel;
+                    } else if (cursorInSegment) {
                       const charToHighlight = cpSlice(
                         seg.text,
                         relativeVisualColForHighlight - segStart,
