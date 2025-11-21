@@ -9,8 +9,12 @@ import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { useLoadingIndicator } from './useLoadingIndicator.js';
 import { StreamingState } from '../types.js';
-import { PHRASE_CHANGE_INTERVAL_MS } from './usePhraseCycler.js';
+import {
+  PHRASE_CHANGE_INTERVAL_MS,
+  INTERACTIVE_SHELL_WAITING_PHRASE,
+} from './usePhraseCycler.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
+import { INFORMATIVE_TIPS } from '../constants/tips.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -25,18 +29,33 @@ describe('useLoadingIndicator', () => {
 
   const renderLoadingIndicatorHook = (
     initialStreamingState: StreamingState,
+    initialIsInteractiveShellWaiting: boolean = false,
+    initialLastOutputTime: number = 0,
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
       streamingState,
+      isInteractiveShellWaiting,
+      lastOutputTime,
     }: {
       streamingState: StreamingState;
+      isInteractiveShellWaiting?: boolean;
+      lastOutputTime?: number;
     }) {
-      hookResult = useLoadingIndicator(streamingState);
+      hookResult = useLoadingIndicator(
+        streamingState,
+        undefined,
+        isInteractiveShellWaiting,
+        lastOutputTime,
+      );
       return null;
     }
     const { rerender } = render(
-      <TestComponent streamingState={initialStreamingState} />,
+      <TestComponent
+        streamingState={initialStreamingState}
+        isInteractiveShellWaiting={initialIsInteractiveShellWaiting}
+        lastOutputTime={initialLastOutputTime}
+      />,
     );
     return {
       result: {
@@ -44,8 +63,11 @@ describe('useLoadingIndicator', () => {
           return hookResult;
         },
       },
-      rerender: (newProps: { streamingState: StreamingState }) =>
-        rerender(<TestComponent {...newProps} />),
+      rerender: (newProps: {
+        streamingState: StreamingState;
+        isInteractiveShellWaiting?: boolean;
+        lastOutputTime?: number;
+      }) => rerender(<TestComponent {...newProps} />),
     };
   };
 
@@ -55,6 +77,28 @@ describe('useLoadingIndicator', () => {
     expect(result.current.elapsedTime).toBe(0);
     expect(WITTY_LOADING_PHRASES).toContain(
       result.current.currentLoadingPhrase,
+    );
+  });
+
+  it('should show interactive shell waiting phrase when isInteractiveShellWaiting is true after 5s', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      true,
+      1,
+    );
+
+    // Initially should be witty phrase or tip
+    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
+      result.current.currentLoadingPhrase,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      INTERACTIVE_SHELL_WAITING_PHRASE,
     );
   });
 

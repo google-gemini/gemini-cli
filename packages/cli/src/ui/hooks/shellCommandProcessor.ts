@@ -76,6 +76,8 @@ export const useShellCommandProcessor = (
   terminalHeight?: number,
 ) => {
   const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
+  const [lastShellOutputTime, setLastShellOutputTime] = useState<number>(0);
+
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
       if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
@@ -202,6 +204,7 @@ export const useShellCommandProcessor = (
 
               // Throttle pending UI updates, but allow forced updates.
               if (shouldUpdate) {
+                setLastShellOutputTime(Date.now());
                 setPendingHistoryItem((prevItem) => {
                   if (prevItem?.type === 'tool_group') {
                     return {
@@ -366,5 +369,5 @@ export const useShellCommandProcessor = (
     ],
   );
 
-  return { handleShellCommand, activeShellPtyId };
+  return { handleShellCommand, activeShellPtyId, lastShellOutputTime };
 };

@@ -24,6 +24,8 @@ export const SHELL_NAME = 'Shell';
 // usage.
 export const MAX_GEMINI_MESSAGE_LINES = 65536;
 
+export const SHELL_FOCUS_HINT_DELAY_MS = 5000;
+
 // Tool status symbols used in ToolMessage component
 export const TOOL_STATUS = {
   SUCCESS: '✓',
