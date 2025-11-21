@@ -138,12 +138,13 @@ describe('github.ts', () => {
 
     it('should return null for non-GitHub URLs', () => {
       expect(tryParseGithubUrl('https://gitlab.com/owner/repo')).toBeNull();
+      expect(
+        tryParseGithubUrl('git@gitlab.com:root-group/subgroup/repo.git'),
+      ).toBeNull();
     });
 
-    it('should throw for invalid formats', () => {
-      expect(() => tryParseGithubUrl('invalid')).toThrow(
-        'Invalid GitHub repository source',
-      );
+    it('should return null for invalid formats', () => {
+      expect(tryParseGithubUrl('invalid')).toBeNull();
     });
   });
 
