@@ -65,6 +65,7 @@ describe('executeToolCall', () => {
       getMessageBus: () => null,
       getPolicyEngine: () => null,
       isInteractive: () => false,
+      getExperiments: () => {},
     } as unknown as Config;
 
     abortController = new AbortController();

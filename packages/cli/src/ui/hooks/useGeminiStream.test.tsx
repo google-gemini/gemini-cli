@@ -223,6 +223,7 @@ describe('useGeminiStream', () => {
         .mockReturnValue(contentGeneratorConfig),
       getUseSmartEdit: () => false,
       isInteractive: () => false,
+      getExperiments: () => {},
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
