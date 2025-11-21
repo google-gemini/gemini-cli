@@ -1454,7 +1454,6 @@ describe('CoreToolScheduler request queueing', () => {
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
     expect(mockConfig.getToolSandbox()).toBeDefined();
     const statusSpy = vi.spyOn(
