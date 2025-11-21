@@ -28,6 +28,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.19.0-nightly.20251120.8e531dc02"
   },
   "dependencies": {
+    "@crosscopy/clipboard": "^0.2.8",
     "@google/gemini-cli-core": "file:../core",
     "@google/genai": "1.30.0",
     "@iarna/toml": "^2.2.5",
@@ -35,6 +36,7 @@
     "@types/update-notifier": "^6.0.8",
     "ansi-regex": "^6.2.2",
     "clipboardy": "^5.0.0",
+    "node-screenshots": "^0.2.1",
     "command-exists": "^1.2.9",
     "comment-json": "^4.2.5",
     "diff": "^7.0.0",
