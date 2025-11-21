@@ -116,6 +116,7 @@ describe('SmartEditTool', () => {
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any,
       isInteractive: () => false,
+      getExperiments: () => {},
     } as unknown as Config;
 
     (mockConfig.getApprovalMode as Mock).mockClear();
