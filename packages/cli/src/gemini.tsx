@@ -279,12 +279,16 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
-  const cleanupStdio = patchStdio();
-  registerSyncCleanup(() => {
-    // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
-    cleanupStdio();
-  });
+  const isExtensionsCommand =
+    process.argv.includes('extension') || process.argv.includes('extensions');
+  if (!isExtensionsCommand) {
+    const cleanupStdio = patchStdio();
+    registerSyncCleanup(() => {
+      // This is needed to ensure we don't lose any buffered output.
+      initializeOutputListenersAndFlush();
+      cleanupStdio();
+    });
+  }
 
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
