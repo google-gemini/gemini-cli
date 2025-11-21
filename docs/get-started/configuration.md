@@ -243,6 +243,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.forceAlternateBuffer`** (boolean):
+  - **Description:** Force the use of alternate screen buffer even on
+    unsupported terminals.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.incrementalRendering`** (boolean):
   - **Description:** Enable incremental rendering for the UI. This option will
     reduce flickering but may cause rendering artifacts. Only supported when

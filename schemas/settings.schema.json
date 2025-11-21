@@ -296,6 +296,13 @@
           "default": true,
           "type": "boolean"
         },
+        "forceAlternateBuffer": {
+          "title": "Force Alternate Screen Buffer",
+          "description": "Force the use of alternate screen buffer even on unsupported terminals.",
+          "markdownDescription": "Force the use of alternate screen buffer even on unsupported terminals.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "incrementalRendering": {
           "title": "Incremental Rendering",
           "description": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.",

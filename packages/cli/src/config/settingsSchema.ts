@@ -521,6 +521,16 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      forceAlternateBuffer: {
+        type: 'boolean',
+        label: 'Force Alternate Screen Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Force the use of alternate screen buffer even on unsupported terminals.',
+        showInDialog: true,
+      },
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',
