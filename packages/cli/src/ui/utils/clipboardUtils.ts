@@ -87,6 +87,35 @@ async function wslClipboardHasImage(): Promise<boolean> {
 }
 
 /**
+ * Gets the next available image number by checking existing files
+ * @param targetDir The target directory
+ * @returns The next image number
+ */
+async function getNextImageNumber(targetDir: string): Promise<number> {
+  try {
+    const tempDir = path.join(targetDir, '.gemini-clipboard');
+    await fs.mkdir(tempDir, { recursive: true });
+
+    const files = await fs.readdir(tempDir);
+    const imageFiles = files.filter((f) => f.match(/^image-(\d+)\.png$/));
+
+    if (imageFiles.length === 0) {
+      return 1;
+    }
+
+    // Extract numbers and find the max
+    const numbers = imageFiles.map((f) => {
+      const match = f.match(/^image-(\d+)\.png$/);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+
+    return Math.max(...numbers) + 1;
+  } catch {
+    return 1;
+  }
+}
+
+/**
  * Saves clipboard image using PowerShell (WSL)
  * @param targetDir The target directory to save the image
  * @returns The path to the saved image file, or null on error
@@ -106,9 +135,9 @@ async function wslSaveClipboardImage(
     const tempDir = path.join(baseDir, '.gemini-clipboard');
     await fs.mkdir(tempDir, { recursive: true });
 
-    // Generate unique filename
-    const timestamp = new Date().getTime();
-    const wslPath = path.join(tempDir, `clipboard-${timestamp}.png`);
+    // Get next image number
+    const imageNumber = await getNextImageNumber(baseDir);
+    const wslPath = path.join(tempDir, `image-${imageNumber}.png`);
 
     // Convert WSL path to Windows path for PowerShell
     const { stdout: winPath } = await spawnAsync('wslpath', ['-w', wslPath]);
@@ -269,14 +298,14 @@ export async function saveClipboardImage(
     const tempDir = path.join(baseDir, '.gemini-clipboard');
     await fs.mkdir(tempDir, { recursive: true });
 
-    // Generate a unique filename with timestamp
-    const timestamp = new Date().getTime();
+    // Get next image number
+    const imageNumber = await getNextImageNumber(baseDir);
 
     // Detect image format from magic bytes
     const extension = detectImageFormat(base64Data);
     const tempFilePath = path.join(
       tempDir,
-      `clipboard-${timestamp}.${extension}`,
+      `image-${imageNumber}.${extension}`,
     );
 
     // Convert base64 to buffer and save to file
@@ -317,14 +346,9 @@ export async function cleanupOldClipboardImages(
 
     for (const file of files) {
       if (
-        file.startsWith('clipboard-') &&
-        (file.endsWith('.png') ||
-          file.endsWith('.jpg') ||
-          file.endsWith('.jpeg') ||
-          file.endsWith('.tiff') ||
-          file.endsWith('.gif') ||
-          file.endsWith('.bmp') ||
-          file.endsWith('.webp'))
+        file.match(
+          /^(clipboard-\d+|image-\d+)\.(png|jpg|jpeg|tiff|gif|bmp|webp)$/,
+        )
       ) {
         const filePath = path.join(tempDir, file);
         const stats = await fs.stat(filePath);
