@@ -57,12 +57,12 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 
 ### Available settings in `settings.json`:
 
-- **`contextFileName`** (string or array of strings):
+- **`context.fileName`** (string or array of strings):
   - **Description:** Specifies the filename for context files (e.g.,
-    `GEMINI.md`, `AGENTS.md`). Can be a single filename or a list of accepted
+    `GEMINI.md`, `AGENTS.md`). Can be a single filename or an array of accepted
     filenames.
-  - **Default:** `GEMINI.md`
-  - **Example:** `"contextFileName": "AGENTS.md"`
+  - **Default:** `undefined` (falls back to `GEMINI.md`)
+  - **Example:** `"context": { "fileName": "AGENTS.md" }`
 
 - **`bugCommand`** (object):
   - **Description:** Overrides the default URL for the `/bug` command.
@@ -597,7 +597,7 @@ for that specific session.
 ## Context Files (Hierarchical Instructional Context)
 
 While not strictly configuration for the CLI's _behavior_, context files
-(defaulting to `GEMINI.md` but configurable via the `contextFileName` setting)
+(defaulting to `GEMINI.md` but configurable via the `context.fileName` setting)
 are crucial for configuring the _instructional context_ (also referred to as
 "memory") provided to the Gemini model. This powerful feature allows you to give
 project-specific instructions, coding style guides, or any relevant background
