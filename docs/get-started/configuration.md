@@ -325,49 +325,50 @@ their corresponding top-level category object in your `settings.json` file.
     used.
   - **Default:** `[]`
 
-#### `context`
+#### Context Configuration
 
-- **`context.fileName`** (string | string[]):
+- **`contextFileName`** (string | string[]):
   - **Description:** The name of the context file or files to load into memory.
     Accepts either a single string or an array of strings.
+  - **Default:** `GEMINI.md`
+
+- **`importFormat`** (string):
+  - **Description:** The format to use when importing memory. Options are `tree`
+    or `flat`.
   - **Default:** `undefined`
 
-- **`context.importFormat`** (string):
-  - **Description:** The format to use when importing memory.
-  - **Default:** `undefined`
-
-- **`context.discoveryMaxDirs`** (number):
+- **`discoveryMaxDirs`** (number):
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
 
-- **`context.includeDirectories`** (array):
+- **`includeDirectories`** (array):
   - **Description:** Additional directories to include in the workspace context.
     Missing directories will be skipped with a warning.
   - **Default:** `[]`
 
-- **`context.loadMemoryFromIncludeDirectories`** (boolean):
+- **`loadMemoryFromIncludeDirectories`** (boolean):
   - **Description:** Controls how /memory refresh loads GEMINI.md files. When
     true, include directories are scanned; when false, only the current
     directory is used.
   - **Default:** `false`
 
-- **`context.fileFiltering.respectGitIgnore`** (boolean):
+- **`fileFiltering.respectGitIgnore`** (boolean):
   - **Description:** Respect .gitignore files when searching
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.respectGeminiIgnore`** (boolean):
+- **`fileFiltering.respectGeminiIgnore`** (boolean):
   - **Description:** Respect .geminiignore files when searching
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
+- **`fileFiltering.enableRecursiveFileSearch`** (boolean):
   - **Description:** Enable recursive file search functionality when completing
     @ references in the prompt.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.disableFuzzySearch`** (boolean):
+- **`fileFiltering.disableFuzzySearch`** (boolean):
   - **Description:** Disable fuzzy search when searching for files.
   - **Default:** `false`
   - **Requires restart:** Yes
@@ -934,7 +935,7 @@ for that specific session.
 ## Context Files (Hierarchical Instructional Context)
 
 While not strictly configuration for the CLI's _behavior_, context files
-(defaulting to `GEMINI.md` but configurable via the `context.fileName` setting)
+(defaulting to `GEMINI.md` but configurable via the `contextFileName` setting)
 are crucial for configuring the _instructional context_ (also referred to as
 "memory") provided to the Gemini model. This powerful feature allows you to give
 project-specific instructions, coding style guides, or any relevant background
@@ -1009,7 +1010,7 @@ conventions and context.
         subdirectories _below_ the current working directory (respecting common
         ignore patterns like `node_modules`, `.git`, etc.). The breadth of this
         search is limited to 200 directories by default, but can be configured
-        with the `context.discoveryMaxDirs` setting in your `settings.json`
+        with the `discoveryMaxDirs` setting in your `settings.json`
         file.
       - Scope: Allows for highly specific instructions relevant to a particular
         component, module, or subsection of your project.
