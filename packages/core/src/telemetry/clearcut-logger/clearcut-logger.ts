@@ -295,7 +295,7 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
-    
+
     const baseMetadata: EventValue[] = [
       ...data,
       {
