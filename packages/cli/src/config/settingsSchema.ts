@@ -164,7 +164,7 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Preview Features (e.g., models)',
         category: 'General',
-        requiresRestart: true,
+        requiresRestart: false,
         default: false,
         description: 'Enable preview features (e.g., preview models).',
         showInDialog: true,
@@ -693,7 +693,7 @@ const SETTINGS_SCHEMA = {
         label: 'Compression Threshold',
         category: 'Model',
         requiresRestart: true,
-        default: 0.7 as number,
+        default: 0.5 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
@@ -1280,16 +1280,6 @@ const SETTINGS_SCHEMA = {
         description:
           'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
-      },
-      useModelRouter: {
-        type: 'boolean',
-        label: 'Use Model Router',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enable model routing to route requests to the best model based on complexity.',
-        showInDialog: true,
       },
       codebaseInvestigatorSettings: {
         type: 'object',

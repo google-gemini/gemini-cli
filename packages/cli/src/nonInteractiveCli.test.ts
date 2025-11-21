@@ -43,7 +43,7 @@ vi.mock('./ui/hooks/atCommandProcessor.js');
 const mockCoreEvents = vi.hoisted(() => ({
   on: vi.fn(),
   off: vi.fn(),
-  drainFeedbackBacklog: vi.fn(),
+  drainBacklogs: vi.fn(),
   emit: vi.fn(),
 }));
 
@@ -1131,7 +1131,7 @@ describe('runNonInteractive', () => {
         CoreEvent.UserFeedback,
         expect.any(Function),
       );
-      expect(mockCoreEvents.drainFeedbackBacklog).toHaveBeenCalledTimes(1);
+      expect(mockCoreEvents.drainBacklogs).toHaveBeenCalledTimes(1);
     });
 
     it('unsubscribes from UserFeedback on finish', async () => {

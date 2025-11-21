@@ -35,7 +35,6 @@ import {
   isModifiableDeclarativeTool,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
-import { ShellToolInvocation } from '../tools/shell.js';
 import * as Diff from 'diff';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -45,6 +44,7 @@ import {
 } from '../utils/shell-utils.js';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import levenshtein from 'fast-levenshtein';
+import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
