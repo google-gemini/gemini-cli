@@ -1481,16 +1481,20 @@ describe('CoreToolScheduler request queueing', () => {
       ).toBe(true);
     });
 
-    const sandboxPromptCall = [...statusSpy.mock.calls]
-      .reverse()
-      .find((call) => {
+    const getSandboxPromptCall = () =>
+      [...statusSpy.mock.calls].reverse().find((call) => {
         if (call[1] !== 'awaiting_approval') return false;
         const details = call[3] as ToolCallConfirmationDetails | undefined;
         if (!details || details.type !== 'exec') return false;
         const exec = details as ToolExecuteConfirmationDetails;
         return Boolean(exec.danger && exec.hideAlways && exec.defaultToNo);
       });
-    expect(sandboxPromptCall).toBeDefined();
+
+    const sandboxPromptCall = await vi.waitFor(() => {
+      const call = getSandboxPromptCall();
+      expect(call).toBeDefined();
+      return call;
+    });
 
     const confirmationDetails =
       sandboxPromptCall?.[3] as ToolCallConfirmationDetails;
