@@ -1405,16 +1405,6 @@ describe('loadCliConfig model selection', () => {
   });
 });
 
-describe('loadCliConfig model selection with model router', () => {
-  beforeEach(() => {
-    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
-  });
-
-  afterEach(() => {
-    vi.resetAllMocks();
-  });
-});
-
 describe('loadCliConfig folderTrust', () => {
   beforeEach(() => {
     vi.resetAllMocks();
