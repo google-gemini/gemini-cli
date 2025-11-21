@@ -7,7 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, getBoundingBox, type DOMElement } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -41,6 +41,7 @@ import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
+import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { VerticalScrollBar } from './shared/VerticalScrollBar.js';
 
@@ -127,6 +128,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
+  const { setEmbeddedShellFocused } = useUIActions();
   const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
@@ -498,8 +500,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  useMouse(handleMouse, { isActive: focus && !isEmbeddedShellFocused });
-
   const handleInput = useCallback(
     (key: Key) => {
       // TODO(jacobr): this special case is likely not needed anymore.
@@ -512,7 +512,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
-        if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
+        if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
 
           // Clear any existing paste timeout
@@ -821,7 +821,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // newline that was part of the paste.
             // This has the added benefit that in the worst case at least users
             // get some feedback that their keypress was handled rather than
-            // wondering why it was completey ignored.
+            // wondering why it was completely ignored.
             buffer.newline();
             return;
           }
@@ -928,7 +928,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       recentUnsafePasteTime,
       commandSearchActive,
       commandSearchCompletion,
-      kittyProtocol.supported,
+      kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
     ],
