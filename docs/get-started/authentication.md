@@ -233,11 +233,11 @@ To configure Gemini CLI to use a Google Cloud project, do the following:
 
 1.  [Find your Google Cloud Project ID](https://support.google.com/googleapi/answer/7014113).
 
-1.  [Enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api).
+2.  [Enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api).
 
-1.  [Configure necessary IAM access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam).
+3.  [Configure necessary IAM access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam).
 
-1.  Configure your environment variables. Set either the
+4.  Configure your environment variables. Set either the
  `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID` variable to the project ID to use with Gemini CLI. Gemini CLI checks for `GOOGLE_CLOUD_PROJECT` first, then falls back to
  `GOOGLE_CLOUD_PROJECT_ID`.
 
