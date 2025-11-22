@@ -208,7 +208,7 @@ export class HookRegistry {
           eventName,
           matcher: definition.matcher,
           sequential: definition.sequential,
-          enabled: true,
+          enabled: hookConfig.enabled !== false,
         });
       } else {
         // Invalid hooks are logged and discarded here, they won't reach HookRunner

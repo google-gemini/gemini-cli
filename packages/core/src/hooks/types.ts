@@ -41,6 +41,7 @@ export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
   timeout?: number;
+  enabled?: boolean;
 }
 
 export type HookConfig = CommandHookConfig;
