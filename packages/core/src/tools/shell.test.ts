@@ -147,12 +147,12 @@ describe('ShellTool', () => {
 
   describe('build', () => {
     it('should return an invocation for a valid command', () => {
-      const invocation = shellTool.build({ command: 'goodCommand --safe' });
+      const invocation = shellTool.build({ command: 'goodCommand --safe', timeout: 10 });
       expect(invocation).toBeDefined();
     });
 
     it('should throw an error for an empty command', () => {
-      expect(() => shellTool.build({ command: ' ' })).toThrow(
+      expect(() => shellTool.build({ command: ' ', timeout: 10 })).toThrow(
         'Command cannot be empty.',
       );
     });
@@ -160,6 +160,7 @@ describe('ShellTool', () => {
     it('should return an invocation for a valid relative directory path', () => {
       const invocation = shellTool.build({
         command: 'ls',
+        timeout: 10,
         dir_path: 'subdir',
       });
       expect(invocation).toBeDefined();
@@ -168,7 +169,7 @@ describe('ShellTool', () => {
     it('should throw an error for a directory outside the workspace', () => {
       const outsidePath = path.resolve(tempRootDir, '../outside');
       expect(() =>
-        shellTool.build({ command: 'ls', dir_path: outsidePath }),
+        shellTool.build({ command: 'ls', timeout: 10, dir_path: outsidePath }),
       ).toThrow(
         `Directory '${outsidePath}' is not within any of the registered workspace directories.`,
       );
@@ -177,9 +178,16 @@ describe('ShellTool', () => {
     it('should return an invocation for a valid absolute directory path', () => {
       const invocation = shellTool.build({
         command: 'ls',
+        timeout: 10,
         dir_path: path.join(tempRootDir, 'subdir'),
       });
       expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error for invalid timeout', () => {
+      expect(() => shellTool.build({ command: 'ls', timeout: 0 })).toThrow(
+        'Timeout must be greater than 0.',
+      );
     });
   });
 
@@ -204,7 +212,7 @@ describe('ShellTool', () => {
     };
 
     it('should wrap command on linux and parse pgrep output', async () => {
-      const invocation = shellTool.build({ command: 'my-command &' });
+      const invocation = shellTool.build({ command: 'my-command &', timeout: 10 });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({ pid: 54321 });
 
@@ -219,11 +227,12 @@ describe('ShellTool', () => {
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal), // Checking that a signal is passed
         false,
         {},
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
+      expect(result.llmContent).toContain('Duration:');
       // The file should be deleted by the tool
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
@@ -232,6 +241,7 @@ describe('ShellTool', () => {
       const subdir = path.join(tempRootDir, 'subdir');
       const invocation = shellTool.build({
         command: 'ls',
+        timeout: 10,
         dir_path: subdir,
       });
       const promise = invocation.execute(mockAbortSignal);
@@ -244,7 +254,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         subdir,
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -253,6 +263,7 @@ describe('ShellTool', () => {
     it('should use the provided relative directory as cwd', async () => {
       const invocation = shellTool.build({
         command: 'ls',
+        timeout: 10,
         dir_path: 'subdir',
       });
       const promise = invocation.execute(mockAbortSignal);
@@ -265,7 +276,7 @@ describe('ShellTool', () => {
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
-        mockAbortSignal,
+        expect.any(AbortSignal),
         false,
         {},
       );
@@ -275,7 +286,7 @@ describe('ShellTool', () => {
       'should not wrap command on windows',
       async () => {
         mockPlatform.mockReturnValue('win32');
-        const invocation = shellTool.build({ command: 'dir' });
+        const invocation = shellTool.build({ command: 'dir', timeout: 10 });
         const promise = invocation.execute(mockAbortSignal);
         resolveShellExecution({
           rawOutput: Buffer.from(''),
@@ -292,7 +303,7 @@ describe('ShellTool', () => {
           'dir',
           tempRootDir,
           expect.any(Function),
-          mockAbortSignal,
+          expect.any(AbortSignal),
           false,
           {},
         );
@@ -302,7 +313,7 @@ describe('ShellTool', () => {
 
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
-      const invocation = shellTool.build({ command: 'user-command' });
+      const invocation = shellTool.build({ command: 'user-command', timeout: 10 });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({
         error,
@@ -322,7 +333,7 @@ describe('ShellTool', () => {
 
     it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
       const error = new Error('command failed');
-      const invocation = shellTool.build({ command: 'user-command' });
+      const invocation = shellTool.build({ command: 'user-command', timeout: 10 });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({
         error,
@@ -337,7 +348,7 @@ describe('ShellTool', () => {
     });
 
     it('should throw an error for invalid parameters', () => {
-      expect(() => shellTool.build({ command: '' })).toThrow(
+      expect(() => shellTool.build({ command: '', timeout: 10 })).toThrow(
         'Command cannot be empty.',
       );
     });
@@ -350,7 +361,7 @@ describe('ShellTool', () => {
         'summarized output',
       );
 
-      const invocation = shellTool.build({ command: 'ls' });
+      const invocation = shellTool.build({ command: 'ls', timeout: 10 });
       const promise = invocation.execute(mockAbortSignal);
       resolveExecutionPromise({
         output: 'long output',
@@ -373,7 +384,7 @@ describe('ShellTool', () => {
         mockAbortSignal,
       );
       expect(result.llmContent).toBe('summarized output');
-      expect(result.returnDisplay).toBe('long output');
+      expect(result.returnDisplay).toContain('long output');
     });
 
     it('should clean up the temp file on synchronous execution error', async () => {
@@ -385,11 +396,47 @@ describe('ShellTool', () => {
         throw error;
       });
 
-      const invocation = shellTool.build({ command: 'a-command' });
+      const invocation = shellTool.build({ command: 'a-command', timeout: 10 });
       await expect(invocation.execute(mockAbortSignal)).rejects.toThrow(error);
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
       expect(fs.existsSync(tmpFile)).toBe(false);
+    });
+
+    describe('Timeout', () => {
+        beforeEach(() => {
+             vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+        });
+        afterEach(() => {
+             vi.useRealTimers();
+        });
+
+        it('should trigger timeout abort signal', async () => {
+             const invocation = shellTool.build({ command: 'sleep 10', timeout: 5 });
+             const promise = invocation.execute(mockAbortSignal);
+
+             // Fast forward time
+             await vi.advanceTimersByTimeAsync(5001);
+
+             // Verify that the service was called with an abort signal
+             expect(mockShellExecutionService).toHaveBeenCalled();
+             const signal = mockShellExecutionService.mock.calls[0][3] as AbortSignal;
+             expect(signal.aborted).toBe(true);
+
+             resolveExecutionPromise({
+                 rawOutput: Buffer.from(''),
+                 output: '',
+                 exitCode: null,
+                 signal: null,
+                 error: null,
+                 aborted: true, // service reports it was aborted
+                 pid: 12345,
+                 executionMethod: 'child_process',
+             });
+
+             const result = await promise;
+             expect(result.llmContent).toContain('Command execution timed out after 5 seconds');
+        });
     });
 
     describe('Streaming to `updateOutput`', () => {
@@ -403,7 +450,7 @@ describe('ShellTool', () => {
       });
 
       it('should immediately show binary detection message and throttle progress', async () => {
-        const invocation = shellTool.build({ command: 'cat img' });
+        const invocation = shellTool.build({ command: 'cat img', timeout: 10 });
         const promise = invocation.execute(mockAbortSignal, updateOutputMock);
 
         mockShellOutputCallback({ type: 'binary_detected' });
@@ -450,7 +497,7 @@ describe('ShellTool', () => {
 
   describe('shouldConfirmExecute', () => {
     it('should request confirmation for a new command and allowlist it on "Always"', async () => {
-      const params = { command: 'npm install' };
+      const params = { command: 'npm install', timeout: 10 };
       const invocation = shellTool.build(params);
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -465,7 +512,7 @@ describe('ShellTool', () => {
       );
 
       // Should now be allowlisted
-      const secondInvocation = shellTool.build({ command: 'npm test' });
+      const secondInvocation = shellTool.build({ command: 'npm test', timeout: 10 });
       const secondConfirmation = await secondInvocation.shouldConfirmExecute(
         new AbortController().signal,
       );
@@ -473,7 +520,7 @@ describe('ShellTool', () => {
     });
 
     it('should throw an error if validation fails', () => {
-      expect(() => shellTool.build({ command: '' })).toThrow();
+      expect(() => shellTool.build({ command: '', timeout: 10 })).toThrow();
     });
 
     describe('in non-interactive mode', () => {
@@ -483,7 +530,7 @@ describe('ShellTool', () => {
 
       it('should not throw an error or block for an allowed command', async () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue(['ShellTool(wc)']);
-        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
+        const invocation = shellTool.build({ command: 'wc -l foo.txt', timeout: 10 });
         const confirmation = await invocation.shouldConfirmExecute(
           new AbortController().signal,
         );
@@ -494,7 +541,7 @@ describe('ShellTool', () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           'ShellTool(wc -l)',
         ]);
-        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
+        const invocation = shellTool.build({ command: 'wc -l foo.txt', timeout: 10 });
         const confirmation = await invocation.shouldConfirmExecute(
           new AbortController().signal,
         );
@@ -505,7 +552,7 @@ describe('ShellTool', () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           'ShellTool(wc -l)',
         ]);
-        const invocation = shellTool.build({ command: 'madeupcommand' });
+        const invocation = shellTool.build({ command: 'madeupcommand', timeout: 10 });
         await expect(
           invocation.shouldConfirmExecute(new AbortController().signal),
         ).rejects.toThrow('madeupcommand');
@@ -515,7 +562,7 @@ describe('ShellTool', () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           'ShellTool(wc -l)',
         ]);
-        const invocation = shellTool.build({ command: 'wc' });
+        const invocation = shellTool.build({ command: 'wc', timeout: 10 });
         await expect(
           invocation.shouldConfirmExecute(new AbortController().signal),
         ).rejects.toThrow('wc');
@@ -525,7 +572,7 @@ describe('ShellTool', () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           'ShellTool(echo)',
         ]);
-        const invocation = shellTool.build({ command: 'echo "foo" && ls -l' });
+        const invocation = shellTool.build({ command: 'echo "foo" && ls -l', timeout: 10 });
         await expect(
           invocation.shouldConfirmExecute(new AbortController().signal),
         ).rejects.toThrow(

@@ -48,6 +48,7 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 export interface ShellToolParams {
   command: string;
+  timeout: number; // seconds
   description?: string;
   dir_path?: string;
 }
@@ -169,6 +170,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        timeoutController.abort();
+      }, this.params.timeout * 1000);
+
+      const startTime = Date.now();
+
+      const onSignalAbort = () => {
+        clearTimeout(timeoutId);
+        timeoutController.abort();
+      };
+      signal.addEventListener('abort', onSignalAbort);
+
       const { result: resultPromise, pid } =
         await ShellExecutionService.execute(
           commandToExecute,
@@ -211,7 +225,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
               lastUpdateTime = Date.now();
             }
           },
-          signal,
+          timeoutController.signal,
           this.config.getEnableInteractiveShell(),
           shellExecutionConfig ?? {},
         );
@@ -221,6 +235,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const result = await resultPromise;
+
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', onSignalAbort);
+
+      const endTime = Date.now();
+      const durationMs = endTime - startTime;
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
@@ -239,15 +259,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           }
         } else {
-          if (!signal.aborted) {
-            debugLogger.error('missing pgrep output');
+          if (!signal.aborted && !timeoutController.signal.aborted) {
+             // It's possible that it was aborted by the timeout signal
+             // Check if the result was aborted
+             if (!result.aborted) {
+                debugLogger.error('missing pgrep output');
+             }
           }
         }
       }
 
       let llmContent = '';
       if (result.aborted) {
-        llmContent = 'Command was cancelled by user before it could complete.';
+        if (timeoutController.signal.aborted && !signal.aborted) {
+             llmContent = `Command execution timed out after ${this.params.timeout} seconds.`;
+        } else {
+             llmContent = 'Command was cancelled by user before it could complete.';
+        }
+
         if (result.output.trim()) {
           llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
         } else {
@@ -271,6 +300,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
           }`,
           `Process Group PGID: ${result.pid ?? '(none)'}`,
+          `Duration: ${(durationMs / 1000).toFixed(2)}s`
         ].join('\n');
       }
 
@@ -282,7 +312,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
           returnDisplayMessage = result.output;
         } else {
           if (result.aborted) {
-            returnDisplayMessage = 'Command cancelled by user.';
+            if (timeoutController.signal.aborted && !signal.aborted) {
+                returnDisplayMessage = `Command execution timed out after ${this.params.timeout} seconds.`;
+            } else {
+                returnDisplayMessage = 'Command cancelled by user.';
+            }
           } else if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
@@ -296,6 +330,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
           // returnDisplayMessage will remain empty, which is fine.
         }
       }
+      // Add duration to returnDisplayMessage
+      if (returnDisplayMessage) {
+        returnDisplayMessage += `\nDuration: ${(durationMs / 1000).toFixed(2)}s`;
+      } else {
+         returnDisplayMessage = `Duration: ${(durationMs / 1000).toFixed(2)}s`;
+      }
+
 
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
       const executionError = result.error
@@ -357,7 +398,8 @@ function getShellToolDescription(): string {
       Exit Code: Exit code or \`(none)\` if terminated by signal.
       Signal: Signal number or \`(none)\` if no signal was received.
       Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``;
+      Process Group PGID: Process group started or \`(none)\`
+      Duration: Execution duration in seconds.`;
 
   if (os.platform() === 'win32') {
     return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
@@ -401,6 +443,10 @@ export class ShellTool extends BaseDeclarativeTool<
             type: 'string',
             description: getCommandDescription(),
           },
+          timeout: {
+            type: 'number',
+            description: 'The maximum time in seconds to wait for the command to complete.',
+          },
           description: {
             type: 'string',
             description:
@@ -412,7 +458,7 @@ export class ShellTool extends BaseDeclarativeTool<
               '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
           },
         },
-        required: ['command'],
+        required: ['command', 'timeout'],
       },
       false, // output is not markdown
       true, // output can be updated
@@ -425,6 +471,10 @@ export class ShellTool extends BaseDeclarativeTool<
   ): string | null {
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
+    }
+
+    if (params.timeout <= 0) {
+        return 'Timeout must be greater than 0.';
     }
 
     const commandCheck = isCommandAllowed(params.command, this.config);
