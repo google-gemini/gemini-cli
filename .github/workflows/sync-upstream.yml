@@ -1,0 +1,23 @@
+name: Sync Fork with Upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout @v4
+        with:
+          fetch-depth: 0
+      
+      - name: Sync upstream changes
+        run: |
+          git remote add upstream https://github.com/google/gemini-cli.git || true
+          git fetch upstream
+          git checkout main
+          git merge upstream/main --ff-only || git merge upstream/main -m "Merge upstream changes"
+          git push origin main
