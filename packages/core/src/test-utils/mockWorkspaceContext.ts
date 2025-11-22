@@ -22,11 +22,20 @@ export function createMockWorkspaceContext(
   const mockWorkspaceContext = {
     addDirectory: vi.fn(),
     getDirectories: vi.fn().mockReturnValue(allDirs),
-    isPathWithinWorkspace: vi
-      .fn()
-      .mockImplementation((path: string) =>
-        allDirs.some((dir) => path.startsWith(dir)),
-      ),
+    isPathWithinWorkspace: vi.fn().mockImplementation((path: string) =>
+      allDirs.some((dir) => {
+        // Handle root directory
+        if (dir === '/') {
+          return path.startsWith('/');
+        }
+        // Handle empty directory (matches all paths)
+        if (dir === '') {
+          return true;
+        }
+        // Normal path matching
+        return path === dir || path.startsWith(dir + '/');
+      }),
+    ),
   } as unknown as WorkspaceContext;
 
   return mockWorkspaceContext;

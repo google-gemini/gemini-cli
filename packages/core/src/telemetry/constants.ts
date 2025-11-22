@@ -67,6 +67,6 @@ export const METRIC_BASELINE_COMPARISON =
 
 // Performance Events
 export const EVENT_STARTUP_PERFORMANCE = 'gemini_cli.startup.performance';
-export const EVENT_MEMORY_USAGE = 'gemini_cli.memory.usage';
+export const EVENT_MEMORY_USAGE = 'gemini_cli.memory_usage';
 export const EVENT_PERFORMANCE_BASELINE = 'gemini_cli.performance.baseline';
-export const EVENT_PERFORMANCE_REGRESSION = 'gemini_cli.performance.regression';
+export const EVENT_PERFORMANCE_REGRESSION = 'gemini_cli.performance_regression';

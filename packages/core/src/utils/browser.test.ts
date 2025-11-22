@@ -14,7 +14,8 @@ describe('shouldAttemptBrowserLaunch', () => {
   beforeEach(() => {
     originalEnv = process.env;
     originalPlatform = process.platform;
-    process.env = { ...originalEnv };
+    // Start with a clean environment for each test
+    process.env = {};
   });
 
   afterEach(() => {

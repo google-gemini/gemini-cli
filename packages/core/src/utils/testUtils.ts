@@ -23,7 +23,10 @@ export function shouldSimulate429(authType?: string): boolean {
   }
 
   // If auth type filter is set, only simulate for that auth type
-  if (simulate429ForAuthType && authType !== simulate429ForAuthType) {
+  if (
+    simulate429ForAuthType !== undefined &&
+    authType !== simulate429ForAuthType
+  ) {
     return false;
   }
 

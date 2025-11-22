@@ -24,6 +24,11 @@ export class LruCache<K, V> {
   }
 
   set(key: K, value: V): void {
+    // Don't store anything if maxSize is 0 or negative
+    if (this.maxSize <= 0) {
+      return;
+    }
+
     if (this.cache.has(key)) {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {

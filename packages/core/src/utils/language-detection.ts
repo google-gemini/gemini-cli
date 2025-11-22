@@ -98,6 +98,9 @@ export function getLanguageFromFilePath(filePath: string): string | undefined {
   if (extension) {
     return extensionToLanguageMap[extension];
   }
+  // For files without extension (like .gitignore), try matching the basename
   const filename = path.basename(filePath).toLowerCase();
-  return extensionToLanguageMap[`.${filename}`];
+  // If filename already starts with dot, don't add another one
+  const lookupKey = filename.startsWith('.') ? filename : `.${filename}`;
+  return extensionToLanguageMap[lookupKey];
 }

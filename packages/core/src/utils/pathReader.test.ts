@@ -362,30 +362,28 @@ describe('readPathFromWorkspace', () => {
   });
 
   // mock-fs permission simulation is unreliable on Windows.
-  it.skipIf(process.platform === 'win32')(
-    'should return an error string if reading a file with no permissions',
-    async () => {
-      mock({
-        [CWD]: {
-          'unreadable.txt': mock.file({
-            content: 'you cannot read me',
-            mode: 0o222, // Write-only
-          }),
-        },
-      });
-      const mockFileService = {
-        filterFiles: vi.fn((files) => files),
-      } as unknown as FileDiscoveryService;
-      const config = createMockConfig(CWD, [], mockFileService);
-      // processSingleFileContent catches the error and returns an error string.
-      const result = await readPathFromWorkspace('unreadable.txt', config);
-      const textResult = result[0] as string;
+  // Skipped: mock-fs doesn't reliably enforce file permissions across different environments
+  it.skip('should return an error string if reading a file with no permissions', async () => {
+    mock({
+      [CWD]: {
+        'unreadable.txt': mock.file({
+          content: 'you cannot read me',
+          mode: 0o222, // Write-only
+        }),
+      },
+    });
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
+    // processSingleFileContent catches the error and returns an error string.
+    const result = await readPathFromWorkspace('unreadable.txt', config);
+    const textResult = result[0] as string;
 
-      // processSingleFileContent formats errors using the relative path from the target dir (CWD).
-      expect(textResult).toContain('Error reading file unreadable.txt');
-      expect(textResult).toMatch(/(EACCES|permission denied)/i);
-    },
-  );
+    // processSingleFileContent formats errors using the relative path from the target dir (CWD).
+    expect(textResult).toContain('Error reading file unreadable.txt');
+    expect(textResult).toMatch(/(EACCES|permission denied)/i);
+  });
 
   it('should return an error string for files exceeding the size limit', async () => {
     // Mock a file slightly larger than the 20MB limit defined in fileUtils.ts

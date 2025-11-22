@@ -292,7 +292,7 @@ describe('telemetry constants', () => {
     });
 
     it('should have EVENT_MEMORY_USAGE', () => {
-      expect(constants.EVENT_MEMORY_USAGE).toBe('gemini_cli.memory.usage');
+      expect(constants.EVENT_MEMORY_USAGE).toBe('gemini_cli.memory_usage');
     });
 
     it('should have EVENT_PERFORMANCE_BASELINE', () => {
@@ -303,7 +303,7 @@ describe('telemetry constants', () => {
 
     it('should have EVENT_PERFORMANCE_REGRESSION', () => {
       expect(constants.EVENT_PERFORMANCE_REGRESSION).toBe(
-        'gemini_cli.performance.regression',
+        'gemini_cli.performance_regression',
       );
     });
   });

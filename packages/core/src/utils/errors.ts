@@ -85,7 +85,7 @@ export function toFriendlyError(error: unknown): unknown {
   if (error && typeof error === 'object' && 'response' in error) {
     const gaxiosError = error as GaxiosError;
     const data = parseResponseData(gaxiosError);
-    if (data.error && data.error.message && data.error.code) {
+    if (data?.error?.message && data?.error?.code) {
       switch (data.error.code) {
         case 400:
           return new BadRequestError(data.error.message);
