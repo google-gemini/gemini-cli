@@ -85,6 +85,7 @@ import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -607,6 +608,7 @@ export class Config {
     this.initialized = true;
 
     // Initialize centralized FileDiscoveryService
+    startupProfiler.start('discover_tools');
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
@@ -617,17 +619,22 @@ export class Config {
     await this.agentRegistry.initialize();
 
     this.toolRegistry = await this.createToolRegistry();
+    startupProfiler.end('discover_tools');
     this.mcpClientManager = new McpClientManager(
       this.toolRegistry,
       this,
       this.eventEmitter,
     );
+    startupProfiler.start('initialize_mcp_clients');
     await Promise.all([
       await this.mcpClientManager.startConfiguredMcpServers(),
       await this.getExtensionLoader().start(this),
     ]);
+    startupProfiler.end('initialize_mcp_clients');
 
     await this.geminiClient.initialize();
+    startupProfiler.end('total_startup');
+    startupProfiler.flush(this);
   }
 
   getContentGenerator(): ContentGenerator {

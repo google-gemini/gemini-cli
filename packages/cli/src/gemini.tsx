@@ -56,6 +56,7 @@ import {
   enterAlternateScreen,
   disableLineWrapping,
   shouldEnterAlternateScreen,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -280,6 +281,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  startupProfiler.start('total_startup');
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -288,7 +290,11 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+  startupProfiler.start('load_settings');
   const settings = loadSettings();
+  startupProfiler.end('load_settings');
+
+  startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
     // Temporary extension manager only used during this non-interactive UI phase.
@@ -300,9 +306,12 @@ export async function main() {
       requestSetting: null,
     }),
   );
+  startupProfiler.end('migrate_settings');
   await cleanupCheckpoints();
 
+  startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
+  startupProfiler.end('parse_arguments');
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -445,7 +454,9 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
+    startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv);
+    startupProfiler.end('load_cli_config');
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
@@ -509,7 +520,9 @@ export async function main() {
     }
 
     setMaxSizedBoxDebugging(isDebugMode);
+    startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
+    startupProfiler.end('initialize_app');
 
     if (
       settings.merged.security?.auth?.selectedType ===
