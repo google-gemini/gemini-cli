@@ -59,7 +59,7 @@ const renderComponent = (
 
         // --- Spread test-specific overrides ---
         ...contextValue,
-      } as Config)
+      } as unknown as Config)
     : undefined;
 
   const renderResult = render(

@@ -44,7 +44,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
-  const { tools } = useSettings();
+  const { tools } = useSettings().merged;
   const [expanded, setExpanded] = useState(false);
 
   useInput((input) => {
