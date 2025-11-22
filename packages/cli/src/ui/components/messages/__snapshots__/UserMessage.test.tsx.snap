@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`UserMessage > renders multiline user message 1`] = `
+"
+> Line 1
+  Line 2
+"
+`;
+
+exports[`UserMessage > renders normal user message with correct prefix 1`] = `
+"
+> Hello Gemini
+"
+`;
+
+exports[`UserMessage > renders slash command message 1`] = `
+"
+> /help
+"
+`;

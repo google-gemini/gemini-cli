@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SessionBrowser component > enters search mode, filters sessions, and renders match snippets 1`] = `
+" Chat Sessions (1 total, filtered)                                              sorted by date desc
+
+ Search: query (Esc to cancel)
+
+   Index │ Msgs │ Age  │ Match
+ ❯ #1    │ 1    │ 10mo │ You:    Query is here a… (+1 more)
+ ▼"
+`;
+
+exports[`SessionBrowser component > renders a list of sessions and marks current session as disabled 1`] = `
+" Chat Sessions (2 total)                                                        sorted by date desc
+ Navigate: ↑/↓   Resume: Enter   Search: /   Delete: x   Quit: q
+ Sort: s         Reverse: r      First/Last: g/G
+
+   Index │ Msgs │ Age  │ Name
+ ❯ #1    │ 5    │ 10mo │ Second conversation about dogs (current)
+   #2    │ 2    │ 10mo │ First conversation about cats
+ ▼"
+`;
+
+exports[`SessionBrowser component > shows an error state when loading sessions fails 1`] = `
+" Error: storage failure
+ Press q to exit"
+`;
+
+exports[`SessionBrowser component > shows empty state when no sessions exist 1`] = `
+" No auto-saved conversations found.
+ Press q to exit"
+`;
