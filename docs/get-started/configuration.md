@@ -240,7 +240,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.useAlternateBuffer`** (boolean):
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.incrementalRendering`** (boolean):
@@ -317,7 +317,187 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Named presets for model configs. Can be used in place of a
     model name and can inherit from other aliases using an `extends` property.
   - **Default:**
-    `{"base":{"modelConfig":{"generateContentConfig":{"temperature":0,"topP":1}}},"chat-base":{"extends":"base","modelConfig":{"generateContentConfig":{"thinkingConfig":{"includeThoughts":true},"temperature":1,"topP":0.95,"topK":64}}},"chat-base-2.5":{"extends":"chat-base","modelConfig":{"generateContentConfig":{"thinkingConfig":{"thinkingBudget":8192}}}},"chat-base-3":{"extends":"chat-base","modelConfig":{"generateContentConfig":{"thinkingConfig":{"thinkingLevel":"HIGH"}}}},"gemini-3-pro-preview":{"extends":"chat-base-3","modelConfig":{"model":"gemini-3-pro-preview"}},"gemini-2.5-pro":{"extends":"chat-base-2.5","modelConfig":{"model":"gemini-2.5-pro"}},"gemini-2.5-flash":{"extends":"chat-base-2.5","modelConfig":{"model":"gemini-2.5-flash"}},"gemini-2.5-flash-lite":{"extends":"chat-base-2.5","modelConfig":{"model":"gemini-2.5-flash-lite"}},"gemini-2.5-flash-base":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash"}},"classifier":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":1024,"thinkingConfig":{"thinkingBudget":512}}}},"prompt-completion":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"temperature":0.3,"maxOutputTokens":16000,"thinkingConfig":{"thinkingBudget":0}}}},"edit-corrector":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"thinkingConfig":{"thinkingBudget":0}}}},"summarizer-default":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":2000}}},"summarizer-shell":{"extends":"base","modelConfig":{"model":"gemini-2.5-flash-lite","generateContentConfig":{"maxOutputTokens":2000}}},"web-search":{"extends":"gemini-2.5-flash-base","modelConfig":{"generateContentConfig":{"tools":[{"googleSearch":{}}]}}},"web-fetch":{"extends":"gemini-2.5-flash-base","modelConfig":{"generateContentConfig":{"tools":[{"urlContext":{}}]}}},"web-fetch-fallback":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"loop-detection":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"loop-detection-double-check":{"extends":"base","modelConfig":{"model":"gemini-2.5-pro"}},"llm-edit-fixer":{"extends":"gemini-2.5-flash-base","modelConfig":{}},"next-speaker-checker":{"extends":"gemini-2.5-flash-base","modelConfig":{}}}`
+
+    ```json
+    {
+      "base": {
+        "modelConfig": {
+          "generateContentConfig": {
+            "temperature": 0,
+            "topP": 1
+          }
+        }
+      },
+      "chat-base": {
+        "extends": "base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "includeThoughts": true
+            },
+            "temperature": 1,
+            "topP": 0.95,
+            "topK": 64
+          }
+        }
+      },
+      "chat-base-2.5": {
+        "extends": "chat-base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "thinkingBudget": 8192
+            }
+          }
+        }
+      },
+      "chat-base-3": {
+        "extends": "chat-base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "thinkingLevel": "HIGH"
+            }
+          }
+        }
+      },
+      "gemini-3-pro-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3-pro-preview"
+        }
+      },
+      "gemini-2.5-pro": {
+        "extends": "chat-base-2.5",
+        "modelConfig": {
+          "model": "gemini-2.5-pro"
+        }
+      },
+      "gemini-2.5-flash": {
+        "extends": "chat-base-2.5",
+        "modelConfig": {
+          "model": "gemini-2.5-flash"
+        }
+      },
+      "gemini-2.5-flash-lite": {
+        "extends": "chat-base-2.5",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite"
+        }
+      },
+      "gemini-2.5-flash-base": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash"
+        }
+      },
+      "classifier": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "maxOutputTokens": 1024,
+            "thinkingConfig": {
+              "thinkingBudget": 512
+            }
+          }
+        }
+      },
+      "prompt-completion": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "temperature": 0.3,
+            "maxOutputTokens": 16000,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        }
+      },
+      "edit-corrector": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        }
+      },
+      "summarizer-default": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "maxOutputTokens": 2000
+          }
+        }
+      },
+      "summarizer-shell": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "maxOutputTokens": 2000
+          }
+        }
+      },
+      "web-search": {
+        "extends": "gemini-2.5-flash-base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "tools": [
+              {
+                "googleSearch": {}
+              }
+            ]
+          }
+        }
+      },
+      "web-fetch": {
+        "extends": "gemini-2.5-flash-base",
+        "modelConfig": {
+          "generateContentConfig": {
+            "tools": [
+              {
+                "urlContext": {}
+              }
+            ]
+          }
+        }
+      },
+      "web-fetch-fallback": {
+        "extends": "gemini-2.5-flash-base",
+        "modelConfig": {}
+      },
+      "loop-detection": {
+        "extends": "gemini-2.5-flash-base",
+        "modelConfig": {}
+      },
+      "loop-detection-double-check": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-pro"
+        }
+      },
+      "llm-edit-fixer": {
+        "extends": "gemini-2.5-flash-base",
+        "modelConfig": {}
+      },
+      "next-speaker-checker": {
+        "extends": "gemini-2.5-flash-base",
+        "modelConfig": {}
+      }
+    }
+    ```
+
+- **`modelConfigs.customAliases`** (object):
+  - **Description:** Custom named presets for model configs. These are merged
+    with (and override) the built-in aliases.
+  - **Default:** `{}`
 
 - **`modelConfigs.overrides`** (array):
   - **Description:** Apply specific configuration overrides based on matches,
@@ -545,7 +725,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`advanced.excludedEnvVars`** (array):
   - **Description:** Environment variables to exclude from project context.
-  - **Default:** `["DEBUG","DEBUG_MODE"]`
+  - **Default:**
+
+    ```json
+    ["DEBUG", "DEBUG_MODE"]
+    ```
 
 - **`advanced.bugCommand`** (object):
   - **Description:** Configuration for the bug report command.
@@ -561,12 +745,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.useModelRouter`** (boolean):
-  - **Description:** Enable model routing to route requests to the best model
-    based on complexity.
-  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
