@@ -13,6 +13,7 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import { format } from 'node:util';
 import { type CommandModule, type Argv } from 'yargs';
 import { handleUpdate, updateCommand } from './update.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -22,27 +23,41 @@ import * as github from '../../config/extensions/github.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 
 // Mock dependencies
-vi.mock('../../config/extension-manager.js');
-vi.mock('../../config/settings.js');
-vi.mock('../../utils/errors.js');
-vi.mock('../../config/extensions/update.js');
-vi.mock('../../config/extensions/github.js');
+const emitConsoleLog = vi.hoisted(() => vi.fn());
+const debugLogger = vi.hoisted(() => ({
+  log: vi.fn((message, ...args) => {
+    emitConsoleLog('log', format(message, ...args));
+  }),
+  error: vi.fn((message, ...args) => {
+    emitConsoleLog('error', format(message, ...args));
+  }),
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    debugLogger: {
-      log: vi.fn(),
-      error: vi.fn(),
+    coreEvents: {
+      emitConsoleLog,
     },
+    debugLogger,
   };
 });
+
+vi.mock('../../config/extension-manager.js');
+vi.mock('../../config/settings.js');
+vi.mock('../../utils/errors.js');
+vi.mock('../../config/extensions/update.js');
+vi.mock('../../config/extensions/github.js');
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: vi.fn(),
 }));
 vi.mock('../../config/extensions/extensionSettings.js', () => ({
   promptForSetting: vi.fn(),
+}));
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
 }));
 
 describe('extensions update command', () => {
@@ -57,16 +72,8 @@ describe('extensions update command', () => {
     update.updateAllUpdatableExtensions,
   );
 
-  interface MockDebugLogger {
-    log: Mock;
-    error: Mock;
-  }
-  let mockDebugLogger: MockDebugLogger;
-
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockDebugLogger = (await import('@google/gemini-cli-core'))
-      .debugLogger as unknown as MockDebugLogger;
     mockLoadSettings.mockReturnValue({
       merged: { experimental: { extensionReloading: true } },
     } as unknown as LoadedSettings);
@@ -106,7 +113,7 @@ describe('extensions update command', () => {
 
         await handleUpdate({ name: 'my-extension' });
 
-        expect(mockDebugLogger.log).toHaveBeenCalledWith(expectedLog);
+        expect(emitConsoleLog).toHaveBeenCalledWith('log', expectedLog);
         if (shouldCallUpdateExtension) {
           expect(mockUpdateExtension).toHaveBeenCalled();
         } else {
@@ -141,7 +148,7 @@ describe('extensions update command', () => {
 
         await handleUpdate({ all: true });
 
-        expect(mockDebugLogger.log).toHaveBeenCalledWith(expectedLog);
+        expect(emitConsoleLog).toHaveBeenCalledWith('log', expectedLog);
         mockCwd.mockRestore();
       },
     );
