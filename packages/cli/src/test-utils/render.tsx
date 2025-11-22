@@ -126,12 +126,8 @@ export const renderWithProviders = (
     width,
     mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
-<<<<<<< HEAD
-    useAlternateBuffer,
-=======
     useAlternateBuffer = true,
     uiActions,
->>>>>>> 5e218a563 (Turn off alternate buffer mode by default. (#13623))
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
