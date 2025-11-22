@@ -48,10 +48,12 @@ import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { HookRunner } from '../hooks/hookRunner.js';
 import {
-  fireToolNotificationHook,
-  executeToolWithHooks,
-} from './coreToolHookTriggers.js';
+  HookEventName,
+  type BeforeToolInput,
+  type AfterToolInput,
+} from '../hooks/types.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -360,6 +362,7 @@ export class CoreToolScheduler {
   }> = [];
   private toolCallQueue: ToolCall[] = [];
   private completedToolCallsForBatch: CompletedToolCall[] = [];
+  private hookRunner = new HookRunner();
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -842,6 +845,59 @@ export class CoreToolScheduler {
       const { request: reqInfo, invocation } = toolCall;
 
       try {
+        // Hook: BeforeTool
+        const registry = this.config.getHookRegistry();
+        if (registry) {
+          const hooks = registry.getHooksForEvent(HookEventName.BeforeTool);
+          if (hooks.length > 0) {
+            const matchingHooks = hooks.filter((entry) => {
+              if (!entry.matcher || entry.matcher === '*') return true;
+              try {
+                const regex = new RegExp(entry.matcher);
+                return regex.test(reqInfo.name);
+              } catch {
+                // Fallback to exact match if regex fails
+                return entry.matcher === reqInfo.name;
+              }
+            });
+
+            if (matchingHooks.length > 0) {
+              const hookConfigs = matchingHooks.map((h) => h.config);
+              const input: BeforeToolInput = {
+                session_id: this.config.getSessionId(),
+                transcript_path: '', // TODO: Add transcript path
+                cwd: this.config.getWorkingDir(),
+                hook_event_name: HookEventName.BeforeTool,
+                timestamp: new Date().toISOString(),
+                tool_name: reqInfo.name,
+                tool_input: reqInfo.args,
+              };
+
+              const results = await this.hookRunner.executeHooksSequential(
+                hookConfigs,
+                HookEventName.BeforeTool,
+                input,
+              );
+
+              for (const result of results) {
+                if (
+                  result.output?.decision === 'deny' ||
+                  result.output?.decision === 'block'
+                ) {
+                  this.setStatusInternal(
+                    reqInfo.callId,
+                    'cancelled',
+                    signal,
+                    `Blocked by BeforeTool hook: ${result.output.reason || 'No reason provided'}`,
+                  );
+                  await this.checkAndNotifyCompletion(signal);
+                  return;
+                }
+              }
+            }
+          }
+        }
+
         if (signal.aborted) {
           this.setStatusInternal(
             reqInfo.callId,
@@ -871,13 +927,6 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
-            // Fire Notification hook before showing confirmation to user
-            const messageBus = this.config.getMessageBus();
-            const hooksEnabled = this.config.getEnableHooks();
-            if (hooksEnabled && messageBus) {
-              await fireToolNotificationHook(messageBus, confirmationDetails);
-            }
-
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
@@ -1114,8 +1163,6 @@ export class CoreToolScheduler {
             : undefined;
 
         const shellExecutionConfig = this.config.getShellExecutionConfig();
-        const hooksEnabled = this.config.getEnableHooks();
-        const messageBus = this.config.getMessageBus();
 
         await runInDevTraceSpan(
           {
@@ -1140,23 +1187,15 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
-              promise = executeToolWithHooks(
-                invocation,
-                toolName,
+              promise = invocation.execute(
                 signal,
-                messageBus,
-                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
               );
             } else {
-              promise = executeToolWithHooks(
-                invocation,
-                toolName,
+              promise = invocation.execute(
                 signal,
-                messageBus,
-                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
               );
@@ -1244,6 +1283,60 @@ export class CoreToolScheduler {
                   toolResult.error.type,
                 );
                 this.setStatusInternal(callId, 'error', signal, errorResponse);
+              }
+
+              // Hook: AfterTool
+              const registry = this.config.getHookRegistry();
+              if (registry) {
+                const hooks = registry.getHooksForEvent(
+                  HookEventName.AfterTool,
+                );
+                if (hooks.length > 0) {
+                  const matchingHooks = hooks.filter((entry) => {
+                    if (!entry.matcher || entry.matcher === '*') return true;
+                    try {
+                      const regex = new RegExp(entry.matcher);
+                      return regex.test(toolName);
+                    } catch {
+                      return entry.matcher === toolName;
+                    }
+                  });
+
+                  if (matchingHooks.length > 0) {
+                    const hookConfigs = matchingHooks.map((h) => h.config);
+
+                    // Determine tool output for hook
+                    let toolResponse: Record<string, unknown> = {};
+                    if (toolResult.error) {
+                      toolResponse = { error: toolResult.error.message };
+                    } else if (typeof toolResult.llmContent === 'string') {
+                      toolResponse = { output: toolResult.llmContent };
+                    } else {
+                      // Complex content, approximate
+                      toolResponse = { output: 'Complex content' };
+                    }
+
+                    const input: AfterToolInput = {
+                      session_id: this.config.getSessionId(),
+                      transcript_path: '',
+                      cwd: this.config.getWorkingDir(),
+                      hook_event_name: HookEventName.AfterTool,
+                      timestamp: new Date().toISOString(),
+                      tool_name: toolName,
+                      tool_input: scheduledCall.request.args,
+                      tool_response: toolResponse,
+                    };
+
+                    // Execute asynchronously, don't block completion (or should we?)
+                    // Claude docs say hooks are synchronous usually.
+                    // We'll await it to be safe and allow context injection.
+                    await this.hookRunner.executeHooksSequential(
+                      hookConfigs,
+                      HookEventName.AfterTool,
+                      input,
+                    );
+                  }
+                }
               }
             } catch (executionError: unknown) {
               spanMetadata.error = executionError;

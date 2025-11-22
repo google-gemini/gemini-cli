@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ToolCallRequestInfo,
-  ResumedSessionData,
-  CompletedToolCall,
-  UserFeedbackPayload,
-
+import {
+  type Config,
+  type ToolCallRequestInfo,
+  type ResumedSessionData,
+  type CompletedToolCall,
+  type UserFeedbackPayload,
   executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
@@ -29,7 +28,8 @@ import type {
   HookEventName,
   type BeforeAgentInput,
   type BeforeAgentOutput,
-  type AfterAgentInput} from '@google/gemini-cli-core';
+  type AfterAgentInput,
+} from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 
@@ -195,24 +195,36 @@ export async function runNonInteractive({
       });
 
       // Hook: BeforeAgent
+
       let finalInput = input;
+
       const registry = config.getHookRegistry();
+
       if (registry) {
         const hooks = registry.getHooksForEvent(HookEventName.BeforeAgent);
+
         if (hooks.length > 0) {
           const hookConfigs = hooks.map((h) => h.config);
+
           const inputData: BeforeAgentInput = {
             session_id: config.getSessionId(),
+
             transcript_path: '',
+
             cwd: config.getWorkingDir(),
+
             hook_event_name: HookEventName.BeforeAgent,
+
             timestamp: new Date().toISOString(),
+
             prompt: input,
           };
 
           const results = await hookRunner.executeHooksSequential(
             hookConfigs,
+
             HookEventName.BeforeAgent,
+
             inputData,
           );
 
@@ -222,11 +234,16 @@ export async function runNonInteractive({
               result.output?.decision === 'block'
             ) {
               console.error(`Request blocked by hook: ${result.output.reason}`);
-              process.exit(1); // Or throw FatalInputError
+
+              process.exit(1);
             }
+
             const hookOutput = result.output as BeforeAgentOutput;
+
             let additionalContext: string | undefined;
+
             if (
+              hookOutput &&
               hookOutput.hookSpecificOutput &&
               'additionalContext' in hookOutput.hookSpecificOutput
             ) {

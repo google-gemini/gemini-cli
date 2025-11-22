@@ -16,7 +16,11 @@ import type {
   ThoughtSummary,
   ToolCallRequestInfo,
   GeminiErrorEventValue,
-
+  BeforeAgentInput,
+  AfterAgentInput,
+  BeforeAgentOutput,
+} from '@google/gemini-cli-core';
+import {
   GeminiEventType as ServerGeminiEventType,
   getErrorMessage,
   isNodeError,
@@ -38,9 +42,7 @@ import type {
   runInDevTraceSpan,
   HookEventName,
   HookRunner,
-  type BeforeAgentInput,
-  type AfterAgentInput,
-  type BeforeAgentOutput} from '@google/gemini-cli-core';
+} from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
   HistoryItem,
