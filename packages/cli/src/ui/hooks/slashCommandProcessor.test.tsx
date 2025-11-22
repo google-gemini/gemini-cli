@@ -1006,7 +1006,7 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Slash Command Logging', () => {
-    const mockCommandAction = vi.fn().mockResolvedValue(undefined);
+    const mockCommandAction = vi.fn().mockResolvedValue({ type: 'handled' });
     let loggingTestCommands: SlashCommand[];
 
     beforeEach(() => {
