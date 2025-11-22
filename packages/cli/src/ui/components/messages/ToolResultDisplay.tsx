@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React from 'react';
+import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
@@ -14,11 +14,11 @@ import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
-import { useSettings } from '../../contexts/SettingsContext.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
 const MIN_LINES_SHOWN = 2; // show at least this many lines
+const MAX_LINES = 20; // Maximum lines to show before truncation
 
 // Large threshold to ensure we don't cause performance issues for very large
 // outputs that will get truncated further MaxSizedBox anyway.
@@ -44,18 +44,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
-  const { tools } = useSettings().merged;
-  const [expanded, setExpanded] = useState(false);
-
-  // Only enable keyboard shortcut if stdin is a TTY (interactive environment)
-  useInput(
-    (input, key) => {
-      if (key.meta && input === 'b') {
-        setExpanded((prev) => !prev);
-      }
-    },
-    { isActive: process.stdin.isTTY },
-  );
 
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -74,8 +62,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
 
-  const truncateLines = tools?.truncateToolOutputLines ?? 15;
-
   const { displayContent, isTruncatedByLines, hiddenLineCount } =
     React.useMemo(() => {
       let content = resultDisplay;
@@ -84,16 +70,14 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
       if (typeof resultDisplay === 'string') {
         const lines = resultDisplay.split('\n');
-        if (lines.length > truncateLines && !expanded) {
-          content = lines.slice(0, truncateLines).join('\n');
+        if (lines.length > MAX_LINES) {
+          content = lines.slice(0, MAX_LINES).join('\n');
           isLineTruncated = true;
-          hiddenLines = lines.length - truncateLines;
-        } else {
-          // Apply character truncation if not folded or if expanded
-          if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-            content =
-              '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
-          }
+          hiddenLines = lines.length - MAX_LINES;
+        } else if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
+          // Apply character truncation for very long outputs
+          content =
+            '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
         }
       }
       return {
@@ -101,7 +85,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         isTruncatedByLines: isLineTruncated,
         hiddenLineCount: hiddenLines,
       };
-    }, [resultDisplay, expanded, truncateLines]);
+    }, [resultDisplay]);
 
   if (!displayContent) return null;
 
@@ -152,9 +136,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           />
         )}
         {isTruncatedByLines && (
-          <Text color="dimColor">
-            ... +{hiddenLineCount} lines (Cmd+B to expand)
-          </Text>
+          <Text color="dimColor">... +{hiddenLineCount} lines</Text>
         )}
       </Box>
     </Box>
