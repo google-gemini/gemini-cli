@@ -47,8 +47,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   const { tools } = useSettings().merged;
   const [expanded, setExpanded] = useState(false);
 
-  useInput((input) => {
-    if (input === ' ') {
+  useInput((input, key) => {
+    if (key.meta && input === 'b') {
       setExpanded((prev) => !prev);
     }
   });
@@ -149,7 +149,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         )}
         {isTruncatedByLines && (
           <Text color="dimColor">
-            ... +{hiddenLineCount} lines (Space to expand)
+            ... +{hiddenLineCount} lines (Cmd+B to expand)
           </Text>
         )}
       </Box>

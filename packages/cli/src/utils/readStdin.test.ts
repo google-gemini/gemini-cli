@@ -14,6 +14,7 @@ const mockStdin = {
   on: vi.fn(),
   removeListener: vi.fn(),
   destroy: vi.fn(),
+  pause: vi.fn(),
 };
 
 describe('readStdin', () => {
@@ -108,5 +109,27 @@ describe('readStdin', () => {
     onEndHandler();
 
     await expect(promise).resolves.toBe('chunk1chunk2');
+  });
+
+  it('should truncate and pause if input exceeds MAX_STDIN_SIZE', async () => {
+    const largeChunk = 'a'.repeat(8 * 1024 * 1024 + 10);
+    mockStdin.read.mockReturnValueOnce(largeChunk).mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+    // onEndHandler not needed as we break from loop but we resolve onEnd which needs to be triggered?
+    // wait, readStdin logic:
+    // if (totalSize > MAX) { pause(); break; }
+    // loop finishes. onReadable returns.
+    // Promise is NOT resolved yet. It resolves in onEnd.
+    // We must manually trigger onEnd if we want it to finish?
+    // Or does the user naturally close pipe?
+    // In test we must trigger onEnd.
+    onEndHandler();
+
+    const result = await promise;
+    expect(result.length).toBe(8 * 1024 * 1024);
+    expect(mockStdin.pause).toHaveBeenCalled();
+    expect(mockStdin.destroy).not.toHaveBeenCalled();
   });
 });

@@ -31,7 +31,6 @@ import {
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
-import readline from 'node:readline';
 
 import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
@@ -92,92 +91,33 @@ export async function runNonInteractive({
 
     const abortController = new AbortController();
 
-    // Track cancellation state
-    let isAborting = false;
-    let cancelMessageTimer: NodeJS.Timeout | null = null;
+    // Note: stdin cancellation removed to avoid conflicts with Ink's useInput
+    // The UI components (like ToolResultDisplay) need stdin for interactive features
 
-    // Setup stdin listener for Ctrl+C detection
-    let stdinWasRaw = false;
-    let rl: readline.Interface | null = null;
+    // Handle Ctrl+C (SIGINT) explicitly because the Telemetry SDK's listener
+    // prevents the default Node.js exit behavior, but doesn't exit the process itself.
+    process.on('SIGINT', async () => {
+      // 1. Stop the generation loop
+      abortController.abort();
 
-    const setupStdinCancellation = () => {
-      // Only setup if stdin is a TTY (user can interact)
-      if (!process.stdin.isTTY) {
-        return;
+      // 2. Ensure telemetry is flushed (idempotent, safe to call even if SDK listener also triggers)
+      if (isTelemetrySdkInitialized()) {
+        await shutdownTelemetry(config);
       }
 
-      // Save original raw mode state
-      stdinWasRaw = process.stdin.isRaw || false;
-
-      // Enable raw mode to capture individual keypresses
-      process.stdin.setRawMode(true);
-      process.stdin.resume();
-
-      // Setup readline to emit keypress events
-      rl = readline.createInterface({
-        input: process.stdin,
-        escapeCodeTimeout: 0,
-      });
-      readline.emitKeypressEvents(process.stdin, rl);
-
-      // Listen for Ctrl+C
-      const keypressHandler = (
-        str: string,
-        key: { name?: string; ctrl?: boolean },
-      ) => {
-        // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
-        if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
-          // Only handle once
-          if (isAborting) {
-            return;
-          }
-
-          isAborting = true;
-
-          // Only show message if cancellation takes longer than 200ms
-          // This reduces verbosity for fast cancellations
-          cancelMessageTimer = setTimeout(() => {
-            process.stderr.write('\nCancelling...\n');
-          }, 200);
-
-          abortController.abort();
-          // Note: Don't exit here - let the abort flow through the system
-          // and trigger handleCancellationError() which will exit with proper code
-        }
-      };
-
-      process.stdin.on('keypress', keypressHandler);
-    };
-
-    const cleanupStdinCancellation = () => {
-      // Clear any pending cancel message timer
-      if (cancelMessageTimer) {
-        clearTimeout(cancelMessageTimer);
-        cancelMessageTimer = null;
-      }
-
-      // Cleanup readline and stdin listeners
-      if (rl) {
-        rl.close();
-        rl = null;
-      }
-
-      // Remove keypress listener
-      process.stdin.removeAllListeners('keypress');
-
-      // Restore stdin to original state
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(stdinWasRaw);
-        process.stdin.pause();
-      }
-    };
+      // 3. Force exit with standard Ctrl+C exit code
+      process.exit(130);
+    });
 
     let errorToHandle: unknown | undefined;
     try {
       consolePatcher.patch();
 
-      // Setup stdin cancellation listener
-      setupStdinCancellation();
+      // Note: We do NOT setup stdin cancellation in non-interactive mode
+      // because the UI components (like ToolResultDisplay) use useInput from Ink
+      // to handle interactive features (e.g., spacebar to expand/collapse).
+      // Setting up stdin cancellation would put stdin in raw mode and conflict
+      // with Ink's input handling, causing the application to freeze.
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
       coreEvents.drainBacklogs();
@@ -438,9 +378,6 @@ export async function runNonInteractive({
     } catch (error) {
       errorToHandle = error;
     } finally {
-      // Cleanup stdin cancellation before other cleanup
-      cleanupStdinCancellation();
-
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
       if (isTelemetrySdkInitialized()) {
