@@ -494,6 +494,11 @@ their corresponding top-level category object in your `settings.json` file.
     }
     ```
 
+- **`modelConfigs.customAliases`** (object):
+  - **Description:** Custom named presets for model configs. These are merged
+    with (and override) the built-in aliases.
+  - **Default:** `{}`
+
 - **`modelConfigs.overrides`** (array):
   - **Description:** Apply specific configuration overrides based on matches,
     with a primary key of model (or alias). The most specific match will be

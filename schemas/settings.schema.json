@@ -794,6 +794,14 @@
           "type": "object",
           "additionalProperties": true
         },
+        "customAliases": {
+          "title": "Custom Model Config Aliases",
+          "description": "Custom named presets for model configs. These are merged with (and override) the built-in aliases.",
+          "markdownDescription": "Custom named presets for model configs. These are merged with (and override) the built-in aliases.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "additionalProperties": true
+        },
         "overrides": {
           "title": "Model Config Overrides",
           "description": "Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.",

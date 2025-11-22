@@ -43,6 +43,7 @@ export interface ModelConfigAlias {
 
 export interface ModelConfigServiceConfig {
   aliases?: Record<string, ModelConfigAlias>;
+  customAliases?: Record<string, ModelConfigAlias>;
   overrides?: ModelConfigOverride[];
 }
 
@@ -104,8 +105,12 @@ export class ModelConfigService {
     generateContentConfig: GenerateContentConfig;
   } {
     const config = this.config || {};
-    const { aliases = {}, overrides = [] } = config;
-    const allAliases = { ...aliases, ...this.runtimeAliases };
+    const { aliases = {}, customAliases = {}, overrides = [] } = config;
+    const allAliases = {
+      ...aliases,
+      ...customAliases,
+      ...this.runtimeAliases,
+    };
     let baseModel: string | undefined = context.model;
     let resolvedConfig: GenerateContentConfig = {};
 

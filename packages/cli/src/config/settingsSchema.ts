@@ -729,6 +729,16 @@ const SETTINGS_SCHEMA = {
           'Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
         showInDialog: false,
       },
+      customAliases: {
+        type: 'object',
+        label: 'Custom Model Config Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Custom named presets for model configs. These are merged with (and override) the built-in aliases.',
+        showInDialog: false,
+      },
       overrides: {
         type: 'array',
         label: 'Model Config Overrides',
