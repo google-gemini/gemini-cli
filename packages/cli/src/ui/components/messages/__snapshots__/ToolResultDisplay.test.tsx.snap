@@ -1,5 +1,33 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`ToolResultDisplay > does not truncate by lines when showAllOutput is true 1`] = `
+"MarkdownDisplay: line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line"
+`;
+
 exports[`ToolResultDisplay > falls back to plain text if availableHeight is set and not in alternate buffer 1`] = `"MaxSizedBox:Some result"`;
 
 exports[`ToolResultDisplay > keeps markdown if in alternate buffer even with availableHeight 1`] = `"MarkdownDisplay: Some result"`;
@@ -13,6 +41,30 @@ exports[`ToolResultDisplay > renders nothing for todos result 1`] = `""`;
 exports[`ToolResultDisplay > renders string result as markdown by default 1`] = `"MarkdownDisplay: Some result"`;
 
 exports[`ToolResultDisplay > renders string result as plain text when renderOutputAsMarkdown is false 1`] = `"MaxSizedBox:Some result"`;
+
+exports[`ToolResultDisplay > truncates by lines when showAllOutput is false 1`] = `
+"MarkdownDisplay: line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+... +5 lines (Ctrl+B to expand)"
+`;
 
 exports[`ToolResultDisplay > truncates very long string results 1`] = `
 "MaxSizedBo...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

@@ -177,6 +177,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
+  const [showAllOutput, setShowAllOutput] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -1186,6 +1187,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (activePtyId || embeddedShellFocused) {
           setEmbeddedShellFocused((prev) => !prev);
         }
+      } else if (keyMatchers[Command.TOGGLE_EXPAND_OUTPUT](key)) {
+        setShowAllOutput((prev) => !prev);
       }
     },
     [
@@ -1477,6 +1480,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         warningText: warningBannerText,
       },
       bannerVisible,
+      showAllOutput,
     }),
     [
       isThemeDialogOpen,
@@ -1568,6 +1572,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       defaultBannerText,
       warningBannerText,
       bannerVisible,
+      showAllOutput,
     ],
   );
 

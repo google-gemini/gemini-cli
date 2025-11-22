@@ -73,7 +73,10 @@ vi.mock('../../hooks/useAlternateBuffer.js', () => ({
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseUIState.mockReturnValue({ renderMarkdown: true });
+    mockUseUIState.mockReturnValue({
+      renderMarkdown: true,
+      showAllOutput: false,
+    });
     mockUseSettings.mockReturnValue({
       merged: {
         tools: {
@@ -194,6 +197,42 @@ describe('ToolResultDisplay', () => {
         resultDisplay="Some result"
         terminalWidth={80}
         availableTerminalHeight={20}
+        renderOutputAsMarkdown={true}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toMatchSnapshot();
+  });
+
+  it('truncates by lines when showAllOutput is false', () => {
+    mockUseUIState.mockReturnValue({
+      renderMarkdown: true,
+      showAllOutput: false,
+    });
+    const longLines = Array(25).fill('line').join('\n');
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={longLines}
+        terminalWidth={80}
+        renderOutputAsMarkdown={true}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toMatchSnapshot();
+  });
+
+  it('does not truncate by lines when showAllOutput is true', () => {
+    mockUseUIState.mockReturnValue({
+      renderMarkdown: true,
+      showAllOutput: true,
+    });
+    const longLines = Array(25).fill('line').join('\n');
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={longLines}
+        terminalWidth={80}
         renderOutputAsMarkdown={true}
       />,
     );

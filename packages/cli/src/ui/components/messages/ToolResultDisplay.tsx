@@ -42,7 +42,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   terminalWidth,
   renderOutputAsMarkdown = true,
 }) => {
-  const { renderMarkdown } = useUIState();
+  const { renderMarkdown, showAllOutput } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
   const availableHeight = availableTerminalHeight
@@ -70,7 +70,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
       if (typeof resultDisplay === 'string') {
         const lines = resultDisplay.split('\n');
-        if (lines.length > MAX_LINES) {
+        if (!showAllOutput && lines.length > MAX_LINES) {
           content = lines.slice(0, MAX_LINES).join('\n');
           isLineTruncated = true;
           hiddenLines = lines.length - MAX_LINES;
@@ -85,7 +85,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         isTruncatedByLines: isLineTruncated,
         hiddenLineCount: hiddenLines,
       };
-    }, [resultDisplay]);
+    }, [resultDisplay, showAllOutput]);
 
   if (!displayContent) return null;
 
@@ -136,7 +136,9 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           />
         )}
         {isTruncatedByLines && (
-          <Text color="dimColor">... +{hiddenLineCount} lines</Text>
+          <Text color="dimColor">
+            ... +{hiddenLineCount} lines (Ctrl+B to expand)
+          </Text>
         )}
       </Box>
     </Box>

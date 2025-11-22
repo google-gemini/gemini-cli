@@ -75,6 +75,7 @@ export enum Command {
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
   COLLAPSE_SUGGESTION = 'collapseSuggestion',
+  TOGGLE_EXPAND_OUTPUT = 'toggleExpandOutput',
 }
 
 /**
@@ -214,6 +215,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
+  [Command.TOGGLE_EXPAND_OUTPUT]: [{ key: 'b', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -304,6 +306,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_COPY_MODE,
       Command.SHOW_MORE_LINES,
       Command.TOGGLE_SHELL_INPUT_FOCUS,
+      Command.TOGGLE_EXPAND_OUTPUT,
     ],
   },
   {
@@ -363,4 +366,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Toggle focus between the shell and Gemini input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+  [Command.TOGGLE_EXPAND_OUTPUT]: 'Toggle expansion of truncated output.',
 };
