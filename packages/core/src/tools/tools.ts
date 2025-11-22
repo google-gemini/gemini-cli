@@ -16,6 +16,7 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   type ToolConfirmationResponse,
+  type UpdatePolicy,
 } from '../confirmation-bus/types.js';
 
 /**
@@ -124,36 +125,48 @@ export abstract class BaseToolInvocation<
       payload?: ToolConfirmationPayload,
     ) => {
       if (this.messageBus) {
-        if (
-          outcome === ToolConfirmationOutcome.ProceedAlways &&
-          this._toolName
-        ) {
-          this.messageBus.publish({
-            type: MessageBusType.UPDATE_POLICY,
-            toolName: this._toolName,
-          });
-        } else if (
-          outcome === ToolConfirmationOutcome.ProceedAlwaysTool &&
-          this._toolName
-        ) {
-          this.messageBus.publish({
-            type: MessageBusType.UPDATE_POLICY,
-            toolName: this._toolName,
-          });
-        } else if (
-          outcome === ToolConfirmationOutcome.ProceedAlwaysServer &&
-          this._serverName
-        ) {
-          this.messageBus.publish({
-            type: MessageBusType.UPDATE_POLICY,
-            toolName: `${this._serverName}__*`,
-          });
+        const policyMessage = this.getPolicyUpdateMessage(outcome);
+        if (policyMessage) {
+          this.messageBus.publish(policyMessage);
         }
       }
       await originalOnConfirm(outcome, payload);
     };
 
     return details;
+  }
+
+  protected getPolicyUpdateMessage(
+    outcome: ToolConfirmationOutcome,
+  ): UpdatePolicy | undefined {
+    if (outcome === ToolConfirmationOutcome.ProceedAlways && this._toolName) {
+      return {
+        type: MessageBusType.UPDATE_POLICY,
+        toolName: this._toolName,
+      };
+    }
+
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlwaysTool &&
+      this._toolName
+    ) {
+      return {
+        type: MessageBusType.UPDATE_POLICY,
+        toolName: this._toolName,
+      };
+    }
+
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlwaysServer &&
+      this._serverName
+    ) {
+      return {
+        type: MessageBusType.UPDATE_POLICY,
+        toolName: `${this._serverName}__*`,
+      };
+    }
+
+    return undefined;
   }
 
   /**

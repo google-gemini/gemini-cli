@@ -241,9 +241,13 @@ export function createPolicyUpdater(
     MessageBusType.UPDATE_POLICY,
     (message: UpdatePolicy) => {
       const toolName = message.toolName;
+      const argsPattern = message.argsPattern
+        ? new RegExp(message.argsPattern)
+        : undefined;
 
       policyEngine.addRule({
         toolName,
+        argsPattern,
         decision: PolicyDecision.ALLOW,
         // User tier (2) + high priority (950/1000) = 2.95
         // This ensures user "always allow" selections are high priority

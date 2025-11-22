@@ -43,6 +43,10 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  MessageBusType,
+  type UpdatePolicy,
+} from '../confirmation-bus/types.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -81,6 +85,36 @@ export class ShellToolInvocation extends BaseToolInvocation<
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
     return description;
+  }
+
+  protected override getPolicyUpdateMessage(
+    outcome: ToolConfirmationOutcome,
+  ): UpdatePolicy | undefined {
+    if (outcome === ToolConfirmationOutcome.ProceedAlways && this._toolName) {
+      const command = stripShellWrapper(this.params.command);
+      const rootCommands = [...new Set(getCommandRoots(command))];
+      if (rootCommands.length > 0) {
+        const escapedRoots = rootCommands.map((r) =>
+          r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        );
+        // Match "command":"root" followed by space or end of string (quote)
+        // Note: In JSON, quotes are escaped as \", but here we are matching the raw string
+        // which contains the escaped quote if it's inside the value, but here it's the delimiter.
+        // Actually, stableStringify produces valid JSON.
+        // For {"command":"ls"}, the string is ... "command":"ls"}
+        // Wait, I was thinking of the closing quote of the value.
+        // "command":"ls"
+        // The regex should match up to the end of the command name.
+        // If it's "ls", it's followed by " or space.
+        const pattern = `"command"\\s*:\\s*"(?:${escapedRoots.join('|')})(?:\\s|")`;
+        return {
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: this._toolName,
+          argsPattern: pattern,
+        };
+      }
+    }
+    return super.getPolicyUpdateMessage(outcome);
   }
 
   protected override async getConfirmationDetails(

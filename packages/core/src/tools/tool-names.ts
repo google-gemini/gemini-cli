@@ -20,3 +20,15 @@ export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const LS_TOOL_NAME = 'list_directory';
 export const MEMORY_TOOL_NAME = 'save_memory';
+
+export const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  [SHELL_TOOL_NAME]: 'Shell',
+  [READ_FILE_TOOL_NAME]: 'Read File',
+  [WRITE_FILE_TOOL_NAME]: 'Write File',
+  [EDIT_TOOL_NAME]: 'Replace',
+  [GREP_TOOL_NAME]: 'Grep',
+  [LS_TOOL_NAME]: 'List Directory',
+  [MEMORY_TOOL_NAME]: 'Memory',
+  [WEB_SEARCH_TOOL_NAME]: 'Web Search',
+  [WEB_FETCH_TOOL_NAME]: 'Web Fetch',
+};

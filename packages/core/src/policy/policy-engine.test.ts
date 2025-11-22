@@ -418,6 +418,59 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should match shell commands using generated regex pattern', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          // Pattern generated for 'ls'
+          argsPattern: /"command"\s*:\s*"(?:ls)(?:\s|")/,
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Matches 'ls'
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'ls' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Matches 'ls -la'
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'ls -la' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Does not match 'lsa'
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'lsa' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+
+      // Does not match 'cat ls'
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'cat ls' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should handle tools with no args', async () => {
       const rules: PolicyRule[] = [
         {
