@@ -229,8 +229,8 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Intentionally only start to animate at multiplier >= 2 as there
       // is no point doing animations of small changes in speed.
-      const isAnimatedScroll =
-        !!candidate.scrollTo && multiplier > 2 && scrollWheelSpeed > 1;
+      const isAnimatedScroll = false;
+      //        !!candidate.scrollTo && multiplier > 2 && scrollWheelSpeed > 1;
 
       if (!isAnimatedScroll) {
         candidate.scrollBy(scrollAmount);
