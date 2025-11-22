@@ -13,6 +13,7 @@ import { StreamingState } from '../types.js';
 import {
   SCREEN_READER_LOADING,
   SCREEN_READER_RESPONDING,
+  SCREEN_READER_WAITING_FOR_CONFIRMATION,
 } from '../textConstants.js';
 import { theme } from '../semantic-colors.js';
 
@@ -30,14 +31,18 @@ export const GeminiRespondingSpinner: React.FC<
 > = ({ nonRespondingDisplay, spinnerType = 'dots' }) => {
   const streamingState = useStreamingContext();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  if (
-    streamingState === StreamingState.Responding ||
-    streamingState === StreamingState.WaitingForConfirmation
-  ) {
+  if (streamingState === StreamingState.Responding) {
     return (
       <GeminiSpinner
         spinnerType={spinnerType}
         altText={SCREEN_READER_RESPONDING}
+      />
+    );
+  } else if (streamingState === StreamingState.WaitingForConfirmation) {
+    return (
+      <GeminiSpinner
+        spinnerType={spinnerType}
+        altText={SCREEN_READER_WAITING_FOR_CONFIRMATION}
       />
     );
   } else if (nonRespondingDisplay) {
