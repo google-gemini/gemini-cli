@@ -46,7 +46,8 @@ const EVENT_MAPPING: Record<string, HookEventName> = {
 export const migrateCommand: CommandModule = {
   command: 'migrate',
   describe: 'Migrate hooks from Claude Code configuration',
-  builder: (yargs) => yargs.option('from-claude', {
+  builder: (yargs) =>
+    yargs.option('from-claude', {
       type: 'boolean',
       description: 'Migrate from Claude Code settings',
       default: true,
@@ -94,14 +95,10 @@ export const migrateCommand: CommandModule = {
             return {
               type: HookType.Command,
               command,
-              timeout: hook.timeout ? hook.timeout * 1000 : undefined, // Claude uses seconds? Gemini uses ms (default 60000).
-              // Wait, check Claude timeout unit.
-              // The settings.json has "timeout": 30.
-              // Gemini HookRunner DEFAULT_HOOK_TIMEOUT = 60000 (60s).
-              // If Claude is seconds, 30 -> 30000.
+              // Claude timeouts are in seconds; converting to milliseconds for Gemini.
+              timeout: hook.timeout ? hook.timeout * 1000 : undefined,
             };
           });
-
           return {
             hooks,
             matcher: def.matcher,

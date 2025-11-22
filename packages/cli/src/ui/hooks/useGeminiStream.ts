@@ -799,7 +799,7 @@ export const useGeminiStream = (
       stream: AsyncIterable<GeminiEvent>,
       userMessageTimestamp: number,
       signal: AbortSignal,
-    ): Promise<StreamProcessingStatus> => {
+    ): Promise<{ status: StreamProcessingStatus; text: string }> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
@@ -862,15 +862,21 @@ export const useGeminiStream = (
             break;
           default: {
             // enforces exhaustive switch-case
-            const unreachable: never = event;
-            return unreachable;
+            // const unreachable: never = event;
+            return {
+              status: StreamProcessingStatus.Error,
+              text: geminiMessageBuffer,
+            };
           }
         }
       }
       if (toolCallRequests.length > 0) {
         scheduleToolCalls(toolCallRequests, signal);
       }
-      return StreamProcessingStatus.Completed;
+      return {
+        status: StreamProcessingStatus.Completed,
+        text: geminiMessageBuffer,
+      };
     },
     [
       handleContentEvent,
@@ -934,7 +940,10 @@ export const useGeminiStream = (
                 const hookConfigs = hooks.map((h) => h.config);
                 const input: BeforeAgentInput = {
                   session_id: config.getSessionId(),
-                  transcript_path: '',
+                  transcript_path: path.join(
+                    storage.getHistoryDir(),
+                    config.getSessionId() + '.json',
+                  ),
                   cwd: config.getWorkingDir(),
                   hook_event_name: HookEventName.BeforeAgent,
                   timestamp: new Date().toISOString(),
@@ -1016,17 +1025,21 @@ export const useGeminiStream = (
             lastQueryRef.current = queryToSend;
             lastPromptIdRef.current = prompt_id!;
 
+            let fullResponseText = '';
+
             try {
               const stream = geminiClient.sendMessageStream(
                 queryToSend,
                 abortSignal,
                 prompt_id!,
               );
-              const processingStatus = await processGeminiStreamEvents(
-                stream,
-                userMessageTimestamp,
-                abortSignal,
-              );
+              const { status: processingStatus, text } =
+                await processGeminiStreamEvents(
+                  stream,
+                  userMessageTimestamp,
+                  abortSignal,
+                );
+              fullResponseText = text;
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
                 return;
@@ -1111,17 +1124,18 @@ export const useGeminiStream = (
                   const hookConfigs = hooks.map((h) => h.config);
                   const promptText =
                     typeof query === 'string' ? query : 'Complex input';
-                  // Approximation of response... tricky with streaming.
-                  // For now, sending empty response or last history item text if available.
 
                   const input: AfterAgentInput = {
                     session_id: config.getSessionId(),
-                    transcript_path: '',
+                    transcript_path: path.join(
+                      storage.getHistoryDir(),
+                      config.getSessionId() + '.json',
+                    ),
                     cwd: config.getWorkingDir(),
                     hook_event_name: HookEventName.AfterAgent,
                     timestamp: new Date().toISOString(),
                     prompt: promptText,
-                    prompt_response: 'Response stream finished', // TODO: Capture full response
+                    prompt_response: fullResponseText,
                     stop_hook_active: false,
                   };
 
@@ -1153,6 +1167,7 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       hookRunner,
+      storage,
     ],
   );
 

@@ -10,7 +10,7 @@ import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
@@ -586,7 +586,10 @@ export async function main() {
         const hookConfigs = hooks.map((h) => h.config);
         const input: SessionStartInput = {
           session_id: config.getSessionId(),
-          transcript_path: '',
+          transcript_path: join(
+            config.storage.getHistoryDir(),
+            config.getSessionId() + '.json',
+          ),
           cwd: config.getWorkingDir(),
           hook_event_name: HookEventName.SessionStart,
           timestamp: new Date().toISOString(),
@@ -610,7 +613,10 @@ export async function main() {
           const hookConfigs = hooks.map((h) => h.config);
           const input: SessionEndInput = {
             session_id: config.getSessionId(),
-            transcript_path: '',
+            transcript_path: join(
+              config.storage.getHistoryDir(),
+              config.getSessionId() + '.json',
+            ),
             cwd: config.getWorkingDir(),
             hook_event_name: HookEventName.SessionEnd,
             timestamp: new Date().toISOString(),
