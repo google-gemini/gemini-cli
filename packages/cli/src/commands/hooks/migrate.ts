@@ -117,19 +117,27 @@ export const migrateCommand: CommandModule = {
         const eventName = event as HookEventName;
         const existingDefinitions = newHooks[eventName] ?? [];
 
-        // Only add hooks that don't already exist (check by command)
+        // Only add hooks that don't already exist (check by command and matcher)
         const newDefinitions = definitions.filter((newDef) => {
-          // Check if this definition's hooks already exist
-          const newCommands = newDef.hooks
-            .filter((h) => h.type === HookType.Command)
-            .map((h) => h.command);
+          const newCommandSet = new Set(newDef.hooks.map((h) => h.command));
+          if (newCommandSet.size === 0) return false; // Don't filter out definitions with no command hooks
 
-          // Check if any existing definition has the same commands
           const alreadyExists = existingDefinitions.some((existingDef) => {
-            const existingCommands = existingDef.hooks
-              .filter((h) => h.type === HookType.Command)
-              .map((h) => h.command);
-            return newCommands.some((cmd) => existingCommands.includes(cmd));
+            // Only consider definitions with the same matcher as potential duplicates.
+            if (newDef.matcher !== existingDef.matcher) {
+              return false;
+            }
+            const existingCommandSet = new Set(
+              existingDef.hooks.map((h) => h.command),
+            );
+            // Consider it a duplicate if the existing set of commands is a superset
+            // of the new set of commands.
+            if (existingCommandSet.size < newCommandSet.size) {
+              return false;
+            }
+            return [...newCommandSet].every((cmd) =>
+              existingCommandSet.has(cmd),
+            );
           });
 
           return !alreadyExists;
