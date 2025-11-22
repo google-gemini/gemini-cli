@@ -156,6 +156,13 @@ function determineGHWorkflowName(): string | undefined {
 }
 
 /**
+ * Determines the GitHub repository name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHRepositoryName(): string | undefined {
+  return process.env['GITHUB_REPOSITORY'];
+}
+
+/**
  * Clearcut URL to send logging events to.
  */
 const CLEARCUT_URL = 'https://play.googleapis.com/log?format=json&hasfast=true';
@@ -295,6 +302,7 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
+    const ghRepositoryName = determineGHRepositoryName();
 
     const baseMetadata: EventValue[] = [
       ...data,
@@ -320,6 +328,13 @@ export class ClearcutLogger {
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
         value: ghWorkflowName,
+      });
+    }
+
+    if (ghRepositoryName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+        value: ghRepositoryName,
       });
     }
 

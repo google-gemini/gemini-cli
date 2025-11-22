@@ -427,6 +427,32 @@ describe('ClearcutLogger', () => {
     });
   });
 
+  describe('GITHUB_REPOSITORY metadata', () => {
+    it('includes repository when GITHUB_REPOSITORY is set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+        value: 'google/gemini-cli',
+      });
+    });
+
+    it('does not include repository when GITHUB_REPOSITORY is not set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GITHUB_REPOSITORY', undefined);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasRepository = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+      );
+      expect(hasRepository).toBe(false);
+    });
+  });
+
   describe('logChatCompressionEvent', () => {
     it('logs an event with proper fields', () => {
       const { logger } = setup();
