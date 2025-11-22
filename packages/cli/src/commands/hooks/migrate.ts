@@ -113,8 +113,12 @@ export const migrateCommand: CommandModule = {
       // Merge hooks
       // Use a deep copy or a new object to ensure we don't mutate the loaded settings directly
       // (although for initial read it doesn't matter much, but for setValues it's cleaner)
-      const existingHooks = userSettings.settings.hooks || {};
-      const newHooks = { ...existingHooks, ...geminiHooks };
+      const newHooks = { ...(userSettings.settings.hooks || {}) };
+      for (const [event, definitions] of Object.entries(geminiHooks)) {
+        const eventName = event as HookEventName;
+        const existingDefinitions = newHooks[eventName] ?? [];
+        newHooks[eventName] = [...existingDefinitions, ...definitions];
+      }
 
       // Enable hooks in tools settings
       const existingTools = userSettings.settings.tools || {};

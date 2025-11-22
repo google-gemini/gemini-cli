@@ -865,7 +865,10 @@ export class CoreToolScheduler {
               const hookConfigs = matchingHooks.map((h) => h.config);
               const input: BeforeToolInput = {
                 session_id: this.config.getSessionId(),
-                transcript_path: '', // TODO: Add transcript path
+                transcript_path: path.join(
+                  this.config.storage.getHistoryDir(),
+                  `${this.config.getSessionId()}.json`,
+                ),
                 cwd: this.config.getWorkingDir(),
                 hook_event_name: HookEventName.BeforeTool,
                 timestamp: new Date().toISOString(),
@@ -1318,7 +1321,10 @@ export class CoreToolScheduler {
 
                     const input: AfterToolInput = {
                       session_id: this.config.getSessionId(),
-                      transcript_path: '',
+                      transcript_path: path.join(
+                        this.config.storage.getHistoryDir(),
+                        `${this.config.getSessionId()}.json`,
+                      ),
                       cwd: this.config.getWorkingDir(),
                       hook_event_name: HookEventName.AfterTool,
                       timestamp: new Date().toISOString(),

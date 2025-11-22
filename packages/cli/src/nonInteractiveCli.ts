@@ -35,6 +35,7 @@ import type { LoadedSettings } from './config/settings.js';
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
+import * as path from 'node:path';
 
 import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
@@ -209,7 +210,10 @@ export async function runNonInteractive({
           const inputData: BeforeAgentInput = {
             session_id: config.getSessionId(),
 
-            transcript_path: '',
+            transcript_path: path.join(
+              config.storage.getHistoryDir(),
+              `${config.getSessionId()}.json`,
+            ),
 
             cwd: config.getWorkingDir(),
 
@@ -508,7 +512,10 @@ export async function runNonInteractive({
               const hookConfigs = hooks.map((h) => h.config);
               const inputData: AfterAgentInput = {
                 session_id: config.getSessionId(),
-                transcript_path: '',
+                transcript_path: path.join(
+                  config.storage.getHistoryDir(),
+                  `${config.getSessionId()}.json`,
+                ),
                 cwd: config.getWorkingDir(),
                 hook_event_name: HookEventName.AfterAgent,
                 timestamp: new Date().toISOString(),
