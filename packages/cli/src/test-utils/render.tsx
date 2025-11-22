@@ -127,7 +127,6 @@ export const renderWithProviders = (
     mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
     useAlternateBuffer = true,
-    uiActions,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
