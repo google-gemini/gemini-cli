@@ -16,8 +16,7 @@ import type {
   ThoughtSummary,
   ToolCallRequestInfo,
   GeminiErrorEventValue,
-} from '@google/gemini-cli-core';
-import {
+
   GeminiEventType as ServerGeminiEventType,
   getErrorMessage,
   isNodeError,
@@ -37,7 +36,11 @@ import {
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
-} from '@google/gemini-cli-core';
+  HookEventName,
+  HookRunner,
+  type BeforeAgentInput,
+  type AfterAgentInput,
+  type BeforeAgentOutput} from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
   HistoryItem,
@@ -123,6 +126,8 @@ export const useGeminiStream = (
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
+  const hookRunner = useMemo(() => new HookRunner(), []);
+
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
@@ -913,8 +918,68 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
+            let finalQuery = query;
+
+            // Hook: BeforeAgent
+            const registry = config.getHookRegistry();
+            if (registry) {
+              const hooks = registry.getHooksForEvent(
+                HookEventName.BeforeAgent,
+              );
+              if (hooks.length > 0) {
+                const promptText =
+                  typeof query === 'string' ? query : 'Complex input';
+                const hookConfigs = hooks.map((h) => h.config);
+                const input: BeforeAgentInput = {
+                  session_id: config.getSessionId(),
+                  transcript_path: '',
+                  cwd: config.getWorkingDir(),
+                  hook_event_name: HookEventName.BeforeAgent,
+                  timestamp: new Date().toISOString(),
+                  prompt: promptText,
+                };
+
+                const results = await hookRunner.executeHooksSequential(
+                  hookConfigs,
+                  HookEventName.BeforeAgent,
+                  input,
+                );
+
+                for (const result of results) {
+                  if (
+                    result.output?.decision === 'deny' ||
+                    result.output?.decision === 'block'
+                  ) {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: `Request blocked by hook: ${result.output.reason}`,
+                      },
+                      Date.now(),
+                    );
+                    return;
+                  }
+
+                  const hookOutput = result.output as BeforeAgentOutput;
+                  let additionalContext: string | undefined;
+                  if (
+                    hookOutput &&
+                    hookOutput.hookSpecificOutput &&
+                    'additionalContext' in hookOutput.hookSpecificOutput
+                  ) {
+                    additionalContext = hookOutput.hookSpecificOutput
+                      .additionalContext as string;
+                  }
+
+                  if (additionalContext && typeof finalQuery === 'string') {
+                    finalQuery += '\n\n' + additionalContext;
+                  }
+                }
+              }
+            }
+
             const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
+              finalQuery,
               userMessageTimestamp,
               abortSignal,
               prompt_id!,
@@ -1033,6 +1098,40 @@ export const useGeminiStream = (
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
               }
+
+              // Hook: AfterAgent
+              const registry = config.getHookRegistry();
+              if (registry) {
+                const hooks = registry.getHooksForEvent(
+                  HookEventName.AfterAgent,
+                );
+                if (hooks.length > 0) {
+                  const hookConfigs = hooks.map((h) => h.config);
+                  const promptText =
+                    typeof query === 'string' ? query : 'Complex input';
+                  // Approximation of response... tricky with streaming.
+                  // For now, sending empty response or last history item text if available.
+
+                  const input: AfterAgentInput = {
+                    session_id: config.getSessionId(),
+                    transcript_path: '',
+                    cwd: config.getWorkingDir(),
+                    hook_event_name: HookEventName.AfterAgent,
+                    timestamp: new Date().toISOString(),
+                    prompt: promptText,
+                    prompt_response: 'Response stream finished', // TODO: Capture full response
+                    stop_hook_active: false,
+                  };
+
+                  // Run async without awaiting to avoid blocking UI?
+                  // Or await? Claude waits.
+                  await hookRunner.executeHooksSequential(
+                    hookConfigs,
+                    HookEventName.AfterAgent,
+                    input,
+                  );
+                }
+              }
             }
           });
         },
@@ -1051,6 +1150,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      hookRunner,
     ],
   );
 

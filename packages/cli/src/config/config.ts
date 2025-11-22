@@ -10,6 +10,7 @@ import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
+import { hooksCommand } from '../commands/hooks/index.js';
 import {
   Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -279,6 +280,8 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
   }
+
+  yargsInstance.command(hooksCommand);
 
   yargsInstance
     .version(await getCliVersion()) // This will enable the --version flag based on package.json

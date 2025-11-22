@@ -10,10 +10,7 @@ import type {
   ResumedSessionData,
   CompletedToolCall,
   UserFeedbackPayload,
-} from '@google/gemini-cli-core';
-import { isSlashCommand } from './ui/utils/commandUtils.js';
-import type { LoadedSettings } from './config/settings.js';
-import {
+
   executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
@@ -28,7 +25,13 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
-} from '@google/gemini-cli-core';
+  HookRunner,
+  HookEventName,
+  type BeforeAgentInput,
+  type BeforeAgentOutput,
+  type AfterAgentInput} from '@google/gemini-cli-core';
+import { isSlashCommand } from './ui/utils/commandUtils.js';
+import type { LoadedSettings } from './config/settings.js';
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
@@ -71,6 +74,7 @@ export async function runNonInteractive({
       },
     });
     const textOutput = new TextOutput();
+    const hookRunner = new HookRunner();
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -189,6 +193,53 @@ export async function runNonInteractive({
           process.exit(0);
         }
       });
+
+      // Hook: BeforeAgent
+      let finalInput = input;
+      const registry = config.getHookRegistry();
+      if (registry) {
+        const hooks = registry.getHooksForEvent(HookEventName.BeforeAgent);
+        if (hooks.length > 0) {
+          const hookConfigs = hooks.map((h) => h.config);
+          const inputData: BeforeAgentInput = {
+            session_id: config.getSessionId(),
+            transcript_path: '',
+            cwd: config.getWorkingDir(),
+            hook_event_name: HookEventName.BeforeAgent,
+            timestamp: new Date().toISOString(),
+            prompt: input,
+          };
+
+          const results = await hookRunner.executeHooksSequential(
+            hookConfigs,
+            HookEventName.BeforeAgent,
+            inputData,
+          );
+
+          for (const result of results) {
+            if (
+              result.output?.decision === 'deny' ||
+              result.output?.decision === 'block'
+            ) {
+              console.error(`Request blocked by hook: ${result.output.reason}`);
+              process.exit(1); // Or throw FatalInputError
+            }
+            const hookOutput = result.output as BeforeAgentOutput;
+            let additionalContext: string | undefined;
+            if (
+              hookOutput.hookSpecificOutput &&
+              'additionalContext' in hookOutput.hookSpecificOutput
+            ) {
+              additionalContext = hookOutput.hookSpecificOutput
+                .additionalContext as string;
+            }
+
+            if (additionalContext) {
+              finalInput += '\n\n' + additionalContext;
+            }
+          }
+        }
+      }
 
       const geminiClient = config.getGeminiClient();
 
@@ -432,6 +483,30 @@ export async function runNonInteractive({
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
           }
+
+          // Hook: AfterAgent
+          if (registry) {
+            const hooks = registry.getHooksForEvent(HookEventName.AfterAgent);
+            if (hooks.length > 0) {
+              const hookConfigs = hooks.map((h) => h.config);
+              const inputData: AfterAgentInput = {
+                session_id: config.getSessionId(),
+                transcript_path: '',
+                cwd: config.getWorkingDir(),
+                hook_event_name: HookEventName.AfterAgent,
+                timestamp: new Date().toISOString(),
+                prompt: finalInput,
+                prompt_response: responseText,
+                stop_hook_active: false,
+              };
+              await hookRunner.executeHooksSequential(
+                hookConfigs,
+                HookEventName.AfterAgent,
+                inputData,
+              );
+            }
+          }
+
           return;
         }
       }

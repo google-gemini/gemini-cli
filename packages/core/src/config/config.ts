@@ -33,6 +33,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
+import { HookRegistry } from '../hooks/hookRegistry.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
@@ -421,6 +422,7 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  readonly hookRegistry: HookRegistry;
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -567,6 +569,7 @@ export class Config {
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
+    this.hookRegistry = new HookRegistry(this);
     this.experiments = params.experiments;
 
     if (params.contextFileName) {
@@ -640,6 +643,7 @@ export class Config {
     await Promise.all([
       await this.mcpClientManager.startConfiguredMcpServers(),
       await this.getExtensionLoader().start(this),
+      await this.hookRegistry.initialize(),
     ]);
 
     // Initialize hook system if enabled
@@ -929,6 +933,10 @@ export class Config {
    */
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getHookRegistry(): HookRegistry {
+    return this.hookRegistry;
   }
 
   getMcpClientManager(): McpClientManager | undefined {

@@ -57,6 +57,12 @@ import {
   disableLineWrapping,
   shouldEnterAlternateScreen,
   ExitCodes,
+  HookEventName,
+  type SessionStartInput,
+  type SessionEndInput,
+  SessionStartSource,
+  SessionEndReason,
+  HookRunner,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -570,6 +576,54 @@ export async function main() {
     }
 
     await config.initialize();
+
+    // Hook: SessionStart
+    const hookRegistry = config.getHookRegistry();
+    const hookRunner = new HookRunner();
+    if (hookRegistry) {
+      const hooks = hookRegistry.getHooksForEvent(HookEventName.SessionStart);
+      if (hooks.length > 0) {
+        const hookConfigs = hooks.map((h) => h.config);
+        const input: SessionStartInput = {
+          session_id: config.getSessionId(),
+          transcript_path: '',
+          cwd: config.getWorkingDir(),
+          hook_event_name: HookEventName.SessionStart,
+          timestamp: new Date().toISOString(),
+          source: argv.resume
+            ? SessionStartSource.Resume
+            : SessionStartSource.Startup,
+        };
+        await hookRunner.executeHooksSequential(
+          hookConfigs,
+          HookEventName.SessionStart,
+          input,
+        );
+      }
+    }
+
+    // Register SessionEnd hook
+    registerCleanup(async () => {
+      if (hookRegistry) {
+        const hooks = hookRegistry.getHooksForEvent(HookEventName.SessionEnd);
+        if (hooks.length > 0) {
+          const hookConfigs = hooks.map((h) => h.config);
+          const input: SessionEndInput = {
+            session_id: config.getSessionId(),
+            transcript_path: '',
+            cwd: config.getWorkingDir(),
+            hook_event_name: HookEventName.SessionEnd,
+            timestamp: new Date().toISOString(),
+            reason: SessionEndReason.Exit, // Simplified for now
+          };
+          await hookRunner.executeHooksSequential(
+            hookConfigs,
+            HookEventName.SessionEnd,
+            input,
+          );
+        }
+      }
+    });
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
