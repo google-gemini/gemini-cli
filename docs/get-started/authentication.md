@@ -214,8 +214,7 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
     ```bash
     gemini 
     ```
-
-5. Select **Use Vertex API key**.
+5. Select **Vertex AI**.
 
 ## Set your Google Cloud project <a id="set-gcp"></a>
 
