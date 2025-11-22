@@ -321,6 +321,9 @@ export class TestRig {
           selectedType: 'gemini-api-key',
         },
       },
+      ui: {
+        useAlternateBuffer: true,
+      },
       model: DEFAULT_GEMINI_MODEL,
       sandbox:
         env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
