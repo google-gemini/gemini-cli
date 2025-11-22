@@ -205,7 +205,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const searchDirDisplay = pathParam;
 
       const totalMaxMatches =
-        this.config.getRipgrepMaxMatches?.() ?? DEFAULT_RIPGREP_MAX_MATCHES;
+        this.config.getRipgrepMaxMatches() ?? DEFAULT_RIPGREP_MAX_MATCHES;
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
