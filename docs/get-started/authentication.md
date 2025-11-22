@@ -151,8 +151,7 @@ Consider this authentication method if you have Google Cloud CLI installed.
     ```bash
     gemini 
     ```
-
-5. Select **Use Vertex API key**.
+5. Select **Vertex AI**.
 
 #### B. Vertex AI - Service Account JSON key
 
