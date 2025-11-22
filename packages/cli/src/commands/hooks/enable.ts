@@ -12,7 +12,7 @@ export const enableCommand: CommandModule = {
   command: 'enable <command>',
   describe: 'Enable a hook by command name',
   handler: async (argv) => {
-    const commandToEnable = argv.command as string;
+    const commandToEnable = argv['command'] as string;
     console.log(`Enabling hook: ${commandToEnable}`);
 
     const settings = loadSettings();
@@ -23,8 +23,11 @@ export const enableCommand: CommandModule = {
       return;
     }
 
+    // Deep copy to avoid mutation of the original settings object
+    const newHooks = JSON.parse(JSON.stringify(userSettings.hooks));
+
     let found = false;
-    for (const definitions of Object.values(userSettings.hooks)) {
+    for (const definitions of Object.values(newHooks)) {
       if (Array.isArray(definitions)) {
         for (const def of definitions as HookDefinition[]) {
           for (const hook of def.hooks) {
@@ -38,7 +41,7 @@ export const enableCommand: CommandModule = {
     }
 
     if (found) {
-      settings.setValue(SettingScope.User, 'hooks', userSettings.hooks);
+      settings.setValue(SettingScope.User, 'hooks', newHooks);
       console.log(`Hook "${commandToEnable}" enabled.`);
     } else {
       console.log(`Hook "${commandToEnable}" not found in user settings.`);

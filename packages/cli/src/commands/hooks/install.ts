@@ -14,7 +14,7 @@ export const installCommand: CommandModule = {
   command: 'install <source>',
   describe: 'Install a hook plugin (as an extension)',
   handler: async (argv) => {
-    const source = argv.source as string;
+    const source = argv['source'] as string;
     console.log(`Installing hook plugin from: ${source}`);
 
     const settings = loadSettings();

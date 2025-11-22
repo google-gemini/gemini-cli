@@ -13,7 +13,7 @@ export const uninstallCommand: CommandModule = {
   command: 'uninstall <name>',
   describe: 'Uninstall a hook plugin',
   handler: async (argv) => {
-    const name = argv.name as string;
+    const name = argv['name'] as string;
     console.log(`Uninstalling hook plugin: ${name}`);
 
     const settings = loadSettings();

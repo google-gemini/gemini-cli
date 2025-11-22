@@ -15,7 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { CommandModule } from 'yargs';
 import stripJsonComments from 'strip-json-comments';
-import { saveSettings, loadSettings } from '../../config/settings.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 
 const CLAUDE_SETTINGS_PATH = path.join(homedir(), '.claude', 'settings.json');
 
@@ -111,22 +111,18 @@ export const migrateCommand: CommandModule = {
       const userSettings = loadedSettings.user;
 
       // Merge hooks
-      if (!userSettings.settings.hooks) {
-        userSettings.settings.hooks = {};
-      }
+      // Use a deep copy or a new object to ensure we don't mutate the loaded settings directly
+      // (although for initial read it doesn't matter much, but for setValues it's cleaner)
+      const existingHooks = userSettings.settings.hooks || {};
+      const newHooks = { ...existingHooks, ...geminiHooks };
 
-      // We append/overwrite based on event
-      Object.assign(userSettings.settings.hooks, geminiHooks);
+      // Enable hooks in tools settings
+      const existingTools = userSettings.settings.tools || {};
+      const newTools = { ...existingTools, enableHooks: true };
 
-      // Save settings
-      userSettings.settings.tools = userSettings.settings.tools || {};
-      userSettings.settings.tools.enableHooks = true;
-
-      // Update originalSettings as well to ensure save works correctly
-      userSettings.originalSettings.hooks = userSettings.settings.hooks;
-      userSettings.originalSettings.tools = userSettings.settings.tools;
-
-      saveSettings(userSettings);
+      // Save settings using the robust setValue API which handles originalSettings update and saving
+      loadedSettings.setValue(SettingScope.User, 'hooks', newHooks);
+      loadedSettings.setValue(SettingScope.User, 'tools', newTools);
 
       console.log('Successfully migrated hooks to ~/.gemini/settings.json');
       console.log(`Enabled ${Object.keys(geminiHooks).length} hook events.`);

@@ -587,11 +587,23 @@ export class GeminiClient {
                   // We cast conservatively or map if needed.
                   // Hook format: Array<{ type: string; [key: string]: unknown }>
                   // We assume they are valid Parts if type is text/image/etc.
-                  finalRequest = lastMessage.content.map((p) => {
-                    if (p['type'] === 'text' && typeof p['text'] === 'string') {
-                      return { text: p['text'] };
+                  finalRequest = lastMessage.content.flatMap((p) => {
+                    if (
+                      p &&
+                      typeof p === 'object' &&
+                      ('text' in p ||
+                        'inlineData' in p ||
+                        'functionCall' in p ||
+                        'functionResponse' in p ||
+                        'fileData' in p)
+                    ) {
+                      return [p as import('@google/genai').Part];
                     }
-                    return p as unknown as import('@google/genai').Part;
+                    debugLogger.warn(
+                      'Received an invalid part from a BeforeModel hook, it will be ignored:',
+                      p,
+                    );
+                    return [];
                   });
                 }
               }
