@@ -33,23 +33,10 @@ defaults:
     shell: 'bash'
 
 jobs:
-  merge_queue_skipper:
-    permissions: 'read-all'
-    name: 'Merge Queue Skipper'
-    runs-on: 'ubuntu-latest'
-    outputs:
-      skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
-    steps:
-      - id: 'merge-queue-ci-skipper'
-        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
-        with:
-          secret: '${{ secrets.GITHUB_TOKEN }}'
-
   lint:
     name: 'Lint'
     runs-on: 'ubuntu-latest'
-    needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    needs: []
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -110,13 +97,8 @@ jobs:
         with:
           args: '--verbose --accept 200,503 ./**/*.md'
           fail: true
-  test_linux:
-    name: 'Test (Linux)'
-    runs-on: 'ubuntu-latest'
     needs:
       - 'lint'
-      - 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -180,8 +162,6 @@ jobs:
     runs-on: '${{ matrix.os }}'
     needs:
       - 'lint'
-      - 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -253,9 +233,7 @@ jobs:
 
   codeql:
     name: 'CodeQL'
-    runs-on: 'ubuntu-latest'
-    needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    needs: []
     permissions:
       actions: 'read'
       contents: 'read'
@@ -277,8 +255,7 @@ jobs:
   # Check for changes in bundle size.
   bundle_size:
     name: 'Check Bundle Size'
-    needs: 'merge_queue_skipper'
-    if: "${{github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    if: "${{github.event_name == 'pull_request'}}"
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'read' # For checkout
@@ -302,8 +279,7 @@ jobs:
   test_windows:
     name: 'Slow Test - Win'
     runs-on: 'windows-latest'
-    needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    needs: []
     continue-on-error: true
 
     steps:
