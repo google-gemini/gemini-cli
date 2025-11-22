@@ -6,7 +6,6 @@
 
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-import type { HookDefinition } from '@google/gemini-cli-core';
 
 export const disableCommand: CommandModule = {
   command: 'disable <command>',
@@ -17,39 +16,23 @@ export const disableCommand: CommandModule = {
       console.log(`Disabling hook: ${commandToDisable}`);
 
       const settings = loadSettings();
-      const userSettings = settings.user.settings;
 
-      if (!userSettings.hooks) {
-        console.log('No hooks configured in user settings.');
+      // Get current disabled hooks list
+      const currentDisabledHooks = settings.merged.disabledHooks || [];
+
+      // Add to disabled list if not already there
+      if (currentDisabledHooks.includes(commandToDisable)) {
+        console.log(`Hook "${commandToDisable}" is already disabled.`);
         return;
       }
 
-      // Deep copy to avoid mutation of the original settings object
-      const newHooks = JSON.parse(JSON.stringify(userSettings.hooks));
+      const newDisabledHooks = [...currentDisabledHooks, commandToDisable];
 
-      let found = false;
-      for (const definitions of Object.values(newHooks)) {
-        if (Array.isArray(definitions)) {
-          for (const def of definitions as HookDefinition[]) {
-            for (const hook of def.hooks) {
-              if (
-                hook.type === 'command' &&
-                hook.command === commandToDisable
-              ) {
-                hook.enabled = false;
-                found = true;
-              }
-            }
-          }
-        }
-      }
-
-      if (found) {
-        settings.setValue(SettingScope.User, 'hooks', newHooks);
-        console.log(`Hook "${commandToDisable}" disabled.`);
-      } else {
-        console.log(`Hook "${commandToDisable}" not found in user settings.`);
-      }
+      // Persist to user settings
+      settings.setValue(SettingScope.User, 'disabledHooks', newDisabledHooks);
+      console.log(
+        `Hook "${commandToDisable}" disabled. This will persist across sessions for all hook sources.`,
+      );
     } catch (error) {
       console.error('Failed to disable hook:', error);
       throw error;

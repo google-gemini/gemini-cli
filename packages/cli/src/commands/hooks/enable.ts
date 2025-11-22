@@ -6,7 +6,6 @@
 
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-import type { HookDefinition } from '@google/gemini-cli-core';
 
 export const enableCommand: CommandModule = {
   command: 'enable <command>',
@@ -17,36 +16,25 @@ export const enableCommand: CommandModule = {
       console.log(`Enabling hook: ${commandToEnable}`);
 
       const settings = loadSettings();
-      const userSettings = settings.user.settings;
 
-      if (!userSettings.hooks) {
-        console.log('No hooks configured in user settings.');
+      // Get current disabled hooks list
+      const currentDisabledHooks = settings.merged.disabledHooks || [];
+
+      // Remove from disabled list if present
+      if (!currentDisabledHooks.includes(commandToEnable)) {
+        console.log(`Hook "${commandToEnable}" is already enabled.`);
         return;
       }
 
-      // Deep copy to avoid mutation of the original settings object
-      const newHooks = JSON.parse(JSON.stringify(userSettings.hooks));
+      const newDisabledHooks = currentDisabledHooks.filter(
+        (cmd) => cmd !== commandToEnable,
+      );
 
-      let found = false;
-      for (const definitions of Object.values(newHooks)) {
-        if (Array.isArray(definitions)) {
-          for (const def of definitions as HookDefinition[]) {
-            for (const hook of def.hooks) {
-              if (hook.type === 'command' && hook.command === commandToEnable) {
-                hook.enabled = true;
-                found = true;
-              }
-            }
-          }
-        }
-      }
-
-      if (found) {
-        settings.setValue(SettingScope.User, 'hooks', newHooks);
-        console.log(`Hook "${commandToEnable}" enabled.`);
-      } else {
-        console.log(`Hook "${commandToEnable}" not found in user settings.`);
-      }
+      // Persist to user settings
+      settings.setValue(SettingScope.User, 'disabledHooks', newDisabledHooks);
+      console.log(
+        `Hook "${commandToEnable}" enabled. This will persist across sessions for all hook sources.`,
+      );
     } catch (error) {
       console.error('Failed to enable hook:', error);
       throw error;

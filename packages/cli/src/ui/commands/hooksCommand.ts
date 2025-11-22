@@ -8,7 +8,6 @@ import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
-import type { HookDefinition } from '@google/gemini-cli-core';
 
 export const hooksCommand: SlashCommand = {
   name: 'hooks',
@@ -68,37 +67,34 @@ export const hooksCommand: SlashCommand = {
           return;
         }
         const enabled = subCommand === 'enable';
+
+        // Update in-memory state immediately for this session
         registry.setHookEnabled(target, enabled);
 
-        // Persist the change to settings
+        // Persist the change to disabled hooks list
         const settings = context.services.settings;
-        const userHooks = settings.user.settings.hooks;
+        const currentDisabledHooks = settings.merged.disabledHooks || [];
 
-        if (userHooks) {
-          // Deep copy to avoid mutation
-          const newHooks = JSON.parse(JSON.stringify(userHooks));
-
-          // Update enabled state in the copied hooks
-          for (const definitions of Object.values(newHooks)) {
-            if (Array.isArray(definitions)) {
-              for (const def of definitions as HookDefinition[]) {
-                for (const hook of def.hooks) {
-                  if (hook.type === 'command' && hook.command === target) {
-                    hook.enabled = enabled;
-                  }
-                }
-              }
-            }
-          }
-
-          // Persist to disk
-          settings.setValue(SettingScope.User, 'hooks', newHooks);
+        let newDisabledHooks: string[];
+        if (enabled) {
+          // Remove from disabled list
+          newDisabledHooks = currentDisabledHooks.filter(
+            (cmd) => cmd !== target,
+          );
+        } else {
+          // Add to disabled list if not already there
+          newDisabledHooks = currentDisabledHooks.includes(target)
+            ? currentDisabledHooks
+            : [...currentDisabledHooks, target];
         }
+
+        // Persist to disk
+        settings.setValue(SettingScope.User, 'disabledHooks', newDisabledHooks);
 
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: `Hook "${target}" ${enabled ? 'enabled' : 'disabled'}.`,
+            text: `Hook "${target}" ${enabled ? 'enabled' : 'disabled'}. This will persist across sessions for all hook sources.`,
           },
           Date.now(),
         );

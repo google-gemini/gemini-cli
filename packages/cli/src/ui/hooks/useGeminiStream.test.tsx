@@ -224,6 +224,8 @@ describe('useGeminiStream', () => {
       getUseSmartEdit: () => false,
       isInteractive: () => false,
       getExperiments: () => {},
+      getHookRegistry: vi.fn(() => null),
+      getDisabledHooks: vi.fn(() => []),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);

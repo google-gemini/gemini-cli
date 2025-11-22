@@ -112,7 +112,9 @@ export const migrateCommand: CommandModule = {
 
       // Merge hooks using upsert mechanism (truly idempotent)
       // Use a deep copy to ensure we don't mutate the loaded settings directly
-      const newHooks = { ...(userSettings.settings.hooks || {}) };
+      const newHooks = JSON.parse(
+        JSON.stringify(userSettings.settings.hooks || {}),
+      );
       for (const [event, definitions] of Object.entries(geminiHooks)) {
         const eventName = event as HookEventName;
         if (!newHooks[eventName]) {
@@ -125,7 +127,7 @@ export const migrateCommand: CommandModule = {
           if (newCommandSet.size === 0) continue;
 
           const existingDefIndex = existingEventDefinitions.findIndex(
-            (d) => d.matcher === newDef.matcher,
+            (d: HookDefinition) => d.matcher === newDef.matcher,
           );
 
           if (existingDefIndex !== -1) {

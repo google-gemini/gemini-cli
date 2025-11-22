@@ -84,6 +84,8 @@ const mockConfig = {
   isInteractive: () => false,
   getExperiments: () => {},
   getEnableHooks: () => false,
+  getHookRegistry: vi.fn(() => null),
+  getDisabledHooks: vi.fn(() => []),
 } as unknown as Config;
 mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
 mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));

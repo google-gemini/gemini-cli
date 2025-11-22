@@ -131,6 +131,8 @@ vi.mock('./config/config.js', () => ({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
+    getHookRegistry: vi.fn(() => null),
+    getDisabledHooks: vi.fn(() => []),
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
   isDebugMode: vi.fn(() => false),
@@ -269,6 +271,8 @@ describe('gemini.tsx main function', () => {
         getOutputFormat: () => 'text',
         getExtensions: () => [],
         getUsageStatisticsEnabled: () => false,
+        getHookRegistry: vi.fn(() => null),
+        getDisabledHooks: vi.fn(() => []),
       } as unknown as Config;
     });
     vi.mocked(loadSettings).mockReturnValue({
@@ -501,6 +505,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       getOutputFormat: () => 'text',
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
+      getHookRegistry: vi.fn(() => null),
+      getDisabledHooks: vi.fn(() => []),
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       errors: [],
@@ -1266,6 +1272,8 @@ describe('startInteractiveUI', () => {
     getProjectRoot: () => '/root',
     getScreenReader: () => false,
     getDebugMode: () => false,
+    getHookRegistry: vi.fn(() => null),
+    getDisabledHooks: vi.fn(() => []),
   } as unknown as Config;
   const mockSettings = {
     merged: {

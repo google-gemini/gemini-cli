@@ -309,6 +309,7 @@ export interface ConfigParameters {
   hooks?: {
     [K in HookEventName]?: HookDefinition[];
   };
+  disabledHooks?: string[];
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
 }
@@ -422,6 +423,7 @@ export class Config {
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
+  private readonly disabledHooks: string[];
   readonly hookRegistry: HookRegistry;
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
@@ -569,6 +571,7 @@ export class Config {
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
+    this.disabledHooks = params.disabledHooks ?? [];
     this.hookRegistry = new HookRegistry(this);
     this.experiments = params.experiments;
 
@@ -1528,6 +1531,13 @@ export class Config {
    */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
+  }
+
+  /**
+   * Get list of disabled hook command names
+   */
+  getDisabledHooks(): string[] {
+    return this.disabledHooks;
   }
 
   /**

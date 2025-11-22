@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as path from 'node:path';
 import type {
   GenerateContentConfig,
   PartListUnion,
@@ -53,13 +52,6 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import { HookRunner } from '../hooks/hookRunner.js';
-import {
-  HookEventName,
-  type BeforeModelInput,
-  type BeforeModelOutput,
-} from '../hooks/types.js';
-import { defaultHookTranslator } from '../hooks/hookTranslator.js';
 
 const MAX_TURNS = 100;
 
@@ -73,7 +65,6 @@ export class GeminiClient {
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
-  private hookRunner = new HookRunner();
 
   /**
    * At any point in this conversation, was compression triggered without
@@ -510,114 +501,10 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
 
-    // Hook: BeforeModel
-    const registry = this.config.getHookRegistry();
-    let finalRequest = request;
-    if (registry) {
-      const hooks = registry.getHooksForEvent(HookEventName.BeforeModel);
-      if (hooks.length > 0) {
-        const hookConfigs = hooks.map((h) => h.config);
-        const input: BeforeModelInput = {
-          session_id: this.config.getSessionId(),
-          transcript_path: path.join(
-            this.config.storage.getHistoryDir(),
-            this.config.getSessionId() + '.json',
-          ),
-          cwd: this.config.getWorkingDir(),
-          hook_event_name: HookEventName.BeforeModel,
-          timestamp: new Date().toISOString(),
-          llm_request: defaultHookTranslator.toHookLLMRequest({
-            model: modelToUse,
-            config: {},
-            contents: [
-              {
-                role: 'user',
-                parts: Array.isArray(request)
-                  ? request.map((p) =>
-                      typeof p === 'string' ? { text: p } : p,
-                    )
-                  : [typeof request === 'string' ? { text: request } : request],
-              },
-            ],
-          }),
-        };
+    // Note: BeforeModel hook execution has been moved to GeminiChat.sendMessageStream
+    // to provide access to full conversation history instead of just the latest message
 
-        const results = await this.hookRunner.executeHooksSequential(
-          hookConfigs,
-          HookEventName.BeforeModel,
-          input,
-        );
-
-        // Check for blocking or modification
-        for (const result of results) {
-          if (
-            result.output?.decision === 'deny' ||
-            result.output?.decision === 'block'
-          ) {
-            debugLogger.log(
-              `Request blocked by BeforeModel hook: ${result.output.reason}`,
-            );
-            return turn; // Or yield an error/stop event
-          }
-
-          const hookOutput = result.output as BeforeModelOutput;
-          if (
-            hookOutput &&
-            hookOutput.hookSpecificOutput &&
-            'llm_request' in hookOutput.hookSpecificOutput
-          ) {
-            // Apply modifications
-            const modifiedHookRequest =
-              hookOutput.hookSpecificOutput.llm_request;
-            if (
-              modifiedHookRequest &&
-              modifiedHookRequest.messages &&
-              modifiedHookRequest.messages.length > 0
-            ) {
-              // We only support modifying the user message content for this specific stream method
-              const lastMessage =
-                modifiedHookRequest.messages[
-                  modifiedHookRequest.messages.length - 1
-                ];
-              if (lastMessage.content) {
-                if (typeof lastMessage.content === 'string') {
-                  finalRequest = [{ text: lastMessage.content }];
-                } else if (Array.isArray(lastMessage.content)) {
-                  // Ensure content is in Part format. Hook format might be generic objects.
-                  // We cast conservatively or map if needed.
-                  // Hook format: Array<{ type: string; [key: string]: unknown }>
-                  // We assume they are valid Parts if type is text/image/etc.
-                  finalRequest = lastMessage.content.flatMap((p) => {
-                    if (
-                      p &&
-                      typeof p === 'object' &&
-                      ('text' in p ||
-                        'inlineData' in p ||
-                        'functionCall' in p ||
-                        'functionResponse' in p ||
-                        'fileData' in p)
-                    ) {
-                      return [p as import('@google/genai').Part];
-                    }
-                    debugLogger.warn(
-                      'Received an invalid part from a BeforeModel hook, it will be ignored:',
-                      p,
-                    );
-                    return [];
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    const resultStream = turn.run(
-      { model: modelToUse },
-      finalRequest,
-      linkedSignal,
-    );
+    const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };

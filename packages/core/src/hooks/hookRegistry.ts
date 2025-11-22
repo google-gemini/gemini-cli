@@ -202,13 +202,18 @@ export class HookRegistry {
         typeof hookConfig === 'object' &&
         this.validateHookConfig(hookConfig, eventName, source)
       ) {
+        // Check if this hook is in the disabled list
+        const disabledHooks = this.config.getDisabledHooks();
+        const isDisabled =
+          hookConfig.command && disabledHooks.includes(hookConfig.command);
+
         this.entries.push({
           config: hookConfig,
           source,
           eventName,
           matcher: definition.matcher,
           sequential: definition.sequential,
-          enabled: hookConfig.enabled !== false,
+          enabled: hookConfig.enabled !== false && !isDisabled,
         });
       } else {
         // Invalid hooks are logged and discarded here, they won't reach HookRunner
