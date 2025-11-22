@@ -110,14 +110,32 @@ export const migrateCommand: CommandModule = {
       const loadedSettings = loadSettings();
       const userSettings = loadedSettings.user;
 
-      // Merge hooks
+      // Merge hooks (idempotent - avoid duplicates)
       // Use a deep copy or a new object to ensure we don't mutate the loaded settings directly
-      // (although for initial read it doesn't matter much, but for setValues it's cleaner)
       const newHooks = { ...(userSettings.settings.hooks || {}) };
       for (const [event, definitions] of Object.entries(geminiHooks)) {
         const eventName = event as HookEventName;
         const existingDefinitions = newHooks[eventName] ?? [];
-        newHooks[eventName] = [...existingDefinitions, ...definitions];
+
+        // Only add hooks that don't already exist (check by command)
+        const newDefinitions = definitions.filter((newDef) => {
+          // Check if this definition's hooks already exist
+          const newCommands = newDef.hooks
+            .filter((h) => h.type === HookType.Command)
+            .map((h) => h.command);
+
+          // Check if any existing definition has the same commands
+          const alreadyExists = existingDefinitions.some((existingDef) => {
+            const existingCommands = existingDef.hooks
+              .filter((h) => h.type === HookType.Command)
+              .map((h) => h.command);
+            return newCommands.some((cmd) => existingCommands.includes(cmd));
+          });
+
+          return !alreadyExists;
+        });
+
+        newHooks[eventName] = [...existingDefinitions, ...newDefinitions];
       }
 
       // Enable hooks in tools settings
@@ -130,11 +148,9 @@ export const migrateCommand: CommandModule = {
 
       console.log('Successfully migrated hooks to ~/.gemini/settings.json');
       console.log(`Enabled ${Object.keys(geminiHooks).length} hook events.`);
-
-      process.exit(0);
     } catch (error) {
       console.error('Failed to migrate hooks:', error);
-      process.exit(1);
+      throw error;
     }
   },
 };

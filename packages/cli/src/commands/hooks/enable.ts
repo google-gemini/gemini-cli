@@ -46,6 +46,5 @@ export const enableCommand: CommandModule = {
     } else {
       console.log(`Hook "${commandToEnable}" not found in user settings.`);
     }
-    process.exit(0);
   },
 };

@@ -39,6 +39,5 @@ export const listCommand: CommandModule = {
       }
       console.log('');
     }
-    process.exit(0);
   },
 };

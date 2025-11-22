@@ -46,6 +46,5 @@ export const disableCommand: CommandModule = {
     } else {
       console.log(`Hook "${commandToDisable}" not found in user settings.`);
     }
-    process.exit(0);
   },
 };

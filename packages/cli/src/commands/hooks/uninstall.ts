@@ -31,8 +31,7 @@ export const uninstallCommand: CommandModule = {
       console.log(`Successfully uninstalled plugin: ${name}`);
     } catch (error) {
       console.error('Failed to uninstall plugin:', error);
-      process.exit(1);
+      throw error;
     }
-    process.exit(0);
   },
 };

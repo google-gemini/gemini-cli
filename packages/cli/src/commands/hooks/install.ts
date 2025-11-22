@@ -55,8 +55,7 @@ export const installCommand: CommandModule = {
       }
     } catch (error) {
       console.error('Failed to install plugin:', error);
-      process.exit(1);
+      throw error;
     }
-    process.exit(0);
   },
 };

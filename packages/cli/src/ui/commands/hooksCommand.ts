@@ -7,6 +7,8 @@
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
+import { SettingScope } from '../../config/settings.js';
+import type { HookDefinition } from '@google/gemini-cli-core';
 
 export const hooksCommand: SlashCommand = {
   name: 'hooks',
@@ -66,6 +68,32 @@ export const hooksCommand: SlashCommand = {
       }
       const enabled = subCommand === 'enable';
       registry.setHookEnabled(target, enabled);
+
+      // Persist the change to settings
+      const settings = context.services.settings;
+      const userHooks = settings.user.settings.hooks;
+
+      if (userHooks) {
+        // Deep copy to avoid mutation
+        const newHooks = JSON.parse(JSON.stringify(userHooks));
+
+        // Update enabled state in the copied hooks
+        for (const definitions of Object.values(newHooks)) {
+          if (Array.isArray(definitions)) {
+            for (const def of definitions as HookDefinition[]) {
+              for (const hook of def.hooks) {
+                if (hook.type === 'command' && hook.command === target) {
+                  hook.enabled = enabled;
+                }
+              }
+            }
+          }
+        }
+
+        // Persist to disk
+        settings.setValue(SettingScope.User, 'hooks', newHooks);
+      }
+
       context.ui.addItem(
         {
           type: MessageType.INFO,
