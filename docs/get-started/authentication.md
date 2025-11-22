@@ -17,7 +17,7 @@ Select the authentication method that matches your situation in the table below:
 | Organization users with a company, school, or Google Workspace account | [Login with Google](#login-google)| [Yes](#set-gcp) |
 | AI Studio user with a Gemini API key | [Use Gemini API Key](#gemini-api) | No |
 | Google Cloud Vertex AI user | [Vertex AI](#vertex-ai) | [Yes](#set-gcp) |
-| Headless mode | [Use Gemini API Key](#gemini-api) or<br> [Vertex AI](#vertex-ai) | No (for Gemini API Key)<br> [Yes](#set-gcp) (for Vertex AI) |
+| [Headless mode](#headless) | [Use Gemini API Key](#gemini-api) or<br> [Vertex AI](#vertex-ai) | No (for Gemini API Key)<br> [Yes](#set-gcp) (for Vertex AI) |
 
 ### What is my Google account type?
 
@@ -25,7 +25,7 @@ Select the authentication method that matches your situation in the table below:
   [free tier accounts](../quota-and-pricing/#free-usage) such as Gemini Code
   Assist for individuals, as well as paid subscriptions for
   [Google AI Pro and Ultra](https://gemini.google/subscriptions/).
-  
+
 * **Organization accounts:** Accounts using paid licenses through an
   organization such as a company, school, or
   [Google Workspace](https://workspace.google.com/). Includes
@@ -301,6 +301,17 @@ environments, Gemini CLI automatically uses Application Default Credentials
 
 If automatic authentication fails, use one of the interactive methods described
 on this page.
+
+## Running in headless mode <a id="headless"></a>
+
+[Headless mode](../cli/headless) will use your existing
+authentication method, if an existing authentication credential is cached.
+
+If you have not already logged in with an authentication credential, you must
+configure authentication using environment variables:
+
+* [Use Gemini API Key](#gemini-api)
+* [Vertex AI](#vertex-ai)
 
 ## What's next?
 
