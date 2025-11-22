@@ -509,6 +509,7 @@ describe('startInteractiveUI', () => {
     merged: {
       ui: {
         hideWindowTitle: false,
+        useAlternateBuffer: true,
       },
     },
   } as LoadedSettings;
