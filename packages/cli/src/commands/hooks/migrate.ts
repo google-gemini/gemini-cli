@@ -131,8 +131,18 @@ export const migrateCommand: CommandModule = {
           );
 
           if (existingDefIndex !== -1) {
-            // A definition with the same matcher exists. Overwrite it to "update".
-            existingEventDefinitions[existingDefIndex] = newDef;
+            // A definition with the same matcher exists. Additive merge to avoid data loss.
+            const existingDef = existingEventDefinitions[existingDefIndex];
+            for (const newHook of newDef.hooks) {
+              // Add the new hook only if a hook with the same command doesn't already exist.
+              if (
+                !existingDef.hooks.some(
+                  (h: HookConfig) => h.command === newHook.command,
+                )
+              ) {
+                existingDef.hooks.push(newHook);
+              }
+            }
           } else {
             // No definition with this matcher, so add it as a new one.
             existingEventDefinitions.push(newDef);

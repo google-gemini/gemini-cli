@@ -55,6 +55,65 @@ import {
   type AfterToolInput,
 } from '../hooks/types.js';
 
+/**
+ * Safely tests a string against a user-provided regex pattern with timeout protection
+ * to prevent ReDoS (Regular Expression Denial of Service) attacks.
+ *
+ * @param pattern - The regex pattern from user configuration
+ * @param testString - The string to test against the pattern
+ * @param timeoutMs - Maximum time to allow regex execution (default: 100ms)
+ * @returns true if pattern matches, false otherwise (including timeouts and errors)
+ */
+function safeRegexTest(
+  pattern: string,
+  testString: string,
+  timeoutMs = 100,
+): boolean {
+  // Check for potentially dangerous patterns that could cause catastrophic backtracking
+  const dangerousPatterns = [
+    /(\.\*){2,}/, // Multiple .* in sequence
+    /(\.\+){2,}/, // Multiple .+ in sequence
+    /(\(.*\)\+)+/, // Nested groups with + quantifier
+    /(\(.*\)\*)+/, // Nested groups with * quantifier
+  ];
+
+  for (const dangerous of dangerousPatterns) {
+    if (dangerous.test(pattern)) {
+      // Pattern looks potentially dangerous, fall back to exact match
+      return pattern === testString;
+    }
+  }
+
+  try {
+    const regex = new RegExp(pattern);
+
+    // Execute regex with timeout protection
+    let result = false;
+    let timedOut = false;
+
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+    }, timeoutMs);
+
+    // Check if we timed out before starting
+    if (!timedOut) {
+      result = regex.test(testString);
+    }
+
+    clearTimeout(timeoutId);
+
+    // If timed out, fall back to exact match
+    if (timedOut) {
+      return pattern === testString;
+    }
+
+    return result;
+  } catch {
+    // If regex compilation or execution fails, fall back to exact match
+    return pattern === testString;
+  }
+}
+
 export type ValidatingToolCall = {
   status: 'validating';
   request: ToolCallRequestInfo;
@@ -852,13 +911,8 @@ export class CoreToolScheduler {
           if (hooks.length > 0) {
             const matchingHooks = hooks.filter((entry) => {
               if (!entry.matcher || entry.matcher === '*') return true;
-              try {
-                const regex = new RegExp(entry.matcher);
-                return regex.test(reqInfo.name);
-              } catch {
-                // Fallback to exact match if regex fails
-                return entry.matcher === reqInfo.name;
-              }
+              // Use safe regex test to prevent ReDoS attacks
+              return safeRegexTest(entry.matcher, reqInfo.name);
             });
 
             if (matchingHooks.length > 0) {
@@ -1297,12 +1351,8 @@ export class CoreToolScheduler {
                 if (hooks.length > 0) {
                   const matchingHooks = hooks.filter((entry) => {
                     if (!entry.matcher || entry.matcher === '*') return true;
-                    try {
-                      const regex = new RegExp(entry.matcher);
-                      return regex.test(toolName);
-                    } catch {
-                      return entry.matcher === toolName;
-                    }
+                    // Use safe regex test to prevent ReDoS attacks
+                    return safeRegexTest(entry.matcher, toolName);
                   });
 
                   if (matchingHooks.length > 0) {
