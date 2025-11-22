@@ -600,7 +600,18 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export interface Alert {
+  title: string;
+  content: string;
+  type: 'timeout' | 'error' | 'info';
+}
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | Alert;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 

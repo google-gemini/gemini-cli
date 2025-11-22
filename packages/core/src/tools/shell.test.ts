@@ -147,7 +147,10 @@ describe('ShellTool', () => {
 
   describe('build', () => {
     it('should return an invocation for a valid command', () => {
-      const invocation = shellTool.build({ command: 'goodCommand --safe', timeout: 10 });
+      const invocation = shellTool.build({
+        command: 'goodCommand --safe',
+        timeout: 10,
+      });
       expect(invocation).toBeDefined();
     });
 
@@ -212,7 +215,10 @@ describe('ShellTool', () => {
     };
 
     it('should wrap command on linux and parse pgrep output', async () => {
-      const invocation = shellTool.build({ command: 'my-command &', timeout: 10 });
+      const invocation = shellTool.build({
+        command: 'my-command &',
+        timeout: 10,
+      });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({ pid: 54321 });
 
@@ -313,7 +319,10 @@ describe('ShellTool', () => {
 
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
-      const invocation = shellTool.build({ command: 'user-command', timeout: 10 });
+      const invocation = shellTool.build({
+        command: 'user-command',
+        timeout: 10,
+      });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({
         error,
@@ -333,7 +342,10 @@ describe('ShellTool', () => {
 
     it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
       const error = new Error('command failed');
-      const invocation = shellTool.build({ command: 'user-command', timeout: 10 });
+      const invocation = shellTool.build({
+        command: 'user-command',
+        timeout: 10,
+      });
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({
         error,
@@ -404,39 +416,42 @@ describe('ShellTool', () => {
     });
 
     describe('Timeout', () => {
-        beforeEach(() => {
-             vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should trigger timeout abort signal', async () => {
+        const invocation = shellTool.build({ command: 'sleep 10', timeout: 5 });
+        const promise = invocation.execute(mockAbortSignal);
+
+        // Fast forward time
+        await vi.advanceTimersByTimeAsync(5001);
+
+        // Verify that the service was called with an abort signal
+        expect(mockShellExecutionService).toHaveBeenCalled();
+        const signal = mockShellExecutionService.mock
+          .calls[0][3] as AbortSignal;
+        expect(signal.aborted).toBe(true);
+
+        resolveExecutionPromise({
+          rawOutput: Buffer.from(''),
+          output: '',
+          exitCode: null,
+          signal: null,
+          error: null,
+          aborted: true, // service reports it was aborted
+          pid: 12345,
+          executionMethod: 'child_process',
         });
-        afterEach(() => {
-             vi.useRealTimers();
-        });
 
-        it('should trigger timeout abort signal', async () => {
-             const invocation = shellTool.build({ command: 'sleep 10', timeout: 5 });
-             const promise = invocation.execute(mockAbortSignal);
-
-             // Fast forward time
-             await vi.advanceTimersByTimeAsync(5001);
-
-             // Verify that the service was called with an abort signal
-             expect(mockShellExecutionService).toHaveBeenCalled();
-             const signal = mockShellExecutionService.mock.calls[0][3] as AbortSignal;
-             expect(signal.aborted).toBe(true);
-
-             resolveExecutionPromise({
-                 rawOutput: Buffer.from(''),
-                 output: '',
-                 exitCode: null,
-                 signal: null,
-                 error: null,
-                 aborted: true, // service reports it was aborted
-                 pid: 12345,
-                 executionMethod: 'child_process',
-             });
-
-             const result = await promise;
-             expect(result.llmContent).toContain('Command execution timed out after 5 seconds');
-        });
+        const result = await promise;
+        expect(result.llmContent).toContain(
+          'Command execution timed out after 5 seconds',
+        );
+      });
     });
 
     describe('Streaming to `updateOutput`', () => {
@@ -512,7 +527,10 @@ describe('ShellTool', () => {
       );
 
       // Should now be allowlisted
-      const secondInvocation = shellTool.build({ command: 'npm test', timeout: 10 });
+      const secondInvocation = shellTool.build({
+        command: 'npm test',
+        timeout: 10,
+      });
       const secondConfirmation = await secondInvocation.shouldConfirmExecute(
         new AbortController().signal,
       );
@@ -530,7 +548,10 @@ describe('ShellTool', () => {
 
       it('should not throw an error or block for an allowed command', async () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue(['ShellTool(wc)']);
-        const invocation = shellTool.build({ command: 'wc -l foo.txt', timeout: 10 });
+        const invocation = shellTool.build({
+          command: 'wc -l foo.txt',
+          timeout: 10,
+        });
         const confirmation = await invocation.shouldConfirmExecute(
           new AbortController().signal,
         );
@@ -541,7 +562,10 @@ describe('ShellTool', () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           'ShellTool(wc -l)',
         ]);
-        const invocation = shellTool.build({ command: 'wc -l foo.txt', timeout: 10 });
+        const invocation = shellTool.build({
+          command: 'wc -l foo.txt',
+          timeout: 10,
+        });
         const confirmation = await invocation.shouldConfirmExecute(
           new AbortController().signal,
         );
@@ -552,7 +576,10 @@ describe('ShellTool', () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           'ShellTool(wc -l)',
         ]);
-        const invocation = shellTool.build({ command: 'madeupcommand', timeout: 10 });
+        const invocation = shellTool.build({
+          command: 'madeupcommand',
+          timeout: 10,
+        });
         await expect(
           invocation.shouldConfirmExecute(new AbortController().signal),
         ).rejects.toThrow('madeupcommand');
@@ -572,7 +599,10 @@ describe('ShellTool', () => {
         (mockConfig.getAllowedTools as Mock).mockReturnValue([
           'ShellTool(echo)',
         ]);
-        const invocation = shellTool.build({ command: 'echo "foo" && ls -l', timeout: 10 });
+        const invocation = shellTool.build({
+          command: 'echo "foo" && ls -l',
+          timeout: 10,
+        });
         await expect(
           invocation.shouldConfirmExecute(new AbortController().signal),
         ).rejects.toThrow(

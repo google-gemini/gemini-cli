@@ -16,6 +16,7 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
+  ToolResultDisplay,
 } from './tools.js';
 import {
   BaseDeclarativeTool,
@@ -260,11 +261,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         } else {
           if (!signal.aborted && !timeoutController.signal.aborted) {
-             // It's possible that it was aborted by the timeout signal
-             // Check if the result was aborted
-             if (!result.aborted) {
-                debugLogger.error('missing pgrep output');
-             }
+            // It's possible that it was aborted by the timeout signal
+            // Check if the result was aborted
+            if (!result.aborted) {
+              debugLogger.error('missing pgrep output');
+            }
           }
         }
       }
@@ -272,9 +273,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let llmContent = '';
       if (result.aborted) {
         if (timeoutController.signal.aborted && !signal.aborted) {
-             llmContent = `Command execution timed out after ${this.params.timeout} seconds.`;
+          llmContent = `Command execution timed out after ${this.params.timeout} seconds.`;
         } else {
-             llmContent = 'Command was cancelled by user before it could complete.';
+          llmContent =
+            'Command was cancelled by user before it could complete.';
         }
 
         if (result.output.trim()) {
@@ -300,11 +302,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
             backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
           }`,
           `Process Group PGID: ${result.pid ?? '(none)'}`,
-          `Duration: ${(durationMs / 1000).toFixed(2)}s`
+          `Duration: ${(durationMs / 1000).toFixed(2)}s`,
         ].join('\n');
       }
 
-      let returnDisplayMessage = '';
+      let returnDisplayMessage: ToolResultDisplay = '';
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
@@ -313,9 +315,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           if (result.aborted) {
             if (timeoutController.signal.aborted && !signal.aborted) {
-                returnDisplayMessage = `Command execution timed out after ${this.params.timeout} seconds.`;
+              returnDisplayMessage = {
+                title: 'Timeout',
+                content: `Command execution timed out after ${this.params.timeout} seconds.`,
+                type: 'timeout',
+              };
             } else {
-                returnDisplayMessage = 'Command cancelled by user.';
+              returnDisplayMessage = 'Command cancelled by user.';
             }
           } else if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
@@ -331,12 +337,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
       // Add duration to returnDisplayMessage
-      if (returnDisplayMessage) {
-        returnDisplayMessage += `\nDuration: ${(durationMs / 1000).toFixed(2)}s`;
-      } else {
-         returnDisplayMessage = `Duration: ${(durationMs / 1000).toFixed(2)}s`;
+      const durationString = `Duration: ${(durationMs / 1000).toFixed(2)}s`;
+      if (typeof returnDisplayMessage === 'string') {
+        if (returnDisplayMessage) {
+          returnDisplayMessage += `\n${durationString}`;
+        } else {
+          returnDisplayMessage = durationString;
+        }
+      } else if (
+        typeof returnDisplayMessage === 'object' &&
+        'type' in returnDisplayMessage &&
+        returnDisplayMessage.type === 'timeout'
+      ) {
+        returnDisplayMessage.content += `\n\n${durationString}`;
       }
-
 
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
       const executionError = result.error
@@ -445,7 +459,8 @@ export class ShellTool extends BaseDeclarativeTool<
           },
           timeout: {
             type: 'number',
-            description: 'The maximum time in seconds to wait for the command to complete.',
+            description:
+              'The maximum time in seconds to wait for the command to complete.',
           },
           description: {
             type: 'string',
@@ -474,7 +489,7 @@ export class ShellTool extends BaseDeclarativeTool<
     }
 
     if (params.timeout <= 0) {
-        return 'Timeout must be greater than 0.';
+      return 'Timeout must be greater than 0.';
     }
 
     const commandCheck = isCommandAllowed(params.command, this.config);
