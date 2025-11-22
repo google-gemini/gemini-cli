@@ -1009,3 +1009,278 @@ gemini mcp remove my-server
 
 This will find and delete the "my-server" entry from the `mcpServers` object in
 the appropriate `settings.json` file based on the scope (`-s, --scope`).
+
+## Advanced: Parallel Agent Execution
+
+The Gemini CLI now supports **parallel multi-agent execution** through the
+`parallel_analyzer` agent. This enables spawning multiple subagents concurrently
+to analyze problems from different angles.
+
+### How Parallel Execution Works
+
+The key insight is that **when multiple subagent tools are called in a SINGLE
+turn**, they execute in parallel via the existing `Promise.all()` infrastructure
+in the tool execution layer.
+
+**Sequential Execution (old):**
+
+```
+Turn 1: Call codebase_investigator → Wait → Complete
+Turn 2: Call codebase_investigator → Wait → Complete
+Turn 3: Call codebase_investigator → Wait → Complete
+Total time: 3x execution time
+```
+
+**Parallel Execution (new):**
+
+```
+Turn 1: Call codebase_investigator (3 times) → All execute concurrently → All complete
+Total time: ~1x execution time
+```
+
+### Using the Parallel Analyzer
+
+The `parallel_analyzer` agent coordinates multiple `codebase_investigator`
+agents in parallel:
+
+```bash
+# In the Gemini CLI
+Call parallel_analyzer with:
+  task: "Analyze authentication in this codebase"
+  agent_count: 5
+  focus_areas: ["API security", "Token handling", "Session management", "Auth flows", "Permissions"]
+```
+
+The agent will:
+
+1. **Spawn 5 agents in parallel** (one turn, 5 concurrent tool calls)
+2. **Each agent** investigates its assigned focus area independently
+3. **Synthesize findings** into a consensus report showing:
+   - What multiple agents agreed on (high confidence)
+   - Unique insights from individual agents
+   - Conflicts or disagreements between agents
+   - Comprehensive recommendations
+
+### Parallel Execution Architecture
+
+**File:** `/packages/core/src/agents/executor.ts:888`
+
+```typescript
+// Existing code that enables parallel execution:
+const toolExecutionPromises = functionCalls.map((call) =>
+  executeToolCall(call),
+);
+
+// All tool calls execute concurrently
+const results = await Promise.all(toolExecutionPromises);
+```
+
+**When the model calls multiple tools in one turn, they run in parallel
+automatically.**
+
+### Best Practices for Parallel Agents
+
+1. **Clear Focus Areas:** Give each agent a distinct, non-overlapping focus
+2. **Appropriate Agent Count:** 2-10 agents (sweet spot is 3-5)
+3. **Time Limits:** Set appropriate `max_time_minutes` for parallel workload
+4. **Consensus Building:** Always synthesize findings from multiple agents
+5. **Conflict Resolution:** Document when agents disagree
+
+### MCP Servers for Multi-Agent Coordination
+
+MCP servers can enhance parallel execution workflows:
+
+#### Zen MCP Server Integration
+
+The Zen MCP server provides advanced workflow coordination tools:
+
+```json
+{
+  "mcpServers": {
+    "zen": {
+      "command": "/path/to/zen-mcp-server/.zen_venv/bin/zen-mcp-server",
+      "trust": true,
+      "timeout": 60000
+    }
+  }
+}
+```
+
+**Available Zen Tools:**
+
+- **`thinkdeep`**: Multi-stage investigation with hypothesis testing
+- **`planner`**: Sequential planning with revision and branching
+- **`consensus`**: Multi-model consensus through structured debate
+- **`codereview`**: Systematic code review with expert validation
+- **`debug`**: Root cause analysis with parallel investigation
+
+**Example: Combining Parallel Agents + Zen Tools:**
+
+```
+1. Use parallel_analyzer to spawn 3 codebase investigators
+2. Each agent uses zen.thinkdeep for systematic investigation
+3. Results are fed to zen.consensus for multi-model validation
+4. Final synthesis includes high-confidence findings
+```
+
+### Writing MCP Tools for Parallel Workflows
+
+When building MCP tools that support parallel execution:
+
+#### 1. Make Tools Stateless
+
+```python
+# Good: Stateless tool
+@server.call_tool()
+async def analyze_module(module_path: str) -> str:
+    # Each call is independent
+    return analyze(module_path)
+
+# Bad: Stateful tool
+class Analyzer:
+    def __init__(self):
+        self.results = []  # Shared state!
+
+    @server.call_tool()
+    async def analyze_module(self, module_path: str):
+        self.results.append(...)  # Race condition!
+```
+
+#### 2. Handle Concurrent Access
+
+```python
+# Use locks for shared resources
+import asyncio
+
+@server.call_tool()
+async def write_to_shared_file(data: str) -> str:
+    async with file_lock:  # Prevent concurrent writes
+        with open("shared.txt", "a") as f:
+            f.write(data)
+```
+
+#### 3. Return Structured Data
+
+```python
+@server.call_tool()
+async def investigate_pattern(pattern: str) -> dict:
+    return {
+        "pattern": pattern,
+        "findings": [...],
+        "confidence": "high",
+        "evidence": [...]
+    }
+```
+
+This makes it easy for the coordinating agent to synthesize results.
+
+### Performance Considerations
+
+**Parallel Execution Benefits:**
+
+- **3-5x faster** for independent analysis tasks
+- **Better coverage** from multiple perspectives
+- **Higher confidence** through consensus
+- **Scales horizontally** with agent count
+
+**Resource Costs:**
+
+- **Memory:** Each agent maintains separate chat history
+- **API Calls:** More concurrent calls = higher quota usage
+- **Token Usage:** Multiple agents = multiple context windows
+
+**Optimization Tips:**
+
+1. **Use agent pooling** for repeated tasks
+2. **Set tight time limits** to prevent runaway execution
+3. **Monitor token usage** across parallel agents
+4. **Use model routing** (Flash for speed, Pro for quality)
+
+### Debugging Parallel Execution
+
+Enable debug mode to see parallel execution:
+
+```bash
+gemini-cli --debug
+```
+
+**Output shows:**
+
+```
+[Agent 1] Starting investigation: Authentication patterns
+[Agent 2] Starting investigation: Database patterns
+[Agent 3] Starting investigation: Error handling
+...
+[Agent 1] Completed in 45s
+[Agent 2] Completed in 52s
+[Agent 3] Completed in 48s
+Synthesizing consensus from 3 agents...
+```
+
+### Example: Custom Parallel Agent
+
+You can create your own parallel coordination agent:
+
+```typescript
+// File: packages/core/src/agents/custom-parallel.ts
+
+export const CustomParallelAgent: AgentDefinition = {
+  name: 'security_auditor',
+  description:
+    'Spawns multiple security auditors in parallel to analyze different attack vectors',
+
+  inputConfig: {
+    inputs: {
+      target: { type: 'string', required: true },
+      depth: { type: 'string', required: false },
+    },
+  },
+
+  toolConfig: {
+    tools: ['codebase_investigator', ...],
+  },
+
+  promptConfig: {
+    systemPrompt: `You are a security audit coordinator.
+
+In ONE turn, call codebase_investigator MULTIPLE TIMES:
+- Call 1: SQL injection vulnerabilities
+- Call 2: XSS attack vectors
+- Call 3: Authentication bypass
+- Call 4: Privilege escalation
+- Call 5: Data exposure risks
+
+Then synthesize findings with severity ratings.`,
+  },
+
+  // ... rest of config
+};
+```
+
+Register it in `/packages/core/src/agents/registry.ts`:
+
+```typescript
+import { CustomParallelAgent } from './custom-parallel.js';
+
+private loadBuiltInAgents(): void {
+  // ... existing agents
+  this.registerAgent(CustomParallelAgent);
+}
+```
+
+### Future: Wave-Based Parallel Execution
+
+**Coming Soon:** Multi-wave parallel execution with dependencies:
+
+```
+Wave 1 (Parallel): 5 analyzers investigate different areas
+  ↓
+Quality Gate: Validate findings
+  ↓
+Wave 2 (Parallel): 3 validators verify high-risk findings
+  ↓
+Wave 3 (Sequential): 1 synthesizer creates final report
+```
+
+This enables complex multi-agent workflows with dependency management and
+quality gates between execution waves.
