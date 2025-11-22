@@ -110,40 +110,32 @@ export const migrateCommand: CommandModule = {
       const loadedSettings = loadSettings();
       const userSettings = loadedSettings.user;
 
-      // Merge hooks (idempotent - avoid duplicates)
-      // Use a deep copy or a new object to ensure we don't mutate the loaded settings directly
+      // Merge hooks using upsert mechanism (truly idempotent)
+      // Use a deep copy to ensure we don't mutate the loaded settings directly
       const newHooks = { ...(userSettings.settings.hooks || {}) };
       for (const [event, definitions] of Object.entries(geminiHooks)) {
         const eventName = event as HookEventName;
-        const existingDefinitions = newHooks[eventName] ?? [];
+        if (!newHooks[eventName]) {
+          newHooks[eventName] = [];
+        }
+        const existingEventDefinitions = newHooks[eventName];
 
-        // Only add hooks that don't already exist (check by command and matcher)
-        const newDefinitions = definitions.filter((newDef) => {
+        for (const newDef of definitions) {
           const newCommandSet = new Set(newDef.hooks.map((h) => h.command));
-          if (newCommandSet.size === 0) return false; // Don't filter out definitions with no command hooks
+          if (newCommandSet.size === 0) continue;
 
-          const alreadyExists = existingDefinitions.some((existingDef) => {
-            // Only consider definitions with the same matcher as potential duplicates.
-            if (newDef.matcher !== existingDef.matcher) {
-              return false;
-            }
-            const existingCommandSet = new Set(
-              existingDef.hooks.map((h) => h.command),
-            );
-            // Consider it a duplicate if the existing set of commands is a superset
-            // of the new set of commands.
-            if (existingCommandSet.size < newCommandSet.size) {
-              return false;
-            }
-            return [...newCommandSet].every((cmd) =>
-              existingCommandSet.has(cmd),
-            );
-          });
+          const existingDefIndex = existingEventDefinitions.findIndex(
+            (d) => d.matcher === newDef.matcher,
+          );
 
-          return !alreadyExists;
-        });
-
-        newHooks[eventName] = [...existingDefinitions, ...newDefinitions];
+          if (existingDefIndex !== -1) {
+            // A definition with the same matcher exists. Overwrite it to "update".
+            existingEventDefinitions[existingDefIndex] = newDef;
+          } else {
+            // No definition with this matcher, so add it as a new one.
+            existingEventDefinitions.push(newDef);
+          }
+        }
       }
 
       // Enable hooks in tools settings
