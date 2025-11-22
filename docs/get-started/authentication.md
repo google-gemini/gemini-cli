@@ -185,8 +185,7 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
     gemini 
     ```
 
-5. Select **Use Vertex API key**.
-
+5. Select **Vertex AI**.
 > **Warning:** Protect your service account key file as it gives access to
 > your resources.
 
