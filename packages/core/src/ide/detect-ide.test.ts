@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 
 describe('detectIde', () => {
   const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
   const ideProcessInfoNoCode = { pid: 123, command: 'some/path/to/fork' };
+
+  beforeEach(() => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+  });
 
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -98,6 +102,10 @@ describe('detectIde', () => {
 
 describe('detectIde with ideInfoFromFile', () => {
   const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
+
+  beforeEach(() => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+  });
 
   afterEach(() => {
     vi.unstubAllEnvs();

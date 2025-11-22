@@ -15,6 +15,14 @@ import {
   type Mock,
 } from 'vitest';
 
+vi.mock('@google/genai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@google/genai')>();
+  return {
+    ...actual,
+    ThinkingLevel: { HIGH: 'HIGH' },
+  };
+});
+
 const mockPlatform = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
@@ -35,6 +43,7 @@ vi.mock('node:os', async (importOriginal) => {
 });
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
+vi.mock('./mcp-client.js', () => ({}));
 
 import {
   initializeShellParsers,

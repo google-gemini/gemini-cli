@@ -90,6 +90,8 @@ export abstract class BaseToolInvocation<
   async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
+    let details: ToolCallConfirmationDetails | false = false;
+
     if (this.messageBus) {
       const decision = await this.getMessageBusDecision(abortSignal);
       if (decision === 'ALLOW') {
@@ -105,11 +107,53 @@ export abstract class BaseToolInvocation<
       }
 
       if (decision === 'ASK_USER') {
-        return this.getConfirmationDetails(abortSignal);
+        details = await this.getConfirmationDetails(abortSignal);
       }
+    } else {
+      // When no message bus, use default confirmation flow
+      details = await this.getConfirmationDetails(abortSignal);
     }
-    // When no message bus, use default confirmation flow
-    return this.getConfirmationDetails(abortSignal);
+
+    if (!details) {
+      return false;
+    }
+
+    const originalOnConfirm = details.onConfirm;
+    details.onConfirm = async (
+      outcome: ToolConfirmationOutcome,
+      payload?: ToolConfirmationPayload,
+    ) => {
+      if (this.messageBus) {
+        if (
+          outcome === ToolConfirmationOutcome.ProceedAlways &&
+          this._toolName
+        ) {
+          this.messageBus.publish({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: this._toolName,
+          });
+        } else if (
+          outcome === ToolConfirmationOutcome.ProceedAlwaysTool &&
+          this._toolName
+        ) {
+          this.messageBus.publish({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: this._toolName,
+          });
+        } else if (
+          outcome === ToolConfirmationOutcome.ProceedAlwaysServer &&
+          this._serverName
+        ) {
+          this.messageBus.publish({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: `${this._serverName}__*`,
+          });
+        }
+      }
+      await originalOnConfirm(outcome, payload);
+    };
+
+    return details;
   }
 
   /**
@@ -128,16 +172,7 @@ export abstract class BaseToolInvocation<
       type: 'info',
       title: `Confirm: ${this._toolDisplayName || this._toolName}`,
       prompt: this.getDescription(),
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          if (this.messageBus && this._toolName) {
-            this.messageBus.publish({
-              type: MessageBusType.UPDATE_POLICY,
-              toolName: this._toolName,
-            });
-          }
-        }
-      },
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {},
     };
     return confirmationDetails;
   }
