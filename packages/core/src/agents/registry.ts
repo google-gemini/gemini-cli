@@ -7,6 +7,7 @@
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { ParallelAnalyzerAgent } from './parallel-analyzer.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigAlias } from '../services/modelConfigService.js';
@@ -71,6 +72,9 @@ export class AgentRegistry {
       };
       this.registerAgent(agentDef);
     }
+
+    // Register parallel analyzer (enabled by default)
+    this.registerAgent(ParallelAnalyzerAgent);
   }
 
   /**
