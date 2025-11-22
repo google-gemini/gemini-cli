@@ -583,25 +583,30 @@ export async function main() {
     if (hookRegistry) {
       const hooks = hookRegistry.getHooksForEvent(HookEventName.SessionStart);
       if (hooks.length > 0) {
-        const hookConfigs = hooks.map((h) => h.config);
-        const input: SessionStartInput = {
-          session_id: config.getSessionId(),
-          transcript_path: join(
-            config.storage.getHistoryDir(),
-            config.getSessionId() + '.json',
-          ),
-          cwd: config.getWorkingDir(),
-          hook_event_name: HookEventName.SessionStart,
-          timestamp: new Date().toISOString(),
-          source: argv.resume
-            ? SessionStartSource.Resume
-            : SessionStartSource.Startup,
-        };
-        await hookRunner.executeHooksSequential(
-          hookConfigs,
-          HookEventName.SessionStart,
-          input,
-        );
+        try {
+          const hookConfigs = hooks.map((h) => h.config);
+          const input: SessionStartInput = {
+            session_id: config.getSessionId(),
+            transcript_path: join(
+              config.storage.getHistoryDir(),
+              config.getSessionId() + '.json',
+            ),
+            cwd: config.getWorkingDir(),
+            hook_event_name: HookEventName.SessionStart,
+            timestamp: new Date().toISOString(),
+            source: argv.resume
+              ? SessionStartSource.Resume
+              : SessionStartSource.Startup,
+          };
+          await hookRunner.executeHooksSequential(
+            hookConfigs,
+            HookEventName.SessionStart,
+            input,
+          );
+        } catch (error) {
+          // Log the error but don't block startup
+          debugLogger.error('Error executing SessionStart hooks:', error);
+        }
       }
     }
 

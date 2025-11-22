@@ -12,39 +12,44 @@ export const enableCommand: CommandModule = {
   command: 'enable <command>',
   describe: 'Enable a hook by command name',
   handler: async (argv) => {
-    const commandToEnable = argv['command'] as string;
-    console.log(`Enabling hook: ${commandToEnable}`);
+    try {
+      const commandToEnable = argv['command'] as string;
+      console.log(`Enabling hook: ${commandToEnable}`);
 
-    const settings = loadSettings();
-    const userSettings = settings.user.settings;
+      const settings = loadSettings();
+      const userSettings = settings.user.settings;
 
-    if (!userSettings.hooks) {
-      console.log('No hooks configured in user settings.');
-      return;
-    }
+      if (!userSettings.hooks) {
+        console.log('No hooks configured in user settings.');
+        return;
+      }
 
-    // Deep copy to avoid mutation of the original settings object
-    const newHooks = JSON.parse(JSON.stringify(userSettings.hooks));
+      // Deep copy to avoid mutation of the original settings object
+      const newHooks = JSON.parse(JSON.stringify(userSettings.hooks));
 
-    let found = false;
-    for (const definitions of Object.values(newHooks)) {
-      if (Array.isArray(definitions)) {
-        for (const def of definitions as HookDefinition[]) {
-          for (const hook of def.hooks) {
-            if (hook.type === 'command' && hook.command === commandToEnable) {
-              hook.enabled = true;
-              found = true;
+      let found = false;
+      for (const definitions of Object.values(newHooks)) {
+        if (Array.isArray(definitions)) {
+          for (const def of definitions as HookDefinition[]) {
+            for (const hook of def.hooks) {
+              if (hook.type === 'command' && hook.command === commandToEnable) {
+                hook.enabled = true;
+                found = true;
+              }
             }
           }
         }
       }
-    }
 
-    if (found) {
-      settings.setValue(SettingScope.User, 'hooks', newHooks);
-      console.log(`Hook "${commandToEnable}" enabled.`);
-    } else {
-      console.log(`Hook "${commandToEnable}" not found in user settings.`);
+      if (found) {
+        settings.setValue(SettingScope.User, 'hooks', newHooks);
+        console.log(`Hook "${commandToEnable}" enabled.`);
+      } else {
+        console.log(`Hook "${commandToEnable}" not found in user settings.`);
+      }
+    } catch (error) {
+      console.error('Failed to enable hook:', error);
+      throw error;
     }
   },
 };
