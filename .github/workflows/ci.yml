@@ -97,6 +97,10 @@ jobs:
         with:
           args: '--verbose --accept 200,503 ./**/*.md'
           fail: true
+
+  test_linux:
+    name: 'Test (Linux)'
+    runs-on: 'ubuntu-latest'
     needs:
       - 'lint'
     permissions:
