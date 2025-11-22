@@ -47,11 +47,15 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   const { tools } = useSettings().merged;
   const [expanded, setExpanded] = useState(false);
 
-  useInput((input, key) => {
-    if (key.meta && input === 'b') {
-      setExpanded((prev) => !prev);
-    }
-  });
+  // Only enable keyboard shortcut if stdin is a TTY (interactive environment)
+  useInput(
+    (input, key) => {
+      if (key.meta && input === 'b') {
+        setExpanded((prev) => !prev);
+      }
+    },
+    { isActive: process.stdin.isTTY },
+  );
 
   const availableHeight = availableTerminalHeight
     ? Math.max(
