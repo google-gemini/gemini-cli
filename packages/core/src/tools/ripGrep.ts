@@ -14,7 +14,7 @@ import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import type { Config } from '../config/config.js';
+import { DEFAULT_RIPGREP_MAX_MATCHES, type Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
@@ -23,8 +23,6 @@ import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
-
-const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -206,7 +204,8 @@ class GrepToolInvocation extends BaseToolInvocation<
       const searchDirAbs = resolveAndValidatePath(this.config, pathParam);
       const searchDirDisplay = pathParam;
 
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.config.getRipgrepMaxMatches?.() ?? DEFAULT_RIPGREP_MAX_MATCHES;
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }

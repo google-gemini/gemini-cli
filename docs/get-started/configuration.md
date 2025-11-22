@@ -437,6 +437,11 @@ their corresponding top-level category object in your `settings.json` file.
     implementation. Provides faster search performance.
   - **Default:** `true`
 
+- **`tools.ripgrep.maxMatches`** (number):
+  - **Description:** Maximum number of matches returned by the ripgrep tool.
+    Increase for larger repositories or decrease to conserve context.
+  - **Default:** `20000`
+
 - **`tools.enableToolOutputTruncation`** (boolean):
   - **Description:** Enable truncation of large tool outputs.
   - **Default:** `true`

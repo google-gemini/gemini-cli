@@ -986,6 +986,23 @@
           "default": true,
           "type": "boolean"
         },
+        "ripgrep": {
+          "title": "Ripgrep",
+          "description": "Ripgrep-specific settings.",
+          "markdownDescription": "Ripgrep-specific settings.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "maxMatches": {
+              "title": "Ripgrep Max Matches",
+              "description": "Maximum number of matches returned by the ripgrep tool. Increase for larger repositories or decrease to conserve context.",
+              "markdownDescription": "Maximum number of matches returned by the ripgrep tool. Increase for larger repositories or decrease to conserve context.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `20000`",
+              "default": 20000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
         "enableToolOutputTruncation": {
           "title": "Enable Tool Output Truncation",
           "description": "Enable truncation of large tool outputs.",

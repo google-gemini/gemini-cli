@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import {
+  Config,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  DEFAULT_RIPGREP_MAX_MATCHES,
+} from './config.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -70,6 +74,7 @@ vi.mock('../tools/grep.js');
 vi.mock('../tools/ripGrep.js', () => ({
   canUseRipgrep: vi.fn(),
   RipGrepTool: class MockRipGrepTool {},
+  RIPGREP_DEFAULT_MAX_MATCHES: 20000,
 }));
 vi.mock('../tools/glob');
 vi.mock('../tools/edit');
@@ -1077,6 +1082,22 @@ describe('Server Config (config.ts)', () => {
       // 4 * (32000 - 1000) = 124000
       // custom threshold is 50000
       expect(config.getTruncateToolOutputThreshold()).toBe(50000);
+    });
+  });
+
+  describe('getRipgrepMaxMatches', () => {
+    it('returns the default value when not configured', () => {
+      const config = new Config(baseParams);
+      expect(config.getRipgrepMaxMatches()).toBe(DEFAULT_RIPGREP_MAX_MATCHES);
+    });
+
+    it('returns the configured value when provided', () => {
+      const customValue = 1234;
+      const config = new Config({
+        ...baseParams,
+        ripgrepMaxMatches: customValue,
+      });
+      expect(config.getRipgrepMaxMatches()).toBe(customValue);
     });
   });
 

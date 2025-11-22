@@ -530,6 +530,42 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toBe('Found 1 match');
     });
 
+    it('should respect the configured ripgrep max matches', async () => {
+      const limitedConfig = {
+        ...mockConfig,
+        getRipgrepMaxMatches: () => 5,
+      } as unknown as Config;
+      const limitedTool = new RipGrepTool(limitedConfig);
+
+      const outputData = Array.from({ length: 6 }, (_, index) =>
+        JSON.stringify({
+          type: 'match',
+          data: {
+            path: { text: `file${index}.txt` },
+            line_number: index + 1,
+            lines: { text: `match ${index}\n` },
+          },
+        }),
+      ).join('\n');
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData,
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'match' };
+      const invocation = limitedTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.returnDisplay).toBe('Found 5 matches (limited)');
+      expect(result.llmContent).toContain(
+        '(results limited to 5 matches for performance)',
+      );
+      expect(result.llmContent).not.toContain('File: file5.txt');
+    });
+
     it('should return "No matches found" when pattern does not exist', async () => {
       // Setup specific mock for no matches
       mockSpawn.mockImplementationOnce(

@@ -20,6 +20,7 @@ import type {
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  DEFAULT_RIPGREP_MAX_MATCHES,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_MODEL_CONFIGS,
 } from '@google/gemini-cli-core';
@@ -1001,6 +1002,27 @@ const SETTINGS_SCHEMA = {
         description:
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
+      },
+      ripgrep: {
+        type: 'object',
+        label: 'Ripgrep',
+        category: 'Tools',
+        requiresRestart: false,
+        default: {},
+        description: 'Ripgrep-specific settings.',
+        showInDialog: false,
+        properties: {
+          maxMatches: {
+            type: 'number',
+            label: 'Ripgrep Max Matches',
+            category: 'Tools',
+            requiresRestart: false,
+            default: DEFAULT_RIPGREP_MAX_MATCHES,
+            description:
+              'Maximum number of matches returned by the ripgrep tool. Increase for larger repositories or decrease to conserve context.',
+            showInDialog: true,
+          },
+        },
       },
       enableToolOutputTruncation: {
         type: 'boolean',
