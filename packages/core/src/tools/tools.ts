@@ -139,15 +139,9 @@ export abstract class BaseToolInvocation<
   protected getPolicyUpdateMessage(
     outcome: ToolConfirmationOutcome,
   ): UpdatePolicy | undefined {
-    if (outcome === ToolConfirmationOutcome.ProceedAlways && this._toolName) {
-      return {
-        type: MessageBusType.UPDATE_POLICY,
-        toolName: this._toolName,
-      };
-    }
-
     if (
-      outcome === ToolConfirmationOutcome.ProceedAlwaysTool &&
+      (outcome === ToolConfirmationOutcome.ProceedAlways ||
+        outcome === ToolConfirmationOutcome.ProceedAlwaysTool) &&
       this._toolName
     ) {
       return {
