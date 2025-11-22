@@ -48,10 +48,10 @@ const SCROLL_RATE_LIMIT_MS = 16;
 const FAST_SCROLL_THRESHOLD_MS = 200;
 // The number of scroll events in the same direction that have to occur before
 // we change the speed.
-const MIN_CONSECUTIVE_FAST_SCROLLS = 12;
+const MIN_CONSECUTIVE_FAST_SCROLLS = 8;
 // The number of scroll events in the same direction that have to occur while
 // scrolling fast before we reach the full scroll speed multiplier.
-const SCROLL_ACCELERATION_EVENTS = 128;
+const SCROLL_ACCELERATION_EVENTS = 64;
 // The duration of the smooth scroll animation.
 const SCROLL_ANIMATION_DURATION_MS = 100;
 // The time to wait before resetting the continuous scroll target.
@@ -194,13 +194,8 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
           // Calculate linear progress from 0 to 1.
           const progress = Math.min(1, (stepsIntoAccel + 1) / accelEvents);
 
-          // Apply a quadratic (ease-in) tween for smoother acceleration.
-          // This makes the initial acceleration slower to make the transition
-          // to fast scolling less jumpy.
-          const easedProgress = progress ** 2;
-
           const speedRange = maxMultiplier - 1;
-          const calculatedMultiplier = 1 + speedRange * easedProgress;
+          const calculatedMultiplier = 1 + speedRange * progress;
 
           // Floor to get an integer scroll multiplier and clamp to the max
           // speed. Clamping is a safeguard against floating point issues to
