@@ -203,7 +203,10 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
 
     return {
       llmContent: transformedParts,
-      returnDisplay: getStringifiedResultForDisplay(rawResponseParts),
+      returnDisplay: getStringifiedResultForDisplay(
+        rawResponseParts,
+        this.cliConfig,
+      ),
     };
   }
 

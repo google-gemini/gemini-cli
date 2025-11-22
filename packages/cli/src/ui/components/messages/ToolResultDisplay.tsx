@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Box, Text } from 'ink';
+import React, { useState } from 'react';
+import { Box, Text, useInput } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
@@ -14,6 +14,7 @@ import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -43,6 +44,14 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+  const { tools } = useSettings();
+  const [expanded, setExpanded] = useState(false);
+
+  useInput((input) => {
+    if (input === ' ') {
+      setExpanded((prev) => !prev);
+    }
+  });
 
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -61,65 +70,87 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
 
-  const truncatedResultDisplay = React.useMemo(() => {
-    if (typeof resultDisplay === 'string') {
-      if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-        return '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
-      }
-    }
-    return resultDisplay;
-  }, [resultDisplay]);
+  const truncateLines = tools?.truncateToolOutputLines ?? 15;
 
-  if (!truncatedResultDisplay) return null;
+  const { displayContent, isTruncatedByLines, hiddenLineCount } =
+    React.useMemo(() => {
+      let content = resultDisplay;
+      let isLineTruncated = false;
+      let hiddenLines = 0;
+
+      if (typeof resultDisplay === 'string') {
+        const lines = resultDisplay.split('\n');
+        if (lines.length > truncateLines && !expanded) {
+          content = lines.slice(0, truncateLines).join('\n');
+          isLineTruncated = true;
+          hiddenLines = lines.length - truncateLines;
+        } else {
+          // Apply character truncation if not folded or if expanded
+          if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
+            content =
+              '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+          }
+        }
+      }
+      return {
+        displayContent: content,
+        isTruncatedByLines: isLineTruncated,
+        hiddenLineCount: hiddenLines,
+      };
+    }, [resultDisplay, expanded, truncateLines]);
+
+  if (!displayContent) return null;
 
   return (
     <Box width={childWidth} flexDirection="column">
       <Box flexDirection="column">
-        {typeof truncatedResultDisplay === 'string' &&
-        renderOutputAsMarkdown ? (
+        {typeof displayContent === 'string' && renderOutputAsMarkdown ? (
           <Box flexDirection="column">
             <MarkdownDisplay
-              text={truncatedResultDisplay}
+              text={displayContent}
               terminalWidth={childWidth}
               renderMarkdown={renderMarkdown}
               isPending={false}
             />
           </Box>
-        ) : typeof truncatedResultDisplay === 'string' &&
-          !renderOutputAsMarkdown ? (
+        ) : typeof displayContent === 'string' && !renderOutputAsMarkdown ? (
           isAlternateBuffer ? (
             <Box flexDirection="column" width={childWidth}>
               <Text wrap="wrap" color={theme.text.primary}>
-                {truncatedResultDisplay}
+                {displayContent}
               </Text>
             </Box>
           ) : (
             <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
               <Box>
                 <Text wrap="wrap" color={theme.text.primary}>
-                  {truncatedResultDisplay}
+                  {displayContent}
                 </Text>
               </Box>
             </MaxSizedBox>
           )
-        ) : typeof truncatedResultDisplay === 'object' &&
-          'fileDiff' in truncatedResultDisplay ? (
+        ) : typeof displayContent === 'object' &&
+          'fileDiff' in displayContent ? (
           <DiffRenderer
-            diffContent={(truncatedResultDisplay as FileDiffResult).fileDiff}
-            filename={(truncatedResultDisplay as FileDiffResult).fileName}
+            diffContent={(displayContent as FileDiffResult).fileDiff}
+            filename={(displayContent as FileDiffResult).fileName}
             availableTerminalHeight={availableHeight}
             terminalWidth={childWidth}
           />
-        ) : typeof truncatedResultDisplay === 'object' &&
-          'todos' in truncatedResultDisplay ? (
+        ) : typeof displayContent === 'object' && 'todos' in displayContent ? (
           // display nothing, as the TodoTray will handle rendering todos
           <></>
         ) : (
           <AnsiOutputText
-            data={truncatedResultDisplay as AnsiOutput}
+            data={displayContent as AnsiOutput}
             availableTerminalHeight={availableHeight}
             width={childWidth}
           />
+        )}
+        {isTruncatedByLines && (
+          <Text color="dimColor">
+            ... +{hiddenLineCount} lines (Space to expand)
+          </Text>
         )}
       </Box>
     </Box>
