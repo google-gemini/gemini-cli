@@ -79,7 +79,7 @@ tests, aim to follow existing patterns. Key conventions include:
 
 ## Git Repo
 
-The main branch for this project is called "main". You can easily clone this repo by doing ```git clone https://github.com/google-gemini/gemini-cli.git``` then list all remote and local branches via ```git branch -a```. To participate to this repo, you will need a GitHub Account, fork this repo and commit changes.
+The main branch for this project is called "main". For instructions on how to contribute, please see our [Contributing Guide](./CONTRIBUTING.md).
 
 ## JavaScript/TypeScript
 
