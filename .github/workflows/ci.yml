@@ -233,6 +233,7 @@ jobs:
 
   codeql:
     name: 'CodeQL'
+    runs-on: 'ubuntu-latest'
     needs: []
     permissions:
       actions: 'read'
