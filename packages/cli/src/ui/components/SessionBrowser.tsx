@@ -463,9 +463,11 @@ const SessionItem = ({
     }
   }
 
+  // Reserve a few characters for metadata like " (current)" so the name doesn't wrap awkwardly.
+  const reservedForMeta = additionalInfo ? additionalInfo.length + 1 : 0;
   const availableMessageWidth = Math.max(
     20,
-    terminalWidth - FIXED_SESSION_COLUMNS_WIDTH,
+    terminalWidth - FIXED_SESSION_COLUMNS_WIDTH - reservedForMeta,
   );
 
   const truncatedMessage =
