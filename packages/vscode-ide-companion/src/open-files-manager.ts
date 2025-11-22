@@ -7,6 +7,7 @@
 import * as vscode from 'vscode';
 import type {
   File,
+  FileDiagnostic,
   IdeContext,
 } from '@google/gemini-cli-core/src/ide/types.js';
 
@@ -71,12 +72,24 @@ export class OpenFilesManager {
       this.fireWithDebounce();
     });
 
+    const diagnosticWatcher = vscode.languages.onDidChangeDiagnostics(
+      (event) => {
+        for (const uri of event.uris) {
+          if (this.isFileUri(uri)) {
+            this.updateDiagnostic(uri);
+          }
+        }
+        this.fireWithDebounce();
+      },
+    );
+
     context.subscriptions.push(
       editorWatcher,
       selectionWatcher,
       closeWatcher,
       deleteWatcher,
       renameWatcher,
+      diagnosticWatcher,
     );
 
     // Just add current active file on start-up.
@@ -114,6 +127,7 @@ export class OpenFilesManager {
       path: editor.document.uri.fsPath,
       timestamp: Date.now(),
       isActive: true,
+      diagnostics: [],
     });
 
     // Enforce max length
@@ -122,6 +136,7 @@ export class OpenFilesManager {
     }
 
     this.updateActiveContext(editor);
+    this.updateDiagnostic(editor.document.uri);
   }
 
   private remove(uri: vscode.Uri) {
@@ -160,6 +175,32 @@ export class OpenFilesManager {
         selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + '... [TRUNCATED]';
     }
     file.selectedText = selectedText;
+  }
+
+  private updateDiagnostic(uri: vscode.Uri) {
+    const file = this.openFiles.find((f) => f.path === uri.fsPath);
+    if (!file) {
+      return;
+    }
+
+    const diagnostics: FileDiagnostic[] = vscode.languages
+      .getDiagnostics(uri)
+      .map((diagnostic) => ({
+        range: {
+          start: {
+            line: diagnostic.range.start.line + 1,
+            character: diagnostic.range.start.character + 1,
+          },
+          end: {
+            line: diagnostic.range.end.line + 1,
+            character: diagnostic.range.end.character + 1,
+          },
+        },
+        message: diagnostic.message,
+        severity: vscode.DiagnosticSeverity[diagnostic.severity],
+      }));
+
+    file.diagnostics = diagnostics;
   }
 
   private fireWithDebounce() {
