@@ -15,6 +15,7 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { loadSettings } from '../../config/settings.js';
+import { exitCli } from '../utils.js';
 
 interface ValidateArgs {
   path: string;
@@ -101,5 +102,6 @@ export const validateCommand: CommandModule = {
     await handleValidate({
       path: args['path'] as string,
     });
+    await exitCli();
   },
 };

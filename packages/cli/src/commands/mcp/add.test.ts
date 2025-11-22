@@ -10,6 +10,10 @@ import { addCommand } from './add.js';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
   writeFile: vi.fn(),

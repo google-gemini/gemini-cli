@@ -56,6 +56,7 @@ describe('mcp command', () => {
       command: vi.fn().mockReturnThis(),
       demandCommand: vi.fn().mockReturnThis(),
       version: vi.fn().mockReturnThis(),
+      middleware: vi.fn().mockReturnThis(),
     };
 
     (mcpCommand.builder as (y: Argv) => Argv)(mockYargs as unknown as Argv);

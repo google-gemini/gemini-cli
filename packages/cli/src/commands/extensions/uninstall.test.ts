@@ -75,6 +75,9 @@ vi.mock('../../config/extensions/consent.js', () => ({
 vi.mock('../../config/extensions/extensionSettings.js', () => ({
   promptForSetting: vi.fn(),
 }));
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
 
 describe('extensions uninstall command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);

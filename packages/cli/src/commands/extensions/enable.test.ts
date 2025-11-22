@@ -58,6 +58,9 @@ vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
 vi.mock('../../config/extensions/consent.js');
 vi.mock('../../config/extensions/extensionSettings.js');
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
 
 describe('extensions enable command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);

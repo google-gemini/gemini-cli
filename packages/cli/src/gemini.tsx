@@ -634,7 +634,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
   }
 }
 
-function initializeOutputListenersAndFlush() {
+export function initializeOutputListenersAndFlush() {
   // If there are no listeners for output, make sure we flush so output is not
   // lost.
   if (coreEvents.listenerCount(CoreEvent.Output) === 0) {

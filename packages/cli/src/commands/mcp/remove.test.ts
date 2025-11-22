@@ -26,6 +26,10 @@ vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
 }));
 
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 describe('mcp remove command', () => {
   describe('unit tests with mocks', () => {
     let parser: Argv;

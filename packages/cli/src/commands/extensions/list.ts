@@ -11,6 +11,7 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 export async function handleList() {
   try {
@@ -45,5 +46,6 @@ export const listCommand: CommandModule = {
   builder: (yargs) => yargs,
   handler: async () => {
     await handleList();
+    await exitCli();
   },
 };
