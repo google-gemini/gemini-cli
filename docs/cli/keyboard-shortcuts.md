@@ -131,8 +131,8 @@ available combinations.
 - `Ctrl+Left Arrow` / `Meta+Left Arrow` / `Meta+B`: Move one word to the left.
 - `Ctrl+Right Arrow` / `Meta+Right Arrow` / `Meta+F`: Move one word to the
   right.
-  - `Shift+Ctrl+Left / Shift+Ctrl+Right` – Select previous/next word (Windows/Linux)
-- `Shift+Option+Left / Shift+Option+Right` – Select previous/next word (macOS)
+- `Shift+Ctrl+Left Arrow` / `Shift+Ctrl+Right Arrow`: Select previous/next word (Windows/Linux)
+- `Shift+Option+Left Arrow` / `Shift+Option+Right Arrow`: Select previous/next word (macOS)
 - `Ctrl+W`: Delete the word to the left of the cursor (in addition to
   `Ctrl+Backspace` / `Cmd+Backspace`).
 - `Ctrl+Z` / `Ctrl+Shift+Z`: Undo or redo the most recent text edit.
