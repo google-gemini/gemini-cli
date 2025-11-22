@@ -9,9 +9,9 @@ import { CommandKind } from './types.js';
 import { clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
 
-const authChangeCommand: SlashCommand = {
-  name: 'change',
-  description: 'Change the auth method',
+const authLoginCommand: SlashCommand = {
+  name: 'login',
+  description: 'Login or change the auth method',
   kind: CommandKind.BUILT_IN,
   action: (_context, _args): OpenDialogActionReturn => ({
     type: 'dialog',
@@ -45,8 +45,8 @@ export const authCommand: SlashCommand = {
   name: 'auth',
   description: 'Manage authentication',
   kind: CommandKind.BUILT_IN,
-  subCommands: [authChangeCommand, authLogoutCommand],
+  subCommands: [authLoginCommand, authLogoutCommand],
   action: (context, args) =>
-    // Default to change if no subcommand is provided
-    authChangeCommand.action!(context, args),
+    // Default to login if no subcommand is provided
+    authLoginCommand.action!(context, args),
 };

@@ -34,10 +34,10 @@ describe('authCommand', () => {
     vi.clearAllMocks();
   });
 
-  it('should have subcommands: change and logout', () => {
+  it('should have subcommands: login and logout', () => {
     expect(authCommand.subCommands).toBeDefined();
     expect(authCommand.subCommands).toHaveLength(2);
-    expect(authCommand.subCommands?.[0]?.name).toBe('change');
+    expect(authCommand.subCommands?.[0]?.name).toBe('login');
     expect(authCommand.subCommands?.[1]?.name).toBe('logout');
   });
 
@@ -59,11 +59,11 @@ describe('authCommand', () => {
     expect(authCommand.description).toBe('Manage authentication');
   });
 
-  describe('auth change subcommand', () => {
+  describe('auth login subcommand', () => {
     it('should return auth dialog action', () => {
-      const changeCommand = authCommand.subCommands?.[0];
-      expect(changeCommand?.name).toBe('change');
-      const result = changeCommand!.action!(mockContext, '');
+      const loginCommand = authCommand.subCommands?.[0];
+      expect(loginCommand?.name).toBe('login');
+      const result = loginCommand!.action!(mockContext, '');
       expect(result).toEqual({ type: 'dialog', dialog: 'auth' });
     });
   });
