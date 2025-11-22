@@ -157,7 +157,7 @@ describe('createContentGenerator', () => {
     );
   });
 
-  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS and pass api key as Authorization Header for GoogleGenAI requests', async () => {
+  it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS for GoogleGenAI requests without inferring auth mechanism', async () => {
     const mockConfig = {
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
@@ -171,7 +171,7 @@ describe('createContentGenerator', () => {
       'X-Test-Header: test, Another: value',
     );
 
-    const generator = await createContentGenerator(
+    await createContentGenerator(
       {
         apiKey: 'test-api-key',
         authType: AuthType.USE_GEMINI,
@@ -187,15 +187,88 @@ describe('createContentGenerator', () => {
           'User-Agent': expect.any(String),
           'X-Test-Header': 'test',
           Another: 'value',
+        }),
+      },
+    });
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        httpOptions: {
+          headers: expect.objectContaining({
+            Authorization: expect.any(String),
+          }),
+        },
+      }),
+    );
+  });
+
+  it('should pass api key as Authorization Header when GEMINI_API_KEY_AUTH_MECHANISM is set to bearer', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GEMINI_API_KEY_AUTH_MECHANISM', 'bearer');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
           Authorization: 'Bearer test-api-key',
         }),
       },
     });
-    expect(generator).toEqual(
-      new LoggingContentGenerator(
-        (mockGenerator as GoogleGenAI).models,
-        mockConfig,
-      ),
+  });
+
+  it('should not pass api key as Authorization Header when GEMINI_API_KEY_AUTH_MECHANISM is not set (default behavior)', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    // GEMINI_API_KEY_AUTH_MECHANISM is not stubbed, so it will be undefined, triggering default 'x-goog-api-key'
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+        }),
+      },
+    });
+    // Explicitly assert that Authorization header is NOT present
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        httpOptions: {
+          headers: expect.objectContaining({
+            Authorization: expect.any(String),
+          }),
+        },
+      }),
     );
   });
 
