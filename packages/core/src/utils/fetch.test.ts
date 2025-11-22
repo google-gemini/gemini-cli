@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { FetchError, isPrivateIp, fetchWithTimeout } from './fetch.js';
 import * as errorsModule from './errors.js';
 

@@ -35,24 +35,26 @@ vi.mock('../config/extension.js', () => ({
 
 vi.mock('./task.js', () => ({
   Task: {
-    create: vi.fn().mockResolvedValue({
-      id: 'task-123',
-      contextId: 'context-456',
-      taskState: 'submitted',
-      geminiClient: {
-        initialize: vi.fn().mockResolvedValue(undefined),
-      },
-      eventBus: undefined,
-      acceptUserMessage: vi.fn().mockReturnValue((async function* () {})()),
-      acceptAgentMessage: vi.fn().mockResolvedValue(undefined),
-      scheduleToolCalls: vi.fn().mockResolvedValue(undefined),
-      waitForPendingTools: vi.fn().mockResolvedValue(undefined),
-      getAndClearCompletedTools: vi.fn().mockReturnValue([]),
-      addToolResponsesToHistory: vi.fn(),
-      sendCompletedToolsToLlm: vi.fn().mockReturnValue((async function* () {})()),
-      setTaskStateAndPublishUpdate: vi.fn(),
-      cancelPendingTools: vi.fn(),
-    }),
+    create: vi.fn().mockImplementation((id: string, contextId: string) => Promise.resolve({
+        id,
+        contextId,
+        taskState: 'submitted',
+        geminiClient: {
+          initialize: vi.fn().mockResolvedValue(undefined),
+        },
+        eventBus: undefined,
+        acceptUserMessage: vi.fn().mockReturnValue((async function* () {})()),
+        acceptAgentMessage: vi.fn().mockResolvedValue(undefined),
+        scheduleToolCalls: vi.fn().mockResolvedValue(undefined),
+        waitForPendingTools: vi.fn().mockResolvedValue(undefined),
+        getAndClearCompletedTools: vi.fn().mockReturnValue([]),
+        addToolResponsesToHistory: vi.fn(),
+        sendCompletedToolsToLlm: vi
+          .fn()
+          .mockReturnValue((async function* () {})()),
+        setTaskStateAndPublishUpdate: vi.fn(),
+        cancelPendingTools: vi.fn(),
+      })),
   },
 }));
 
@@ -206,7 +208,10 @@ describe('CoderAgentExecutor', () => {
         id: 'task-recon',
         contextId: 'ctx-recon',
         kind: 'task',
-        status: { state: 'input-required', timestamp: new Date().toISOString() },
+        status: {
+          state: 'input-required',
+          timestamp: new Date().toISOString(),
+        },
         metadata: { some: 'data' },
         history: [],
         artifacts: [],
@@ -235,11 +240,9 @@ describe('CoderAgentExecutor', () => {
     });
 
     it('should not cancel task already in final state', async () => {
-      const { Task } = await import('./task.js');
-      const mockTask = await vi.mocked(Task.create).getMockImplementation()!();
-      mockTask.taskState = 'canceled';
-
-      await executor.createTask('already-canceled', 'ctx-1');
+      const wrapper = await executor.createTask('already-canceled', 'ctx-1');
+      // Manually set the task to a final state
+      wrapper.task.taskState = 'canceled';
 
       await executor.cancelTask('already-canceled', mockEventBus);
 

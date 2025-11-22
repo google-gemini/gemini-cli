@@ -5,8 +5,24 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+// Mock os module before importing settings to ensure homedir() is mocked during module initialization
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      homedir: vi.fn(() => '/home/testuser'),
+    },
+    homedir: vi.fn(() => '/home/testuser'),
+  };
+});
+
+vi.mock('node:fs');
+
+import * as fs from 'node:fs';
 import { homedir } from 'node:os';
 import {
   loadSettings,
@@ -14,9 +30,6 @@ import {
   USER_SETTINGS_PATH,
   SETTINGS_DIRECTORY_NAME,
 } from './settings.js';
-
-vi.mock('node:fs');
-vi.mock('node:os');
 
 describe('settings', () => {
   const mockHomedir = '/home/testuser';
@@ -63,9 +76,7 @@ describe('settings', () => {
         coreTools: ['tool1'],
       };
 
-      vi.mocked(fs.existsSync).mockImplementation((filePath) => {
-        return filePath === USER_SETTINGS_PATH;
-      });
+      vi.mocked(fs.existsSync).mockImplementation((filePath) => filePath === USER_SETTINGS_PATH);
 
       vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
         if (filePath === USER_SETTINGS_PATH) {
@@ -91,9 +102,7 @@ describe('settings', () => {
         'settings.json',
       );
 
-      vi.mocked(fs.existsSync).mockImplementation((filePath) => {
-        return filePath === workspaceSettingsPath;
-      });
+      vi.mocked(fs.existsSync).mockImplementation((filePath) => filePath === workspaceSettingsPath);
 
       vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
         if (filePath === workspaceSettingsPath) {
@@ -153,9 +162,7 @@ describe('settings', () => {
         "showMemoryUsage": true
       }`;
 
-      vi.mocked(fs.existsSync).mockImplementation((filePath) => {
-        return filePath === USER_SETTINGS_PATH;
-      });
+      vi.mocked(fs.existsSync).mockImplementation((filePath) => filePath === USER_SETTINGS_PATH);
 
       vi.mocked(fs.readFileSync).mockReturnValue(settingsWithComments);
 
@@ -181,7 +188,9 @@ describe('settings', () => {
       };
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(settingsWithEnv));
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify(settingsWithEnv),
+      );
 
       const result = loadSettings(mockWorkspaceDir);
 
@@ -207,7 +216,9 @@ describe('settings', () => {
       };
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(settingsWithEnv));
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify(settingsWithEnv),
+      );
 
       const result = loadSettings(mockWorkspaceDir);
 
@@ -230,13 +241,9 @@ describe('settings', () => {
     });
 
     it('should log errors for invalid user settings', () => {
-      vi.mocked(fs.existsSync).mockImplementation((filePath) => {
-        return filePath === USER_SETTINGS_PATH;
-      });
+      vi.mocked(fs.existsSync).mockImplementation((filePath) => filePath === USER_SETTINGS_PATH);
 
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
-        return 'invalid json';
-      });
+      vi.mocked(fs.readFileSync).mockImplementation(() => 'invalid json');
 
       loadSettings(mockWorkspaceDir);
 
