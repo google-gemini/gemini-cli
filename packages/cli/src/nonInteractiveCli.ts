@@ -96,7 +96,13 @@ export async function runNonInteractive({
 
     // Handle Ctrl+C (SIGINT) explicitly because the Telemetry SDK's listener
     // prevents the default Node.js exit behavior, but doesn't exit the process itself.
+    let isExiting = false;
     process.on('SIGINT', async () => {
+      if (isExiting) {
+        return;
+      }
+      isExiting = true;
+
       // 1. Stop the generation loop
       abortController.abort();
 

@@ -58,6 +58,12 @@ vi.mock('../../contexts/UIStateContext.js', () => ({
   useUIState: () => mockUseUIState(),
 }));
 
+// Mock SettingsContext
+const mockUseSettings = vi.fn();
+vi.mock('../../contexts/SettingsContext.js', () => ({
+  useSettings: () => mockUseSettings(),
+}));
+
 // Mock useAlternateBuffer
 const mockUseAlternateBuffer = vi.fn();
 vi.mock('../../hooks/useAlternateBuffer.js', () => ({
@@ -68,6 +74,13 @@ describe('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseUIState.mockReturnValue({ renderMarkdown: true });
+    mockUseSettings.mockReturnValue({
+      merged: {
+        tools: {
+          truncateToolOutputLines: 15,
+        },
+      },
+    });
     mockUseAlternateBuffer.mockReturnValue(false);
   });
 
