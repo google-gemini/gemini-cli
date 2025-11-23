@@ -55,85 +55,111 @@ import {
   type AfterToolInput,
 } from '../hooks/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { Worker } from 'node:worker_threads';
+
+// Inline worker code for regex testing to avoid separate file dependency
+const workerCode = `
+const { parentPort } = require('node:worker_threads');
+
+if (!parentPort) {
+  throw new Error('This code must be run as a worker thread');
+}
+
+parentPort.on('message', ({ pattern, testString }) => {
+  try {
+    const regex = new RegExp(pattern);
+    const result = regex.test(testString);
+    parentPort.postMessage({ success: true, result });
+  } catch (error) {
+    parentPort.postMessage({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+`;
 
 /**
  * Safely tests a string against a user-provided regex pattern to prevent
  * ReDoS (Regular Expression Denial of Service) attacks.
  *
- * NOTE: This function uses pattern detection to identify potentially dangerous
- * regex patterns. It cannot provide runtime timeout protection because regex
- * execution in JavaScript is synchronous and blocks the event loop. For true
- * timeout protection, regex execution would need to run in a worker thread.
+ * This function executes the regex test in an isolated worker thread with a hard
+ * timeout. If the regex takes too long (catastrophic backtracking), the worker
+ * is terminated and the pattern is rejected. This provides robust protection
+ * against malicious or poorly-written regex patterns from untrusted hook sources.
  *
  * @param pattern - The regex pattern from user configuration
  * @param testString - The string to test against the pattern
- * @returns true if pattern matches, false if pattern is rejected or doesn't match
+ * @param timeoutMs - Maximum time to allow regex execution (default: 100ms)
+ * @returns Promise resolving to true if pattern matches, false otherwise
  */
-function safeRegexTest(pattern: string, testString: string): boolean {
-  // Comprehensive detection of patterns that could cause catastrophic backtracking.
-  // These patterns can cause exponential time complexity with certain inputs.
-  const dangerousPatterns = [
-    // Nested quantifiers - the most common cause of ReDoS
-    /\([^)]*[*+][^)]*\)[*+]/, // (x+)+, (x*)*, (x+)*, etc.
-    /\([^)]*[*+][^)]*\)\{/, // (x+){n,m}
+async function safeRegexTest(
+  pattern: string,
+  testString: string,
+  timeoutMs = 100,
+): Promise<boolean> {
+  // Quick checks before spinning up a worker
+  if (pattern === '*') return true;
+  if (pattern === testString) return true;
 
-    // Multiple greedy quantifiers in sequence without anchors
-    /\.\*\.\*/, // .*.* - greedy quantifiers on wildcards
-    /\.\+\.\+/, // .+.+ - greedy quantifiers on wildcards
-    /\.\*\.\+/, // .*.+
-    /\.\+\.\*/, // .+.*
+  return new Promise((resolve) => {
+    let worker: Worker;
+    let resolved = false;
 
-    // Nested groups with quantifiers
-    /\(\([^)]*[*+]/, // ((x+) - nested groups with quantifiers
-    /\([^)]*\([^)]*[*+]/, // (a(x+) - nested groups with quantifiers
-
-    // Alternation with overlapping patterns
-    /\([^|)]*\|[^)]*\)[*+]/, // (a|ab)+ - alternation with overlap in quantified group
-
-    // Character classes with quantifiers inside quantified groups
-    /\(\[[^\]]*\][*+][^)]*\)[*+]/, // ([a-z]+)+ - character class with quantifier in quantified group
-
-    // Extremely complex patterns
-    /(\([^)]*){3,}/, // More than 2 levels of nested groups
-    /{[0-9]+,}.*{[0-9]+,}/, // Multiple unbounded quantifiers
-
-    // Known evil patterns
-    /\(a\+\)\+b/, // (a+)+b - classic ReDoS example
-    /\(a\|\w\)\*/, // (a|\w)* - alternation with character class
-  ];
-
-  for (const dangerous of dangerousPatterns) {
-    if (dangerous.test(pattern)) {
-      // Pattern matches a known dangerous pattern, fall back to exact match
+    try {
+      // Create worker from inline code
+      worker = new Worker(workerCode, { eval: true });
+    } catch (error) {
+      // If worker creation fails, fall back to exact match
       debugLogger.warn(
-        `Regex pattern '${pattern}' appears potentially unsafe for ReDoS. Falling back to exact match.`,
+        `Failed to create worker for regex test: ${error}. Falling back to exact match.`,
       );
-      return pattern === testString;
+      resolve(pattern === testString);
+      return;
     }
-  }
 
-  // Additional heuristic checks
-  const quantifierCount = (pattern.match(/[*+?{]/g) || []).length;
-  const groupCount = (pattern.match(/\(/g) || []).length;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        worker.terminate();
+        debugLogger.warn(
+          `Regex pattern '${pattern}' timed out after ${timeoutMs}ms. Falling back to exact match.`,
+        );
+        resolve(pattern === testString);
+      }
+    }, timeoutMs);
 
-  // Too many quantifiers or groups is suspicious
-  if (quantifierCount > 5 || groupCount > 3) {
-    debugLogger.warn(
-      `Regex pattern '${pattern}' has high complexity (${quantifierCount} quantifiers, ${groupCount} groups). Falling back to exact match.`,
-    );
-    return pattern === testString;
-  }
+    worker.on('message', (msg) => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        worker.terminate();
 
-  try {
-    const regex = new RegExp(pattern);
-    return regex.test(testString);
-  } catch (error) {
-    // If regex compilation fails, fall back to exact match
-    debugLogger.warn(
-      `Failed to compile regex pattern '${pattern}': ${error}. Falling back to exact match.`,
-    );
-    return pattern === testString;
-  }
+        if (msg.success) {
+          resolve(msg.result);
+        } else {
+          debugLogger.warn(
+            `Failed to compile regex pattern '${pattern}': ${msg.error}. Falling back to exact match.`,
+          );
+          resolve(pattern === testString);
+        }
+      }
+    });
+
+    worker.on('error', (error) => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        worker.terminate();
+        debugLogger.warn(
+          `Worker error testing regex pattern '${pattern}': ${error}. Falling back to exact match.`,
+        );
+        resolve(pattern === testString);
+      }
+    });
+
+    worker.postMessage({ pattern, testString });
+  });
 }
 
 export type ValidatingToolCall = {
@@ -931,11 +957,18 @@ export class CoreToolScheduler {
         if (registry) {
           const hooks = registry.getHooksForEvent(HookEventName.BeforeTool);
           if (hooks.length > 0) {
-            const matchingHooks = hooks.filter((entry) => {
-              if (!entry.matcher || entry.matcher === '*') return true;
-              // Use safe regex test to prevent ReDoS attacks
-              return safeRegexTest(entry.matcher, reqInfo.name);
-            });
+            // Evaluate all matchers in parallel with worker thread protection
+            const matchResults = await Promise.all(
+              hooks.map(async (entry) => {
+                if (!entry.matcher || entry.matcher === '*') return true;
+                // Use safe regex test to prevent ReDoS attacks
+                return safeRegexTest(entry.matcher, reqInfo.name);
+              }),
+            );
+
+            const matchingHooks = hooks.filter(
+              (_, index) => matchResults[index],
+            );
 
             if (matchingHooks.length > 0) {
               const hookConfigs = matchingHooks.map((h) => h.config);
@@ -1371,11 +1404,18 @@ export class CoreToolScheduler {
                   HookEventName.AfterTool,
                 );
                 if (hooks.length > 0) {
-                  const matchingHooks = hooks.filter((entry) => {
-                    if (!entry.matcher || entry.matcher === '*') return true;
-                    // Use safe regex test to prevent ReDoS attacks
-                    return safeRegexTest(entry.matcher, toolName);
-                  });
+                  // Evaluate all matchers in parallel with worker thread protection
+                  const matchResults = await Promise.all(
+                    hooks.map(async (entry) => {
+                      if (!entry.matcher || entry.matcher === '*') return true;
+                      // Use safe regex test to prevent ReDoS attacks
+                      return safeRegexTest(entry.matcher, toolName);
+                    }),
+                  );
+
+                  const matchingHooks = hooks.filter(
+                    (_, index) => matchResults[index],
+                  );
 
                   if (matchingHooks.length > 0) {
                     const hookConfigs = matchingHooks.map((h) => h.config);
