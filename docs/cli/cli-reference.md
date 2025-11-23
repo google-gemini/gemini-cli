@@ -12,8 +12,8 @@ and parameters.
 | `gemini -p "query"`                | Query via SDK, then exit           | `gemini -p "explain this function"`                 |
 | `cat file \| gemini -p "query"`    | Process piped content              | `cat logs.txt \| gemini -p "explain"`               |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`  |
-| `gemini -c`                        | Continue most recent session       | `gemini -c`                                         |
-| `gemini -c -p "query"`             | Continue via SDK                   | `gemini -c -p "Check for type errors"`              |
+| `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                |
+| `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`        |
 | `gemini -r "<session-id>" "query"` | Resume session by ID               | `gemini -r "abc123" "Finish this PR"`               |
 | `gemini update`                    | Update to latest version           | `gemini update`                                     |
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management) |
