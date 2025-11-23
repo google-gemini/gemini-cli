@@ -332,10 +332,12 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
         displayName = appInfo.fullApplicationName
       )
 
-    val workspacePath =
-      ProjectRootManager.getInstance(project).contentRoots.joinToString(File.pathSeparator) {
-        it.path
-      }
+    val contentRoots = ProjectRootManager.getInstance(project).contentRoots
+    val workspacePath = if (contentRoots.isNotEmpty()) {
+        contentRoots.joinToString(File.pathSeparator) { it.path }
+    } else {
+        project.basePath ?: ""
+    }
 
     val ppid = ProcessHandle.current().pid()
     val actualPort = port ?: project.service<GeminiCliServerState>().port
