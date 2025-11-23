@@ -46,6 +46,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
 > = {
   name: 'codebase_investigator',
   displayName: 'Codebase Investigator Agent',
+  icon: '🔍',
   description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. 
     Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation. 
     It returns a structured report with key file paths, symbols, and actionable architectural insights.`,

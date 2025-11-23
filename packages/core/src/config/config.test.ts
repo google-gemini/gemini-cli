@@ -140,7 +140,7 @@ vi.mock('../agents/registry.js', () => ({
     config: Config,
   ) {
     this.config = config;
-    this.definitions = new Map<string, AgentDefinition>(); // Initialize definitions as instance property
+    this.definitions = new Map<string, AgentDefinition>();
     this.initialize = vi.fn(function (this: any) {
       const settings = (
         this.config as Config
@@ -150,6 +150,7 @@ vi.mock('../agents/registry.js', () => ({
           name: 'codebase_investigator',
           displayName: 'Codebase Investigator Agent',
           description: 'The specialized tool for codebase analysis...',
+          icon: '🔍',
           promptConfig: {
             systemPrompt: 'You are Codebase Investigator...',
             query: 'Your task is to do a deep investigation of the codebase...',
@@ -183,21 +184,17 @@ vi.mock('../agents/registry.js', () => ({
         this.definitions.delete('codebase_investigator');
       }
     });
-
-    this.getDefinition = vi.fn((this: any, name: string) =>
-      this.definitions.get(name),
-    );
-    this.registerAgent = vi.fn((this: any, def: AgentDefinition) =>
-      this.definitions.set(def.name, def),
-    );
+    this.getAllDefinitions = vi.fn(function (this: any) {
+      return Array.from(this.definitions.values());
+    });
+    this.getDefinition = vi.fn(function (this: any, name: string) {
+      return this.definitions.get(name);
+    });
+    this.registerAgent = vi.fn(function (this: any, def: AgentDefinition) {
+      this.definitions.set(def.name, def);
+    });
     this.unregisterAgent = vi.fn(function (this: any, name: string) {
       this.definitions.delete(name);
-    });
-    this.getAllDefinitions = vi.fn(function (this: any) {
-      return Array.from(this.definitions.values());
-    });
-    this.getAllDefinitions = vi.fn(function (this: any) {
-      return Array.from(this.definitions.values());
     });
   }),
 }));
@@ -278,7 +275,6 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
-    definitions.clear();
     loadUserAgents.mockClear();
   });
 

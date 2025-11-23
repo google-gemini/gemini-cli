@@ -10,6 +10,7 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType, type HistoryItemToolsList } from '../types.js';
+import { Kind } from '@google/gemini-cli-core';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
@@ -38,7 +39,10 @@ export const toolsCommand: SlashCommand = {
 
     const tools = toolRegistry.getAllTools();
     // Filter out MCP tools by checking for the absence of a serverName property
-    const geminiTools = tools.filter((tool) => !('serverName' in tool));
+    // And filter out agents (Kind.Think) which are listed separately via /agents
+    const geminiTools = tools.filter(
+      (tool) => !('serverName' in tool) && tool.kind !== Kind.Think,
+    );
 
     const toolsListItem: HistoryItemToolsList = {
       type: MessageType.TOOLS_LIST,

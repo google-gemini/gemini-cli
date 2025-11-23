@@ -18,6 +18,7 @@ import { type AgentDefinition } from './types.js';
 const AgentTomlSchema = z.object({
   name: z.string(),
   displayName: z.string().optional(),
+  icon: z.string().optional(),
   description: z.string(),
   promptConfig: z.object({
     systemPrompt: z.string().optional(),
@@ -69,11 +70,17 @@ export async function loadAgentFromToml(
   filePath: string,
 ): Promise<AgentDefinition<any>> {
   const content = await fs.readFile(filePath, 'utf-8');
-  return parseAgentToml(content);
+
+  return parseAgentToml(content, filePath);
 }
 
-export function parseAgentToml(content: string): AgentDefinition<any> {
+export function parseAgentToml(
+  content: string,
+
+  filePath?: string,
+): AgentDefinition<any> {
   const raw = toml.parse(content);
+
   const parsed = AgentTomlSchema.parse(raw);
 
   // Map TOML-friendly structure to AgentDefinition
@@ -81,16 +88,26 @@ export function parseAgentToml(content: string): AgentDefinition<any> {
   const definition: AgentDefinition<any> = {
     name: parsed.name,
     displayName: parsed.displayName,
+    icon: parsed.icon,
+    filePath,
     description: parsed.description,
+
     promptConfig: parsed.promptConfig,
+
     modelConfig: parsed.modelConfig,
+
     runConfig: parsed.runConfig,
+
     toolConfig: parsed.toolConfig,
+
     inputConfig: parsed.inputConfig,
+
     outputConfig: parsed.outputConfig
       ? {
           outputName: parsed.outputConfig.outputName,
+
           description: parsed.outputConfig.description,
+
           schema: z.unknown(), // Default to unknown schema for TOML-defined agents for now
         }
       : undefined,

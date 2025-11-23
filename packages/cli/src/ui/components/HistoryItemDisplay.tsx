@@ -28,6 +28,7 @@ import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
 import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
+import { AgentsList } from './views/AgentsList.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
@@ -146,6 +147,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <ToolsList
           terminalWidth={terminalWidth}
           tools={itemForDisplay.tools}
+          showDescriptions={itemForDisplay.showDescriptions}
+        />
+      )}
+      {itemForDisplay.type === 'agents_list' && (
+        <AgentsList
+          terminalWidth={terminalWidth}
+          agents={itemForDisplay.agents}
           showDescriptions={itemForDisplay.showDescriptions}
         />
       )}
