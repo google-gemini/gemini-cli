@@ -27,14 +27,16 @@ export const installCommand: CommandModule = {
 
     await extensionManager.loadExtensions();
 
-    let type: ExtensionInstallMetadata['type'] = 'git';
+    let type: ExtensionInstallMetadata['type'];
     if (source.startsWith('.') || source.startsWith('/')) {
       type = 'local';
     } else if (source.startsWith('http')) {
       type = 'git'; // Default to git for URLs
     } else {
-      // Fallback or TODO: npm support?
-      console.warn('Assuming git source for: ' + source);
+      console.error(
+        `Could not determine source type for "${source}". Please provide a local path or a git URL.`,
+      );
+      return;
     }
 
     const metadata: ExtensionInstallMetadata = {

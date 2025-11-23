@@ -862,11 +862,13 @@ export const useGeminiStream = (
             break;
           default: {
             // enforces exhaustive switch-case
-            // const unreachable: never = event;
-            return {
-              status: StreamProcessingStatus.Error,
-              text: geminiMessageBuffer,
-            };
+            const unreachable: never = event;
+            // This error will be caught by the `try...catch` block in `submitQuery`,
+            // and ensures that unhandled event types are not silently ignored.
+            // The cast to unknown then to an object type allows us to access the type property
+            throw new Error(
+              `Unhandled event type: ${(unreachable as unknown as { type: string }).type}`,
+            );
           }
         }
       }
