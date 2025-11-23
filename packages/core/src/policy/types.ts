@@ -151,6 +151,36 @@ export interface HookExecutionContext {
   trustedFolder?: boolean;
 }
 
+/**
+ * Rule for applying safety checkers to hook executions.
+ * Similar to SafetyCheckerRule but with hook-specific matching criteria.
+ */
+export interface HookCheckerRule {
+  /**
+   * The name of the hook event this rule applies to.
+   * If undefined, the rule applies to all hook events.
+   */
+  eventName?: string;
+
+  /**
+   * The source of hooks this rule applies to.
+   * If undefined, the rule applies to all hook sources.
+   */
+  hookSource?: HookSource;
+
+  /**
+   * Priority of this checker. Higher numbers run first.
+   * Default is 0.
+   */
+  priority?: number;
+
+  /**
+   * Specifies an external or built-in safety checker to execute for
+   * additional validation of a hook execution.
+   */
+  checker: SafetyCheckerConfig;
+}
+
 export interface PolicyEngineConfig {
   /**
    * List of policy rules to apply.
@@ -158,9 +188,14 @@ export interface PolicyEngineConfig {
   rules?: PolicyRule[];
 
   /**
-   * List of safety checkers to apply.
+   * List of safety checkers to apply to tool calls.
    */
   checkers?: SafetyCheckerRule[];
+
+  /**
+   * List of safety checkers to apply to hook executions.
+   */
+  hookCheckers?: HookCheckerRule[];
 
   /**
    * Default decision when no rules match.

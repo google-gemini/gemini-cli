@@ -92,16 +92,20 @@ export class MessageBus extends EventEmitter {
       } else if (message.type === MessageBusType.HOOK_EXECUTION_REQUEST) {
         // Handle hook execution requests through policy evaluation
         const hookRequest = message as HookExecutionRequest;
-        const decision = this.policyEngine.checkHook(hookRequest);
+        const decision = await this.policyEngine.checkHook(hookRequest);
+
+        // Map decision to allow/deny for observability (ASK_USER treated as deny for hooks)
+        const effectiveDecision =
+          decision === PolicyDecision.ALLOW ? 'allow' : 'deny';
 
         // Emit policy decision for observability
         this.emitMessage({
           type: MessageBusType.HOOK_POLICY_DECISION,
           eventName: hookRequest.eventName,
           hookSource: getHookSource(hookRequest.input),
-          decision: decision === PolicyDecision.ALLOW ? 'allow' : 'deny',
+          decision: effectiveDecision,
           reason:
-            decision === PolicyDecision.DENY
+            decision !== PolicyDecision.ALLOW
               ? 'Hook execution denied by policy'
               : undefined,
         } as HookPolicyDecision);
@@ -110,7 +114,7 @@ export class MessageBus extends EventEmitter {
         if (decision === PolicyDecision.ALLOW) {
           this.emitMessage(message);
         } else {
-          // If denied, emit error response
+          // If denied or ASK_USER, emit error response (hooks don't support interactive confirmation)
           this.emitMessage({
             type: MessageBusType.HOOK_EXECUTION_RESPONSE,
             correlationId: hookRequest.correlationId,
