@@ -44,6 +44,183 @@ import {
 import { debugLogger } from '../utils/debugLogger.js';
 
 /**
+ * Validates that a value is a non-null object
+ */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Validates BeforeTool input fields
+ */
+function validateBeforeToolInput(input: Record<string, unknown>): {
+  toolName: string;
+  toolInput: Record<string, unknown>;
+} {
+  const toolName = input['tool_name'];
+  const toolInput = input['tool_input'];
+  if (typeof toolName !== 'string') {
+    throw new Error(
+      'Invalid input for BeforeTool hook event: tool_name must be a string',
+    );
+  }
+  if (!isObject(toolInput)) {
+    throw new Error(
+      'Invalid input for BeforeTool hook event: tool_input must be an object',
+    );
+  }
+  return { toolName, toolInput };
+}
+
+/**
+ * Validates AfterTool input fields
+ */
+function validateAfterToolInput(input: Record<string, unknown>): {
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  toolResponse: Record<string, unknown>;
+} {
+  const toolName = input['tool_name'];
+  const toolInput = input['tool_input'];
+  const toolResponse = input['tool_response'];
+  if (typeof toolName !== 'string') {
+    throw new Error(
+      'Invalid input for AfterTool hook event: tool_name must be a string',
+    );
+  }
+  if (!isObject(toolInput)) {
+    throw new Error(
+      'Invalid input for AfterTool hook event: tool_input must be an object',
+    );
+  }
+  if (!isObject(toolResponse)) {
+    throw new Error(
+      'Invalid input for AfterTool hook event: tool_response must be an object',
+    );
+  }
+  return { toolName, toolInput, toolResponse };
+}
+
+/**
+ * Validates BeforeAgent input fields
+ */
+function validateBeforeAgentInput(input: Record<string, unknown>): {
+  prompt: string;
+} {
+  const prompt = input['prompt'];
+  if (typeof prompt !== 'string') {
+    throw new Error(
+      'Invalid input for BeforeAgent hook event: prompt must be a string',
+    );
+  }
+  return { prompt };
+}
+
+/**
+ * Validates AfterAgent input fields
+ */
+function validateAfterAgentInput(input: Record<string, unknown>): {
+  prompt: string;
+  promptResponse: string;
+  stopHookActive: boolean;
+} {
+  const prompt = input['prompt'];
+  const promptResponse = input['prompt_response'];
+  const stopHookActive = input['stop_hook_active'];
+  if (typeof prompt !== 'string') {
+    throw new Error(
+      'Invalid input for AfterAgent hook event: prompt must be a string',
+    );
+  }
+  if (typeof promptResponse !== 'string') {
+    throw new Error(
+      'Invalid input for AfterAgent hook event: prompt_response must be a string',
+    );
+  }
+  // stopHookActive defaults to false if not a boolean
+  return {
+    prompt,
+    promptResponse,
+    stopHookActive:
+      typeof stopHookActive === 'boolean' ? stopHookActive : false,
+  };
+}
+
+/**
+ * Validates model-related input fields (llm_request)
+ */
+function validateModelInput(
+  input: Record<string, unknown>,
+  eventName: string,
+): { llmRequest: GenerateContentParameters } {
+  const llmRequest = input['llm_request'];
+  if (!isObject(llmRequest)) {
+    throw new Error(
+      `Invalid input for ${eventName} hook event: llm_request must be an object`,
+    );
+  }
+  return { llmRequest: llmRequest as unknown as GenerateContentParameters };
+}
+
+/**
+ * Validates AfterModel input fields
+ */
+function validateAfterModelInput(input: Record<string, unknown>): {
+  llmRequest: GenerateContentParameters;
+  llmResponse: GenerateContentResponse;
+} {
+  const llmRequest = input['llm_request'];
+  const llmResponse = input['llm_response'];
+  if (!isObject(llmRequest)) {
+    throw new Error(
+      'Invalid input for AfterModel hook event: llm_request must be an object',
+    );
+  }
+  if (!isObject(llmResponse)) {
+    throw new Error(
+      'Invalid input for AfterModel hook event: llm_response must be an object',
+    );
+  }
+  return {
+    llmRequest: llmRequest as unknown as GenerateContentParameters,
+    llmResponse: llmResponse as unknown as GenerateContentResponse,
+  };
+}
+
+/**
+ * Validates Notification input fields
+ */
+function validateNotificationInput(input: Record<string, unknown>): {
+  notificationType: NotificationType;
+  message: string;
+  details: Record<string, unknown>;
+} {
+  const notificationType = input['notification_type'];
+  const message = input['message'];
+  const details = input['details'];
+  if (typeof notificationType !== 'string') {
+    throw new Error(
+      'Invalid input for Notification hook event: notification_type must be a string',
+    );
+  }
+  if (typeof message !== 'string') {
+    throw new Error(
+      'Invalid input for Notification hook event: message must be a string',
+    );
+  }
+  if (!isObject(details)) {
+    throw new Error(
+      'Invalid input for Notification hook event: details must be an object',
+    );
+  }
+  return {
+    notificationType: notificationType as NotificationType,
+    message,
+    details,
+  };
+}
+
+/**
  * Hook event bus that coordinates hook execution across the system
  */
 export class HookEventHandler {
@@ -449,36 +626,42 @@ export class HookEventHandler {
 
       // Route to appropriate event handler based on eventName
       switch (request.eventName) {
-        case HookEventName.BeforeTool:
-          result = await this.fireBeforeToolEvent(
-            enrichedInput['tool_name'] as string,
-            enrichedInput['tool_input'] as Record<string, unknown>,
-          );
+        case HookEventName.BeforeTool: {
+          const { toolName, toolInput } =
+            validateBeforeToolInput(enrichedInput);
+          result = await this.fireBeforeToolEvent(toolName, toolInput);
           break;
-        case HookEventName.AfterTool:
+        }
+        case HookEventName.AfterTool: {
+          const { toolName, toolInput, toolResponse } =
+            validateAfterToolInput(enrichedInput);
           result = await this.fireAfterToolEvent(
-            enrichedInput['tool_name'] as string,
-            enrichedInput['tool_input'] as Record<string, unknown>,
-            enrichedInput['tool_response'] as Record<string, unknown>,
+            toolName,
+            toolInput,
+            toolResponse,
           );
           break;
-        case HookEventName.BeforeAgent:
-          result = await this.fireBeforeAgentEvent(
-            enrichedInput['prompt'] as string,
-          );
+        }
+        case HookEventName.BeforeAgent: {
+          const { prompt } = validateBeforeAgentInput(enrichedInput);
+          result = await this.fireBeforeAgentEvent(prompt);
           break;
-        case HookEventName.AfterAgent:
+        }
+        case HookEventName.AfterAgent: {
+          const { prompt, promptResponse, stopHookActive } =
+            validateAfterAgentInput(enrichedInput);
           result = await this.fireAfterAgentEvent(
-            enrichedInput['prompt'] as string,
-            enrichedInput['prompt_response'] as string,
-            enrichedInput['stop_hook_active'] as boolean,
+            prompt,
+            promptResponse,
+            stopHookActive,
           );
           break;
+        }
         case HookEventName.BeforeModel: {
-          // Translate raw LLM request to hook format
-          const llmRequest = enrichedInput[
-            'llm_request'
-          ] as GenerateContentParameters;
+          const { llmRequest } = validateModelInput(
+            enrichedInput,
+            'BeforeModel',
+          );
           const translatedRequest =
             defaultHookTranslator.toHookLLMRequest(llmRequest);
           // Update the enrichedInput with translated request
@@ -487,13 +670,8 @@ export class HookEventHandler {
           break;
         }
         case HookEventName.AfterModel: {
-          // Translate raw LLM request and response to hook format
-          const llmRequest = enrichedInput[
-            'llm_request'
-          ] as GenerateContentParameters;
-          const llmResponse = enrichedInput[
-            'llm_response'
-          ] as GenerateContentResponse;
+          const { llmRequest, llmResponse } =
+            validateAfterModelInput(enrichedInput);
           const translatedRequest =
             defaultHookTranslator.toHookLLMRequest(llmRequest);
           const translatedResponse =
@@ -505,10 +683,10 @@ export class HookEventHandler {
           break;
         }
         case HookEventName.BeforeToolSelection: {
-          // Translate raw LLM request to hook format
-          const llmRequest = enrichedInput[
-            'llm_request'
-          ] as GenerateContentParameters;
+          const { llmRequest } = validateModelInput(
+            enrichedInput,
+            'BeforeToolSelection',
+          );
           const translatedRequest =
             defaultHookTranslator.toHookLLMRequest(llmRequest);
           // Update the enrichedInput with translated request
@@ -516,13 +694,16 @@ export class HookEventHandler {
           result = await this.fireBeforeToolSelectionEvent(llmRequest);
           break;
         }
-        case HookEventName.Notification:
+        case HookEventName.Notification: {
+          const { notificationType, message, details } =
+            validateNotificationInput(enrichedInput);
           result = await this.fireNotificationEvent(
-            enrichedInput['notification_type'] as NotificationType,
-            enrichedInput['message'] as string,
-            enrichedInput['details'] as Record<string, unknown>,
+            notificationType,
+            message,
+            details,
           );
           break;
+        }
         default:
           throw new Error(`Unsupported hook event: ${request.eventName}`);
       }

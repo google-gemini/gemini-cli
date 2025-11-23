@@ -11,6 +11,7 @@ import {
   type PolicyRule,
   type SafetyCheckerRule,
   type HookExecutionContext,
+  getHookSource,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -225,15 +226,11 @@ export class PolicyEngine {
       'input' in request
         ? {
             eventName: request.eventName,
-            hookSource:
-              (request.input['hook_source'] as
-                | 'project'
-                | 'user'
-                | 'system'
-                | 'extension') || 'project',
-            trustedFolder: request.input['trusted_folder'] as
-              | boolean
-              | undefined,
+            hookSource: getHookSource(request.input),
+            trustedFolder:
+              typeof request.input['trusted_folder'] === 'boolean'
+                ? request.input['trusted_folder']
+                : undefined,
           }
         : request;
 

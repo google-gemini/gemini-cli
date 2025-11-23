@@ -7,7 +7,7 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import type { PolicyEngine } from '../policy/policy-engine.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, getHookSource } from '../policy/types.js';
 import {
   MessageBusType,
   type Message,
@@ -98,12 +98,7 @@ export class MessageBus extends EventEmitter {
         this.emitMessage({
           type: MessageBusType.HOOK_POLICY_DECISION,
           eventName: hookRequest.eventName,
-          hookSource:
-            (hookRequest.input['hook_source'] as
-              | 'project'
-              | 'user'
-              | 'system'
-              | 'extension') || 'project',
+          hookSource: getHookSource(hookRequest.input),
           decision: decision === PolicyDecision.ALLOW ? 'allow' : 'deny',
           reason:
             decision === PolicyDecision.DENY

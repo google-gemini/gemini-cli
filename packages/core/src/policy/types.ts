@@ -12,6 +12,36 @@ export enum PolicyDecision {
   ASK_USER = 'ask_user',
 }
 
+/**
+ * Valid sources for hook execution
+ */
+export type HookSource = 'project' | 'user' | 'system' | 'extension';
+
+/**
+ * Array of valid hook source values for runtime validation
+ */
+const VALID_HOOK_SOURCES: HookSource[] = [
+  'project',
+  'user',
+  'system',
+  'extension',
+];
+
+/**
+ * Safely extract and validate hook source from input
+ * Returns 'project' as default if the value is invalid or missing
+ */
+export function getHookSource(input: Record<string, unknown>): HookSource {
+  const source = input['hook_source'];
+  if (
+    typeof source === 'string' &&
+    VALID_HOOK_SOURCES.includes(source as HookSource)
+  ) {
+    return source as HookSource;
+  }
+  return 'project';
+}
+
 export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
@@ -117,7 +147,7 @@ export interface SafetyCheckerRule {
 
 export interface HookExecutionContext {
   eventName: string;
-  hookSource?: 'project' | 'user' | 'system' | 'extension';
+  hookSource?: HookSource;
   trustedFolder?: boolean;
 }
 
