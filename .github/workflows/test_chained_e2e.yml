@@ -53,12 +53,12 @@ jobs:
         run: |
           mkdir -p ./pr
           echo '${{ env.REPO_NAME }}' > ./pr/repo_name
-      - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+      - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4.6.2
         with:
           name: 'repo_name'
           path: 'pr/'
       - name: 'Download the repo_name artifact'
-        uses: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0' # ratchet:actions/download-artifact@v5
+        uses: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0' # ratchet:actions/download-artifact@v5.0.0
         env:
           RUN_ID: "${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id  }}"
         with:
@@ -68,7 +68,7 @@ jobs:
           path: '${{ runner.temp }}/artifacts'
       - name: 'Output Repo Name'
         id: 'output-repo-name'
-        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8
+        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8.0.0
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
@@ -139,7 +139,7 @@ jobs:
           repository: '${{ needs.parse_run_context.outputs.repository }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4.4.0
         with:
           node-version: '${{ matrix.node-version }}'
 
@@ -151,7 +151,7 @@ jobs:
 
       - name: 'Set up Docker'
         if: "matrix.sandbox == 'sandbox:docker'"
-        uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+        uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3.11.1
 
       - name: 'Run E2E tests'
         env:
@@ -182,7 +182,7 @@ jobs:
           repository: '${{ needs.parse_run_context.outputs.repository }}'
 
       - name: 'Set up Node.js 20.x'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4.4.0
         with:
           node-version: '20.x'
 
@@ -217,13 +217,13 @@ jobs:
 
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4.3.0
         with:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
 
       - name: 'Set up Node.js 20.x'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4.4.0
         with:
           node-version: '20.x'
           cache: 'npm'
