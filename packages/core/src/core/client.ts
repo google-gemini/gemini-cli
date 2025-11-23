@@ -47,7 +47,7 @@ import {
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import type { IdeContext, File } from '../ide/types.js';
+import type { IdeContext, File, FileDiagnostic } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -241,6 +241,7 @@ export class GeminiClient {
               }
             : undefined,
           selectedText: activeFile.selectedText || undefined,
+          diagnostics: activeFile.diagnostics || [],
         };
       }
 
@@ -322,6 +323,7 @@ export class GeminiClient {
                 }
               : undefined,
             selectedText: currentActiveFile.selectedText || undefined,
+            diagnostics: currentActiveFile.diagnostics || [],
           };
         } else {
           const lastCursor = lastActiveFile.cursor;
@@ -348,6 +350,41 @@ export class GeminiClient {
               path: currentActiveFile.path,
               selectedText: currentSelectedText,
             };
+          }
+
+          const lastDiagnostics = new Map(
+            (lastActiveFile.diagnostics || []).map((d) => [
+              JSON.stringify(d),
+              d,
+            ]),
+          );
+          const currentDiagnostics = new Map(
+            (currentActiveFile.diagnostics || []).map((d) => [
+              JSON.stringify(d),
+              d,
+            ]),
+          );
+
+          const diagnosticsAdded: FileDiagnostic[] = [];
+          for (const [key, diag] of currentDiagnostics.entries()) {
+            if (!lastDiagnostics.has(key)) {
+              diagnosticsAdded.push(diag);
+            }
+          }
+
+          const diagnosticsRemoved: FileDiagnostic[] = [];
+          for (const [key, diag] of lastDiagnostics.entries()) {
+            if (!currentDiagnostics.has(key)) {
+              diagnosticsRemoved.push(diag);
+            }
+          }
+
+          if (diagnosticsAdded.length > 0) {
+            changes['diagnosticsAdded'] = diagnosticsAdded;
+          }
+
+          if (diagnosticsRemoved.length > 0) {
+            changes['diagnosticsRemoved'] = diagnosticsRemoved;
           }
         }
       } else if (lastActiveFile) {
