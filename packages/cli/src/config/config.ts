@@ -72,6 +72,7 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  proxy?: string;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -235,6 +236,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('proxy', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'HTTP/HTTPS proxy URL (e.g., http://localhost:8082). Overrides environment variables.',
         })
         .deprecateOption(
           'prompt',
@@ -620,6 +627,7 @@ export async function loadCliConfig(
     fileFiltering,
     checkpointing: settings.general?.checkpointing?.enabled,
     proxy:
+      argv.proxy ||
       process.env['HTTPS_PROXY'] ||
       process.env['https_proxy'] ||
       process.env['HTTP_PROXY'] ||

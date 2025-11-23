@@ -148,7 +148,13 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      const httpOptions: { headers: Record<string, string>; baseUrl?: string } =
+        { headers };
+
+      // If proxy is set, use it as the base URL for API calls
+      if (config.proxy) {
+        httpOptions.baseUrl = config.proxy;
+      }
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
