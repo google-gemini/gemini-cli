@@ -240,7 +240,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.useAlternateBuffer`** (boolean):
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.incrementalRendering`** (boolean):
