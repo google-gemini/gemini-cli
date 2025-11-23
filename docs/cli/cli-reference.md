@@ -1,25 +1,25 @@
-# CLI Reference
+# CLI cheatsheet
 
-This page provides a complete reference for all Gemini CLI commands, options,
+This page provides a reference for commonly used Gemini CLI commands, options,
 and parameters.
 
-## CLI Commands
+## CLI commands
 
 | Command                            | Description                        | Example                                             |
 | ---------------------------------- | ---------------------------------- | --------------------------------------------------- |
 | `gemini`                           | Start interactive REPL             | `gemini`                                            |
-| `gemini "query"`                   | Start REPL with initial prompt     | `gemini "explain this project"`                     |
+| `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                     |
 | `gemini -p "query"`                | Query via SDK, then exit           | `gemini -p "explain this function"`                 |
 | `cat file \| gemini -p "query"`    | Process piped content              | `cat logs.txt \| gemini -p "explain"`               |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`  |
-| `gemini -c`                        | Continue most recent session       | `gemini -c`                                         |
-| `gemini -c -p "query"`             | Continue via SDK                   | `gemini -c -p "Check for type errors"`              |
+| `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                |
+| `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`        |
 | `gemini -r "<session-id>" "query"` | Resume session by ID               | `gemini -r "abc123" "Finish this PR"`               |
 | `gemini update`                    | Update to latest version           | `gemini update`                                     |
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management) |
 | `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management) |
 
-### Positional Arguments
+### Positional arguments
 
 | Argument | Type              | Description                                                                                                        |
 | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -50,23 +50,23 @@ and parameters.
 | `--screen-reader`            | -     | boolean | -         | Enable screen reader mode for accessibility                                                                |
 | `--output-format`            | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                       |
 
-## Model Selection
+## Model selection
 
 The `--model` (or `-m`) flag allows you to specify which Gemini model to use.
 You can use either model aliases (user-friendly names) or concrete model names.
 
-### Model Aliases
+### Model aliases
 
 These are convenient shortcuts that map to specific models:
 
 | Alias        | Resolves To                                | Description                                                                                                                     |
 | ------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `auto`       | `gemini-2.5-pro` or `gemini-3-pro-preview` | **Default.** Automatically selects the best model based on task complexity. Uses preview model if preview features are enabled. |
+| `auto`       | `gemini-2.5-pro` or `gemini-3-pro-preview` | **Default.** Resolves to the preview model if preview features are enabled, otherwise resolves to the standard pro model. |
 | `pro`        | `gemini-2.5-pro` or `gemini-3-pro-preview` | For complex reasoning tasks. Uses preview model if enabled.                                                                     |
 | `flash`      | `gemini-2.5-flash`                         | Fast, balanced model for most tasks.                                                                                            |
 | `flash-lite` | `gemini-2.5-flash-lite`                    | Fastest model for simple tasks.                                                                                                 |
 
-## Extensions Management
+## Extensions management
 
 | Command                                            | Description                                  | Example                                                                        |
 | -------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -85,7 +85,7 @@ These are convenient shortcuts that map to specific models:
 
 See [Extensions Documentation](../extensions/index.md) for more details.
 
-## MCP Server Management
+## MCP server management
 
 | Command                                                       | Description                     | Example                                                                                              |
 | ------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
