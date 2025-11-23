@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type {
   StartSessionEvent,
@@ -332,9 +333,12 @@ export class ClearcutLogger {
     }
 
     if (ghRepositoryName) {
+      const hashedRepositoryName = createHash('sha256')
+        .update(ghRepositoryName)
+        .digest('hex');
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
-        value: ghRepositoryName,
+        value: hashedRepositoryName,
       });
     }
 

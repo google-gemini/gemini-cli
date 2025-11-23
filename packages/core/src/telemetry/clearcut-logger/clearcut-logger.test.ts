@@ -428,15 +428,66 @@ describe('ClearcutLogger', () => {
   });
 
   describe('GITHUB_REPOSITORY metadata', () => {
-    it('includes repository when GITHUB_REPOSITORY is set', () => {
+    it('includes hashed repository when GITHUB_REPOSITORY is set', () => {
       const { logger } = setup({});
       vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
-        value: 'google/gemini-cli',
-      });
+      const repositoryMetadata = event?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+      );
+      expect(repositoryMetadata).toBeDefined();
+      expect(repositoryMetadata?.value).toMatch(/^[a-f0-9]{64}$/);
+      expect(repositoryMetadata?.value).not.toBe('google/gemini-cli');
+    });
+
+    it('hashes repository name consistently', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+
+      const event1 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event2 = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      const hash1 = event1?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+      )?.value;
+      const hash2 = event2?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+      )?.value;
+
+      expect(hash1).toBeDefined();
+      expect(hash2).toBeDefined();
+      expect(hash1).toBe(hash2);
+    });
+
+    it('produces different hashes for different repositories', () => {
+      const { logger } = setup({});
+
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
+      const event1 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hash1 = event1?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+      )?.value;
+
+      vi.stubEnv('GITHUB_REPOSITORY', 'google/other-repo');
+      const event2 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hash2 = event2?.event_metadata[0].find(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+      )?.value;
+
+      expect(hash1).toBeDefined();
+      expect(hash2).toBeDefined();
+      expect(hash1).not.toBe(hash2);
     });
 
     it('does not include repository when GITHUB_REPOSITORY is not set', () => {
