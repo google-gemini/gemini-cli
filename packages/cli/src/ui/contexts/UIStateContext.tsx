@@ -14,6 +14,7 @@ import type {
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
+  LogoVariants,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -135,6 +136,7 @@ export interface UIState {
   };
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
+  customLogoVariants: LogoVariants | undefined;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

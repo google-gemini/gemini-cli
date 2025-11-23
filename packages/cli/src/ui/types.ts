@@ -384,3 +384,12 @@ export interface ConfirmationRequest {
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
 }
+
+export interface LogoVariants {
+  longAsciiLogo?: string;
+  shortAsciiLogo?: string;
+  tinyAsciiLogo?: string;
+  longAsciiLogoIde?: string;
+  shortAsciiLogoIde?: string;
+  tinyAsciiLogoIde?: string;
+}

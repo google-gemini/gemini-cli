@@ -12,7 +12,6 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { Banner } from './Banner.js';
 import { useBanner } from '../hooks/useBanner.js';
-import { useCustomLogo } from '../hooks/useCustomLogo.js';
 
 interface AppHeaderProps {
   version: string;
@@ -21,12 +20,15 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
+  const {
+    nightly,
+    mainAreaWidth,
+    bannerData,
+    bannerVisible,
+    customLogoVariants,
+  } = useUIState();
 
   const { bannerText } = useBanner(bannerData, config);
-  const customLogoVariants = useCustomLogo(
-    settings.merged.ui?.customLogoVariantsFile,
-  );
 
   return (
     <Box flexDirection="column">

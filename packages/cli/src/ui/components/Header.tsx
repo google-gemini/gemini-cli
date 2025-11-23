@@ -18,7 +18,7 @@ import {
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { getTerminalProgram } from '../utils/terminalSetup.js';
-import type { LogoVariants } from '../hooks/useCustomLogo.js';
+import type { LogoVariants } from '../types.js';
 
 interface HeaderProps {
   customLogoVariants?: LogoVariants;

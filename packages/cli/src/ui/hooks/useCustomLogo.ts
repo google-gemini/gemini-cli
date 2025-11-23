@@ -8,15 +8,7 @@ import { useEffect, useState } from 'react';
 import * as fs from 'node:fs/promises';
 import { getErrorMessage, debugLogger } from '@google/gemini-cli-core';
 import toml from '@iarna/toml';
-
-export interface LogoVariants {
-  longAsciiLogo?: string;
-  shortAsciiLogo?: string;
-  tinyAsciiLogo?: string;
-  longAsciiLogoIde?: string;
-  shortAsciiLogoIde?: string;
-  tinyAsciiLogoIde?: string;
-}
+import type { LogoVariants } from '../types.js';
 
 export function useCustomLogo(
   variantsFilePath: string | undefined,
@@ -35,9 +27,8 @@ export function useCustomLogo(
         const parsed = toml.parse(content) as unknown as LogoVariants;
         setVariants(parsed);
       } catch (e) {
-        debugLogger.warn(
-          `Failed to load custom logo variants from "${variantsFilePath}": ${getErrorMessage(e)}`,
-        );
+        const msg = `Failed to load custom logo variants from "${variantsFilePath}": ${getErrorMessage(e)}`;
+        debugLogger.warn(msg);
         setVariants(undefined);
       }
     };
