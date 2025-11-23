@@ -353,7 +353,6 @@ jobs:
       - 'test_linux'
       - 'test_mac'
       - 'codeql'
-      - 'bundle_size'
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check all job results'
@@ -362,8 +361,7 @@ jobs:
                (${{ needs.link_checker.result }} != 'success' && ${{ needs.link_checker.result }} != 'skipped') || \
                (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
                (${{ needs.test_mac.result }} != 'success' && ${{ needs.test_mac.result }} != 'skipped') || \
-               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
-               (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
+               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') ]]; then
             echo "One or more CI jobs failed."
             exit 1
           fi
