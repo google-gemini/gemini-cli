@@ -573,6 +573,31 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
     });
+
+    it.each(['exit', 'quit', 'EXIT', 'Quit'])(
+      'should handle "%s" command without a slash',
+      async (cmd) => {
+        const quitAction = vi
+          .fn()
+          .mockResolvedValue({ type: 'quit', messages: ['bye'] });
+        const command = createTestCommand({
+          name: 'quit',
+          altNames: ['exit'],
+          action: quitAction,
+        });
+        const result = await setupProcessorHook([command]);
+
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        await act(async () => {
+          await result.current.handleSlashCommand(cmd);
+        });
+
+        expect(quitAction).toHaveBeenCalled();
+      },
+    );
     it('should handle "submit_prompt" action returned from a file-based command', async () => {
       const fileCommand = createTestCommand(
         {
