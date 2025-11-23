@@ -54,62 +54,84 @@ import {
   type BeforeToolInput,
   type AfterToolInput,
 } from '../hooks/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
- * Safely tests a string against a user-provided regex pattern with timeout protection
- * to prevent ReDoS (Regular Expression Denial of Service) attacks.
+ * Safely tests a string against a user-provided regex pattern to prevent
+ * ReDoS (Regular Expression Denial of Service) attacks.
+ *
+ * NOTE: This function uses pattern detection to identify potentially dangerous
+ * regex patterns. It cannot provide runtime timeout protection because regex
+ * execution in JavaScript is synchronous and blocks the event loop. For true
+ * timeout protection, regex execution would need to run in a worker thread.
  *
  * @param pattern - The regex pattern from user configuration
  * @param testString - The string to test against the pattern
- * @param timeoutMs - Maximum time to allow regex execution (default: 100ms)
- * @returns true if pattern matches, false otherwise (including timeouts and errors)
+ * @returns true if pattern matches, false if pattern is rejected or doesn't match
  */
-function safeRegexTest(
-  pattern: string,
-  testString: string,
-  timeoutMs = 100,
-): boolean {
-  // Check for potentially dangerous patterns that could cause catastrophic backtracking
+function safeRegexTest(pattern: string, testString: string): boolean {
+  // Comprehensive detection of patterns that could cause catastrophic backtracking.
+  // These patterns can cause exponential time complexity with certain inputs.
   const dangerousPatterns = [
-    /(\.\*){2,}/, // Multiple .* in sequence
-    /(\.\+){2,}/, // Multiple .+ in sequence
-    /(\(.*\)\+)+/, // Nested groups with + quantifier
-    /(\(.*\)\*)+/, // Nested groups with * quantifier
+    // Nested quantifiers - the most common cause of ReDoS
+    /\([^)]*[*+][^)]*\)[*+]/, // (x+)+, (x*)*, (x+)*, etc.
+    /\([^)]*[*+][^)]*\)\{/, // (x+){n,m}
+
+    // Multiple greedy quantifiers in sequence without anchors
+    /\.\*\.\*/, // .*.* - greedy quantifiers on wildcards
+    /\.\+\.\+/, // .+.+ - greedy quantifiers on wildcards
+    /\.\*\.\+/, // .*.+
+    /\.\+\.\*/, // .+.*
+
+    // Nested groups with quantifiers
+    /\(\([^)]*[*+]/, // ((x+) - nested groups with quantifiers
+    /\([^)]*\([^)]*[*+]/, // (a(x+) - nested groups with quantifiers
+
+    // Alternation with overlapping patterns
+    /\([^|)]*\|[^)]*\)[*+]/, // (a|ab)+ - alternation with overlap in quantified group
+
+    // Character classes with quantifiers inside quantified groups
+    /\(\[[^\]]*\][*+][^)]*\)[*+]/, // ([a-z]+)+ - character class with quantifier in quantified group
+
+    // Extremely complex patterns
+    /(\([^)]*){3,}/, // More than 2 levels of nested groups
+    /{[0-9]+,}.*{[0-9]+,}/, // Multiple unbounded quantifiers
+
+    // Known evil patterns
+    /\(a\+\)\+b/, // (a+)+b - classic ReDoS example
+    /\(a\|\w\)\*/, // (a|\w)* - alternation with character class
   ];
 
   for (const dangerous of dangerousPatterns) {
     if (dangerous.test(pattern)) {
-      // Pattern looks potentially dangerous, fall back to exact match
+      // Pattern matches a known dangerous pattern, fall back to exact match
+      debugLogger.warn(
+        `Regex pattern '${pattern}' appears potentially unsafe for ReDoS. Falling back to exact match.`,
+      );
       return pattern === testString;
     }
   }
 
+  // Additional heuristic checks
+  const quantifierCount = (pattern.match(/[*+?{]/g) || []).length;
+  const groupCount = (pattern.match(/\(/g) || []).length;
+
+  // Too many quantifiers or groups is suspicious
+  if (quantifierCount > 5 || groupCount > 3) {
+    debugLogger.warn(
+      `Regex pattern '${pattern}' has high complexity (${quantifierCount} quantifiers, ${groupCount} groups). Falling back to exact match.`,
+    );
+    return pattern === testString;
+  }
+
   try {
     const regex = new RegExp(pattern);
-
-    // Execute regex with timeout protection
-    let result = false;
-    let timedOut = false;
-
-    const timeoutId = setTimeout(() => {
-      timedOut = true;
-    }, timeoutMs);
-
-    // Check if we timed out before starting
-    if (!timedOut) {
-      result = regex.test(testString);
-    }
-
-    clearTimeout(timeoutId);
-
-    // If timed out, fall back to exact match
-    if (timedOut) {
-      return pattern === testString;
-    }
-
-    return result;
-  } catch {
-    // If regex compilation or execution fails, fall back to exact match
+    return regex.test(testString);
+  } catch (error) {
+    // If regex compilation fails, fall back to exact match
+    debugLogger.warn(
+      `Failed to compile regex pattern '${pattern}': ${error}. Falling back to exact match.`,
+    );
     return pattern === testString;
   }
 }

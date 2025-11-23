@@ -353,43 +353,68 @@ export class GeminiChat {
                 modifiedHookRequest.messages.length > 0
               ) {
                 // Convert hook LLM request back to Content[] format
-                requestContents = modifiedHookRequest.messages.map((msg) => ({
-                  role: msg.role === 'user' ? 'user' : 'model',
-                  parts:
-                    typeof msg.content === 'string'
-                      ? [{ text: msg.content }]
-                      : Array.isArray(msg.content)
-                        ? msg.content
-                            .map((p) => {
-                              // Validate that the Part has exactly one valid property
-                              if (
-                                p &&
-                                typeof p === 'object' &&
-                                !Array.isArray(p)
-                              ) {
-                                const validKeys = [
-                                  'text',
-                                  'inlineData',
-                                  'functionCall',
-                                  'functionResponse',
-                                  'fileData',
-                                ];
-                                const presentKeys = Object.keys(p).filter(
-                                  (key) => validKeys.includes(key),
-                                );
-                                if (presentKeys.length === 1) {
-                                  return p as Part;
+                const newRequestContents = modifiedHookRequest.messages.map(
+                  (msg) => ({
+                    role: msg.role === 'user' ? 'user' : 'model',
+                    parts:
+                      typeof msg.content === 'string'
+                        ? [{ text: msg.content }]
+                        : Array.isArray(msg.content)
+                          ? msg.content
+                              .map((p) => {
+                                // Validate that the Part has exactly one valid property
+                                if (
+                                  p &&
+                                  typeof p === 'object' &&
+                                  !Array.isArray(p)
+                                ) {
+                                  const validKeys = [
+                                    'text',
+                                    'inlineData',
+                                    'functionCall',
+                                    'functionResponse',
+                                    'fileData',
+                                  ];
+                                  const presentKeys = Object.keys(p).filter(
+                                    (key) => validKeys.includes(key),
+                                  );
+                                  if (presentKeys.length === 1) {
+                                    return p as Part;
+                                  }
                                 }
-                              }
-                              debugLogger.warn(
-                                'Received an invalid part from a BeforeModel hook, it will be ignored:',
-                                p,
-                              );
-                              return null;
-                            })
-                            .filter((p): p is Part => p !== null)
-                        : [],
-                }));
+                                debugLogger.warn(
+                                  'Received an invalid part from a BeforeModel hook, it will be ignored:',
+                                  p,
+                                );
+                                return null;
+                              })
+                              .filter((p): p is Part => p !== null)
+                          : [],
+                  }),
+                );
+
+                // Validate message role sequence - must alternate between user and model
+                let isValid = true;
+                for (let i = 0; i < newRequestContents.length - 1; i++) {
+                  if (
+                    newRequestContents[i].role ===
+                    newRequestContents[i + 1].role
+                  ) {
+                    isValid = false;
+                    debugLogger.error(
+                      `Invalid message sequence from BeforeModel hook: consecutive roles of '${newRequestContents[i].role}' detected at positions ${i} and ${i + 1}. Discarding modification.`,
+                    );
+                    break;
+                  }
+                }
+
+                if (isValid) {
+                  requestContents = newRequestContents;
+                } else {
+                  debugLogger.warn(
+                    'BeforeModel hook returned invalid conversation structure. Using original request.',
+                  );
+                }
               }
             }
           }
