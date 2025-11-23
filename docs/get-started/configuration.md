@@ -240,7 +240,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.useAlternateBuffer`** (boolean):
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.incrementalRendering`** (boolean):
@@ -493,6 +493,11 @@ their corresponding top-level category object in your `settings.json` file.
       }
     }
     ```
+
+- **`modelConfigs.customAliases`** (object):
+  - **Description:** Custom named presets for model configs. These are merged
+    with (and override) the built-in aliases.
+  - **Default:** `{}`
 
 - **`modelConfigs.overrides`** (array):
   - **Description:** Apply specific configuration overrides based on matches,
