@@ -5,7 +5,6 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
- 
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
@@ -136,67 +135,72 @@ vi.mock('../ide/ide-client.js', () => ({
 
 // Mock AgentRegistry
 vi.mock('../agents/registry.js', () => ({
-    AgentRegistry: vi.fn().mockImplementation(function (
-      this: any,
-      config: Config,
-    ) {
-      this.config = config;
-      this.definitions = new Map<string, AgentDefinition>(); // Initialize definitions as instance property
-      this.initialize = vi.fn(function (this: any) {
-        const settings = (
-          this.config as Config
-        ).getCodebaseInvestigatorSettings();
-        if (settings?.enabled) {
-          const mockAgentDefinition: AgentDefinition = {
-            name: 'codebase_investigator',
-            displayName: 'Codebase Investigator Agent',
-            description: 'The specialized tool for codebase analysis...',
-            promptConfig: {
-              systemPrompt: 'You are Codebase Investigator...',
-              query:
-                'Your task is to do a deep investigation of the codebase...',
-            },
-            modelConfig: {
-              model: 'gemini-2.5-pro',
-              temp: 0.1,
-              top_p: 0.95,
-              thinkingBudget: 8192,
-            },
-            runConfig: { max_time_minutes: 3, max_turns: 10 },
-            inputConfig: {
-              inputs: {
-                objective: {
-                  description: 'obj',
-                  type: 'string',
-                  required: true,
-                },
+  AgentRegistry: vi.fn().mockImplementation(function (
+    this: any,
+    config: Config,
+  ) {
+    this.config = config;
+    this.definitions = new Map<string, AgentDefinition>(); // Initialize definitions as instance property
+    this.initialize = vi.fn(function (this: any) {
+      const settings = (
+        this.config as Config
+      ).getCodebaseInvestigatorSettings();
+      if (settings?.enabled) {
+        const mockAgentDefinition: AgentDefinition = {
+          name: 'codebase_investigator',
+          displayName: 'Codebase Investigator Agent',
+          description: 'The specialized tool for codebase analysis...',
+          promptConfig: {
+            systemPrompt: 'You are Codebase Investigator...',
+            query: 'Your task is to do a deep investigation of the codebase...',
+          },
+          modelConfig: {
+            model: 'gemini-2.5-pro',
+            temp: 0.1,
+            top_p: 0.95,
+            thinkingBudget: 8192,
+          },
+          runConfig: { max_time_minutes: 3, max_turns: 10 },
+          inputConfig: {
+            inputs: {
+              objective: {
+                description: 'obj',
+                type: 'string',
+                required: true,
               },
             },
-            outputConfig: {
-              outputName: 'report',
-              description: 'report',
-              schema: {} as any,
-            },
-            processOutput: vi.fn(),
-            toolConfig: { tools: [] },
-          };
-          this.definitions.set('codebase_investigator', mockAgentDefinition);
-        } else {
-          this.definitions.delete('codebase_investigator');
-        }
-      });
+          },
+          outputConfig: {
+            outputName: 'report',
+            description: 'report',
+            schema: {} as any,
+          },
+          processOutput: vi.fn(),
+          toolConfig: { tools: [] },
+        };
+        this.definitions.set('codebase_investigator', mockAgentDefinition);
+      } else {
+        this.definitions.delete('codebase_investigator');
+      }
+    });
 
-      this.getDefinition = vi.fn((this: any, name: string) =>
-        this.definitions.get(name),
-      );
-      this.registerAgent = vi.fn((this: any, def: AgentDefinition) =>
-        this.definitions.set(def.name, def),
-      );
-      this.unregisterAgent = vi.fn((this: any, name: string) =>
-        this.definitions.delete(name),
-      );
-    }),
-  }));
+    this.getDefinition = vi.fn((this: any, name: string) =>
+      this.definitions.get(name),
+    );
+    this.registerAgent = vi.fn((this: any, def: AgentDefinition) =>
+      this.definitions.set(def.name, def),
+    );
+    this.unregisterAgent = vi.fn(function (this: any, name: string) {
+      this.definitions.delete(name);
+    });
+    this.getAllDefinitions = vi.fn(function (this: any) {
+      return Array.from(this.definitions.values());
+    });
+    this.getAllDefinitions = vi.fn(function (this: any) {
+      return Array.from(this.definitions.values());
+    });
+  }),
+}));
 vi.mock('../agents/subagent-tool-wrapper.js', () => ({
   SubagentToolWrapper: vi.fn(),
 }));
