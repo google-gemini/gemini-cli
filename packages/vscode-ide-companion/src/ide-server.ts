@@ -5,8 +5,13 @@
  */
 
 import * as vscode from 'vscode';
+import type {
+  LSPLocation,
+  LSPSymbolInformation} from '@google/gemini-cli-core/src/ide/types.js';
 import {
   CloseDiffRequestSchema,
+  FindReferencesRequestSchema,
+  GetWorkspaceSymbolsRequestSchema,
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
 } from '@google/gemini-cli-core/src/ide/types.js';
@@ -478,6 +483,82 @@ const createMcpServer = (
         suppressNotification,
       );
       const response = { content: content ?? undefined };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(response),
+          },
+        ],
+      };
+    },
+  );
+  server.registerTool(
+    'getWorkspaceSymbols',
+    {
+      description: '(IDE Tool) Get symbols from the current workspace.',
+      inputSchema: GetWorkspaceSymbolsRequestSchema.shape,
+    },
+    async ({ query }: z.infer<typeof GetWorkspaceSymbolsRequestSchema>) => {
+      try {
+        const symbols =
+          ((await vscode.commands.executeCommand(
+            'vscode.executeWorkspaceSymbolProvider',
+            query,
+          )) as vscode.SymbolInformation[] | undefined) || [];
+
+        const response: LSPSymbolInformation[] = symbols.map((symbol) => ({
+          name: symbol.name,
+          location: {
+            filePath: symbol.location.uri.fsPath,
+            line: symbol.location.range.start.line + 1,
+            character: symbol.location.range.start.character + 1,
+          },
+        }));
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(response),
+            },
+          ],
+        };
+      } catch (_error) {
+        return {
+          content: [],
+          isError: true,
+        };
+      }
+    },
+  );
+  server.registerTool(
+    'findReferences',
+    {
+      description:
+        '(IDE Tool) Find references to a symbol at a particular line and character.',
+      inputSchema: FindReferencesRequestSchema.shape,
+    },
+    async ({
+      filePath,
+      line,
+      character,
+    }: z.infer<typeof FindReferencesRequestSchema>) => {
+      const uri = vscode.Uri.file(filePath);
+      const position = new vscode.Position(line - 1, character - 1);
+
+      const references =
+        ((await vscode.commands.executeCommand(
+          'vscode.executeReferenceProvider',
+          uri,
+          position,
+        )) as vscode.Location[] | undefined) || [];
+
+      const response: LSPLocation[] = references.map((ref) => ({
+        filePath: ref.uri.fsPath,
+        line: ref.range.start.line + 1,
+        character: ref.range.start.character + 1,
+      }));
       return {
         content: [
           {

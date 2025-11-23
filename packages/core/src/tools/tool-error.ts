@@ -71,6 +71,8 @@ export enum ToolErrorType {
 
   // WebSearch-specific Errors
   WEB_SEARCH_FAILED = 'web_search_failed',
+
+  LSP_ERROR = 'lsp_error',
 }
 
 /**

@@ -162,6 +162,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { LSPWorkspaceSymbolsTool } from '../tools/lsp-workspace-symbols.js';
 
 export type { FileFilteringOptions };
 export {
@@ -1434,6 +1435,8 @@ export class Config {
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool, this);
     }
+
+    registerCoreTool(LSPWorkspaceSymbolsTool);
 
     // Register Subagents as Tools
     if (this.getCodebaseInvestigatorSettings().enabled) {
