@@ -5,10 +5,10 @@
  */
 
 import { useEffect } from 'react';
-import { writeToStdout } from '@google/gemini-cli-core';
-
-const ENABLE_BRACKETED_PASTE = '\x1b[?2004h';
-const DISABLE_BRACKETED_PASTE = '\x1b[?2004l';
+import {
+  disableBracketedPaste,
+  enableBracketedPaste,
+} from '../utils/bracketedPaste.js';
 
 /**
  * Enables and disables bracketed paste mode in the terminal.
@@ -18,11 +18,11 @@ const DISABLE_BRACKETED_PASTE = '\x1b[?2004l';
  */
 export const useBracketedPaste = () => {
   const cleanup = () => {
-    writeToStdout(DISABLE_BRACKETED_PASTE);
+    disableBracketedPaste();
   };
 
   useEffect(() => {
-    writeToStdout(ENABLE_BRACKETED_PASTE);
+    enableBracketedPaste();
 
     process.on('exit', cleanup);
     process.on('SIGINT', cleanup);

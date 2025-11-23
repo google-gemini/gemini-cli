@@ -217,7 +217,6 @@ describe('Gemini Client (client.ts)', () => {
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getUseSmartEdit: vi.fn().mockReturnValue(false),
-      getUseModelRouter: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
@@ -243,6 +242,7 @@ describe('Gemini Client (client.ts)', () => {
         },
       },
       isInteractive: vi.fn().mockReturnValue(false),
+      getExperiments: () => {},
     } as unknown as Config;
 
     client = new GeminiClient(mockConfig);
