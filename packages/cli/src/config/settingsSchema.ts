@@ -551,7 +551,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as string | undefined,
         description: oneLine`
-          Path to a JSON file containing custom ASCII art variants for the header logo.
+          Path to a TOML file containing custom ASCII art variants for the header logo.
         `,
         showInDialog: false,
       },

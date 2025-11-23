@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import * as fs from 'node:fs/promises';
 import { getErrorMessage, debugLogger } from '@google/gemini-cli-core';
+import toml from '@iarna/toml';
 
 export interface LogoVariants {
   longAsciiLogo?: string;
@@ -31,7 +32,7 @@ export function useCustomLogo(
     const loadVariants = async () => {
       try {
         const content = await fs.readFile(variantsFilePath, 'utf-8');
-        const parsed = JSON.parse(content) as LogoVariants;
+        const parsed = toml.parse(content) as unknown as LogoVariants;
         setVariants(parsed);
       } catch (e) {
         debugLogger.warn(

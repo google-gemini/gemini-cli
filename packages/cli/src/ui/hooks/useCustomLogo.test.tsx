@@ -9,6 +9,7 @@ import { render } from 'ink-testing-library';
 import { Text } from 'ink';
 import { useCustomLogo } from './useCustomLogo.js';
 import * as fs from 'node:fs/promises';
+import toml from '@iarna/toml';
 
 vi.mock('node:fs/promises');
 vi.mock('@google/gemini-cli-core', () => ({
@@ -33,53 +34,50 @@ describe('useCustomLogo', () => {
     expect(lastFrame()).toBe('undefined');
   });
 
-  it('loads and parses a valid JSON file', async () => {
+  it('loads and parses a valid TOML file', async () => {
     const mockVariants = {
       longAsciiLogo: 'LONG LOGO',
       shortAsciiLogo: 'SHORT LOGO',
     };
-    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockVariants));
+    const tomlContent = toml.stringify(mockVariants);
+    vi.mocked(fs.readFile).mockResolvedValue(tomlContent);
 
     const { lastFrame, rerender } = render(
-      <TestComponent path="/path/to/logo.json" />,
+      <TestComponent path="/path/to/logo.toml" />,
     );
 
-    // Initial state should be undefined
     expect(lastFrame()).toBe('undefined');
 
-    // Wait for async update - we can't easily wait for hook state update in ink-testing-library
-    // without polling or using timers. Since fs.readFile is mocked to resolve immediately,
-    // we just need to wait for the promise queue to drain.
     await new Promise((resolve) => setTimeout(resolve, 0));
-    rerender(<TestComponent path="/path/to/logo.json" />);
+    rerender(<TestComponent path="/path/to/logo.toml" />);
 
     expect(lastFrame()).toBe(JSON.stringify(mockVariants));
-    expect(fs.readFile).toHaveBeenCalledWith('/path/to/logo.json', 'utf-8');
+    expect(fs.readFile).toHaveBeenCalledWith('/path/to/logo.toml', 'utf-8');
   });
 
   it('handles file read errors gracefully', async () => {
     vi.mocked(fs.readFile).mockRejectedValue(new Error('File not found'));
 
     const { lastFrame, rerender } = render(
-      <TestComponent path="/invalid/path.json" />,
+      <TestComponent path="/invalid/path.toml" />,
     );
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    rerender(<TestComponent path="/invalid/path.json" />);
+    rerender(<TestComponent path="/invalid/path.toml" />);
 
     expect(lastFrame()).toBe('undefined');
-    expect(fs.readFile).toHaveBeenCalledWith('/invalid/path.json', 'utf-8');
+    expect(fs.readFile).toHaveBeenCalledWith('/invalid/path.toml', 'utf-8');
   });
 
-  it('handles JSON parse errors gracefully', async () => {
-    vi.mocked(fs.readFile).mockResolvedValue('INVALID JSON');
+  it('handles TOML parse errors gracefully', async () => {
+    vi.mocked(fs.readFile).mockResolvedValue('INVALID TOML [');
 
     const { lastFrame, rerender } = render(
-      <TestComponent path="/path/to/bad.json" />,
+      <TestComponent path="/path/to/bad.toml" />,
     );
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-    rerender(<TestComponent path="/path/to/bad.json" />);
+    rerender(<TestComponent path="/path/to/bad.toml" />);
 
     expect(lastFrame()).toBe('undefined');
   });

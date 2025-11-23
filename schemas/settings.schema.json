@@ -315,8 +315,8 @@
         },
         "customLogoVariantsFile": {
           "title": "Custom Logo Variants File",
-          "description": "Path to a JSON file containing custom ASCII art variants for the header logo.",
-          "markdownDescription": "Path to a JSON file containing custom ASCII art variants for the header logo.\n\n- Category: `UI`\n- Requires restart: `no`",
+          "description": "Path to a TOML file containing custom ASCII art variants for the header logo.",
+          "markdownDescription": "Path to a TOML file containing custom ASCII art variants for the header logo.\n\n- Category: `UI`\n- Requires restart: `no`",
           "type": "string"
         },
         "accessibility": {
