@@ -73,6 +73,9 @@ export abstract class ExtensionLoader {
     });
     try {
       await this.config.getMcpClientManager()!.startExtension(extension);
+      if (this.config.getAgentLoader()) {
+        await this.config.getAgentLoader().loadExtensionAgents(extension.path);
+      }
       await this.maybeRefreshGeminiTools(extension);
 
       // Note: Context files are loaded only once all extensions are done
@@ -164,6 +167,11 @@ export abstract class ExtensionLoader {
 
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
+      if (this.config.getAgentLoader()) {
+        await this.config
+          .getAgentLoader()
+          .unloadExtensionAgents(extension.path);
+      }
       await this.maybeRefreshGeminiTools(extension);
 
       // Note: Context files are loaded only once all extensions are done

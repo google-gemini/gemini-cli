@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
@@ -15,6 +18,7 @@ import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
+import type { AgentDefinition } from '../agents/types.js';
 import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
@@ -130,16 +134,84 @@ vi.mock('../ide/ide-client.js', () => ({
   },
 }));
 
-vi.mock('../agents/registry.js', () => {
-  const AgentRegistryMock = vi.fn();
-  AgentRegistryMock.prototype.initialize = vi.fn();
-  AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
-  AgentRegistryMock.prototype.getDefinition = vi.fn();
-  return { AgentRegistry: AgentRegistryMock };
-});
+// Mock AgentRegistry
+vi.mock('../agents/registry.js', () => ({
+    AgentRegistry: vi.fn().mockImplementation(function (
+      this: any,
+      config: Config,
+    ) {
+      this.config = config;
+      this.definitions = new Map<string, AgentDefinition>(); // Initialize definitions as instance property
+      this.initialize = vi.fn(function (this: any) {
+        const settings = (
+          this.config as Config
+        ).getCodebaseInvestigatorSettings();
+        if (settings?.enabled) {
+          const mockAgentDefinition: AgentDefinition = {
+            name: 'codebase_investigator',
+            displayName: 'Codebase Investigator Agent',
+            description: 'The specialized tool for codebase analysis...',
+            promptConfig: {
+              systemPrompt: 'You are Codebase Investigator...',
+              query:
+                'Your task is to do a deep investigation of the codebase...',
+            },
+            modelConfig: {
+              model: 'gemini-2.5-pro',
+              temp: 0.1,
+              top_p: 0.95,
+              thinkingBudget: 8192,
+            },
+            runConfig: { max_time_minutes: 3, max_turns: 10 },
+            inputConfig: {
+              inputs: {
+                objective: {
+                  description: 'obj',
+                  type: 'string',
+                  required: true,
+                },
+              },
+            },
+            outputConfig: {
+              outputName: 'report',
+              description: 'report',
+              schema: {} as any,
+            },
+            processOutput: vi.fn(),
+            toolConfig: { tools: [] },
+          };
+          this.definitions.set('codebase_investigator', mockAgentDefinition);
+        } else {
+          this.definitions.delete('codebase_investigator');
+        }
+      });
 
+      this.getDefinition = vi.fn((this: any, name: string) =>
+        this.definitions.get(name),
+      );
+      this.registerAgent = vi.fn((this: any, def: AgentDefinition) =>
+        this.definitions.set(def.name, def),
+      );
+      this.unregisterAgent = vi.fn((this: any, name: string) =>
+        this.definitions.delete(name),
+      );
+    }),
+  }));
 vi.mock('../agents/subagent-tool-wrapper.js', () => ({
   SubagentToolWrapper: vi.fn(),
+}));
+
+// Mock AgentLoader
+const loadUserAgents = vi.fn();
+const loadExtensionAgents = vi.fn();
+const unloadExtensionAgents = vi.fn();
+
+vi.mock('../agents/agent-loader.js', () => ({
+  AgentLoader: vi.fn().mockImplementation(() => ({
+    loadUserAgents,
+    loadExtensionAgents,
+    unloadExtensionAgents,
+  })),
 }));
 
 const mockCoreEvents = vi.hoisted(() => ({
@@ -202,6 +274,8 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    definitions.clear();
+    loadUserAgents.mockClear();
   });
 
   describe('initialize', () => {
@@ -258,7 +332,7 @@ describe('Server Config (config.ts)', () => {
               [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.8,
               },
-            },
+            }, // Correctly added comma
           },
         } as unknown as ConfigParameters);
         expect(await config.getCompressionThreshold()).toBe(0.8);
@@ -272,7 +346,7 @@ describe('Server Config (config.ts)', () => {
               [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.0,
               },
-            },
+            }, // Comma added here
           },
         } as unknown as ConfigParameters);
         expect(await config.getCompressionThreshold()).toBeUndefined();
@@ -358,7 +432,6 @@ describe('Server Config (config.ts)', () => {
         async (_: Config, authType: AuthType | undefined) =>
           ({ authType }) as unknown as ContentGeneratorConfig,
       );
-
       await config.refreshAuth(AuthType.USE_GEMINI);
 
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
@@ -811,20 +884,8 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(params);
 
-      const mockAgentDefinition = {
-        name: 'codebase-investigator',
-        description: 'Agent 1',
-        instructions: 'Inst 1',
-      };
-
-      const AgentRegistryMock = (
-        (await vi.importMock('../agents/registry.js')) as {
-          AgentRegistry: Mock;
-        }
-      ).AgentRegistry;
-      AgentRegistryMock.prototype.getDefinition.mockReturnValue(
-        mockAgentDefinition,
-      );
+      // We don't need to mock getDefinition/getAllDefinitions here because the AgentRegistry mock's initialize function
+      // (which runs as part of config.initialize) will populate the definitions map based on the settings.
 
       const SubagentToolWrapperMock = (
         (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
@@ -841,8 +902,9 @@ describe('Server Config (config.ts)', () => {
       ).ToolRegistry.prototype.registerTool;
 
       expect(SubagentToolWrapperMock).toHaveBeenCalledTimes(1);
+      // The first argument is the definition object. We can match partial properties.
       expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
-        mockAgentDefinition,
+        expect.objectContaining({ name: 'codebase_investigator' }),
         config,
         undefined,
       );
@@ -860,6 +922,9 @@ describe('Server Config (config.ts)', () => {
         codebaseInvestigatorSettings: { enabled: false },
       };
       const config = new Config(params);
+
+      // The AgentRegistry mock's initialize function will check the settings.
+      // Since enabled is false, it will ensure 'codebase_investigator' is NOT in the definitions map.
 
       const SubagentToolWrapperMock = (
         (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
@@ -1314,7 +1379,7 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const serviceConfig = (config.modelConfigService as any).config;
 
     // Assert that the default aliases are present
@@ -1338,7 +1403,7 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const serviceConfig = (config.modelConfigService as any).config;
 
     // Assert that the user's aliases are used, not the defaults
@@ -1349,7 +1414,7 @@ describe('Generation Config Merging (HACK)', () => {
     const params: ConfigParameters = { ...baseParams };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const serviceConfig = (config.modelConfigService as any).config;
 
     // Assert that the full default config is used

@@ -85,6 +85,8 @@ import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { AgentDefinition } from '../agents/types.js';
+import { AgentLoader } from '../agents/agent-loader.js';
 
 import { ApprovalMode } from '../policy/types.js';
 
@@ -313,6 +315,7 @@ export class Config {
   private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
   private agentRegistry!: AgentRegistry;
+  private agentLoader!: AgentLoader;
   private sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -616,6 +619,9 @@ export class Config {
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
 
+    this.agentLoader = new AgentLoader(this);
+    await this.agentLoader.loadUserAgents(this.storage);
+
     this.toolRegistry = await this.createToolRegistry();
     this.mcpClientManager = new McpClientManager(
       this.toolRegistry,
@@ -837,6 +843,38 @@ export class Config {
 
   getAgentRegistry(): AgentRegistry {
     return this.agentRegistry;
+  }
+
+  getAgentLoader(): AgentLoader {
+    return this.agentLoader;
+  }
+
+  registerAgent(definition: AgentDefinition): void {
+    this.agentRegistry.registerAgent(definition);
+
+    // We must respect the main allowed/exclude lists for agents too.
+    const allowedTools = this.getAllowedTools();
+    const isAllowed = !allowedTools || allowedTools.includes(definition.name);
+
+    if (isAllowed) {
+      const excludeTools = this.getExcludeTools();
+      if (excludeTools && excludeTools.has(definition.name)) {
+        return;
+      }
+
+      const messageBusEnabled = this.getEnableMessageBusIntegration();
+      const wrapper = new SubagentToolWrapper(
+        definition,
+        this,
+        messageBusEnabled ? this.getMessageBus() : undefined,
+      );
+      this.toolRegistry.registerTool(wrapper);
+    }
+  }
+
+  unregisterAgent(name: string): void {
+    this.agentRegistry.unregisterAgent(name);
+    this.toolRegistry.removeTool(name);
   }
 
   getToolRegistry(): ToolRegistry {
@@ -1447,26 +1485,20 @@ export class Config {
     }
 
     // Register Subagents as Tools
-    if (this.getCodebaseInvestigatorSettings().enabled) {
-      const definition = this.agentRegistry.getDefinition(
-        'codebase_investigator',
-      );
-      if (definition) {
-        // We must respect the main allowed/exclude lists for agents too.
-        const allowedTools = this.getAllowedTools();
+    for (const definition of this.agentRegistry.getAllDefinitions()) {
+      // We must respect the main allowed/exclude lists for agents too.
+      const allowedTools = this.getAllowedTools();
 
-        const isAllowed =
-          !allowedTools || allowedTools.includes(definition.name);
+      const isAllowed = !allowedTools || allowedTools.includes(definition.name);
 
-        if (isAllowed) {
-          const messageBusEnabled = this.getEnableMessageBusIntegration();
-          const wrapper = new SubagentToolWrapper(
-            definition,
-            this,
-            messageBusEnabled ? this.getMessageBus() : undefined,
-          );
-          registry.registerTool(wrapper);
-        }
+      if (isAllowed) {
+        const messageBusEnabled = this.getEnableMessageBusIntegration();
+        const wrapper = new SubagentToolWrapper(
+          definition,
+          this,
+          messageBusEnabled ? this.getMessageBus() : undefined,
+        );
+        registry.registerTool(wrapper);
       }
     }
 

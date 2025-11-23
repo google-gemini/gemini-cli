@@ -15,8 +15,10 @@ import {
 } from 'vitest';
 import { SimpleExtensionLoader } from './extensionLoader.js';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
-import { type McpClientManager } from '../tools/mcp-client-manager.js';
+import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { GeminiClient } from '../core/client.js';
+import type { AgentLoader } from '../agents/agent-loader.js';
+import type { AgentRegistry } from '../agents/registry.js';
 
 const mockRefreshServerHierarchicalMemory = vi.hoisted(() => vi.fn());
 
@@ -29,6 +31,8 @@ vi.mock('./memoryDiscovery.js', async (importActual) => {
 });
 
 describe('SimpleExtensionLoader', () => {
+  let mockAgentRegistry: AgentRegistry;
+  let mockAgentLoader: AgentLoader;
   let mockConfig: Config;
   let extensionReloadingEnabled: boolean;
   let mockMcpClientManager: McpClientManager;
@@ -61,6 +65,18 @@ describe('SimpleExtensionLoader', () => {
     } as unknown as McpClientManager;
     extensionReloadingEnabled = false;
     mockGeminiClientSetTools = vi.fn();
+    mockAgentRegistry = {
+      registerAgent: vi.fn(),
+      unregisterAgent: vi.fn(),
+      initialize: vi.fn(),
+      getDefinition: vi.fn(),
+      getAllDefinitions: vi.fn(),
+    } as unknown as AgentRegistry;
+    mockAgentLoader = {
+      loadExtensionAgents: vi.fn(),
+      unloadExtensionAgents: vi.fn(),
+      loadUserAgents: vi.fn(),
+    } as unknown as AgentLoader;
     mockConfig = {
       getMcpClientManager: () => mockMcpClientManager,
       getEnableExtensionReloading: () => extensionReloadingEnabled,
@@ -68,6 +84,10 @@ describe('SimpleExtensionLoader', () => {
         isInitialized: () => true,
         setTools: mockGeminiClientSetTools,
       })),
+      getAgentRegistry: () => mockAgentRegistry,
+      getAgentLoader: () => mockAgentLoader,
+      registerAgent: vi.fn(),
+      unregisterAgent: vi.fn(),
     } as unknown as Config;
   });
 
