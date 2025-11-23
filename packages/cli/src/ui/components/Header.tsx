@@ -8,37 +8,50 @@ import type React from 'react';
 import { Box } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import {
-  shortAsciiLogo,
-  longAsciiLogo,
-  tinyAsciiLogo,
-  shortAsciiLogoIde,
-  longAsciiLogoIde,
-  tinyAsciiLogoIde,
+  shortAsciiLogo as defaultShortAsciiLogo,
+  longAsciiLogo as defaultLongAsciiLogo,
+  tinyAsciiLogo as defaultTinyAsciiLogo,
+  shortAsciiLogoIde as defaultShortAsciiLogoIde,
+  longAsciiLogoIde as defaultLongAsciiLogoIde,
+  tinyAsciiLogoIde as defaultTinyAsciiLogoIde,
 } from './AsciiArt.js';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { getTerminalProgram } from '../utils/terminalSetup.js';
+import type { LogoVariants } from '../hooks/useCustomLogo.js';
 
 interface HeaderProps {
-  customAsciiArt?: string; // For user-defined ASCII art
+  customLogoVariants?: LogoVariants;
   version: string;
   nightly: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  customAsciiArt,
+  customLogoVariants,
   version,
   nightly,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
   const isIde = getTerminalProgram();
+
+  const longAsciiLogo =
+    customLogoVariants?.longAsciiLogo ?? defaultLongAsciiLogo;
+  const shortAsciiLogo =
+    customLogoVariants?.shortAsciiLogo ?? defaultShortAsciiLogo;
+  const tinyAsciiLogo =
+    customLogoVariants?.tinyAsciiLogo ?? defaultTinyAsciiLogo;
+  const longAsciiLogoIde =
+    customLogoVariants?.longAsciiLogoIde ?? defaultLongAsciiLogoIde;
+  const shortAsciiLogoIde =
+    customLogoVariants?.shortAsciiLogoIde ?? defaultShortAsciiLogoIde;
+  const tinyAsciiLogoIde =
+    customLogoVariants?.tinyAsciiLogoIde ?? defaultTinyAsciiLogoIde;
+
   let displayTitle;
   const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
   const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
 
-  if (customAsciiArt) {
-    displayTitle = customAsciiArt;
-  } else if (terminalWidth >= widthOfLongLogo) {
+  if (terminalWidth >= widthOfLongLogo) {
     displayTitle = isIde ? longAsciiLogoIde : longAsciiLogo;
   } else if (terminalWidth >= widthOfShortLogo) {
     displayTitle = isIde ? shortAsciiLogoIde : shortAsciiLogo;

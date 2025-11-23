@@ -544,6 +544,17 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      customLogoVariantsFile: {
+        type: 'string',
+        label: 'Custom Logo Variants File',
+        category: 'UI',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: oneLine`
+          Path to a JSON file containing custom ASCII art variants for the header logo.
+        `,
+        showInDialog: false,
+      },
       accessibility: {
         type: 'object',
         label: 'Accessibility',
