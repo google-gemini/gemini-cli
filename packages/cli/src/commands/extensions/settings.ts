@@ -12,6 +12,7 @@ import {
 } from '../../config/extensions/extensionSettings.js';
 import { getExtensionAndManager } from './utils.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 // --- SET COMMAND ---
 interface SetArgs {
@@ -55,6 +56,7 @@ const setCommand: CommandModule<object, SetArgs> = {
       setting,
       promptForSetting,
     );
+    await exitCli();
   },
 };
 
@@ -108,6 +110,7 @@ const listCommand: CommandModule<object, ListArgs> = {
       debugLogger.log(`  Description: ${setting.description}`);
       debugLogger.log(`  Value: ${displayValue}`);
     }
+    await exitCli();
   },
 };
 
