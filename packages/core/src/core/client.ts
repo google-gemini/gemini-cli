@@ -116,6 +116,7 @@ export class GeminiClient {
   private messagesSinceLastCompress = 0;
   private lastCompressionTime = 0;
   private isCompressing = false;
+  private currentTurn?: Turn;
 
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
@@ -712,6 +713,24 @@ export class GeminiClient {
     reason: string;
     isSafetyValve: boolean;
   }> {
+    // Concurrency guard: prevent concurrent compressions
+    if (this.isCompressing) {
+      return {
+        shouldCompress: false,
+        reason: 'compression_in_progress',
+        isSafetyValve: false,
+      };
+    }
+
+    // Concurrency guard: don't compress during streaming
+    if (this.currentTurn?.isStreaming()) {
+      return {
+        shouldCompress: false,
+        reason: 'streaming_active',
+        isSafetyValve: false,
+      };
+    }
+
     const chat = this.getChat();
     const currentTokens = chat.getLastPromptTokenCount();
     const model = this._getEffectiveModelForCurrentTurn();
@@ -781,37 +800,45 @@ export class GeminiClient {
     prompt_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo> {
-    // If the model is 'auto', we will use a placeholder model to check.
-    // Compression occurs before we choose a model, so calling `count_tokens`
-    // before the model is chosen would result in an error.
-    const model = this._getEffectiveModelForCurrentTurn();
+    // Set compression lock
+    this.isCompressing = true;
 
-    const { newHistory, info } = await this.compressionService.compress(
-      this.getChat(),
-      prompt_id,
-      force,
-      model,
-      this.config,
-      this.hasFailedCompressionAttempt,
-    );
+    try {
+      // If the model is 'auto', we will use a placeholder model to check.
+      // Compression occurs before we choose a model, so calling `count_tokens`
+      // before the model is chosen would result in an error.
+      const model = this._getEffectiveModelForCurrentTurn();
 
-    if (
-      info.compressionStatus ===
-      CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
-    ) {
-      this.hasFailedCompressionAttempt = !force && true;
-    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
-      if (newHistory) {
-        this.chat = await this.startChat(newHistory);
-        this.updateTelemetryTokenCount();
-        this.forceFullIdeContext = true;
+      const { newHistory, info } = await this.compressionService.compress(
+        this.getChat(),
+        prompt_id,
+        force,
+        model,
+        this.config,
+        this.hasFailedCompressionAttempt,
+      );
 
-        // Update tracking state
-        this.messagesSinceLastCompress = 0;
-        this.lastCompressionTime = Date.now();
+      if (
+        info.compressionStatus ===
+        CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
+      ) {
+        this.hasFailedCompressionAttempt = !force && true;
+      } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+        if (newHistory) {
+          this.chat = await this.startChat(newHistory);
+          this.updateTelemetryTokenCount();
+          this.forceFullIdeContext = true;
+
+          // Update tracking state
+          this.messagesSinceLastCompress = 0;
+          this.lastCompressionTime = Date.now();
+        }
       }
-    }
 
-    return info;
+      return info;
+    } finally {
+      // Always clear compression lock
+      this.isCompressing = false;
+    }
   }
 }

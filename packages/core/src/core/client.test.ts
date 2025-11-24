@@ -2489,4 +2489,38 @@ ${JSON.stringify(
       // Guards are bypassed for safety valve
     });
   });
+
+  describe('concurrency guards', () => {
+    it('should prevent concurrent compressions', async () => {
+      // Set up conditions to trigger compression
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(45000);
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockResolvedValue(40000);
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockResolvedValue(25);
+      client['messagesSinceLastCompress'] = 30;
+
+      // Set isCompressing flag
+      client['isCompressing'] = true;
+
+      const decision = await client.shouldTriggerCompression();
+
+      expect(decision.shouldCompress).toBe(false);
+      expect(decision.reason).toBe('compression_in_progress');
+    });
+
+    it('should not trigger during streaming turn', async () => {
+      // Set up conditions to trigger compression
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(45000);
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockResolvedValue(40000);
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockResolvedValue(25);
+      client['messagesSinceLastCompress'] = 30;
+
+      // Mock that a streaming turn is active
+      client['currentTurn'] = { isStreaming: () => true } as any;
+
+      const decision = await client.shouldTriggerCompression();
+
+      expect(decision.shouldCompress).toBe(false);
+      expect(decision.reason).toBe('streaming_active');
+    });
+  });
 });
