@@ -45,6 +45,7 @@ describe('ReadFileTool', () => {
       storage: {
         getProjectTempDir: () => path.join(tempRootDir, '.temp'),
       },
+      isInteractive: () => false,
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance);
   });

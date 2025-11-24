@@ -60,11 +60,12 @@ describe('executeToolCall', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
       getEnableMessageBusIntegration: () => false,
       getMessageBus: () => null,
       getPolicyEngine: () => null,
+      isInteractive: () => false,
+      getExperiments: () => {},
     } as unknown as Config;
 
     abortController = new AbortController();

@@ -82,7 +82,7 @@ describe('ShellTool', () => {
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
-      getExcludeTools: vi.fn().mockReturnValue([]),
+      getExcludeTools: vi.fn().mockReturnValue(new Set([])),
       getDebugMode: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue(tempRootDir),
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
@@ -366,10 +366,11 @@ describe('ShellTool', () => {
       const result = await promise;
 
       expect(summarizer.summarizeToolOutput).toHaveBeenCalledWith(
+        mockConfig,
+        { model: 'summarizer-shell' },
         expect.any(String),
         mockConfig.getGeminiClient(),
         mockAbortSignal,
-        1000,
       );
       expect(result.llmContent).toBe('summarized output');
       expect(result.returnDisplay).toBe('long output');

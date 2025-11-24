@@ -11,6 +11,7 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface DisableArgs {
   name: string;
@@ -76,10 +77,11 @@ export const disableCommand: CommandModule = {
         }
         return true;
       }),
-  handler: (argv) => {
-    handleDisable({
+  handler: async (argv) => {
+    await handleDisable({
       name: argv['name'] as string,
       scope: argv['scope'] as string,
     });
+    await exitCli();
   },
 };

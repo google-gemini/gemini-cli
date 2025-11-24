@@ -146,6 +146,10 @@ vi.mock('./slashCommandProcessor.js', () => ({
   handleSlashCommand: vi.fn().mockReturnValue(false),
 }));
 
+vi.mock('./useAlternateBuffer.js', () => ({
+  useAlternateBuffer: vi.fn(() => false),
+}));
+
 // --- END MOCKS ---
 
 // --- Tests for useGeminiStream Hook ---
@@ -218,7 +222,8 @@ describe('useGeminiStream', () => {
         .fn()
         .mockReturnValue(contentGeneratorConfig),
       getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
+      isInteractive: () => false,
+      getExperiments: () => {},
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -342,7 +347,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         );
@@ -414,7 +418,6 @@ describe('useGeminiStream', () => {
       setShellInputFocused?: (focused: boolean) => void;
       performMemoryRefresh?: () => Promise<void>;
       onAuthError?: () => void;
-      onEditorClose?: () => void;
       setModelSwitched?: Mock;
       modelSwitched?: boolean;
     } = {},
@@ -425,7 +428,6 @@ describe('useGeminiStream', () => {
       setShellInputFocused = () => {},
       performMemoryRefresh = () => Promise.resolve(),
       onAuthError = () => {},
-      onEditorClose = () => {},
       setModelSwitched = vi.fn(),
       modelSwitched = false,
     } = options;
@@ -445,7 +447,6 @@ describe('useGeminiStream', () => {
         performMemoryRefresh,
         modelSwitched,
         setModelSwitched,
-        onEditorClose,
         onCancelSubmit,
         setShellInputFocused,
         80,
@@ -589,7 +590,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
         80,
         24,
       ),
@@ -669,7 +669,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
-        () => {},
         () => {},
         () => {},
         () => {},
@@ -784,7 +783,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
         80,
         24,
       ),
@@ -895,7 +893,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => Promise.resolve(),
         false,
-        () => {},
         () => {},
         () => {},
         () => {},
@@ -1030,7 +1027,6 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
-          () => {},
           cancelSubmitSpy,
           () => {},
           80,
@@ -1045,7 +1041,7 @@ describe('useGeminiStream', () => {
 
       simulateEscapeKeyPress();
 
-      expect(cancelSubmitSpy).toHaveBeenCalled();
+      expect(cancelSubmitSpy).toHaveBeenCalledWith(false);
     });
 
     it('should call setShellInputFocused(false) when escape is pressed', async () => {
@@ -1070,7 +1066,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
-          () => {},
           () => {},
           vi.fn(),
           setShellInputFocusedSpy, // Pass the spy here
@@ -1408,7 +1403,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -1482,7 +1476,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -1536,7 +1529,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
-          () => {},
           () => {},
           () => {},
           () => {},
@@ -1841,7 +1833,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -1948,7 +1939,6 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
-          () => {},
           onCancelSubmitSpy,
           () => {},
           80,
@@ -1963,7 +1953,7 @@ describe('useGeminiStream', () => {
 
       // Check that onCancelSubmit was called
       await waitFor(() => {
-        expect(onCancelSubmitSpy).toHaveBeenCalled();
+        expect(onCancelSubmitSpy).toHaveBeenCalledWith(true);
       });
     });
 
@@ -2093,7 +2083,6 @@ describe('useGeminiStream', () => {
         vi.fn(), // performMemoryRefresh
         false, // modelSwitched
         vi.fn(), // setModelSwitched
-        vi.fn(), // onEditorClose
         vi.fn(), // onCancelSubmit
         vi.fn(), // setShellInputFocused
         80, // terminalWidth
@@ -2163,7 +2152,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
-          () => {},
           () => {},
           () => {},
           () => {},
@@ -2247,7 +2235,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -2317,7 +2304,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -2372,7 +2358,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
-          () => {},
           () => {},
           () => {},
           () => {},
