@@ -13,6 +13,7 @@ import {
   IdeDiffAcceptedNotificationSchema,
   IdeDiffClosedNotificationSchema,
   IdeDiffRejectedNotificationSchema,
+  type LSPLocation,
   type LSPSymbolInformation,
 } from './types.js';
 import { getIdeProcessInfo } from './process-utils.js';
@@ -392,6 +393,61 @@ export class IdeClient {
         resolver({ status: 'rejected', content: undefined });
       }
       this.diffResponses.delete(filePath);
+    }
+  }
+
+  async findReferences(
+    filePath: string,
+    line: number,
+    character: number,
+  ): Promise<LSPLocation[]> {
+    if (!this.client) {
+      throw new Error('IDE client is not connected.');
+    }
+
+    const result = await this.client.request(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'findReferences',
+          arguments: {
+            filePath,
+            line,
+            character,
+          },
+        },
+      },
+      CallToolResultSchema,
+      { timeout: IDE_REQUEST_TIMEOUT_MS },
+    );
+
+    if (!result) {
+      debugLogger.log('No response from IDE for find references request.');
+      return [];
+    }
+
+    if (result.isError) {
+      debugLogger.log(
+        'Error response from IDE for find references request.',
+        JSON.stringify(result),
+      );
+      return [];
+    }
+
+    const textPart = result.content.find((part) => part.type === 'text');
+    if (!textPart?.text) {
+      debugLogger.log('No text content in find references response from IDE.');
+      return [];
+    }
+
+    try {
+      return JSON.parse(textPart.text) as LSPLocation[];
+    } catch (error) {
+      debugLogger.log(
+        'Failed to parse find references response from IDE:',
+        error,
+      );
+      return [];
     }
   }
 

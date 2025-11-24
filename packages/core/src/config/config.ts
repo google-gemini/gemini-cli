@@ -163,6 +163,7 @@ import {
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { LSPWorkspaceSymbolsTool } from '../tools/lsp-workspace-symbols.js';
+import { LSPFindReferencesTool } from '../tools/lsp-find-references.js';
 
 export type { FileFilteringOptions };
 export {
@@ -1437,6 +1438,7 @@ export class Config {
     }
 
     registerCoreTool(LSPWorkspaceSymbolsTool);
+    registerCoreTool(LSPFindReferencesTool, this);
 
     // Register Subagents as Tools
     if (this.getCodebaseInvestigatorSettings().enabled) {
