@@ -738,7 +738,7 @@ export class GeminiClient {
 
     // Check safety valve first (50% utilization threshold)
     const utilizationThreshold =
-      (await this.config.getCompressionTriggerUtilization?.()) ?? 0.5;
+      await this.config.getCompressionTriggerUtilization();
     const utilization = currentTokens / modelLimit;
 
     if (utilization >= utilizationThreshold) {
@@ -751,8 +751,7 @@ export class GeminiClient {
     }
 
     // Check absolute token threshold
-    const tokenThreshold =
-      (await this.config.getCompressionTriggerTokens?.()) ?? 40000;
+    const tokenThreshold = await this.config.getCompressionTriggerTokens();
 
     if (currentTokens < tokenThreshold) {
       return {
@@ -763,7 +762,7 @@ export class GeminiClient {
     }
 
     // Apply guards
-    const minMessages = (await this.config.getCompressionMinMessages?.()) ?? 25;
+    const minMessages = await this.config.getCompressionMinMessages();
     if (this.messagesSinceLastCompress < minMessages) {
       return {
         shouldCompress: false,
@@ -773,7 +772,7 @@ export class GeminiClient {
     }
 
     const minTimeBetween =
-      (await this.config.getCompressionMinTimeBetweenPrompts?.()) ?? 300; // seconds
+      await this.config.getCompressionMinTimeBetweenPrompts(); // seconds
     const timeSinceLastCompress =
       (Date.now() - this.lastCompressionTime) / 1000;
     if (
