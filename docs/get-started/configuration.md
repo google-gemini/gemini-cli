@@ -510,6 +510,11 @@ their corresponding top-level category object in your `settings.json` file.
         "modelConfig": {
           "model": "gemini-2.5-flash-lite"
         }
+      },
+      "chat-compression-default": {
+        "modelConfig": {
+          "model": "gemini-2.5-pro"
+        }
       }
     }
     ```
