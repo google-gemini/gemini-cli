@@ -31,7 +31,7 @@ import {
   loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
-import { saveModelChange } from './settings.js';
+import { saveModelChange, loadSettings } from './settings.js';
 
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -385,6 +385,8 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const debugMode = isDebugMode(argv);
 
+  const loadedSettings = loadSettings(cwd);
+
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
   }
@@ -673,7 +675,8 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
-    onModelChange: saveModelChange,
+    onModelChange: (model: string, persist: boolean) =>
+      saveModelChange(loadedSettings, model, persist),
   });
 }
 

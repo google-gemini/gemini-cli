@@ -29,8 +29,6 @@ interface ModelDialogProps {
   onClose: () => void;
 }
 
-
-
 interface PersistModelPromptProps {
   selectedModel: string;
   onPersist: (model: string) => void;
