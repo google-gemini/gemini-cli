@@ -183,22 +183,22 @@ export class OpenFilesManager {
       return;
     }
 
-    const diagnostics: FileDiagnostic[] = vscode.languages
-      .getDiagnostics(uri)
-      .map((diagnostic) => ({
-        range: {
-          start: {
-            line: diagnostic.range.start.line + 1,
-            character: diagnostic.range.start.character + 1,
-          },
-          end: {
-            line: diagnostic.range.end.line + 1,
-            character: diagnostic.range.end.character + 1,
-          },
+    const diagnostics: FileDiagnostic[] = (
+      vscode.languages.getDiagnostics(uri) || []
+    ).map((diagnostic) => ({
+      range: {
+        start: {
+          line: diagnostic.range.start.line + 1,
+          character: diagnostic.range.start.character + 1,
         },
-        message: diagnostic.message,
-        severity: vscode.DiagnosticSeverity[diagnostic.severity],
-      }));
+        end: {
+          line: diagnostic.range.end.line + 1,
+          character: diagnostic.range.end.character + 1,
+        },
+      },
+      message: diagnostic.message,
+      severity: vscode.DiagnosticSeverity[diagnostic.severity],
+    }));
 
     file.diagnostics = diagnostics;
   }

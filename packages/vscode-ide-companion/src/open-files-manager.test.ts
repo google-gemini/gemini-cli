@@ -22,6 +22,10 @@ vi.mock('vscode', () => ({
       dispose: vi.fn(),
     };
   }),
+  languages: {
+    getDiagnostics: vi.fn().mockReturnValue([]),
+    onDidChangeDiagnostics: vi.fn(),
+  },
   window: {
     onDidChangeActiveTextEditor: vi.fn(),
     onDidChangeTextEditorSelection: vi.fn(),
