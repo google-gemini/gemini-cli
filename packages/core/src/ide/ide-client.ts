@@ -402,7 +402,7 @@ export class IdeClient {
     character: number,
   ): Promise<LSPLocation[]> {
     if (!this.client) {
-      throw new Error('IDE client is not connected.');
+      throw new Error('IDE client is not connected');
     }
 
     const result = await this.client.request(
@@ -422,38 +422,28 @@ export class IdeClient {
     );
 
     if (!result) {
-      debugLogger.log('No response from IDE for find references request.');
-      return [];
+      throw new Error('No response from IDE for find references request');
     }
 
     if (result.isError) {
-      debugLogger.log(
-        'Error response from IDE for find references request.',
-        JSON.stringify(result),
-      );
-      return [];
+      throw new Error('Error response from IDE for find references request');
     }
 
     const textPart = result.content.find((part) => part.type === 'text');
     if (!textPart?.text) {
-      debugLogger.log('No text content in find references response from IDE.');
-      return [];
+      throw new Error('No text content in find references response from IDE');
     }
 
     try {
       return JSON.parse(textPart.text) as LSPLocation[];
-    } catch (error) {
-      debugLogger.log(
-        'Failed to parse find references response from IDE:',
-        error,
-      );
-      return [];
+    } catch (_error) {
+      throw new Error('Failed to parse find references response from IDE');
     }
   }
 
   async getWorkspaceSymbols(query: string): Promise<LSPSymbolInformation[]> {
     if (!this.client) {
-      throw new Error('IDE client is not connected.');
+      throw new Error('IDE client is not connected');
     }
 
     const result = await this.client.request(
@@ -471,31 +461,22 @@ export class IdeClient {
     );
 
     if (!result) {
-      debugLogger.log('No response from IDE for workspace symbols request.');
-      return [];
+      throw new Error('No response from IDE for workspace symbols request');
     }
 
     if (result.isError) {
-      debugLogger.log('Error response from IDE for workspace symbols request.');
-      return [];
+      throw new Error('Error response from IDE for workspace symbols request');
     }
 
     const textPart = result.content.find((part) => part.type === 'text');
     if (!textPart?.text) {
-      debugLogger.log(
-        'No text content in workspace symbols response from IDE.',
-      );
-      return [];
+      throw new Error('No text content in workspace symbols response from IDE');
     }
 
     try {
       return JSON.parse(textPart.text) as LSPSymbolInformation[];
-    } catch (error) {
-      debugLogger.log(
-        'Failed to parse workspace symbols response from IDE:',
-        error,
-      );
-      return [];
+    } catch (_error) {
+      throw new Error('Failed to parse workspace symbols response from IDE');
     }
   }
 

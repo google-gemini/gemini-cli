@@ -8,7 +8,6 @@ import type { Config } from '../config/config.js';
 import path from 'node:path';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { IdeClient } from '../ide/ide-client.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { ToolErrorType } from './tool-error.js';
 import { LSP_FIND_REFERENCES_TOOL_NAME } from './tool-names.js';
 import {
@@ -67,10 +66,6 @@ class LSPFindReferencesToolInvocation extends BaseToolInvocation<
   }
 
   override async execute(): Promise<ToolResult> {
-    debugLogger.log(
-      'Executing LSPFindReferencesTool with params: ',
-      JSON.stringify(this.params),
-    );
     const ideClient = await IdeClient.getInstance();
     if (!ideClient) {
       return {

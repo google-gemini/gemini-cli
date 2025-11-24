@@ -6,7 +6,6 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { IdeClient } from '../ide/ide-client.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { ToolErrorType } from './tool-error.js';
 import { LSP_WORKSPACE_SYMBOLS_TOOL_NAME } from './tool-names.js';
 import {
@@ -49,11 +48,6 @@ class LSPWorkspaceSymbolsToolInvocation extends BaseToolInvocation<
   }
 
   override async execute(): Promise<ToolResult> {
-    // TODO: implement abort signal handling
-    debugLogger.log(
-      'Executing LSPWorkspaceSymbolsTool with query: ',
-      this.params.query,
-    );
     const ideClient = await IdeClient.getInstance();
     if (!ideClient) {
       return {
