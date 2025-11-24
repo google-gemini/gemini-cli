@@ -14,6 +14,12 @@ import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
 import { makeChatCompressionEvent } from '../telemetry/types.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -73,6 +79,21 @@ export function findCompressSplitPoint(
 
   // Can't compress everything so just compress at last splitpoint.
   return lastSplitPoint;
+}
+
+export function modelStringToModelConfigAlias(model: string): string {
+  switch (model) {
+    case PREVIEW_GEMINI_MODEL:
+      return 'chat-compression-3-pro';
+    case DEFAULT_GEMINI_MODEL:
+      return 'chat-compression-2.5-pro';
+    case DEFAULT_GEMINI_FLASH_MODEL:
+      return 'chat-compression-2.5-flash';
+    case DEFAULT_GEMINI_FLASH_LITE_MODEL:
+      return 'chat-compression-2.5-flash-lite';
+    default:
+      return DEFAULT_GEMINI_MODEL;
+  }
 }
 
 export class ChatCompressionService {
@@ -139,26 +160,24 @@ export class ChatCompressionService {
       };
     }
 
-    const summaryResponse = await config.getContentGenerator().generateContent(
-      {
-        model,
-        contents: [
-          ...historyToCompress,
-          {
-            role: 'user',
-            parts: [
-              {
-                text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
-              },
-            ],
-          },
-        ],
-        config: {
-          systemInstruction: { text: getCompressionPrompt() },
+    const summaryResponse = await config.getBaseLlmClient().generateContent({
+      modelConfigKey: { model: modelStringToModelConfigAlias(model) },
+      contents: [
+        ...historyToCompress,
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+            },
+          ],
         },
-      },
+      ],
+      systemInstruction: { text: getCompressionPrompt() },
       promptId,
-    );
+      // TODO(joshualitt): wire up a sensible abort signal,
+      abortSignal: new AbortController().signal,
+    });
     const summary = getResponseText(summaryResponse) ?? '';
 
     const extraHistory: Content[] = [
