@@ -41,8 +41,10 @@ describe('StartupProfiler', () => {
     // Create a fresh profiler instance
     profiler = StartupProfiler.getInstance();
 
-    // Clear any existing phases
+    // Clear any existing phases and performance entries
     profiler['phases'].clear();
+    performance.clearMarks();
+    performance.clearMeasures();
 
     mockConfig = {
       getSessionId: () => 'test-session-id',
@@ -63,14 +65,19 @@ describe('StartupProfiler', () => {
   });
 
   describe('start', () => {
-    it('should record the start time of a phase', () => {
+    it('should create a performance mark for a phase', () => {
       profiler.start('test_phase');
 
       const phase = profiler['phases'].get('test_phase');
       expect(phase).toBeDefined();
       expect(phase?.name).toBe('test_phase');
-      expect(phase?.startTime).toBeGreaterThan(0);
-      expect(phase?.duration).toBeUndefined();
+
+      // Verify performance mark was created
+      const marks = performance.getEntriesByType('mark');
+      const startMark = marks.find(
+        (m) => m.name === 'startup:test_phase:start',
+      );
+      expect(startMark).toBeDefined();
     });
 
     it('should record start time with details', () => {
@@ -81,41 +88,30 @@ describe('StartupProfiler', () => {
       expect(phase?.details).toEqual(details);
     });
 
-    it('should overwrite existing phase if started again', () => {
+    it('should throw error when starting a phase that is already active', () => {
       profiler.start('test_phase');
-      const firstStartTime = profiler['phases'].get('test_phase')?.startTime;
 
-      // Wait a bit to ensure different timestamp
-      vi.useFakeTimers();
-      vi.advanceTimersByTime(10);
-
-      profiler.start('test_phase');
-      const secondStartTime = profiler['phases'].get('test_phase')?.startTime;
-
-      expect(secondStartTime).not.toBe(firstStartTime);
-      vi.useRealTimers();
+      expect(() => profiler.start('test_phase')).toThrow(
+        "Cannot start phase 'test_phase': phase is already active",
+      );
     });
   });
 
   describe('end', () => {
-    it('should calculate duration for a started phase', () => {
-      profiler.start('test_phase');
+    it('should create a performance measure for a started phase', () => {
+      const handle = profiler.start('test_phase');
+      handle.end();
 
-      // Simulate some time passing
-      vi.useFakeTimers();
-      vi.advanceTimersByTime(100);
-
-      profiler.end('test_phase');
-
-      const phase = profiler['phases'].get('test_phase');
-      expect(phase?.duration).toBeGreaterThan(0);
-
-      vi.useRealTimers();
+      // Verify performance measure was created
+      const measures = performance.getEntriesByType('measure');
+      const measure = measures.find((m) => m.name === 'test_phase');
+      expect(measure).toBeDefined();
+      expect(measure?.duration).toBeGreaterThan(0);
     });
 
     it('should merge details when ending a phase', () => {
-      profiler.start('test_phase', { initial: 'value' });
-      profiler.end('test_phase', { additional: 'data' });
+      const handle = profiler.start('test_phase', { initial: 'value' });
+      handle.end({ additional: 'data' });
 
       const phase = profiler['phases'].get('test_phase');
       expect(phase?.details).toEqual({
@@ -124,16 +120,9 @@ describe('StartupProfiler', () => {
       });
     });
 
-    it('should do nothing if phase was not started', () => {
-      profiler.end('nonexistent_phase');
-
-      const phase = profiler['phases'].get('nonexistent_phase');
-      expect(phase).toBeUndefined();
-    });
-
     it('should overwrite details with same key', () => {
-      profiler.start('test_phase', { key: 'original' });
-      profiler.end('test_phase', { key: 'updated' });
+      const handle = profiler.start('test_phase', { key: 'original' });
+      handle.end({ key: 'updated' });
 
       const phase = profiler['phases'].get('test_phase');
       expect(phase?.details).toEqual({ key: 'updated' });
@@ -142,11 +131,11 @@ describe('StartupProfiler', () => {
 
   describe('flush', () => {
     it('should call recordStartupPerformance for each completed phase', () => {
-      profiler.start('phase1');
-      profiler.end('phase1');
+      const handle1 = profiler.start('phase1');
+      handle1.end();
 
-      profiler.start('phase2');
-      profiler.end('phase2');
+      const handle2 = profiler.start('phase2');
+      handle2.end();
 
       profiler.flush(mockConfig);
 
@@ -161,8 +150,8 @@ describe('StartupProfiler', () => {
     });
 
     it('should include common details in all metrics', () => {
-      profiler.start('test_phase');
-      profiler.end('test_phase');
+      const handle = profiler.start('test_phase');
+      handle.end();
 
       profiler.flush(mockConfig);
 
@@ -184,8 +173,8 @@ describe('StartupProfiler', () => {
     });
 
     it('should merge phase-specific details with common details', () => {
-      profiler.start('test_phase', { custom: 'value' });
-      profiler.end('test_phase');
+      const handle = profiler.start('test_phase', { custom: 'value' });
+      handle.end();
 
       profiler.flush(mockConfig);
 
@@ -203,8 +192,8 @@ describe('StartupProfiler', () => {
     });
 
     it('should clear phases after flushing', () => {
-      profiler.start('test_phase');
-      profiler.end('test_phase');
+      const handle = profiler.start('test_phase');
+      handle.end();
 
       profiler.flush(mockConfig);
 
@@ -215,8 +204,8 @@ describe('StartupProfiler', () => {
       const fs = await import('node:fs');
       (fs.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
-      profiler.start('test_phase');
-      profiler.end('test_phase');
+      const handle = profiler.start('test_phase');
+      handle.end();
 
       profiler.flush(mockConfig);
 
@@ -230,23 +219,48 @@ describe('StartupProfiler', () => {
         }),
       );
     });
+
+    it('should calculate CPU usage correctly', () => {
+      const cpuUsageSpy = vi.spyOn(process, 'cpuUsage');
+      // Mock start usage
+      cpuUsageSpy.mockReturnValueOnce({ user: 1000, system: 500 });
+      // Mock diff usage (this is what process.cpuUsage(startUsage) returns)
+      cpuUsageSpy.mockReturnValueOnce({ user: 100, system: 50 });
+
+      const handle = profiler.start('cpu_test_phase');
+      handle.end();
+
+      profiler.flush(mockConfig);
+
+      expect(recordStartupPerformance).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        expect.objectContaining({
+          phase: 'cpu_test_phase',
+          details: expect.objectContaining({
+            cpu_usage_user: 100,
+            cpu_usage_system: 50,
+          }),
+        }),
+      );
+    });
   });
 
   describe('integration scenarios', () => {
     it('should handle a complete startup profiling workflow', () => {
       // Simulate startup sequence
-      profiler.start('total_startup');
+      const totalHandle = profiler.start('total_startup');
 
-      profiler.start('load_settings');
-      profiler.end('load_settings');
+      const settingsHandle = profiler.start('load_settings');
+      settingsHandle.end();
 
-      profiler.start('parse_arguments');
-      profiler.end('parse_arguments');
+      const argsHandle = profiler.start('parse_arguments');
+      argsHandle.end();
 
-      profiler.start('initialize_app');
-      profiler.end('initialize_app');
+      const appHandle = profiler.start('initialize_app');
+      appHandle.end();
 
-      profiler.end('total_startup');
+      totalHandle.end();
 
       profiler.flush(mockConfig);
 
@@ -259,10 +273,10 @@ describe('StartupProfiler', () => {
     });
 
     it('should handle nested timing correctly', () => {
-      profiler.start('outer');
-      profiler.start('inner');
-      profiler.end('inner');
-      profiler.end('outer');
+      const outerHandle = profiler.start('outer');
+      const innerHandle = profiler.start('inner');
+      innerHandle.end();
+      outerHandle.end();
 
       profiler.flush(mockConfig);
 
@@ -273,9 +287,63 @@ describe('StartupProfiler', () => {
 
       expect(outerCall).toBeDefined();
       expect(innerCall).toBeDefined();
-
       // Outer duration should be >= inner duration
       expect(outerCall![1]).toBeGreaterThanOrEqual(innerCall![1]);
+    });
+  });
+
+  describe('sanity checking', () => {
+    it('should throw error when starting a phase that is already active', () => {
+      profiler.start('test_phase');
+
+      expect(() => profiler.start('test_phase')).toThrow(
+        "Cannot start phase 'test_phase': phase is already active",
+      );
+    });
+
+    it('should allow restarting a phase after it has ended', () => {
+      const handle1 = profiler.start('test_phase');
+      handle1.end();
+
+      // Should not throw
+      expect(() => profiler.start('test_phase')).not.toThrow();
+    });
+
+    it('should throw error when ending a phase that is already ended', () => {
+      const handle = profiler.start('test_phase');
+      handle.end();
+
+      // Calling end() again on the same handle should throw
+      expect(() => handle.end()).toThrow(
+        "Cannot end phase 'test_phase': phase was already ended",
+      );
+    });
+
+    it('should not record metrics for incomplete phases', () => {
+      profiler.start('incomplete_phase');
+      // Never call end()
+
+      profiler.flush(mockConfig);
+
+      expect(recordStartupPerformance).not.toHaveBeenCalled();
+    });
+
+    it('should handle mix of complete and incomplete phases', () => {
+      const completeHandle = profiler.start('complete_phase');
+      completeHandle.end();
+
+      profiler.start('incomplete_phase');
+      // Never call end()
+
+      profiler.flush(mockConfig);
+
+      // Should only record the complete phase
+      expect(recordStartupPerformance).toHaveBeenCalledTimes(1);
+      expect(recordStartupPerformance).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        expect.objectContaining({ phase: 'complete_phase' }),
+      );
     });
   });
 });

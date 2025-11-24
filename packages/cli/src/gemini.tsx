@@ -281,7 +281,7 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
-  startupProfiler.start('total_startup');
+  const cliStartupHandle = startupProfiler.start('cli_startup');
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -290,11 +290,11 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
-  startupProfiler.start('load_settings');
+  const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
-  startupProfiler.end('load_settings');
+  loadSettingsHandle.end();
 
-  startupProfiler.start('migrate_settings');
+  const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
     // Temporary extension manager only used during this non-interactive UI phase.
@@ -306,12 +306,12 @@ export async function main() {
       requestSetting: null,
     }),
   );
-  startupProfiler.end('migrate_settings');
+  migrateHandle.end();
   await cleanupCheckpoints();
 
-  startupProfiler.start('parse_arguments');
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
-  startupProfiler.end('parse_arguments');
+  parseArgsHandle.end();
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -454,9 +454,9 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    startupProfiler.start('load_cli_config');
+    const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv);
-    startupProfiler.end('load_cli_config');
+    loadConfigHandle.end();
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
@@ -520,9 +520,9 @@ export async function main() {
     }
 
     setMaxSizedBoxDebugging(isDebugMode);
-    startupProfiler.start('initialize_app');
+    const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
-    startupProfiler.end('initialize_app');
+    initAppHandle.end();
 
     if (
       settings.merged.security?.auth?.selectedType ===
@@ -564,6 +564,7 @@ export async function main() {
       }
     }
 
+    cliStartupHandle.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       await startInteractiveUI(
@@ -578,6 +579,7 @@ export async function main() {
     }
 
     await config.initialize();
+    startupProfiler.flush(config);
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command

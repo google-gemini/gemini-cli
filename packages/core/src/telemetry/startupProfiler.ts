@@ -13,9 +13,17 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 interface StartupPhase {
   name: string;
-  startTime: number;
-  duration?: number;
+  startCpuUsage: NodeJS.CpuUsage;
+  cpuUsage?: NodeJS.CpuUsage;
   details?: Record<string, string | number | boolean>;
+  ended: boolean;
+}
+
+/**
+ * Handle returned by start() that allows ending the phase without repeating the phase name.
+ */
+export interface StartupPhaseHandle {
+  end(details?: Record<string, string | number | boolean>): void;
 }
 
 /**
@@ -35,32 +43,80 @@ export class StartupProfiler {
   }
 
   /**
-   * Marks the start of a phase.
+   * Returns the mark name for the start of a phase.
+   */
+  private getStartMarkName(phaseName: string): string {
+    return `startup:${phaseName}:start`;
+  }
+
+  /**
+   * Returns the mark name for the end of a phase.
+   */
+  private getEndMarkName(phaseName: string): string {
+    return `startup:${phaseName}:end`;
+  }
+
+  /**
+   * Marks the start of a phase and returns a handle to end it.
    */
   start(
     phaseName: string,
     details?: Record<string, string | number | boolean>,
-  ): void {
-    this.phases.set(phaseName, {
+  ): StartupPhaseHandle {
+    const existingPhase = this.phases.get(phaseName);
+
+    // Error if starting a phase that's already active.
+    if (existingPhase && !existingPhase.ended) {
+      throw new Error(
+        `[STARTUP] Cannot start phase '${phaseName}': phase is already active. Call end() before starting again.`,
+      );
+    }
+
+    const startMarkName = this.getStartMarkName(phaseName);
+    performance.mark(startMarkName, { detail: details });
+
+    const phase: StartupPhase = {
       name: phaseName,
-      startTime: performance.now(),
+      startCpuUsage: process.cpuUsage(),
       details,
-    });
+      ended: false,
+    };
+
+    this.phases.set(phaseName, phase);
+
+    // Return a handle that allows ending the phase without repeating the name
+    return {
+      end: (endDetails?: Record<string, string | number | boolean>) => {
+        this._end(phase, endDetails);
+      },
+    };
   }
 
   /**
    * Marks the end of a phase and calculates duration.
+   * This is now a private method; callers should use the handle returned by start().
    */
-  end(
-    phaseName: string,
+  private _end(
+    phase: StartupPhase,
     details?: Record<string, string | number | boolean>,
   ): void {
-    const phase = this.phases.get(phaseName);
-    if (phase) {
-      phase.duration = performance.now() - phase.startTime;
-      if (details) {
-        phase.details = { ...phase.details, ...details };
-      }
+    // Error if ending a phase that's already ended.
+    if (phase.ended) {
+      throw new Error(
+        `[STARTUP] Cannot end phase '${phase.name}': phase was already ended.`,
+      );
+    }
+
+    const startMarkName = this.getStartMarkName(phase.name);
+    const endMarkName = this.getEndMarkName(phase.name);
+
+    performance.mark(endMarkName, { detail: details });
+    performance.measure(phase.name, startMarkName, endMarkName);
+
+    phase.cpuUsage = process.cpuUsage(phase.startCpuUsage);
+    phase.ended = true;
+    if (details) {
+      phase.details = { ...phase.details, ...details };
     }
   }
 
@@ -81,13 +137,26 @@ export class StartupProfiler {
       is_docker: fs.existsSync('/.dockerenv'),
     };
 
+    // Get all performance measures.
+    const measures = performance.getEntriesByType('measure');
+
     for (const phase of this.phases.values()) {
-      if (phase.duration !== undefined) {
-        const cpuUsage = process.cpuUsage();
+      // Warn about incomplete phases.
+      if (!phase.ended) {
+        debugLogger.warn(
+          `[STARTUP] Phase '${phase.name}' was started but never ended. Skipping metrics.`,
+        );
+        continue;
+      }
+
+      // Find the corresponding measure.
+      const measure = measures.find((m) => m.name === phase.name);
+
+      if (measure && phase.cpuUsage) {
         const details = {
           ...commonDetails,
-          cpu_usage_user: cpuUsage.user,
-          cpu_usage_system: cpuUsage.system,
+          cpu_usage_user: phase.cpuUsage.user,
+          cpu_usage_system: phase.cpuUsage.system,
           ...phase.details,
         };
 
@@ -95,20 +164,39 @@ export class StartupProfiler {
           '[STARTUP] Recording metric for phase:',
           phase.name,
           'duration:',
-          phase.duration,
+          measure.duration,
         );
-        recordStartupPerformance(config, phase.duration, {
+        recordStartupPerformance(config, measure.duration, {
           phase: phase.name,
           details,
         });
       } else {
         debugLogger.log(
-          '[STARTUP] Skipping phase without duration:',
+          '[STARTUP] Skipping phase without measure:',
           phase.name,
         );
       }
     }
-    // Clear buffer after flushing.
+
+    this.reset();
+  }
+
+  /**
+   * Resets the profiler state, clearing all phases and performance entries.
+   * Useful for testing to ensure clean state between test runs.
+   */
+  reset(): void {
+    // Clear performance marks and measures for all tracked phases.
+    for (const phaseName of this.phases.keys()) {
+      const startMarkName = this.getStartMarkName(phaseName);
+      const endMarkName = this.getEndMarkName(phaseName);
+
+      performance.clearMarks(startMarkName);
+      performance.clearMarks(endMarkName);
+      performance.clearMeasures(phaseName);
+    }
+
+    // Clear all phases.
     this.phases.clear();
   }
 }

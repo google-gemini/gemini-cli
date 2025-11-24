@@ -36,12 +36,12 @@ export async function initializeApp(
   config: Config,
   settings: LoadedSettings,
 ): Promise<InitializationResult> {
-  startupProfiler.start('authenticate');
+  const authHandle = startupProfiler.start('authenticate');
   const authError = await performInitialAuth(
     config,
     settings.merged.security?.auth?.selectedType,
   );
-  startupProfiler.end('authenticate');
+  authHandle.end();
   const themeError = validateTheme(settings);
 
   const shouldOpenAuthDialog =

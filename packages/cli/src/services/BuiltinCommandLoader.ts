@@ -56,7 +56,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
-    startupProfiler.start('load_builtin_commands');
+    const handle = startupProfiler.start('load_builtin_commands');
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       authCommand,
@@ -93,7 +93,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       terminalSetupCommand,
     ];
 
-    startupProfiler.end('load_builtin_commands');
+    handle.end();
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
   }
 }
