@@ -202,7 +202,7 @@ export const agentsCommand: SlashCommand = {
   subCommands: [newAgentCommand, listAgentsCommand, descAgentCommand],
   action: (context, args) => {
     const parts = args?.trim().split(' ') ?? [];
-    const subCommand = parts[0];
+    const subCommand = parts[0] || '';
     const subCommandArgs = parts.slice(1).join(' ');
 
     switch (subCommand) {
@@ -217,7 +217,7 @@ export const agentsCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: MessageType.ERROR,
-            text: `Unknown subcommand: "${subCommand}". Valid subcommands are "new" and "list".`,
+            text: `Unknown subcommand: "${subCommand}". Valid subcommands are "new", "list", and "desc".`,
           },
           Date.now(),
         );
