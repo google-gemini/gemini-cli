@@ -87,6 +87,8 @@ describe('extensions uninstall command', () => {
   beforeEach(async () => {
     mockLoadSettings.mockReturnValue({
       merged: {},
+      forScope: vi.fn().mockReturnValue({ settings: {} }),
+      setValue: vi.fn(),
     } as unknown as LoadedSettings);
   });
 
