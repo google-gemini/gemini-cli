@@ -223,6 +223,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     discoverTools: async () => {},
     getAllTools: () => [],
     getToolsByServer: () => [],
+    getExperiments: () => {},
   } as unknown as ToolRegistry;
 
   const baseConfig = {
@@ -248,11 +249,11 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getToolRegistry: () => defaultToolRegistry,
     getUseSmartEdit: () => false,
-    getUseModelRouter: () => false,
     getGeminiClient: () => null,
     getEnableMessageBusIntegration: () => false,
     getMessageBus: () => null,
     getPolicyEngine: () => null,
+    getExperiments: () => {},
   } as unknown as Config;
 
   return { ...baseConfig, ...overrides } as Config;
