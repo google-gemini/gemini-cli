@@ -81,7 +81,7 @@ export class HookRunner {
       this.executeHook(config, eventName, input),
     );
 
-    return await Promise.all(promises);
+    return Promise.all(promises);
   }
 
   /**
