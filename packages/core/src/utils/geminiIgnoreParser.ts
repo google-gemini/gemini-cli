@@ -89,7 +89,11 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
     if (this.patterns.length === 0) {
       return null;
     }
-    return path.join(this.projectRoot, '.geminiignore');
+    const ignoreFilePath = path.join(this.projectRoot, '.geminiignore');
+    if (!fs.existsSync(ignoreFilePath)) {
+      return null;
+    }
+    return ignoreFilePath;
   }
 
   /**

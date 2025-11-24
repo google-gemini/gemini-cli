@@ -190,6 +190,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
+    private readonly geminiIgnoreParser: GeminiIgnoreParser,
     params: RipGrepToolParams,
     messageBus?: MessageBus,
     _toolName?: string,
@@ -390,8 +391,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       });
 
       // Add .geminiignore support (ripgrep natively handles .gitignore)
-      const geminiIgnore = new GeminiIgnoreParser(this.config.getTargetDir());
-      const geminiIgnorePath = geminiIgnore.getIgnoreFilePath();
+      const geminiIgnorePath = this.geminiIgnoreParser.getIgnoreFilePath();
       if (geminiIgnorePath) {
         rgArgs.push('--ignore-file', geminiIgnorePath);
       }
@@ -487,6 +487,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = GREP_TOOL_NAME;
+  private readonly geminiIgnoreParser: GeminiIgnoreParser;
 
   constructor(
     private readonly config: Config,
@@ -552,6 +553,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
       false, // canUpdateOutput
       messageBus,
     );
+    this.geminiIgnoreParser = new GeminiIgnoreParser(config.getTargetDir());
   }
 
   /**
@@ -588,6 +590,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
+      this.geminiIgnoreParser,
       params,
       messageBus,
       _toolName,
