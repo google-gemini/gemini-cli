@@ -22,4 +22,21 @@ export type FallbackModelHandler = (
   failedModel: string,
   fallbackModel: string,
   error?: unknown,
+  autoFallbackStatus?: AutoFallbackStatus,
 ) => Promise<FallbackIntent | null>;
+
+/**
+ * Status of automatic fallback attempt by the core handler.
+ */
+export type AutoFallbackStatus =
+  | {
+      status: 'success';
+      authType: 'gemini-api-key' | 'vertex-ai';
+    }
+  | {
+      status: 'missing-env-vars';
+      authType: 'gemini-api-key' | 'vertex-ai';
+    }
+  | {
+      status: 'not-attempted';
+    };

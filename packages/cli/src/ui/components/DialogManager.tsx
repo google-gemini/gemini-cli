@@ -53,6 +53,14 @@ export const DialogManager = ({
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
   }
   if (uiState.proQuotaRequest) {
+    // Detect available auth methods
+    const hasApiKey = Boolean(process.env['GEMINI_API_KEY']);
+    const hasVertexAI = Boolean(
+      process.env['GOOGLE_API_KEY'] ||
+        (process.env['GOOGLE_CLOUD_PROJECT'] &&
+          process.env['GOOGLE_CLOUD_LOCATION']),
+    );
+
     return (
       <ProQuotaDialog
         failedModel={uiState.proQuotaRequest.failedModel}
@@ -60,6 +68,8 @@ export const DialogManager = ({
         message={uiState.proQuotaRequest.message}
         isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
         isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
+        hasApiKey={hasApiKey}
+        hasVertexAI={hasVertexAI}
         onChoice={uiActions.handleProQuotaChoice}
         userTier={uiState.userTier}
       />

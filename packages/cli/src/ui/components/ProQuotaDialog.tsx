@@ -22,8 +22,16 @@ interface ProQuotaDialogProps {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  hasApiKey: boolean;
+  hasVertexAI: boolean;
   onChoice: (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+    choice:
+      | 'retry_later'
+      | 'retry_once'
+      | 'retry_always'
+      | 'upgrade'
+      | 'gemini-api-key'
+      | 'vertex-ai',
   ) => void;
   userTier: UserTierId | undefined;
 }
@@ -34,6 +42,8 @@ export function ProQuotaDialog({
   message,
   isTerminalQuotaError,
   isModelNotFoundError,
+  hasApiKey,
+  hasVertexAI,
   onChoice,
   userTier,
 }: ProQuotaDialogProps): React.JSX.Element {
@@ -112,8 +122,38 @@ export function ProQuotaDialog({
     ];
   }
 
+  // Add auth fallback options for terminal quota errors
+  if (isTerminalQuotaError) {
+    const authFallbackItems = [];
+    if (hasApiKey) {
+      authFallbackItems.push({
+        label: 'Always fallback to Gemini API key',
+        value: 'gemini-api-key' as const,
+        key: 'gemini-api-key',
+      });
+    }
+    if (hasVertexAI) {
+      authFallbackItems.push({
+        label: 'Always fallback to Vertex AI',
+        value: 'vertex-ai' as const,
+        key: 'vertex-ai',
+      });
+    }
+    // Insert auth options before the final "Stop" option
+    if (authFallbackItems.length > 0) {
+      const stopOption = items.pop()!; // Remove "Stop"
+      items = [...items, ...authFallbackItems, stopOption]; // Add auth options, then "Stop"
+    }
+  }
+
   const handleSelect = (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+    choice:
+      | 'retry_later'
+      | 'retry_once'
+      | 'retry_always'
+      | 'upgrade'
+      | 'gemini-api-key'
+      | 'vertex-ai',
   ) => {
     onChoice(choice);
   };

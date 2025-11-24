@@ -10,7 +10,7 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
-import { IdeClient } from '@google/gemini-cli-core';
+import { IdeClient, AuthType } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -37,13 +37,31 @@ describe('aboutCommand', () => {
   const originalPlatform = process.platform;
   const originalEnv = { ...process.env };
 
+  const createConfigMock = (
+    overrides: Partial<CommandContext['services']['config']> = {},
+  ): CommandContext['services']['config'] => {
+    const baseConfig = {
+      getModel: vi.fn().mockReturnValue('test-model'),
+      getIdeMode: vi.fn().mockReturnValue(true),
+      getAutoFallback: vi.fn().mockReturnValue({
+        enabled: false,
+        type: 'gemini-api-key',
+      }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: 'test-auth',
+      }),
+    } as unknown as CommandContext['services']['config'];
+
+    return {
+      ...baseConfig,
+      ...overrides,
+    } as CommandContext['services']['config'];
+  };
+
   beforeEach(() => {
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: vi.fn(),
-          getIdeMode: vi.fn().mockReturnValue(true),
-        },
+        config: createConfigMock(),
         settings: {
           merged: {
             security: {
@@ -60,9 +78,7 @@ describe('aboutCommand', () => {
     } as unknown as CommandContext);
 
     vi.mocked(versionUtils.getCliVersion).mockResolvedValue('test-version');
-    vi.spyOn(mockContext.services.config!, 'getModel').mockReturnValue(
-      'test-model',
-    );
+
     process.env['GOOGLE_CLOUD_PROJECT'] = 'test-gcp-project';
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
@@ -165,5 +181,116 @@ describe('aboutCommand', () => {
       }),
       expect.any(Number),
     );
+  });
+
+  describe('auth display', () => {
+    const setSelectedAuthType = (selected: AuthType) => {
+      mockContext.services.settings.merged.security = {
+        auth: {
+          selectedType: selected,
+        },
+      } as typeof mockContext.services.settings.merged.security;
+    };
+
+    it('should show only settings auth when auto-fallback is disabled and session matches', async () => {
+      setSelectedAuthType(AuthType.LOGIN_WITH_GOOGLE);
+      mockContext.services.config = createConfigMock({
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+        getAutoFallback: vi.fn().mockReturnValue({
+          enabled: false,
+          type: 'gemini-api-key',
+        }),
+      });
+
+      if (!aboutCommand.action) {
+        throw new Error('The about command must have an action.');
+      }
+      await aboutCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selectedAuthType: 'OAuth',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show fallback type when auto-fallback is enabled', async () => {
+      setSelectedAuthType(AuthType.LOGIN_WITH_GOOGLE);
+      mockContext.services.config = createConfigMock({
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+        getAutoFallback: vi.fn().mockReturnValue({
+          enabled: true,
+          type: 'gemini-api-key',
+        }),
+      });
+
+      if (!aboutCommand.action) {
+        throw new Error('The about command must have an action.');
+      }
+      await aboutCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selectedAuthType: 'OAuth (fallback: Gemini API Key)',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show fallback active when auto-fallback is enabled and active', async () => {
+      setSelectedAuthType(AuthType.LOGIN_WITH_GOOGLE);
+      mockContext.services.config = createConfigMock({
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          authType: AuthType.USE_GEMINI,
+        }),
+        getAutoFallback: vi.fn().mockReturnValue({
+          enabled: true,
+          type: 'gemini-api-key',
+        }),
+      });
+
+      if (!aboutCommand.action) {
+        throw new Error('The about command must have an action.');
+      }
+      await aboutCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selectedAuthType:
+            'OAuth (fallback: Gemini API Key) → active this session',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show session override when differing without auto-fallback', async () => {
+      setSelectedAuthType(AuthType.LOGIN_WITH_GOOGLE);
+      mockContext.services.config = createConfigMock({
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          authType: AuthType.USE_VERTEX_AI,
+        }),
+        getAutoFallback: vi.fn().mockReturnValue({
+          enabled: false,
+          type: 'gemini-api-key',
+        }),
+      });
+
+      if (!aboutCommand.action) {
+        throw new Error('The about command must have an action.');
+      }
+      await aboutCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selectedAuthType: 'OAuth → session: Vertex AI',
+        }),
+        expect.any(Number),
+      );
+    });
   });
 });

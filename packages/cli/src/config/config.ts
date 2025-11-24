@@ -610,6 +610,11 @@ export async function loadCliConfig(
     geminiMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode: settings.security?.disableYoloMode,
+    autoFallback: {
+      enabled: settings.security?.auth?.autoFallback?.enabled ?? false,
+      type: (settings.security?.auth?.autoFallback?.type ??
+        'gemini-api-key') as 'gemini-api-key' | 'vertex-ai',
+    },
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,

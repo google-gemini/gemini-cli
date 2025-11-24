@@ -36,6 +36,8 @@ describe('ProQuotaDialog', () => {
           fallbackModel="gemini-2.5-pro"
           message="flash error"
           isTerminalQuotaError={true} // should not matter
+          hasApiKey={false}
+          hasVertexAI={false}
           onChoice={mockOnChoice}
           userTier={UserTierId.FREE}
         />,
@@ -72,6 +74,8 @@ describe('ProQuotaDialog', () => {
             message="paid tier quota error"
             isTerminalQuotaError={true}
             isModelNotFoundError={false}
+            hasApiKey={false}
+            hasVertexAI={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.LEGACY}
           />,
@@ -105,6 +109,8 @@ describe('ProQuotaDialog', () => {
             message="free tier quota error"
             isTerminalQuotaError={true}
             isModelNotFoundError={false}
+            hasApiKey={false}
+            hasVertexAI={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.FREE}
           />,
@@ -145,6 +151,8 @@ describe('ProQuotaDialog', () => {
             message="capacity error"
             isTerminalQuotaError={false}
             isModelNotFoundError={false}
+            hasApiKey={false}
+            hasVertexAI={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.FREE}
           />,
@@ -181,6 +189,8 @@ describe('ProQuotaDialog', () => {
             message="You don't have access to gemini-3-pro-preview yet."
             isTerminalQuotaError={false}
             isModelNotFoundError={true}
+            hasApiKey={false}
+            hasVertexAI={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.FREE}
           />,
@@ -214,6 +224,8 @@ describe('ProQuotaDialog', () => {
             message="You don't have access to gemini-3-pro-preview yet."
             isTerminalQuotaError={false}
             isModelNotFoundError={true}
+            hasApiKey={false}
+            hasVertexAI={false}
             onChoice={mockOnChoice}
             userTier={UserTierId.LEGACY}
           />,
@@ -249,6 +261,8 @@ describe('ProQuotaDialog', () => {
           fallbackModel="gemini-2.5-flash"
           message=""
           isTerminalQuotaError={false}
+          hasApiKey={false}
+          hasVertexAI={false}
           onChoice={mockOnChoice}
           userTier={UserTierId.FREE}
         />,
@@ -272,6 +286,8 @@ describe('ProQuotaDialog', () => {
           fallbackModel="gemini-2.5-pro"
           message=""
           isTerminalQuotaError={false}
+          hasApiKey={false}
+          hasVertexAI={false}
           onChoice={mockOnChoice}
           userTier={UserTierId.FREE}
         />,
@@ -291,6 +307,8 @@ describe('ProQuotaDialog', () => {
           fallbackModel="gemini-2.5-flash"
           message=""
           isTerminalQuotaError={false}
+          hasApiKey={false}
+          hasVertexAI={false}
           onChoice={mockOnChoice}
           userTier={UserTierId.FREE}
         />,
@@ -300,6 +318,87 @@ describe('ProQuotaDialog', () => {
       expect(output).toContain(
         'Note: You can always use /model to select a different option.',
       );
+      unmount();
+    });
+  });
+
+  describe('auth fallback options', () => {
+    it('should render Gemini API key option when hasApiKey is true', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          hasApiKey={true}
+          hasVertexAI={false}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+        />,
+      );
+
+      expect(RadioButtonSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              label: 'Always fallback to Gemini API key',
+              value: 'gemini-api-key',
+            }),
+          ]),
+        }),
+        undefined,
+      );
+      unmount();
+    });
+
+    it('should render Vertex AI option when hasVertexAI is true', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="quota error"
+          isTerminalQuotaError={true}
+          hasApiKey={false}
+          hasVertexAI={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+        />,
+      );
+
+      expect(RadioButtonSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              label: 'Always fallback to Vertex AI',
+              value: 'vertex-ai',
+            }),
+          ]),
+        }),
+        undefined,
+      );
+      unmount();
+    });
+
+    it('should NOT render auth options if not a terminal quota error', () => {
+      const { unmount } = render(
+        <ProQuotaDialog
+          failedModel="gemini-2.5-pro"
+          fallbackModel="gemini-2.5-flash"
+          message="capacity error"
+          isTerminalQuotaError={false}
+          hasApiKey={true}
+          hasVertexAI={true}
+          onChoice={mockOnChoice}
+          userTier={UserTierId.FREE}
+        />,
+      );
+
+      const items = (RadioButtonSelect as Mock).mock.calls[0][0]
+        .items as Array<{ label: string }>;
+      const labels = items.map((item) => item.label);
+
+      expect(labels).not.toContain('Always fallback to Gemini API key');
+      expect(labels).not.toContain('Always fallback to Vertex AI');
       unmount();
     });
   });

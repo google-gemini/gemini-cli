@@ -48,6 +48,13 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     fallbackHandler: undefined,
     getFallbackModelHandler: vi.fn(),
     isInteractive: vi.fn(() => false),
+    getContentGeneratorConfig: vi.fn(() => ({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    })),
+    getAutoFallback: vi.fn(() => ({
+      enabled: false,
+      type: 'gemini-api-key' as const,
+    })),
     ...overrides,
   }) as unknown as Config;
 
@@ -167,6 +174,7 @@ describe('handleFallback', () => {
       MOCK_PRO_MODEL,
       FALLBACK_MODEL,
       mockError,
+      { status: 'not-attempted' },
     );
   });
 
@@ -281,6 +289,7 @@ describe('handleFallback', () => {
         PREVIEW_GEMINI_MODEL,
         DEFAULT_GEMINI_MODEL,
         undefined,
+        { status: 'not-attempted' },
       );
     });
   });

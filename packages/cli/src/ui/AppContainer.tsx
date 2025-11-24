@@ -427,6 +427,7 @@ export const AppContainer = (props: AppContainerProps) => {
     historyManager,
     userTier,
     setModelSwitchedFromQuotaError,
+    settings,
   });
 
   // Derive auth state variables for backward compatibility with UIStateContext

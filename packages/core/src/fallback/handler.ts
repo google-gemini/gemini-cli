@@ -12,6 +12,7 @@ import {
   PREVIEW_GEMINI_MODEL,
 } from '../config/models.js';
 import { logFlashFallback, FlashFallbackEvent } from '../telemetry/index.js';
+import type { AutoFallbackStatus } from './types.js';
 import { coreEvents } from '../utils/events.js';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -28,6 +29,48 @@ export async function handleFallback(
 ): Promise<string | boolean | null> {
   // Applicability Checks
   if (authType !== AuthType.LOGIN_WITH_GOOGLE) return null;
+
+  const currentAuthType = config.getContentGeneratorConfig()?.authType;
+  const autoFallback = config.getAutoFallback();
+
+  let autoFallbackStatus: AutoFallbackStatus = { status: 'not-attempted' };
+
+  // Check auto-fallback settings and attempt automatic auth switch
+  if (currentAuthType === AuthType.LOGIN_WITH_GOOGLE && autoFallback.enabled) {
+    if (
+      autoFallback.type === 'gemini-api-key' &&
+      process.env['GEMINI_API_KEY']
+    ) {
+      // Session-only switch to Gemini API key auth
+      try {
+        await config.refreshAuth(AuthType.USE_GEMINI);
+        autoFallbackStatus = { status: 'success', authType: 'gemini-api-key' };
+      } catch (_e) {
+        // If refresh fails, continue to show dialog
+        autoFallbackStatus = { status: 'not-attempted' };
+      }
+    } else if (
+      autoFallback.type === 'vertex-ai' &&
+      (process.env['GOOGLE_API_KEY'] ||
+        (process.env['GOOGLE_CLOUD_PROJECT'] &&
+          process.env['GOOGLE_CLOUD_LOCATION']))
+    ) {
+      // Session-only switch to Vertex AI auth
+      try {
+        await config.refreshAuth(AuthType.USE_VERTEX_AI);
+        autoFallbackStatus = { status: 'success', authType: 'vertex-ai' };
+      } catch (_e) {
+        // If refresh fails, continue to show dialog
+        autoFallbackStatus = { status: 'not-attempted' };
+      }
+    } else if (autoFallback.enabled) {
+      // Auto-fallback is enabled but env vars are missing
+      autoFallbackStatus = {
+        status: 'missing-env-vars',
+        authType: autoFallback.type,
+      };
+    }
+  }
 
   // Guardrail: If it's a ModelNotFoundError but NOT the preview model, do not handle it.
   if (
@@ -60,11 +103,12 @@ export async function handleFallback(
   if (typeof fallbackModelHandler !== 'function') return null;
 
   try {
-    // Pass the specific failed model to the UI handler.
+    // Pass the specific failed model and auto-fallback status to the UI handler.
     const intent = await fallbackModelHandler(
       failedModel,
       fallbackModel,
       error,
+      autoFallbackStatus,
     );
 
     // Process Intent and Update State

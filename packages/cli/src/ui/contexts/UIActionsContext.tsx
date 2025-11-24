@@ -43,7 +43,13 @@ export interface UIActions {
   handleFinalSubmit: (value: string) => void;
   handleClearScreen: () => void;
   handleProQuotaChoice: (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+    choice:
+      | 'retry_later'
+      | 'retry_once'
+      | 'retry_always'
+      | 'upgrade'
+      | 'gemini-api-key'
+      | 'vertex-ai',
   ) => void;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: (onPop: (messages: string | undefined) => void) => void;
