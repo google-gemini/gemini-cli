@@ -62,7 +62,7 @@ const PREVIEW_CHAIN: ModelPolicyChain = [
 export function getModelPolicyChain(
   options: ModelPolicyOptions,
 ): ModelPolicyChain {
-  if (options?.previewEnabled) {
+  if (options.previewEnabled) {
     return cloneChain(PREVIEW_CHAIN);
   }
 
