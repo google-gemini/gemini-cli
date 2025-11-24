@@ -292,7 +292,7 @@ export async function main() {
   setupUnhandledRejectionHandler();
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
-  loadSettingsHandle.end();
+  loadSettingsHandle?.end();
 
   const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
@@ -306,12 +306,12 @@ export async function main() {
       requestSetting: null,
     }),
   );
-  migrateHandle.end();
+  migrateHandle?.end();
   await cleanupCheckpoints();
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
-  parseArgsHandle.end();
+  parseArgsHandle?.end();
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -456,7 +456,7 @@ export async function main() {
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv);
-    loadConfigHandle.end();
+    loadConfigHandle?.end();
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
@@ -522,7 +522,7 @@ export async function main() {
     setMaxSizedBoxDebugging(isDebugMode);
     const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
-    initAppHandle.end();
+    initAppHandle?.end();
 
     if (
       settings.merged.security?.auth?.selectedType ===
@@ -564,7 +564,7 @@ export async function main() {
       }
     }
 
-    cliStartupHandle.end();
+    cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       await startInteractiveUI(

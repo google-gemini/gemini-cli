@@ -37,15 +37,11 @@ export async function initializeApp(
   settings: LoadedSettings,
 ): Promise<InitializationResult> {
   const authHandle = startupProfiler.start('authenticate');
-  let authError: string | null;
-  try {
-    authError = await performInitialAuth(
-      config,
-      settings.merged.security?.auth?.selectedType,
-    );
-  } finally {
-    authHandle.end();
-  }
+  const authError = await performInitialAuth(
+    config,
+    settings.merged.security?.auth?.selectedType,
+  );
+  authHandle?.end();
   const themeError = validateTheme(settings);
 
   const shouldOpenAuthDialog =

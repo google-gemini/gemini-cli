@@ -57,46 +57,43 @@ export class BuiltinCommandLoader implements ICommandLoader {
    */
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
     const handle = startupProfiler.start('load_builtin_commands');
-    try {
-      const allDefinitions: Array<SlashCommand | null> = [
-        aboutCommand,
-        authCommand,
-        bugCommand,
-        chatCommand,
-        clearCommand,
-        compressCommand,
-        copyCommand,
-        corgiCommand,
-        docsCommand,
-        directoryCommand,
-        editorCommand,
-        extensionsCommand(this.config?.getEnableExtensionReloading()),
-        helpCommand,
-        await ideCommand(),
-        initCommand,
-        mcpCommand,
-        memoryCommand,
-        modelCommand,
-        ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
-        privacyCommand,
-        ...(this.config?.getEnableMessageBusIntegration()
-          ? [policiesCommand]
-          : []),
-        ...(isDevelopment ? [profileCommand] : []),
-        quitCommand,
-        restoreCommand(this.config),
-        statsCommand,
-        themeCommand,
-        toolsCommand,
-        settingsCommand,
-        vimCommand,
-        setupGithubCommand,
-        terminalSetupCommand,
-      ];
-
-      return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
-    } finally {
-      handle.end();
-    }
+    const handle = startupProfiler.start('load_builtin_commands');
+    const allDefinitions: Array<SlashCommand | null> = [
+      aboutCommand,
+      authCommand,
+      bugCommand,
+      chatCommand,
+      clearCommand,
+      compressCommand,
+      copyCommand,
+      corgiCommand,
+      docsCommand,
+      directoryCommand,
+      editorCommand,
+      extensionsCommand(this.config?.getEnableExtensionReloading()),
+      helpCommand,
+      await ideCommand(),
+      initCommand,
+      mcpCommand,
+      memoryCommand,
+      modelCommand,
+      ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
+      privacyCommand,
+      ...(this.config?.getEnableMessageBusIntegration()
+        ? [policiesCommand]
+        : []),
+      ...(isDevelopment ? [profileCommand] : []),
+      quitCommand,
+      restoreCommand(this.config),
+      statsCommand,
+      themeCommand,
+      toolsCommand,
+      settingsCommand,
+      vimCommand,
+      setupGithubCommand,
+      terminalSetupCommand,
+    ];
+    handle?.end();
+    return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
   }
 }

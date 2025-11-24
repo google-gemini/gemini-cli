@@ -609,34 +609,28 @@ export class Config {
 
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
-    try {
-      this.getFileService();
-      if (this.getCheckpointingEnabled()) {
-        await this.getGitService();
-      }
-      this.promptRegistry = new PromptRegistry();
-
-      this.agentRegistry = new AgentRegistry(this);
-      await this.agentRegistry.initialize();
-
-      this.toolRegistry = await this.createToolRegistry();
-    } finally {
-      discoverToolsHandle.end();
+    this.getFileService();
+    if (this.getCheckpointingEnabled()) {
+      await this.getGitService();
     }
+    this.promptRegistry = new PromptRegistry();
+
+    this.agentRegistry = new AgentRegistry(this);
+    await this.agentRegistry.initialize();
+
+    this.toolRegistry = await this.createToolRegistry();
+    discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.toolRegistry,
       this,
       this.eventEmitter,
     );
     const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
-    try {
-      await Promise.all([
-        await this.mcpClientManager.startConfiguredMcpServers(),
-        await this.getExtensionLoader().start(this),
-      ]);
-    } finally {
-      initMcpHandle.end();
-    }
+    await Promise.all([
+      await this.mcpClientManager.startConfiguredMcpServers(),
+      await this.getExtensionLoader().start(this),
+    ]);
+    initMcpHandle?.end();
 
     await this.geminiClient.initialize();
   }

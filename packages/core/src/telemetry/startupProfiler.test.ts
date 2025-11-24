@@ -88,19 +88,17 @@ describe('StartupProfiler', () => {
       expect(phase?.details).toEqual(details);
     });
 
-    it('should throw error when starting a phase that is already active', () => {
+    it('should return undefined when starting a phase that is already active', () => {
       profiler.start('test_phase');
-
-      expect(() => profiler.start('test_phase')).toThrow(
-        "Cannot start phase 'test_phase': phase is already active",
-      );
+      const handle = profiler.start('test_phase');
+      expect(handle).toBeUndefined();
     });
   });
 
   describe('end', () => {
     it('should create a performance measure for a started phase', () => {
       const handle = profiler.start('test_phase');
-      handle.end();
+      handle?.end();
 
       // Verify performance measure was created
       const measures = performance.getEntriesByType('measure');
@@ -111,7 +109,7 @@ describe('StartupProfiler', () => {
 
     it('should merge details when ending a phase', () => {
       const handle = profiler.start('test_phase', { initial: 'value' });
-      handle.end({ additional: 'data' });
+      handle?.end({ additional: 'data' });
 
       const phase = profiler['phases'].get('test_phase');
       expect(phase?.details).toEqual({
@@ -122,7 +120,7 @@ describe('StartupProfiler', () => {
 
     it('should overwrite details with same key', () => {
       const handle = profiler.start('test_phase', { key: 'original' });
-      handle.end({ key: 'updated' });
+      handle?.end({ key: 'updated' });
 
       const phase = profiler['phases'].get('test_phase');
       expect(phase?.details).toEqual({ key: 'updated' });
@@ -132,10 +130,10 @@ describe('StartupProfiler', () => {
   describe('flush', () => {
     it('should call recordStartupPerformance for each completed phase', () => {
       const handle1 = profiler.start('phase1');
-      handle1.end();
+      handle1?.end();
 
       const handle2 = profiler.start('phase2');
-      handle2.end();
+      handle2?.end();
 
       profiler.flush(mockConfig);
 
@@ -151,7 +149,7 @@ describe('StartupProfiler', () => {
 
     it('should include common details in all metrics', () => {
       const handle = profiler.start('test_phase');
-      handle.end();
+      handle?.end();
 
       profiler.flush(mockConfig);
 
@@ -174,7 +172,7 @@ describe('StartupProfiler', () => {
 
     it('should merge phase-specific details with common details', () => {
       const handle = profiler.start('test_phase', { custom: 'value' });
-      handle.end();
+      handle?.end();
 
       profiler.flush(mockConfig);
 
@@ -193,7 +191,7 @@ describe('StartupProfiler', () => {
 
     it('should clear phases after flushing', () => {
       const handle = profiler.start('test_phase');
-      handle.end();
+      handle?.end();
 
       profiler.flush(mockConfig);
 
@@ -205,7 +203,7 @@ describe('StartupProfiler', () => {
       (fs.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
 
       const handle = profiler.start('test_phase');
-      handle.end();
+      handle?.end();
 
       profiler.flush(mockConfig);
 
@@ -228,7 +226,7 @@ describe('StartupProfiler', () => {
       cpuUsageSpy.mockReturnValueOnce({ user: 100, system: 50 });
 
       const handle = profiler.start('cpu_test_phase');
-      handle.end();
+      handle?.end();
 
       profiler.flush(mockConfig);
 
@@ -252,15 +250,15 @@ describe('StartupProfiler', () => {
       const totalHandle = profiler.start('total_startup');
 
       const settingsHandle = profiler.start('load_settings');
-      settingsHandle.end();
+      settingsHandle?.end();
 
       const argsHandle = profiler.start('parse_arguments');
-      argsHandle.end();
+      argsHandle?.end();
 
       const appHandle = profiler.start('initialize_app');
-      appHandle.end();
+      appHandle?.end();
 
-      totalHandle.end();
+      totalHandle?.end();
 
       profiler.flush(mockConfig);
 
@@ -275,8 +273,8 @@ describe('StartupProfiler', () => {
     it('should handle nested timing correctly', () => {
       const outerHandle = profiler.start('outer');
       const innerHandle = profiler.start('inner');
-      innerHandle.end();
-      outerHandle.end();
+      innerHandle?.end();
+      outerHandle?.end();
 
       profiler.flush(mockConfig);
 
@@ -293,30 +291,26 @@ describe('StartupProfiler', () => {
   });
 
   describe('sanity checking', () => {
-    it('should throw error when starting a phase that is already active', () => {
+    it('should return undefined when starting a phase that is already active', () => {
       profiler.start('test_phase');
-
-      expect(() => profiler.start('test_phase')).toThrow(
-        "Cannot start phase 'test_phase': phase is already active",
-      );
+      const handle = profiler.start('test_phase');
+      expect(handle).toBeUndefined();
     });
 
     it('should allow restarting a phase after it has ended', () => {
       const handle1 = profiler.start('test_phase');
-      handle1.end();
+      handle1?.end();
 
       // Should not throw
       expect(() => profiler.start('test_phase')).not.toThrow();
     });
 
-    it('should throw error when ending a phase that is already ended', () => {
+    it('should not throw error when ending a phase that is already ended', () => {
       const handle = profiler.start('test_phase');
-      handle.end();
+      handle?.end();
 
-      // Calling end() again on the same handle should throw
-      expect(() => handle.end()).toThrow(
-        "Cannot end phase 'test_phase': phase was already ended",
-      );
+      // Calling end() again on the same handle should not throw
+      expect(() => handle?.end()).not.toThrow();
     });
 
     it('should not record metrics for incomplete phases', () => {
@@ -330,7 +324,7 @@ describe('StartupProfiler', () => {
 
     it('should handle mix of complete and incomplete phases', () => {
       const completeHandle = profiler.start('complete_phase');
-      completeHandle.end();
+      completeHandle?.end();
 
       profiler.start('incomplete_phase');
       // Never call end()

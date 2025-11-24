@@ -58,18 +58,27 @@ export class StartupProfiler {
 
   /**
    * Marks the start of a phase and returns a handle to end it.
+   *
+   * If a phase with the same name is already active (started but not ended),
+   * this method will log a warning and return `undefined`. This allows for
+   * idempotent calls in environments where initialization might happen multiple
+   * times.
+   *
+   * Callers should handle the potential `undefined` return value, typically
+   * by using optional chaining: `handle?.end()`.
    */
   start(
     phaseName: string,
     details?: Record<string, string | number | boolean>,
-  ): StartupPhaseHandle {
+  ): StartupPhaseHandle | undefined {
     const existingPhase = this.phases.get(phaseName);
 
     // Error if starting a phase that's already active.
     if (existingPhase && !existingPhase.ended) {
-      throw new Error(
+      debugLogger.warn(
         `[STARTUP] Cannot start phase '${phaseName}': phase is already active. Call end() before starting again.`,
       );
+      return undefined;
     }
 
     const startMarkName = this.getStartMarkName(phaseName);
@@ -102,9 +111,10 @@ export class StartupProfiler {
   ): void {
     // Error if ending a phase that's already ended.
     if (phase.ended) {
-      throw new Error(
+      debugLogger.warn(
         `[STARTUP] Cannot end phase '${phase.name}': phase was already ended.`,
       );
+      return;
     }
 
     const startMarkName = this.getStartMarkName(phase.name);
