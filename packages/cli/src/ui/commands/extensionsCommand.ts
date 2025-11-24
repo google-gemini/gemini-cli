@@ -25,11 +25,24 @@ import { SettingScope } from '../../config/settings.js';
 import { theme } from '../semantic-colors.js';
 
 async function listAction(context: CommandContext) {
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (extensions.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run /extensions explore to check out the gallery',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
   const historyItem: HistoryItemExtensionsList = {
     type: MessageType.EXTENSIONS_LIST,
-    extensions: context.services.config
-      ? listExtensions(context.services.config)
-      : [],
+    extensions,
   };
 
   context.ui.addItem(historyItem, Date.now());
@@ -56,11 +69,24 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     (resolve) => (resolveUpdateComplete = resolve),
   );
 
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (extensions.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run /extensions explore to check out the gallery',
+      },
+      Date.now(),
+    );
+    return Promise.resolve();
+  }
+
   const historyItem: HistoryItemExtensionsList = {
     type: MessageType.EXTENSIONS_LIST,
-    extensions: context.services.config
-      ? listExtensions(context.services.config)
-      : [],
+    extensions,
   };
 
   updateComplete.then((updateInfos) => {
@@ -132,6 +158,18 @@ async function restartAction(
       {
         type: MessageType.ERROR,
         text: "Extensions are not yet loaded, can't restart yet",
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  const extensions = extensionLoader.getExtensions();
+  if (extensions.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run /extensions explore to check out the gallery',
       },
       Date.now(),
     );
