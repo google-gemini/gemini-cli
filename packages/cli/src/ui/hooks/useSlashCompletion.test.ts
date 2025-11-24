@@ -293,7 +293,7 @@ describe('useSlashCompletion', () => {
         const hook = renderHook(() =>
           useTestHarnessForSlashCompletion(
             true,
-            '/usag',
+            '/usage',
             slashCommands,
             mockCommandContext,
           ),
