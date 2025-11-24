@@ -43,6 +43,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         ),
       ),
     })),
+    StreamJsonFormatter: vi.fn().mockImplementation(() => ({
+      emitEvent: vi.fn(),
+      convertToStreamStats: vi.fn().mockReturnValue({}),
+    })),
+    uiTelemetryService: {
+      getMetrics: vi.fn().mockReturnValue({}),
+    },
+    JsonStreamEventType: {
+      RESULT: 'result',
+    },
     FatalToolExecutionError: class extends Error {
       constructor(message: string) {
         super(message);
@@ -248,6 +258,30 @@ describe('errors', () => {
         );
       });
     });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit', () => {
+        const testError = new Error('Test error');
+
+        expect(() => {
+          handleError(testError, mockConfig);
+        }).toThrow('process.exit called with code: 1');
+      });
+
+      it('should extract exitCode from FatalError instances', () => {
+        const fatalError = new FatalInputError('Fatal error');
+
+        expect(() => {
+          handleError(fatalError, mockConfig);
+        }).toThrow('process.exit called with code: 42');
+      });
+    });
   });
 
   describe('handleToolError', () => {
@@ -377,6 +411,28 @@ describe('errors', () => {
         });
       });
     });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit for fatal errors', () => {
+        expect(() => {
+          handleToolError(toolName, toolError, mockConfig, 'no_space_left');
+        }).toThrow('process.exit called with code: 54');
+      });
+
+      it('should log to stderr and not exit for non-fatal errors', () => {
+        handleToolError(toolName, toolError, mockConfig, 'invalid_tool_params');
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Error executing tool test-tool: Tool failed',
+        );
+        expect(processExitSpy).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('handleCancellationError', () => {
@@ -421,6 +477,20 @@ describe('errors', () => {
             2,
           ),
         );
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit with 130', () => {
+        expect(() => {
+          handleCancellationError(mockConfig);
+        }).toThrow('process.exit called with code: 130');
       });
     });
   });
@@ -470,6 +540,20 @@ describe('errors', () => {
             2,
           ),
         );
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit with 53', () => {
+        expect(() => {
+          handleMaxTurnsExceededError(mockConfig);
+        }).toThrow('process.exit called with code: 53');
       });
     });
   });

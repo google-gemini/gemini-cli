@@ -112,7 +112,7 @@ export function validateDnsResolutionOrder(
   return defaultValue;
 }
 
-function getNodeMemoryArgs(isDebugMode: boolean): string[] {
+export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
   const heapStats = v8.getHeapStatistics();
   const currentMaxOldSpaceSizeMb = Math.floor(
@@ -452,7 +452,11 @@ export async function main() {
     createPolicyUpdater(policyEngine, messageBus);
 
     // Cleanup sessions after config initialization
-    await cleanupExpiredSessions(config, settings.merged);
+    try {
+      await cleanupExpiredSessions(config, settings.merged);
+    } catch (e) {
+      debugLogger.error('Failed to cleanup expired sessions:', e);
+    }
 
     if (config.getListExtensions()) {
       debugLogger.log('Installed extensions:');

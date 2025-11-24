@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AuthDialog > Snapshots > renders correctly with auth error 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ ? Get started                                                                                                        │
+│                                                                                                                      │
+│   How would you like to authenticate for this project?                                                               │
+│                                                                                                                      │
+│   (selected) Login with Google(not selected) Use Gemini API Key(not selected) Vertex AI                              │
+│                                                                                                                      │
+│   Something went wrong                                                                                               │
+│                                                                                                                      │
+│   (Use Enter to select)                                                                                              │
+│                                                                                                                      │
+│   Terms of Services and Privacy Notice for Gemini CLI                                                                │
+│                                                                                                                      │
+│   https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md                                          │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`AuthDialog > Snapshots > renders correctly with default props 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ ? Get started                                                                                                        │
+│                                                                                                                      │
+│   How would you like to authenticate for this project?                                                               │
+│                                                                                                                      │
+│   (selected) Login with Google(not selected) Use Gemini API Key(not selected) Vertex AI                              │
+│                                                                                                                      │
+│   (Use Enter to select)                                                                                              │
+│                                                                                                                      │
+│   Terms of Services and Privacy Notice for Gemini CLI                                                                │
+│                                                                                                                      │
+│   https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md                                          │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`AuthDialog > Snapshots > renders correctly with enforced auth type 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ ? Get started                                                                                                        │
+│                                                                                                                      │
+│   How would you like to authenticate for this project?                                                               │
+│                                                                                                                      │
+│   (selected) Use Gemini API Key                                                                                      │
+│                                                                                                                      │
+│   (Use Enter to select)                                                                                              │
+│                                                                                                                      │
+│   Terms of Services and Privacy Notice for Gemini CLI                                                                │
+│                                                                                                                      │
+│   https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md                                          │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

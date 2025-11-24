@@ -1,0 +1,65 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`TableRenderer > handles empty rows 1`] = `
+"
+┌──────┬──────┬────────┐
+│ Name │ Role │ Status │
+├──────┼──────┼────────┤
+└──────┴──────┴────────┘
+"
+`;
+
+exports[`TableRenderer > handles markdown content in cells 1`] = `
+"
+┌───────┬──────────┬────────┐
+│ Name  │ Role     │ Status │
+├───────┼──────────┼────────┤
+│ Alice │ Engineer │ Active │
+└───────┴──────────┴────────┘
+"
+`;
+
+exports[`TableRenderer > handles rows with missing cells 1`] = `
+"
+┌───────┬──────────┬────────┐
+│ Name  │ Role     │ Status │
+├───────┼──────────┼────────┤
+│ Alice │ Engineer │
+│ Bob   │
+└───────┴──────────┴────────┘
+"
+`;
+
+exports[`TableRenderer > renders a simple table correctly 1`] = `
+"
+┌─────────┬──────────┬──────────┐
+│ Name    │ Role     │ Status   │
+├─────────┼──────────┼──────────┤
+│ Alice   │ Engineer │ Active   │
+│ Bob     │ Designer │ Inactive │
+│ Charlie │ Manager  │ Active   │
+└─────────┴──────────┴──────────┘
+"
+`;
+
+exports[`TableRenderer > truncates content when terminal width is small 1`] = `
+"
+┌────────┬─────────┬─────────┐
+│ Name   │ Role    │ Status  │
+├────────┼─────────┼─────────┤
+│ Alice  │ Engi... │ Active  │
+│ Bob    │ Desi... │ Inac... │
+│ Cha... │ Manager │ Active  │
+└────────┴─────────┴─────────┘
+"
+`;
+
+exports[`TableRenderer > truncates long markdown content correctly 1`] = `
+"
+┌───────────────────────────┬─────┬────┐
+│ Name                      │ Rol │ St │
+├───────────────────────────┼─────┼────┤
+│ Alice with a very long... │ Eng │ Ac │
+└───────────────────────────┴─────┴────┘
+"
+`;
