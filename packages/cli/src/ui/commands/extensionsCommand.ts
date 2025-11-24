@@ -24,11 +24,10 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { theme } from '../semantic-colors.js';
 
-async function listAction(context: CommandContext) {
-  const extensions = context.services.config
-    ? listExtensions(context.services.config)
-    : [];
-
+function showMessageIfNoExtensions(
+  context: CommandContext,
+  extensions: unknown[],
+): boolean {
   if (extensions.length === 0) {
     context.ui.addItem(
       {
@@ -37,6 +36,17 @@ async function listAction(context: CommandContext) {
       },
       Date.now(),
     );
+    return true;
+  }
+  return false;
+}
+
+async function listAction(context: CommandContext) {
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (showMessageIfNoExtensions(context, extensions)) {
     return;
   }
 
@@ -73,14 +83,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     ? listExtensions(context.services.config)
     : [];
 
-  if (extensions.length === 0) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: 'No extensions installed. Run /extensions explore to check out the gallery',
-      },
-      Date.now(),
-    );
+  if (showMessageIfNoExtensions(context, extensions)) {
     return Promise.resolve();
   }
 
@@ -165,14 +168,7 @@ async function restartAction(
   }
 
   const extensions = extensionLoader.getExtensions();
-  if (extensions.length === 0) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: 'No extensions installed. Run /extensions explore to check out the gallery',
-      },
-      Date.now(),
-    );
+  if (showMessageIfNoExtensions(context, extensions)) {
     return;
   }
 
