@@ -17,6 +17,17 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
+import {
+  RetryableQuotaError,
+  TerminalQuotaError,
+} from '../utils/googleQuotaErrors.js';
+import type { FallbackIntent, FallbackRecommendation } from './types.js';
+import type { FailureKind } from '../availability/modelPolicy.js';
+import {
+  buildFallbackPolicyContext,
+  resolvePolicyChain,
+  resolvePolicyAction,
+} from '../availability/policyHelpers.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -26,7 +37,21 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
-  // Applicability Checks
+  if (config.isModelAvailabilityServiceEnabled()) {
+    return handlePolicyDrivenFallback(config, failedModel, authType, error);
+  }
+  return legacyHandleFallback(config, failedModel, authType, error);
+}
+
+/**
+ * Old fallback logic relying on hard coded strings
+ */
+async function legacyHandleFallback(
+  config: Config,
+  failedModel: string,
+  authType?: string,
+  error?: unknown,
+): Promise<string | boolean | null> {
   if (authType !== AuthType.LOGIN_WITH_GOOGLE) return null;
 
   // Guardrail: If it's a ModelNotFoundError but NOT the preview model, do not handle it.
@@ -68,37 +93,115 @@ export async function handleFallback(
     );
 
     // Process Intent and Update State
-    switch (intent) {
-      case 'retry_always':
-        if (failedModel === PREVIEW_GEMINI_MODEL) {
-          activatePreviewModelFallbackMode(config);
-        } else {
-          activateFallbackMode(config, authType);
-        }
-        return true; // Signal retryWithBackoff to continue.
-
-      case 'retry_once':
-        // Just retry this time, do NOT set sticky fallback mode.
-        return true;
-
-      case 'stop':
-        activateFallbackMode(config, authType);
-        return false;
-
-      case 'retry_later':
-        return false;
-
-      case 'upgrade':
-        await handleUpgrade();
-        return false;
-
-      default:
-        throw new Error(
-          `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,
-        );
-    }
+    return await processIntent(
+      config,
+      intent,
+      failedModel,
+      fallbackModel,
+      authType,
+    );
   } catch (handlerError) {
     console.error('Fallback UI handler failed:', handlerError);
+    return null;
+  }
+}
+
+/**
+ * New fallback logic using the ModelAvailabilityService
+ */
+async function handlePolicyDrivenFallback(
+  config: Config,
+  failedModel: string,
+  authType?: string,
+  error?: unknown,
+): Promise<string | boolean | null> {
+  if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
+    return null;
+  }
+
+  const chain = resolvePolicyChain(config);
+  const { failedPolicy, candidates } = buildFallbackPolicyContext(
+    chain,
+    failedModel,
+  );
+  if (!candidates.length) {
+    return null;
+  }
+
+  const availability = config.getModelAvailabilityService();
+  const selection = availability.selectFirstAvailable(
+    candidates.map((policy) => policy.model),
+  );
+
+  const lastResortPolicy =
+    candidates.find((policy) => policy.isLastResort) ??
+    candidates[candidates.length - 1];
+
+  const fallbackModel = selection.selected ?? lastResortPolicy.model;
+  const selectedPolicy =
+    candidates.find((policy) => policy.model === fallbackModel) ??
+    lastResortPolicy;
+
+  if (!fallbackModel || fallbackModel === failedModel) {
+    return null;
+  }
+
+  const failureKind = classifyFailureKind(error);
+  const action = resolvePolicyAction(failureKind, selectedPolicy);
+
+  if (action === 'silent') {
+    return processIntent(
+      config,
+      'retry_always',
+      failedModel,
+      fallbackModel,
+      authType,
+    );
+  }
+
+  // This will be used in the future when FallbackRecommendation is passed through UI
+  const recommendation: FallbackRecommendation = {
+    ...selection,
+    selected: fallbackModel,
+    action,
+    failureKind,
+    failedPolicy,
+    selectedPolicy,
+  };
+
+  // Code below is a place holder for now until the UI is rewired to handle new
+  // inputs
+  void recommendation;
+
+  const handler = config.getFallbackModelHandler();
+  if (typeof handler !== 'function') {
+    return null;
+  }
+
+  let intent: FallbackIntent | null = null;
+  try {
+    intent = await handler(failedModel, fallbackModel, error);
+  } catch (handlerError) {
+    debugLogger.error(
+      'Fallback UI handler failed:',
+      getErrorMessage(handlerError),
+    );
+    return null;
+  }
+
+  try {
+    return await processIntent(
+      config,
+      intent,
+      failedModel,
+      fallbackModel,
+      authType,
+    );
+  } catch (handlerError) {
+    debugLogger.error(
+      'Fallback UI handler failed:',
+      getErrorMessage(handlerError),
+    );
     return null;
   }
 }
@@ -111,6 +214,43 @@ async function handleUpgrade() {
       'Failed to open browser automatically:',
       getErrorMessage(error),
     );
+  }
+}
+
+async function processIntent(
+  config: Config,
+  intent: FallbackIntent | null,
+  failedModel: string,
+  fallbackModel: string,
+  authType?: string,
+): Promise<boolean> {
+  switch (intent) {
+    case 'retry_always':
+      if (failedModel === PREVIEW_GEMINI_MODEL) {
+        activatePreviewModelFallbackMode(config);
+      } else {
+        activateFallbackMode(config, authType);
+      }
+      return true;
+
+    case 'retry_once':
+      return true;
+
+    case 'stop':
+      activateFallbackMode(config, authType);
+      return false;
+
+    case 'retry_later':
+      return false;
+
+    case 'upgrade':
+      await handleUpgrade();
+      return false;
+
+    default:
+      throw new Error(
+        `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,
+      );
   }
 }
 
@@ -129,4 +269,17 @@ function activatePreviewModelFallbackMode(config: Config) {
     config.setPreviewModelFallbackMode(true);
     // We might want a specific event for Preview Model fallback, but for now we just set the mode.
   }
+}
+
+function classifyFailureKind(error?: unknown): FailureKind {
+  if (error instanceof TerminalQuotaError) {
+    return 'terminal';
+  }
+  if (error instanceof RetryableQuotaError) {
+    return 'transient';
+  }
+  if (error instanceof ModelNotFoundError) {
+    return 'not_found';
+  }
+  return 'unknown';
 }
