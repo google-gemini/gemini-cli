@@ -14,6 +14,12 @@ import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
 import { makeChatCompressionEvent } from '../telemetry/types.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 
 export interface CompressionOptions {
   userGoal?: string;
@@ -72,8 +78,8 @@ export function findCompressSplitPoint(
       throw new Error('Fraction must be between 0 and 1');
     }
 
-    const charCounts = contents.map((content) =>
-      JSON.stringify(content).length,
+    const charCounts = contents.map(
+      (content) => JSON.stringify(content).length,
     );
     const totalCharCount = charCounts.reduce((a, b) => a + b, 0);
     const targetCharCount = totalCharCount * fraction;
@@ -188,6 +194,21 @@ export function findCompressSplitPoint(
   };
 }
 
+export function modelStringToModelConfigAlias(model: string): string {
+  switch (model) {
+    case PREVIEW_GEMINI_MODEL:
+      return 'chat-compression-3-pro';
+    case DEFAULT_GEMINI_MODEL:
+      return 'chat-compression-2.5-pro';
+    case DEFAULT_GEMINI_FLASH_MODEL:
+      return 'chat-compression-2.5-flash';
+    case DEFAULT_GEMINI_FLASH_LITE_MODEL:
+      return 'chat-compression-2.5-flash-lite';
+    default:
+      return DEFAULT_GEMINI_MODEL;
+  }
+}
+
 export class ChatCompressionService {
   async compress(
     chat: GeminiChat,
@@ -240,8 +261,6 @@ export class ChatCompressionService {
 
     let historyToCompress: Content[];
     let historyToKeep: Content[];
-    let messagesPreserved: number | undefined;
-    let messagesCompressed: number | undefined;
 
     if (preserveStrategy === 'since-last-prompt') {
       const splitResult = findCompressSplitPoint(curatedHistory, {
@@ -281,8 +300,8 @@ export class ChatCompressionService {
       );
     }
 
-    messagesPreserved = historyToKeep.length;
-    messagesCompressed = historyToCompress.length;
+    const messagesPreserved = historyToKeep.length;
+    const messagesCompressed = historyToCompress.length;
 
     if (historyToCompress.length === 0) {
       return {
@@ -295,26 +314,24 @@ export class ChatCompressionService {
       };
     }
 
-    const summaryResponse = await config.getContentGenerator().generateContent(
-      {
-        model,
-        contents: [
-          ...historyToCompress,
-          {
-            role: 'user',
-            parts: [
-              {
-                text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
-              },
-            ],
-          },
-        ],
-        config: {
-          systemInstruction: { text: getChatCompressionPrompt(userGoal) },
+    const summaryResponse = await config.getBaseLlmClient().generateContent({
+      modelConfigKey: { model: modelStringToModelConfigAlias(model) },
+      contents: [
+        ...historyToCompress,
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+            },
+          ],
         },
-      },
+      ],
+      systemInstruction: { text: getChatCompressionPrompt(userGoal) },
       promptId,
-    );
+      // TODO(joshualitt): wire up a sensible abort signal,
+      abortSignal: new AbortController().signal,
+    });
     const summary = getResponseText(summaryResponse) ?? '';
 
     // Extract discarded context summary from XML
