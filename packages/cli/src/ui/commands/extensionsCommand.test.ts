@@ -134,6 +134,21 @@ describe('extensionsCommand', () => {
         expect.any(Number),
       );
     });
+
+    it('should show a message if no extensions are installed', async () => {
+      mockGetExtensions.mockReturnValue([]);
+      const command = extensionsCommand();
+      if (!command.action) throw new Error('Action not defined');
+      await command.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+        },
+        expect.any(Number),
+      );
+    });
   });
 
   describe('completeExtensions', () => {
@@ -211,6 +226,19 @@ describe('extensionsCommand', () => {
         {
           type: MessageType.ERROR,
           text: 'Usage: /extensions update <extension-names>|--all',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show a message if no extensions are installed', async () => {
+      mockGetExtensions.mockReturnValue([]);
+      await updateAction(mockContext, 'ext-one');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
         },
         expect.any(Number),
       );
@@ -605,6 +633,25 @@ describe('extensionsCommand', () => {
           restartExtension: mockRestartExtension,
         }));
       mockContext.invocation!.name = 'restart';
+    });
+
+    it('should show a message if no extensions are installed', async () => {
+      mockContext.services.config!.getExtensionLoader = vi
+        .fn()
+        .mockImplementation(() => ({
+          getExtensions: () => [],
+          restartExtension: mockRestartExtension,
+        }));
+
+      await restartAction!(mockContext, '--all');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+        },
+        expect.any(Number),
+      );
     });
 
     it('restarts all active extensions when --all is provided', async () => {
