@@ -351,8 +351,24 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
  * think in a scratchpad, and produce a structured XML summary.
  */
 export function getCompressionPrompt(): string {
-  return `
-You are the component that summarizes internal chat history into a given structure.
+  return getChatCompressionPrompt();
+}
+
+export function getChatCompressionPrompt(userGoal?: string): string {
+  const goalSection = userGoal
+    ? `
+The user has indicated they are currently working on:
+<current_goal>
+${userGoal}
+</current_goal>
+
+When creating your summary, prioritize information relevant to this goal.
+De-emphasize or omit details unrelated to the current trajectory.
+
+`
+    : '';
+
+  return `${goalSection}You are the component that summarizes internal chat history into a given structure.
 
 When the conversation history grows too large, you will be invoked to distill the entire history into a concise, structured XML snapshot. This snapshot is CRITICAL, as it will become the agent's *only* memory of the past. The agent will resume its work based solely on this snapshot. All crucial details, plans, errors, and user directives MUST be preserved.
 
@@ -374,7 +390,7 @@ The structure MUST be as follows:
          - Build Command: \`npm run build\`
          - Testing: Tests are run with \`npm test\`. Test files must end in \`.test.ts\`.
          - API Endpoint: The primary API endpoint is \`https://api.example.com/v2\`.
-         
+
         -->
     </key_knowledge>
 
@@ -406,6 +422,11 @@ The structure MUST be as follows:
          4. [TODO] Update tests to reflect the API change.
         -->
     </current_plan>
+
+    <discarded_context_summary>
+        <!-- One sentence about what was omitted from the original history and why. Helps the user understand what context was deliberately removed. -->
+        <!-- Example: "Omitted earlier exploration of database migration approaches that were rejected in favor of the current JWT refactoring work." -->
+    </discarded_context_summary>
 </state_snapshot>
 `.trim();
 }

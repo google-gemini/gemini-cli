@@ -365,4 +365,33 @@ describe('resolvePathFromEnv helper function', () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe('getChatCompressionPrompt', () => {
+    it('should return base prompt without user goal', () => {
+      const { getChatCompressionPrompt } = await import('./prompts.js');
+      const prompt = getChatCompressionPrompt();
+
+      expect(prompt).toContain('<state_snapshot>');
+      expect(prompt).toContain('<overall_goal>');
+      expect(prompt).not.toContain('<current_goal>');
+    });
+
+    it('should prepend user goal section when provided', () => {
+      const { getChatCompressionPrompt } = await import('./prompts.js');
+      const userGoal = 'Implementing user authentication';
+      const prompt = getChatCompressionPrompt(userGoal);
+
+      expect(prompt).toContain('<current_goal>');
+      expect(prompt).toContain(userGoal);
+      expect(prompt).toContain('prioritize information relevant to this goal');
+    });
+
+    it('should include discarded_context_summary in XML structure', () => {
+      const { getChatCompressionPrompt } = await import('./prompts.js');
+      const prompt = getChatCompressionPrompt('Test goal');
+
+      expect(prompt).toContain('<discarded_context_summary>');
+      expect(prompt).toContain('One sentence about what was omitted');
+    });
+  });
 });
