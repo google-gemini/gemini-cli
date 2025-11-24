@@ -68,6 +68,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -116,6 +117,7 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
+  const { vimEnabled, vimMode } = useVimMode();
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
@@ -388,6 +390,10 @@ export const useGeminiStream = (
   useKeypress(
     (key) => {
       if (key.name === 'escape' && !isShellFocused) {
+        // In Vim INSERT mode, Esc should only switch to NORMAL mode, not cancel operations
+        if (vimEnabled && vimMode === 'INSERT') {
+          return; // Let Vim handle the mode switch
+        }
         cancelOngoingRequest();
       }
     },
