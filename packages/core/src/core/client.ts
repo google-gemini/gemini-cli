@@ -33,8 +33,6 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_THINKING_MODE,
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -55,23 +53,48 @@ import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 
-export function isThinkingSupported(model: string) {
-  return (
-    model.startsWith('gemini-2.5') ||
-    model.startsWith('gemini-3') ||
-    model === DEFAULT_GEMINI_MODEL_AUTO
-  );
-}
-
 const MAX_TURNS = 100;
+
+/**
+ * Estimates the character length of text-only parts in a request.
+ * Binary data (inline_data, fileData) is excluded from the estimation
+ * because Gemini counts these as fixed token values, not based on their size.
+ * @param request The request to estimate tokens for
+ * @returns Estimated character length of text content
+ */
+function estimateTextOnlyLength(request: PartListUnion): number {
+  if (typeof request === 'string') {
+    return request.length;
+  }
+
+  // Ensure request is an array before iterating
+  if (!Array.isArray(request)) {
+    return 0;
+  }
+
+  let textLength = 0;
+  for (const part of request) {
+    // Handle string elements in the array
+    if (typeof part === 'string') {
+      textLength += part.length;
+    }
+    // Handle object elements with text property
+    else if (
+      typeof part === 'object' &&
+      part !== null &&
+      'text' in part &&
+      part.text
+    ) {
+      textLength += part.text.length;
+    }
+    // inlineData, fileData, and other binary parts are ignored
+    // as they are counted as fixed tokens by Gemini
+  }
+  return textLength;
+}
 
 export class GeminiClient {
   private chat?: GeminiChat;
-  private readonly generateContentConfig: GenerateContentConfig = {
-    temperature: 1,
-    topP: 0.95,
-    topK: 64,
-  };
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
@@ -183,6 +206,16 @@ export class GeminiClient {
     });
   }
 
+  async updateSystemInstruction(): Promise<void> {
+    if (!this.isInitialized()) {
+      return;
+    }
+
+    const userMemory = this.config.getUserMemory();
+    const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+    this.getChat().setSystemInstruction(systemInstruction);
+  }
+
   async startChat(
     extraHistory?: Content[],
     resumedSessionData?: ResumedSessionData,
@@ -199,24 +232,10 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
-      const model = this.config.getModel();
-
-      const config: GenerateContentConfig = { ...this.generateContentConfig };
-
-      if (isThinkingSupported(model)) {
-        config.thinkingConfig = {
-          includeThoughts: true,
-          thinkingBudget: DEFAULT_THINKING_MODE,
-        };
-      }
-
       return new GeminiChat(
         this.config,
-        {
-          systemInstruction,
-          ...config,
-          tools,
-        },
+        systemInstruction,
+        tools,
         history,
         resumedSessionData,
       );
@@ -441,8 +460,11 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
 
+    // Estimate tokens based on text content only.
+    // Binary data (PDFs, images) are counted as fixed tokens by Gemini,
+    // not based on their base64-encoded size.
     const estimatedRequestTokenCount = Math.floor(
-      JSON.stringify(request).length / 4,
+      estimateTextOnlyLength(request) / 4,
     );
 
     const remainingTokenCount =
@@ -520,7 +542,7 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
 
-    const resultStream = turn.run(modelToUse, request, linkedSignal);
+    const resultStream = turn.run({ model: modelToUse }, request, linkedSignal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };

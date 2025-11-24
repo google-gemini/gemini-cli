@@ -50,6 +50,7 @@ export interface UIActions {
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
+  setEmbeddedShellFocused: (value: boolean) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

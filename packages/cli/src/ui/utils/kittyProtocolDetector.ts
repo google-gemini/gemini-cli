@@ -4,25 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
+
 let detectionComplete = false;
-let protocolSupported = false;
-let protocolEnabled = false;
-let sgrMouseEnabled = false;
+
+let kittySupported = false;
+
+let kittyEnabled = false;
 
 /**
  * Detects Kitty keyboard protocol support.
  * Definitive document about this protocol lives at https://sw.kovidgoyal.net/kitty/keyboard-protocol/
  * This function should be called once at app startup.
  */
-export async function detectAndEnableKittyProtocol(): Promise<boolean> {
+export async function detectAndEnableKittyProtocol(): Promise<void> {
   if (detectionComplete) {
-    return protocolSupported;
+    return;
   }
 
   return new Promise((resolve) => {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       detectionComplete = true;
-      resolve(false);
+      resolve();
       return;
     }
 
@@ -35,14 +38,24 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
     let progressiveEnhancementReceived = false;
     let timeoutId: NodeJS.Timeout | undefined;
 
-    const onTimeout = () => {
-      timeoutId = undefined;
+    const finish = () => {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
       process.stdin.removeListener('data', handleData);
       if (!originalRawMode) {
         process.stdin.setRawMode(false);
       }
+
+      if (kittySupported) {
+        enableSupportedProtocol();
+        process.on('exit', disableAllProtocols);
+        process.on('SIGTERM', disableAllProtocols);
+      }
+
       detectionComplete = true;
-      resolve(false);
+      resolve();
     };
 
     const handleData = (data: Buffer) => {
@@ -59,68 +72,62 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
         // indication the terminal probably supports kitty and we just need to
         // wait a bit longer for a response.
         clearTimeout(timeoutId);
-        timeoutId = setTimeout(onTimeout, 1000);
+        timeoutId = setTimeout(finish, 1000);
       }
 
       // Check for device attributes response (CSI ? <attrs> c)
       if (responseBuffer.includes('\x1b[?') && responseBuffer.includes('c')) {
-        clearTimeout(timeoutId);
-        timeoutId = undefined;
-        process.stdin.removeListener('data', handleData);
-
-        if (!originalRawMode) {
-          process.stdin.setRawMode(false);
-        }
-
         if (progressiveEnhancementReceived) {
-          // Enable the protocol
-          process.stdout.write('\x1b[>1u');
-          protocolSupported = true;
-          protocolEnabled = true;
+          kittySupported = true;
         }
 
-        // Broaden mouse support by enabling SGR mode if we get any device
-        // attribute response, which is a strong signal of a modern terminal.
-        process.stdout.write('\x1b[?1006h');
-        sgrMouseEnabled = true;
-
-        // Set up cleanup on exit for all enabled protocols
-        process.on('exit', disableAllProtocols);
-        process.on('SIGTERM', disableAllProtocols);
-
-        detectionComplete = true;
-        resolve(protocolSupported);
+        finish();
       }
     };
 
     process.stdin.on('data', handleData);
 
-    // Send queries
-    process.stdout.write('\x1b[?u'); // Query progressive enhancement
-    process.stdout.write('\x1b[c'); // Query device attributes
+    // Query progressive enhancement and device attributes
+    fs.writeSync(process.stdout.fd, '\x1b[?u\x1b[c');
 
     // Timeout after 200ms
     // When a iterm2 terminal does not have focus this can take over 90s on a
     // fast macbook so we need a somewhat longer threshold than would be ideal.
-    timeoutId = setTimeout(onTimeout, 200);
+    timeoutId = setTimeout(finish, 200);
   });
 }
 
-function disableAllProtocols() {
-  if (protocolEnabled) {
-    process.stdout.write('\x1b[<u');
-    protocolEnabled = false;
-  }
-  if (sgrMouseEnabled) {
-    process.stdout.write('\x1b[?1006l'); // Disable SGR Mouse
-    sgrMouseEnabled = false;
-  }
-}
+import {
+  enableKittyKeyboardProtocol,
+  disableKittyKeyboardProtocol,
+} from '@google/gemini-cli-core';
 
 export function isKittyProtocolEnabled(): boolean {
-  return protocolEnabled;
+  return kittyEnabled;
 }
 
-export function isKittyProtocolSupported(): boolean {
-  return protocolSupported;
+function disableAllProtocols() {
+  try {
+    if (kittyEnabled) {
+      disableKittyKeyboardProtocol();
+      kittyEnabled = false;
+    }
+  } catch {
+    // Ignore
+  }
+}
+
+/**
+ * This is exported so we can reenable this after exiting an editor which might
+ * change the mode.
+ */
+export function enableSupportedProtocol(): void {
+  try {
+    if (kittySupported) {
+      enableKittyKeyboardProtocol();
+      kittyEnabled = true;
+    }
+  } catch {
+    // Ignore
+  }
 }
