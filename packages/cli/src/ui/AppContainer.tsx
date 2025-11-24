@@ -93,6 +93,7 @@ import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
+import { useNotifications } from './hooks/useNotifications.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
@@ -858,6 +859,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const isFocused = useFocus();
   useBracketedPaste();
+
+  // Audio notifications
+  useNotifications(settings, streamingState, isInputActive, isFocused);
 
   // Context file names computation
   const contextFileNames = useMemo(() => {
