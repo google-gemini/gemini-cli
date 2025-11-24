@@ -1143,9 +1143,8 @@ ${JSON.stringify(
       // A string of length 400 is roughly 100 tokens.
       const longText = 'a'.repeat(400);
       const request: Part[] = [{ text: longText }];
-      const estimatedRequestTokenCount = Math.floor(
-        JSON.stringify(request).length / 4,
-      );
+      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1203,9 +1202,8 @@ ${JSON.stringify(
       // We need a request > 95 tokens.
       const longText = 'a'.repeat(400);
       const request: Part[] = [{ text: longText }];
-      const estimatedRequestTokenCount = Math.floor(
-        JSON.stringify(request).length / 4,
-      );
+      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
