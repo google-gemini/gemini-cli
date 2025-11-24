@@ -15,6 +15,7 @@ import * as http from 'node:http';
 import url from 'node:url';
 import crypto from 'node:crypto';
 import * as net from 'node:net';
+import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -44,6 +45,22 @@ import {
   exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+
+export const authEvents = new EventEmitter();
+
+async function triggerPostAuthCallbacks(tokens: Credentials) {
+  // Construct a JWTInput object to pass to callbacks, as this is the
+  // type expected by the downstream Google Cloud client libraries.
+  const jwtInput: JWTInput = {
+    client_id: OAUTH_CLIENT_ID,
+    client_secret: OAUTH_CLIENT_SECRET,
+    refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
+    type: 'authorized_user',
+  };
+
+  // Execute all registered post-authentication callbacks.
+  authEvents.emit('post_auth', jwtInput);
+}
 
 const userAccountManager = new UserAccountManager();
 
@@ -139,6 +156,8 @@ async function initOauthClient(
     } else {
       await cacheCredentials(tokens);
     }
+
+    await triggerPostAuthCallbacks(tokens);
   });
 
   if (credentials) {
@@ -163,6 +182,7 @@ async function initOauthClient(
         }
         debugLogger.log('Loaded cached credentials.');
         await ensureADCFileExists(credentials as Credentials);
+        await triggerPostAuthCallbacks(credentials as Credentials);
 
         return client;
       }
