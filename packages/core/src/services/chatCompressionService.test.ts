@@ -99,6 +99,83 @@ describe('findCompressSplitPoint', () => {
     ];
     expect(findCompressSplitPoint(historyWithEmptyParts, 0.5)).toBe(2);
   });
+
+  describe('since-last-prompt strategy', () => {
+    it('should split at last user message', () => {
+      // GIVEN: History with 10 messages, last user message at index 8
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        { role: 'model', parts: [{ text: 'response 1' }] },
+        { role: 'user', parts: [{ text: 'msg 2' }] },
+        { role: 'model', parts: [{ text: 'response 2' }] },
+        { role: 'user', parts: [{ text: 'msg 3' }] }, // Index 4
+        { role: 'model', parts: [{ text: 'response 3' }] },
+        { role: 'user', parts: [{ text: 'msg 4' }] },
+        { role: 'model', parts: [{ text: 'response 4' }] },
+        { role: 'user', parts: [{ text: 'msg 5' }] }, // Index 8 - last user
+        { role: 'model', parts: [{ text: 'response 5' }] },
+      ];
+
+      // WHEN: Find split point with since-last-prompt strategy
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+        minMessagesToCompress: 5,
+      });
+
+      // THEN: Should split at index 8
+      expect(result).toBeDefined();
+      expect(result).not.toBeNull();
+      if (result && typeof result !== 'number') {
+        expect(result.splitIndex).toBe(8);
+        expect(result.historyToCompress).toHaveLength(8); // 0-7
+        expect(result.historyToKeep).toHaveLength(2); // 8-9
+      }
+    });
+
+    it('should return null if history too short', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        { role: 'model', parts: [{ text: 'response 1' }] },
+      ];
+
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+        minMessagesToCompress: 5,
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if not enough messages to compress', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        { role: 'model', parts: [{ text: 'response 1' }] },
+        { role: 'user', parts: [{ text: 'msg 2' }] }, // Index 2 - last user
+        { role: 'model', parts: [{ text: 'response 2' }] },
+      ];
+
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+        minMessagesToCompress: 5, // Need at least 5, but only have 2
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if no user messages found', () => {
+      const history: Content[] = [
+        { role: 'model', parts: [{ text: 'response 1' }] },
+        { role: 'model', parts: [{ text: 'response 2' }] },
+        { role: 'model', parts: [{ text: 'response 3' }] },
+      ];
+
+      const result = findCompressSplitPoint(history, {
+        strategy: 'since-last-prompt',
+      });
+
+      expect(result).toBeNull();
+    });
+  });
 });
 
 describe('ChatCompressionService', () => {

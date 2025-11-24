@@ -27,6 +27,18 @@ export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
  */
 export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
+export interface SplitPointOptions {
+  strategy: 'percentage' | 'since-last-prompt';
+  minMessagesToCompress?: number;
+  preserveThreshold?: number;
+}
+
+export interface SplitPointResult {
+  splitIndex: number;
+  historyToCompress: Content[];
+  historyToKeep: Content[];
+}
+
 /**
  * Returns the index of the oldest item to keep when compressing. May return
  * contents.length which indicates that everything should be compressed.
@@ -35,17 +47,92 @@ export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
  */
 export function findCompressSplitPoint(
   contents: Content[],
-  fraction: number,
-): number {
-  if (fraction <= 0 || fraction >= 1) {
-    throw new Error('Fraction must be between 0 and 1');
+  fractionOrOptions: number | SplitPointOptions,
+): number | SplitPointResult | null {
+  // Handle legacy number parameter (percentage-based)
+  if (typeof fractionOrOptions === 'number') {
+    const fraction = fractionOrOptions;
+    if (fraction <= 0 || fraction >= 1) {
+      throw new Error('Fraction must be between 0 and 1');
+    }
+
+    const charCounts = contents.map((content) =>
+      JSON.stringify(content).length,
+    );
+    const totalCharCount = charCounts.reduce((a, b) => a + b, 0);
+    const targetCharCount = totalCharCount * fraction;
+
+    let lastSplitPoint = 0; // 0 is always valid (compress nothing)
+    let cumulativeCharCount = 0;
+    for (let i = 0; i < contents.length; i++) {
+      const content = contents[i];
+      if (
+        content.role === 'user' &&
+        !content.parts?.some((part) => !!part.functionResponse)
+      ) {
+        if (cumulativeCharCount >= targetCharCount) {
+          return i;
+        }
+        lastSplitPoint = i;
+      }
+      cumulativeCharCount += charCounts[i];
+    }
+
+    // We found no split points after targetCharCount.
+    // Check if it's safe to compress everything.
+    const lastContent = contents[contents.length - 1];
+    if (
+      lastContent?.role === 'model' &&
+      !lastContent?.parts?.some((part) => part.functionCall)
+    ) {
+      return contents.length;
+    }
+
+    // Can't compress everything so just compress at last splitpoint.
+    return lastSplitPoint;
   }
+
+  // Handle new options-based approach
+  const options = fractionOrOptions;
+
+  if (options.strategy === 'since-last-prompt') {
+    // Find last user message index
+    let lastUserMessageIndex = -1;
+    for (let i = contents.length - 1; i >= 0; i--) {
+      if (contents[i].role === 'user') {
+        lastUserMessageIndex = i;
+        break;
+      }
+    }
+
+    // No user message found or too early
+    if (lastUserMessageIndex <= 0) {
+      return null;
+    }
+
+    // Check if we have enough messages to compress
+    const minMessagesToCompress = options.minMessagesToCompress ?? 5;
+    if (lastUserMessageIndex < minMessagesToCompress) {
+      return null;
+    }
+
+    // Return split result
+    return {
+      splitIndex: lastUserMessageIndex,
+      historyToCompress: contents.slice(0, lastUserMessageIndex),
+      historyToKeep: contents.slice(lastUserMessageIndex),
+    };
+  }
+
+  // percentage strategy with new format
+  const preserveThreshold = options.preserveThreshold ?? 0.3;
+  const fraction = 1 - preserveThreshold;
 
   const charCounts = contents.map((content) => JSON.stringify(content).length);
   const totalCharCount = charCounts.reduce((a, b) => a + b, 0);
   const targetCharCount = totalCharCount * fraction;
 
-  let lastSplitPoint = 0; // 0 is always valid (compress nothing)
+  let lastSplitPoint = 0;
   let cumulativeCharCount = 0;
   for (let i = 0; i < contents.length; i++) {
     const content = contents[i];
@@ -54,25 +141,35 @@ export function findCompressSplitPoint(
       !content.parts?.some((part) => !!part.functionResponse)
     ) {
       if (cumulativeCharCount >= targetCharCount) {
-        return i;
+        return {
+          splitIndex: i,
+          historyToCompress: contents.slice(0, i),
+          historyToKeep: contents.slice(i),
+        };
       }
       lastSplitPoint = i;
     }
     cumulativeCharCount += charCounts[i];
   }
 
-  // We found no split points after targetCharCount.
-  // Check if it's safe to compress everything.
+  // Check if safe to compress everything
   const lastContent = contents[contents.length - 1];
   if (
     lastContent?.role === 'model' &&
     !lastContent?.parts?.some((part) => part.functionCall)
   ) {
-    return contents.length;
+    return {
+      splitIndex: contents.length,
+      historyToCompress: contents,
+      historyToKeep: [],
+    };
   }
 
-  // Can't compress everything so just compress at last splitpoint.
-  return lastSplitPoint;
+  return {
+    splitIndex: lastSplitPoint,
+    historyToCompress: contents.slice(0, lastSplitPoint),
+    historyToKeep: contents.slice(lastSplitPoint),
+  };
 }
 
 export class ChatCompressionService {
