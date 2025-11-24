@@ -214,5 +214,9 @@
   "chat-compression-2.5-flash-lite": {
     "model": "gemini-2.5-flash-lite",
     "generateContentConfig": {}
+  },
+  "chat-compression-default": {
+    "model": "gemini-2.5-pro",
+    "generateContentConfig": {}
   }
 }

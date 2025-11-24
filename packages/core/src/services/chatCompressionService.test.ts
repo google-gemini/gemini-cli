@@ -16,7 +16,6 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 vi.mock('../core/tokenLimits.js');
 vi.mock('../telemetry/loggers.js');
@@ -105,7 +104,7 @@ describe('findCompressSplitPoint', () => {
 describe('modelStringToModelConfigAlias', () => {
   it('should return the default model for unexpected aliases', () => {
     expect(modelStringToModelConfigAlias('gemini-flash-flash')).toBe(
-      DEFAULT_GEMINI_MODEL,
+      'chat-compression-default',
     );
   });
 

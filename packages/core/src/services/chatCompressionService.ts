@@ -92,7 +92,7 @@ export function modelStringToModelConfigAlias(model: string): string {
     case DEFAULT_GEMINI_FLASH_LITE_MODEL:
       return 'chat-compression-2.5-flash-lite';
     default:
-      return DEFAULT_GEMINI_MODEL;
+      return 'chat-compression-default';
   }
 }
 
