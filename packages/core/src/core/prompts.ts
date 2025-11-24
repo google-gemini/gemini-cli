@@ -11,6 +11,8 @@ import {
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  LSP_FIND_REFERENCES_TOOL_NAME,
+  LSP_WORKSPACE_SYMBOLS_TOOL_NAME,
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
@@ -112,6 +114,8 @@ export function getCoreSystemPrompt(
     .getAllToolNames()
     .includes(WriteTodosTool.Name);
 
+  const inIde = config.isIdeConnected();
+
   let basePrompt: string;
   if (systemMdEnabled) {
     basePrompt = fs.readFileSync(systemMdPath, 'utf8');
@@ -131,7 +135,16 @@ export function getCoreSystemPrompt(
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.`,
 
-      primaryWorkflows_prefix: `
+      primaryWorkflows_prefix: inIde
+        ? `
+# Primary Workflows
+
+## Software Engineering Tasks
+When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
+1. **Understand:** Think about the user's request and the relevant codebase context. First use '${LSP_WORKSPACE_SYMBOLS_TOOL_NAME}' to find relevant symbol locations, '${LSP_FIND_REFERENCES_TOOL_NAME}' to find references for those locations, otherwise fallback to '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' (run in parallel if independent) to understand file structures, existing code patterns, and conventions. 
+Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.
+2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`
+        : `
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -140,7 +153,15 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`,
 
-      primaryWorkflows_prefix_ci: `
+      primaryWorkflows_prefix_ci: inIde
+        ? `
+# Primary Workflows
+
+## Software Engineering Tasks
+When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
+1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should first use '${LSP_WORKSPACE_SYMBOLS_TOOL_NAME}' to find symbol locations, then '${LSP_FIND_REFERENCES_TOOL_NAME}' to find the references for those locations, otherwise fallback to '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}'.
+2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If '${CodebaseInvestigatorAgent.name}' was used, do not ignore the output of '${CodebaseInvestigatorAgent.name}', you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`
+        : `
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -148,7 +169,15 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If '${CodebaseInvestigatorAgent.name}' was used, do not ignore the output of '${CodebaseInvestigatorAgent.name}', you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`,
 
-      primaryWorkflows_prefix_ci_todo: `
+      primaryWorkflows_prefix_ci_todo: inIde
+        ? `
+# Primary Workflows
+
+## Software Engineering Tasks
+When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
+1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should first use '${LSP_WORKSPACE_SYMBOLS_TOOL_NAME}' to find symbol locations, then '${LSP_FIND_REFERENCES_TOOL_NAME}' to find the references for those locations, otherwise fallback to '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}'.
+2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If '${CodebaseInvestigatorAgent.name}' was used, do not ignore the output of '${CodebaseInvestigatorAgent.name}', you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`
+        : `
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -156,7 +185,15 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If '${CodebaseInvestigatorAgent.name}' was used, do not ignore the output of '${CodebaseInvestigatorAgent.name}', you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`,
 
-      primaryWorkflows_todo: `
+      primaryWorkflows_todo: inIde
+        ? `
+# Primary Workflows
+
+## Software Engineering Tasks
+When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
+1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. First use '${LSP_WORKSPACE_SYMBOLS_TOOL_NAME}' to find relevant symbol locations, '${LSP_FIND_REFERENCES_TOOL_NAME}' to find references for those locations, otherwise fallback to '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' (run in parallel if independent) to understand file structures, existing code patterns, and conventions.
+2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`
+        : `
 # Primary Workflows
 
 ## Software Engineering Tasks

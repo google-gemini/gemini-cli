@@ -7,7 +7,8 @@
 import * as vscode from 'vscode';
 import type {
   LSPLocation,
-  LSPSymbolInformation} from '@google/gemini-cli-core/src/ide/types.js';
+  LSPSymbolInformation,
+} from '@google/gemini-cli-core/src/ide/types.js';
 import {
   CloseDiffRequestSchema,
   FindReferencesRequestSchema,
