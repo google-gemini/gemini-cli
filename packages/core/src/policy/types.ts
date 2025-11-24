@@ -12,6 +12,36 @@ export enum PolicyDecision {
   ASK_USER = 'ask_user',
 }
 
+/**
+ * Valid sources for hook execution
+ */
+export type HookSource = 'project' | 'user' | 'system' | 'extension';
+
+/**
+ * Array of valid hook source values for runtime validation
+ */
+const VALID_HOOK_SOURCES: HookSource[] = [
+  'project',
+  'user',
+  'system',
+  'extension',
+];
+
+/**
+ * Safely extract and validate hook source from input
+ * Returns 'project' as default if the value is invalid or missing
+ */
+export function getHookSource(input: Record<string, unknown>): HookSource {
+  const source = input['hook_source'];
+  if (
+    typeof source === 'string' &&
+    VALID_HOOK_SOURCES.includes(source as HookSource)
+  ) {
+    return source as HookSource;
+  }
+  return 'project';
+}
+
 export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
@@ -115,6 +145,42 @@ export interface SafetyCheckerRule {
   checker: SafetyCheckerConfig;
 }
 
+export interface HookExecutionContext {
+  eventName: string;
+  hookSource?: HookSource;
+  trustedFolder?: boolean;
+}
+
+/**
+ * Rule for applying safety checkers to hook executions.
+ * Similar to SafetyCheckerRule but with hook-specific matching criteria.
+ */
+export interface HookCheckerRule {
+  /**
+   * The name of the hook event this rule applies to.
+   * If undefined, the rule applies to all hook events.
+   */
+  eventName?: string;
+
+  /**
+   * The source of hooks this rule applies to.
+   * If undefined, the rule applies to all hook sources.
+   */
+  hookSource?: HookSource;
+
+  /**
+   * Priority of this checker. Higher numbers run first.
+   * Default is 0.
+   */
+  priority?: number;
+
+  /**
+   * Specifies an external or built-in safety checker to execute for
+   * additional validation of a hook execution.
+   */
+  checker: SafetyCheckerConfig;
+}
+
 export interface PolicyEngineConfig {
   /**
    * List of policy rules to apply.
@@ -122,9 +188,14 @@ export interface PolicyEngineConfig {
   rules?: PolicyRule[];
 
   /**
-   * List of safety checkers to apply.
+   * List of safety checkers to apply to tool calls.
    */
   checkers?: SafetyCheckerRule[];
+
+  /**
+   * List of safety checkers to apply to hook executions.
+   */
+  hookCheckers?: HookCheckerRule[];
 
   /**
    * Default decision when no rules match.
@@ -137,6 +208,13 @@ export interface PolicyEngineConfig {
    * When true, ASK_USER decisions become DENY.
    */
   nonInteractive?: boolean;
+
+  /**
+   * Whether to allow hooks to execute.
+   * When false, all hooks are denied.
+   * Defaults to true.
+   */
+  allowHooks?: boolean;
 }
 
 export interface PolicySettings {
