@@ -9,7 +9,11 @@ import { getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
-import { loadSettings } from '../../config/settings.js';
+import {
+  loadSettings,
+  SettingScope,
+  type LoadableSettingScope,
+} from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
 
@@ -20,11 +24,12 @@ interface UninstallArgs {
 export async function handleUninstall(args: UninstallArgs) {
   try {
     const workspaceDir = process.cwd();
+    const loadedSettings = loadSettings(workspaceDir);
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent: requestConsentNonInteractive,
       requestSetting: promptForSetting,
-      settings: loadSettings(workspaceDir).merged,
+      settings: loadedSettings.merged,
     });
     await extensionManager.loadExtensions();
 
@@ -33,6 +38,23 @@ export async function handleUninstall(args: UninstallArgs) {
       try {
         await extensionManager.uninstallExtension(name, false);
         debugLogger.log(`Extension "${name}" successfully uninstalled.`);
+
+        // Also remove any MCP server config for this extension
+        const scopes: LoadableSettingScope[] = [
+          SettingScope.User,
+          SettingScope.Workspace,
+        ];
+        for (const scope of scopes) {
+          const settings = loadedSettings.forScope(scope).settings;
+          if (settings.mcpServers && settings.mcpServers[name]) {
+            const newMcpServers = { ...settings.mcpServers };
+            delete newMcpServers[name];
+            loadedSettings.setValue(scope, 'mcpServers', newMcpServers);
+            debugLogger.log(
+              `Removed MCP server configuration for "${name}" from ${scope} settings.`,
+            );
+          }
+        }
       } catch (error) {
         errors.push({ name, error: getErrorMessage(error) });
       }
