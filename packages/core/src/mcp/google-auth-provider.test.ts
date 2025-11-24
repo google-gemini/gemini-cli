@@ -86,6 +86,7 @@ describe('GoogleCredentialProvider', () => {
     let mockClient: {
       getAccessToken: Mock;
       credentials?: { expiry_date: number | null };
+      quotaProjectId?: string;
     };
 
     beforeEach(() => {
@@ -152,6 +153,26 @@ describe('GoogleCredentialProvider', () => {
       expect(mockGetAccessToken).toHaveBeenCalledTimes(2); // new fetch
 
       vi.useRealTimers();
+    });
+
+    it('should return quota project ID', async () => {
+      mockClient['quotaProjectId'] = 'test-project-id';
+      const quotaProjectId = await provider.getQuotaProjectId();
+      expect(quotaProjectId).toBe('test-project-id');
+    });
+
+    it('should return request headers with quota project ID', async () => {
+      mockClient['quotaProjectId'] = 'test-project-id';
+      const headers = await provider.getRequestHeaders();
+      expect(headers).toEqual({
+        'X-Goog-User-Project': 'test-project-id',
+      });
+    });
+
+    it('should return empty request headers if quota project ID is missing', async () => {
+      mockClient['quotaProjectId'] = undefined;
+      const headers = await provider.getRequestHeaders();
+      expect(headers).toEqual({});
     });
   });
 });

@@ -410,12 +410,12 @@ async function handleAutomaticOAuth(
  */
 function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
-  headers: Record<string, string>,
+  defaultHeaders: Record<string, string>,
 ): RequestInit {
   return {
     headers: {
+      ...defaultHeaders,
       ...mcpServerConfig.headers,
-      ...headers,
     },
   };
 }
@@ -1333,6 +1333,31 @@ export async function createTransport(
 
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
     const authProvider = createAuthProvider(mcpServerConfig);
+
+    if (
+      mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
+    ) {
+      const provider = new GoogleCredentialProvider(mcpServerConfig);
+      const customHeaders = await provider.getRequestHeaders();
+      const transportOptions:
+        | StreamableHTTPClientTransportOptions
+        | SSEClientTransportOptions = {
+        requestInit: createTransportRequestInit(mcpServerConfig, customHeaders),
+        authProvider: provider,
+      };
+      if (mcpServerConfig.httpUrl) {
+        return new StreamableHTTPClientTransport(
+          new URL(mcpServerConfig.httpUrl),
+          transportOptions,
+        );
+      }
+      if (mcpServerConfig.url) {
+        return new SSEClientTransport(
+          new URL(mcpServerConfig.url),
+          transportOptions,
+        );
+      }
+    }
 
     const headers: Record<string, string> = {};
     if (authProvider === undefined) {
