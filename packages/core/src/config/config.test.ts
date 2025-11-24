@@ -126,6 +126,7 @@ vi.mock('../ide/ide-client.js', () => ({
       getConnectionStatus: vi.fn(),
       initialize: vi.fn(),
       shutdown: vi.fn(),
+      getCurrentIde: vi.fn(),
     }),
   },
 }));
