@@ -78,16 +78,7 @@ const scriptPath = join(projectRoot, 'scripts', targetScripts[target]);
 try {
   console.log(`🚀 Running telemetry script for target: ${target}.`);
   const env = { ...process.env };
-  if (telemetrySettings?.useCliAuth) {
-    const credsPath = join(USER_SETTINGS_DIR, 'oauth_creds_adc.json');
-    if (existsSync(credsPath)) {
-      env['GEMINI_CLI_CREDENTIALS_PATH'] = credsPath;
-    } else {
-      console.warn(
-        `🛑 WARNING: telemetry.useCliAuth is true, but credential file not found at ${credsPath}`,
-      );
-    }
-  }
+
   execSync(`node ${scriptPath}`, {
     stdio: 'inherit',
     cwd: projectRoot,

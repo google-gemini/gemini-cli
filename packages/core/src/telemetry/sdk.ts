@@ -143,6 +143,15 @@ export async function initializeTelemetry(
     return;
   }
 
+  if (config.getTelemetryUseCollector() && config.getTelemetryUseCliAuth()) {
+    debugLogger.error(
+      'Telemetry configuration error: "useCollector" and "useCliAuth" cannot both be true. ' +
+        'CLI authentication is only supported with in-process exporters. ' +
+        'Disabling telemetry.',
+    );
+    return;
+  }
+
   // If using CLI auth and no credentials provided, defer initialization
   if (config.getTelemetryUseCliAuth() && !credentials) {
     // Register a callback to initialize telemetry when the user logs in.
@@ -175,6 +184,7 @@ export async function initializeTelemetry(
   const otlpProtocol = config.getTelemetryOtlpProtocol();
   const telemetryTarget = config.getTelemetryTarget();
   const useCollector = config.getTelemetryUseCollector();
+
   const parsedEndpoint = parseOtlpEndpoint(otlpEndpoint, otlpProtocol);
   const telemetryOutfile = config.getTelemetryOutfile();
   const useOtlp = !!parsedEndpoint && !telemetryOutfile;

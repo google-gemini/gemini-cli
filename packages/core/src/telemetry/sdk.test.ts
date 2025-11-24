@@ -356,4 +356,18 @@ describe('Telemetry SDK', () => {
       expect(callback).toHaveBeenCalled();
     });
   });
+
+  it('should disable telemetry and log error if useCollector and useCliAuth are both true', async () => {
+    vi.spyOn(mockConfig, 'getTelemetryUseCollector').mockReturnValue(true);
+    vi.spyOn(mockConfig, 'getTelemetryUseCliAuth').mockReturnValue(true);
+
+    await initializeTelemetry(mockConfig);
+
+    expect(debugLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Telemetry configuration error: "useCollector" and "useCliAuth" cannot both be true',
+      ),
+    );
+    expect(NodeSDK.prototype.start).not.toHaveBeenCalled();
+  });
 });

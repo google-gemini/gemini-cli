@@ -133,13 +133,6 @@ async function main() {
   console.log(`📄 Wrote OTEL collector config to ${OTEL_CONFIG_FILE}`);
 
   const spawnEnv = { ...process.env };
-  if (process.env.GEMINI_CLI_CREDENTIALS_PATH) {
-    spawnEnv['GOOGLE_APPLICATION_CREDENTIALS'] =
-      process.env.GEMINI_CLI_CREDENTIALS_PATH;
-    console.log(
-      `\n🔑 Using CLI credentials for telemetry: ${process.env.GEMINI_CLI_CREDENTIALS_PATH}`,
-    );
-  }
 
   console.log(`🚀 Starting OTEL collector for GCP... Logs: ${OTEL_LOG_FILE}`);
   collectorLogFd = fs.openSync(OTEL_LOG_FILE, 'a');
