@@ -7,12 +7,19 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as dotenv from 'dotenv';
+import * as path from 'node:path';
 
 import { ExtensionStorage } from './storage.js';
 import type { ExtensionConfig } from '../extension.js';
 
 import prompts from 'prompts';
 import { debugLogger, KeychainTokenStorage } from '@google/gemini-cli-core';
+import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
+
+export enum ExtensionSettingScope {
+  USER = 'user',
+  WORKSPACE = 'workspace',
+}
 
 export interface ExtensionSetting {
   name: string;
@@ -25,7 +32,24 @@ export interface ExtensionSetting {
 const getKeychainStorageName = (
   extensionName: string,
   extensionId: string,
-): string => `Gemini CLI Extensions ${extensionName} ${extensionId}`;
+  scope: ExtensionSettingScope,
+): string => {
+  const base = `Gemini CLI Extensions ${extensionName} ${extensionId}`;
+  if (scope === ExtensionSettingScope.WORKSPACE) {
+    return `${base} ${process.cwd()}`;
+  }
+  return base;
+};
+
+const getEnvFilePath = (
+  extensionName: string,
+  scope: ExtensionSettingScope,
+): string => {
+  if (scope === ExtensionSettingScope.WORKSPACE) {
+    return path.join(process.cwd(), EXTENSION_SETTINGS_FILENAME);
+  }
+  return new ExtensionStorage(extensionName).getEnvFilePath();
+};
 
 export async function maybePromptForSettings(
   extensionConfig: ExtensionConfig,
@@ -42,9 +66,12 @@ export async function maybePromptForSettings(
   ) {
     return;
   }
-  const envFilePath = new ExtensionStorage(extensionName).getEnvFilePath();
+  // We assume user scope here because we don't have a way to ask the user for scope during the initial setup.
+  // The user can change the scope later using the `settings set` command.
+  const scope = ExtensionSettingScope.USER;
+  const envFilePath = getEnvFilePath(extensionName, scope);
   const keychain = new KeychainTokenStorage(
-    getKeychainStorageName(extensionName, extensionId),
+    getKeychainStorageName(extensionName, extensionId, scope),
   );
 
   if (!settings || settings.length === 0) {
@@ -112,23 +139,19 @@ export async function promptForSetting(
   return response.value;
 }
 
-export async function getEnvContents(
+export async function getScopedEnvContents(
   extensionConfig: ExtensionConfig,
   extensionId: string,
+  scope: ExtensionSettingScope,
 ): Promise<Record<string, string>> {
-  if (!extensionConfig.settings || extensionConfig.settings.length === 0) {
-    return Promise.resolve({});
-  }
-  const extensionStorage = new ExtensionStorage(extensionConfig.name);
+  const { name: extensionName } = extensionConfig;
   const keychain = new KeychainTokenStorage(
-    getKeychainStorageName(extensionConfig.name, extensionId),
+    getKeychainStorageName(extensionName, extensionId, scope),
   );
+  const envFilePath = getEnvFilePath(extensionName, scope);
   let customEnv: Record<string, string> = {};
-  if (fsSync.existsSync(extensionStorage.getEnvFilePath())) {
-    const envFile = fsSync.readFileSync(
-      extensionStorage.getEnvFilePath(),
-      'utf-8',
-    );
+  if (fsSync.existsSync(envFilePath)) {
+    const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
     customEnv = dotenv.parse(envFile);
   }
 
@@ -145,11 +168,34 @@ export async function getEnvContents(
   return customEnv;
 }
 
+export async function getEnvContents(
+  extensionConfig: ExtensionConfig,
+  extensionId: string,
+): Promise<Record<string, string>> {
+  if (!extensionConfig.settings || extensionConfig.settings.length === 0) {
+    return Promise.resolve({});
+  }
+
+  const userSettings = await getScopedEnvContents(
+    extensionConfig,
+    extensionId,
+    ExtensionSettingScope.USER,
+  );
+  const workspaceSettings = await getScopedEnvContents(
+    extensionConfig,
+    extensionId,
+    ExtensionSettingScope.WORKSPACE,
+  );
+
+  return { ...userSettings, ...workspaceSettings };
+}
+
 export async function updateSetting(
   extensionConfig: ExtensionConfig,
   extensionId: string,
   settingKey: string,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
+  scope: ExtensionSettingScope,
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
   if (!settings || settings.length === 0) {
@@ -168,7 +214,7 @@ export async function updateSetting(
 
   const newValue = await requestSetting(settingToUpdate);
   const keychain = new KeychainTokenStorage(
-    getKeychainStorageName(extensionName, extensionId),
+    getKeychainStorageName(extensionName, extensionId, scope),
   );
 
   if (settingToUpdate.sensitive) {
@@ -176,12 +222,16 @@ export async function updateSetting(
     return;
   }
 
-  // For non-sensitive settings, we need to read the existing .env file,
+  // For non-sensitive settings, we need to read the existing .env file for the given scope,
   // update the value, and write it back.
-  const allSettings = await getEnvContents(extensionConfig, extensionId);
+  const allSettings = await getScopedEnvContents(
+    extensionConfig,
+    extensionId,
+    scope,
+  );
   allSettings[settingToUpdate.envVar] = newValue;
 
-  const envFilePath = new ExtensionStorage(extensionName).getEnvFilePath();
+  const envFilePath = getEnvFilePath(extensionName, scope);
 
   const nonSensitiveSettings: Record<string, string> = {};
   for (const setting of settings) {

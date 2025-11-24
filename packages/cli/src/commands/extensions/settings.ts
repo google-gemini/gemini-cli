@@ -6,9 +6,10 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  getEnvContents,
   updateSetting,
   promptForSetting,
+  ExtensionSettingScope,
+  getScopedEnvContents,
 } from '../../config/extensions/extensionSettings.js';
 import { getExtensionAndManager } from './utils.js';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -17,10 +18,11 @@ import { debugLogger } from '@google/gemini-cli-core';
 interface SetArgs {
   name: string;
   setting: string;
+  scope: string;
 }
 
 const setCommand: CommandModule<object, SetArgs> = {
-  command: 'set <name> <setting>',
+  command: 'set [--scope] <name> <setting>',
   describe: 'Set a specific setting for an extension.',
   builder: (yargs) =>
     yargs
@@ -33,9 +35,15 @@ const setCommand: CommandModule<object, SetArgs> = {
         describe: 'The setting to configure (name or env var).',
         type: 'string',
         demandOption: true,
+      })
+      .option('scope', {
+        describe: 'The scope to set the setting in.',
+        type: 'string',
+        choices: ['user', 'workspace'],
+        default: 'user',
       }),
   handler: async (args) => {
-    const { name, setting } = args;
+    const { name, setting, scope } = args;
     const { extension, extensionManager } = await getExtensionAndManager(name);
     if (!extension || !extensionManager) {
       return;
@@ -54,6 +62,7 @@ const setCommand: CommandModule<object, SetArgs> = {
       extension.id,
       setting,
       promptForSetting,
+      scope as ExtensionSettingScope,
     );
   },
 };
@@ -90,12 +99,30 @@ const listCommand: CommandModule<object, ListArgs> = {
       return;
     }
 
-    const currentSettings = await getEnvContents(extensionConfig, extension.id);
+    const userSettings = await getScopedEnvContents(
+      extensionConfig,
+      extension.id,
+      ExtensionSettingScope.USER,
+    );
+    const workspaceSettings = await getScopedEnvContents(
+      extensionConfig,
+      extension.id,
+      ExtensionSettingScope.WORKSPACE,
+    );
+    const mergedSettings = { ...userSettings, ...workspaceSettings };
 
     debugLogger.log(`Settings for "${name}":`);
     for (const setting of extensionConfig.settings) {
-      const value = currentSettings[setting.envVar];
+      const value = mergedSettings[setting.envVar];
       let displayValue: string;
+      let scopeInfo = '';
+
+      if (workspaceSettings[setting.envVar] !== undefined) {
+        scopeInfo = ' (workspace)';
+      } else if (userSettings[setting.envVar] !== undefined) {
+        scopeInfo = ' (user)';
+      }
+
       if (value === undefined) {
         displayValue = '[not set]';
       } else if (setting.sensitive) {
@@ -106,7 +133,7 @@ const listCommand: CommandModule<object, ListArgs> = {
       debugLogger.log(`
 - ${setting.name} (${setting.envVar})`);
       debugLogger.log(`  Description: ${setting.description}`);
-      debugLogger.log(`  Value: ${displayValue}`);
+      debugLogger.log(`  Value: ${displayValue}${scopeInfo}`);
     }
   },
 };

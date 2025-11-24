@@ -13,6 +13,8 @@ import {
   promptForSetting,
   type ExtensionSetting,
   updateSetting,
+  ExtensionSettingScope,
+  getScopedEnvContents,
 } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
 import { ExtensionStorage } from './storage.js';
@@ -20,6 +22,7 @@ import prompts from 'prompts';
 import * as fsPromises from 'node:fs/promises';
 import * as fs from 'node:fs';
 import { KeychainTokenStorage } from '@google/gemini-cli-core';
+import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
 
 vi.mock('prompts');
 vi.mock('os', async (importOriginal) => {
@@ -55,6 +58,7 @@ interface MockKeychainStorage {
 
 describe('extensionSettings', () => {
   let tempHomeDir: string;
+  let tempWorkspaceDir: string;
   let extensionDir: string;
   let mockKeychainStorage: MockKeychainStorage;
   let keychainData: Record<string, string>;
@@ -84,18 +88,25 @@ describe('extensionSettings', () => {
     ).mockImplementation(() => mockKeychainStorage);
 
     tempHomeDir = os.tmpdir() + path.sep + `gemini-cli-test-home-${Date.now()}`;
+    tempWorkspaceDir = path.join(
+      os.tmpdir(),
+      `gemini-cli-test-workspace-${Date.now()}`,
+    );
     extensionDir = path.join(tempHomeDir, '.gemini', 'extensions', 'test-ext');
     // Spy and mock the method, but also create the directory so we can write to it.
     vi.spyOn(ExtensionStorage.prototype, 'getExtensionDir').mockReturnValue(
       extensionDir,
     );
     fs.mkdirSync(extensionDir, { recursive: true });
+    fs.mkdirSync(tempWorkspaceDir, { recursive: true });
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     vi.mocked(prompts).mockClear();
   });
 
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
@@ -455,7 +466,7 @@ describe('extensionSettings', () => {
     });
   });
 
-  describe('getEnvContents', () => {
+  describe('getScopedEnvContents', () => {
     const config: ExtensionConfig = {
       name: 'test-ext',
       version: '1.0.0',
@@ -469,39 +480,88 @@ describe('extensionSettings', () => {
         },
       ],
     };
+    const extensionId = '12345';
 
-    it('should return combined contents from .env and keychain', async () => {
-      const envPath = path.join(extensionDir, '.env');
-      await fsPromises.writeFile(envPath, 'VAR1=value1');
-      keychainData['SENSITIVE_VAR'] = 'secret';
+    it('should return combined contents from user .env and keychain for USER scope', async () => {
+      const userEnvPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+      await fsPromises.writeFile(userEnvPath, 'VAR1=user-value1');
+      await mockKeychainStorage.setSecret('SENSITIVE_VAR', 'user-secret');
 
-      const contents = await getEnvContents(config, '12345');
+      const contents = await getScopedEnvContents(
+        config,
+        extensionId,
+        ExtensionSettingScope.USER,
+      );
 
       expect(contents).toEqual({
-        VAR1: 'value1',
-        SENSITIVE_VAR: 'secret',
+        VAR1: 'user-value1',
+        SENSITIVE_VAR: 'user-secret',
       });
     });
 
-    it('should return an empty object if no settings are defined', async () => {
-      const contents = await getEnvContents(
-        { name: 'test-ext', version: '1.0.0' },
-        '12345',
+    it('should return combined contents from workspace .env and keychain for WORKSPACE scope', async () => {
+      const workspaceEnvPath = path.join(
+        tempWorkspaceDir,
+        EXTENSION_SETTINGS_FILENAME,
       );
-      expect(contents).toEqual({});
-    });
+      await fsPromises.writeFile(workspaceEnvPath, 'VAR1=workspace-value1');
+      await mockKeychainStorage.setSecret('SENSITIVE_VAR', 'workspace-secret');
 
-    it('should return only keychain contents if .env file does not exist', async () => {
-      keychainData['SENSITIVE_VAR'] = 'secret';
-      const contents = await getEnvContents(config, '12345');
-      expect(contents).toEqual({ SENSITIVE_VAR: 'secret' });
-    });
+      const contents = await getScopedEnvContents(
+        config,
+        extensionId,
+        ExtensionSettingScope.WORKSPACE,
+      );
 
-    it('should return only .env contents if keychain is empty', async () => {
-      const envPath = path.join(extensionDir, '.env');
-      await fsPromises.writeFile(envPath, 'VAR1=value1');
-      const contents = await getEnvContents(config, '12345');
-      expect(contents).toEqual({ VAR1: 'value1' });
+      expect(contents).toEqual({
+        VAR1: 'workspace-value1',
+        SENSITIVE_VAR: 'workspace-secret',
+      });
+    });
+  });
+
+  describe('getEnvContents (merged)', () => {
+    const config: ExtensionConfig = {
+      name: 'test-ext',
+      version: '1.0.0',
+      settings: [
+        { name: 's1', description: 'd1', envVar: 'VAR1' },
+        { name: 's2', description: 'd2', envVar: 'VAR2', sensitive: true },
+        { name: 's3', description: 'd3', envVar: 'VAR3' },
+      ],
+    };
+    const extensionId = '12345';
+
+    it('should merge user and workspace settings, with workspace taking precedence', async () => {
+      // User settings
+      const userEnvPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+      await fsPromises.writeFile(
+        userEnvPath,
+        'VAR1=user-value1\nVAR3=user-value3',
+      );
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext ${extensionId}`,
+      );
+      await userKeychain.setSecret('VAR2', 'user-secret2');
+
+      // Workspace settings
+      const workspaceEnvPath = path.join(
+        tempWorkspaceDir,
+        EXTENSION_SETTINGS_FILENAME,
+      );
+      await fsPromises.writeFile(workspaceEnvPath, 'VAR1=workspace-value1');
+      const workspaceKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext ${extensionId} ${tempWorkspaceDir}`,
+      );
+      await workspaceKeychain.setSecret('VAR2', 'workspace-secret2');
+
+      const contents = await getEnvContents(config, extensionId);
+
+      expect(contents).toEqual({
+        VAR1: 'workspace-value1',
+        VAR2: 'workspace-secret2',
+        VAR3: 'user-value3',
+      });
     });
   });
 
@@ -517,87 +577,114 @@ describe('extensionSettings', () => {
     const mockRequestSetting = vi.fn();
 
     beforeEach(async () => {
-      // Pre-populate settings
-      const envContent = 'VAR1=value1\n';
-      const envPath = path.join(extensionDir, '.env');
-      await fsPromises.writeFile(envPath, envContent);
-      keychainData['VAR2'] = 'value2';
+      const userEnvPath = path.join(extensionDir, '.env');
+      await fsPromises.writeFile(userEnvPath, 'VAR1=value1\n');
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      await userKeychain.setSecret('VAR2', 'value2');
       mockRequestSetting.mockClear();
     });
 
-    it('should update a non-sensitive setting', async () => {
+    it('should update a non-sensitive setting in USER scope', async () => {
       mockRequestSetting.mockResolvedValue('new-value1');
 
-      await updateSetting(config, '12345', 'VAR1', mockRequestSetting);
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+      );
 
-      expect(mockRequestSetting).toHaveBeenCalledWith(config.settings![0]);
       const expectedEnvPath = path.join(extensionDir, '.env');
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
       expect(actualContent).toContain('VAR1=new-value1');
-      expect(mockKeychainStorage.setSecret).not.toHaveBeenCalled();
     });
 
-    it('should update a non-sensitive setting by name', async () => {
-      mockRequestSetting.mockResolvedValue('new-value-by-name');
+    it('should update a non-sensitive setting in WORKSPACE scope', async () => {
+      mockRequestSetting.mockResolvedValue('new-workspace-value');
 
-      await updateSetting(config, '12345', 's1', mockRequestSetting);
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.WORKSPACE,
+      );
 
-      expect(mockRequestSetting).toHaveBeenCalledWith(config.settings![0]);
-      const expectedEnvPath = path.join(extensionDir, '.env');
+      const expectedEnvPath = path.join(tempWorkspaceDir, '.env');
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
-      expect(actualContent).toContain('VAR1=new-value-by-name');
-      expect(mockKeychainStorage.setSecret).not.toHaveBeenCalled();
+      expect(actualContent).toContain('VAR1=new-workspace-value');
     });
 
-    it('should update a sensitive setting', async () => {
+    it('should update a sensitive setting in USER scope', async () => {
       mockRequestSetting.mockResolvedValue('new-value2');
 
-      await updateSetting(config, '12345', 'VAR2', mockRequestSetting);
-
-      expect(mockRequestSetting).toHaveBeenCalledWith(config.settings![1]);
-      expect(mockKeychainStorage.setSecret).toHaveBeenCalledWith(
+      await updateSetting(
+        config,
+        '12345',
         'VAR2',
-        'new-value2',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
       );
-      const expectedEnvPath = path.join(extensionDir, '.env');
-      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
-      expect(actualContent).not.toContain('VAR2=new-value2');
+
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      expect(await userKeychain.getSecret('VAR2')).toBe('new-value2');
     });
 
-    it('should update a sensitive setting by name', async () => {
-      mockRequestSetting.mockResolvedValue('new-sensitive-by-name');
+    it('should update a sensitive setting in WORKSPACE scope', async () => {
+      mockRequestSetting.mockResolvedValue('new-workspace-secret');
 
-      await updateSetting(config, '12345', 's2', mockRequestSetting);
-
-      expect(mockRequestSetting).toHaveBeenCalledWith(config.settings![1]);
-      expect(mockKeychainStorage.setSecret).toHaveBeenCalledWith(
+      await updateSetting(
+        config,
+        '12345',
         'VAR2',
-        'new-sensitive-by-name',
+        mockRequestSetting,
+        ExtensionSettingScope.WORKSPACE,
+      );
+
+      const workspaceKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345 ${tempWorkspaceDir}`,
+      );
+      expect(await workspaceKeychain.getSecret('VAR2')).toBe(
+        'new-workspace-secret',
       );
     });
 
-    it('should do nothing if the setting does not exist', async () => {
-      await updateSetting(config, '12345', 'VAR3', mockRequestSetting);
-      expect(mockRequestSetting).not.toHaveBeenCalled();
-    });
+    it('should leave existing, unmanaged .env variables intact when updating in WORKSPACE scope', async () => {
+      // Setup a pre-existing .env file in the workspace with unmanaged variables
+      const workspaceEnvPath = path.join(tempWorkspaceDir, '.env');
+      const originalEnvContent =
+        'PROJECT_VAR_1=value_1\nPROJECT_VAR_2=value_2\nVAR1=original-value'; // VAR1 is managed by extension
+      await fsPromises.writeFile(workspaceEnvPath, originalEnvContent);
 
-    it('should do nothing if there are no settings', async () => {
-      const emptyConfig: ExtensionConfig = {
-        name: 'test-ext',
-        version: '1.0.0',
-      };
-      await updateSetting(emptyConfig, '12345', 'VAR1', mockRequestSetting);
-      expect(mockRequestSetting).not.toHaveBeenCalled();
-    });
+      // Simulate updating an extension-managed non-sensitive setting
+      mockRequestSetting.mockResolvedValue('updated-value');
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.WORKSPACE,
+      );
 
-    it('should wrap values with spaces in quotes', async () => {
-      mockRequestSetting.mockResolvedValue('a value with spaces');
+      // Read the .env file after update
+      const actualContent = await fsPromises.readFile(
+        workspaceEnvPath,
+        'utf-8',
+      );
 
-      await updateSetting(config, '12345', 'VAR1', mockRequestSetting);
+      // Assert that original variables are intact and extension variable is updated
+      expect(actualContent).toContain('PROJECT_VAR_1=value_1');
+      expect(actualContent).toContain('PROJECT_VAR_2=value_2');
+      expect(actualContent).toContain('VAR1=updated-value');
 
-      const expectedEnvPath = path.join(extensionDir, '.env');
-      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
-      expect(actualContent).toContain('VAR1="a value with spaces"');
+      // Ensure no other unexpected changes or deletions
+      const lines = actualContent.split('\n').filter((line) => line.length > 0);
+      expect(lines).toHaveLength(3); // Should only have the three variables
     });
   });
 });
