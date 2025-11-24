@@ -1,4 +1,4 @@
-# Gemini CLI Keyboard Shortcuts
+# Gemini CLI keyboard shortcuts
 
 Gemini CLI ships with a set of default keyboard shortcuts for editing input,
 navigating history, and controlling the UI. Use this reference to learn the
@@ -6,14 +6,14 @@ available combinations.
 
 <!-- KEYBINDINGS-AUTOGEN:START -->
 
-#### Basic Controls
+#### Basic controls
 
 | Action                                       | Keys    |
 | -------------------------------------------- | ------- |
 | Confirm the current selection or choice.     | `Enter` |
 | Dismiss dialogs or cancel the current focus. | `Esc`   |
 
-#### Cursor Movement
+#### Cursor movement
 
 | Action                                    | Keys                   |
 | ----------------------------------------- | ---------------------- |
@@ -29,7 +29,7 @@ available combinations.
 | Clear all text in the input field.               | `Ctrl + C`                                |
 | Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace` |
 
-#### Screen Control
+#### Screen control
 
 | Action                                       | Keys       |
 | -------------------------------------------- | ---------- |
@@ -46,7 +46,7 @@ available combinations.
 | Scroll up by one page.   | `Page Up`            |
 | Scroll down by one page. | `Page Down`          |
 
-#### History & Search
+#### History and search
 
 | Action                                       | Keys                  |
 | -------------------------------------------- | --------------------- |
@@ -65,7 +65,7 @@ available combinations.
 | Move up within dialog options.   | `Up Arrow (no Shift)`<br />`K (no Shift)`   |
 | Move down within dialog options. | `Down Arrow (no Shift)`<br />`J (no Shift)` |
 
-#### Suggestions & Completions
+#### Suggestions and completions
 
 | Action                                  | Keys                                               |
 | --------------------------------------- | -------------------------------------------------- |
@@ -75,21 +75,21 @@ available combinations.
 | Expand an inline suggestion.            | `Right Arrow`                                      |
 | Collapse an inline suggestion.          | `Left Arrow`                                       |
 
-#### Text Input
+#### Text input
 
 | Action                               | Keys                                                                                        |
 | ------------------------------------ | ------------------------------------------------------------------------------------------- |
 | Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd, not Paste)`                                              |
 | Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Paste + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
 
-#### External Tools
+#### External tools
 
 | Action                                         | Keys       |
 | ---------------------------------------------- | ---------- |
 | Open the current prompt in an external editor. | `Ctrl + X` |
 | Paste from the clipboard.                      | `Ctrl + V` |
 
-#### App Controls
+#### App controls
 
 | Action                                                            | Keys       |
 | ----------------------------------------------------------------- | ---------- |
@@ -101,7 +101,7 @@ available combinations.
 | Expand a height-constrained response to show additional lines.    | `Ctrl + S` |
 | Toggle focus between the shell and Gemini input.                  | `Ctrl + F` |
 
-#### Session Control
+#### Session control
 
 | Action                                       | Keys       |
 | -------------------------------------------- | ---------- |
@@ -110,7 +110,7 @@ available combinations.
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
-## Additional Context-Specific Shortcuts
+## Additional context-specific shortcuts
 
 - `Ctrl+Y`: Toggle YOLO (auto-approval) mode for tool calls.
 - `Shift+Tab`: Toggle Auto Edit (auto-accept edits) mode.
