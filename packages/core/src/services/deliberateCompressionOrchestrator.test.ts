@@ -10,7 +10,6 @@ import type { Content, GenerateContentResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import type { GeminiChat } from '../core/geminiChat.js';
-import { CompressionStatus } from '../core/turn.js';
 
 describe('DeliberateCompressionOrchestrator', () => {
   let orchestrator: DeliberateCompressionOrchestrator;
@@ -50,9 +49,7 @@ describe('DeliberateCompressionOrchestrator', () => {
       candidates: [
         {
           content: {
-            parts: [
-              { text: '<goals><goal>Implementing OAuth</goal></goals>' },
-            ],
+            parts: [{ text: '<goals><goal>Implementing OAuth</goal></goals>' }],
           },
         },
       ],
@@ -96,9 +93,7 @@ describe('DeliberateCompressionOrchestrator', () => {
   });
 
   it('should skip prompt when no goals found', async () => {
-    const history: Content[] = [
-      { role: 'user', parts: [{ text: 'Hello' }] },
-    ];
+    const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
 
     vi.mocked(mockChat.getHistory).mockReturnValue(history);
 

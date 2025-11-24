@@ -1217,46 +1217,46 @@ export class Config {
   /**
    * Get absolute token threshold for triggering compression (default: 40000)
    */
-  async getCompressionTriggerTokens(): Promise<number | undefined> {
+  async getCompressionTriggerTokens(): Promise<number> {
     await this.ensureExperimentsLoaded();
-    return (
+    const value =
       this.experiments?.flags[ExperimentFlags.COMPRESSION_TRIGGER_TOKENS]
-        ?.intValue ?? 40000
-    );
+        ?.intValue;
+    return typeof value === 'number' ? value : 40000;
   }
 
   /**
    * Get utilization threshold for safety valve compression (default: 0.5 = 50%)
    */
-  async getCompressionTriggerUtilization(): Promise<number | undefined> {
+  async getCompressionTriggerUtilization(): Promise<number> {
     await this.ensureExperimentsLoaded();
-    return (
+    const value =
       this.experiments?.flags[ExperimentFlags.COMPRESSION_TRIGGER_UTILIZATION]
-        ?.floatValue ?? 0.5
-    );
+        ?.floatValue;
+    return value ?? 0.5;
   }
 
   /**
    * Get minimum messages required between compressions (default: 25)
    */
-  async getCompressionMinMessages(): Promise<number | undefined> {
+  async getCompressionMinMessages(): Promise<number> {
     await this.ensureExperimentsLoaded();
-    return (
+    const value =
       this.experiments?.flags[ExperimentFlags.COMPRESSION_MIN_MESSAGES]
-        ?.intValue ?? 25
-    );
+        ?.intValue;
+    return typeof value === 'number' ? value : 25;
   }
 
   /**
    * Get minimum time in seconds between compressions (default: 300 = 5 minutes)
    */
-  async getCompressionMinTimeBetweenPrompts(): Promise<number | undefined> {
+  async getCompressionMinTimeBetweenPrompts(): Promise<number> {
     await this.ensureExperimentsLoaded();
-    return (
+    const value =
       this.experiments?.flags[
         ExperimentFlags.COMPRESSION_MIN_TIME_BETWEEN_PROMPTS
-      ]?.intValue ?? 300
-    );
+      ]?.intValue;
+    return typeof value === 'number' ? value : 300;
   }
 
   /**
@@ -1276,9 +1276,8 @@ export class Config {
   async getDeliberateCompressionAutoSkip(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
     return (
-      this.experiments?.flags[
-        ExperimentFlags.DELIBERATE_COMPRESSION_AUTO_SKIP
-      ]?.boolValue ?? false
+      this.experiments?.flags[ExperimentFlags.DELIBERATE_COMPRESSION_AUTO_SKIP]
+        ?.boolValue ?? false
     );
   }
 

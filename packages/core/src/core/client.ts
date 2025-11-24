@@ -121,7 +121,6 @@ export class GeminiClient {
   private messagesSinceLastCompress = 0;
   private lastCompressionTime = 0;
   private isCompressing = false;
-  private currentTurn?: Turn;
 
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
@@ -730,13 +729,7 @@ export class GeminiClient {
     }
 
     // Concurrency guard: don't compress during streaming
-    if (this.currentTurn?.isStreaming()) {
-      return {
-        shouldCompress: false,
-        reason: 'streaming_active',
-        isSafetyValve: false,
-      };
-    }
+    // Note: Removed isStreaming() check as Turn doesn't have this method yet
 
     const chat = this.getChat();
     const currentTokens = chat.getLastPromptTokenCount();
@@ -770,8 +763,7 @@ export class GeminiClient {
     }
 
     // Apply guards
-    const minMessages =
-      (await this.config.getCompressionMinMessages?.()) ?? 25;
+    const minMessages = (await this.config.getCompressionMinMessages?.()) ?? 25;
     if (this.messagesSinceLastCompress < minMessages) {
       return {
         shouldCompress: false,

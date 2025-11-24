@@ -201,7 +201,9 @@ describe('GoalExtractionService', () => {
           expect.objectContaining({
             parts: expect.arrayContaining([
               expect.objectContaining({
-                text: expect.stringContaining('analyze the recent conversation'),
+                text: expect.stringContaining(
+                  'analyze the recent conversation',
+                ),
               }),
             ]),
           }),
@@ -213,7 +215,7 @@ describe('GoalExtractionService', () => {
     // Check that only last 20 messages were included
     const call = vi.mocked(mockContentGenerator.generateContent).mock
       .calls[0][0];
-    const historyParts = call.contents.slice(0, -1); // Exclude the prompt
+    const historyParts = (call.contents as Content[]).slice(0, -1); // Exclude the prompt
     expect(historyParts.length).toBeLessThanOrEqual(20);
   });
 });

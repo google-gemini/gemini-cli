@@ -40,11 +40,11 @@ export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
       width={Math.min(terminalWidth - 4, 100)}
     >
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold color={theme.text.title}>
+        <Text bold color={theme.text.primary}>
           Context window is filling up
         </Text>
         <Text color={theme.text.secondary}>
-          We'll compress the conversation to free up space.
+          We&apos;ll compress the conversation to free up space.
         </Text>
       </Box>
 

@@ -367,7 +367,7 @@ describe('resolvePathFromEnv helper function', () => {
   });
 
   describe('getChatCompressionPrompt', () => {
-    it('should return base prompt without user goal', () => {
+    it('should return base prompt without user goal', async () => {
       const { getChatCompressionPrompt } = await import('./prompts.js');
       const prompt = getChatCompressionPrompt();
 
@@ -376,7 +376,7 @@ describe('resolvePathFromEnv helper function', () => {
       expect(prompt).not.toContain('<current_goal>');
     });
 
-    it('should prepend user goal section when provided', () => {
+    it('should prepend user goal section when provided', async () => {
       const { getChatCompressionPrompt } = await import('./prompts.js');
       const userGoal = 'Implementing user authentication';
       const prompt = getChatCompressionPrompt(userGoal);
@@ -386,7 +386,7 @@ describe('resolvePathFromEnv helper function', () => {
       expect(prompt).toContain('prioritize information relevant to this goal');
     });
 
-    it('should include discarded_context_summary in XML structure', () => {
+    it('should include discarded_context_summary in XML structure', async () => {
       const { getChatCompressionPrompt } = await import('./prompts.js');
       const prompt = getChatCompressionPrompt('Test goal');
 

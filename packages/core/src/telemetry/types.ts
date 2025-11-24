@@ -894,16 +894,16 @@ export function makeChatCompressionEvent({
       };
 
       if (this.goal_was_selected !== undefined) {
-        attrs.goal_was_selected = this.goal_was_selected;
+        attrs['goal_was_selected'] = this.goal_was_selected;
       }
       if (this.messages_preserved !== undefined) {
-        attrs.messages_preserved = this.messages_preserved;
+        attrs['messages_preserved'] = this.messages_preserved;
       }
       if (this.messages_compressed !== undefined) {
-        attrs.messages_compressed = this.messages_compressed;
+        attrs['messages_compressed'] = this.messages_compressed;
       }
       if (this.trigger_reason) {
-        attrs.trigger_reason = this.trigger_reason;
+        attrs['trigger_reason'] = this.trigger_reason;
       }
 
       return attrs;

@@ -6,7 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DeliberateCompressionHandler } from './deliberateCompressionHandler.js';
-import type { Content } from '@google/genai';
 import type { GoalExtractionResult } from './goalExtractionService.js';
 import type { Config } from '../config/config.js';
 
