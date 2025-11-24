@@ -844,6 +844,7 @@ export function saveSettings(settingsFile: SettingsFile): void {
 }
 
 export async function saveModelChange(
+  loadedSettings: LoadedSettings,
   model: string,
   persist: boolean,
 ): Promise<void> {
@@ -851,7 +852,6 @@ export async function saveModelChange(
     return;
   }
   try {
-    const loadedSettings = loadSettings();
     loadedSettings.setValue(SettingScope.User, 'model.preferredModel', model);
   } catch (error) {
     coreEvents.emitFeedback(
