@@ -59,7 +59,7 @@ import { Worker } from 'node:worker_threads';
 
 // Inline worker code for regex testing to avoid separate file dependency
 const workerCode = `
-const { parentPort } = require('node:worker_threads');
+import { parentPort } from 'node:worker_threads';
 
 if (!parentPort) {
   throw new Error('This code must be run as a worker thread');
@@ -108,7 +108,9 @@ async function safeRegexTest(
 
     try {
       // Create worker from inline code
-      worker = new Worker(workerCode, { eval: true });
+      // Cast to any because @types/node might be missing 'type' in WorkerOptions
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      worker = new Worker(workerCode, { eval: true, type: 'module' } as any);
     } catch (error) {
       // If worker creation fails, fall back to exact match
       debugLogger.warn(

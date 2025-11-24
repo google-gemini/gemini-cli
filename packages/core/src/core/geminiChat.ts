@@ -408,6 +408,18 @@ export class GeminiChat {
                   }
                 }
 
+                if (
+                  isValid &&
+                  newRequestContents.length > 0 &&
+                  newRequestContents[newRequestContents.length - 1].role !==
+                    'user'
+                ) {
+                  isValid = false;
+                  debugLogger.error(
+                    `Invalid message sequence from BeforeModel hook: last message must have role 'user'. Discarding modification.`,
+                  );
+                }
+
                 if (isValid) {
                   requestContents = newRequestContents;
                 } else {
