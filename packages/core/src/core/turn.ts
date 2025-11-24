@@ -392,6 +392,17 @@ export class Turn {
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
   }
+
+  /**
+   * Get the concatenated response text from all responses in this turn.
+   * This extracts and joins all text content from the model's responses.
+   */
+  getResponseText(): string {
+    return this.debugResponses
+      .map((response) => getResponseText(response))
+      .filter((text): text is string => text !== null)
+      .join(' ');
+  }
 }
 
 function getCitations(resp: GenerateContentResponse): string[] {
