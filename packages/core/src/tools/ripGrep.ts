@@ -23,6 +23,7 @@ import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
+import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
@@ -387,6 +388,13 @@ class GrepToolInvocation extends BaseToolInvocation<
       excludes.forEach((exclude) => {
         rgArgs.push('--glob', `!${exclude}`);
       });
+
+      // Add .geminiignore support (ripgrep natively handles .gitignore)
+      const geminiIgnore = new GeminiIgnoreParser(this.config.getTargetDir());
+      const geminiIgnorePath = geminiIgnore.getIgnoreFilePath();
+      if (geminiIgnorePath) {
+        rgArgs.push('--ignore-file', geminiIgnorePath);
+      }
     }
 
     rgArgs.push('--threads', '4');
