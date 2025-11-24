@@ -490,6 +490,26 @@ their corresponding top-level category object in your `settings.json` file.
       "next-speaker-checker": {
         "extends": "gemini-2.5-flash-base",
         "modelConfig": {}
+      },
+      "chat-compression-3-pro": {
+        "modelConfig": {
+          "model": "gemini-3-pro-preview"
+        }
+      },
+      "chat-compression-2.5-pro": {
+        "modelConfig": {
+          "model": "gemini-2.5-pro"
+        }
+      },
+      "chat-compression-2.5-flash": {
+        "modelConfig": {
+          "model": "gemini-2.5-flash"
+        }
+      },
+      "chat-compression-2.5-flash-lite": {
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite"
+        }
       }
     }
     ```
