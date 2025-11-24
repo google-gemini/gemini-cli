@@ -856,6 +856,10 @@ export interface ChatCompressionEvent extends BaseTelemetryEvent {
   'event.timestamp': string;
   tokens_before: number;
   tokens_after: number;
+  goal_was_selected?: boolean;
+  messages_preserved?: number;
+  messages_compressed?: number;
+  trigger_reason?: string;
   toOpenTelemetryAttributes(config: Config): LogAttributes;
   toLogBody(): string;
 }
@@ -863,6 +867,10 @@ export interface ChatCompressionEvent extends BaseTelemetryEvent {
 export function makeChatCompressionEvent({
   tokens_before,
   tokens_after,
+  goal_was_selected,
+  messages_preserved,
+  messages_compressed,
+  trigger_reason,
 }: Omit<
   ChatCompressionEvent,
   CommonFields | 'toOpenTelemetryAttributes' | 'toLogBody'
@@ -872,17 +880,38 @@ export function makeChatCompressionEvent({
     'event.timestamp': new Date().toISOString(),
     tokens_before,
     tokens_after,
+    goal_was_selected,
+    messages_preserved,
+    messages_compressed,
+    trigger_reason,
     toOpenTelemetryAttributes(config: Config): LogAttributes {
-      return {
+      const attrs: LogAttributes = {
         ...getCommonAttributes(config),
         'event.name': EVENT_CHAT_COMPRESSION,
         'event.timestamp': this['event.timestamp'],
         tokens_before: this.tokens_before,
         tokens_after: this.tokens_after,
       };
+
+      if (this.goal_was_selected !== undefined) {
+        attrs.goal_was_selected = this.goal_was_selected;
+      }
+      if (this.messages_preserved !== undefined) {
+        attrs.messages_preserved = this.messages_preserved;
+      }
+      if (this.messages_compressed !== undefined) {
+        attrs.messages_compressed = this.messages_compressed;
+      }
+      if (this.trigger_reason) {
+        attrs.trigger_reason = this.trigger_reason;
+      }
+
+      return attrs;
     },
     toLogBody(): string {
-      return `Chat compression (Saved ${this.tokens_before - this.tokens_after} tokens)`;
+      const saved = this.tokens_before - this.tokens_after;
+      const goalInfo = this.goal_was_selected ? ' (goal-focused)' : '';
+      return `Chat compression${goalInfo} (Saved ${saved} tokens)`;
     },
   };
 }

@@ -348,6 +348,10 @@ export class ChatCompressionService {
       makeChatCompressionEvent({
         tokens_before: originalTokenCount,
         tokens_after: newTokenCount,
+        goal_was_selected: !!userGoal,
+        messages_preserved: messagesPreserved,
+        messages_compressed: messagesCompressed,
+        trigger_reason: preserveStrategy,
       }),
     );
 
