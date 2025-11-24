@@ -44,6 +44,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 const mockedGetUserExtensionsDir =
   ExtensionStorage.getUserExtensionsDir as Mock;
 const mockedLoadSettings = loadSettings as Mock;

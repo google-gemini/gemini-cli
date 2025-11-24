@@ -136,6 +136,7 @@ export const useGeminiStream = (
     markToolsAsSubmitted,
     setToolCallsForDisplay,
     cancelAllToolCalls,
+    lastToolOutputTime,
   ] = useReactToolScheduler(
     async (completedToolCallsFromScheduler) => {
       // This onComplete is called when ALL scheduled tools for a given batch are done.
@@ -211,17 +212,18 @@ export const useGeminiStream = (
     await done;
     setIsResponding(false);
   }, []);
-  const { handleShellCommand, activeShellPtyId } = useShellCommandProcessor(
-    addItem,
-    setPendingHistoryItem,
-    onExec,
-    onDebugMessage,
-    config,
-    geminiClient,
-    setShellInputFocused,
-    terminalWidth,
-    terminalHeight,
-  );
+  const { handleShellCommand, activeShellPtyId, lastShellOutputTime } =
+    useShellCommandProcessor(
+      addItem,
+      setPendingHistoryItem,
+      onExec,
+      onDebugMessage,
+      config,
+      geminiClient,
+      setShellInputFocused,
+      terminalWidth,
+      terminalHeight,
+    );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
 
@@ -681,8 +683,9 @@ export const useGeminiStream = (
         [FinishReason.UNEXPECTED_TOOL_CALL]:
           'Response stopped due to unexpected tool call.',
         [FinishReason.IMAGE_PROHIBITED_CONTENT]:
-          'Response stopped due to prohibited content.',
-        [FinishReason.NO_IMAGE]: 'Response stopped due to no image.',
+          'Response stopped due to prohibited image content.',
+        [FinishReason.NO_IMAGE]:
+          'Response stopped because no image was generated.',
       };
 
       const message = finishReasonMessages[finishReason];
@@ -1348,6 +1351,8 @@ export const useGeminiStream = (
     storage,
   ]);
 
+  const lastOutputTime = Math.max(lastToolOutputTime, lastShellOutputTime);
+
   return {
     streamingState,
     submitQuery,
@@ -1359,5 +1364,6 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    lastOutputTime,
   };
 };

@@ -516,7 +516,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Alternate Screen Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: true,
+        default: false,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
@@ -727,6 +727,16 @@ const SETTINGS_SCHEMA = {
         default: DEFAULT_MODEL_CONFIGS.aliases,
         description:
           'Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.',
+        showInDialog: false,
+      },
+      customAliases: {
+        type: 'object',
+        label: 'Custom Model Config Aliases',
+        category: 'Model',
+        requiresRestart: false,
+        default: {},
+        description:
+          'Custom named presets for model configs. These are merged with (and override) the built-in aliases.',
         showInDialog: false,
       },
       overrides: {
@@ -1280,16 +1290,6 @@ const SETTINGS_SCHEMA = {
         description:
           'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
-      },
-      useModelRouter: {
-        type: 'boolean',
-        label: 'Use Model Router',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enable model routing to route requests to the best model based on complexity.',
-        showInDialog: true,
       },
       codebaseInvestigatorSettings: {
         type: 'object',

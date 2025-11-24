@@ -19,6 +19,7 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface UpdateArgs {
   name?: string;
@@ -144,5 +145,6 @@ export const updateCommand: CommandModule = {
       name: argv['name'] as string | undefined,
       all: argv['all'] as boolean | undefined,
     });
+    await exitCli();
   },
 };

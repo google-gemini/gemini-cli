@@ -853,7 +853,7 @@ export interface TextBufferState {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
-  preferredCol: number | null; // This is visual preferred col
+  preferredCol: number | null; // This is the logical character offset in the visual line
   undoStack: UndoHistoryEntry[];
   redoStack: UndoHistoryEntry[];
   clipboard: string | null;
@@ -2022,20 +2022,40 @@ export function useTextBuffer({
         Math.min(visRow, visualLines.length - 1),
       );
       const visualLine = visualLines[clampedVisRow] || '';
-      // Clamp visCol to the length of the visual line
-      const clampedVisCol = Math.max(0, Math.min(visCol, cpLen(visualLine)));
 
       if (visualToLogicalMap[clampedVisRow]) {
         const [logRow, logStartCol] = visualToLogicalMap[clampedVisRow];
+
+        const codePoints = toCodePoints(visualLine);
+        let currentVisX = 0;
+        let charOffset = 0;
+
+        for (const char of codePoints) {
+          const charWidth = getCachedStringWidth(char);
+          // If the click is within this character
+          if (visCol < currentVisX + charWidth) {
+            // Check if we clicked the second half of a wide character
+            if (charWidth > 1 && visCol >= currentVisX + charWidth / 2) {
+              charOffset++;
+            }
+            break;
+          }
+          currentVisX += charWidth;
+          charOffset++;
+        }
+
+        // Clamp charOffset to length
+        charOffset = Math.min(charOffset, codePoints.length);
+
         const newCursorRow = logRow;
-        const newCursorCol = logStartCol + clampedVisCol;
+        const newCursorCol = logStartCol + charOffset;
 
         dispatch({
           type: 'set_cursor',
           payload: {
             cursorRow: newCursorRow,
             cursorCol: newCursorCol,
-            preferredCol: clampedVisCol,
+            preferredCol: charOffset,
           },
         });
       }

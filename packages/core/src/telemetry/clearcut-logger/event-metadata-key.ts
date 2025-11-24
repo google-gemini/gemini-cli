@@ -194,6 +194,9 @@ export enum EventMetadataKey {
   // Logs the name of the GitHub Action workflow that triggered the session.
   GEMINI_CLI_GH_WORKFLOW_NAME = 130,
 
+  // Logs the active experiment IDs for the session.
+  GEMINI_CLI_EXPERIMENT_IDS = 131,
+
   // ==========================================================================
   // Loop Detected Event Keys
   // ===========================================================================
