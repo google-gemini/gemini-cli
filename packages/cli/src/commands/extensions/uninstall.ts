@@ -36,9 +36,6 @@ export async function handleUninstall(args: UninstallArgs) {
     const errors: Array<{ name: string; error: string }> = [];
     for (const name of [...new Set(args.names)]) {
       try {
-        await extensionManager.uninstallExtension(name, false);
-        debugLogger.log(`Extension "${name}" successfully uninstalled.`);
-
         // Also remove any MCP server config for this extension
         const scopes: LoadableSettingScope[] = [
           SettingScope.User,
@@ -55,6 +52,9 @@ export async function handleUninstall(args: UninstallArgs) {
             );
           }
         }
+
+        await extensionManager.uninstallExtension(name, false);
+        debugLogger.log(`Extension "${name}" successfully uninstalled.`);
       } catch (error) {
         errors.push({ name, error: getErrorMessage(error) });
       }
