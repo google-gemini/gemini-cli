@@ -14,6 +14,8 @@ export type UnavailabilityReason =
   | TurnUnavailabilityReason
   | 'unknown';
 
+export type ModelHealthStatus = 'terminal' | 'sticky_retry';
+
 type HealthState =
   | { status: 'terminal'; reason: TerminalUnavailabilityReason }
   | {
