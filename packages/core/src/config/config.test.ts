@@ -34,7 +34,6 @@ import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -203,10 +202,6 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    startupProfiler.reset();
   });
 
   describe('initialize', () => {

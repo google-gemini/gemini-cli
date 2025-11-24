@@ -27,7 +27,6 @@ import {
   type UserFeedbackPayload,
   type ResumedSessionData,
   AuthType,
-  startupProfiler,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -51,7 +50,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-
   return {
     ...actual,
     coreEvents: mockCoreEvents,
@@ -390,16 +388,8 @@ describe('AppContainer State Management', () => {
     } as InitializationResult;
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     cleanup();
-    // Wait a bit for any pending effects to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    // Reset the startup profiler, ignoring any errors from incomplete phases
-    try {
-      startupProfiler.reset();
-    } catch {
-      // Ignore errors during cleanup
-    }
   });
 
   describe('Basic Rendering', () => {

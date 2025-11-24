@@ -120,6 +120,15 @@ export class StartupProfiler {
     const startMarkName = this.getStartMarkName(phase.name);
     const endMarkName = this.getEndMarkName(phase.name);
 
+    // Check if start mark exists before measuring
+    if (performance.getEntriesByName(startMarkName).length === 0) {
+      debugLogger.warn(
+        `[STARTUP] Cannot measure phase '${phase.name}': start mark '${startMarkName}' not found (likely cleared by reset).`,
+      );
+      phase.ended = true;
+      return;
+    }
+
     performance.mark(endMarkName, { detail: details });
     performance.measure(phase.name, startMarkName, endMarkName);
 
@@ -188,14 +197,6 @@ export class StartupProfiler {
       }
     }
 
-    this.reset();
-  }
-
-  /**
-   * Resets the profiler state, clearing all phases and performance entries.
-   * Useful for testing to ensure clean state between test runs.
-   */
-  reset(): void {
     // Clear performance marks and measures for all tracked phases.
     for (const phaseName of this.phases.keys()) {
       const startMarkName = this.getStartMarkName(phaseName);
