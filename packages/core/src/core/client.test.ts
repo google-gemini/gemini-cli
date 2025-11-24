@@ -2403,4 +2403,90 @@ ${JSON.stringify(
       );
     });
   });
+
+  describe('shouldTriggerCompression - hybrid trigger system', () => {
+    it('should trigger when absolute token threshold reached', async () => {
+      // Mock token count at 42k (over 40k threshold)
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(
+        42000,
+      );
+
+      // Mock config to return compression settings
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockResolvedValue(40000);
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockResolvedValue(25);
+      vi.spyOn(client['config'], 'getCompressionMinTimeBetweenPrompts').mockResolvedValue(300);
+
+      // Set client state: enough messages and time have passed
+      client['messagesSinceLastCompress'] = 26;
+      client['lastCompressionTime'] = Date.now() - 400000; // 6+ minutes ago
+
+      const decision = await client.shouldTriggerCompression();
+
+      expect(decision.shouldCompress).toBe(true);
+      expect(decision.isSafetyValve).toBe(false);
+      expect(decision.reason).toBe('absolute_tokens');
+    });
+
+    it('should trigger safety valve at 50% utilization', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(1000000);
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(520000); // 52%
+
+      vi.spyOn(client['config'], 'getCompressionTriggerUtilization').mockResolvedValue(0.50);
+
+      const decision = await client.shouldTriggerCompression();
+
+      expect(decision.shouldCompress).toBe(true);
+      expect(decision.isSafetyValve).toBe(true);
+      expect(decision.reason).toBe('utilization_threshold');
+    });
+
+    it('should not trigger if insufficient messages since last compress', async () => {
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(45000);
+
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockResolvedValue(40000);
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockResolvedValue(25);
+
+      // Under minimum messages
+      client['messagesSinceLastCompress'] = 20;
+
+      const decision = await client.shouldTriggerCompression();
+
+      expect(decision.shouldCompress).toBe(false);
+      expect(decision.reason).toBe('message_guard_failed');
+    });
+
+    it('should not trigger if too soon since last compress', async () => {
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(45000);
+
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockResolvedValue(40000);
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockResolvedValue(25);
+      vi.spyOn(client['config'], 'getCompressionMinTimeBetweenPrompts').mockResolvedValue(300); // 5 minutes
+
+      client['messagesSinceLastCompress'] = 30;
+      client['lastCompressionTime'] = Date.now() - 120000; // 2 minutes ago - too soon
+
+      const decision = await client.shouldTriggerCompression();
+
+      expect(decision.shouldCompress).toBe(false);
+      expect(decision.reason).toBe('time_guard_failed');
+    });
+
+    it('should bypass guards when safety valve triggers', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(1000000);
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(520000); // 52%
+
+      vi.spyOn(client['config'], 'getCompressionTriggerUtilization').mockResolvedValue(0.50);
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockResolvedValue(25);
+
+      // Under minimum requirements
+      client['messagesSinceLastCompress'] = 10;
+      client['lastCompressionTime'] = Date.now() - 60000; // 1 minute ago
+
+      const decision = await client.shouldTriggerCompression();
+
+      expect(decision.shouldCompress).toBe(true);
+      expect(decision.isSafetyValve).toBe(true);
+      // Guards are bypassed for safety valve
+    });
+  });
 });

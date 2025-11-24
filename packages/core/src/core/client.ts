@@ -110,6 +110,13 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
+  /**
+   * Track state for hybrid trigger system
+   */
+  private messagesSinceLastCompress = 0;
+  private lastCompressionTime = 0;
+  private isCompressing = false;
+
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
@@ -697,6 +704,79 @@ export class GeminiClient {
     }
   }
 
+  /**
+   * Determines if compression should be triggered based on hybrid criteria
+   */
+  async shouldTriggerCompression(): Promise<{
+    shouldCompress: boolean;
+    reason: string;
+    isSafetyValve: boolean;
+  }> {
+    const chat = this.getChat();
+    const currentTokens = chat.getLastPromptTokenCount();
+    const model = this._getEffectiveModelForCurrentTurn();
+    const modelLimit = tokenLimit(model);
+
+    // Check safety valve first (50% utilization threshold)
+    const utilizationThreshold =
+      (await this.config.getCompressionTriggerUtilization?.()) ?? 0.5;
+    const utilization = currentTokens / modelLimit;
+
+    if (utilization >= utilizationThreshold) {
+      // Safety valve - bypass all guards
+      return {
+        shouldCompress: true,
+        reason: 'utilization_threshold',
+        isSafetyValve: true,
+      };
+    }
+
+    // Check absolute token threshold
+    const tokenThreshold =
+      (await this.config.getCompressionTriggerTokens?.()) ?? 40000;
+
+    if (currentTokens < tokenThreshold) {
+      return {
+        shouldCompress: false,
+        reason: 'below_token_threshold',
+        isSafetyValve: false,
+      };
+    }
+
+    // Apply guards
+    const minMessages =
+      (await this.config.getCompressionMinMessages?.()) ?? 25;
+    if (this.messagesSinceLastCompress < minMessages) {
+      return {
+        shouldCompress: false,
+        reason: 'message_guard_failed',
+        isSafetyValve: false,
+      };
+    }
+
+    const minTimeBetween =
+      (await this.config.getCompressionMinTimeBetweenPrompts?.()) ?? 300; // seconds
+    const timeSinceLastCompress =
+      (Date.now() - this.lastCompressionTime) / 1000;
+    if (
+      this.lastCompressionTime > 0 &&
+      timeSinceLastCompress < minTimeBetween
+    ) {
+      return {
+        shouldCompress: false,
+        reason: 'time_guard_failed',
+        isSafetyValve: false,
+      };
+    }
+
+    // All checks passed
+    return {
+      shouldCompress: true,
+      reason: 'absolute_tokens',
+      isSafetyValve: false,
+    };
+  }
+
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
@@ -725,6 +805,10 @@ export class GeminiClient {
         this.chat = await this.startChat(newHistory);
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
+
+        // Update tracking state
+        this.messagesSinceLastCompress = 0;
+        this.lastCompressionTime = Date.now();
       }
     }
 
