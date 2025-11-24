@@ -127,7 +127,7 @@ or reauthenticate.
 
 Perform the following steps to troubleshoot your access:
 
-1. **Turn on Preview Features**. Run the `/setting` command in the CLI and
+1. **Turn on Preview Features**. Run the `/settings` command in the CLI and
    ensure that **Preview Features** is set to `true`. You can’t use Gemini 3 Pro
    if the Preview Features setting is turned off.
 2. **Restart the CLI.** Use `/quit` to exit the CLI and reopen it with the
