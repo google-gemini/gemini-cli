@@ -36,7 +36,11 @@ import {
   getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import {
+  ChatCompressionService,
+  type CompressionOptions,
+} from '../services/chatCompressionService.js';
+import { DeliberateCompressionOrchestrator } from '../services/deliberateCompressionOrchestrator.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -99,6 +103,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
+  private readonly deliberateCompressionOrchestrator: DeliberateCompressionOrchestrator;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -121,6 +126,8 @@ export class GeminiClient {
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
+    this.deliberateCompressionOrchestrator =
+      new DeliberateCompressionOrchestrator();
     this.lastPromptId = this.config.getSessionId();
   }
 
@@ -796,9 +803,38 @@ export class GeminiClient {
     };
   }
 
+  /**
+   * Prepares for deliberate compression by extracting goals
+   * Returns info about whether to prompt user and what goals were found
+   */
+  async prepareDeliberateCompression(
+    prompt_id: string,
+    isSafetyValve: boolean,
+  ) {
+    const model = this._getEffectiveModelForCurrentTurn();
+
+    return await this.deliberateCompressionOrchestrator.prepareDeliberateCompression(
+      this.getChat(),
+      this.config,
+      model,
+      prompt_id,
+      isSafetyValve,
+    );
+  }
+
+  /**
+   * Creates compression options from user's goal selection
+   */
+  createCompressionOptions(selectedGoal: string | null): CompressionOptions {
+    return this.deliberateCompressionOrchestrator.createCompressionOptions(
+      selectedGoal,
+    );
+  }
+
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    options?: CompressionOptions,
   ): Promise<ChatCompressionInfo> {
     // Set compression lock
     this.isCompressing = true;
@@ -816,6 +852,7 @@ export class GeminiClient {
         model,
         this.config,
         this.hasFailedCompressionAttempt,
+        options,
       );
 
       if (
