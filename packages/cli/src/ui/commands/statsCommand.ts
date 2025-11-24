@@ -13,32 +13,36 @@ import {
   CommandKind,
 } from './types.js';
 
+function defaultSessionView(context: CommandContext) {
+  const now = new Date();
+  const { sessionStartTime } = context.session.stats;
+  if (!sessionStartTime) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Session start time is unavailable, cannot calculate stats.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+  const wallDuration = now.getTime() - sessionStartTime.getTime();
+
+  const statsItem: HistoryItemStats = {
+    type: MessageType.STATS,
+    duration: formatDuration(wallDuration),
+  };
+
+  context.ui.addItem(statsItem, Date.now());
+}
+
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
   description: 'Check session stats. Usage: /stats [session|model|tools]',
   kind: CommandKind.BUILT_IN,
   action: (context: CommandContext) => {
-    const now = new Date();
-    const { sessionStartTime } = context.session.stats;
-    if (!sessionStartTime) {
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Session start time is unavailable, cannot calculate stats.',
-        },
-        Date.now(),
-      );
-      return;
-    }
-    const wallDuration = now.getTime() - sessionStartTime.getTime();
-
-    const statsItem: HistoryItemStats = {
-      type: MessageType.STATS,
-      duration: formatDuration(wallDuration),
-    };
-
-    context.ui.addItem(statsItem, Date.now());
+    defaultSessionView(context);
   },
   subCommands: [
     {
@@ -46,12 +50,7 @@ export const statsCommand: SlashCommand = {
       description: 'Show session-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       action: (context: CommandContext) => {
-        context.ui.addItem(
-          {
-            type: MessageType.STATS,
-          },
-          Date.now(),
-        );
+        defaultSessionView(context);
       },
     },
     {
