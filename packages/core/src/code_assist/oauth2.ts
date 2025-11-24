@@ -546,7 +546,7 @@ async function fetchCachedCredentials(): Promise<
 > {
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
-    return await OAuthCredentialStorage.loadCredentials();
+    return OAuthCredentialStorage.loadCredentials();
   }
 
   const pathsToTry = [
