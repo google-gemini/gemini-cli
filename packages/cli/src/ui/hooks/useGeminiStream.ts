@@ -895,6 +895,50 @@ export const useGeminiStream = (
             setSnapshottingMessage(
               'Creating file snapshot, this may take a moment...',
             );
+            const handleSnapshotFailure = (
+              uiErrorMessage: string,
+              modelErrorMessage: string,
+            ) => {
+              addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: `${uiErrorMessage}. Aborting operation.`,
+                },
+                Date.now(),
+              );
+
+              const toolRegistry = config.getToolRegistry();
+              const error = new Error(modelErrorMessage);
+              const erroredToolCalls: TrackedToolCall[] = toolCallRequests.map(
+                (request): TrackedCompletedToolCall => {
+                  const tool = toolRegistry.getTool(request.name);
+                  return {
+                    request,
+                    status: 'error',
+                    response: {
+                      callId: request.callId,
+                      resultDisplay: error.message,
+                      error,
+                      errorType: ToolErrorType.UNKNOWN,
+                      responseParts: [
+                        {
+                          functionResponse: {
+                            name: request.name,
+                            response: { error: error.message },
+                          },
+                        },
+                      ],
+                    },
+                    responseSubmittedToGemini: false,
+                    tool,
+                  };
+                },
+              );
+
+              void handleCompletedToolsRef.current!(erroredToolCalls);
+              setSnapshottingMessage(null);
+            };
+
             let commitHash: string | undefined;
             try {
               if (!gitService) {
@@ -911,92 +955,17 @@ export const useGeminiStream = (
               const errorMessage = `Failed to create file snapshot: ${getErrorMessage(
                 error,
               )}`;
-              addItem(
-                {
-                  type: MessageType.ERROR,
-                  text: `${errorMessage}. Aborting operation.`,
-                },
-                Date.now(),
+              handleSnapshotFailure(
+                errorMessage,
+                'Tool call aborted due to a critical, non-recoverable file snapshot failure.',
               );
-
-              // Inform the model that the tool calls failed due to a non-recoverable error.
-              const toolRegistry = config.getToolRegistry();
-              const erroredToolCalls: TrackedToolCall[] = toolCallRequests.map(
-                (request): TrackedCompletedToolCall => {
-                  const tool = toolRegistry.getTool(request.name);
-                  const error = new Error(
-                    'Tool call aborted due to a critical, non-recoverable file snapshot failure.',
-                  );
-
-                  return {
-                    request,
-                    status: 'error',
-                    response: {
-                      callId: request.callId,
-                      resultDisplay: error.message,
-                      error,
-                      errorType: ToolErrorType.UNKNOWN,
-                      responseParts: [
-                        {
-                          functionResponse: {
-                            name: request.name,
-                            response: { error: error.message },
-                          },
-                        },
-                      ],
-                    },
-                    responseSubmittedToGemini: false,
-                    tool,
-                  };
-                },
-              );
-
-              void handleCompletedToolsRef.current!(erroredToolCalls);
-              setSnapshottingMessage(null);
               return StreamProcessingStatus.Completed; // Stop processing
             }
+
             if (!commitHash) {
               const errorMessage =
-                'Failed to get a commit hash for the file snapshot. Aborting operation.';
-              addItem(
-                {
-                  type: MessageType.ERROR,
-                  text: errorMessage,
-                },
-                Date.now(),
-              );
-
-              // Inform the model that the tool calls failed.
-              const toolRegistry = config.getToolRegistry();
-              const erroredToolCalls: TrackedToolCall[] = toolCallRequests.map(
-                (request): TrackedCompletedToolCall => {
-                  const tool = toolRegistry.getTool(request.name);
-                  const error = new Error(errorMessage);
-                  return {
-                    request,
-                    status: 'error',
-                    response: {
-                      callId: request.callId,
-                      resultDisplay: error.message,
-                      error,
-                      errorType: ToolErrorType.UNKNOWN,
-                      responseParts: [
-                        {
-                          functionResponse: {
-                            name: request.name,
-                            response: { error: error.message },
-                          },
-                        },
-                      ],
-                    },
-                    responseSubmittedToGemini: false,
-                    tool,
-                  };
-                },
-              );
-              void handleCompletedToolsRef.current!(erroredToolCalls);
-              setSnapshottingMessage(null);
-              cancelOngoingRequest();
+                'Failed to get a commit hash for the file snapshot';
+              handleSnapshotFailure(errorMessage, errorMessage);
               return StreamProcessingStatus.Completed;
             }
 
@@ -1059,7 +1028,6 @@ export const useGeminiStream = (
     },
     [
       addItem,
-      cancelOngoingRequest,
       config,
       geminiClient,
       gitService,
