@@ -95,7 +95,6 @@ describe('BuiltinCommandLoader', () => {
     vi.clearAllMocks();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
-      getUseModelRouter: () => false,
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
     } as unknown as Config;
@@ -168,28 +167,6 @@ describe('BuiltinCommandLoader', () => {
     expect(permissionsCmd).toBeUndefined();
   });
 
-  it('should include modelCommand when getUseModelRouter is true', async () => {
-    const mockConfigWithModelRouter = {
-      ...mockConfig,
-      getUseModelRouter: () => true,
-    } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithModelRouter);
-    const commands = await loader.loadCommands(new AbortController().signal);
-    const modelCmd = commands.find((c) => c.name === 'model');
-    expect(modelCmd).toBeDefined();
-  });
-
-  it('should not include modelCommand when getUseModelRouter is false', async () => {
-    const mockConfigWithoutModelRouter = {
-      ...mockConfig,
-      getUseModelRouter: () => false,
-    } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithoutModelRouter);
-    const commands = await loader.loadCommands(new AbortController().signal);
-    const modelCmd = commands.find((c) => c.name === 'model');
-    expect(modelCmd).toBeUndefined();
-  });
-
   it('should include policies command when message bus integration is enabled', async () => {
     const mockConfigWithMessageBus = {
       ...mockConfig,
@@ -220,7 +197,6 @@ describe('BuiltinCommandLoader profile', () => {
     vi.resetModules();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
-      getUseModelRouter: () => false,
       getCheckpointingEnabled: () => false,
       getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
