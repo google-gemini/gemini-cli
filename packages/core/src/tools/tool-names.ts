@@ -20,3 +20,5 @@ export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const LS_TOOL_NAME = 'list_directory';
 export const MEMORY_TOOL_NAME = 'save_memory';
+export const LSP_WORKSPACE_SYMBOLS_TOOL_NAME = 'lsp_workspace_symbols';
+export const LSP_FIND_REFERENCES_TOOL_NAME = 'lsp_find_references';

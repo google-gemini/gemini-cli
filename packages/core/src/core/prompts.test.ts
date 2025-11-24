@@ -54,6 +54,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      isIdeConnected: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -134,6 +135,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+        isIdeConnected: vi.fn().mockReturnValue(false),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);

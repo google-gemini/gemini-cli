@@ -162,6 +162,9 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { LSPWorkspaceSymbolsTool } from '../tools/lsp-workspace-symbols.js';
+import { LSPFindReferencesTool } from '../tools/lsp-find-references.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 export type { FileFilteringOptions };
 export {
@@ -309,6 +312,7 @@ export interface ConfigParameters {
 export class Config {
   private toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
+  private _isIdeConnected = false;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
   private promptRegistry!: PromptRegistry;
@@ -605,6 +609,9 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
+
+    const ideClient = await IdeClient.getInstance();
+    this._isIdeConnected = ideClient.getCurrentIde() !== undefined;
 
     // Initialize centralized FileDiscoveryService
     this.getFileService();
@@ -1150,6 +1157,10 @@ export class Config {
     return this.ideMode;
   }
 
+  isIdeConnected(): boolean {
+    return this._isIdeConnected;
+  }
+
   /**
    * Returns 'true' if the folder trust feature is enabled.
    */
@@ -1444,6 +1455,11 @@ export class Config {
     registerCoreTool(WebSearchTool, this);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool, this);
+    }
+
+    if (this.isIdeConnected()) {
+      registerCoreTool(LSPWorkspaceSymbolsTool);
+      registerCoreTool(LSPFindReferencesTool, this);
     }
 
     // Register Subagents as Tools

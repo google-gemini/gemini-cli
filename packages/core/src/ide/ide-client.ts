@@ -13,6 +13,8 @@ import {
   IdeDiffAcceptedNotificationSchema,
   IdeDiffClosedNotificationSchema,
   IdeDiffRejectedNotificationSchema,
+  type LSPLocation,
+  type LSPSymbolInformation,
 } from './types.js';
 import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -391,6 +393,90 @@ export class IdeClient {
         resolver({ status: 'rejected', content: undefined });
       }
       this.diffResponses.delete(filePath);
+    }
+  }
+
+  async findReferences(
+    filePath: string,
+    line: number,
+    character: number,
+  ): Promise<LSPLocation[]> {
+    if (!this.client) {
+      throw new Error('IDE client is not connected');
+    }
+
+    const result = await this.client.request(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'findReferences',
+          arguments: {
+            filePath,
+            line,
+            character,
+          },
+        },
+      },
+      CallToolResultSchema,
+      { timeout: IDE_REQUEST_TIMEOUT_MS },
+    );
+
+    if (!result) {
+      throw new Error('No response from IDE for find references request');
+    }
+
+    if (result.isError) {
+      throw new Error('Error response from IDE for find references request');
+    }
+
+    const textPart = result.content.find((part) => part.type === 'text');
+    if (!textPart?.text) {
+      throw new Error('No text content in find references response from IDE');
+    }
+
+    try {
+      return JSON.parse(textPart.text) as LSPLocation[];
+    } catch (_error) {
+      throw new Error('Failed to parse find references response from IDE');
+    }
+  }
+
+  async getWorkspaceSymbols(query: string): Promise<LSPSymbolInformation[]> {
+    if (!this.client) {
+      throw new Error('IDE client is not connected');
+    }
+
+    const result = await this.client.request(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'getWorkspaceSymbols',
+          arguments: {
+            query,
+          },
+        },
+      },
+      CallToolResultSchema,
+      { timeout: IDE_REQUEST_TIMEOUT_MS },
+    );
+
+    if (!result) {
+      throw new Error('No response from IDE for workspace symbols request');
+    }
+
+    if (result.isError) {
+      throw new Error('Error response from IDE for workspace symbols request');
+    }
+
+    const textPart = result.content.find((part) => part.type === 'text');
+    if (!textPart?.text) {
+      throw new Error('No text content in workspace symbols response from IDE');
+    }
+
+    try {
+      return JSON.parse(textPart.text) as LSPSymbolInformation[];
+    } catch (_error) {
+      throw new Error('Failed to parse workspace symbols response from IDE');
     }
   }
 

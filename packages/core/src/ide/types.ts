@@ -146,3 +146,25 @@ export const CloseDiffRequestSchema = z.object({
    */
   suppressNotification: z.boolean().optional(),
 });
+
+export const GetWorkspaceSymbolsRequestSchema = z.object({
+  query: z.string(),
+});
+
+export const FindReferencesRequestSchema = z.object({
+  filePath: z.string(),
+  line: z.number(),
+  character: z.number(),
+});
+
+export interface LSPLocation {
+  filePath: string;
+  // 1-based line and character positions
+  line: number;
+  character: number;
+}
+
+export interface LSPSymbolInformation {
+  name: string;
+  location: LSPLocation;
+}
