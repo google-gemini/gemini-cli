@@ -8,7 +8,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
 export const isAlternateBufferEnabled = (settings: LoadedSettings): boolean =>
-  settings.merged.ui?.useAlternateBuffer !== false;
+  settings.merged.ui?.useAlternateBuffer === true;
 
 export const useAlternateBuffer = (): boolean => {
   const settings = useSettings();

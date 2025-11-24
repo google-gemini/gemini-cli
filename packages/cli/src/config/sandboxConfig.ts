@@ -21,7 +21,7 @@ const __dirname = path.dirname(__filename);
 // This is a stripped-down version of the CliArgs interface from config.ts
 // to avoid circular dependencies.
 interface SandboxCliArgs {
-  sandbox?: boolean | string;
+  sandbox?: boolean | string | null;
 }
 const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'docker',
@@ -34,7 +34,7 @@ function isSandboxCommand(value: string): value is SandboxConfig['command'] {
 }
 
 function getSandboxCommand(
-  sandbox?: boolean | string,
+  sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
   // If the SANDBOX env var is set, we're already inside the sandbox.
   if (process.env['SANDBOX']) {

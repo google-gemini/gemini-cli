@@ -62,6 +62,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         write: vi.fn(),
       },
     })),
+    enableMouseEvents: vi.fn(),
+    disableMouseEvents: vi.fn(),
+    enterAlternateScreen: vi.fn(),
+    disableLineWrapping: vi.fn(),
   };
 });
 
@@ -505,6 +509,7 @@ describe('startInteractiveUI', () => {
     merged: {
       ui: {
         hideWindowTitle: false,
+        useAlternateBuffer: true,
       },
     },
   } as LoadedSettings;

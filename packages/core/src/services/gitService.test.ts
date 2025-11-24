@@ -259,7 +259,7 @@ describe('GitService', () => {
         '--no-verify': null,
       });
     });
-    
+
     it('should create a new commit if there are staged changes', async () => {
       hoistedMockStatus.mockResolvedValue({ isClean: () => false });
       hoistedMockCommit.mockResolvedValue({ commit: 'new-commit-hash' });

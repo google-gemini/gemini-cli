@@ -1121,5 +1121,46 @@ describe('E2E Tests', () => {
       expect(res.body.error).toBe('"args" field must be an array.');
       expect(getExtensionsSpy).not.toHaveBeenCalled();
     });
+
+    it('should handle streaming commands via executeStream', async () => {
+      const mockExecuteStream = vi.fn(async (context, args, eventBus) => {
+        eventBus.publish({
+          kind: 'test-event-1',
+          data: 'first event',
+        } as unknown as AgentExecutionEvent);
+        eventBus.publish({
+          kind: 'test-event-2',
+          data: 'second event',
+        } as unknown as AgentExecutionEvent);
+      });
+
+      const mockStreamCommand = {
+        name: 'streaming-command',
+        description: 'A mock streaming command',
+        executeStream: mockExecuteStream,
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockStreamCommand);
+
+      const agent = request.agent(app);
+      const res = await agent
+        .post('/executeCommand')
+        .send({ command: 'streaming-command', args: [] })
+        .set('Content-Type', 'application/json')
+        .expect(200);
+
+      // The streamToSSEEvents helper will parse the response for us
+      const events = streamToSSEEvents(res.text);
+
+      expect(mockExecuteStream).toHaveBeenCalledOnce();
+      expect(events).toHaveLength(2);
+      expect(events[0].result).toEqual({
+        kind: 'test-event-1',
+        data: 'first event',
+      });
+      expect(events[1].result).toEqual({
+        kind: 'test-event-2',
+        data: 'second event',
+      });
+    });
   });
 });

@@ -97,6 +97,11 @@ export async function detectAndEnableKittyProtocol(): Promise<void> {
   });
 }
 
+import {
+  enableKittyKeyboardProtocol,
+  disableKittyKeyboardProtocol,
+} from '@google/gemini-cli-core';
+
 export function isKittyProtocolEnabled(): boolean {
   return kittyEnabled;
 }
@@ -104,8 +109,7 @@ export function isKittyProtocolEnabled(): boolean {
 function disableAllProtocols() {
   try {
     if (kittyEnabled) {
-      // use writeSync to avoid race conditions
-      fs.writeSync(process.stdout.fd, '\x1b[<u');
+      disableKittyKeyboardProtocol();
       kittyEnabled = false;
     }
   } catch {
@@ -120,8 +124,7 @@ function disableAllProtocols() {
 export function enableSupportedProtocol(): void {
   try {
     if (kittySupported) {
-      // use writeSync to avoid race conditions
-      fs.writeSync(process.stdout.fd, '\x1b[>1u');
+      enableKittyKeyboardProtocol();
       kittyEnabled = true;
     }
   } catch {

@@ -194,14 +194,14 @@ export async function createApp() {
 
         if (commandToExecute.executeStream) {
           const eventBus = new DefaultExecutionEventBus();
-          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Content-Type', 'text/event-stream');
           const eventHandler = (event: AgentExecutionEvent) => {
             const jsonRpcResponse = {
               jsonrpc: '2.0',
               id: null,
               result: event,
             };
-            res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n`);
+            res.write(`data: ${JSON.stringify(jsonRpcResponse)}\n\n`);
           };
           eventBus.on('event', eventHandler);
 
@@ -251,6 +251,7 @@ export async function createApp() {
               .status(200)
               .json({ name: result.name, data: processedChunks });
           }
+          return res.status(200).json(result);
         }
         return res.status(200).json({});
       } catch (e) {

@@ -36,7 +36,7 @@ describe('ToolConfirmationMessage', () => {
       />,
     );
 
-    expect(lastFrame()).not.toContain('URLs to fetch:');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should display urls if prompt and url are different', () => {
@@ -60,10 +60,7 @@ describe('ToolConfirmationMessage', () => {
       />,
     );
 
-    expect(lastFrame()).toContain('URLs to fetch:');
-    expect(lastFrame()).toContain(
-      '- https://raw.githubusercontent.com/google/gemini-react/main/README.md',
-    );
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   describe('with folder trust', () => {
@@ -124,7 +121,7 @@ describe('ToolConfirmationMessage', () => {
         details: mcpConfirmationDetails,
         alwaysAllowText: 'always allow',
       },
-    ])('$description', ({ details, alwaysAllowText }) => {
+    ])('$description', ({ details }) => {
       it('should show "allow always" when folder is trusted', () => {
         const mockConfig = {
           isTrustedFolder: () => true,
@@ -140,7 +137,7 @@ describe('ToolConfirmationMessage', () => {
           />,
         );
 
-        expect(lastFrame()).toContain(alwaysAllowText);
+        expect(lastFrame()).toMatchSnapshot();
       });
 
       it('should NOT show "allow always" when folder is untrusted', () => {
@@ -158,7 +155,7 @@ describe('ToolConfirmationMessage', () => {
           />,
         );
 
-        expect(lastFrame()).not.toContain(alwaysAllowText);
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
   });

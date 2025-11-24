@@ -27,6 +27,7 @@ import readline from 'node:readline';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { writeToStdout } from '../utils/stdio.js';
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -43,6 +44,19 @@ vi.mock('crypto');
 vi.mock('node:readline');
 vi.mock('../utils/browser.js', () => ({
   shouldAttemptBrowserLaunch: () => true,
+}));
+vi.mock('../utils/stdio.js', () => ({
+  writeToStdout: vi.fn(),
+  writeToStderr: vi.fn(),
+  createInkStdio: vi.fn(() => ({
+    stdout: process.stdout,
+    stderr: process.stderr,
+  })),
+  enterAlternateScreen: vi.fn(),
+  exitAlternateScreen: vi.fn(),
+  enableLineWrapping: vi.fn(),
+  disableMouseEvents: vi.fn(),
+  disableKittyKeyboardProtocol: vi.fn(),
 }));
 
 vi.mock('./oauth-credential-storage.js', () => ({
@@ -238,12 +252,9 @@ describe('oauth2', () => {
       const mockReadline = {
         question: vi.fn((_query, callback) => callback(mockCode)),
         close: vi.fn(),
+        on: vi.fn(),
       };
       (readline.createInterface as Mock).mockReturnValue(mockReadline);
-
-      const consoleLogSpy = vi
-        .spyOn(debugLogger, 'log')
-        .mockImplementation(() => {});
 
       const client = await getOauthClient(
         AuthType.LOGIN_WITH_GOOGLE,
@@ -255,7 +266,7 @@ describe('oauth2', () => {
       // Verify the auth flow
       expect(mockGenerateCodeVerifierAsync).toHaveBeenCalled();
       expect(mockGenerateAuthUrl).toHaveBeenCalled();
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(vi.mocked(writeToStdout)).toHaveBeenCalledWith(
         expect.stringContaining(mockAuthUrl),
       );
       expect(mockReadline.question).toHaveBeenCalledWith(
@@ -268,8 +279,6 @@ describe('oauth2', () => {
         redirect_uri: 'https://codeassist.google.com/authcode',
       });
       expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
-
-      consoleLogSpy.mockRestore();
     });
 
     describe('in Cloud Shell', () => {
@@ -932,6 +941,7 @@ describe('oauth2', () => {
         const mockReadline = {
           question: vi.fn((_query, callback) => callback('invalid-code')),
           close: vi.fn(),
+          on: vi.fn(),
         };
         (readline.createInterface as Mock).mockReturnValue(mockReadline);
 

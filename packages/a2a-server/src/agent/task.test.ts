@@ -18,6 +18,9 @@ import {
   GeminiEventType,
   type Config,
   type ToolCallRequestInfo,
+  ApprovalMode,
+  ToolConfirmationOutcome,
+  type ToolConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
@@ -406,6 +409,95 @@ describe('Task', () => {
         (call) => call[4] === true,
       );
       expect(finalCall).toBeUndefined();
+    });
+  });
+
+  describe('autoConfirm', () => {
+    it('should auto-approve tools when autoConfirm is true', async () => {
+      const mockConfig = createMockConfig();
+      // The Task constructor is private. We'll bypass it for this unit test.
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-1',
+        'context-1',
+        mockConfig as Config,
+        undefined,
+        true,
+      );
+      const mockOnConfirm = vi.fn();
+      const mockToolCall: ToolCall = {
+        request: { callId: 'tool-call-1', name: 'test-tool' },
+        status: 'awaiting_approval',
+        confirmationDetails: {
+          onConfirm: mockOnConfirm,
+        } as unknown as ToolConfirmationDetails,
+      };
+
+      // Access private method for testing
+      // @ts-expect-error - Calling private method for test purposes.
+      task._schedulerToolCallsUpdate([mockToolCall]);
+
+      expect(mockOnConfirm).toHaveBeenCalledWith(
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+    });
+
+    it('should NOT auto-approve tools when autoConfirm is false', async () => {
+      const mockConfig = createMockConfig();
+      // The Task constructor is private. We'll bypass it for this unit test.
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-1',
+        'context-1',
+        mockConfig as Config,
+        undefined,
+        false,
+      );
+      const mockOnConfirm = vi.fn();
+      const mockToolCall: ToolCall = {
+        request: { callId: 'tool-call-1', name: 'test-tool' },
+        status: 'awaiting_approval',
+        confirmationDetails: {
+          onConfirm: mockOnConfirm,
+        } as unknown as ToolConfirmationDetails,
+      };
+
+      // Access private method for testing
+      // @ts-expect-error - Calling private method for test purposes.
+      task._schedulerToolCallsUpdate([mockToolCall]);
+
+      expect(mockOnConfirm).not.toHaveBeenCalled();
+    });
+
+    it('should auto-approve tools when approvalMode is YOLO, regardless of autoConfirm', async () => {
+      const mockConfig = createMockConfig({
+        getApprovalMode: () => ApprovalMode.YOLO,
+      });
+      // The Task constructor is private. We'll bypass it for this unit test.
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-1',
+        'context-1',
+        mockConfig as Config,
+        undefined,
+        false,
+      );
+      const mockOnConfirm = vi.fn();
+      const mockToolCall: ToolCall = {
+        request: { callId: 'tool-call-1', name: 'test-tool' },
+        status: 'awaiting_approval',
+        confirmationDetails: {
+          onConfirm: mockOnConfirm,
+        } as unknown as ToolConfirmationDetails,
+      };
+
+      // Access private method for testing
+      // @ts-expect-error - Calling private method for test purposes.
+      task._schedulerToolCallsUpdate([mockToolCall]);
+
+      expect(mockOnConfirm).toHaveBeenCalledWith(
+        ToolConfirmationOutcome.ProceedOnce,
+      );
     });
   });
 });

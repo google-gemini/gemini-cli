@@ -25,18 +25,6 @@ Here's how it works:
     `packages/cli/src/zed-integration/zedIntegration.ts` which checks if
     `isInFallbackMode()` is true.
 
-## Configuration
-
-Model routing is controlled by the `useModelRouter` setting in your
-`settings.json` file.
-
-- **`"experimental.useModelRouter": true` (Default):** Enables the model
-  routing/fallback feature.
-
-- **`"experimental.useModelRouter": false`:** Disables the model
-  routing/fallback feature. If a model fails, the CLI will not attempt to switch
-  to a fallback model.
-
 ### Model Selection Precedence
 
 The model used by Gemini CLI is determined by the following order of precedence:
@@ -50,7 +38,4 @@ The model used by Gemini CLI is determined by the following order of precedence:
     model specified in the `model.name` property of your `settings.json` file
     will be used.
 4.  **Default Model:** If none of the above are set, the default model will be
-    used. The default model is determined by the `useModelRouter` setting:
-    - If `useModelRouter` is `true`, the default model is `"auto"`.
-    - If `useModelRouter` is `false`, the default model is the standard Gemini
-      model.
+    used. The default model is `auto`
