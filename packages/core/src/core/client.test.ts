@@ -1143,9 +1143,8 @@ ${JSON.stringify(
       // A string of length 400 is roughly 100 tokens.
       const longText = 'a'.repeat(400);
       const request: Part[] = [{ text: longText }];
-      const estimatedRequestTokenCount = Math.floor(
-        JSON.stringify(request).length / 4,
-      );
+      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
       const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
 
       // Mock tryCompressChat to not compress
@@ -1203,9 +1202,8 @@ ${JSON.stringify(
       // We need a request > 95 tokens.
       const longText = 'a'.repeat(400);
       const request: Part[] = [{ text: longText }];
-      const estimatedRequestTokenCount = Math.floor(
-        JSON.stringify(request).length / 4,
-      );
+      // estimateTextOnlyLength counts only text content (400 chars), not JSON structure
+      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
       const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
@@ -1234,6 +1232,66 @@ ${JSON.stringify(
       });
       expect(tokenLimit).toHaveBeenCalledWith(STICKY_MODEL);
       expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
+    it('should not trigger overflow warning for requests with large binary data (PDFs/images)', async () => {
+      // Arrange
+      const MOCKED_TOKEN_LIMIT = 1000000; // 1M tokens
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      const lastPromptTokenCount = 10000;
+      const mockChat: Partial<GeminiChat> = {
+        getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Simulate a PDF file with large base64 data (11MB when encoded)
+      // In the old implementation, this would incorrectly estimate ~2.7M tokens
+      // In the new implementation, only the text part is counted
+      const largePdfBase64 = 'A'.repeat(11 * 1024 * 1024);
+      const request: Part[] = [
+        { text: 'Please analyze this PDF document' }, // ~35 chars = ~8 tokens
+        {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: largePdfBase64, // This should be ignored in token estimation
+          },
+        },
+      ];
+
+      // Mock tryCompressChat to not compress
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Mock Turn.run to simulate successful processing
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Analysis complete' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      // Act
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'prompt-id-pdf-test',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      // Should NOT contain overflow warning
+      expect(events).not.toContainEqual(
+        expect.objectContaining({
+          type: GeminiEventType.ContextWindowWillOverflow,
+        }),
+      );
+
+      // Turn.run should be called (processing should continue)
+      expect(mockTurnRunFn).toHaveBeenCalled();
     });
 
     describe('Model Routing', () => {
