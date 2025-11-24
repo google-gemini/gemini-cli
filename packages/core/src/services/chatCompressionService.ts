@@ -9,11 +9,27 @@ import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
 import { tokenLimit } from '../core/tokenLimits.js';
-import { getCompressionPrompt } from '../core/prompts.js';
+import { getChatCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
 import { makeChatCompressionEvent } from '../telemetry/types.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
+
+export interface CompressionOptions {
+  userGoal?: string;
+  preserveStrategy?: 'percentage' | 'since-last-prompt';
+  preserveThreshold?: number;
+}
+
+/**
+ * Extracts the discarded context summary from the XML response
+ */
+function extractDiscardedContextSummary(text: string): string | undefined {
+  const match = text.match(
+    /<discarded_context_summary>\s*([\s\S]*?)\s*<\/discarded_context_summary>/,
+  );
+  return match ? match[1].trim() : undefined;
+}
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -180,6 +196,7 @@ export class ChatCompressionService {
     model: string,
     config: Config,
     hasFailedCompressionAttempt: boolean,
+    options?: CompressionOptions,
   ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
     const curatedHistory = chat.getHistory(true);
 
@@ -217,13 +234,55 @@ export class ChatCompressionService {
       }
     }
 
-    const splitPoint = findCompressSplitPoint(
-      curatedHistory,
-      1 - COMPRESSION_PRESERVE_THRESHOLD,
-    );
+    // Determine split strategy
+    const preserveStrategy = options?.preserveStrategy ?? 'percentage';
+    const userGoal = options?.userGoal;
 
-    const historyToCompress = curatedHistory.slice(0, splitPoint);
-    const historyToKeep = curatedHistory.slice(splitPoint);
+    let historyToCompress: Content[];
+    let historyToKeep: Content[];
+    let messagesPreserved: number | undefined;
+    let messagesCompressed: number | undefined;
+
+    if (preserveStrategy === 'since-last-prompt') {
+      const splitResult = findCompressSplitPoint(curatedHistory, {
+        strategy: 'since-last-prompt',
+        minMessagesToCompress: 5,
+      });
+
+      if (!splitResult || typeof splitResult === 'number') {
+        // Fall back to percentage if split not possible
+        const splitPoint = findCompressSplitPoint(
+          curatedHistory,
+          1 - COMPRESSION_PRESERVE_THRESHOLD,
+        );
+        historyToCompress = curatedHistory.slice(
+          0,
+          typeof splitPoint === 'number' ? splitPoint : 0,
+        );
+        historyToKeep = curatedHistory.slice(
+          typeof splitPoint === 'number' ? splitPoint : 0,
+        );
+      } else {
+        historyToCompress = splitResult.historyToCompress;
+        historyToKeep = splitResult.historyToKeep;
+      }
+    } else {
+      // percentage strategy
+      const splitPoint = findCompressSplitPoint(
+        curatedHistory,
+        1 - (options?.preserveThreshold ?? COMPRESSION_PRESERVE_THRESHOLD),
+      );
+      historyToCompress = curatedHistory.slice(
+        0,
+        typeof splitPoint === 'number' ? splitPoint : 0,
+      );
+      historyToKeep = curatedHistory.slice(
+        typeof splitPoint === 'number' ? splitPoint : 0,
+      );
+    }
+
+    messagesPreserved = historyToKeep.length;
+    messagesCompressed = historyToCompress.length;
 
     if (historyToCompress.length === 0) {
       return {
@@ -251,12 +310,15 @@ export class ChatCompressionService {
           },
         ],
         config: {
-          systemInstruction: { text: getCompressionPrompt() },
+          systemInstruction: { text: getChatCompressionPrompt(userGoal) },
         },
       },
       promptId,
     );
     const summary = getResponseText(summaryResponse) ?? '';
+
+    // Extract discarded context summary from XML
+    const discardedContextSummary = extractDiscardedContextSummary(summary);
 
     const extraHistory: Content[] = [
       {
@@ -297,6 +359,10 @@ export class ChatCompressionService {
           newTokenCount,
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+          messagesPreserved,
+          messagesCompressed,
+          goalWasSelected: !!userGoal,
+          discardedContextSummary,
         },
       };
     } else {
@@ -306,6 +372,10 @@ export class ChatCompressionService {
           originalTokenCount,
           newTokenCount,
           compressionStatus: CompressionStatus.COMPRESSED,
+          messagesPreserved,
+          messagesCompressed,
+          goalWasSelected: !!userGoal,
+          discardedContextSummary,
         },
       };
     }

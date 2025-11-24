@@ -369,4 +369,141 @@ describe('ChatCompressionService', () => {
     );
     expect(result.newHistory).toBeNull();
   });
+
+  describe('compress with new options', () => {
+    it('should accept userGoal and preserveStrategy options', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg1' }] },
+        { role: 'model', parts: [{ text: 'msg2' }] },
+        { role: 'user', parts: [{ text: 'msg3' }] },
+        { role: 'model', parts: [{ text: 'msg4' }] },
+        { role: 'user', parts: [{ text: 'msg5' }] },
+        { role: 'model', parts: [{ text: 'msg6' }] },
+        { role: 'user', parts: [{ text: 'msg7' }] },
+        { role: 'model', parts: [{ text: 'msg8' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Summary with goal' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+      vi.mocked(mockConfig.getContentGenerator).mockReturnValue({
+        generateContent: mockGenerateContent,
+      } as unknown as ContentGenerator);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+        {
+          userGoal: 'Implementing auth',
+          preserveStrategy: 'since-last-prompt',
+        },
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      expect(result.newHistory).not.toBeNull();
+      expect(result.info.goalWasSelected).toBe(true);
+      expect(mockGenerateContent).toHaveBeenCalled();
+    });
+
+    it('should use since-last-prompt split when specified', async () => {
+      const history: Content[] = Array.from({ length: 50 }, (_, i) => ({
+        role: i % 2 === 0 ? ('user' as const) : ('model' as const),
+        parts: [{ text: `msg ${i + 1}` }],
+      }));
+
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(1000);
+      vi.mocked(tokenLimit).mockReturnValue(2000);
+
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Summary' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+      vi.mocked(mockConfig.getContentGenerator).mockReturnValue({
+        generateContent: mockGenerateContent,
+      } as unknown as ContentGenerator);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        false,
+        mockModel,
+        mockConfig,
+        false,
+        {
+          preserveStrategy: 'since-last-prompt',
+        },
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      // Should preserve fewer messages than percentage strategy (which would keep 30% = 15 messages)
+      expect(result.info.messagesPreserved).toBeLessThan(15);
+      expect(result.info.messagesPreserved).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should extract discarded context summary from XML', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg1' }] },
+        { role: 'model', parts: [{ text: 'msg2' }] },
+        { role: 'user', parts: [{ text: 'msg3' }] },
+        { role: 'model', parts: [{ text: 'msg4' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      const mockResponse = `
+        <state_snapshot>
+          <current_goal>Testing</current_goal>
+          <discarded_context_summary>
+            Omitted earlier discussion about database setup
+          </discarded_context_summary>
+        </state_snapshot>
+      `;
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: mockResponse }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
+      vi.mocked(mockConfig.getContentGenerator).mockReturnValue({
+        generateContent: mockGenerateContent,
+      } as unknown as ContentGenerator);
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      expect(result.info.discardedContextSummary).toContain(
+        'Omitted earlier discussion about database setup',
+      );
+    });
+  });
 });
