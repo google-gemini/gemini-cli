@@ -21,7 +21,8 @@ export type ClientMetadataIdeType =
   | 'INTELLIJ'
   | 'VSCODE_CLOUD_WORKSTATION'
   | 'INTELLIJ_CLOUD_WORKSTATION'
-  | 'CLOUD_SHELL';
+  | 'CLOUD_SHELL'
+  | 'GEMINI_CLI';
 export type ClientMetadataPlatform =
   | 'PLATFORM_UNSPECIFIED'
   | 'DARWIN_AMD64'
@@ -57,8 +58,8 @@ export interface LoadCodeAssistResponse {
  */
 export interface GeminiUserTier {
   id: UserTierId;
-  name: string;
-  description: string;
+  name?: string;
+  description?: string;
   // This value is used to declare whether a given tier requires the user to configure the project setting on the IDE settings or not.
   userDefinedCloudaicompanionProject?: boolean | null;
   isDefault?: boolean;
@@ -182,4 +183,20 @@ export interface SetCodeAssistGlobalUserSettingRequest {
 export interface CodeAssistGlobalUserSettingResponse {
   cloudaicompanionProject?: string;
   freeTierDataCollectionOptin: boolean;
+}
+
+/**
+ * Relevant fields that can be returned from a Google RPC response
+ */
+export interface GoogleRpcResponse {
+  error?: {
+    details?: GoogleRpcErrorInfo[];
+  };
+}
+
+/**
+ * Relevant fields that can be returned in the details of an error returned from GoogleRPCs
+ */
+interface GoogleRpcErrorInfo {
+  reason?: string;
 }

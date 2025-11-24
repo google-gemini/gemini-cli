@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "jsx": "react-jsx",
-    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "types": ["node", "vitest/globals"]
   },
   "include": [
@@ -13,12 +13,6 @@
     "src/**/*.json",
     "./package.json"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/test-utils"
-  ],
+  "exclude": ["node_modules", "dist"],
   "references": [{ "path": "../core" }]
 }

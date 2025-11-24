@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { copyCommand } from './copyCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -227,7 +228,7 @@ describe('copyCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content: `Failed to copy to the clipboard. ${clipboardError.message}`,
     });
   });
 
@@ -242,14 +243,15 @@ describe('copyCommand', () => {
     ];
 
     mockGetHistory.mockReturnValue(historyWithAiMessage);
-    mockCopyToClipboard.mockRejectedValue('String error');
+    const rejectedValue = 'String error';
+    mockCopyToClipboard.mockRejectedValue(rejectedValue);
 
     const result = await copyCommand.action(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content: `Failed to copy to the clipboard. ${rejectedValue}`,
     });
   });
 

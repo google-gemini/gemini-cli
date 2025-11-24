@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MessageType, HistoryItemStats } from '../types.js';
+import type { HistoryItemStats } from '../types.js';
+import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   type CommandContext,
@@ -15,7 +16,7 @@ import {
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
-  description: 'check session stats. Usage: /stats [model|tools]',
+  description: 'Check session stats. Usage: /stats [model|tools]',
   kind: CommandKind.BUILT_IN,
   action: (context: CommandContext) => {
     const now = new Date();
@@ -42,7 +43,7 @@ export const statsCommand: SlashCommand = {
   subCommands: [
     {
       name: 'model',
-      description: 'Show model-specific usage statistics.',
+      description: 'Show model-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       action: (context: CommandContext) => {
         context.ui.addItem(
@@ -55,7 +56,7 @@ export const statsCommand: SlashCommand = {
     },
     {
       name: 'tools',
-      description: 'Show tool-specific usage statistics.',
+      description: 'Show tool-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       action: (context: CommandContext) => {
         context.ui.addItem(

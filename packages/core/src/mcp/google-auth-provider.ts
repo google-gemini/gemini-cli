@@ -4,18 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import {
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import type {
   OAuthClientInformation,
   OAuthClientInformationFull,
   OAuthClientMetadata,
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { GoogleAuth } from 'google-auth-library';
-import { MCPServerConfig } from '../config/config.js';
+import type { MCPServerConfig } from '../config/config.js';
+import { FIVE_MIN_BUFFER_MS } from './oauth-utils.js';
+import { coreEvents } from '../utils/events.js';
+
+const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
 
 export class GoogleCredentialProvider implements OAuthClientProvider {
   private readonly auth: GoogleAuth;
+  private cachedToken?: OAuthTokens;
+  private tokenExpiryTime?: number;
 
   // Properties required by OAuthClientProvider, with no-op values
   readonly redirectUrl = '';
@@ -29,6 +35,20 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
   private _clientInformation?: OAuthClientInformationFull;
 
   constructor(private readonly config?: MCPServerConfig) {
+    const url = this.config?.url || this.config?.httpUrl;
+    if (!url) {
+      throw new Error(
+        'URL must be provided in the config for Google Credentials provider',
+      );
+    }
+
+    const hostname = new URL(url).hostname;
+    if (!ALLOWED_HOSTS.some((pattern) => pattern.test(hostname))) {
+      throw new Error(
+        `Host "${hostname}" is not an allowed host for Google Credential provider.`,
+      );
+    }
+
     const scopes = this.config?.oauth?.scopes;
     if (!scopes || scopes.length === 0) {
       throw new Error(
@@ -49,19 +69,42 @@ export class GoogleCredentialProvider implements OAuthClientProvider {
   }
 
   async tokens(): Promise<OAuthTokens | undefined> {
+    // check for a valid, non-expired cached token.
+    if (
+      this.cachedToken &&
+      this.tokenExpiryTime &&
+      Date.now() < this.tokenExpiryTime - FIVE_MIN_BUFFER_MS
+    ) {
+      return this.cachedToken;
+    }
+
+    // Clear invalid/expired cache.
+    this.cachedToken = undefined;
+    this.tokenExpiryTime = undefined;
+
     const client = await this.auth.getClient();
     const accessTokenResponse = await client.getAccessToken();
 
     if (!accessTokenResponse.token) {
-      console.error('Failed to get access token from Google ADC');
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to get access token from Google ADC',
+      );
       return undefined;
     }
 
-    const tokens: OAuthTokens = {
+    const newToken: OAuthTokens = {
       access_token: accessTokenResponse.token,
       token_type: 'Bearer',
     };
-    return tokens;
+
+    const expiryTime = client.credentials?.expiry_date;
+    if (expiryTime) {
+      this.tokenExpiryTime = expiryTime;
+      this.cachedToken = newToken;
+    }
+
+    return newToken;
   }
 
   saveTokens(_tokens: OAuthTokens): void {

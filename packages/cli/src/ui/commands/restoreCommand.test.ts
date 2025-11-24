@@ -5,13 +5,17 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { restoreCommand } from './restoreCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { Config, GitService } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  type Config,
+  type GitService,
+} from '@google/gemini-cli-core';
 
 describe('restoreCommand', () => {
   let mockContext: CommandContext;
@@ -26,7 +30,7 @@ describe('restoreCommand', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'restore-command-test-'),
     );
-    geminiTempDir = path.join(testRootDir, '.gemini');
+    geminiTempDir = path.join(testRootDir, GEMINI_DIR);
     checkpointsDir = path.join(geminiTempDir, 'checkpoints');
     // The command itself creates this, but for tests it's easier to have it ready.
     // Some tests might remove it to test error paths.
@@ -39,7 +43,10 @@ describe('restoreCommand', () => {
 
     mockConfig = {
       getCheckpointingEnabled: vi.fn().mockReturnValue(true),
-      getProjectTempDir: vi.fn().mockReturnValue(geminiTempDir),
+      storage: {
+        getProjectTempCheckpointsDir: vi.fn().mockReturnValue(checkpointsDir),
+        getProjectTempDir: vi.fn().mockReturnValue(geminiTempDir),
+      },
       getGeminiClient: vi.fn().mockReturnValue({
         setHistory: mockSetHistory,
       }),
@@ -77,7 +84,9 @@ describe('restoreCommand', () => {
 
   describe('action', () => {
     it('should return an error if temp dir is not found', async () => {
-      vi.mocked(mockConfig.getProjectTempDir).mockReturnValue('');
+      vi.mocked(
+        mockConfig.storage.getProjectTempCheckpointsDir,
+      ).mockReturnValue('');
 
       expect(
         await restoreCommand(mockConfig)?.action?.(mockContext, ''),
@@ -219,7 +228,7 @@ describe('restoreCommand', () => {
 
   describe('completion', () => {
     it('should return an empty array if temp dir is not found', async () => {
-      vi.mocked(mockConfig.getProjectTempDir).mockReturnValue('');
+      vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue('');
       const command = restoreCommand(mockConfig);
 
       expect(await command?.completion?.(mockContext, '')).toEqual([]);

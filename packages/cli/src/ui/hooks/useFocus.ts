@@ -6,14 +6,15 @@
 
 import { useStdin, useStdout } from 'ink';
 import { useEffect, useState } from 'react';
+import { useKeypress } from './useKeypress.js';
 
 // ANSI escape codes to enable/disable terminal focus reporting
-const ENABLE_FOCUS_REPORTING = '\x1b[?1004h';
-const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
+export const ENABLE_FOCUS_REPORTING = '\x1b[?1004h';
+export const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
 
 // ANSI escape codes for focus events
-const FOCUS_IN = '\x1b[I';
-const FOCUS_OUT = '\x1b[O';
+export const FOCUS_IN = '\x1b[I';
+export const FOCUS_OUT = '\x1b[O';
 
 export const useFocus = () => {
   const { stdin } = useStdin();
@@ -43,6 +44,19 @@ export const useFocus = () => {
       stdin?.removeListener('data', handleData);
     };
   }, [stdin, stdout]);
+
+  useKeypress(
+    (_) => {
+      if (!isFocused) {
+        // If the user has typed a key, and we cannot possibly be focused out.
+        // This is a workaround for some tmux use cases. It is still useful to
+        // listen for the true FOCUS_IN event as well as that will update the
+        // focus state earlier than waiting for a keypress.
+        setIsFocused(true);
+      }
+    },
+    { isActive: true },
+  );
 
   return isFocused;
 };

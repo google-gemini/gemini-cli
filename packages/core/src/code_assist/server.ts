@@ -4,16 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client } from 'google-auth-library';
-import {
+import type { AuthClient } from 'google-auth-library';
+import type {
   CodeAssistGlobalUserSettingResponse,
+  GoogleRpcResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
   LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
 } from './types.js';
-import {
+import type {
+  ListExperimentsRequest,
+  ListExperimentsResponse,
+} from './experiments/types.js';
+import type {
   CountTokensParameters,
   CountTokensResponse,
   EmbedContentParameters,
@@ -21,12 +27,14 @@ import {
   GenerateContentParameters,
   GenerateContentResponse,
 } from '@google/genai';
-import * as readline from 'readline';
-import { ContentGenerator } from '../core/contentGenerator.js';
+import * as readline from 'node:readline';
+import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
-import {
+import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
+} from './converter.js';
+import {
   fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,
@@ -44,7 +52,7 @@ export const CODE_ASSIST_API_VERSION = 'v1internal';
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
-    readonly client: OAuth2Client,
+    readonly client: AuthClient,
     readonly projectId?: string,
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
@@ -53,10 +61,16 @@ export class CodeAssistServer implements ContentGenerator {
 
   async generateContentStream(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
       'streamGenerateContent',
-      toGenerateContentRequest(req, this.projectId, this.sessionId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return (async function* (): AsyncGenerator<GenerateContentResponse> {
@@ -68,10 +82,16 @@ export class CodeAssistServer implements ContentGenerator {
 
   async generateContent(
     req: GenerateContentParameters,
+    userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const resp = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
-      toGenerateContentRequest(req, this.projectId, this.sessionId),
+      toGenerateContentRequest(
+        req,
+        userPromptId,
+        this.projectId,
+        this.sessionId,
+      ),
       req.config?.abortSignal,
     );
     return fromGenerateContentResponse(resp);
@@ -89,10 +109,20 @@ export class CodeAssistServer implements ContentGenerator {
   async loadCodeAssist(
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
-    return await this.requestPost<LoadCodeAssistResponse>(
-      'loadCodeAssist',
-      req,
-    );
+    try {
+      return await this.requestPost<LoadCodeAssistResponse>(
+        'loadCodeAssist',
+        req,
+      );
+    } catch (e) {
+      if (isVpcScAffectedUser(e)) {
+        return {
+          currentTier: { id: UserTierId.STANDARD },
+        };
+      } else {
+        throw e;
+      }
+    }
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
@@ -122,6 +152,23 @@ export class CodeAssistServer implements ContentGenerator {
     _req: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
     throw Error();
+  }
+
+  async listExperiments(
+    metadata: ClientMetadata,
+  ): Promise<ListExperimentsResponse> {
+    if (!this.projectId) {
+      throw new Error('projectId is not defined for CodeAssistServer.');
+    }
+    const projectId = this.projectId;
+    const req: ListExperimentsRequest = {
+      project: projectId,
+      metadata: { ...metadata, duetProject: projectId },
+    };
+    return await this.requestPost<ListExperimentsResponse>(
+      'listExperiments',
+      req,
+    );
   }
 
   async requestPost<T>(
@@ -185,24 +232,42 @@ export class CodeAssistServer implements ContentGenerator {
 
       let bufferedLines: string[] = [];
       for await (const line of rl) {
-        // blank lines are used to separate JSON objects in the stream
-        if (line === '') {
+        if (line.startsWith('data: ')) {
+          bufferedLines.push(line.slice(6).trim());
+        } else if (line === '') {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
           yield JSON.parse(bufferedLines.join('\n')) as T;
           bufferedLines = []; // Reset the buffer after yielding
-        } else if (line.startsWith('data: ')) {
-          bufferedLines.push(line.slice(6).trim());
-        } else {
-          throw new Error(`Unexpected line format in response: ${line}`);
         }
+        // Ignore other lines like comments or id fields
       }
     })();
   }
 
   getMethodUrl(method: string): string {
-    const endpoint = process.env.CODE_ASSIST_ENDPOINT ?? CODE_ASSIST_ENDPOINT;
+    const endpoint =
+      process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
     return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
   }
+}
+
+function isVpcScAffectedUser(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const gaxiosError = error as {
+      response?: {
+        data?: unknown;
+      };
+    };
+    const response = gaxiosError.response?.data as
+      | GoogleRpcResponse
+      | undefined;
+    if (Array.isArray(response?.error?.details)) {
+      return response.error.details.some(
+        (detail) => detail.reason === 'SECURITY_POLICY_VIOLATED',
+      );
+    }
+  }
+  return false;
 }

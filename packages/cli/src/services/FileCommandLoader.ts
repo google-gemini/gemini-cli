@@ -4,40 +4,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import {
-  Config,
-  getProjectCommandsDir,
-  getUserCommandsDir,
-} from '@google/gemini-cli-core';
-import { ICommandLoader } from './types.js';
-import {
+import type { Config } from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
+import type { ICommandLoader } from './types.js';
+import type {
   CommandContext,
-  CommandKind,
   SlashCommand,
   SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import {
-  DefaultArgumentProcessor,
-  ShorthandArgumentProcessor,
-} from './prompt-processors/argumentProcessor.js';
-import {
+import { CommandKind } from '../ui/commands/types.js';
+import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
+import type {
   IPromptProcessor,
+  PromptPipelineContent,
+} from './prompt-processors/types.js';
+import {
   SHORTHAND_ARGS_PLACEHOLDER,
   SHELL_INJECTION_TRIGGER,
+  AT_FILE_INJECTION_TRIGGER,
 } from './prompt-processors/types.js';
 import {
   ConfirmationRequiredError,
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
+import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 
 interface CommandDirectory {
   path: string;
   extensionName?: string;
+  extensionId?: string;
 }
 
 /**
@@ -64,8 +64,12 @@ const TomlCommandDefSchema = z.object({
  */
 export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
+  private readonly folderTrustEnabled: boolean;
+  private readonly isTrustedFolder: boolean;
 
   constructor(private readonly config: Config | null) {
+    this.folderTrustEnabled = !!config?.getFolderTrust();
+    this.isTrustedFolder = !!config?.isTrustedFolder();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
   }
 
@@ -81,6 +85,10 @@ export class FileCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of all loaded SlashCommands.
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
+    if (this.folderTrustEnabled && !this.isTrustedFolder) {
+      return [];
+    }
+
     const allCommands: SlashCommand[] = [];
     const globOptions = {
       nodir: true,
@@ -103,6 +111,7 @@ export class FileCommandLoader implements ICommandLoader {
             path.join(dirInfo.path, file),
             dirInfo.path,
             dirInfo.extensionName,
+            dirInfo.extensionId,
           ),
         );
 
@@ -113,7 +122,10 @@ export class FileCommandLoader implements ICommandLoader {
         // Add all commands without deduplication
         allCommands.push(...commands);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        if (
+          !signal.aborted &&
+          (error as { code?: string })?.code !== 'ENOENT'
+        ) {
           console.error(
             `[FileCommandLoader] Error loading commands from ${dirInfo.path}:`,
             error,
@@ -133,11 +145,13 @@ export class FileCommandLoader implements ICommandLoader {
   private getCommandDirectories(): CommandDirectory[] {
     const dirs: CommandDirectory[] = [];
 
+    const storage = this.config?.storage ?? new Storage(this.projectRoot);
+
     // 1. User commands
-    dirs.push({ path: getUserCommandsDir() });
+    dirs.push({ path: Storage.getUserCommandsDir() });
 
     // 2. Project commands (override user commands)
-    dirs.push({ path: getProjectCommandsDir(this.projectRoot) });
+    dirs.push({ path: storage.getProjectCommandsDir() });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
@@ -149,6 +163,7 @@ export class FileCommandLoader implements ICommandLoader {
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
         extensionName: ext.name,
+        extensionId: ext.id,
       }));
 
       dirs.push(...extensionCommandDirs);
@@ -168,6 +183,7 @@ export class FileCommandLoader implements ICommandLoader {
     filePath: string,
     baseDir: string,
     extensionName?: string,
+    extensionId?: string,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -224,16 +240,30 @@ export class FileCommandLoader implements ICommandLoader {
     }
 
     const processors: IPromptProcessor[] = [];
+    const usesArgs = validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER);
+    const usesShellInjection = validDef.prompt.includes(
+      SHELL_INJECTION_TRIGGER,
+    );
+    const usesAtFileInjection = validDef.prompt.includes(
+      AT_FILE_INJECTION_TRIGGER,
+    );
 
-    // Add the Shell Processor if needed.
-    if (validDef.prompt.includes(SHELL_INJECTION_TRIGGER)) {
+    // 1. @-File Injection (Security First).
+    // This runs first to ensure we're not executing shell commands that
+    // could dynamically generate malicious @-paths.
+    if (usesAtFileInjection) {
+      processors.push(new AtFileProcessor(baseCommandName));
+    }
+
+    // 2. Argument and Shell Injection.
+    // This runs after file content has been safely injected.
+    if (usesShellInjection || usesArgs) {
       processors.push(new ShellProcessor(baseCommandName));
     }
 
-    // The presence of '{{args}}' is the switch that determines the behavior.
-    if (validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER)) {
-      processors.push(new ShorthandArgumentProcessor());
-    } else {
+    // 3. Default Argument Handling.
+    // Appends the raw invocation if no explicit {{args}} are used.
+    if (!usesArgs) {
       processors.push(new DefaultArgumentProcessor());
     }
 
@@ -242,6 +272,7 @@ export class FileCommandLoader implements ICommandLoader {
       description,
       kind: CommandKind.FILE,
       extensionName,
+      extensionId,
       action: async (
         context: CommandContext,
         _args: string,
@@ -252,19 +283,24 @@ export class FileCommandLoader implements ICommandLoader {
           );
           return {
             type: 'submit_prompt',
-            content: validDef.prompt, // Fallback to unprocessed prompt
+            content: [{ text: validDef.prompt }], // Fallback to unprocessed prompt
           };
         }
 
         try {
-          let processedPrompt = validDef.prompt;
+          let processedContent: PromptPipelineContent = [
+            { text: validDef.prompt },
+          ];
           for (const processor of processors) {
-            processedPrompt = await processor.process(processedPrompt, context);
+            processedContent = await processor.process(
+              processedContent,
+              context,
+            );
           }
 
           return {
             type: 'submit_prompt',
-            content: processedPrompt,
+            content: processedContent,
           };
         } catch (e) {
           // Check if it's our specific error type

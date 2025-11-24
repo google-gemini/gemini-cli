@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Text } from 'ink';
-import { Colors } from '../colors.js';
+import type React from 'react';
+import { Box, Text } from 'ink';
+import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 interface ContextSummaryDisplayProps {
   geminiMdFileCount: number;
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
-  showToolDescriptions?: boolean;
   ideContext?: IdeContext;
 }
 
@@ -23,9 +24,10 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   contextFileNames,
   mcpServers,
   blockedMcpServers,
-  showToolDescriptions,
   ideContext,
 }) => {
+  const { columns: terminalWidth } = useTerminalSize();
+  const isNarrow = isNarrowWidth(terminalWidth);
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
   const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
@@ -45,7 +47,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     return `${openFileCount} open file${
       openFileCount > 1 ? 's' : ''
-    } (ctrl+e to view)`;
+    } (ctrl+g to view)`;
   })();
 
   const geminiMdText = (() => {
@@ -81,27 +83,26 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     return parts.join(', ');
   })();
 
-  let summaryText = 'Using: ';
-  const summaryParts = [];
-  if (openFilesText) {
-    summaryParts.push(openFilesText);
-  }
-  if (geminiMdText) {
-    summaryParts.push(geminiMdText);
-  }
-  if (mcpText) {
-    summaryParts.push(mcpText);
-  }
-  summaryText += summaryParts.join(' | ');
+  const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);
 
-  // Add ctrl+t hint when MCP servers are available
-  if (mcpServers && Object.keys(mcpServers).length > 0) {
-    if (showToolDescriptions) {
-      summaryText += ' (ctrl+t to toggle)';
-    } else {
-      summaryText += ' (ctrl+t to view)';
-    }
+  if (isNarrow) {
+    return (
+      <Box flexDirection="column" paddingX={1}>
+        <Text color={theme.text.secondary}>Using:</Text>
+        {summaryParts.map((part, index) => (
+          <Text key={index} color={theme.text.secondary}>
+            {'  '}- {part}
+          </Text>
+        ))}
+      </Box>
+    );
   }
 
-  return <Text color={Colors.Gray}>{summaryText}</Text>;
+  return (
+    <Box paddingX={1}>
+      <Text color={theme.text.secondary}>
+        Using: {summaryParts.join(' | ')}
+      </Text>
+    </Box>
+  );
 };

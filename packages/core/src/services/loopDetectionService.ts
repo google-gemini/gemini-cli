@@ -4,17 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createHash } from 'crypto';
-import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
-import { logLoopDetected } from '../telemetry/loggers.js';
-import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
-import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
-import { SchemaUnion, Type } from '@google/genai';
+import type { Content } from '@google/genai';
+import { createHash } from 'node:crypto';
+import type { ServerGeminiStreamEvent } from '../core/turn.js';
+import { GeminiEventType } from '../core/turn.js';
+import {
+  logLoopDetected,
+  logLoopDetectionDisabled,
+  logLlmLoopCheck,
+} from '../telemetry/loggers.js';
+import {
+  LoopDetectedEvent,
+  LoopDetectionDisabledEvent,
+  LoopType,
+  LlmLoopCheckEvent,
+} from '../telemetry/types.js';
+import type { Config } from '../config/config.js';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../utils/messageInspectors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
-const MAX_HISTORY_LENGTH = 1000;
+const MAX_HISTORY_LENGTH = 5000;
 
 /**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
@@ -45,6 +60,40 @@ const MIN_LLM_CHECK_INTERVAL = 5;
 const MAX_LLM_CHECK_INTERVAL = 15;
 
 /**
+ * The confidence threshold above which the LLM is considered to have detected a loop.
+ */
+const LLM_CONFIDENCE_THRESHOLD = 0.9;
+const DOUBLE_CHECK_MODEL_ALIAS = 'loop-detection-double-check';
+
+const LOOP_DETECTION_SYSTEM_PROMPT = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+
+An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
+
+Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
+
+Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
+
+Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
+For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.`;
+
+const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    unproductive_state_analysis: {
+      type: 'string',
+      description:
+        'Your reasoning on if the conversation is looping without forward progress.',
+    },
+    unproductive_state_confidence: {
+      type: 'number',
+      description:
+        'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
+    },
+  },
+  required: ['unproductive_state_analysis', 'unproductive_state_confidence'],
+};
+
+/**
  * Service for detecting and preventing infinite loops in AI responses.
  * Monitors tool call repetitions and content sentence repetitions.
  */
@@ -61,14 +110,29 @@ export class LoopDetectionService {
   private contentStats = new Map<string, number[]>();
   private lastContentIndex = 0;
   private loopDetected = false;
+  private inCodeBlock = false;
 
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
   private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
   private lastCheckTurn = 0;
 
+  // Session-level disable flag
+  private disabledForSession = false;
+
   constructor(config: Config) {
     this.config = config;
+  }
+
+  /**
+   * Disables loop detection for the current session.
+   */
+  disableForSession(): void {
+    this.disabledForSession = true;
+    logLoopDetectionDisabled(
+      this.config,
+      new LoopDetectionDisabledEvent(this.promptId),
+    );
   }
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
@@ -83,8 +147,12 @@ export class LoopDetectionService {
    * @returns true if a loop is detected, false otherwise
    */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
+    if (this.disabledForSession) {
+      return false;
+    }
+
     if (this.loopDetected) {
-      return true;
+      return this.loopDetected;
     }
 
     switch (event.type) {
@@ -114,6 +182,9 @@ export class LoopDetectionService {
    * @returns A promise that resolves to `true` if a loop is detected, and `false` otherwise.
    */
   async turnStarted(signal: AbortSignal) {
+    if (this.disabledForSession) {
+      return false;
+    }
     this.turnsInCurrentPrompt++;
 
     if (
@@ -156,8 +227,41 @@ export class LoopDetectionService {
    * 2. Truncating history if it exceeds the maximum length
    * 3. Analyzing content chunks for repetitive patterns using hashing
    * 4. Detecting loops when identical chunks appear frequently within a short distance
+   * 5. Disabling loop detection within code blocks to prevent false positives,
+   *    as repetitive code structures are common and not necessarily loops.
    */
   private checkContentLoop(content: string): boolean {
+    // Different content elements can often contain repetitive syntax that is not indicative of a loop.
+    // To avoid false positives, we detect when we encounter different content types and
+    // reset tracking to avoid analyzing content that spans across different element boundaries.
+    const numFences = (content.match(/```/g) ?? []).length;
+    const hasTable = /(^|\n)\s*(\|.*\||[|+-]{3,})/.test(content);
+    const hasListItem =
+      /(^|\n)\s*[*-+]\s/.test(content) || /(^|\n)\s*\d+\.\s/.test(content);
+    const hasHeading = /(^|\n)#+\s/.test(content);
+    const hasBlockquote = /(^|\n)>\s/.test(content);
+    const isDivider = /^[+-_=*\u2500-\u257F]+$/.test(content);
+
+    if (
+      numFences ||
+      hasTable ||
+      hasListItem ||
+      hasHeading ||
+      hasBlockquote ||
+      isDivider
+    ) {
+      // Reset tracking when different content elements are detected to avoid analyzing content
+      // that spans across different element boundaries.
+      this.resetContentTracking();
+    }
+
+    const wasInCodeBlock = this.inCodeBlock;
+    this.inCodeBlock =
+      numFences % 2 === 0 ? this.inCodeBlock : !this.inCodeBlock;
+    if (wasInCodeBlock || this.inCodeBlock || isDivider) {
+      return false;
+    }
+
     this.streamContentHistory += content;
 
     this.truncateAndUpdate();
@@ -248,7 +352,7 @@ export class LoopDetectionService {
    * 2. Verify actual content matches to prevent hash collisions
    * 3. Track all positions where this chunk appears
    * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
-   *    within a small average distance (≤ 1.5 * chunk size)
+   *    within a small average distance (≤ 5 * chunk size)
    */
   private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
     const existingIndices = this.contentStats.get(hash);
@@ -273,7 +377,7 @@ export class LoopDetectionService {
     const totalDistance =
       recentIndices[recentIndices.length - 1] - recentIndices[0];
     const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
-    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 1.5;
+    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 5;
 
     return averageDistance <= maxAllowedDistance;
   }
@@ -293,74 +397,177 @@ export class LoopDetectionService {
     return originalChunk === currentChunk;
   }
 
+  private trimRecentHistory(recentHistory: Content[]): Content[] {
+    // A function response must be preceded by a function call.
+    // Continuously removes dangling function calls from the end of the history
+    // until the last turn is not a function call.
+    while (
+      recentHistory.length > 0 &&
+      isFunctionCall(recentHistory[recentHistory.length - 1])
+    ) {
+      recentHistory.pop();
+    }
+
+    // A function response should follow a function call.
+    // Continuously removes leading function responses from the beginning of history
+    // until the first turn is not a function response.
+    while (recentHistory.length > 0 && isFunctionResponse(recentHistory[0])) {
+      recentHistory.shift();
+    }
+
+    return recentHistory;
+  }
+
   private async checkForLoopWithLLM(signal: AbortSignal) {
     const recentHistory = this.config
       .getGeminiClient()
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
-    const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+    const trimmedHistory = this.trimRecentHistory(recentHistory);
 
-An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
+    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Provide your response in the requested JSON format.`;
 
-Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
-
-Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
-
-Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
-For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.
-
-Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state.`;
     const contents = [
-      ...recentHistory,
-      { role: 'user', parts: [{ text: prompt }] },
+      ...trimmedHistory,
+      { role: 'user', parts: [{ text: taskPrompt }] },
     ];
-    const schema: SchemaUnion = {
-      type: Type.OBJECT,
-      properties: {
-        reasoning: {
-          type: Type.STRING,
-          description:
-            'Your reasoning on if the conversation is looping without forward progress.',
-        },
-        confidence: {
-          type: Type.NUMBER,
-          description:
-            'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
-        },
-      },
-      required: ['reasoning', 'confidence'],
-    };
-    let result;
-    try {
-      result = await this.config
-        .getGeminiClient()
-        .generateJson(contents, schema, signal, DEFAULT_GEMINI_FLASH_MODEL);
-    } catch (e) {
-      // Do nothing, treat it as a non-loop.
-      this.config.getDebugMode() ? console.error(e) : console.debug(e);
+    if (contents.length > 0 && isFunctionCall(contents[0])) {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Recent conversation history:' }],
+      });
+    }
+
+    const flashResult = await this.queryLoopDetectionModel(
+      'loop-detection',
+      contents,
+      signal,
+    );
+
+    if (!flashResult) {
       return false;
     }
 
-    if (typeof result.confidence === 'number') {
-      if (result.confidence > 0.9) {
-        if (typeof result.reasoning === 'string' && result.reasoning) {
-          console.warn(result.reasoning);
-        }
-        logLoopDetected(
-          this.config,
-          new LoopDetectedEvent(LoopType.LLM_DETECTED_LOOP, this.promptId),
-        );
+    const flashConfidence = flashResult[
+      'unproductive_state_confidence'
+    ] as number;
+
+    const doubleCheckModelName =
+      this.config.modelConfigService.getResolvedConfig({
+        model: DOUBLE_CHECK_MODEL_ALIAS,
+      }).model;
+
+    if (flashConfidence < LLM_CONFIDENCE_THRESHOLD) {
+      logLlmLoopCheck(
+        this.config,
+        new LlmLoopCheckEvent(
+          this.promptId,
+          flashConfidence,
+          doubleCheckModelName,
+          -1,
+        ),
+      );
+      this.updateCheckInterval(flashConfidence);
+      return false;
+    }
+
+    if (this.config.isInFallbackMode()) {
+      const flashModelName = this.config.modelConfigService.getResolvedConfig({
+        model: 'loop-detection',
+      }).model;
+      this.handleConfirmedLoop(flashResult, flashModelName);
+      return true;
+    }
+
+    // Double check with configured model
+    const mainModelResult = await this.queryLoopDetectionModel(
+      DOUBLE_CHECK_MODEL_ALIAS,
+      contents,
+      signal,
+    );
+
+    const mainModelConfidence = mainModelResult
+      ? (mainModelResult['unproductive_state_confidence'] as number)
+      : 0;
+
+    logLlmLoopCheck(
+      this.config,
+      new LlmLoopCheckEvent(
+        this.promptId,
+        flashConfidence,
+        doubleCheckModelName,
+        mainModelConfidence,
+      ),
+    );
+
+    if (mainModelResult) {
+      if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
+        this.handleConfirmedLoop(mainModelResult, doubleCheckModelName);
         return true;
       } else {
-        this.llmCheckInterval = Math.round(
-          MIN_LLM_CHECK_INTERVAL +
-            (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result.confidence),
-        );
+        this.updateCheckInterval(mainModelConfidence);
       }
     }
+
     return false;
+  }
+
+  private async queryLoopDetectionModel(
+    model: string,
+    contents: Content[],
+    signal: AbortSignal,
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      const result = (await this.config.getBaseLlmClient().generateJson({
+        modelConfigKey: { model },
+        contents,
+        schema: LOOP_DETECTION_SCHEMA,
+        systemInstruction: LOOP_DETECTION_SYSTEM_PROMPT,
+        abortSignal: signal,
+        promptId: this.promptId,
+        maxAttempts: 2,
+      })) as Record<string, unknown>;
+
+      if (
+        result &&
+        typeof result['unproductive_state_confidence'] === 'number'
+      ) {
+        return result;
+      }
+      return null;
+    } catch (e) {
+      this.config.getDebugMode() ? debugLogger.warn(e) : debugLogger.debug(e);
+      return null;
+    }
+  }
+
+  private handleConfirmedLoop(
+    result: Record<string, unknown>,
+    modelName: string,
+  ): void {
+    if (
+      typeof result['unproductive_state_analysis'] === 'string' &&
+      result['unproductive_state_analysis']
+    ) {
+      debugLogger.warn(result['unproductive_state_analysis']);
+    }
+    logLoopDetected(
+      this.config,
+      new LoopDetectedEvent(
+        LoopType.LLM_DETECTED_LOOP,
+        this.promptId,
+        modelName,
+      ),
+    );
+  }
+
+  private updateCheckInterval(unproductive_state_confidence: number): void {
+    this.llmCheckInterval = Math.round(
+      MIN_LLM_CHECK_INTERVAL +
+        (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
+          (1 - unproductive_state_confidence),
+    );
   }
 
   /**
