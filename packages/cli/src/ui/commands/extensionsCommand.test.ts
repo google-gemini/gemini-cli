@@ -144,7 +144,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'No extensions installed. Run /extensions explore to check out the gallery',
+          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
         },
         expect.any(Number),
       );
@@ -238,7 +238,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'No extensions installed. Run /extensions explore to check out the gallery',
+          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
         },
         expect.any(Number),
       );
@@ -648,7 +648,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'No extensions installed. Run /extensions explore to check out the gallery',
+          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
         },
         expect.any(Number),
       );

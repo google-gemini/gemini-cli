@@ -32,7 +32,7 @@ function showMessageIfNoExtensions(
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: 'No extensions installed. Run /extensions explore to check out the gallery',
+        text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
       },
       Date.now(),
     );
