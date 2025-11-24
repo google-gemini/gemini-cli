@@ -46,8 +46,7 @@ export class DeliberateCompressionOrchestrator {
     isSafetyValve: boolean,
   ): Promise<DeliberateCompressionPrepareResult> {
     // Check if deliberate compression is enabled
-    const isEnabled =
-      (await config.getDeliberateCompressionEnabled?.()) ?? true;
+    const isEnabled = await config.getDeliberateCompressionEnabled();
 
     if (!isEnabled) {
       return {
@@ -70,7 +69,7 @@ export class DeliberateCompressionOrchestrator {
         model,
         promptId,
       );
-    } catch (error) {
+    } catch (_error) {
       // If extraction fails, fall back to basic compression
       return {
         shouldPromptUser: false,

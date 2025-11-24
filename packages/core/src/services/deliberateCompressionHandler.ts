@@ -59,8 +59,7 @@ export class DeliberateCompressionHandler {
     }
 
     // Check if auto-skip is enabled
-    const autoSkip =
-      (await config.getDeliberateCompressionAutoSkip?.()) ?? false;
+    const autoSkip = await config.getDeliberateCompressionAutoSkip();
     if (autoSkip) {
       return {
         shouldPrompt: false,
