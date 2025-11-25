@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import latestVersion from 'latest-version';
 import semver from 'semver';
 import { getPackageJson, debugLogger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -65,6 +64,7 @@ export async function checkForUpdates(
 
     const { name, version: currentVersion } = packageJson;
     const isNightly = currentVersion.includes('nightly');
+    const { default: latestVersion } = await import('latest-version');
 
     if (isNightly) {
       const [nightlyUpdate, latestUpdate] = await Promise.all([

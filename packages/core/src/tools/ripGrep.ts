@@ -8,7 +8,6 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
@@ -51,6 +50,7 @@ async function ensureRipgrepAvailable(): Promise<string | null> {
   if (!ripgrepAcquisitionPromise) {
     ripgrepAcquisitionPromise = (async () => {
       try {
+        const { downloadRipGrep } = await import('@joshua.litt/get-ripgrep');
         await downloadRipGrep(Storage.getGlobalBinDir());
         return await resolveExistingRgPath();
       } finally {
