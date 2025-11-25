@@ -216,15 +216,49 @@ describe('handleFallback', () => {
   describe('Preview Model Fallback Logic', () => {
     const previewModel = PREVIEW_GEMINI_MODEL;
 
-    it('should always set Preview Model bypass mode on failure', async () => {
-      await handleFallback(mockConfig, previewModel, AUTH_OAUTH);
+    it('should only set Preview Model bypass mode on retryable quota failure', async () => {
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const retryableQuotaError = new RetryableQuotaError(
+        'Capacity error',
+        mockGoogleApiError,
+        5,
+      );
+      await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        retryableQuotaError,
+      );
       expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
     });
 
-    it('should silently retry if Preview Model fallback mode is already active', async () => {
-      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(true);
+    it('should not set Preview Model bypass mode on non-retryable quota failure', async () => {
+      await handleFallback(mockConfig, previewModel, AUTH_OAUTH);
+      expect(mockConfig.setPreviewModelBypassMode).not.toHaveBeenCalled();
+    });
 
-      const result = await handleFallback(mockConfig, previewModel, AUTH_OAUTH);
+    it('should silently retry if Preview Model fallback mode is already active and error is retryable error', async () => {
+      vi.spyOn(mockConfig, 'isPreviewModelFallbackMode').mockReturnValue(true);
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const retryableQuotaError = new RetryableQuotaError(
+        'Capacity error',
+        mockGoogleApiError,
+        5,
+      );
+      const result = await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        retryableQuotaError,
+      );
 
       expect(result).toBe(true);
       expect(mockHandler).not.toHaveBeenCalled();
@@ -289,8 +323,9 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockConfig.setPreviewModelBypassMode).toHaveBeenCalledWith(true);
+      expect(mockConfig.setPreviewModelBypassMode).not.toHaveBeenCalled();
       expect(mockConfig.setPreviewModelFallbackMode).not.toHaveBeenCalled();
+      expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
     });
 
     it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails', async () => {

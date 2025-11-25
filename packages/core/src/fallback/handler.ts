@@ -39,8 +39,11 @@ export async function handleFallback(
   }
 
   // Preview Model Specific Logic
-  if (failedModel === PREVIEW_GEMINI_MODEL) {
-    // Always set bypass mode for the immediate retry.
+  if (
+    failedModel === PREVIEW_GEMINI_MODEL &&
+    error instanceof RetryableQuotaError
+  ) {
+    // Always set bypass mode for the immediate retry, for RetryableQuotaError.
     // This ensures the next attempt uses 2.5 Pro.
     config.setPreviewModelBypassMode(true);
 
