@@ -27,6 +27,8 @@ import {
   RetryableQuotaError,
   PREVIEW_GEMINI_MODEL,
   ModelNotFoundError,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -432,7 +434,7 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       await act(() => {
         promise = handler(
           PREVIEW_GEMINI_MODEL,
-          'gemini-flash',
+          DEFAULT_GEMINI_MODEL,
           new Error('preview model failed'),
         );
       });
@@ -447,7 +449,42 @@ To disable Gemini 3, disable "Preview features" in /settings.`,
       const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
       expect(lastCall.type).toBe(MessageType.INFO);
       expect(lastCall.text).toContain(
-        `Switched to fallback model gemini-flash. We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.`,
+        `Switched to fallback model gemini-2.5-pro. We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.`,
+      );
+    });
+
+    it('should show a special message when falling back from the preview model, but do not show periodical check message for flash model fallback', async () => {
+      const { result } = renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      let promise: Promise<FallbackIntent | null>;
+      await act(() => {
+        promise = handler(
+          PREVIEW_GEMINI_MODEL,
+          DEFAULT_GEMINI_FLASH_MODEL,
+          new Error('preview model failed'),
+        );
+      });
+
+      await act(() => {
+        result.current.handleProQuotaChoice('retry_always');
+      });
+
+      await promise!;
+
+      expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+      const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
+      expect(lastCall.type).toBe(MessageType.INFO);
+      expect(lastCall.text).toContain(
+        `Switched to fallback model gemini-2.5-flash.`,
       );
     });
   });

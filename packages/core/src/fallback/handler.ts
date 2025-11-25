@@ -17,6 +17,7 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -36,10 +37,12 @@ export async function handleFallback(
   ) {
     return null;
   }
-
+  const shouldActivatePreviewFallback =
+    failedModel === PREVIEW_GEMINI_MODEL &&
+    !(error instanceof TerminalQuotaError);
   // Preview Model Specific Logic
-  if (failedModel === PREVIEW_GEMINI_MODEL) {
-    // Always set bypass mode for the immediate retry.
+  if (shouldActivatePreviewFallback) {
+    // Always set bypass mode for the immediate retry, for non-TerminalQuotaErrors.
     // This ensures the next attempt uses 2.5 Pro.
     config.setPreviewModelBypassMode(true);
 
@@ -50,10 +53,9 @@ export async function handleFallback(
     }
   }
 
-  const fallbackModel =
-    failedModel === PREVIEW_GEMINI_MODEL
-      ? DEFAULT_GEMINI_MODEL
-      : DEFAULT_GEMINI_FLASH_MODEL;
+  const fallbackModel = shouldActivatePreviewFallback
+    ? DEFAULT_GEMINI_MODEL
+    : DEFAULT_GEMINI_FLASH_MODEL;
 
   // Consult UI Handler for Intent
   const fallbackModelHandler = config.fallbackModelHandler;
@@ -70,7 +72,9 @@ export async function handleFallback(
     // Process Intent and Update State
     switch (intent) {
       case 'retry_always':
-        if (failedModel === PREVIEW_GEMINI_MODEL) {
+        // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
+        // For all other errors, activate previewModel fallback.
+        if (shouldActivatePreviewFallback) {
           activatePreviewModelFallbackMode(config);
         } else {
           activateFallbackMode(config, authType);
