@@ -8,6 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
@@ -143,6 +145,7 @@ vi.mock('../agents/subagent-tool-wrapper.js', () => ({
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
   emitModelChanged: vi.fn(),
+  emitConsoleLog: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
@@ -158,11 +161,16 @@ vi.mock('../utils/fetch.js', () => ({
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { uiTelemetryService } from '../telemetry/index.js';
+import { getCodeAssistServer } from '../code_assist/codeAssist.js';
+import { getExperiments } from '../code_assist/experiments/experiments.js';
+import type { CodeAssistServer } from '../code_assist/server.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
   tokenLimit: vi.fn(),
 }));
+vi.mock('../code_assist/codeAssist.js');
+vi.mock('../code_assist/experiments/experiments.js');
 
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
@@ -247,7 +255,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.8,
               },
             },
@@ -261,7 +269,7 @@ describe('Server Config (config.ts)', () => {
           ...baseParams,
           experiments: {
             flags: {
-              GeminiCLIContextCompression__threshold_fraction: {
+              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
                 floatValue: 0.0,
               },
             },
@@ -273,6 +281,43 @@ describe('Server Config (config.ts)', () => {
       it('should return undefined if there are no experiments', async () => {
         const config = new Config(baseParams);
         expect(await config.getCompressionThreshold()).toBeUndefined();
+      });
+    });
+
+    describe('getUserCaching', () => {
+      it('should return the remote experiment flag when available', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.USER_CACHING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        });
+        expect(await config.getUserCaching()).toBe(true);
+      });
+
+      it('should return false when the remote flag is false', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.USER_CACHING]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        });
+        expect(await config.getUserCaching()).toBe(false);
+      });
+
+      it('should return undefined if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getUserCaching()).toBeUndefined();
       });
     });
   });
@@ -323,6 +368,23 @@ describe('Server Config (config.ts)', () => {
       ).toHaveBeenCalledWith();
     });
 
+    it('should strip thoughts when switching from GenAI to Vertex AI', async () => {
+      const config = new Config(baseParams);
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({ authType }) as unknown as ContentGeneratorConfig,
+      );
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(
+        config.getGeminiClient().stripThoughtsFromHistory,
+      ).toHaveBeenCalledWith();
+    });
+
     it('should not strip thoughts when switching from Vertex to GenAI', async () => {
       const config = new Config(baseParams);
 
@@ -338,6 +400,78 @@ describe('Server Config (config.ts)', () => {
       expect(
         config.getGeminiClient().stripThoughtsFromHistory,
       ).not.toHaveBeenCalledWith();
+    });
+  });
+
+  describe('Preview Features Logic in refreshAuth', () => {
+    beforeEach(() => {
+      // Set up default mock behavior for these functions before each test
+      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+      vi.mocked(getExperiments).mockResolvedValue({
+        flags: {},
+        experimentIds: [],
+      });
+    });
+
+    it('should enable preview features for Google auth when remote flag is true', async () => {
+      // Override the default mock for this specific test
+      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer); // Simulate Google auth by returning a truthy value
+      vi.mocked(getExperiments).mockResolvedValue({
+        flags: {
+          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: true },
+        },
+        experimentIds: [],
+      });
+      const config = new Config({ ...baseParams, previewFeatures: undefined });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getPreviewFeatures()).toBe(true);
+    });
+
+    it('should disable preview features for Google auth when remote flag is false', async () => {
+      // Override the default mock
+      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer);
+      vi.mocked(getExperiments).mockResolvedValue({
+        flags: {
+          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: false },
+        },
+        experimentIds: [],
+      });
+      const config = new Config({ ...baseParams, previewFeatures: undefined });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getPreviewFeatures()).toBe(undefined);
+    });
+
+    it('should disable preview features for Google auth when remote flag is missing', async () => {
+      // Override the default mock for getCodeAssistServer, the getExperiments mock is already correct
+      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer);
+      const config = new Config({ ...baseParams, previewFeatures: undefined });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getPreviewFeatures()).toBe(undefined);
+    });
+
+    it('should not change preview features or model if it is already set to true', async () => {
+      const initialModel = 'some-other-model';
+      const config = new Config({
+        ...baseParams,
+        previewFeatures: true,
+        model: initialModel,
+      });
+      // It doesn't matter which auth method we use here, the logic should exit early
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getPreviewFeatures()).toBe(true);
+      expect(config.getModel()).toBe(initialModel);
+    });
+
+    it('should not change preview features or model if it is already set to false', async () => {
+      const initialModel = 'some-other-model';
+      const config = new Config({
+        ...baseParams,
+        previewFeatures: false,
+        model: initialModel,
+      });
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getPreviewFeatures()).toBe(false);
+      expect(config.getModel()).toBe(initialModel);
     });
   });
 
@@ -391,7 +525,6 @@ describe('Server Config (config.ts)', () => {
   });
 
   it('should initialize WorkspaceContext with includeDirectories', () => {
-    const resolved = path.resolve(baseParams.targetDir);
     const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
       ...baseParams,
@@ -400,11 +533,13 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(paramsWithIncludeDirs);
     const workspaceContext = config.getWorkspaceContext();
     const directories = workspaceContext.getDirectories();
-    // Should include the target directory plus the included directories
-    expect(directories).toHaveLength(3);
-    expect(directories).toContain(resolved);
-    expect(directories).toContain(path.join(resolved, 'dir1'));
-    expect(directories).toContain(path.join(resolved, 'dir2'));
+
+    // Should include only the target directory initially
+    expect(directories).toHaveLength(1);
+    expect(directories).toContain(path.resolve(baseParams.targetDir));
+
+    // The other directories should be in the pending list
+    expect(config.getPendingIncludeDirectories()).toEqual(includeDirectories);
   });
 
   it('Config constructor should set telemetry to true when provided as true', () => {
@@ -612,99 +747,6 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(paramsWithUndefinedRipgrep);
       expect(config.getUseRipgrep()).toBe(true);
-    });
-  });
-
-  describe('Model Router with Auth', () => {
-    it('should disable model router by default for oauth-personal', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should enable model router by default for other auth types', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should disable model router for specified auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should enable model router for other auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [],
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should keep model router disabled when useModelRouter is false', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: false,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should keep the user-chosen model after refreshAuth, even when model router is disabled for the auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      const chosenModel = 'gemini-1.5-pro-latest';
-      config.setModel(chosenModel);
-
-      await config.refreshAuth(AuthType.USE_GEMINI);
-
-      expect(config.getUseModelRouter()).toBe(false);
-      expect(config.getModel()).toBe(chosenModel);
-    });
-
-    it('should keep the user-chosen model after refreshAuth, when model router is enabled for the auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      const chosenModel = 'gemini-1.5-pro-latest';
-      config.setModel(chosenModel);
-
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-
-      expect(config.getUseModelRouter()).toBe(true);
-      expect(config.getModel()).toBe(chosenModel);
-    });
-
-    it('should NOT switch to auto model if cli provides specific model, even if router is enabled', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        model: 'gemini-flash-latest',
-      });
-
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-
-      expect(config.getUseModelRouter()).toBe(true);
-      expect(config.getModel()).toBe('gemini-flash-latest');
     });
   });
 
@@ -1435,6 +1477,37 @@ describe('Config getHooks', () => {
       expect(config.isInFallbackMode()).toBe(false);
       expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith(proModel);
     });
+
+    it('should allow setting auto model from non-auto model and disable fallback mode', () => {
+      const config = new Config(baseParams);
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      config.setModel('auto');
+
+      expect(config.getModel()).toBe('auto');
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+    });
+
+    it('should allow setting auto model from auto model if it is in the fallback mode', () => {
+      const config = new Config({
+        cwd: '/tmp',
+        targetDir: '/path/to/target',
+        debugMode: false,
+        sessionId: 'test-session-id',
+        model: 'auto',
+        usageStatisticsEnabled: false,
+      });
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
+      config.setModel('auto');
+
+      expect(config.getModel()).toBe('auto');
+      expect(config.isInFallbackMode()).toBe(false);
+      expect(mockCoreEvents.emitModelChanged).toHaveBeenCalledWith('auto');
+    });
   });
 });
 
@@ -1480,5 +1553,66 @@ describe('Config getExperiments', () => {
     const retrievedExps = config.getExperiments();
     expect(retrievedExps).toEqual(mockExps);
     expect(retrievedExps).toBe(mockExps); // Should return the same reference
+  });
+});
+
+describe('Config setExperiments logging', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('logs a sorted, non-truncated summary of experiments when they are set', () => {
+    const config = new Config(baseParams);
+    const debugSpy = vi
+      .spyOn(debugLogger, 'debug')
+      .mockImplementation(() => {});
+    const experiments = {
+      flags: {
+        ZetaFlag: {
+          boolValue: true,
+          stringValue: 'zeta',
+          int32ListValue: { values: [1, 2] },
+        },
+        AlphaFlag: {
+          boolValue: false,
+          stringValue: 'alpha',
+          stringListValue: { values: ['a', 'b', 'c'] },
+        },
+        MiddleFlag: {
+          // Intentionally sparse to ensure undefined values are omitted
+          floatValue: 0.42,
+          int32ListValue: { values: [] },
+        },
+      },
+      experimentIds: [101, 99],
+    };
+
+    config.setExperiments(experiments);
+
+    const logCall = debugSpy.mock.calls.find(
+      ([message]) => message === 'Experiments loaded',
+    );
+    expect(logCall).toBeDefined();
+    const loggedSummary = logCall?.[1] as string;
+    expect(typeof loggedSummary).toBe('string');
+    expect(loggedSummary).toContain('experimentIds');
+    expect(loggedSummary).toContain('101');
+    expect(loggedSummary).toContain('AlphaFlag');
+    expect(loggedSummary).toContain('ZetaFlag');
+    const alphaIndex = loggedSummary.indexOf('AlphaFlag');
+    const zetaIndex = loggedSummary.indexOf('ZetaFlag');
+    expect(alphaIndex).toBeGreaterThan(-1);
+    expect(zetaIndex).toBeGreaterThan(-1);
+    expect(alphaIndex).toBeLessThan(zetaIndex);
+    expect(loggedSummary).toContain('\n');
+    expect(loggedSummary).not.toContain('stringListLength: 0');
+    expect(loggedSummary).not.toContain('int32ListLength: 0');
+
+    debugSpy.mockRestore();
   });
 });

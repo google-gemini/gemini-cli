@@ -41,7 +41,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 
 
 ## Methodology for using this tool
-1. Use this todo list list as soon as you receive a user request based on the complexity of the task.
+1. Use this todo list as soon as you receive a user request based on the complexity of the task.
 2. Keep track of every subtask that you update the list with.
 3. Mark a subtask as in_progress before you begin working on it. You should only have one subtask as in_progress at a time.
 4. Update the subtask list as you proceed in executing the task. The subtask list is not static and should reflect your progress and current plans, which may evolve as you acquire new information.
@@ -148,7 +148,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   constructor() {
     super(
       WriteTodosTool.Name,
-      'Write Todos',
+      'WriteTodos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,
       {
@@ -173,12 +173,46 @@ export class WriteTodosTool extends BaseDeclarativeTool<
                 },
               },
               required: ['description', 'status'],
+              additionalProperties: false,
             },
           },
         },
         required: ['todos'],
+        additionalProperties: false,
       },
     );
+  }
+
+  override get schema() {
+    return {
+      name: this.name,
+      description: this.description,
+      parametersJsonSchema: this.parameterSchema,
+      responseJsonSchema: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: {
+                  type: 'string',
+                },
+                status: {
+                  type: 'string',
+                  enum: TODO_STATUSES,
+                },
+              },
+              required: ['description', 'status'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['todos'],
+        additionalProperties: false,
+      },
+    };
   }
 
   protected override validateToolParamValues(

@@ -963,6 +963,34 @@ describe('useTextBuffer', () => {
       expect(state.cursor).toEqual([0, 1]);
       expect(state.visualCursor).toEqual([0, 1]);
     });
+
+    it('moveToVisualPosition: should correctly handle wide characters (Chinese)', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: '你好', // 2 chars, width 4
+          viewport: { width: 10, height: 1 },
+          isValidPath: () => false,
+        }),
+      );
+
+      // '你' (width 2): visual 0-1. '好' (width 2): visual 2-3.
+
+      // Click on '你' (first half, x=0) -> index 0
+      act(() => result.current.moveToVisualPosition(0, 0));
+      expect(getBufferState(result).cursor).toEqual([0, 0]);
+
+      // Click on '你' (second half, x=1) -> index 1 (after first char)
+      act(() => result.current.moveToVisualPosition(0, 1));
+      expect(getBufferState(result).cursor).toEqual([0, 1]);
+
+      // Click on '好' (first half, x=2) -> index 1 (before second char)
+      act(() => result.current.moveToVisualPosition(0, 2));
+      expect(getBufferState(result).cursor).toEqual([0, 1]);
+
+      // Click on '好' (second half, x=3) -> index 2 (after second char)
+      act(() => result.current.moveToVisualPosition(0, 3));
+      expect(getBufferState(result).cursor).toEqual([0, 2]);
+    });
   });
 
   describe('handleInput', () => {
@@ -977,6 +1005,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: 'h',
         }),
       );
@@ -987,6 +1016,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: 'i',
         }),
       );
@@ -1004,6 +1034,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: '\r',
         }),
       );
@@ -1021,6 +1052,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\t',
         }),
       );
@@ -1038,6 +1070,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: true,
           paste: false,
+          insertable: false,
           sequence: '\u001b[9;2u',
         }),
       );
@@ -1060,6 +1093,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         }),
       );
@@ -1084,6 +1118,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
@@ -1092,6 +1127,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
@@ -1100,6 +1136,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x7f',
         });
       });
@@ -1159,6 +1196,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x1b[D',
         }),
       ); // cursor [0,1]
@@ -1170,6 +1208,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: false,
           sequence: '\x1b[C',
         }),
       ); // cursor [0,2]
@@ -1189,6 +1228,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: textWithAnsi,
         }),
       );
@@ -1206,6 +1246,7 @@ describe('useTextBuffer', () => {
           meta: false,
           shift: true,
           paste: false,
+          insertable: true,
           sequence: '\r',
         }),
       ); // Simulates Shift+Enter in VSCode terminal
@@ -1410,6 +1451,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       meta: false,
       shift: false,
       paste: false,
+      insertable: true,
       sequence,
     });
 
@@ -1468,6 +1510,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: largeTextWithUnsafe,
         }),
       );
@@ -1502,6 +1545,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: largeTextWithAnsi,
         }),
       );
@@ -1526,6 +1570,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: emojis,
         }),
       );
@@ -1717,7 +1762,30 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           meta: false,
           shift: false,
           paste: false,
+          insertable: true,
           sequence: '\r',
+        }),
+      );
+      expect(getBufferState(result).lines).toEqual(['']);
+    });
+
+    it('should not print anything for function keys when singleLine is true', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: () => false,
+          singleLine: true,
+        }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'f1',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          insertable: false,
+          sequence: '\u001bOP',
         }),
       );
       expect(getBufferState(result).lines).toEqual(['']);

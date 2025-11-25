@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, type MockedFunction } from 'vitest';
+import {
+  vi,
+  type MockedFunction,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -594,83 +603,89 @@ describe('extension tests', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should not load github extensions if blockGitExtensions is set', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://somehost.com/foo/bar',
+        },
+      });
+
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === 'my-ext');
+
+      expect(extension).toBeUndefined();
+    });
+
     describe('id generation', () => {
-      it('should generate id from source for non-github git urls', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'my-ext',
-          version: '1.0.0',
+      it.each([
+        {
+          description: 'should generate id from source for non-github git urls',
           installMetadata: {
-            type: 'git',
+            type: 'git' as const,
             source: 'http://somehost.com/foo/bar',
           },
-        });
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('http://somehost.com/foo/bar'));
-      });
-
-      it('should generate id from owner/repo for github http urls', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'my-ext',
-          version: '1.0.0',
+          expectedIdSource: 'http://somehost.com/foo/bar',
+        },
+        {
+          description:
+            'should generate id from owner/repo for github http urls',
           installMetadata: {
-            type: 'git',
+            type: 'git' as const,
             source: 'http://github.com/foo/bar',
           },
-        });
-
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
-      });
-
-      it('should generate id from owner/repo for github ssh urls', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'my-ext',
-          version: '1.0.0',
+          expectedIdSource: 'https://github.com/foo/bar',
+        },
+        {
+          description: 'should generate id from owner/repo for github ssh urls',
           installMetadata: {
-            type: 'git',
+            type: 'git' as const,
             source: 'git@github.com:foo/bar',
           },
-        });
-
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
-      });
-
-      it('should generate id from source for github-release extension', async () => {
+          expectedIdSource: 'https://github.com/foo/bar',
+        },
+        {
+          description:
+            'should generate id from source for github-release extension',
+          installMetadata: {
+            type: 'github-release' as const,
+            source: 'https://github.com/foo/bar',
+          },
+          expectedIdSource: 'https://github.com/foo/bar',
+        },
+        {
+          description:
+            'should generate id from the original source for local extension',
+          installMetadata: {
+            type: 'local' as const,
+            source: '/some/path',
+          },
+          expectedIdSource: '/some/path',
+        },
+      ])('$description', async ({ installMetadata, expectedIdSource }) => {
         createExtension({
           extensionsDir: userExtensionsDir,
           name: 'my-ext',
           version: '1.0.0',
-          installMetadata: {
-            type: 'github-release',
-            source: 'https://github.com/foo/bar',
-          },
+          installMetadata,
         });
         const extensions = await extensionManager.loadExtensions();
         const extension = extensions.find((e) => e.name === 'my-ext');
-        expect(extension?.id).toBe(hashValue('https://github.com/foo/bar'));
-      });
-
-      it('should generate id from the original source for local extension', async () => {
-        createExtension({
-          extensionsDir: userExtensionsDir,
-          name: 'local-ext-name',
-          version: '1.0.0',
-          installMetadata: {
-            type: 'local',
-            source: '/some/path',
-          },
-        });
-
-        const extensions = await extensionManager.loadExtensions();
-        const extension = extensions.find((e) => e.name === 'local-ext-name');
-        expect(extension?.id).toBe(hashValue('/some/path'));
+        expect(extension?.id).toBe(hashValue(expectedIdSource));
       });
 
       it('should generate id from the original source for linked extensions', async () => {
@@ -874,6 +889,30 @@ describe('extension tests', () => {
         type: 'link',
       });
       fs.rmSync(targetExtDir, { recursive: true, force: true });
+    });
+
+    it('should not install a github extension if blockGitExtensions is set', async () => {
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const blockGitExtensionsSetting = {
+        security: {
+          blockGitExtensions: true,
+        },
+      };
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: blockGitExtensionsSetting,
+      });
+      await extensionManager.loadExtensions();
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: gitUrl,
+          type: 'git',
+        }),
+      ).rejects.toThrow(
+        'Installing extensions from remote sources is disallowed by your current settings.',
+      );
     });
 
     it('should prompt for trust if workspace is not trusted', async () => {
@@ -1551,6 +1590,34 @@ This extension will run the following MCP servers:
       await extensionManager.uninstallExtension('my-local-extension', false);
 
       expect(fs.existsSync(sourceExtDir)).toBe(false);
+      expect(extensionManager.getExtensions()).toHaveLength(1);
+      expect(fs.existsSync(otherExtDir)).toBe(true);
+    });
+
+    it('should uninstall an extension on non-matching extension directory name', async () => {
+      // Create an extension with a name that differs from the directory name.
+      const sourceExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'My-Local-Extension',
+        version: '1.0.0',
+      });
+      const newSourceExtDir = path.join(
+        userExtensionsDir,
+        'my-local-extension',
+      );
+      fs.renameSync(sourceExtDir, newSourceExtDir);
+
+      const otherExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'other-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.uninstallExtension('my-local-extension', false);
+
+      expect(fs.existsSync(sourceExtDir)).toBe(false);
+      expect(fs.existsSync(newSourceExtDir)).toBe(false);
       expect(extensionManager.getExtensions()).toHaveLength(1);
       expect(fs.existsSync(otherExtDir)).toBe(true);
     });
