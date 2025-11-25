@@ -572,6 +572,24 @@ describe('Gemini Client (client.ts)', () => {
         })(),
       );
 
+      // Set up conditions that would trigger compression
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(
+        45000,
+      );
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockReturnValue(
+        40000,
+      );
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockReturnValue(
+        2,
+      );
+      vi.spyOn(
+        client['config'],
+        'getCompressionMinTimeBetweenPrompts',
+      ).mockReturnValue(5);
+
+      client['messagesSinceLastCompress'] = 10;
+      client['lastCompressionTime'] = Date.now() - 60000;
+
       const compressionInfo: ChatCompressionInfo = {
         compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount: 1000,
@@ -2630,7 +2648,7 @@ ${JSON.stringify(
       ]);
     });
 
-    it('should NOT trigger compression on recursive calls (next-speaker check)', async () => {
+    it('should trigger compression only on top-level call, not recursive calls (next-speaker check)', async () => {
       // Arrange: Set up conditions that would trigger compression
       vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(
         45000,
@@ -2685,11 +2703,10 @@ ${JSON.stringify(
       );
       await fromAsync(stream);
 
-      // Assert: When flow goes through 'return yield*' recursive call,
-      // the outer call never reaches post-compression code.
-      // The inner call has isTopLevelCall=false, so no compression happens.
-      // This is expected - compression is skipped during recursive flows.
-      expect(tryCompressSpy).toHaveBeenCalledTimes(0);
+      // Assert: Compression runs on top-level call before the recursive continuation,
+      // but NOT on the recursive call (which has isTopLevelCall=false).
+      // This ensures compression happens before model continues, but only once.
+      expect(tryCompressSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should compress when turn completes with no pending tool calls', async () => {

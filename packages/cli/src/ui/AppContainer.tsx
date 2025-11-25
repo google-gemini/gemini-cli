@@ -732,6 +732,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             goals={goals}
             terminalWidth={terminalWidth}
             isSafetyValve={isSafetyValve}
+            timeoutSeconds={config.getCompressionPromptTimeout()}
             onSelect={(goal) => {
               if (goal === 'other') {
                 // User wants to enter a custom goal
@@ -744,7 +745,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           />,
         );
       }),
-    [setCustomDialog, terminalWidth],
+    [setCustomDialog, terminalWidth, config],
   );
 
   const {
