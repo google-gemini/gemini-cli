@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { formatCompactNumber } from '../utils/formatCompactNumber.js';
+import { calculateTotalCost, formatCost } from '../utils/tokenPricing.js';
 
 export const TokenUsageDisplay: React.FC = () => {
   const { stats } = useSessionStats();
@@ -17,10 +18,20 @@ export const TokenUsageDisplay: React.FC = () => {
   let inputTokens = 0;
   let outputTokens = 0;
 
-  for (const modelMetrics of Object.values(models)) {
+  // Build model tokens map for cost calculation
+  const modelTokens: Record<string, { prompt: number; candidates: number }> =
+    {};
+
+  for (const [modelName, modelMetrics] of Object.entries(models)) {
     inputTokens += modelMetrics.tokens.prompt;
     outputTokens += modelMetrics.tokens.candidates;
+    modelTokens[modelName] = {
+      prompt: modelMetrics.tokens.prompt,
+      candidates: modelMetrics.tokens.candidates,
+    };
   }
+
+  const estimatedCost = calculateTotalCost(modelTokens);
 
   return (
     <Box>
@@ -33,6 +44,7 @@ export const TokenUsageDisplay: React.FC = () => {
       <Text color={theme.text.secondary}>
         {formatCompactNumber(outputTokens)}
       </Text>
+      <Text color={theme.text.secondary}> ~{formatCost(estimatedCost)}</Text>
     </Box>
   );
 };

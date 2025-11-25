@@ -78,4 +78,37 @@ describe('TokenUsageDisplay', () => {
     expect(output).toContain('↓');
     expect(output).toContain('3.2K');
   });
+
+  it('displays estimated cost', () => {
+    useSessionStatsMock.mockReturnValue({
+      stats: {
+        metrics: {
+          models: {
+            'gemini-2.5-flash': {
+              tokens: { prompt: 100000, candidates: 50000 },
+            },
+          },
+        },
+      },
+    } as never);
+
+    const { lastFrame } = render(<TokenUsageDisplay />);
+    const output = lastFrame();
+    // Flash: (100K * 0.15 + 50K * 0.6) / 1M = 0.015 + 0.03 = 0.045
+    expect(output).toContain('~$0.05');
+  });
+
+  it('displays $0 when no tokens used', () => {
+    useSessionStatsMock.mockReturnValue({
+      stats: {
+        metrics: {
+          models: {},
+        },
+      },
+    } as never);
+
+    const { lastFrame } = render(<TokenUsageDisplay />);
+    const output = lastFrame();
+    expect(output).toContain('~$0');
+  });
 });
