@@ -345,6 +345,21 @@ describe('SettingsSchema', () => {
         getSettingsSchema().general.properties.previewFeatures.description,
       ).toBe('Enable preview features (e.g., preview models).');
     });
+
+    it('should have isModelAvailabilityServiceEnabled setting in schema', () => {
+      const setting =
+        getSettingsSchema().experimental.properties
+          .isModelAvailabilityServiceEnabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enable model routing using new availability service.',
+      );
+    });
   });
 
   it('has JSON schema definitions for every referenced ref', () => {
