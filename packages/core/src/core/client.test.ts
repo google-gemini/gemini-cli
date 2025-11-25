@@ -1744,6 +1744,211 @@ ${JSON.stringify(
         },
       );
 
+      it('sends diagnosticsAdded when a new diagnostic appears', async () => {
+        const diagNew = {
+          range: {
+            start: { line: 1, character: 1 },
+            end: { line: 1, character: 5 },
+          },
+          message: 'New error',
+          severity: 'Error',
+        };
+
+        // previous context had no diagnostics
+        client['lastSentIdeContext'] = {
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/path/to/active/file.ts',
+                cursor: { line: 5, character: 10 },
+                selectedText: 'hello',
+                isActive: true,
+                timestamp: Date.now() - 1000,
+                diagnostics: [],
+              },
+            ],
+          },
+        };
+
+        // current context has one new diagnostic
+        vi.mocked(ideContextStore.get).mockReturnValue({
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/path/to/active/file.ts',
+                cursor: { line: 5, character: 10 },
+                selectedText: 'hello',
+                isActive: true,
+                timestamp: Date.now(),
+                diagnostics: [diagNew],
+              },
+            ],
+          },
+        });
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-diagnostics-added',
+        );
+        for await (const _ of stream) {
+          // consume
+        }
+
+        const mockChat = client['chat'] as unknown as {
+          addHistory: (typeof vi)['fn'];
+        };
+        expect(mockChat.addHistory).toHaveBeenCalledWith(
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                text: expect.stringContaining('diagnosticsAdded'),
+              }),
+            ]),
+          }),
+        );
+      });
+
+      it('sends diagnosticsRemoved when a diagnostic is removed', async () => {
+        const diagOld = {
+          range: {
+            start: { line: 2, character: 1 },
+            end: { line: 2, character: 5 },
+          },
+          message: 'Old warning',
+          severity: 'Warning',
+        };
+
+        // previous context had one diagnostic
+        client['lastSentIdeContext'] = {
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/path/to/active/file.ts',
+                cursor: { line: 5, character: 10 },
+                selectedText: 'hello',
+                isActive: true,
+                timestamp: Date.now() - 1000,
+                diagnostics: [diagOld],
+              },
+            ],
+          },
+        };
+
+        // current context has no diagnostics
+        vi.mocked(ideContextStore.get).mockReturnValue({
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/path/to/active/file.ts',
+                cursor: { line: 5, character: 10 },
+                selectedText: 'hello',
+                isActive: true,
+                timestamp: Date.now(),
+                diagnostics: [],
+              },
+            ],
+          },
+        });
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-diagnostics-removed',
+        );
+        for await (const _ of stream) {
+          // consume
+        }
+
+        const mockChat = client['chat'] as unknown as {
+          addHistory: (typeof vi)['fn'];
+        };
+        expect(mockChat.addHistory).toHaveBeenCalledWith(
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                text: expect.stringContaining('diagnosticsRemoved'),
+              }),
+            ]),
+          }),
+        );
+      });
+
+      it('does not send diagnostics delta when diagnostics are unchanged', async () => {
+        const diag = {
+          range: {
+            start: { line: 3, character: 1 },
+            end: { line: 3, character: 5 },
+          },
+          message: 'Same issue',
+          severity: 'Information',
+        };
+
+        // previous context has the diagnostic
+        client['lastSentIdeContext'] = {
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/path/to/active/file.ts',
+                cursor: { line: 5, character: 10 },
+                selectedText: 'hello',
+                isActive: true,
+                timestamp: Date.now() - 1000,
+                diagnostics: [diag],
+              },
+            ],
+          },
+        };
+
+        // current context has the same diagnostic
+        vi.mocked(ideContextStore.get).mockReturnValue({
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/path/to/active/file.ts',
+                cursor: { line: 5, character: 10 },
+                selectedText: 'hello',
+                isActive: true,
+                timestamp: Date.now(),
+                diagnostics: [diag],
+              },
+            ],
+          },
+        });
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-diagnostics-unchanged',
+        );
+        for await (const _ of stream) {
+          // consume
+        }
+
+        const mockChat = client['chat'] as unknown as {
+          addHistory: (typeof vi)['fn'];
+        };
+        // Since nothing changed, no IDE delta context should be added.
+        expect(mockChat.addHistory).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                text: expect.stringContaining('diagnosticsAdded'),
+              }),
+            ]),
+          }),
+        );
+        expect(mockChat.addHistory).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            parts: expect.arrayContaining([
+              expect.objectContaining({
+                text: expect.stringContaining('diagnosticsRemoved'),
+              }),
+            ]),
+          }),
+        );
+      });
+
       it('sends full context when history is cleared, even if editor state is unchanged', async () => {
         const activeFile = {
           path: '/path/to/active/file.ts',
