@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { theme } from './semantic-colors.js';
+import { theme } from '../semantic-colors.js';
 
 export const TokenUsageDisplay: React.FC = () => {
   // Placeholder values for now
