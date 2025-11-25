@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { McpAuthProvider } from './auth-provider.js';
 import type {
   OAuthClientInformation,
   OAuthClientInformationFull,
@@ -18,7 +18,7 @@ import { coreEvents } from '../utils/events.js';
 
 const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
 
-export class GoogleCredentialProvider implements OAuthClientProvider {
+export class GoogleCredentialProvider implements McpAuthProvider {
   private readonly auth: GoogleAuth;
   private cachedToken?: OAuthTokens;
   private tokenExpiryTime?: number;

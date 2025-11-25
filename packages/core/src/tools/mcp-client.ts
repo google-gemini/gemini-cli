@@ -420,12 +420,16 @@ function createTransportRequestInit(
   };
 }
 
+import type { McpAuthProvider } from '../mcp/auth-provider.js';
+
 /**
  * Create an AuthProvider for the MCP Transport.
  *
  * @param mcpServerConfig The MCP server configuration
  */
-function createAuthProvider(mcpServerConfig: MCPServerConfig) {
+function createAuthProvider(
+  mcpServerConfig: MCPServerConfig,
+): McpAuthProvider | undefined {
   if (
     mcpServerConfig.authProviderType ===
     AuthProviderType.SERVICE_ACCOUNT_IMPERSONATION
@@ -1333,33 +1337,9 @@ export async function createTransport(
 
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
     const authProvider = createAuthProvider(mcpServerConfig);
+    const customHeaders = (await authProvider?.getRequestHeaders()) ?? {};
+    const headers: Record<string, string> = { ...customHeaders };
 
-    if (
-      mcpServerConfig.authProviderType === AuthProviderType.GOOGLE_CREDENTIALS
-    ) {
-      const provider = new GoogleCredentialProvider(mcpServerConfig);
-      const customHeaders = await provider.getRequestHeaders();
-      const transportOptions:
-        | StreamableHTTPClientTransportOptions
-        | SSEClientTransportOptions = {
-        requestInit: createTransportRequestInit(mcpServerConfig, customHeaders),
-        authProvider: provider,
-      };
-      if (mcpServerConfig.httpUrl) {
-        return new StreamableHTTPClientTransport(
-          new URL(mcpServerConfig.httpUrl),
-          transportOptions,
-        );
-      }
-      if (mcpServerConfig.url) {
-        return new SSEClientTransport(
-          new URL(mcpServerConfig.url),
-          transportOptions,
-        );
-      }
-    }
-
-    const headers: Record<string, string> = {};
     if (authProvider === undefined) {
       // Check if we have OAuth configuration or stored tokens
       let accessToken: string | null = null;
