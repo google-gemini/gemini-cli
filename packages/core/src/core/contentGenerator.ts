@@ -118,17 +118,23 @@ export async function createContentGenerator(
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
-    const customHeadersMap = {
-      ...parseCustomHeaders(customHeadersEnv),
-      // If custom headers env var and api key are both defined, pass the api key as a Authorization Header
-      ...(customHeadersEnv &&
-        config.apiKey && { Authorization: `Bearer ${config.apiKey}` }),
-    };
+    const customHeadersMap = parseCustomHeaders(customHeadersEnv);
+    const apiKeyAuthMechanism =
+      process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
 
     const baseHeaders: Record<string, string> = {
       ...customHeadersMap,
       'User-Agent': userAgent,
     };
+
+    if (
+      apiKeyAuthMechanism === 'bearer' &&
+      (config.authType === AuthType.USE_GEMINI ||
+        config.authType === AuthType.USE_VERTEX_AI) &&
+      config.apiKey
+    ) {
+      baseHeaders['Authorization'] = `Bearer ${config.apiKey}`;
+    }
     if (
       config.authType === AuthType.LOGIN_WITH_GOOGLE ||
       config.authType === AuthType.CLOUD_SHELL
