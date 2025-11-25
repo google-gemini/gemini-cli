@@ -262,7 +262,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       if (argv['prompt'] && argv['promptInteractive']) {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
       }
-      if (argv['resume'] && !argv['prompt'] && !process.stdin.isTTY) {
+      if (
+        argv['resume'] &&
+        !argv['prompt'] &&
+        !hasPositionalQuery &&
+        process.stdin.isTTY
+      ) {
         throw new Error(
           'When resuming a session, you must provide a message via --prompt (-p) or stdin',
         );

@@ -435,9 +435,9 @@ describe('parseArguments', () => {
     debugErrorSpy.mockRestore();
   });
 
-  it('should throw an error when resuming a session without prompt in non-interactive mode', async () => {
+  it('should throw an error when resuming a session without prompt in interactive mode', async () => {
     const originalIsTTY = process.stdin.isTTY;
-    process.stdin.isTTY = false;
+    process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--resume', 'session-id'];
 
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -472,13 +472,27 @@ describe('parseArguments', () => {
 
   it('should return RESUME_LATEST constant when --resume is passed without a value', async () => {
     const originalIsTTY = process.stdin.isTTY;
-    process.stdin.isTTY = true; // Make it interactive to avoid validation error
+    process.stdin.isTTY = false; // Make it non-interactive (piped stdin) to avoid validation error
     process.argv = ['node', 'script.js', '--resume'];
 
     try {
       const argv = await parseArguments({} as Settings);
       expect(argv.resume).toBe(RESUME_LATEST);
       expect(argv.resume).toBe('latest');
+    } finally {
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
+  it('should allow --resume with a positional query argument in interactive mode', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = true; // Interactive mode (no stdin pipe)
+    process.argv = ['node', 'script.js', 'hello', '--resume', 'session-id'];
+
+    try {
+      const argv = await parseArguments({} as Settings);
+      expect(argv.resume).toBe('session-id');
+      expect(argv.prompt).toBe('hello');
     } finally {
       process.stdin.isTTY = originalIsTTY;
     }
