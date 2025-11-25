@@ -6,6 +6,12 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "title": "Schema",
+      "description": "The URL of the JSON schema for this settings file. Used by editors for validation and autocompletion.",
+      "type": "string",
+      "default": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json"
+    },
     "mcpServers": {
       "title": "MCP Servers",
       "description": "Configuration for MCP servers.",
