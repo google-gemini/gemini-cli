@@ -483,8 +483,10 @@ describe('handleFallback', () => {
 
       expect(result).toBeNull();
       expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-        'Fallback UI handler failed:',
-        'Unexpected fallback intent received from fallbackModelHandler: "null"',
+        'Fallback handler failed:',
+        new Error(
+          'Unexpected fallback intent received from fallbackModelHandler: "null"',
+        ),
       );
       debugLoggerErrorSpy.mockRestore();
     });

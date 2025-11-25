@@ -168,9 +168,6 @@ async function handlePolicyDrivenFallback(
     failedPolicy,
     selectedPolicy,
   };
-
-  // Code below is a place holder for now until the UI is rewired to handle new
-  // inputs
   void recommendation;
 
   const handler = config.getFallbackModelHandler();
@@ -178,18 +175,8 @@ async function handlePolicyDrivenFallback(
     return null;
   }
 
-  let intent: FallbackIntent | null = null;
   try {
-    intent = await handler(failedModel, fallbackModel, error);
-  } catch (handlerError) {
-    debugLogger.error(
-      'Fallback UI handler failed:',
-      getErrorMessage(handlerError),
-    );
-    return null;
-  }
-
-  try {
+    const intent = await handler(failedModel, fallbackModel, error);
     return await processIntent(
       config,
       intent,
@@ -198,10 +185,7 @@ async function handlePolicyDrivenFallback(
       authType,
     );
   } catch (handlerError) {
-    debugLogger.error(
-      'Fallback UI handler failed:',
-      getErrorMessage(handlerError),
-    );
+    debugLogger.error('Fallback handler failed:', handlerError);
     return null;
   }
 }
