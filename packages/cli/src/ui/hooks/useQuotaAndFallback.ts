@@ -56,11 +56,16 @@ export function useQuotaAndFallback({
       let message: string;
       let isTerminalQuotaError = false;
       let isModelNotFoundError = false;
+      const usageLimitReachedModel =
+        failedModel === DEFAULT_GEMINI_MODEL ||
+        failedModel === PREVIEW_GEMINI_MODEL
+          ? 'pro'
+          : failedModel;
       if (error instanceof TerminalQuotaError) {
         isTerminalQuotaError = true;
         // Common part of the message for both tiers
         const messageLines = [
-          `Usage limit reached for ${failedModel}.`,
+          `Usage limit reached for ${usageLimitReachedModel}.`,
           error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
           `/stats for usage details`,
           `/auth to switch to API key.`,
