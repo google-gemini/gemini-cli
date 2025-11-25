@@ -1259,6 +1259,13 @@
           "default": false,
           "type": "boolean"
         },
+        "isModelAvailabilityServiceEnabled": {
+          "title": "Enable Model Availability Service",
+          "description": "Enable model routing using new availability service.",
+          "markdownDescription": "Enable model routing using new availability service.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "codebaseInvestigatorSettings": {
           "title": "Codebase Investigator Settings",
           "description": "Configuration for Codebase Investigator.",
