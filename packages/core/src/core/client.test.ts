@@ -246,6 +246,15 @@ describe('Gemini Client (client.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
+
+      // New compression getters
+      getCompressionTriggerTokens: vi.fn().mockReturnValue(40000),
+      getCompressionTriggerUtilization: vi.fn().mockReturnValue(0.5),
+      getCompressionMinMessages: vi.fn().mockReturnValue(25),
+      getCompressionMinTimeBetweenPrompts: vi.fn().mockReturnValue(300),
+      isCompressionInteractive: vi.fn().mockReturnValue(true),
+      getCompressionPromptTimeout: vi.fn().mockReturnValue(30),
+      getCompressionFrequencyMultiplier: vi.fn().mockReturnValue(1.5),
     } as unknown as Config;
     mockConfig.getHookSystem = vi
       .fn()

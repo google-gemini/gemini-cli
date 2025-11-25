@@ -455,6 +455,10 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    onShowCompressionPrompt: (
+      goals: string[],
+      isSafetyValve: boolean,
+    ) => Promise<string>,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
     const hooksEnabled = this.config.getEnableHooks();
@@ -525,7 +529,72 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat(prompt_id, false);
+    let compressionOptions: CompressionOptions | undefined;
+    const { shouldCompress, isSafetyValve } =
+      await this.shouldTriggerCompression();
+
+    if (shouldCompress) {
+      if (this.config.isCompressionInteractive()) {
+        const { extractedGoals, shouldPromptUser, skipReason, userSelection } =
+          await this.prepareDeliberateCompression(prompt_id, isSafetyValve);
+
+        if (shouldPromptUser && extractedGoals) {
+          const selection = await onShowCompressionPrompt(
+            extractedGoals,
+            isSafetyValve,
+          );
+
+          if (selection === 'disable') {
+            this.config.setCompressionInteractive(false);
+            coreEvents.emitUserFeedback(
+              'info',
+              'Interactive compression disabled. Future compressions will be automatic.',
+            );
+            compressionOptions = this.createCompressionOptions('auto');
+          } else if (selection === 'less_frequent') {
+            const currentTokens = this.config.getCompressionTriggerTokens();
+            const currentMessages = this.config.getCompressionMinMessages();
+            const multiplier = this.config.getCompressionFrequencyMultiplier();
+
+            const newTokens = Math.round(currentTokens * multiplier);
+            const newMessages = Math.round(currentMessages * multiplier);
+
+            const cappedTokens = Math.min(newTokens, 200000); // Cap at 200k
+            const cappedMessages = Math.min(newMessages, 100); // Cap at 100 messages
+
+            this.config.setCompressionTriggerTokens(cappedTokens);
+            this.config.setCompressionMinMessages(cappedMessages);
+
+            coreEvents.emitUserFeedback(
+              'info',
+              `Check-ins ${multiplier}x less frequent: ${currentTokens / 1000}k -> ${cappedTokens / 1000}k tokens, ${currentMessages} -> ${cappedMessages} messages`,
+            );
+            compressionOptions = this.createCompressionOptions('auto');
+          } else if (selection === 'auto' || selection === null) {
+            compressionOptions = this.createCompressionOptions('auto');
+          } else {
+            compressionOptions = this.createCompressionOptions(selection);
+          }
+        } else {
+          // If not prompting user (e.g., safety valve, extraction failed)
+          debugLogger.debug(
+            `Skipping compression prompt due to: ${skipReason}. Falling back to basic compression.`,
+          );
+          compressionOptions = this.createCompressionOptions(
+            userSelection || 'auto',
+          );
+        }
+      } else {
+        // Interactive compression is disabled, use default auto-compress behavior
+        compressionOptions = this.createCompressionOptions('auto');
+      }
+    }
+
+    const compressed = await this.tryCompressChat(
+      prompt_id,
+      false,
+      compressionOptions,
+    );
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -621,6 +690,7 @@ export class GeminiClient {
             prompt_id,
             boundedTurns - 1,
             true, // Set isInvalidStreamRetry to true
+            onShowCompressionPrompt, // Pass the callback to recursive calls
           );
           return turn;
         }
@@ -663,6 +733,7 @@ export class GeminiClient {
           prompt_id,
           boundedTurns - 1,
           // isInvalidStreamRetry is false here, as this is a next speaker check
+          onShowCompressionPrompt, // Pass the callback to recursive calls
         );
       }
     }
@@ -688,6 +759,8 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
+          false,
+          onShowCompressionPrompt,
         );
       }
     }

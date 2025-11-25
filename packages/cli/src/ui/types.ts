@@ -79,6 +79,7 @@ export interface CompressionProps {
   originalTokenCount: number | null;
   newTokenCount: number | null;
   compressionStatus: CompressionStatus | null;
+  userGoal?: string;
 }
 
 /**

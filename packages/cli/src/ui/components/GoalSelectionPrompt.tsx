@@ -5,17 +5,52 @@
  */
 
 import { Box, Text } from 'ink';
+import { useEffect, useRef } from 'react';
 import { theme } from '../semantic-colors.js';
+import { useTimer } from '../hooks/useTimer.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 
 interface GoalSelectionPromptProps {
   goals: string[];
-  onSelect: (goal: string | null) => void;
+  onSelect: (
+    goal: string | 'auto' | 'other' | 'disable' | 'less_frequent' | null,
+  ) => void;
   terminalWidth: number;
+  timeoutSeconds?: number;
 }
 
 export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
-  const { goals, onSelect, terminalWidth } = props;
+  const { goals, onSelect, terminalWidth, timeoutSeconds } = props;
+
+  // Track whether user has already made a selection
+  const hasSelectedRef = useRef(false);
+
+  // Use timer to track elapsed time
+  const elapsedTime = useTimer(timeoutSeconds !== undefined, 0);
+
+  // Calculate remaining time
+  const remainingTime =
+    timeoutSeconds !== undefined
+      ? Math.max(0, timeoutSeconds - elapsedTime)
+      : null;
+
+  // Trigger auto-select when countdown reaches zero
+  useEffect(() => {
+    if (remainingTime === 0 && !hasSelectedRef.current) {
+      hasSelectedRef.current = true;
+      onSelect('auto');
+    }
+  }, [remainingTime, onSelect]);
+
+  // Wrap onSelect to track user selection
+  const handleSelect = (
+    value: string | 'auto' | 'other' | 'disable' | 'less_frequent' | null,
+  ) => {
+    if (!hasSelectedRef.current) {
+      hasSelectedRef.current = true;
+      onSelect(value);
+    }
+  };
 
   const items = [
     ...goals.map((goal) => ({
@@ -24,9 +59,24 @@ export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
       key: goal,
     })),
     {
-      label: 'Skip - proceed without goal focus',
-      value: null,
-      key: 'skip',
+      label: 'Auto-compress (default behavior)',
+      value: 'auto',
+      key: 'auto',
+    },
+    {
+      label: 'Other (specify)',
+      value: 'other',
+      key: 'other',
+    },
+    {
+      label: "Don't ask me again",
+      value: 'disable',
+      key: 'disable',
+    },
+    {
+      label: 'Check in less often',
+      value: 'less_frequent',
+      key: 'less_frequent',
     },
   ];
 
@@ -56,8 +106,16 @@ export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
       </Box>
 
       <Box marginTop={1}>
-        <RadioButtonSelect items={items} onSelect={onSelect} />
+        <RadioButtonSelect items={items} onSelect={handleSelect} />
       </Box>
+
+      {remainingTime !== null && (
+        <Box marginTop={1}>
+          <Text color={theme.text.secondary} dimColor>
+            auto in {remainingTime}s
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };

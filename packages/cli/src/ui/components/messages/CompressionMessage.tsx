@@ -22,8 +22,13 @@ export interface CompressionDisplayProps {
 export function CompressionMessage({
   compression,
 }: CompressionDisplayProps): React.JSX.Element {
-  const { isPending, originalTokenCount, newTokenCount, compressionStatus } =
-    compression;
+  const {
+    isPending,
+    originalTokenCount,
+    newTokenCount,
+    compressionStatus,
+    userGoal,
+  } = compression;
 
   const originalTokens = originalTokenCount ?? 0;
   const newTokens = newTokenCount ?? 0;
@@ -55,25 +60,40 @@ export function CompressionMessage({
 
   const text = getCompressionText();
 
+  // Show user goal only for successful compressions
+  const showUserGoal =
+    !isPending &&
+    userGoal &&
+    compressionStatus === CompressionStatus.COMPRESSED;
+
   return (
-    <Box flexDirection="row">
-      <Box marginRight={1}>
-        {isPending ? (
-          <CliSpinner type="dots" />
-        ) : (
-          <Text color={theme.text.accent}>✦</Text>
-        )}
+    <Box flexDirection="column">
+      <Box flexDirection="row">
+        <Box marginRight={1}>
+          {isPending ? (
+            <CliSpinner type="dots" />
+          ) : (
+            <Text color={theme.text.accent}>✦</Text>
+          )}
+        </Box>
+        <Box>
+          <Text
+            color={
+              compression.isPending ? theme.text.accent : theme.status.success
+            }
+            aria-label={SCREEN_READER_MODEL_PREFIX}
+          >
+            {text}
+          </Text>
+        </Box>
       </Box>
-      <Box>
-        <Text
-          color={
-            compression.isPending ? theme.text.accent : theme.status.success
-          }
-          aria-label={SCREEN_READER_MODEL_PREFIX}
-        >
-          {text}
-        </Text>
-      </Box>
+      {showUserGoal && (
+        <Box marginLeft={2} marginTop={0}>
+          <Text color={theme.text.secondary} dimColor>
+            Context optimized for: {userGoal}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
