@@ -179,7 +179,7 @@ export class OpenFilesManager {
 
   private updateDiagnostic(uri: vscode.Uri) {
     const file = this.openFiles.find((f) => f.path === uri.fsPath);
-    if (!file) {
+    if (!file || !file.isActive) {
       return;
     }
 
