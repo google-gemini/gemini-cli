@@ -241,7 +241,7 @@ To configure Gemini CLI to use a Google Cloud project, do the following:
  `GOOGLE_CLOUD_PROJECT` or `GOOGLE_CLOUD_PROJECT_ID` variable to the project ID to use with Gemini CLI. Gemini CLI checks for `GOOGLE_CLOUD_PROJECT` first, then falls back to
  `GOOGLE_CLOUD_PROJECT_ID`.
 
-    For example:
+    For example, to set the `GOOGLE_CLOUD_PROJECT_ID` variable:
 
     ```bash
     # Replace YOUR_PROJECT_ID with your actual Google Cloud project ID
