@@ -13,6 +13,7 @@ import {
   ModelNotFoundError,
   type UserTierId,
   PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -116,10 +117,13 @@ export function useQuotaAndFallback({
       if (choice === 'retry_always') {
         // If we were recovering from a Preview Model failure, show a specific message.
         if (proQuotaRequest.failedModel === PREVIEW_GEMINI_MODEL) {
+          const showPeriodicalCheckMessage =
+            !proQuotaRequest.isModelNotFoundError &&
+            proQuotaRequest.fallbackModel === DEFAULT_GEMINI_MODEL;
           historyManager.addItem(
             {
               type: MessageType.INFO,
-              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}. ${!proQuotaRequest.isModelNotFoundError ? `We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.` : ''}`,
+              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}. ${showPeriodicalCheckMessage ? `We will periodically check if ${PREVIEW_GEMINI_MODEL} is available again.` : ''}`,
             },
             Date.now(),
           );
