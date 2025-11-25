@@ -511,9 +511,10 @@ export class TestRig {
           const isJsonOutput =
             commandArgs.includes('--output-format') &&
             commandArgs.includes('json');
+          const isAcpMode = commandArgs.includes('--experimental-acp');
 
-          // If we have stderr output and it's not a JSON test, include that also
-          if (stderr && !isJsonOutput) {
+          // If we have stderr output and it's not a JSON test or ACP mode (ACP uses JRPC), include that also
+          if (stderr && !isJsonOutput && !isAcpMode) {
             result += `\n\nStdErr:\n${stderr}`;
           }
 
