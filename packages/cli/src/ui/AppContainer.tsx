@@ -571,9 +571,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
-      logout: () => {
-        setAuthState(AuthState.Unauthenticated);
-      },
     }),
     [
       setAuthState,
