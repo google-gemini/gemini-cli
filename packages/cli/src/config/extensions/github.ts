@@ -84,9 +84,15 @@ export interface GithubRepoInfo {
 }
 
 export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
-  // First step in normalizing a github ssh URI to the https form.
-  if (source.startsWith('git@github.com:')) {
-    source = source.replace('git@github.com:', '');
+  // Handle SCP-style SSH URLs.
+  if (source.startsWith('git@')) {
+    if (source.startsWith('git@github.com:')) {
+      // It's a GitHub SSH URL, so normalize it for the URL parser.
+      source = source.replace('git@github.com:', '');
+    } else {
+      // It's another provider's SSH URL (e.g., gitlab), so not a GitHub repo.
+      return null;
+    }
   }
   // Default to a github repo path, so `source` can be just an org/repo
   const parsedUrl = URL.parse(source, 'https://github.com');

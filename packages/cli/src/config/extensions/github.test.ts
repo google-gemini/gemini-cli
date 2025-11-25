@@ -136,8 +136,12 @@ describe('github.ts', () => {
       expect(tryParseGithubUrl(url)).toEqual({ owner, repo });
     });
 
-    it('should return null for non-GitHub URLs', () => {
-      expect(tryParseGithubUrl('https://gitlab.com/owner/repo')).toBeNull();
+    it.each([
+      'https://gitlab.com/owner/repo',
+      'https://my-git-host.com/owner/group/repo',
+      'git@gitlab.com:some-group/some-project/some-repo.git',
+    ])('should return null for non-GitHub URLs', (url) => {
+      expect(tryParseGithubUrl(url)).toBeNull();
     });
 
     it('should throw for invalid formats', () => {
