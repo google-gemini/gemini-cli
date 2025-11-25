@@ -37,12 +37,11 @@ export async function handleFallback(
   ) {
     return null;
   }
-
-  // Preview Model Specific Logic
-  if (
+  const shouldSetPreviewBypassMode =
     failedModel === PREVIEW_GEMINI_MODEL &&
-    error instanceof RetryableQuotaError
-  ) {
+    error instanceof RetryableQuotaError;
+  // Preview Model Specific Logic
+  if (shouldSetPreviewBypassMode) {
     // Always set bypass mode for the immediate retry, for RetryableQuotaError.
     // This ensures the next attempt uses 2.5 Pro.
     config.setPreviewModelBypassMode(true);
@@ -54,10 +53,9 @@ export async function handleFallback(
     }
   }
 
-  const fallbackModel =
-    failedModel === PREVIEW_GEMINI_MODEL
-      ? DEFAULT_GEMINI_MODEL
-      : DEFAULT_GEMINI_FLASH_MODEL;
+  const fallbackModel = shouldSetPreviewBypassMode
+    ? DEFAULT_GEMINI_MODEL
+    : DEFAULT_GEMINI_FLASH_MODEL;
 
   // Consult UI Handler for Intent
   const fallbackModelHandler = config.fallbackModelHandler;

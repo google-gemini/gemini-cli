@@ -328,12 +328,37 @@ describe('handleFallback', () => {
       expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
     });
 
-    it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails', async () => {
+    it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails with Retryable Error', async () => {
       const mockFallbackHandler = vi.fn().mockResolvedValue('stop');
       vi.mocked(mockConfig.fallbackModelHandler!).mockImplementation(
         mockFallbackHandler,
       );
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const retryableQuotaError = new RetryableQuotaError(
+        'Capacity error',
+        mockGoogleApiError,
+        5,
+      );
 
+      await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+        retryableQuotaError,
+      );
+
+      expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_MODEL,
+        retryableQuotaError,
+      );
+    });
+
+    it('should pass DEFAULT_GEMINI_FLASH_MODEL as fallback when Preview Model fails with other error', async () => {
       await handleFallback(
         mockConfig,
         PREVIEW_GEMINI_MODEL,
@@ -342,7 +367,7 @@ describe('handleFallback', () => {
 
       expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
         PREVIEW_GEMINI_MODEL,
-        DEFAULT_GEMINI_MODEL,
+        DEFAULT_GEMINI_FLASH_MODEL,
         undefined,
       );
     });
