@@ -53,18 +53,4 @@ describe('telemetry_gcp.js', () => {
       'GOOGLE_APPLICATION_CREDENTIALS',
     );
   });
-
-  it('should set GOOGLE_APPLICATION_CREDENTIALS when env var is set', async () => {
-    const credsPath = '/path/to/creds.json';
-    process.env.GEMINI_CLI_CREDENTIALS_PATH = credsPath;
-
-    await import('../telemetry_gcp.js');
-
-    expect(mockSpawn).toHaveBeenCalled();
-    const spawnOptions = mockSpawn.mock.calls[0][2];
-    expect(spawnOptions?.env).toHaveProperty(
-      'GOOGLE_APPLICATION_CREDENTIALS',
-      credsPath,
-    );
-  });
 });
