@@ -110,14 +110,15 @@ Write-Host "Validating patched file syntax..."
 try {
     $nodeCheck = & node --check $tempFile 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Syntax validation failed:`n$nodeCheck"
+        Write-Host "Syntax validation failed!" -ForegroundColor Red
+        Write-Host "Node output:`n$nodeCheck" -ForegroundColor Yellow
         Write-Host "Restoring original file..."
         Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
         exit 1
     }
-    Write-Host "Syntax validation passed."
+    Write-Host "Syntax validation passed." -ForegroundColor Green
 } catch {
-    Write-Error "Failed to run node --check: $_"
+    Write-Host "Failed to run node --check: $_" -ForegroundColor Red
     Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
     exit 1
 }
