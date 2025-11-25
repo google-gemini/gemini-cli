@@ -29,20 +29,10 @@ async function resumeFromIdentifier(
     };
   }
 
-  const trimmedId = identifier.trim();
-  if (!trimmedId) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content:
-        'Missing session identifier. Usage: /resume <number|uuid|latest>. Use --list-sessions to see available sessions.',
-    };
-  }
-
   const sessionSelector = new SessionSelector(config);
 
   try {
-    const result = await sessionSelector.resolveSession(trimmedId);
+    const result = await sessionSelector.resolveSession(identifier);
     const resumedSessionData: ResumedSessionData = {
       conversation: result.sessionData,
       filePath: result.sessionPath,

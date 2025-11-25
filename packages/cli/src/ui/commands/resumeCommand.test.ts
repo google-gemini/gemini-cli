@@ -50,7 +50,9 @@ describe('resumeCommand', () => {
       setSessionId: vi.fn(),
     } as unknown as Config;
 
-    mockContext = createMockCommandContext();
+    mockContext = createMockCommandContext({
+      services: { config: mockConfig },
+    });
   });
 
   it('returns error message when no identifier is provided', async () => {
