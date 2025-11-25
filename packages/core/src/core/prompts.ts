@@ -110,12 +110,11 @@ export function getCoreSystemPrompt(
     config.getModel(),
     config.getPreviewFeatures(),
   );
-  // We keep this variable as it handles the "Tone" logic in the original file naturally.
-  const useChattySystemPrompt = desiredModel === PREVIEW_GEMINI_MODEL;
 
-  // Logic specific to Gemini 3 vs others
-  const mandatesVariant = useChattySystemPrompt
-    ? `- **No silent actions:** A very short and concise natural explanation (one sentence) is required before calling tools (e.g., "I'll search the 'src' folder to find where that component is defined", "Since the tests failed, I will fix the imports in 'src/index.js'").`
+  const isGemini3 = desiredModel === PREVIEW_GEMINI_MODEL;
+
+  const mandatesVariant = isGemini3
+    ? `- **Do not call tools in silence:** You must provide to the user very short and concise natural explanation (one sentence) before calling tools.`
     : ``;
 
   const enableCodebaseInvestigator = config
@@ -230,7 +229,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 ${(function () {
-  if (useChattySystemPrompt) {
+  if (isGemini3) {
     return '';
   } else {
     return '- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.';
