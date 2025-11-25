@@ -717,6 +717,12 @@ export class GeminiClient {
           const { extractedGoals, shouldPromptUser, skipReason, selectedGoal } =
             await this.prepareDeliberateCompression(prompt_id, isSafetyValve);
 
+          debugLogger.debug(
+            `Deliberate compression: shouldPromptUser=${shouldPromptUser}, ` +
+              `goals=${extractedGoals?.length ?? 0}, skipReason=${skipReason}, ` +
+              `isSafetyValve=${isSafetyValve}`,
+          );
+
           if (shouldPromptUser && extractedGoals) {
             const selection = await onShowCompressionPrompt(
               extractedGoals,
@@ -760,6 +766,21 @@ export class GeminiClient {
             debugLogger.debug(
               `Skipping compression prompt due to: ${skipReason}. Falling back to basic compression.`,
             );
+            // Emit feedback so user knows why prompt was skipped
+            if (skipReason === 'safety_valve') {
+              coreEvents.emitFeedback(
+                'info',
+                'Context limit reached - compressing automatically.',
+              );
+            } else if (
+              skipReason === 'no_goals' ||
+              skipReason === 'extraction_failed'
+            ) {
+              coreEvents.emitFeedback(
+                'info',
+                `Compressing context (${skipReason}).`,
+              );
+            }
             compressionOptions = this.createCompressionOptions(
               selectedGoal || 'auto',
             );
