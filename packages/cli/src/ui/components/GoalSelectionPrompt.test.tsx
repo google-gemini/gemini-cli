@@ -205,6 +205,93 @@ describe('GoalSelectionPrompt', () => {
     expect(items[3].value).toBe('less_frequent');
   });
 
+  describe('Safety Valve Mode', () => {
+    it('should hide opt-out options when isSafetyValve is true', () => {
+      const goals = ['Some goal'];
+
+      renderWithProviders(
+        <GoalSelectionPrompt
+          goals={goals}
+          onSelect={mockOnSelect}
+          terminalWidth={80}
+          isSafetyValve={true}
+        />,
+      );
+
+      const callProps = MockedRadioButtonSelect.mock.calls[0][0];
+      const items = callProps.items;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const values = items.map((item: any) => item.value);
+
+      // Should NOT include disable and less_frequent options
+      expect(values).not.toContain('disable');
+      expect(values).not.toContain('less_frequent');
+
+      // Should still include goal, auto, and other
+      expect(values).toContain('Some goal');
+      expect(values).toContain('auto');
+      expect(values).toContain('other');
+    });
+
+    it('should show opt-out options when isSafetyValve is false', () => {
+      const goals = ['Some goal'];
+
+      renderWithProviders(
+        <GoalSelectionPrompt
+          goals={goals}
+          onSelect={mockOnSelect}
+          terminalWidth={80}
+          isSafetyValve={false}
+        />,
+      );
+
+      const callProps = MockedRadioButtonSelect.mock.calls[0][0];
+      const items = callProps.items;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const values = items.map((item: any) => item.value);
+
+      // Should include all options including disable and less_frequent
+      expect(values).toContain('disable');
+      expect(values).toContain('less_frequent');
+    });
+
+    it('should show urgent message when isSafetyValve is true', () => {
+      const { lastFrame } = renderWithProviders(
+        <GoalSelectionPrompt
+          goals={['Test goal']}
+          onSelect={mockOnSelect}
+          terminalWidth={80}
+          isSafetyValve={true}
+        />,
+      );
+
+      // Should show urgent message
+      expect(lastFrame()).toContain(
+        'Context window nearly full - compression required',
+      );
+      expect(lastFrame()).toContain(
+        'Compressing now to avoid hitting context limits',
+      );
+    });
+
+    it('should show normal message when isSafetyValve is false', () => {
+      const { lastFrame } = renderWithProviders(
+        <GoalSelectionPrompt
+          goals={['Test goal']}
+          onSelect={mockOnSelect}
+          terminalWidth={80}
+          isSafetyValve={false}
+        />,
+      );
+
+      // Should show normal message
+      expect(lastFrame()).toContain('Context window is filling up');
+      expect(lastFrame()).toContain(
+        "We'll compress the conversation to free up space",
+      );
+    });
+  });
+
   describe('Countdown Timer', () => {
     it('should display countdown timer with initial timeout seconds', () => {
       const { lastFrame } = renderWithProviders(

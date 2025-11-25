@@ -17,10 +17,16 @@ interface GoalSelectionPromptProps {
   ) => void;
   terminalWidth: number;
   timeoutSeconds?: number;
+  /**
+   * When true (safety valve triggered), opt-out options are hidden
+   * as compression is mandatory at high utilization.
+   */
+  isSafetyValve?: boolean;
 }
 
 export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
-  const { goals, onSelect, terminalWidth, timeoutSeconds } = props;
+  const { goals, onSelect, terminalWidth, timeoutSeconds, isSafetyValve } =
+    props;
 
   // Track whether user has already made a selection
   const hasSelectedRef = useRef(false);
@@ -52,6 +58,7 @@ export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
     }
   };
 
+  // Build menu items - opt-out options hidden when safety valve triggers
   const items = [
     ...goals.map((goal) => ({
       label: goal,
@@ -68,16 +75,22 @@ export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
       value: 'other',
       key: 'other',
     },
-    {
-      label: "Don't ask me again",
-      value: 'disable',
-      key: 'disable',
-    },
-    {
-      label: 'Check in less often',
-      value: 'less_frequent',
-      key: 'less_frequent',
-    },
+    // Only show opt-out options when NOT safety valve
+    // At safety valve, compression is mandatory
+    ...(isSafetyValve
+      ? []
+      : [
+          {
+            label: "Don't ask me again",
+            value: 'disable',
+            key: 'disable',
+          },
+          {
+            label: 'Check in less often',
+            value: 'less_frequent',
+            key: 'less_frequent',
+          },
+        ]),
   ];
 
   return (
@@ -90,11 +103,18 @@ export const GoalSelectionPrompt = (props: GoalSelectionPromptProps) => {
       width={Math.min(terminalWidth - 4, 100)}
     >
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          Context window is filling up
+        <Text
+          bold
+          color={isSafetyValve ? theme.status.warning : theme.text.primary}
+        >
+          {isSafetyValve
+            ? 'Context window nearly full - compression required'
+            : 'Context window is filling up'}
         </Text>
         <Text color={theme.text.secondary}>
-          We&apos;ll compress the conversation to free up space.
+          {isSafetyValve
+            ? 'Compressing now to avoid hitting context limits.'
+            : "We'll compress the conversation to free up space."}
         </Text>
       </Box>
 

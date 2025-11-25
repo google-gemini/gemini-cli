@@ -27,6 +27,9 @@ describe('compressCommand', () => {
             ({
               tryCompressChat: mockTryCompressChat,
             }) as unknown as GeminiClient,
+          // Mock interactive compression as disabled for basic compression tests
+          isCompressionInteractive: () => false,
+          isDeliberateCompressionEnabled: async () => false,
         },
       },
     });

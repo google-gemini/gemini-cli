@@ -708,7 +708,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [pendingRestorePrompt, userMessages, historyManager.history]);
 
   const handleCompressionPrompt = useCallback(
-    async (goals: string[]) =>
+    async (goals: string[], isSafetyValve: boolean = false) =>
       new Promise<string>((resolve) => {
         const showCustomGoalInput = () => {
           setCustomDialog(
@@ -731,6 +731,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           <GoalSelectionPrompt
             goals={goals}
             terminalWidth={terminalWidth}
+            isSafetyValve={isSafetyValve}
             onSelect={(goal) => {
               if (goal === 'other') {
                 // User wants to enter a custom goal
