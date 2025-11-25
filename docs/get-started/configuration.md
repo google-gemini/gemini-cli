@@ -510,6 +510,11 @@ their corresponding top-level category object in your `settings.json` file.
         "modelConfig": {
           "model": "gemini-2.5-flash-lite"
         }
+      },
+      "chat-compression-default": {
+        "modelConfig": {
+          "model": "gemini-2.5-pro"
+        }
       }
     }
     ```
@@ -764,6 +769,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.isModelAvailabilityServiceEnabled`** (boolean):
+  - **Description:** Enable model routing using new availability service.
   - **Default:** `false`
   - **Requires restart:** Yes
 
