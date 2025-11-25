@@ -222,7 +222,11 @@ export function runSensitiveKeywordLinter() {
   let violationsFound = false;
 
   for (const file of changedFiles) {
-    if (!existsSync(file) || lstatSync(file).isDirectory()) {
+    if (
+      !existsSync(file) ||
+      lstatSync(file).isDirectory() ||
+      lstatSync(file).isSymbolicLink()
+    ) {
       continue;
     }
     const content = readFileSync(file, 'utf-8');
