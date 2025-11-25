@@ -33,13 +33,18 @@ import {
 const mockCoreEvents = vi.hoisted(() => ({
   on: vi.fn(),
   off: vi.fn(),
-  drainFeedbackBacklog: vi.fn(),
+  drainBacklogs: vi.fn(),
   emit: vi.fn(),
 }));
 
 // Mock IdeClient
 const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
+}));
+
+// Mock stdout
+const mocks = vi.hoisted(() => ({
+  mockStdout: { write: vi.fn() },
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -49,6 +54,23 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     coreEvents: mockCoreEvents,
     IdeClient: mockIdeClient,
+    writeToStdout: vi.fn((...args) =>
+      process.stdout.write(
+        ...(args as Parameters<typeof process.stdout.write>),
+      ),
+    ),
+    writeToStderr: vi.fn((...args) =>
+      process.stderr.write(
+        ...(args as Parameters<typeof process.stderr.write>),
+      ),
+    ),
+    patchStdio: vi.fn(() => () => {}),
+    createInkStdio: vi.fn(() => ({
+      stdout: process.stdout,
+      stderr: process.stderr,
+    })),
+    enableMouseEvents: vi.fn(),
+    disableMouseEvents: vi.fn(),
   };
 });
 import type { LoadedSettings } from '../config/settings.js';
@@ -61,12 +83,11 @@ import {
 } from './contexts/UIActionsContext.js';
 
 // Mock useStdout to capture terminal title writes
-let mockStdout: { write: ReturnType<typeof vi.fn> };
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
   return {
     ...actual,
-    useStdout: () => ({ stdout: mockStdout }),
+    useStdout: () => ({ stdout: mocks.mockStdout }),
     measureElement: vi.fn(),
   };
 });
@@ -118,10 +139,6 @@ vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
-vi.mock('./utils/mouse.js', () => ({
-  enableMouseEvents: vi.fn(),
-  disableMouseEvents: vi.fn(),
-}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -146,9 +163,13 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { ShellExecutionService } from '@google/gemini-cli-core';
+import {
+  ShellExecutionService,
+  writeToStdout,
+  enableMouseEvents,
+  disableMouseEvents,
+} from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
-import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -215,7 +236,7 @@ describe('AppContainer State Management', () => {
     vi.clearAllMocks();
 
     // Initialize mock stdout for terminal title tests
-    mockStdout = { write: vi.fn() };
+    mocks.mockStdout.write.mockClear();
 
     // Mock computeWindowTitle function to centralize title logic testing
     vi.mock('../utils/windowTitle.js', async () => ({
@@ -886,7 +907,13 @@ describe('AppContainer State Management', () => {
   describe('Terminal Title Update Feature', () => {
     beforeEach(() => {
       // Reset mock stdout for each test
-      mockStdout = { write: vi.fn() };
+      mocks.mockStdout.write.mockClear();
+    });
+
+    it('verifies useStdout is mocked', async () => {
+      const { useStdout } = await import('ink');
+      const { stdout } = useStdout();
+      expect(stdout).toBe(mocks.mockStdout);
     });
 
     it('should not update terminal title when showStatusInTitle is false', () => {
@@ -909,9 +936,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that no title-related writes occurred
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(0);
       unmount();
     });
@@ -936,9 +964,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that no title-related writes occurred
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(0);
       unmount();
     });
@@ -974,9 +1003,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with thought subject
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
@@ -1014,9 +1044,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with default Idle text
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${'Gemini - workspace'.padEnd(80, ' ')}\x07`,
@@ -1055,9 +1086,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with confirmation text
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
@@ -1096,9 +1128,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title is padded to exactly 80 characters
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       const calledWith = titleWrites[0][0];
       const expectedTitle = shortTitle.padEnd(80, ' ');
@@ -1141,9 +1174,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that the correct ANSI escape sequence is used
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       const expectedEscapeSequence = `\x1b]2;${title.padEnd(80, ' ')}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
@@ -1183,9 +1217,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with CLI_TITLE value
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${'Custom Gemini Title'.padEnd(80, ' ')}\x07`,
@@ -1392,7 +1427,12 @@ describe('AppContainer State Management', () => {
         pressKey({ name: 'c', ctrl: true }, 2);
 
         expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
         unmount();
       });
 
@@ -1432,7 +1472,12 @@ describe('AppContainer State Management', () => {
 
         pressKey({ name: 'd', ctrl: true }, 2);
 
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/quit');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
         unmount();
       });
 
@@ -1483,7 +1528,7 @@ describe('AppContainer State Management', () => {
     };
 
     beforeEach(() => {
-      mockStdout.write.mockClear();
+      mocks.mockStdout.write.mockClear();
       mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
         handleGlobalKeypress = callback;
       });
@@ -1508,7 +1553,7 @@ describe('AppContainer State Management', () => {
     ])('$modeName', ({ isAlternateMode, shouldEnable }) => {
       it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when Ctrl+S is pressed`, async () => {
         await setupCopyModeTest(isAlternateMode);
-        mockStdout.write.mockClear(); // Clear initial enable call
+        mocks.mockStdout.write.mockClear(); // Clear initial enable call
 
         act(() => {
           handleGlobalKeypress({
@@ -1534,7 +1579,7 @@ describe('AppContainer State Management', () => {
       if (shouldEnable) {
         it('should toggle mouse back on when Ctrl+S is pressed again', async () => {
           await setupCopyModeTest(isAlternateMode);
-          mockStdout.write.mockClear();
+          (writeToStdout as Mock).mockClear();
 
           // Turn it on (disable mouse)
           act(() => {
@@ -1586,7 +1631,7 @@ describe('AppContainer State Management', () => {
           });
           rerender();
 
-          mockStdout.write.mockClear();
+          (writeToStdout as Mock).mockClear();
 
           // Press any other key
           act(() => {
@@ -1655,7 +1700,7 @@ describe('AppContainer State Management', () => {
         CoreEvent.UserFeedback,
         expect.any(Function),
       );
-      expect(mockCoreEvents.drainFeedbackBacklog).toHaveBeenCalledTimes(1);
+      expect(mockCoreEvents.drainBacklogs).toHaveBeenCalledTimes(1);
       unmount();
     });
 
@@ -1772,7 +1817,7 @@ describe('AppContainer State Management', () => {
     // Helper to extract arguments from the useGeminiStream hook call
     // This isolates the positional argument dependency to a single location
     const extractUseGeminiStreamArgs = (args: unknown[]) => ({
-      onCancelSubmit: args[14] as (shouldRestorePrompt?: boolean) => void,
+      onCancelSubmit: args[13] as (shouldRestorePrompt?: boolean) => void,
     });
 
     beforeEach(() => {
@@ -1821,6 +1866,78 @@ describe('AppContainer State Management', () => {
       });
 
       expect(mockSetText).toHaveBeenCalledWith('previous message');
+
+      unmount();
+    });
+
+    it('correctly restores prompt even if userMessages is stale (race condition fix)', async () => {
+      // Setup initial history with one message
+      const initialHistory = [{ type: 'user', text: 'Previous Prompt' }];
+      mockedUseHistory.mockReturnValue({
+        history: initialHistory,
+        addItem: vi.fn(),
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      let resolveLoggerPromise: (val: string[]) => void;
+      const loggerPromise = new Promise<string[]>((resolve) => {
+        resolveLoggerPromise = resolve;
+      });
+
+      // Mock logger to control when userMessages updates
+      const getPreviousUserMessagesMock = vi
+        .fn()
+        .mockResolvedValueOnce([]) // Initial mount
+        .mockReturnValueOnce(loggerPromise); // Second render (simulated update)
+
+      mockedUseLogger.mockReturnValue({
+        getPreviousUserMessages: getPreviousUserMessagesMock,
+      });
+
+      const { unmount, rerender } = renderAppContainer();
+
+      // Wait for userMessages to be populated with 'Previous Prompt'
+      await waitFor(() =>
+        expect(capturedUIState.userMessages).toContain('Previous Prompt'),
+      );
+
+      // Simulate a new prompt being added (e.g., user sent it, but it overflowed)
+      const newPrompt = 'Current Prompt that Overflowed';
+      const newHistory = [...initialHistory, { type: 'user', text: newPrompt }];
+
+      mockedUseHistory.mockReturnValue({
+        history: newHistory,
+        addItem: vi.fn(),
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      // Rerender to reflect the history change.
+      // This triggers the effect to update userMessages, but it hangs on loggerPromise.
+      rerender(getAppContainer());
+
+      const { onCancelSubmit } = extractUseGeminiStreamArgs(
+        mockedUseGeminiStream.mock.lastCall!,
+      );
+
+      // Call onCancelSubmit immediately. userMessages is still stale (has only 'Previous Prompt')
+      // because the effect is waiting on loggerPromise.
+      act(() => {
+        onCancelSubmit(true);
+      });
+
+      // Now resolve the promise to let the effect complete and update userMessages
+      await act(async () => {
+        resolveLoggerPromise!([]);
+      });
+
+      // With the fix, it should have waited for userMessages to update and then set the new prompt
+      await waitFor(() => {
+        expect(mockSetText).toHaveBeenCalledWith(newPrompt);
+      });
 
       unmount();
     });

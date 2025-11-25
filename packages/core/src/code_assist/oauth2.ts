@@ -19,7 +19,11 @@ import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Config } from '../config/config.js';
-import { getErrorMessage, FatalAuthenticationError } from '../utils/errors.js';
+import {
+  getErrorMessage,
+  FatalAuthenticationError,
+  FatalCancellationError,
+} from '../utils/errors.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
@@ -27,6 +31,19 @@ import { Storage } from '../config/storage.js';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  writeToStdout,
+  createInkStdio,
+  writeToStderr,
+} from '../utils/stdio.js';
+import {
+  enableLineWrapping,
+  disableMouseEvents,
+  disableKittyKeyboardProtocol,
+  enterAlternateScreen,
+  exitAlternateScreen,
+} from '../utils/terminal.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 const userAccountManager = new UserAccountManager();
 
@@ -185,16 +202,34 @@ async function initOauthClient(
   if (config.isBrowserLaunchSuppressed()) {
     let success = false;
     const maxRetries = 2;
-    for (let i = 0; !success && i < maxRetries; i++) {
-      success = await authWithUserCode(client);
-      if (!success) {
-        debugLogger.error(
-          '\nFailed to authenticate with user code.',
-          i === maxRetries - 1 ? '' : 'Retrying...\n',
-        );
+    // Enter alternate buffer
+    enterAlternateScreen();
+    // Clear screen and move cursor to top-left.
+    writeToStdout('\u001B[2J\u001B[H');
+    disableMouseEvents();
+    disableKittyKeyboardProtocol();
+    enableLineWrapping();
+
+    try {
+      for (let i = 0; !success && i < maxRetries; i++) {
+        success = await authWithUserCode(client);
+        if (!success) {
+          writeToStderr(
+            '\nFailed to authenticate with user code.' +
+              (i === maxRetries - 1 ? '' : ' Retrying...\n'),
+          );
+        }
       }
+    } finally {
+      exitAlternateScreen();
+      // If this was triggered from an active Gemini CLI TUI this event ensures
+      // the TUI will re-initialize the terminal state just like it will when
+      // another editor like VIM may have modified the buffer of settings.
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
     }
+
     if (!success) {
+      writeToStderr('Failed to authenticate with user code.\n');
       throw new FatalAuthenticationError(
         'Failed to authenticate with user code.',
       );
@@ -202,11 +237,13 @@ async function initOauthClient(
   } else {
     const webLogin = await authWithWeb(client);
 
-    debugLogger.log(
-      `\n\nCode Assist login required.\n` +
+    coreEvents.emit(CoreEvent.UserFeedback, {
+      severity: 'info',
+      message:
+        `\n\nCode Assist login required.\n` +
         `Attempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
-    );
+        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
+    });
     try {
       // Attempt to open the authentication URL in the default browser.
       // We do not use the `wait` option here because the main script's execution
@@ -218,23 +255,28 @@ async function initOauthClient(
       // in a minimal Docker container), it will emit an unhandled 'error' event,
       // causing the entire Node.js process to crash.
       childProcess.on('error', (error) => {
-        debugLogger.error(
-          `Failed to open browser with error:`,
-          getErrorMessage(error),
-          `\nPlease try running again with NO_BROWSER=true set.`,
-        );
+        coreEvents.emit(CoreEvent.UserFeedback, {
+          severity: 'error',
+          message:
+            `Failed to open browser with error: ${getErrorMessage(error)}\n` +
+            `Please try running again with NO_BROWSER=true set.`,
+        });
       });
     } catch (err) {
-      debugLogger.error(
-        `Failed to open browser with error:`,
-        getErrorMessage(err),
-        `\nPlease try running again with NO_BROWSER=true set.`,
-      );
+      coreEvents.emit(CoreEvent.UserFeedback, {
+        severity: 'error',
+        message:
+          `Failed to open browser with error: ${getErrorMessage(err)}\n` +
+          `Please try running again with NO_BROWSER=true set.`,
+      });
       throw new FatalAuthenticationError(
         `Failed to open browser: ${getErrorMessage(err)}`,
       );
     }
-    debugLogger.log('Waiting for authentication...');
+    coreEvents.emit(CoreEvent.UserFeedback, {
+      severity: 'info',
+      message: 'Waiting for authentication...\n',
+    });
 
     // Add timeout to prevent infinite waiting when browser tab gets stuck
     const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
@@ -250,6 +292,11 @@ async function initOauthClient(
     });
 
     await Promise.race([webLogin.loginCompletePromise, timeoutPromise]);
+
+    coreEvents.emit(CoreEvent.UserFeedback, {
+      severity: 'info',
+      message: 'Authentication succeeded\n',
+    });
   }
 
   return client;
@@ -266,55 +313,77 @@ export async function getOauthClient(
 }
 
 async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
-  const redirectUri = 'https://codeassist.google.com/authcode';
-  const codeVerifier = await client.generateCodeVerifierAsync();
-  const state = crypto.randomBytes(32).toString('hex');
-  const authUrl: string = client.generateAuthUrl({
-    redirect_uri: redirectUri,
-    access_type: 'offline',
-    scope: OAUTH_SCOPE,
-    code_challenge_method: CodeChallengeMethod.S256,
-    code_challenge: codeVerifier.codeChallenge,
-    state,
-  });
-  debugLogger.log(
-    'Please visit the following URL to authorize the application:',
-  );
-  debugLogger.log('');
-  debugLogger.log(authUrl);
-  debugLogger.log('');
-
-  const code = await new Promise<string>((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    rl.question('Enter the authorization code: ', (code) => {
-      rl.close();
-      resolve(code.trim());
-    });
-  });
-
-  if (!code) {
-    debugLogger.error('Authorization code is required.');
-    return false;
-  }
-
   try {
-    const { tokens } = await client.getToken({
-      code,
-      codeVerifier: codeVerifier.codeVerifier,
+    const redirectUri = 'https://codeassist.google.com/authcode';
+    const codeVerifier = await client.generateCodeVerifierAsync();
+    const state = crypto.randomBytes(32).toString('hex');
+    const authUrl: string = client.generateAuthUrl({
       redirect_uri: redirectUri,
+      access_type: 'offline',
+      scope: OAUTH_SCOPE,
+      code_challenge_method: CodeChallengeMethod.S256,
+      code_challenge: codeVerifier.codeChallenge,
+      state,
     });
-    client.setCredentials(tokens);
-  } catch (error) {
+    writeToStdout(
+      'Please visit the following URL to authorize the application:\n\n' +
+        authUrl +
+        '\n\n',
+    );
+
+    const code = await new Promise<string>((resolve, _) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: createInkStdio().stdout,
+        terminal: true,
+      });
+
+      rl.question('Enter the authorization code: ', (code) => {
+        rl.close();
+        resolve(code.trim());
+      });
+    });
+
+    if (!code) {
+      writeToStderr('Authorization code is required.\n');
+      debugLogger.error('Authorization code is required.');
+      return false;
+    }
+
+    try {
+      const { tokens } = await client.getToken({
+        code,
+        codeVerifier: codeVerifier.codeVerifier,
+        redirect_uri: redirectUri,
+      });
+      client.setCredentials(tokens);
+    } catch (error) {
+      writeToStderr(
+        'Failed to authenticate with authorization code:' +
+          getErrorMessage(error) +
+          '\n',
+      );
+
+      debugLogger.error(
+        'Failed to authenticate with authorization code:',
+        getErrorMessage(error),
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    if (err instanceof FatalCancellationError) {
+      throw err;
+    }
+    writeToStderr(
+      'Failed to authenticate with user code:' + getErrorMessage(err) + '\n',
+    );
     debugLogger.error(
-      'Failed to authenticate with authorization code:',
-      getErrorMessage(error),
+      'Failed to authenticate with user code:',
+      getErrorMessage(err),
     );
     return false;
   }
-  return true;
 }
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
