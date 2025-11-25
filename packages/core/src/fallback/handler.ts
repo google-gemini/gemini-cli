@@ -17,6 +17,7 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
+import { RetryableQuotaError } from '../utils/googleQuotaErrors.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -70,7 +71,12 @@ export async function handleFallback(
     // Process Intent and Update State
     switch (intent) {
       case 'retry_always':
-        if (failedModel === PREVIEW_GEMINI_MODEL) {
+        // If the error is retryable (a temporary issue), fall back to the default Pro model.
+        // For all other errors, including TerminalQuotaError, trigger a regular fallback to Flash.
+        if (
+          failedModel === PREVIEW_GEMINI_MODEL &&
+          error instanceof RetryableQuotaError
+        ) {
           activatePreviewModelFallbackMode(config);
         } else {
           activateFallbackMode(config, authType);
