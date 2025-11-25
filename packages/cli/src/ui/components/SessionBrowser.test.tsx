@@ -57,7 +57,10 @@ vi.mock('./SessionBrowser.js', async (importOriginal) => {
       moveSelection,
       cycleSortOrder,
       props.onResumeSession,
-      props.onDeleteSession,
+      props.onDeleteSession ??
+        (async () => {
+          // no-op delete handler for tests that don't care about deletion
+        }),
       props.onExit,
     );
 
@@ -146,19 +149,20 @@ describe('SessionBrowser component', () => {
   it('shows empty state when no sessions exist', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[]}
       />,
     );
 
-    expect(lastFrame()).toContain('No auto-saved conversations found.');
-    expect(lastFrame()).toContain('Press q to exit');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders a list of sessions and marks current session as disabled', () => {
@@ -182,22 +186,20 @@ describe('SessionBrowser component', () => {
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[session1, session2]}
       />,
     );
 
-    const output = lastFrame();
-    expect(output).toContain('Chat Sessions (2 total');
-    expect(output).toContain('First conversation about cats');
-    expect(output).toContain('Second conversation about dogs');
-    expect(output).toContain('(current)');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('enters search mode, filters sessions, and renders match snippets', async () => {
@@ -214,6 +216,7 @@ describe('SessionBrowser component', () => {
         },
       ],
       index: 0,
+      lastUpdated: '2025-01-01T12:00:00Z',
     });
 
     const otherSession = createSession({
@@ -229,16 +232,19 @@ describe('SessionBrowser component', () => {
         },
       ],
       index: 1,
+      lastUpdated: '2025-01-01T10:00:00Z',
     });
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[searchSession, otherSession]}
       />,
@@ -259,15 +265,9 @@ describe('SessionBrowser component', () => {
     }
 
     await waitFor(() => {
-      const output = lastFrame();
-      expect(output).toContain('Chat Sessions (1 total, filtered');
-      expect(output).toContain('Query is here');
-      expect(output).not.toContain('Nothing interesting here.');
-
-      expect(output).toContain('You:');
-      expect(output).toContain('query');
-      expect(output).toContain('(+1 more)');
+      expect(lastFrame()).toContain('Chat Sessions (1 total, filtered');
     });
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('handles keyboard navigation and resumes the selected session', () => {
@@ -276,22 +276,26 @@ describe('SessionBrowser component', () => {
       file: 'one',
       displayName: 'First session',
       index: 0,
+      lastUpdated: '2025-01-02T12:00:00Z',
     });
     const session2 = createSession({
       id: 'two',
       file: 'two',
       displayName: 'Second session',
       index: 1,
+      lastUpdated: '2025-01-01T12:00:00Z',
     });
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testSessions={[session1, session2]}
       />,
@@ -317,6 +321,7 @@ describe('SessionBrowser component', () => {
       displayName: 'Current session',
       isCurrentSession: true,
       index: 0,
+      lastUpdated: '2025-01-02T12:00:00Z',
     });
     const otherSession = createSession({
       id: 'other',
@@ -324,11 +329,12 @@ describe('SessionBrowser component', () => {
       displayName: 'Other session',
       isCurrentSession: false,
       index: 1,
+      lastUpdated: '2025-01-01T12:00:00Z',
     });
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
-    const onDeleteSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     render(
@@ -353,19 +359,19 @@ describe('SessionBrowser component', () => {
   it('shows an error state when loading sessions fails', () => {
     const config = createMockConfig();
     const onResumeSession = vi.fn();
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
     const { lastFrame } = render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
+        onDeleteSession={onDeleteSession}
         onExit={onExit}
         testError="storage failure"
       />,
     );
 
-    const output = lastFrame();
-    expect(output).toContain('Error: storage failure');
-    expect(output).toContain('Press q to exit');
+    expect(lastFrame()).toMatchSnapshot();
   });
 });
