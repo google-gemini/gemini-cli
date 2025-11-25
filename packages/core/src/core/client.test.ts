@@ -255,6 +255,10 @@ describe('Gemini Client (client.ts)', () => {
       isCompressionInteractive: vi.fn().mockReturnValue(true),
       getCompressionPromptTimeout: vi.fn().mockReturnValue(30),
       getCompressionFrequencyMultiplier: vi.fn().mockReturnValue(1.5),
+      isDeliberateCompressionEnabled: vi.fn().mockReturnValue(true),
+      setCompressionTriggerTokens: vi.fn(),
+      setCompressionMinMessages: vi.fn(),
+      setCompressionInteractive: vi.fn(),
     } as unknown as Config;
     mockConfig.getHookSystem = vi
       .fn()
@@ -2568,5 +2572,242 @@ ${JSON.stringify(
     });
 
     // Note: Removed streaming guard test since Turn.isStreaming() doesn't exist yet
+  });
+
+  describe('post-response compression timing', () => {
+    it('should trigger compression check AFTER response completes, not before', async () => {
+      // Arrange: Set up conditions that would trigger compression
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(
+        45000,
+      );
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockReturnValue(
+        40000,
+      );
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockReturnValue(
+        2,
+      );
+      vi.spyOn(
+        client['config'],
+        'getCompressionMinTimeBetweenPrompts',
+      ).mockReturnValue(5);
+
+      client['messagesSinceLastCompress'] = 10;
+      client['lastCompressionTime'] = Date.now() - 60000;
+
+      // Track order of operations
+      const operationOrder: string[] = [];
+
+      // Mock Turn.run to track when response streaming happens
+      mockTurnRunFn.mockImplementation(function* () {
+        operationOrder.push('response_streaming_started');
+        yield { type: GeminiEventType.Text, value: 'Hello' };
+        operationOrder.push('response_streaming_completed');
+      });
+
+      // Mock tryCompressChat to track when compression happens
+      vi.spyOn(client, 'tryCompressChat').mockImplementation(async () => {
+        operationOrder.push('compression_executed');
+        return {
+          compressionStatus: CompressionStatus.COMPRESSED,
+          originalTokenCount: 45000,
+          newTokenCount: 20000,
+        };
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-timing-test',
+      );
+      await fromAsync(stream);
+
+      // Assert: Compression should happen AFTER response, not before
+      expect(operationOrder).toEqual([
+        'response_streaming_started',
+        'response_streaming_completed',
+        'compression_executed',
+      ]);
+    });
+
+    it('should NOT trigger compression on recursive calls (next-speaker check)', async () => {
+      // Arrange: Set up conditions that would trigger compression
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(
+        45000,
+      );
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockReturnValue(
+        40000,
+      );
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockReturnValue(
+        2,
+      );
+      vi.spyOn(
+        client['config'],
+        'getCompressionMinTimeBetweenPrompts',
+      ).mockReturnValue(5);
+      vi.spyOn(client['config'], 'getSkipNextSpeakerCheck').mockReturnValue(
+        false,
+      );
+
+      client['messagesSinceLastCompress'] = 10;
+      client['lastCompressionTime'] = Date.now() - 60000;
+
+      // Mock next speaker to return 'model' (causing recursive call via return yield*)
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      let callCount = 0;
+      vi.mocked(checkNextSpeaker).mockImplementation(async () => {
+        callCount++;
+        // First call returns 'model' to trigger recursion, second returns 'user' to stop
+        return callCount === 1
+          ? { next_speaker: 'model', reasoning: 'needs to continue' }
+          : { next_speaker: 'user', reasoning: 'done' };
+      });
+
+      mockTurnRunFn.mockImplementation(function* () {
+        yield { type: GeminiEventType.Text, value: 'Response' };
+      });
+
+      const tryCompressSpy = vi
+        .spyOn(client, 'tryCompressChat')
+        .mockResolvedValue({
+          compressionStatus: CompressionStatus.COMPRESSED,
+          originalTokenCount: 45000,
+          newTokenCount: 20000,
+        });
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-recursive-test',
+      );
+      await fromAsync(stream);
+
+      // Assert: When flow goes through 'return yield*' recursive call,
+      // the outer call never reaches post-compression code.
+      // The inner call has isTopLevelCall=false, so no compression happens.
+      // This is expected - compression is skipped during recursive flows.
+      expect(tryCompressSpy).toHaveBeenCalledTimes(0);
+    });
+
+    it('should compress when turn completes with no pending tool calls', async () => {
+      // This test verifies the positive case: compression happens when
+      // there are NO pending tool calls. Testing the negative case (with pending
+      // tool calls) requires integration testing since the MockTurn class
+      // is statically mocked at module load time.
+
+      // Arrange: Set up conditions that would trigger compression
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(
+        45000,
+      );
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockReturnValue(
+        40000,
+      );
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockReturnValue(
+        2,
+      );
+      vi.spyOn(
+        client['config'],
+        'getCompressionMinTimeBetweenPrompts',
+      ).mockReturnValue(5);
+
+      client['messagesSinceLastCompress'] = 10;
+      client['lastCompressionTime'] = Date.now() - 60000;
+
+      // MockTurn has pendingToolCalls = [] by default (no pending tools)
+      mockTurnRunFn.mockImplementation(function* () {
+        yield { type: GeminiEventType.Text, value: 'Here is the answer' };
+      });
+
+      const tryCompressSpy = vi
+        .spyOn(client, 'tryCompressChat')
+        .mockResolvedValue({
+          compressionStatus: CompressionStatus.COMPRESSED,
+          originalTokenCount: 45000,
+          newTokenCount: 20000,
+        });
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'What is 2+2?' }],
+        new AbortController().signal,
+        'prompt-id-no-tools-test',
+      );
+      await fromAsync(stream);
+
+      // Assert: Should compress when no tool calls are pending
+      expect(tryCompressSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show compression dialog after user sees response', async () => {
+      // Arrange
+      vi.spyOn(client['chat']!, 'getLastPromptTokenCount').mockReturnValue(
+        45000,
+      );
+      vi.spyOn(client['config'], 'getCompressionTriggerTokens').mockReturnValue(
+        40000,
+      );
+      vi.spyOn(client['config'], 'getCompressionMinMessages').mockReturnValue(
+        2,
+      );
+      vi.spyOn(
+        client['config'],
+        'getCompressionMinTimeBetweenPrompts',
+      ).mockReturnValue(5);
+      vi.spyOn(client['config'], 'isCompressionInteractive').mockReturnValue(
+        true,
+      );
+
+      client['messagesSinceLastCompress'] = 10;
+      client['lastCompressionTime'] = Date.now() - 60000;
+
+      const eventsReceived: string[] = [];
+
+      mockTurnRunFn.mockImplementation(function* () {
+        yield { type: GeminiEventType.Text, value: 'Here is your answer!' };
+      });
+
+      // Mock the compression prompt callback
+      const mockCompressionPrompt = vi.fn().mockResolvedValue('auto');
+
+      vi.spyOn(client, 'prepareDeliberateCompression').mockResolvedValue({
+        extractedGoals: ['Goal 1', 'Goal 2'],
+        shouldPromptUser: true,
+        skipReason: undefined,
+        userSelection: undefined,
+      });
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        compressionStatus: CompressionStatus.COMPRESSED,
+        originalTokenCount: 45000,
+        newTokenCount: 20000,
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-dialog-test',
+        10,
+        false,
+        mockCompressionPrompt,
+      );
+
+      for await (const event of stream) {
+        eventsReceived.push(event.type);
+      }
+
+      // Assert: Text event should come BEFORE compression dialog is shown
+      const textIndex = eventsReceived.indexOf(GeminiEventType.Text);
+      const compressionIndex = eventsReceived.indexOf(
+        GeminiEventType.ChatCompressed,
+      );
+
+      expect(textIndex).toBeGreaterThanOrEqual(0);
+      expect(compressionIndex).toBeGreaterThan(textIndex);
+      expect(mockCompressionPrompt).toHaveBeenCalled();
+    });
   });
 });
