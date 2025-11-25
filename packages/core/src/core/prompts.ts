@@ -373,76 +373,94 @@ export function getCompressionPrompt(): string {
 export function getChatCompressionPrompt(userGoal?: string): string {
   const goalSection = userGoal
     ? `
-The user has indicated they are currently working on:
-<current_goal>
-${userGoal}
-</current_goal>
+## CURRENT FOCUS
+The user is working on: "${userGoal}"
 
-When creating your summary, prioritize information relevant to this goal.
-De-emphasize or omit details unrelated to the current trajectory.
+This goal is your PRIMARY filter. Aggressively prioritize information that helps continue this work. Omit tangential details, abandoned approaches, and resolved issues unrelated to this trajectory.
 
 `
     : '';
 
-  return `${goalSection}You are the component that summarizes internal chat history into a given structure.
+  return `${goalSection}You compress conversation history into a structured snapshot that becomes the agent's ONLY memory.
 
-When the conversation history grows too large, you will be invoked to distill the entire history into a concise, structured XML snapshot. This snapshot is CRITICAL, as it will become the agent's *only* memory of the past. The agent will resume its work based solely on this snapshot. All crucial details, plans, errors, and user directives MUST be preserved.
+## PRIORITY ORDER (preserve in this order)
+1. **Blockers & errors** - Unresolved failures, error messages, things that didn't work
+2. **User corrections** - Times the user said "no", "don't", "actually", or redirected approach
+3. **Decisions made** - Architectural choices, library selections, approach commitments
+4. **Current state** - What exists now (files, code, config) vs what existed before
+5. **Next steps** - What was about to happen when compression triggered
 
-First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information that is essential for future actions.
+## WHAT TO OMIT
+- Successful operations that are now complete (the result matters, not the process)
+- Exploratory reads that didn't yield useful information
+- Verbose tool outputs - summarize to the key finding
+- Pleasantries, acknowledgments, thinking-out-loud that led nowhere
 
-After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+## PROCESS
+First, analyze in <scratchpad>:
+- What is the user trying to accomplish RIGHT NOW?
+- What failed or is blocking progress?
+- What did the user explicitly tell me NOT to do?
+- What files/code exist in what state?
+- What was I about to do next?
 
-The structure MUST be as follows:
+Then output <state_snapshot> with ONLY essential information. Be dense. Every word should help the agent continue effectively.
 
 <state_snapshot>
-    <overall_goal>
-        <!-- A single, concise sentence describing the user's high-level objective. -->
-        <!-- Example: "Refactor the authentication service to use a new JWT library." -->
-    </overall_goal>
+    <goal>
+        <!-- What the user is trying to accomplish, in their words if possible -->
+    </goal>
 
-    <key_knowledge>
-        <!-- Crucial facts, conventions, and constraints the agent must remember based on the conversation history and interaction with the user. Use bullet points. -->
+    <blockers>
+        <!-- CRITICAL: Unresolved errors, failures, things that didn't work. Include error messages. -->
         <!-- Example:
-         - Build Command: \`npm run build\`
-         - Testing: Tests are run with \`npm test\`. Test files must end in \`.test.ts\`.
-         - API Endpoint: The primary API endpoint is \`https://api.example.com/v2\`.
-
+         - \`npm run build\` fails: "Cannot find module './config'" in auth.ts:42
+         - OAuth redirect not working - callback URL mismatch suspected
+         - User rejected Redis approach, wants in-memory solution
         -->
-    </key_knowledge>
+    </blockers>
 
-    <file_system_state>
-        <!-- List files that have been created, read, modified, or deleted. Note their status and critical learnings. -->
+    <decisions>
+        <!-- Choices that were made and WHY - prevents re-exploring rejected paths -->
         <!-- Example:
-         - CWD: \`/home/user/project/src\`
-         - READ: \`package.json\` - Confirmed 'axios' is a dependency.
-         - MODIFIED: \`services/auth.ts\` - Replaced 'jsonwebtoken' with 'jose'.
-         - CREATED: \`tests/new-feature.test.ts\` - Initial test structure for the new feature.
+         - Using jose instead of jsonwebtoken (user preference: smaller bundle)
+         - Keeping backward compat for /api/v1 endpoints (explicit user requirement)
+         - NOT using TypeORM - user said "too heavy, use raw SQL"
         -->
-    </file_system_state>
+    </decisions>
 
-    <recent_actions>
-        <!-- A summary of the last few significant agent actions and their outcomes. Focus on facts. -->
+    <current_state>
+        <!-- What exists NOW. Files, their status, key content. -->
         <!-- Example:
-         - Ran \`grep 'old_function'\` which returned 3 results in 2 files.
-         - Ran \`npm run test\`, which failed due to a snapshot mismatch in \`UserProfile.test.ts\`.
-         - Ran \`ls -F static/\` and discovered image assets are stored as \`.webp\`.
+         - CWD: /home/user/project
+         - MODIFIED: src/auth.ts - Added JWT validation, but missing refresh token logic
+         - CREATED: src/types/auth.d.ts - Token interfaces defined
+         - tests/auth.test.ts - 3 passing, 2 failing (refresh token tests)
         -->
-    </recent_actions>
+    </current_state>
 
-    <current_plan>
-        <!-- The agent's step-by-step plan. Mark completed steps. -->
+    <context>
+        <!-- Facts needed to continue: commands, conventions, constraints -->
         <!-- Example:
-         1. [DONE] Identify all files using the deprecated 'UserAPI'.
-         2. [IN PROGRESS] Refactor \`src/components/UserProfile.tsx\` to use the new 'ProfileAPI'.
-         3. [TODO] Refactor the remaining files.
-         4. [TODO] Update tests to reflect the API change.
+         - Build: \`npm run build\`, Test: \`npm test\`
+         - API base: https://api.example.com/v2
+         - Auth header format: "Bearer {token}"
+         - User prefers explicit error handling over try/catch
         -->
-    </current_plan>
+    </context>
 
-    <discarded_context_summary>
-        <!-- One sentence about what was omitted from the original history and why. Helps the user understand what context was deliberately removed. -->
-        <!-- Example: "Omitted earlier exploration of database migration approaches that were rejected in favor of the current JWT refactoring work." -->
-    </discarded_context_summary>
+    <next_steps>
+        <!-- What was about to happen. Be specific. -->
+        <!-- Example:
+         1. [BLOCKED] Fix the module import error in auth.ts
+         2. [TODO] Implement refresh token rotation
+         3. [TODO] Update failing tests
+        -->
+    </next_steps>
+
+    <omitted>
+        <!-- One line: what was dropped and why -->
+    </omitted>
 </state_snapshot>
 `.trim();
 }
