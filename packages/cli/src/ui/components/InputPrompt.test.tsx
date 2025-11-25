@@ -86,6 +86,12 @@ const mockSlashCommands: SlashCommand[] = [
       },
     ],
   },
+  {
+    name: 'resume',
+    description: 'Browse and resume sessions',
+    kind: CommandKind.BUILT_IN,
+    action: vi.fn(),
+  },
 ];
 
 describe('InputPrompt', () => {
