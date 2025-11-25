@@ -516,7 +516,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Alternate Screen Buffer',
         category: 'UI',
         requiresRestart: true,
-        default: true,
+        default: false,
         description:
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
@@ -1289,6 +1289,15 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enables extension loading/unloading within the CLI session.',
+        showInDialog: false,
+      },
+      isModelAvailabilityServiceEnabled: {
+        type: 'boolean',
+        label: 'Enable Model Availability Service',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable model routing using new availability service.',
         showInDialog: false,
       },
       codebaseInvestigatorSettings: {
