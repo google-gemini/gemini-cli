@@ -4,24 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { CommandContext } from './types.js';
-import { resumeCommand } from './resumeCommand.js';
 import type { Config } from '@google/gemini-cli-core';
-import { MessageType } from '../types.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import { MessageType } from '../types.js';
+import { resumeCommand } from './resumeCommand.js';
+import type { CommandContext } from './types.js';
 
 vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('../../utils/sessionUtils.js')>();
 
   class MockSessionSelector {
-    private readonly config: Config;
-
-    constructor(config: Config) {
-      this.config = config;
-    }
-
     async resolveSession(resumeArg: string) {
       if (resumeArg === 'error') {
         throw new Error('Failed to resolve session');
@@ -60,9 +54,9 @@ describe('resumeCommand', () => {
   });
 
   it('returns error message when no identifier is provided', async () => {
-    const result = await resumeCommand.action(mockContext, '');
+    const result = await resumeCommand.action?.(mockContext, '');
 
-    expect(result).toEqual({
+    expect(result).toStrictEqual({
       type: 'message',
       messageType: 'error',
       content:
@@ -79,7 +73,7 @@ describe('resumeCommand', () => {
       },
     };
 
-    const result = await resumeCommand.action(contextWithoutConfig, 'latest');
+    const result = await resumeCommand.action?.(contextWithoutConfig, 'latest');
 
     expect(result).toEqual({
       type: 'message',
@@ -89,19 +83,19 @@ describe('resumeCommand', () => {
   });
 
   it('loads history and sets session id for a valid identifier', async () => {
-    const result = await resumeCommand.action(mockContext, 'latest');
+    const result = await resumeCommand.action?.(mockContext, 'latest');
 
     expect(mockConfig.setSessionId).toHaveBeenCalledWith('session-123');
-    expect(result.type).toBe('load_history');
+    expect(result?.type).toBe('load_history');
 
-    if (result.type === 'load_history') {
+    if (result?.type === 'load_history') {
       expect(result.history).toHaveLength(2);
       expect(result.clientHistory).toHaveLength(2);
     }
   });
 
   it('surfaces errors from session resolution', async () => {
-    const result = await resumeCommand.action(mockContext, 'error');
+    const result = await resumeCommand.action?.(mockContext, 'error');
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       {
