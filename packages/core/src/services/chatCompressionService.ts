@@ -14,6 +14,7 @@ import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
 import { makeChatCompressionEvent } from '../telemetry/types.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
+import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 
 /**
  * Default threshold for compression token count as a fraction of the model's
@@ -176,12 +177,10 @@ export class ChatCompressionService {
     // Use a shared utility to construct the initial history for an accurate token count.
     const fullNewHistory = await getInitialChatHistory(config, extraHistory);
 
-    // Estimate token count 1 token ≈ 4 characters
-    const newTokenCount = Math.floor(
-      fullNewHistory.reduce(
-        (total, content) => total + JSON.stringify(content).length,
-        0,
-      ) / 4,
+    const newTokenCount = await calculateRequestTokenCount(
+      fullNewHistory.flatMap((c) => c.parts || []),
+      config.getContentGenerator(),
+      model,
     );
 
     logChatCompression(

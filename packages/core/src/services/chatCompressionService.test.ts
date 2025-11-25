@@ -188,8 +188,6 @@ describe('ChatCompressionService', () => {
       { role: 'model', parts: [{ text: 'msg4' }] },
     ];
     vi.mocked(mockChat.getHistory).mockReturnValue(history);
-    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
-    vi.mocked(tokenLimit).mockReturnValue(1000);
     const mockGenerateContent = vi.fn().mockResolvedValue({
       candidates: [
         {
@@ -201,6 +199,7 @@ describe('ChatCompressionService', () => {
     } as unknown as GenerateContentResponse);
     vi.mocked(mockConfig.getContentGenerator).mockReturnValue({
       generateContent: mockGenerateContent,
+      countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
     } as unknown as ContentGenerator);
 
     const result = await service.compress(
@@ -240,6 +239,7 @@ describe('ChatCompressionService', () => {
     } as unknown as GenerateContentResponse);
     vi.mocked(mockConfig.getContentGenerator).mockReturnValue({
       generateContent: mockGenerateContent,
+      countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
     } as unknown as ContentGenerator);
 
     const result = await service.compress(
@@ -276,6 +276,7 @@ describe('ChatCompressionService', () => {
     } as unknown as GenerateContentResponse);
     vi.mocked(mockConfig.getContentGenerator).mockReturnValue({
       generateContent: mockGenerateContent,
+      countTokens: vi.fn().mockResolvedValue({ totalTokens: 10000 }),
     } as unknown as ContentGenerator);
 
     const result = await service.compress(
