@@ -22,6 +22,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
       }),
     },
+    UserAccountManager: vi.fn().mockImplementation(() => ({
+      getCachedGoogleAccount: vi.fn().mockReturnValue('test-email@example.com'),
+    })),
   };
 });
 
@@ -98,6 +101,7 @@ describe('aboutCommand', () => {
         selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
         ideClient: 'test-ide',
+        userEmail: 'test-email@example.com',
       },
       expect.any(Number),
     );

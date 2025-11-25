@@ -1,0 +1,52 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`InlineMarkdownRenderer > RenderInline > handles nested/complex markdown gracefully (best effort) 1`] = `
+"Bold *Italic
+*"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders bold text correctly 1`] = `
+"Hello
+World"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders inline code correctly 1`] = `
+"Hello
+World"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders italic text correctly 1`] = `
+"Hello
+World"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders links correctly 1`] = `"Google (https://google.com)"`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders mixed markdown correctly 1`] = `
+"Bold
+ and
+Italic
+ and
+Code
+ and
+Link (https://example.com)"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders plain text correctly 1`] = `"Hello World"`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders raw URLs correctly 1`] = `
+"Visit
+https://google.com"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders strikethrough text correctly 1`] = `
+"Hello
+World"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > renders underline correctly 1`] = `
+"Hello
+World"
+`;
+
+exports[`InlineMarkdownRenderer > RenderInline > respects defaultColor prop 1`] = `"Hello"`;

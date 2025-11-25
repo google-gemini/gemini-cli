@@ -27,11 +27,9 @@ import {
   DiscoveredMCPTool,
   StreamEventType,
   ToolCallEvent,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_GEMINI_FLASH_MODEL,
   debugLogger,
   ReadManyFilesTool,
+  getEffectiveModel,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -46,19 +44,6 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
-
-/**
- * Resolves the model to use based on the current configuration.
- *
- * If the model is set to "auto", it will use the flash model if in fallback
- * mode, otherwise it will use the default model.
- */
-export function resolveModel(model: string, isInFallbackMode: boolean): string {
-  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
-    return isInFallbackMode ? DEFAULT_GEMINI_FLASH_MODEL : DEFAULT_GEMINI_MODEL;
-  }
-  return model;
-}
 
 export async function runZedIntegration(
   config: Config,
@@ -81,7 +66,7 @@ export async function runZedIntegration(
   );
 }
 
-class GeminiAgent {
+export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
 
@@ -224,7 +209,7 @@ class GeminiAgent {
   }
 }
 
-class Session {
+export class Session {
   private pendingPrompt: AbortController | null = null;
 
   constructor(
@@ -264,15 +249,16 @@ class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
+        const model = getEffectiveModel(
+          this.config.isInFallbackMode(),
+          this.config.getModel(),
+          this.config.getPreviewFeatures(),
+        );
         const responseStream = await chat.sendMessageStream(
-          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
-          {
-            message: nextMessage?.parts ?? [],
-            config: {
-              abortSignal: pendingSend.signal,
-            },
-          },
+          { model },
+          nextMessage?.parts ?? [],
           promptId,
+          pendingSend.signal,
         );
         nextMessage = null;
 
@@ -310,12 +296,23 @@ class Session {
             functionCalls.push(...resp.value.functionCalls);
           }
         }
+
+        if (pendingSend.signal.aborted) {
+          return { stopReason: 'cancelled' };
+        }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
           throw new acp.RequestError(
             429,
             'Rate limit exceeded. Try again later.',
           );
+        }
+
+        if (
+          pendingSend.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          return { stopReason: 'cancelled' };
         }
 
         throw error;

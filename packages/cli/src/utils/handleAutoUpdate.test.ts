@@ -11,7 +11,8 @@ import { updateEventEmitter } from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import EventEmitter from 'node:events';
-import { handleAutoUpdate } from './handleAutoUpdate.js';
+import { handleAutoUpdate, setUpdateHandler } from './handleAutoUpdate.js';
+import { MessageType } from '../ui/types.js';
 
 vi.mock('./installationInfo.js', async () => {
   const actual = await vi.importActual('./installationInfo.js');
@@ -21,16 +22,11 @@ vi.mock('./installationInfo.js', async () => {
   };
 });
 
-vi.mock('./updateEventEmitter.js', async () => {
-  const actual = await vi.importActual('./updateEventEmitter.js');
-  return {
-    ...actual,
-    updateEventEmitter: {
-      ...(actual['updateEventEmitter'] as EventEmitter),
-      emit: vi.fn(),
-    },
-  };
-});
+vi.mock(
+  './updateEventEmitter.js',
+  async (importOriginal) =>
+    await importOriginal<typeof import('./updateEventEmitter.js')>(),
+);
 
 interface MockChildProcess extends EventEmitter {
   stdin: EventEmitter & {
@@ -41,7 +37,7 @@ interface MockChildProcess extends EventEmitter {
 }
 
 const mockGetInstallationInfo = vi.mocked(getInstallationInfo);
-const mockUpdateEventEmitter = vi.mocked(updateEventEmitter);
+// updateEventEmitter is now real, but we will spy on it
 
 describe('handleAutoUpdate', () => {
   let mockSpawn: Mock;
@@ -52,6 +48,7 @@ describe('handleAutoUpdate', () => {
   beforeEach(() => {
     mockSpawn = vi.fn();
     vi.clearAllMocks();
+    vi.spyOn(updateEventEmitter, 'emit');
     mockUpdateInfo = {
       update: {
         latest: '2.0.0',
@@ -90,7 +87,7 @@ describe('handleAutoUpdate', () => {
   it('should do nothing if update info is null', () => {
     handleAutoUpdate(null, mockSettings, '/root', mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
-    expect(mockUpdateEventEmitter.emit).not.toHaveBeenCalled();
+    expect(updateEventEmitter.emit).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
@@ -98,7 +95,7 @@ describe('handleAutoUpdate', () => {
     mockSettings.merged.general!.disableUpdateNag = true;
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
-    expect(mockUpdateEventEmitter.emit).not.toHaveBeenCalled();
+    expect(updateEventEmitter.emit).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
@@ -113,13 +110,10 @@ describe('handleAutoUpdate', () => {
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledTimes(1);
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
-      'update-received',
-      {
-        message: 'An update is available!\nPlease update manually.',
-      },
-    );
+    expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      message: 'An update is available!\nPlease update manually.',
+    });
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
@@ -135,7 +129,7 @@ describe('handleAutoUpdate', () => {
 
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-      expect(mockUpdateEventEmitter.emit).not.toHaveBeenCalled();
+      expect(updateEventEmitter.emit).not.toHaveBeenCalled();
       expect(mockSpawn).not.toHaveBeenCalled();
     },
   );
@@ -150,13 +144,10 @@ describe('handleAutoUpdate', () => {
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledTimes(1);
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
-      'update-received',
-      {
-        message: 'An update is available!\nCannot determine update command.',
-      },
-    );
+    expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      message: 'An update is available!\nCannot determine update command.',
+    });
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
@@ -170,13 +161,10 @@ describe('handleAutoUpdate', () => {
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledTimes(1);
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
-      'update-received',
-      {
-        message: 'An update is available!\nThis is an additional message.',
-      },
-    );
+    expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      message: 'An update is available!\nThis is an additional message.',
+    });
   });
 
   it('should attempt to perform an update when conditions are met', async () => {
@@ -216,7 +204,7 @@ describe('handleAutoUpdate', () => {
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     });
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
         'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0, stderr: An error occurred)',
     });
@@ -240,7 +228,7 @@ describe('handleAutoUpdate', () => {
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     });
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
         'Automatic update failed. Please try updating manually. (error: Spawn error)',
     });
@@ -290,9 +278,129 @@ describe('handleAutoUpdate', () => {
       handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     });
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
       message:
         'Update successful! The new version will be used on your next run.',
     });
+  });
+});
+
+describe('setUpdateHandler', () => {
+  let addItem: ReturnType<typeof vi.fn>;
+  let setUpdateInfo: ReturnType<typeof vi.fn>;
+  let unregister: () => void;
+
+  beforeEach(() => {
+    addItem = vi.fn();
+    setUpdateInfo = vi.fn();
+    vi.useFakeTimers();
+    unregister = setUpdateHandler(addItem, setUpdateInfo);
+  });
+
+  afterEach(() => {
+    unregister();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('should register event listeners', () => {
+    // We can't easily check if listeners are registered on the real EventEmitter
+    // without mocking it more deeply, but we can check if they respond to events.
+    expect(unregister).toBeInstanceOf(Function);
+  });
+
+  it('should handle update-received event', () => {
+    const updateInfo: UpdateObject = {
+      update: {
+        latest: '2.0.0',
+        current: '1.0.0',
+        type: 'major',
+        name: '@google/gemini-cli',
+      },
+      message: 'Update available',
+    };
+
+    // Access the actual emitter to emit events
+    updateEventEmitter.emit('update-received', updateInfo);
+
+    expect(setUpdateInfo).toHaveBeenCalledWith(updateInfo);
+
+    // Advance timers to trigger timeout
+    vi.advanceTimersByTime(60000);
+
+    expect(addItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.INFO,
+        text: 'Update available',
+      },
+      expect.any(Number),
+    );
+    expect(setUpdateInfo).toHaveBeenCalledWith(null);
+  });
+
+  it('should handle update-failed event', () => {
+    updateEventEmitter.emit('update-failed', { message: 'Failed' });
+
+    expect(setUpdateInfo).toHaveBeenCalledWith(null);
+    expect(addItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.ERROR,
+        text: 'Automatic update failed. Please try updating manually',
+      },
+      expect.any(Number),
+    );
+  });
+
+  it('should handle update-success event', () => {
+    updateEventEmitter.emit('update-success', { message: 'Success' });
+
+    expect(setUpdateInfo).toHaveBeenCalledWith(null);
+    expect(addItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.INFO,
+        text: 'Update successful! The new version will be used on your next run.',
+      },
+      expect.any(Number),
+    );
+  });
+
+  it('should not show update-received message if update-success was called', () => {
+    const updateInfo: UpdateObject = {
+      update: {
+        latest: '2.0.0',
+        current: '1.0.0',
+        type: 'major',
+        name: '@google/gemini-cli',
+      },
+      message: 'Update available',
+    };
+
+    updateEventEmitter.emit('update-received', updateInfo);
+    updateEventEmitter.emit('update-success', { message: 'Success' });
+
+    // Advance timers
+    vi.advanceTimersByTime(60000);
+
+    // Should only have called addItem for success, not for received (after timeout)
+    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(addItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.INFO,
+        text: 'Update successful! The new version will be used on your next run.',
+      },
+      expect.any(Number),
+    );
+  });
+
+  it('should handle update-info event', () => {
+    updateEventEmitter.emit('update-info', { message: 'Info message' });
+
+    expect(addItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.INFO,
+        text: 'Info message',
+      },
+      expect.any(Number),
+    );
   });
 });
