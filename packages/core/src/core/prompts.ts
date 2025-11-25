@@ -364,7 +364,6 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
       ? `\n\n---\n\n${userMemory.trim()}`
       : '';
 
-  console.debug(`${basePrompt}`);
   return `${basePrompt}${memorySuffix}`;
 }
 
