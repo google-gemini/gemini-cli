@@ -17,7 +17,7 @@ import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ModelNotFoundError } from '../utils/httpErrors.js';
-import { RetryableQuotaError } from '../utils/googleQuotaErrors.js';
+import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 
 const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
@@ -37,12 +37,12 @@ export async function handleFallback(
   ) {
     return null;
   }
-  const shouldSetPreviewBypassMode =
+  const shouldActivatePreviewFallback =
     failedModel === PREVIEW_GEMINI_MODEL &&
-    error instanceof RetryableQuotaError;
+    !(error instanceof TerminalQuotaError);
   // Preview Model Specific Logic
-  if (shouldSetPreviewBypassMode) {
-    // Always set bypass mode for the immediate retry, for RetryableQuotaError.
+  if (shouldActivatePreviewFallback) {
+    // Always set bypass mode for the immediate retry, for non-TerminalQuotaErrors.
     // This ensures the next attempt uses 2.5 Pro.
     config.setPreviewModelBypassMode(true);
 
@@ -53,7 +53,7 @@ export async function handleFallback(
     }
   }
 
-  const fallbackModel = shouldSetPreviewBypassMode
+  const fallbackModel = shouldActivatePreviewFallback
     ? DEFAULT_GEMINI_MODEL
     : DEFAULT_GEMINI_FLASH_MODEL;
 
@@ -72,12 +72,9 @@ export async function handleFallback(
     // Process Intent and Update State
     switch (intent) {
       case 'retry_always':
-        // If the error is retryable (a temporary issue), fall back to the default Pro model.
-        // For all other errors, including TerminalQuotaError, trigger a regular fallback to Flash.
-        if (
-          failedModel === PREVIEW_GEMINI_MODEL &&
-          error instanceof RetryableQuotaError
-        ) {
+        // If the error is non-retryable, e.g. TerminalQuota Error, trigger a regular fallback to flash.
+        // For all other errors, activate previewModel fallback.
+        if (shouldActivatePreviewFallback) {
           activatePreviewModelFallbackMode(config);
         } else {
           activateFallbackMode(config, authType);

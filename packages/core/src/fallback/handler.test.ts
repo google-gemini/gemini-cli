@@ -237,7 +237,23 @@ describe('handleFallback', () => {
     });
 
     it('should not set Preview Model bypass mode on non-retryable quota failure', async () => {
-      await handleFallback(mockConfig, previewModel, AUTH_OAUTH);
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const terminalQuotaError = new TerminalQuotaError(
+        'quota error',
+        mockGoogleApiError,
+        5,
+      );
+      await handleFallback(
+        mockConfig,
+        previewModel,
+        AUTH_OAUTH,
+        terminalQuotaError,
+      );
+
       expect(mockConfig.setPreviewModelBypassMode).not.toHaveBeenCalled();
     });
 
@@ -313,13 +329,23 @@ describe('handleFallback', () => {
     });
 
     it('should NOT set fallback mode if user chooses "retry_once"', async () => {
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const terminalQuotaError = new TerminalQuotaError(
+        'quota error',
+        mockGoogleApiError,
+        5,
+      );
       mockHandler.mockResolvedValue('retry_once');
 
       const result = await handleFallback(
         mockConfig,
         PREVIEW_GEMINI_MODEL,
         AuthType.LOGIN_WITH_GOOGLE,
-        new Error('Capacity'),
+        terminalQuotaError,
       );
 
       expect(result).toBe(true);
@@ -358,7 +384,7 @@ describe('handleFallback', () => {
       );
     });
 
-    it('should pass DEFAULT_GEMINI_FLASH_MODEL as fallback when Preview Model fails with other error', async () => {
+    it('should pass DEFAULT_GEMINI_MODEL as fallback when Preview Model fails with other error', async () => {
       await handleFallback(
         mockConfig,
         PREVIEW_GEMINI_MODEL,
@@ -367,8 +393,33 @@ describe('handleFallback', () => {
 
       expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
         PREVIEW_GEMINI_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_MODEL,
         undefined,
+      );
+    });
+
+    it('should pass DEFAULT_GEMINI_FLASH_MODEL as fallback when Preview Model fails with other error', async () => {
+      const mockGoogleApiError = {
+        code: 429,
+        message: 'mock error',
+        details: [],
+      };
+      const terminalQuotaError = new TerminalQuotaError(
+        'quota error',
+        mockGoogleApiError,
+        5,
+      );
+      await handleFallback(
+        mockConfig,
+        PREVIEW_GEMINI_MODEL,
+        AuthType.LOGIN_WITH_GOOGLE,
+        terminalQuotaError,
+      );
+
+      expect(mockConfig.fallbackModelHandler).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_MODEL,
+        DEFAULT_GEMINI_FLASH_MODEL,
+        terminalQuotaError,
       );
     });
   });
