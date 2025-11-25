@@ -9,29 +9,29 @@ import { type Key } from '../hooks/useKeypress.js';
 import { type IdeIntegrationNudgeResult } from '../IdeIntegrationNudge.js';
 import { type FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import { type AuthType, type EditorType } from '@google/gemini-cli-core';
-import { type SettingScope } from '../../config/settings.js';
+import { type LoadableSettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
+import { type PermissionsDialogProps } from '../components/PermissionsModifyTrustDialog.js';
 
 export interface UIActions {
-  handleThemeSelect: (
-    themeName: string | undefined,
-    scope: SettingScope,
-  ) => void;
+  handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
+  closeThemeDialog: () => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
   handleAuthSelect: (
     authType: AuthType | undefined,
-    scope: SettingScope,
+    scope: LoadableSettingScope,
   ) => void;
   setAuthState: (state: AuthState) => void;
-  onAuthError: (error: string) => void;
+  onAuthError: (error: string | null) => void;
   handleEditorSelect: (
     editorType: EditorType | undefined,
-    scope: SettingScope,
+    scope: LoadableSettingScope,
   ) => void;
   exitEditorDialog: () => void;
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;
   closeModelDialog: () => void;
+  openPermissionsDialog: (props?: PermissionsDialogProps) => void;
   closePermissionsDialog: () => void;
   setShellModeActive: (value: boolean) => void;
   vimHandleInput: (key: Key) => boolean;
@@ -42,9 +42,15 @@ export interface UIActions {
   refreshStatic: () => void;
   handleFinalSubmit: (value: string) => void;
   handleClearScreen: () => void;
-  onWorkspaceMigrationDialogOpen: () => void;
-  onWorkspaceMigrationDialogClose: () => void;
-  handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
+  handleProQuotaChoice: (
+    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+  ) => void;
+  setQueueErrorMessage: (message: string | null) => void;
+  popAllMessages: (onPop: (messages: string | undefined) => void) => void;
+  handleApiKeySubmit: (apiKey: string) => Promise<void>;
+  handleApiKeyCancel: () => void;
+  setBannerVisible: (visible: boolean) => void;
+  setEmbeddedShellFocused: (value: boolean) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

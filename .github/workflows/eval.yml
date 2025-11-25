@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: 'Authenticate to Google Cloud'
         id: 'auth'
-        uses: 'google-github-actions/auth@v2' # ratchet:exclude
+        uses: 'google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed' # ratchet:exclude pin@v2.1.7
         with:
           project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'

@@ -6,25 +6,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import './src/gemini.js';
 import { main } from './src/gemini.js';
-import { FatalError } from '@google/gemini-cli-core';
+import { FatalError, writeToStderr } from '@google/gemini-cli-core';
+import { runExitCleanup } from './src/utils/cleanup.js';
 
 // --- Global Entry Point ---
-main().catch((error) => {
+main().catch(async (error) => {
+  await runExitCleanup();
+
   if (error instanceof FatalError) {
     let errorMessage = error.message;
     if (!process.env['NO_COLOR']) {
       errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
     }
-    console.error(errorMessage);
+    writeToStderr(errorMessage + '\n');
     process.exit(error.exitCode);
   }
-  console.error('An unexpected critical error occurred:');
+  writeToStderr('An unexpected critical error occurred:');
   if (error instanceof Error) {
-    console.error(error.stack);
+    writeToStderr(error.stack + '\n');
   } else {
-    console.error(String(error));
+    writeToStderr(String(error) + '\n');
   }
   process.exit(1);
 });

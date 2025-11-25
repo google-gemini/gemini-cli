@@ -5,6 +5,8 @@
  */
 
 import { execSync, spawn, spawnSync } from 'node:child_process';
+import { debugLogger } from './debugLogger.js';
+import { coreEvents, CoreEvent } from './events.js';
 
 export type EditorType =
   | 'vscode'
@@ -14,7 +16,24 @@ export type EditorType =
   | 'vim'
   | 'neovim'
   | 'zed'
-  | 'emacs';
+  | 'emacs'
+  | 'antigravity';
+
+export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
+  vscode: 'VS Code',
+  vscodium: 'VSCodium',
+  windsurf: 'Windsurf',
+  cursor: 'Cursor',
+  vim: 'Vim',
+  neovim: 'Neovim',
+  zed: 'Zed',
+  emacs: 'Emacs',
+  antigravity: 'Antigravity',
+};
+
+export function getEditorDisplayName(editor: EditorType): string {
+  return EDITOR_DISPLAY_NAMES[editor] || editor;
+}
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -26,6 +45,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'neovim',
     'zed',
     'emacs',
+    'antigravity',
   ].includes(editor);
 }
 
@@ -62,6 +82,7 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  antigravity: { win32: ['agy.cmd'], default: ['agy'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -73,7 +94,11 @@ export function checkHasEditorType(editor: EditorType): boolean {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
-  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (
+    ['vscode', 'vscodium', 'windsurf', 'cursor', 'zed', 'antigravity'].includes(
+      editor,
+    )
+  ) {
     return notUsingSandbox;
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
@@ -115,6 +140,7 @@ export function getDiffCommand(
     case 'windsurf':
     case 'cursor':
     case 'zed':
+    case 'antigravity':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
     case 'neovim':
@@ -164,54 +190,48 @@ export async function openDiff(
   oldPath: string,
   newPath: string,
   editor: EditorType,
-  onEditorClose: () => void,
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
-    console.error('No diff tool available. Install a supported editor.');
+    debugLogger.error('No diff tool available. Install a supported editor.');
     return;
   }
 
-  try {
-    const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
+  const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
 
-    if (isTerminalEditor) {
-      try {
-        const result = spawnSync(diffCommand.command, diffCommand.args, {
-          stdio: 'inherit',
-        });
-        if (result.error) {
-          throw result.error;
-        }
-        if (result.status !== 0) {
-          throw new Error(`${editor} exited with code ${result.status}`);
-        }
-      } finally {
-        onEditorClose();
-      }
-      return;
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      const childProcess = spawn(diffCommand.command, diffCommand.args, {
+  if (isTerminalEditor) {
+    try {
+      const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
-        shell: process.platform === 'win32',
       });
-
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`${editor} exited with code ${code}`));
-        }
-      });
-
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
-    });
-  } catch (error) {
-    console.error(error);
-    throw error;
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== 0) {
+        throw new Error(`${editor} exited with code ${result.status}`);
+      }
+    } finally {
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
+    }
+    return;
   }
+
+  return new Promise<void>((resolve, reject) => {
+    const childProcess = spawn(diffCommand.command, diffCommand.args, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+
+    childProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${editor} exited with code ${code}`));
+      }
+    });
+
+    childProcess.on('error', (error) => {
+      reject(error);
+    });
+  });
 }

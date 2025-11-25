@@ -13,6 +13,44 @@ import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
+import { createRequire as createModuleRequire } from 'node:module';
+import { debugLogger } from './debugLogger.js';
+
+const requireModule = createModuleRequire(import.meta.url);
+
+export async function readWasmBinaryFromDisk(
+  specifier: string,
+): Promise<Uint8Array> {
+  const resolvedPath = requireModule.resolve(specifier);
+  const buffer = await fsPromises.readFile(resolvedPath);
+  return new Uint8Array(buffer);
+}
+
+export async function loadWasmBinary(
+  dynamicImport: () => Promise<{ default: Uint8Array }>,
+  fallbackSpecifier: string,
+): Promise<Uint8Array> {
+  try {
+    const module = await dynamicImport();
+    if (module?.default instanceof Uint8Array) {
+      return module.default;
+    }
+  } catch (error) {
+    try {
+      return await readWasmBinaryFromDisk(fallbackSpecifier);
+    } catch {
+      throw error;
+    }
+  }
+
+  try {
+    return await readWasmBinaryFromDisk(fallbackSpecifier);
+  } catch (error) {
+    throw new Error('WASM binary module did not provide a Uint8Array export', {
+      cause: error,
+    });
+  }
+}
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -223,7 +261,7 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
     // If >30% non-printable characters, consider it binary
     return nonPrintableCount / bytesRead > 0.3;
   } catch (error) {
-    console.warn(
+    debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
       error instanceof Error ? error.message : String(error),
     );
@@ -233,7 +271,7 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
       try {
         await fh.close();
       } catch (closeError) {
-        console.warn(
+        debugLogger.warn(
           `Failed to close file handle for: ${filePath}`,
           closeError instanceof Error ? closeError.message : String(closeError),
         );

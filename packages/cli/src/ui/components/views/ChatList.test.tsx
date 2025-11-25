@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { ChatList } from './ChatList.js';
 import type { ChatDetail } from '../../types.js';
@@ -22,14 +22,16 @@ const mockChats: ChatDetail[] = [
 
 describe('<ChatList />', () => {
   it('renders correctly with a list of chats', () => {
-    const { lastFrame } = render(<ChatList chats={mockChats} />);
+    const { lastFrame, unmount } = render(<ChatList chats={mockChats} />);
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with no chats', () => {
-    const { lastFrame } = render(<ChatList chats={[]} />);
+    const { lastFrame, unmount } = render(<ChatList chats={[]} />);
     expect(lastFrame()).toContain('No saved conversation checkpoints found.');
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('handles invalid date formats gracefully', () => {
@@ -39,8 +41,11 @@ describe('<ChatList />', () => {
         mtime: 'an-invalid-date-string',
       },
     ];
-    const { lastFrame } = render(<ChatList chats={mockChatsWithInvalidDate} />);
+    const { lastFrame, unmount } = render(
+      <ChatList chats={mockChatsWithInvalidDate} />,
+    );
     expect(lastFrame()).toContain('(Invalid Date)');
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 });

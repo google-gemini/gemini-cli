@@ -43,6 +43,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         ),
       ),
     })),
+    StreamJsonFormatter: vi.fn().mockImplementation(() => ({
+      emitEvent: vi.fn(),
+      convertToStreamStats: vi.fn().mockReturnValue({}),
+    })),
+    uiTelemetryService: {
+      getMetrics: vi.fn().mockReturnValue({}),
+    },
+    JsonStreamEventType: {
+      RESULT: 'result',
+    },
     FatalToolExecutionError: class extends Error {
       constructor(message: string) {
         super(message);
@@ -248,6 +258,30 @@ describe('errors', () => {
         );
       });
     });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit', () => {
+        const testError = new Error('Test error');
+
+        expect(() => {
+          handleError(testError, mockConfig);
+        }).toThrow('process.exit called with code: 1');
+      });
+
+      it('should extract exitCode from FatalError instances', () => {
+        const fatalError = new FatalInputError('Fatal error');
+
+        expect(() => {
+          handleError(fatalError, mockConfig);
+        }).toThrow('process.exit called with code: 42');
+      });
+    });
   });
 
   describe('handleToolError', () => {
@@ -291,90 +325,112 @@ describe('errors', () => {
         ).mockReturnValue(OutputFormat.JSON);
       });
 
-      it('should format error as JSON and exit with default code', () => {
-        expect(() => {
-          handleToolError(toolName, toolError, mockConfig);
-        }).toThrow('process.exit called with code: 54');
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          JSON.stringify(
-            {
-              error: {
-                type: 'FatalToolExecutionError',
-                message: 'Error executing tool test-tool: Tool failed',
-                code: 54,
-              },
-            },
-            null,
-            2,
-          ),
-        );
-      });
-
-      it('should use custom error code', () => {
-        expect(() => {
-          handleToolError(toolName, toolError, mockConfig, 'CUSTOM_TOOL_ERROR');
-        }).toThrow('process.exit called with code: 54');
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          JSON.stringify(
-            {
-              error: {
-                type: 'FatalToolExecutionError',
-                message: 'Error executing tool test-tool: Tool failed',
-                code: 'CUSTOM_TOOL_ERROR',
-              },
-            },
-            null,
-            2,
-          ),
-        );
-      });
-
-      it('should use numeric error code and exit with that code', () => {
-        expect(() => {
-          handleToolError(toolName, toolError, mockConfig, 500);
-        }).toThrow('process.exit called with code: 500');
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          JSON.stringify(
-            {
-              error: {
-                type: 'FatalToolExecutionError',
-                message: 'Error executing tool test-tool: Tool failed',
-                code: 500,
-              },
-            },
-            null,
-            2,
-          ),
-        );
-      });
-
-      it('should prefer resultDisplay over error message', () => {
-        expect(() => {
+      describe('non-fatal errors', () => {
+        it('should log error message to stderr without exiting for recoverable errors', () => {
           handleToolError(
             toolName,
             toolError,
             mockConfig,
-            'DISPLAY_ERROR',
+            'invalid_tool_params',
+          );
+
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Error executing tool test-tool: Tool failed',
+          );
+          // Should not exit for non-fatal errors
+          expect(processExitSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not exit for file not found errors', () => {
+          handleToolError(toolName, toolError, mockConfig, 'file_not_found');
+
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Error executing tool test-tool: Tool failed',
+          );
+          expect(processExitSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not exit for permission denied errors', () => {
+          handleToolError(toolName, toolError, mockConfig, 'permission_denied');
+
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Error executing tool test-tool: Tool failed',
+          );
+          expect(processExitSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not exit for path not in workspace errors', () => {
+          handleToolError(
+            toolName,
+            toolError,
+            mockConfig,
+            'path_not_in_workspace',
+          );
+
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Error executing tool test-tool: Tool failed',
+          );
+          expect(processExitSpy).not.toHaveBeenCalled();
+        });
+
+        it('should prefer resultDisplay over error message', () => {
+          handleToolError(
+            toolName,
+            toolError,
+            mockConfig,
+            'invalid_tool_params',
             'Display message',
           );
-        }).toThrow('process.exit called with code: 54');
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          JSON.stringify(
-            {
-              error: {
-                type: 'FatalToolExecutionError',
-                message: 'Error executing tool test-tool: Display message',
-                code: 'DISPLAY_ERROR',
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            'Error executing tool test-tool: Display message',
+          );
+          expect(processExitSpy).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('fatal errors', () => {
+        it('should exit immediately for NO_SPACE_LEFT errors', () => {
+          expect(() => {
+            handleToolError(toolName, toolError, mockConfig, 'no_space_left');
+          }).toThrow('process.exit called with code: 54');
+
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            JSON.stringify(
+              {
+                error: {
+                  type: 'FatalToolExecutionError',
+                  message: 'Error executing tool test-tool: Tool failed',
+                  code: 'no_space_left',
+                },
               },
-            },
-            null,
-            2,
-          ),
+              null,
+              2,
+            ),
+          );
+        });
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit for fatal errors', () => {
+        expect(() => {
+          handleToolError(toolName, toolError, mockConfig, 'no_space_left');
+        }).toThrow('process.exit called with code: 54');
+      });
+
+      it('should log to stderr and not exit for non-fatal errors', () => {
+        handleToolError(toolName, toolError, mockConfig, 'invalid_tool_params');
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Error executing tool test-tool: Tool failed',
         );
+        expect(processExitSpy).not.toHaveBeenCalled();
       });
     });
   });
@@ -421,6 +477,20 @@ describe('errors', () => {
             2,
           ),
         );
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit with 130', () => {
+        expect(() => {
+          handleCancellationError(mockConfig);
+        }).toThrow('process.exit called with code: 130');
       });
     });
   });
@@ -470,6 +540,20 @@ describe('errors', () => {
             2,
           ),
         );
+      });
+    });
+
+    describe('in STREAM_JSON mode', () => {
+      beforeEach(() => {
+        (
+          mockConfig.getOutputFormat as ReturnType<typeof vi.fn>
+        ).mockReturnValue(OutputFormat.STREAM_JSON);
+      });
+
+      it('should emit result event and exit with 53', () => {
+        expect(() => {
+          handleMaxTurnsExceededError(mockConfig);
+        }).toThrow('process.exit called with code: 53');
       });
     });
   });

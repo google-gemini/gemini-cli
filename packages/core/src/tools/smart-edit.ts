@@ -10,6 +10,7 @@ import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
+  BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
@@ -19,12 +20,14 @@ import {
   type ToolResult,
   type ToolResultDisplay,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import { type Config, ApprovalMode } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
-import { ReadFileTool } from './read-file.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -38,6 +41,9 @@ import { logSmartEditStrategy } from '../telemetry/loggers.js';
 import { SmartEditCorrectionEvent } from '../telemetry/types.js';
 import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
+import { correctPath } from '../utils/pathCorrector.js';
+import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -301,7 +307,7 @@ export function getErrorReplaceResult(
   if (occurrences === 0) {
     error = {
       display: `Failed to edit, could not find the string to replace.`,
-      raw: `Failed to edit, 0 occurrences found for old_string (${finalOldString}). Original old_string was (${params.old_string}) in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
+      raw: `Failed to edit, 0 occurrences found for old_string (${finalOldString}). Original old_string was (${params.old_string}) in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
   } else if (occurrences !== expectedReplacements) {
@@ -328,7 +334,7 @@ export function getErrorReplaceResult(
  */
 export interface EditToolParams {
   /**
-   * The absolute path to the file to modify
+   * The path to the file to modify
    */
   file_path: string;
 
@@ -341,6 +347,12 @@ export interface EditToolParams {
    * The text to replace it with
    */
   new_string: string;
+
+  /**
+   * Number of replacements expected. Defaults to 1 if not specified.
+   * Use when you want to replace multiple occurrences.
+   */
+  expected_replacements?: number;
 
   /**
    * The instruction for what needs to be done.
@@ -367,13 +379,21 @@ interface CalculatedEdit {
   originalLineEnding: '\r\n' | '\n';
 }
 
-class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
+class EditToolInvocation
+  extends BaseToolInvocation<EditToolParams, ToolResult>
+  implements ToolInvocation<EditToolParams, ToolResult>
+{
   constructor(
     private readonly config: Config,
-    public params: EditToolParams,
-  ) {}
+    params: EditToolParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
+  ) {
+    super(params, messageBus, toolName, displayName);
+  }
 
-  toolLocations(): ToolLocation[] {
+  override toolLocations(): ToolLocation[] {
     return [{ path: this.params.file_path }];
   }
 
@@ -412,6 +432,18 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       abortSignal,
     );
 
+    // If the self-correction attempt timed out, return the original error.
+    if (fixedEdit === null) {
+      return {
+        currentContent: contentForLlmEditFixer,
+        newContent: currentContent,
+        occurrences: 0,
+        isNewFile: false,
+        error: initialError,
+        originalLineEnding,
+      };
+    }
+
     if (fixedEdit.noChangesRequired) {
       return {
         currentContent,
@@ -440,7 +472,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     const secondError = getErrorReplaceResult(
       params,
       secondAttemptResult.occurrences,
-      1, // expectedReplacements is always 1 for smart_edit
+      params.expected_replacements ?? 1,
       secondAttemptResult.finalOldString,
       secondAttemptResult.finalNewString,
     );
@@ -483,7 +515,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     params: EditToolParams,
     abortSignal: AbortSignal,
   ): Promise<CalculatedEdit> {
-    const expectedReplacements = 1;
+    const expectedReplacements = params.expected_replacements ?? 1;
     let currentContent: string | null = null;
     let fileExists = false;
     let originalLineEnding: '\r\n' | '\n' = '\n'; // Default for new files
@@ -600,7 +632,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
    * Handles the confirmation prompt for the Edit tool in the CLI.
    * It needs to calculate the diff to show the user.
    */
-  async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
@@ -615,12 +647,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         throw error;
       }
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.log(`Error preparing edit: ${errorMsg}`);
+      debugLogger.log(`Error preparing edit: ${errorMsg}`);
       return false;
     }
 
     if (editData.error) {
-      console.log(`Error: ${editData.error.display}`);
+      debugLogger.log(`Error: ${editData.error.display}`);
       return false;
     }
 
@@ -751,12 +783,11 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
         );
-        const originallyProposedContent =
-          this.params.ai_proposed_string || this.params.new_string;
+
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
-          originallyProposedContent,
+          editData.newContent,
           this.params.new_string,
         );
         displayResult = {
@@ -814,31 +845,32 @@ export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  static readonly Name = 'replace';
+  static readonly Name = EDIT_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       SmartEditTool.Name,
       'Edit',
-      `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
+      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
       
       Expectation for required parameters:
-      1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
-      2. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-      3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      4. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      5. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
+      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
+      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
+      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
+      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
-      6. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
-      **Multiple replacements:** If there are multiple and ambiguous occurences of the \`old_string\` in the file, the tool will also fail.`,
+      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
       Kind.Edit,
       {
         properties: {
           file_path: {
-            description:
-              "The absolute path to the file to modify. Must start with '/'.",
+            description: 'The path to the file to modify.',
             type: 'string',
           },
           instruction: {
@@ -861,7 +893,7 @@ A good instruction should concisely answer:
           },
           old_string: {
             description:
-              'The exact literal text to replace, preferably unescaped. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
             type: 'string',
           },
           new_string: {
@@ -869,63 +901,20 @@ A good instruction should concisely answer:
               'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
             type: 'string',
           },
+          expected_replacements: {
+            type: 'number',
+            description:
+              'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+            minimum: 1,
+          },
         },
         required: ['file_path', 'instruction', 'old_string', 'new_string'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
-  }
-
-  /**
-   * Quickly checks if the file path can be resolved directly against the workspace root.
-   * @param filePath The relative file path to check.
-   * @returns The absolute path if the file exists, otherwise null.
-   */
-  private findDirectPath(filePath: string): string | null {
-    const directPath = path.join(this.config.getTargetDir(), filePath);
-    return fs.existsSync(directPath) ? directPath : null;
-  }
-
-  /**
-   * Searches for a file across all configured workspace directories.
-   * @param filePath The file path (can be partial) to search for.
-   * @returns A list of absolute paths for all matching files found.
-   */
-  private findAmbiguousPaths(filePath: string): string[] {
-    const workspaceContext = this.config.getWorkspaceContext();
-    const fileSystem = this.config.getFileSystemService();
-    const searchPaths = workspaceContext.getDirectories();
-    return fileSystem.findFiles(filePath, searchPaths);
-  }
-
-  /**
-   * Attempts to correct a relative file path to an absolute path.
-   * This function modifies `params.file_path` in place if successful.
-   * @param params The tool parameters containing the file_path to correct.
-   * @returns An error message string if correction fails, otherwise null.
-   */
-  private correctPath(params: EditToolParams): string | null {
-    const directPath = this.findDirectPath(params.file_path);
-    if (directPath) {
-      params.file_path = directPath;
-      return null;
-    }
-
-    const foundFiles = this.findAmbiguousPaths(params.file_path);
-
-    if (foundFiles.length === 0) {
-      return `File not found for '${params.file_path}' and path is not absolute.`;
-    }
-
-    if (foundFiles.length > 1) {
-      return (
-        `The file path '${params.file_path}' is too ambiguous and matches multiple files. ` +
-        `Please provide a more specific path. Matches: ${foundFiles.join(', ')}`
-      );
-    }
-
-    params.file_path = foundFiles[0];
-    return null;
   }
 
   /**
@@ -940,11 +929,16 @@ A good instruction should concisely answer:
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    if (!path.isAbsolute(params.file_path)) {
+    let filePath = params.file_path;
+    if (!path.isAbsolute(filePath)) {
       // Attempt to auto-correct to an absolute path
-      const error = this.correctPath(params);
-      if (error) return error;
+      const result = correctPath(filePath, this.config);
+      if (!result.success) {
+        return result.error;
+      }
+      filePath = result.correctedPath;
     }
+    params.file_path = filePath;
 
     const workspaceContext = this.config.getWorkspaceContext();
     if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {
@@ -958,7 +952,13 @@ A good instruction should concisely answer:
   protected createInvocation(
     params: EditToolParams,
   ): ToolInvocation<EditToolParams, ToolResult> {
-    return new EditToolInvocation(this.config, params);
+    return new EditToolInvocation(
+      this.config,
+      params,
+      this.messageBus,
+      this.name,
+      this.displayName,
+    );
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {

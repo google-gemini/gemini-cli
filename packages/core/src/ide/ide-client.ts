@@ -24,10 +24,11 @@ import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
 import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
+  debug: (...args: any[]) => debugLogger.debug('[DEBUG] [IDEClient]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
 };
@@ -136,11 +137,12 @@ export class IdeClient {
     this.trustChangeListeners.delete(listener);
   }
 
-  async connect(): Promise<void> {
+  async connect(options: { logToConsole?: boolean } = {}): Promise<void> {
+    const logError = options.logToConsole ?? true;
     if (!this.currentIde) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks`,
+        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
         false,
       );
       return;
@@ -162,7 +164,7 @@ export class IdeClient {
     );
 
     if (!isValid) {
-      this.setState(IDEConnectionStatus.Disconnected, error, true);
+      this.setState(IDEConnectionStatus.Disconnected, error, logError);
       return;
     }
 
@@ -204,7 +206,7 @@ export class IdeClient {
     this.setState(
       IDEConnectionStatus.Disconnected,
       `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
-      true,
+      logError,
     );
   }
 
@@ -576,7 +578,7 @@ export class IdeClient {
       return undefined;
     }
 
-    // For backwards compatability
+    // For backwards compatibility
     try {
       const portFile = path.join(
         os.tmpdir(),
@@ -667,7 +669,7 @@ export class IdeClient {
   }
 
   private createProxyAwareFetch() {
-    // ignore proxy for '127.0.0.1' by deafult to allow connecting to the ide mcp server
+    // ignore proxy for '127.0.0.1' by default to allow connecting to the ide mcp server
     const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
       noProxy: [existingNoProxy, '127.0.0.1'].filter(Boolean).join(','),
@@ -749,7 +751,7 @@ export class IdeClient {
       },
     );
 
-    // For backwards compatability. Newer extension versions will only send
+    // For backwards compatibility. Newer extension versions will only send
     // IdeDiffRejectedNotificationSchema.
     this.client.setNotificationHandler(
       IdeDiffClosedNotificationSchema,

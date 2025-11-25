@@ -26,19 +26,36 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { ExtensionStorage, loadExtensions } from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
+  registerSyncCleanup,
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import type { Config } from '@google/gemini-cli-core';
 import {
+  type Config,
+  type ResumedSessionData,
+  type OutputPayload,
+  type ConsoleLogPayload,
   sessionId,
   logUserPrompt,
   AuthType,
   getOauthClient,
+  UserPromptEvent,
+  debugLogger,
+  recordSlowRender,
+  coreEvents,
+  CoreEvent,
+  createInkStdio,
+  patchStdio,
+  writeToStdout,
+  writeToStderr,
+  disableMouseEvents,
+  enableMouseEvents,
+  enterAlternateScreen,
+  disableLineWrapping,
+  shouldEnterAlternateScreen,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -53,8 +70,10 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { SessionSelector } from './utils/sessionUtils.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { MouseProvider } from './ui/contexts/MouseContext.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
@@ -65,7 +84,16 @@ import {
   relaunchOnExitCode,
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
-import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
+import { deleteSession, listSessions } from './utils/sessions.js';
+import { ExtensionManager } from './config/extension-manager.js';
+import { createPolicyUpdater } from './config/policy.js';
+import { requestConsentNonInteractive } from './config/extensions/consent.js';
+import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
+import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+
+import { profiler } from './ui/components/DebugProfiler.js';
+
+const SLOW_RENDER_MS = 200;
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -78,13 +106,13 @@ export function validateDnsResolutionOrder(
     return order;
   }
   // We don't want to throw here, just warn and use the default.
-  console.warn(
+  debugLogger.warn(
     `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
   );
   return defaultValue;
 }
 
-function getNodeMemoryArgs(isDebugMode: boolean): string[] {
+export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
   const heapStats = v8.getHeapStatistics();
   const currentMaxOldSpaceSizeMb = Math.floor(
@@ -94,7 +122,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   // Set target to 50% of total memory
   const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
   if (isDebugMode) {
-    console.debug(
+    debugLogger.debug(
       `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
     );
   }
@@ -105,7 +133,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
-      console.debug(
+      debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
@@ -129,7 +157,7 @@ Stack trace:
 ${reason.stack}`
         : ''
     }`;
-    appEvents.emit(AppEvent.LogError, errorMessage);
+    debugLogger.error(errorMessage);
     if (!unhandledRejectionOccurred) {
       unhandledRejectionOccurred = true;
       appEvents.emit(AppEvent.OpenDebugConsole);
@@ -142,32 +170,68 @@ export async function startInteractiveUI(
   settings: LoadedSettings,
   startupWarnings: string[],
   workspaceRoot: string = process.cwd(),
+  resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
 ) {
+  // Never enter Ink alternate buffer mode when screen reader mode is enabled
+  // as there is no benefit of alternate buffer mode when using a screen reader
+  // and the Ink alternate buffer mode requires line wrapping harmful to
+  // screen readers.
+  const useAlternateBuffer = shouldEnterAlternateScreen(
+    isAlternateBufferEnabled(settings),
+    config.getScreenReader(),
+  );
+  const mouseEventsEnabled = useAlternateBuffer;
+  if (mouseEventsEnabled) {
+    enableMouseEvents();
+    registerCleanup(() => {
+      disableMouseEvents();
+    });
+  }
+
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
+  const consolePatcher = new ConsolePatcher({
+    onNewMessage: (msg) => {
+      coreEvents.emitConsoleLog(msg.type, msg.content);
+    },
+    debugMode: config.getDebugMode(),
+  });
+  consolePatcher.patch();
+  registerCleanup(consolePatcher.cleanup);
+
+  const { stdout: inkStdout, stderr: inkStderr } = createInkStdio();
+
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
-    const kittyProtocolStatus = useKittyKeyboardProtocol();
+    useKittyKeyboardProtocol();
     return (
       <SettingsContext.Provider value={settings}>
         <KeypressProvider
-          kittyProtocolEnabled={kittyProtocolStatus.enabled}
           config={config}
           debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
         >
-          <SessionStatsProvider>
-            <VimModeProvider settings={settings}>
-              <AppContainer
-                config={config}
-                settings={settings}
-                startupWarnings={startupWarnings}
-                version={version}
-                initializationResult={initializationResult}
-              />
-            </VimModeProvider>
-          </SessionStatsProvider>
+          <MouseProvider
+            mouseEventsEnabled={mouseEventsEnabled}
+            debugKeystrokeLogging={
+              settings.merged.general?.debugKeystrokeLogging
+            }
+          >
+            <ScrollProvider>
+              <SessionStatsProvider>
+                <VimModeProvider settings={settings}>
+                  <AppContainer
+                    config={config}
+                    startupWarnings={startupWarnings}
+                    version={version}
+                    resumedSessionData={resumedSessionData}
+                    initializationResult={initializationResult}
+                  />
+                </VimModeProvider>
+              </SessionStatsProvider>
+            </ScrollProvider>
+          </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
     );
@@ -182,19 +246,33 @@ export async function startInteractiveUI(
       <AppWrapper />
     ),
     {
+      stdout: inkStdout,
+      stderr: inkStderr,
+      stdin: process.stdin,
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
+      onRender: ({ renderTime }: { renderTime: number }) => {
+        if (renderTime > SLOW_RENDER_MS) {
+          recordSlowRender(config, renderTime);
+        }
+        profiler.reportFrameRendered();
+      },
+      patchConsole: false,
+      alternateBuffer: useAlternateBuffer,
+      incrementalRendering:
+        settings.merged.ui?.incrementalRendering !== false &&
+        useAlternateBuffer,
     },
   );
 
-  checkForUpdates()
+  checkForUpdates(settings)
     .then((info) => {
       handleAutoUpdate(info, settings, config.getProjectRoot());
     })
     .catch((err) => {
       // Silently ignore update check errors.
       if (config.getDebugMode()) {
-        console.error('Update check failed:', err);
+        debugLogger.warn('Update check failed:', err);
       }
     });
 
@@ -202,18 +280,36 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  const cleanupStdio = patchStdio();
+  registerSyncCleanup(() => {
+    // This is needed to ensure we don't lose any buffered output.
+    initializeOutputListenersAndFlush();
+    cleanupStdio();
+  });
+
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
-  migrateDeprecatedSettings(settings);
+  migrateDeprecatedSettings(
+    settings,
+    // Temporary extension manager only used during this non-interactive UI phase.
+    new ExtensionManager({
+      workspaceDir: process.cwd(),
+      settings: settings.merged,
+      enabledExtensionOverrides: [],
+      requestConsent: requestConsentNonInteractive,
+      requestSetting: null,
+    }),
+  );
   await cleanupCheckpoints();
 
   const argv = await parseArguments(settings.merged);
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
-    console.error(
-      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
+    writeToStderr(
+      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
     );
+    await runExitCleanup();
     process.exit(1);
   }
 
@@ -221,6 +317,9 @@ export async function main() {
   const consolePatcher = new ConsolePatcher({
     stderr: true,
     debugMode: isDebugMode,
+    onNewMessage: (msg) => {
+      coreEvents.emitConsoleLog(msg.type, msg.content);
+    },
   });
   consolePatcher.patch();
   registerCleanup(consolePatcher.cleanup);
@@ -229,13 +328,19 @@ export async function main() {
     validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
   );
 
-  // Set a default auth type if one isn't set.
-  if (!settings.merged.security?.auth?.selectedType) {
-    if (process.env['CLOUD_SHELL'] === 'true') {
+  // Set a default auth type if one isn't set or is set to a legacy type
+  if (
+    !settings.merged.security?.auth?.selectedType ||
+    settings.merged.security?.auth?.selectedType === AuthType.LEGACY_CLOUD_SHELL
+  ) {
+    if (
+      process.env['CLOUD_SHELL'] === 'true' ||
+      process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+    ) {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
-        AuthType.CLOUD_SHELL,
+        AuthType.COMPUTE_ADC,
       );
     }
   }
@@ -247,7 +352,9 @@ export async function main() {
     if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
+      debugLogger.warn(
+        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
+      );
     }
   }
 
@@ -257,7 +364,7 @@ export async function main() {
       ? getNodeMemoryArgs(isDebugMode)
       : [];
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
-    // We intentially omit the list of extensions here because extensions
+    // We intentionally omit the list of extensions here because extensions
     // should not impact auth or setting up the sandbox.
     // TODO(jacobr): refactor loadCliConfig so there is a minimal version
     // that only initializes enough config to enable refreshAuth or find
@@ -266,8 +373,6 @@ export async function main() {
     if (sandboxConfig) {
       const partialConfig = await loadCliConfig(
         settings.merged,
-        [],
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
         sessionId,
         argv,
       );
@@ -289,7 +394,8 @@ export async function main() {
             settings.merged.security.auth.selectedType,
           );
         } catch (err) {
-          console.error('Error authenticating:', err);
+          debugLogger.error('Error authenticating:', err);
+          await runExitCleanup();
           process.exit(1);
         }
       }
@@ -326,6 +432,7 @@ export async function main() {
       await relaunchOnExitCode(() =>
         start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
       );
+      await runExitCleanup();
       process.exit(0);
     } else {
       // Relaunch app so we always have a child process that can be internally
@@ -338,36 +445,60 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    const extensionEnablementManager = new ExtensionEnablementManager(
-      ExtensionStorage.getUserExtensionsDir(),
-      argv.extensions,
-    );
-    const extensions = loadExtensions(extensionEnablementManager);
-    const config = await loadCliConfig(
-      settings.merged,
-      extensions,
-      extensionEnablementManager,
-      sessionId,
-      argv,
-    );
+    const config = await loadCliConfig(settings.merged, sessionId, argv);
+
+    const policyEngine = config.getPolicyEngine();
+    const messageBus = config.getMessageBus();
+    createPolicyUpdater(policyEngine, messageBus);
 
     // Cleanup sessions after config initialization
-    await cleanupExpiredSessions(config, settings.merged);
+    try {
+      await cleanupExpiredSessions(config, settings.merged);
+    } catch (e) {
+      debugLogger.error('Failed to cleanup expired sessions:', e);
+    }
 
     if (config.getListExtensions()) {
-      console.log('Installed extensions:');
-      for (const extension of extensions) {
-        console.log(`- ${extension.name}`);
+      debugLogger.log('Installed extensions:');
+      for (const extension of config.getExtensions()) {
+        debugLogger.log(`- ${extension.name}`);
       }
+      await runExitCleanup();
+      process.exit(0);
+    }
+
+    // Handle --list-sessions flag
+    if (config.getListSessions()) {
+      await listSessions(config);
+      await runExitCleanup();
+      process.exit(0);
+    }
+
+    // Handle --delete-session flag
+    const sessionToDelete = config.getDeleteSession();
+    if (sessionToDelete) {
+      await deleteSession(config, sessionToDelete);
+      await runExitCleanup();
       process.exit(0);
     }
 
     const wasRaw = process.stdin.isRaw;
-    let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
     if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
       process.stdin.setRawMode(true);
+
+      if (
+        shouldEnterAlternateScreen(
+          isAlternateBufferEnabled(settings),
+          config.getScreenReader(),
+        )
+      ) {
+        enterAlternateScreen();
+        disableLineWrapping();
+
+        // Ink will cleanup so there is no need for us to manually cleanup.
+      }
 
       // This cleanup isn't strictly needed but may help in certain situations.
       process.on('SIGTERM', () => {
@@ -378,11 +509,10 @@ export async function main() {
       });
 
       // Detect and enable Kitty keyboard protocol once at startup.
-      kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
+      await detectAndEnableKittyProtocol();
     }
 
     setMaxSizedBoxDebugging(isDebugMode);
-
     const initializationResult = await initializeApp(config, settings);
 
     if (
@@ -395,7 +525,7 @@ export async function main() {
     }
 
     if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, extensions, argv);
+      return runZedIntegration(config, settings, argv);
     }
 
     let input = config.getQuestion();
@@ -404,15 +534,35 @@ export async function main() {
       ...(await getUserStartupWarnings()),
     ];
 
+    // Handle --resume flag
+    let resumedSessionData: ResumedSessionData | undefined = undefined;
+    if (argv.resume) {
+      const sessionSelector = new SessionSelector(config);
+      try {
+        const result = await sessionSelector.resolveSession(argv.resume);
+        resumedSessionData = {
+          conversation: result.sessionData,
+          filePath: result.sessionPath,
+        };
+        // Use the existing session ID to continue recording to the same session
+        config.setSessionId(resumedSessionData.conversation.sessionId);
+      } catch (error) {
+        console.error(
+          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        await runExitCleanup();
+        process.exit(1);
+      }
+    }
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
-      // Need kitty detection to be complete before we can start the interactive UI.
-      await kittyProtocolDetectionComplete;
       await startInteractiveUI(
         config,
         settings,
         startupWarnings,
         process.cwd(),
+        resumedSessionData,
         initializationResult,
       );
       return;
@@ -429,21 +579,23 @@ export async function main() {
       }
     }
     if (!input) {
-      console.error(
+      debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
+      await runExitCleanup();
       process.exit(1);
     }
 
     const prompt_id = Math.random().toString(16).slice(2);
-    logUserPrompt(config, {
-      'event.name': 'user_prompt',
-      'event.timestamp': new Date().toISOString(),
-      prompt: input,
-      prompt_id,
-      auth_type: config.getContentGeneratorConfig()?.authType,
-      prompt_length: input.length,
-    });
+    logUserPrompt(
+      config,
+      new UserPromptEvent(
+        input.length,
+        prompt_id,
+        config.getContentGeneratorConfig()?.authType,
+        input,
+      ),
+    );
 
     const nonInteractiveConfig = await validateNonInteractiveAuth(
       settings.merged.security?.auth?.selectedType,
@@ -453,10 +605,22 @@ export async function main() {
     );
 
     if (config.getDebugMode()) {
-      console.log('Session ID: %s', sessionId);
+      debugLogger.log('Session ID: %s', sessionId);
     }
 
-    await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
+    const hasDeprecatedPromptArg = process.argv.some((arg) =>
+      arg.startsWith('--prompt'),
+    );
+    initializeOutputListenersAndFlush();
+
+    await runNonInteractive({
+      config: nonInteractiveConfig,
+      settings,
+      input,
+      prompt_id,
+      hasDeprecatedPromptArg,
+      resumedSessionData,
+    });
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(0);
@@ -466,10 +630,34 @@ export async function main() {
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.ui?.hideWindowTitle) {
     const windowTitle = computeWindowTitle(title);
-    process.stdout.write(`\x1b]2;${windowTitle}\x07`);
+    writeToStdout(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {
-      process.stdout.write(`\x1b]2;\x07`);
+      writeToStdout(`\x1b]2;\x07`);
     });
   }
+}
+
+export function initializeOutputListenersAndFlush() {
+  // If there are no listeners for output, make sure we flush so output is not
+  // lost.
+  if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
+    // In non-interactive mode, ensure we drain any buffered output or logs to stderr
+    coreEvents.on(CoreEvent.Output, (payload: OutputPayload) => {
+      if (payload.isStderr) {
+        writeToStderr(payload.chunk, payload.encoding);
+      } else {
+        writeToStdout(payload.chunk, payload.encoding);
+      }
+    });
+
+    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+      if (payload.type === 'error' || payload.type === 'warn') {
+        writeToStderr(payload.content);
+      } else {
+        writeToStdout(payload.content);
+      }
+    });
+  }
+  coreEvents.drainBacklogs();
 }

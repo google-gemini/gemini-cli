@@ -9,6 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
+import { debugLogger, type AnyToolInvocation } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -22,7 +23,8 @@ import {
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
+
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {
@@ -34,63 +36,20 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  initializeShellParsers,
   isCommandAllowed,
-  SHELL_TOOL_NAMES,
+  isShellInvocationAllowlisted,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
+import { SHELL_TOOL_NAME } from './tool-names.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
-
-/**
- * Parses the `--allowed-tools` flag to determine which sub-commands of the
- * ShellTool are allowed. The flag can be provided multiple times.
- *
- * @param allowedTools The list of allowed tools from the config.
- * @returns A Set of allowed sub-commands, or null if all commands are allowed.
- *  - `null`: All sub-commands are allowed (e.g., --allowed-tools="ShellTool").
- *  - `Set<string>`: A set of specifically allowed sub-commands (e.g., --allowed-tools="ShellTool(wc)" --allowed-tools="ShellTool(ls)").
- *  - `Set<>` (empty): No sub-commands are allowed (e.g., --allowed-tools="ShellTool()").
- */
-function parseAllowedSubcommands(
-  allowedTools: readonly string[],
-): Set<string> | null {
-  const shellToolEntries = allowedTools.filter((tool) =>
-    SHELL_TOOL_NAMES.some((name) => tool.startsWith(name)),
-  );
-
-  if (shellToolEntries.length === 0) {
-    return new Set(); // ShellTool not mentioned, so no subcommands are allowed.
-  }
-
-  // If any entry is just "run_shell_command" or "ShellTool", all subcommands are allowed.
-  if (shellToolEntries.some((entry) => SHELL_TOOL_NAMES.includes(entry))) {
-    return null;
-  }
-
-  const allSubcommands = new Set<string>();
-  const toolNamePattern = SHELL_TOOL_NAMES.join('|');
-  const regex = new RegExp(`^(${toolNamePattern})\\((.*)\\)$`);
-
-  for (const entry of shellToolEntries) {
-    const match = entry.match(regex);
-    if (match) {
-      const subcommands = match[2];
-      if (subcommands) {
-        subcommands
-          .split(',')
-          .map((s) => s.trim())
-          .forEach((s) => s && allSubcommands.add(s));
-      }
-    }
-  }
-
-  return allSubcommands;
-}
 
 export interface ShellToolParams {
   command: string;
   description?: string;
-  directory?: string;
+  dir_path?: string;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -101,16 +60,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: ShellToolParams,
     private readonly allowlist: Set<string>,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
     let description = `${this.params.command}`;
     // append optional [in directory]
     // note description is needed even if validation fails due to absolute path
-    if (this.params.directory) {
-      description += ` [in ${this.params.directory}]`;
+    if (this.params.dir_path) {
+      description += ` [in ${this.params.dir_path}]`;
+    } else {
+      description += ` [current working directory ${process.cwd()}]`;
     }
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
@@ -119,7 +83,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
-  override async shouldConfirmExecute(
+  protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
@@ -133,19 +97,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
       !this.config.isInteractive() &&
       this.config.getApprovalMode() !== ApprovalMode.YOLO
     ) {
-      const allowed = this.config.getAllowedTools() || [];
-      const allowedSubcommands = parseAllowedSubcommands(allowed);
-      if (allowedSubcommands !== null) {
-        // Not all commands are allowed, so we need to check.
-        const allCommandsAllowed = rootCommands.every((cmd) =>
-          allowedSubcommands.has(cmd),
-        );
-        if (!allCommandsAllowed) {
-          throw new Error(
-            `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
-          );
-        }
+      if (this.isInvocationAllowlisted(command)) {
+        // If it's an allowed shell command, we don't need to confirm execution.
+        return false;
       }
+
+      throw new Error(
+        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
+      );
     }
 
     const commandsToConfirm = rootCommands.filter(
@@ -202,7 +161,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = this.params.directory || this.config.getTargetDir();
+      const cwd = this.params.dir_path
+        ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
+        : this.config.getTargetDir();
 
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
@@ -270,7 +231,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
-              console.error(`pgrep: ${line}`);
+              debugLogger.error(`pgrep: ${line}`);
             }
             const pid = Number(line);
             if (pid !== result.pid) {
@@ -279,7 +240,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         } else {
           if (!signal.aborted) {
-            console.error('missing pgrep output');
+            debugLogger.error('missing pgrep output');
           }
         }
       }
@@ -301,7 +262,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         llmContent = [
           `Command: ${this.params.command}`,
-          `Directory: ${this.params.directory || '(root)'}`,
+          `Directory: ${this.params.dir_path || '(root)'}`,
           `Output: ${result.output || '(empty)'}`,
           `Error: ${finalError}`, // Use the cleaned error string.
           `Exit Code: ${result.exitCode ?? '(none)'}`,
@@ -345,12 +306,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
             },
           }
         : {};
-      if (summarizeConfig && summarizeConfig[ShellTool.Name]) {
+      if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
         const summary = await summarizeToolOutput(
+          this.config,
+          { model: 'summarizer-shell' },
           llmContent,
           this.config.getGeminiClient(),
           signal,
-          summarizeConfig[ShellTool.Name].tokenBudget,
         );
         return {
           llmContent: summary,
@@ -370,6 +332,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
     }
   }
+
+  private isInvocationAllowlisted(command: string): boolean {
+    const allowedTools = this.config.getAllowedTools() || [];
+    if (allowedTools.length === 0) {
+      return false;
+    }
+
+    const invocation = { params: { command } } as unknown as AnyToolInvocation;
+    return isShellInvocationAllowlisted(invocation, allowedTools);
+  }
 }
 
 function getShellToolDescription(): string {
@@ -388,25 +360,17 @@ function getShellToolDescription(): string {
       Process Group PGID: Process group started or \`(none)\``;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
   } else {
     return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
   }
 }
 
 function getCommandDescription(): string {
-  const cmd_substitution_warning =
-    '\n*** WARNING: Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons.';
   if (os.platform() === 'win32') {
-    return (
-      'Exact command to execute as `cmd.exe /c <command>`' +
-      cmd_substitution_warning
-    );
+    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
   } else {
-    return (
-      'Exact bash command to execute as `bash -c <command>`' +
-      cmd_substitution_warning
-    );
+    return 'Exact bash command to execute as `bash -c <command>`';
   }
 }
 
@@ -414,10 +378,17 @@ export class ShellTool extends BaseDeclarativeTool<
   ShellToolParams,
   ToolResult
 > {
-  static Name: string = 'run_shell_command';
+  static readonly Name = SHELL_TOOL_NAME;
+
   private allowlist: Set<string> = new Set();
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
+    void initializeShellParsers().catch(() => {
+      // Errors are surfaced when parsing commands.
+    });
     super(
       ShellTool.Name,
       'Shell',
@@ -435,49 +406,48 @@ export class ShellTool extends BaseDeclarativeTool<
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
           },
-          directory: {
+          dir_path: {
             type: 'string',
             description:
-              '(OPTIONAL) The absolute path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
+              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
           },
         },
         required: ['command'],
       },
       false, // output is not markdown
       true, // output can be updated
+      messageBus,
     );
   }
 
   protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
+    if (!params.command.trim()) {
+      return 'Command cannot be empty.';
+    }
+
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
-        console.error(
+        debugLogger.error(
           'Unexpected: isCommandAllowed returned false without a reason',
         );
         return `Command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
     }
-    if (!params.command.trim()) {
-      return 'Command cannot be empty.';
-    }
     if (getCommandRoots(params.command).length === 0) {
       return 'Could not identify command root to obtain permission from user.';
     }
-    if (params.directory) {
-      if (!path.isAbsolute(params.directory)) {
-        return 'Directory must be an absolute path.';
-      }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const isWithinWorkspace = workspaceDirs.some((wsDir) =>
-        params.directory!.startsWith(wsDir),
+    if (params.dir_path) {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.dir_path,
       );
-
-      if (!isWithinWorkspace) {
-        return `Directory '${params.directory}' is not within any of the registered workspace directories.`;
+      const workspaceContext = this.config.getWorkspaceContext();
+      if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
+        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
       }
     }
     return null;
@@ -485,7 +455,17 @@ export class ShellTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ShellToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
-    return new ShellToolInvocation(this.config, params, this.allowlist);
+    return new ShellToolInvocation(
+      this.config,
+      params,
+      this.allowlist,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

@@ -8,10 +8,16 @@
 import type { CommandModule } from 'yargs';
 import { loadSettings } from '../../config/settings.js';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
-import { MCPServerStatus, createTransport } from '@google/gemini-cli-core';
+import {
+  MCPServerStatus,
+  createTransport,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ExtensionStorage, loadExtensions } from '../../config/extension.js';
-import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
+import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -22,9 +28,13 @@ async function getMcpServersFromConfig(): Promise<
   Record<string, MCPServerConfig>
 > {
   const settings = loadSettings();
-  const extensions = loadExtensions(
-    new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-  );
+  const extensionManager = new ExtensionManager({
+    settings: settings.merged,
+    workspaceDir: process.cwd(),
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+  });
+  const extensions = await extensionManager.loadExtensions();
   const mcpServers = { ...(settings.merged.mcpServers || {}) };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
@@ -33,7 +43,7 @@ async function getMcpServersFromConfig(): Promise<
       }
       mcpServers[key] = {
         ...server,
-        extensionName: extension.name,
+        extension,
       };
     });
   }
@@ -86,11 +96,11 @@ export async function listMcpServers(): Promise<void> {
   const serverNames = Object.keys(mcpServers);
 
   if (serverNames.length === 0) {
-    console.log('No MCP servers configured.');
+    debugLogger.log('No MCP servers configured.');
     return;
   }
 
-  console.log('Configured MCP servers:\n');
+  debugLogger.log('Configured MCP servers:\n');
 
   for (const serverName of serverNames) {
     const server = mcpServers[serverName];
@@ -115,7 +125,10 @@ export async function listMcpServers(): Promise<void> {
         break;
     }
 
-    let serverInfo = `${serverName}: `;
+    let serverInfo =
+      serverName +
+      (server.extension?.name ? ` (from ${server.extension.name})` : '') +
+      ': ';
     if (server.httpUrl) {
       serverInfo += `${server.httpUrl} (http)`;
     } else if (server.url) {
@@ -124,7 +137,7 @@ export async function listMcpServers(): Promise<void> {
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }
 
-    console.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
+    debugLogger.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
   }
 }
 
@@ -133,5 +146,6 @@ export const listCommand: CommandModule = {
   describe: 'List all configured MCP servers',
   handler: async () => {
     await listMcpServers();
+    await exitCli();
   },
 };

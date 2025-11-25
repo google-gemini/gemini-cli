@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
 import { describe, it, expect } from 'vitest';
 import { ToolsList } from './ToolsList.js';
 import { type ToolDefinition } from '../../types.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 
 const mockTools: ToolDefinition[] = [
   {
@@ -32,7 +32,7 @@ const mockTools: ToolDefinition[] = [
 
 describe('<ToolsList />', () => {
   it('renders correctly with descriptions', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ToolsList
         tools={mockTools}
         showDescriptions={true}
@@ -43,7 +43,7 @@ describe('<ToolsList />', () => {
   });
 
   it('renders correctly without descriptions', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ToolsList
         tools={mockTools}
         showDescriptions={false}
@@ -54,7 +54,7 @@ describe('<ToolsList />', () => {
   });
 
   it('renders correctly with no tools', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ToolsList tools={[]} showDescriptions={true} terminalWidth={40} />,
     );
     expect(lastFrame()).toMatchSnapshot();

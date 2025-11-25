@@ -38,12 +38,13 @@ export {
   logFlashFallback,
   logSlashCommand,
   logConversationFinishedEvent,
-  logKittySequenceOverflow,
   logChatCompression,
   logToolOutputTruncated,
   logExtensionEnable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logExtensionUpdateEvent,
+  logWebFetchFallbackAttempt,
 } from './loggers.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
@@ -57,8 +58,9 @@ export {
   StartSessionEvent,
   ToolCallEvent,
   ConversationFinishedEvent,
-  KittySequenceOverflowEvent,
   ToolOutputTruncatedEvent,
+  WebFetchFallbackAttemptEvent,
+  ToolCallDecision,
 } from './types.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
@@ -84,6 +86,13 @@ export {
   isUserActive,
 } from './activity-detector.js';
 export {
+  ActivityMonitor,
+  initializeActivityMonitor,
+  getActivityMonitor,
+  startGlobalActivityMonitoring,
+  stopGlobalActivityMonitoring,
+} from './activity-monitor.js';
+export {
   // Core metrics functions
   recordToolCallMetrics,
   recordTokenUsageMetrics,
@@ -97,6 +106,7 @@ export {
   // Custom metrics for token usage and API responses
   recordCustomTokenUsageMetrics,
   recordCustomApiResponseMetrics,
+  recordExitFail,
   // OpenTelemetry GenAI semantic convention for token usage and operation duration
   recordGenAiClientTokenUsage,
   recordGenAiClientOperationDuration,
@@ -113,6 +123,8 @@ export {
   recordPerformanceRegression,
   recordBaselineComparison,
   isPerformanceMonitoringActive,
+  recordFlickerFrame,
+  recordSlowRender,
   // Performance monitoring types
   PerformanceMetricType,
   MemoryMetricType,
@@ -124,3 +136,4 @@ export {
   GenAiProviderName,
   GenAiTokenType,
 } from './metrics.js';
+export { runInDevTraceSpan, type SpanMetadata } from './trace.js';

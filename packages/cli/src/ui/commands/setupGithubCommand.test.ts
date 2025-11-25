@@ -14,9 +14,11 @@ import {
   setupGithubCommand,
   updateGitignore,
   GITHUB_WORKFLOW_PATHS,
+  GITHUB_COMMANDS_PATHS,
 } from './setupGithubCommand.js';
 import type { CommandContext, ToolActionReturn } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 vi.mock('child_process');
 
@@ -49,19 +51,23 @@ describe('setupGithubCommand', async () => {
     if (scratchDir) await fs.rm(scratchDir, { recursive: true });
   });
 
-  //TODO - https://github.com/google-gemini/gemini-cli/issues/10740
-  it.skip('returns a tool action to download github workflows and handles paths', async () => {
+  it('returns a tool action to download github workflows and handles paths', async () => {
     const fakeRepoOwner = 'fake';
     const fakeRepoName = 'repo';
     const fakeRepoRoot = scratchDir;
     const fakeReleaseVersion = 'v1.2.3';
 
     const workflows = GITHUB_WORKFLOW_PATHS.map((p) => path.basename(p));
-    for (const workflow of workflows) {
-      vi.mocked(global.fetch).mockReturnValueOnce(
-        Promise.resolve(new Response(workflow)),
-      );
-    }
+    const commands = GITHUB_COMMANDS_PATHS.map((p) => path.basename(p));
+
+    vi.mocked(global.fetch).mockImplementation(async (url) => {
+      const filename = path.basename(url.toString());
+      return new Response(filename, {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    });
 
     vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
     vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
@@ -103,6 +109,12 @@ describe('setupGithubCommand', async () => {
       expect(contents).toContain(workflow);
     }
 
+    for (const command of commands) {
+      const commandFile = path.join(scratchDir, '.github', 'commands', command);
+      const contents = await fs.readFile(commandFile, 'utf8');
+      expect(contents).toContain(command);
+    }
+
     // Verify that .gitignore was created with the expected entries
     const gitignorePath = path.join(scratchDir, '.gitignore');
     const gitignoreExists = await fs
@@ -116,6 +128,32 @@ describe('setupGithubCommand', async () => {
       expect(gitignoreContent).toContain('.gemini/');
       expect(gitignoreContent).toContain('gha-creds-*.json');
     }
+  });
+
+  it('throws an error when download fails', async () => {
+    const fakeRepoRoot = scratchDir;
+    const fakeReleaseVersion = 'v1.2.3';
+
+    vi.mocked(global.fetch).mockResolvedValue(
+      new Response('Not Found', {
+        status: 404,
+        statusText: 'Not Found',
+      }),
+    );
+
+    vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
+    vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
+    vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce(
+      fakeReleaseVersion,
+    );
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: 'fake',
+      repo: 'repo',
+    });
+
+    await expect(
+      setupGithubCommand.action?.({} as CommandContext, ''),
+    ).rejects.toThrow(/Invalid response code downloading.*404 - Not Found/);
   });
 });
 
@@ -220,7 +258,9 @@ describe('updateGitignore', () => {
   });
 
   it('handles permission errors gracefully', async () => {
-    const consoleSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const consoleSpy = vi
+      .spyOn(debugLogger, 'debug')
+      .mockImplementation(() => {});
 
     const fsModule = await import('node:fs');
     const writeFileSpy = vi

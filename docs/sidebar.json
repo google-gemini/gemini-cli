@@ -9,6 +9,10 @@
       {
         "label": "Architecture Overview",
         "slug": "docs/architecture"
+      },
+      {
+        "label": "Contribution Guide",
+        "slug": "docs/contributing"
       }
     ]
   },
@@ -20,6 +24,10 @@
         "slug": "docs/get-started"
       },
       {
+        "label": "Gemini 3 Pro on Gemini CLI",
+        "slug": "docs/get-started/gemini-3"
+      },
+      {
         "label": "Authentication",
         "slug": "docs/get-started/authentication"
       },
@@ -28,8 +36,8 @@
         "slug": "docs/get-started/configuration"
       },
       {
-        "label": "Deployment",
-        "slug": "docs/get-started/deployment"
+        "label": "Installation",
+        "slug": "docs/get-started/installation"
       },
       {
         "label": "Examples",
@@ -69,8 +77,16 @@
         "slug": "docs/cli/keyboard-shortcuts"
       },
       {
+        "label": "Model Selection",
+        "slug": "docs/cli/model"
+      },
+      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
+      },
+      {
+        "label": "Settings",
+        "slug": "docs/cli/settings"
       },
       {
         "label": "Telemetry",
@@ -112,6 +128,10 @@
       {
         "label": "Memory Import Processor",
         "slug": "docs/core/memport"
+      },
+      {
+        "label": "Policy Engine",
+        "slug": "docs/core/policy-engine"
       }
     ]
   },
@@ -125,10 +145,6 @@
       {
         "label": "File System",
         "slug": "docs/tools/file-system"
-      },
-      {
-        "label": "Multi-File Read",
-        "slug": "docs/tools/multi-file"
       },
       {
         "label": "Shell",
@@ -147,6 +163,10 @@
         "slug": "docs/tools/memory"
       },
       {
+        "label": "Todos",
+        "slug": "docs/tools/todos"
+      },
+      {
         "label": "MCP Servers",
         "slug": "docs/tools/mcp-server"
       }
@@ -158,6 +178,10 @@
       {
         "label": "Introduction",
         "slug": "docs/extensions"
+      },
+      {
+        "label": "Get Started with Extensions",
+        "slug": "docs/extensions/getting-started-extensions"
       },
       {
         "label": "Extension Releasing",
@@ -188,6 +212,10 @@
       {
         "label": "Releases",
         "slug": "docs/releases"
+      },
+      {
+        "label": "Changelog",
+        "slug": "docs/changelogs"
       },
       {
         "label": "Integration Tests",
