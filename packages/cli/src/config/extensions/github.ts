@@ -52,7 +52,7 @@ export async function cloneFromGit(
         // We let git handle the source as is.
       }
     }
-    await git.clone(sourceUrl, './', ['--depth', '1']);
+    await git.raw(['clone', '--depth', '1', '--', sourceUrl, './']);
 
     const remotes = await git.getRemotes(true);
     if (remotes.length === 0) {
@@ -103,9 +103,7 @@ export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
     .filter((part) => part !== '');
 
   if (parts?.length !== 2) {
-    throw new Error(
-      `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
-    );
+    return null;
   }
   const owner = parts[0];
   const repo = parts[1].replace('.git', '');
