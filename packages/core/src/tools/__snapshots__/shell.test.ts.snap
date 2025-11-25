@@ -13,7 +13,8 @@ exports[`ShellTool > getDescription > should return the non-windows description 
       Exit Code: Exit code or \`(none)\` if terminated by signal.
       Signal: Signal number or \`(none)\` if no signal was received.
       Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\`"
+      Process Group PGID: Process group started or \`(none)\`
+      Duration: Execution duration in seconds."
 `;
 
 exports[`ShellTool > getDescription > should return the windows description when on windows 1`] = `
@@ -29,5 +30,6 @@ exports[`ShellTool > getDescription > should return the windows description when
       Exit Code: Exit code or \`(none)\` if terminated by signal.
       Signal: Signal number or \`(none)\` if no signal was received.
       Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\`"
+      Process Group PGID: Process group started or \`(none)\`
+      Duration: Execution duration in seconds."
 `;

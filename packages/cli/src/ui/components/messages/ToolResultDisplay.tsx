@@ -11,7 +11,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput } from '@google/gemini-cli-core';
+import type { AnsiOutput, Alert } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
@@ -114,6 +114,21 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           'todos' in truncatedResultDisplay ? (
           // display nothing, as the TodoTray will handle rendering todos
           <></>
+        ) : typeof truncatedResultDisplay === 'object' &&
+          'type' in truncatedResultDisplay &&
+          (truncatedResultDisplay as Alert).type === 'timeout' ? (
+          <Box
+            borderStyle="round"
+            borderColor="red"
+            paddingX={1}
+            flexDirection="column"
+            width={childWidth}
+          >
+            <Text color="red" bold>
+              {(truncatedResultDisplay as Alert).title}
+            </Text>
+            <Text>{(truncatedResultDisplay as Alert).content}</Text>
+          </Box>
         ) : (
           <AnsiOutputText
             data={truncatedResultDisplay as AnsiOutput}
