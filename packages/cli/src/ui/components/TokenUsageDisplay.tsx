@@ -7,11 +7,19 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
 
 export const TokenUsageDisplay: React.FC = () => {
-  // Placeholder values for now
-  const inputTokens = 0;
-  const outputTokens = 0;
+  const { stats } = useSessionStats();
+  const { models } = stats.metrics;
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  for (const modelMetrics of Object.values(models)) {
+    inputTokens += modelMetrics.tokens.prompt;
+    outputTokens += modelMetrics.tokens.candidates;
+  }
 
   return (
     <Box>
