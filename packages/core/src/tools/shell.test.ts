@@ -19,6 +19,7 @@ const mockPlatform = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
 const mockShellBackground = vi.hoisted(() => vi.fn());
+
 vi.mock('../services/shellExecutionService.js', () => ({
   ShellExecutionService: {
     execute: mockShellExecutionService,
@@ -302,6 +303,26 @@ describe('ShellTool', () => {
         false,
         { pager: 'cat' },
       );
+    });
+
+    it('should handle is_background parameter by calling ShellExecutionService.background', async () => {
+      vi.useFakeTimers();
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // We need to provide a PID for the background logic to trigger
+      resolveShellExecution({ pid: 12345 });
+
+      // Advance time to trigger the background timeout
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
+      vi.useRealTimers();
+      await promise;
     });
 
     itWindowsOnly(
