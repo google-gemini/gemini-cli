@@ -671,20 +671,20 @@ export function logLlmLoopCheck(
 }
 
 export function logHookCall(config: Config, event: HookCallEvent): void {
-  if (!isTelemetrySdkInitialized()) return;
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
 
-  const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: event.toLogBody(),
-    attributes: event.toOpenTelemetryAttributes(config),
-  };
-  logger.emit(logRecord);
-
-  recordHookCallMetrics(
-    config,
-    event.hook_event_name,
-    event.hook_name,
-    event.duration_ms,
-    event.success,
-  );
+    recordHookCallMetrics(
+      config,
+      event.hook_event_name,
+      event.hook_name,
+      event.duration_ms,
+      event.success,
+    );
+  });
 }
