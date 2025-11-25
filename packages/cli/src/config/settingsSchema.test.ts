@@ -165,6 +165,10 @@ describe('SettingsSchema', () => {
         getSettingsSchema().ui.properties.footer.properties
           .hideContextPercentage.showInDialog,
       ).toBe(true);
+      expect(
+        getSettingsSchema().ui.properties.footer.properties.showTokenUsage
+          .showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().general.properties.vimMode.showInDialog).toBe(
         true,
       );
