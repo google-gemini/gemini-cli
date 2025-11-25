@@ -57,4 +57,25 @@ describe('TokenUsageDisplay', () => {
     expect(output).toContain('↓');
     expect(output).toContain('200');
   });
+
+  it('displays compact format for large token counts', () => {
+    useSessionStatsMock.mockReturnValue({
+      stats: {
+        metrics: {
+          models: {
+            'model-1': {
+              tokens: { prompt: 12500, candidates: 3200 },
+            },
+          },
+        },
+      },
+    } as never);
+
+    const { lastFrame } = render(<TokenUsageDisplay />);
+    const output = lastFrame();
+    expect(output).toContain('↑');
+    expect(output).toContain('12.5K');
+    expect(output).toContain('↓');
+    expect(output).toContain('3.2K');
+  });
 });

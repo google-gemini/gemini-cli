@@ -8,6 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { formatCompactNumber } from '../utils/formatCompactNumber.js';
 
 export const TokenUsageDisplay: React.FC = () => {
   const { stats } = useSessionStats();
@@ -25,9 +26,13 @@ export const TokenUsageDisplay: React.FC = () => {
     <Box>
       <Text color={theme.text.secondary}> | </Text>
       <Text color={theme.text.accent}>↑</Text>
-      <Text color={theme.text.secondary}>{inputTokens.toLocaleString()} </Text>
+      <Text color={theme.text.secondary}>
+        {formatCompactNumber(inputTokens)}{' '}
+      </Text>
       <Text color={theme.text.accent}>↓</Text>
-      <Text color={theme.text.secondary}>{outputTokens.toLocaleString()}</Text>
+      <Text color={theme.text.secondary}>
+        {formatCompactNumber(outputTokens)}
+      </Text>
     </Box>
   );
 };
