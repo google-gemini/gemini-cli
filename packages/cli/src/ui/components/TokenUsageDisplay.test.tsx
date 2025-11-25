@@ -51,7 +51,10 @@ describe('TokenUsageDisplay', () => {
     } as never);
 
     const { lastFrame } = render(<TokenUsageDisplay />);
-    expect(lastFrame()).toContain('↑300');
-    expect(lastFrame()).toContain('↓200');
+    const output = lastFrame();
+    expect(output).toContain('↑');
+    expect(output).toContain('300');
+    expect(output).toContain('↓');
+    expect(output).toContain('200');
   });
 });

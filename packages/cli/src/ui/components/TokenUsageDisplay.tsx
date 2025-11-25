@@ -24,9 +24,10 @@ export const TokenUsageDisplay: React.FC = () => {
   return (
     <Box>
       <Text color={theme.text.secondary}> | </Text>
-      <Text color={theme.text.secondary}>
-        ↑{inputTokens.toLocaleString()} ↓{outputTokens.toLocaleString()}
-      </Text>
+      <Text color={theme.text.accent}>↑</Text>
+      <Text color={theme.text.secondary}>{inputTokens.toLocaleString()} </Text>
+      <Text color={theme.text.accent}>↓</Text>
+      <Text color={theme.text.secondary}>{outputTokens.toLocaleString()}</Text>
     </Box>
   );
 };
