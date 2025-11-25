@@ -144,7 +144,19 @@ export const useShellCommandProcessor = (
         binaryBytesReceived: 0,
       });
 
-      // Subscribe to future updates
+      // Subscribe to process exit directly
+      ShellExecutionService.onExit(pid, () => {
+        if (backgroundShellsRef.current.has(pid)) {
+          backgroundShellsRef.current.delete(pid);
+          setBackgroundShellCount(backgroundShellsRef.current.size);
+          if (backgroundShellsRef.current.size === 0) {
+            setIsBackgroundShellVisible(false);
+          }
+          setTick((t) => t + 1);
+        }
+      });
+
+      // Subscribe to future updates (data only)
       ShellExecutionService.subscribe(pid, (event) => {
         const shell = backgroundShellsRef.current.get(pid);
         if (!shell) return;
@@ -244,6 +256,7 @@ export const useShellCommandProcessor = (
             targetDir,
             (event) => {
               let shouldUpdate = false;
+
               switch (event.type) {
                 case 'data':
                   // Do not process text data if we've already switched to binary mode.
@@ -283,7 +296,7 @@ export const useShellCommandProcessor = (
               ) {
                 backgroundShellsRef.current.set(executionPid, {
                   pid: executionPid,
-                  command: rawQuery,
+                  command: rawQuery as string,
                   output: cumulativeStdout,
                   isBinary: isBinaryStream,
                   binaryBytesReceived,
@@ -356,13 +369,24 @@ export const useShellCommandProcessor = (
                 // Add to background shells
                 backgroundShellsRef.current.set(result.pid, {
                   pid: result.pid,
-                  command: rawQuery,
+                  command: rawQuery as string,
                   output: cumulativeStdout,
                   isBinary: isBinaryStream,
                   binaryBytesReceived,
                 });
                 setBackgroundShellCount(backgroundShellsRef.current.size);
                 setActiveShellPtyId(null);
+
+                ShellExecutionService.onExit(result.pid, () => {
+                  if (backgroundShellsRef.current.has(result.pid!)) {
+                    backgroundShellsRef.current.delete(result.pid!);
+                    setBackgroundShellCount(backgroundShellsRef.current.size);
+                    if (backgroundShellsRef.current.size === 0) {
+                      setIsBackgroundShellVisible(false);
+                    }
+                    setTick((t) => t + 1);
+                  }
+                });
               }
 
               let mainContent: string;

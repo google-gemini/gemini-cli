@@ -882,6 +882,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShellCount,
     isBackgroundShellListOpen,
   ]);
+
   const visibleBackgroundShell =
     isBackgroundShellVisible &&
     activeBackgroundShellPid !== null &&
@@ -891,7 +892,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useEffect(() => {
     if (embeddedShellFocused) {
-      if (!isBackgroundShellVisible || backgroundShells.size === 0) {
+      const hasActiveForegroundShell = !!activePtyId;
+      const hasVisibleBackgroundShell =
+        isBackgroundShellVisible && backgroundShells.size > 0;
+
+      if (!hasActiveForegroundShell && !hasVisibleBackgroundShell) {
         setEmbeddedShellFocused(false);
       }
     }
@@ -900,6 +905,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     embeddedShellFocused,
     backgroundShellCount,
+    activePtyId,
   ]);
 
   cancelHandlerRef.current = useCallback(
@@ -1390,9 +1396,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isAlternateBuffer,
       backgroundCurrentShell,
       toggleBackgroundShell,
-      visibleBackgroundShell,
       backgroundShells,
       isBackgroundShellVisible,
+      visibleBackgroundShell,
       setIsBackgroundShellListOpen,
     ],
   );

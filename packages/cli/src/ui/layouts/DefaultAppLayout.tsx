@@ -16,6 +16,7 @@ import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
+import { StreamingState } from '../types.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
@@ -49,7 +50,11 @@ export const DefaultAppLayout: React.FC = () => {
               activePid={uiState.activeBackgroundShellPid}
               width={width}
               height={uiState.backgroundShellHeight}
-              isFocused={uiState.embeddedShellFocused}
+              isFocused={
+                uiState.embeddedShellFocused &&
+                !uiState.dialogsVisible &&
+                uiState.streamingState !== StreamingState.WaitingForConfirmation
+              }
               isListOpenProp={uiState.isBackgroundShellListOpen}
             />
           </Box>

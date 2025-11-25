@@ -48,13 +48,13 @@ export const BackgroundShellDisplay = ({
   const [listSelectionIndex, setListSelectionIndex] = useState(0);
 
   useEffect(() => {
-    if (!activeShell) return;
+    if (!shells.has(activePid)) return;
     // Resize the active PTY
     // 2 for borders, plus padding on both sides
     const ptyWidth = Math.max(1, width - 2 - CONTENT_PADDING_X * 2);
     const ptyHeight = Math.max(1, height - 3); // -2 for border, -1 for header
-    ShellExecutionService.resizePty(activeShell.pid, ptyWidth, ptyHeight);
-  }, [activeShell, width, height]);
+    ShellExecutionService.resizePty(activePid, ptyWidth, ptyHeight);
+  }, [activePid, width, height, shells]);
 
   useEffect(() => {
     if (activeShell) {

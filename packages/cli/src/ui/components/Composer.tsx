@@ -121,6 +121,7 @@ export const Composer = () => {
                   config.getMcpClientManager()?.getBlockedMcpServers() ?? []
                 }
                 skillCount={config.getSkillManager().getSkills().length}
+                backgroundProcessCount={uiState.backgroundShellCount}
               />
             )
           )}

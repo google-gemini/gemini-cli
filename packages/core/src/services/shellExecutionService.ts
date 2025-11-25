@@ -111,6 +111,14 @@ export type ShellOutputEvent =
       type: 'binary_progress';
       /** The total number of bytes received so far. */
       bytesReceived: number;
+    }
+  | {
+      /** Signals that the process has exited. */
+      type: 'exit';
+      /** The exit code of the process, if any. */
+      exitCode: number | null;
+      /** The signal that terminated the process, if any. */
+      signal: number | null;
     };
 
 interface ActivePty {
@@ -695,6 +703,19 @@ export class ShellExecutionService {
             this.activePtys.delete(ptyProcess.pid);
             this.activeResolvers.delete(ptyProcess.pid);
 
+            const event: ShellOutputEvent = {
+              type: 'exit',
+              exitCode,
+              signal: signal ?? null,
+            };
+            const listeners = ShellExecutionService.activeListeners.get(
+              ptyProcess.pid,
+            );
+            if (listeners) {
+              listeners.forEach((listener) => listener(event));
+            }
+            this.activeListeners.delete(ptyProcess.pid);
+
             const finalize = () => {
               render(true);
               const finalBuffer = Buffer.concat(outputChunks);
@@ -817,6 +838,31 @@ export class ShellExecutionService {
   }
 
   /**
+   * Registers a callback to be invoked when the process with the given PID exits.
+   * This attaches directly to the PTY's exit event.
+   *
+   * @param pid The process ID to watch.
+   * @param callback The function to call on exit.
+   */
+  static onExit(
+    pid: number,
+    callback: (exitCode: number, signal?: number) => void,
+  ): void {
+    const activePty = this.activePtys.get(pid);
+    if (activePty) {
+      // We rely on node-pty's event emitter.
+      // Since this is added *after* the process is spawned (usually upon backgrounding),
+      // it will be an additional listener.
+      const disposable = activePty.ptyProcess.onExit(
+        ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
+          callback(exitCode, signal);
+          disposable.dispose();
+        },
+      );
+    }
+  }
+
+  /**
    * Kills a process by its PID.
    *
    * @param pid The process ID to kill.
@@ -840,7 +886,6 @@ export class ShellExecutionService {
       }
       this.activePtys.delete(pid);
       this.activeResolvers.delete(pid);
-      this.activeListeners.delete(pid);
     }
   }
 
