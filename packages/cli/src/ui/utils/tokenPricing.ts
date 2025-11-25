@@ -41,7 +41,8 @@ const DEFAULT_PRICING: ModelPricing = { input: 0.1, output: 0.4 };
 /**
  * Gets the pricing for a specific model.
  */
-export const getModelPricing = (model: string): ModelPricing => MODEL_PRICING[model] || DEFAULT_PRICING;
+export const getModelPricing = (model: string): ModelPricing =>
+  MODEL_PRICING[model] || DEFAULT_PRICING;
 
 /**
  * Calculates the estimated cost for token usage.
@@ -88,8 +89,7 @@ export const formatCost = (cost: number): string => {
   if (cost < 0.01) {
     return '<$0.01';
   }
-  if (cost < 1) {
-    return `$${cost.toFixed(2)}`;
-  }
-  return `$${cost.toFixed(2)}`;
+
+  const rounded = Math.round(cost * 100) / 100;
+  return `$${rounded.toFixed(2)}`;
 };
