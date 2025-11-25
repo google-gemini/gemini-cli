@@ -234,6 +234,70 @@ describe('SessionSelector', () => {
     expect(result.sessionData.messages[0].content).toBe('Latest session');
   });
 
+  it('should deduplicate sessions by ID', async () => {
+    const sessionId = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const sessionOriginal = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Original',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    const sessionDuplicate = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T11:00:00.000Z', // Newer
+      messages: [
+        {
+          type: 'user',
+          content: 'Newer Duplicate',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    // File 1
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionOriginal, null, 2),
+    );
+
+    // File 2 (Simulate a copy or newer version with same ID)
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(sessionDuplicate, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const sessions = await sessionSelector.listSessions();
+
+    expect(sessions.length).toBe(1);
+    expect(sessions[0].id).toBe(sessionId);
+    // Should keep the one with later lastUpdated
+    expect(sessions[0].lastUpdated).toBe('2024-01-01T11:00:00.000Z');
+  });
+
   it('should throw error for invalid session identifier', async () => {
     const sessionId1 = randomUUID();
 
@@ -296,7 +360,7 @@ describe('extractFirstUserMessage', () => {
     expect(extractFirstUserMessage(messages)).toBe('Hello world');
   });
 
-  it('should truncate long messages', () => {
+  it('should not truncate long messages', () => {
     const longMessage = 'a'.repeat(150);
     const messages = [
       {
@@ -308,8 +372,7 @@ describe('extractFirstUserMessage', () => {
     ] as MessageRecord[];
 
     const result = extractFirstUserMessage(messages);
-    expect(result).toBe('a'.repeat(97) + '...');
-    expect(result.length).toBe(100);
+    expect(result).toBe(longMessage);
   });
 
   it('should return "Empty conversation" for no user messages', () => {
