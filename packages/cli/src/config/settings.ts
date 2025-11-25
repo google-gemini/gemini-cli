@@ -846,11 +846,7 @@ export function saveSettings(settingsFile: SettingsFile): void {
 export async function saveModelChange(
   loadedSettings: LoadedSettings,
   model: string,
-  persist: boolean,
 ): Promise<void> {
-  if (!persist) {
-    return;
-  }
   try {
     loadedSettings.setValue(SettingScope.User, 'model.preferredModel', model);
   } catch (error) {

@@ -324,7 +324,7 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   enableModelAvailabilityService?: boolean;
   experimentalJitContext?: boolean;
-  onModelChange?: (model: string, persist: boolean) => Promise<void>;
+  onModelChange?: (model: string) => Promise<void>;
 }
 
 export class Config {
@@ -443,7 +443,7 @@ export class Config {
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange:
-    | ((model: string, persist: boolean) => Promise<void>)
+    | ((model: string) => Promise<void>)
     | undefined;
 
   private previewModelFallbackMode = false;
@@ -828,14 +828,14 @@ export class Config {
     return this.model;
   }
 
-  setModel(newModel: string, persist: boolean = false): void {
+  setModel(newModel: string): void {
     if (this.model !== newModel || this.inFallbackMode) {
       this.model = newModel;
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
       if (this.onModelChange) {
-        void this.onModelChange(newModel, persist);
+        void this.onModelChange(newModel);
       }
     }
     this.setFallbackMode(false);
