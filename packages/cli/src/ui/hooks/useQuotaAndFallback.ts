@@ -59,7 +59,7 @@ export function useQuotaAndFallback({
       const usageLimitReachedModel =
         failedModel === DEFAULT_GEMINI_MODEL ||
         failedModel === PREVIEW_GEMINI_MODEL
-          ? 'pro'
+          ? 'all Pro models'
           : failedModel;
       if (error instanceof TerminalQuotaError) {
         isTerminalQuotaError = true;
