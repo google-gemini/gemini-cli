@@ -708,7 +708,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [pendingRestorePrompt, userMessages, historyManager.history]);
 
   const handleCompressionPrompt = useCallback(
-    async (goals: string[]) => new Promise<string>((resolve) => {
+    async (goals: string[]) =>
+      new Promise<string>((resolve) => {
         const showCustomGoalInput = () => {
           setCustomDialog(
             <CustomGoalInput

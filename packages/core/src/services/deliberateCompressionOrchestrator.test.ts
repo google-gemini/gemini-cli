@@ -24,7 +24,7 @@ describe('DeliberateCompressionOrchestrator', () => {
 
     mockConfig = {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
-      getDeliberateCompressionEnabled: vi.fn().mockResolvedValue(true),
+      isDeliberateCompressionEnabled: vi.fn().mockReturnValue(true),
       getDeliberateCompressionAutoSkip: vi.fn().mockResolvedValue(false),
     } as unknown as Config;
 

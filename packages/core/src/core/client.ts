@@ -460,7 +460,7 @@ export class GeminiClient {
     onShowCompressionPrompt: (
       goals: string[],
       isSafetyValve: boolean,
-    ) => Promise<string>,
+    ) => Promise<string> = async () => 'auto',
     isTopLevelCall: boolean = true,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
@@ -720,7 +720,7 @@ export class GeminiClient {
 
             if (selection === 'disable') {
               this.config.setCompressionInteractive(false);
-              coreEvents.emitUserFeedback(
+              coreEvents.emitFeedback(
                 'info',
                 'Interactive compression disabled. Future compressions will be automatic.',
               );
@@ -740,7 +740,7 @@ export class GeminiClient {
               this.config.setCompressionTriggerTokens(cappedTokens);
               this.config.setCompressionMinMessages(cappedMessages);
 
-              coreEvents.emitUserFeedback(
+              coreEvents.emitFeedback(
                 'info',
                 `Check-ins ${multiplier}x less frequent: ${currentTokens / 1000}k -> ${cappedTokens / 1000}k tokens, ${currentMessages} -> ${cappedMessages} messages`,
               );

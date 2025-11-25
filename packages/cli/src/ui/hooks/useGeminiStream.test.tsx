@@ -2973,7 +2973,9 @@ describe('useGeminiStream', () => {
     });
 
     it('should continue working after compression prompt callback is called', async () => {
-      const mockCompressionPromptCallback = vi.fn().mockImplementation(() => Promise.resolve('Implementing feature X'));
+      const mockCompressionPromptCallback = vi
+        .fn()
+        .mockImplementation(() => Promise.resolve('Implementing feature X'));
 
       mockSendMessageStream.mockReturnValue(
         (async function* () {

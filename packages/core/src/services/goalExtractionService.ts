@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, GenerateContentResponse } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { getResponseText } from '../utils/partUtils.js';
 
@@ -65,14 +65,14 @@ export class GoalExtractionService {
         promptId,
       );
 
-      const timeoutPromise = new Promise((_, reject) =>
+      const timeoutPromise = new Promise<GenerateContentResponse>((_, reject) =>
         setTimeout(() => reject(new Error('Timeout')), timeoutMs),
       );
 
       const response = await Promise.race([responsePromise, timeoutPromise]);
 
       // Parse response
-      const text = getResponseText(response as any) ?? '';
+      const text = getResponseText(response as GenerateContentResponse) ?? '';
       const goals = this.parseGoals(text);
 
       return {
@@ -133,7 +133,7 @@ If there are NO clear current goals, return: <goals></goals>
 
   private determineConfidence(
     goals: string[],
-    text: string,
+    _text: string,
   ): 'high' | 'medium' | 'low' | 'none' {
     if (goals.length === 0) {
       return 'none';

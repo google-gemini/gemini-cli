@@ -120,6 +120,14 @@ export interface SettingDefinition {
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
+  /**
+   * Minimum value for number settings.
+   */
+  min?: number;
+  /**
+   * Maximum value for number settings.
+   */
+  max?: number;
 }
 
 export interface SettingsSchema {
@@ -761,7 +769,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 300,
         description: 'Minimum time in seconds between compression prompts.',
-        showInDialog: true,
+        showInDialog: false,
         min: 60,
         max: 1800,
       },
@@ -772,7 +780,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 1.5,
         description: 'Multiplier when user requests less frequent check-ins.',
-        showInDialog: true,
+        showInDialog: false,
         min: 1.2,
         max: 3.0,
       },

@@ -2600,7 +2600,7 @@ ${JSON.stringify(
       // Mock Turn.run to track when response streaming happens
       mockTurnRunFn.mockImplementation(function* () {
         operationOrder.push('response_streaming_started');
-        yield { type: GeminiEventType.Text, value: 'Hello' };
+        yield { type: GeminiEventType.Content, value: 'Hello' };
         operationOrder.push('response_streaming_completed');
       });
 
@@ -2666,7 +2666,7 @@ ${JSON.stringify(
       });
 
       mockTurnRunFn.mockImplementation(function* () {
-        yield { type: GeminiEventType.Text, value: 'Response' };
+        yield { type: GeminiEventType.Content, value: 'Response' };
       });
 
       const tryCompressSpy = vi
@@ -2718,7 +2718,7 @@ ${JSON.stringify(
 
       // MockTurn has pendingToolCalls = [] by default (no pending tools)
       mockTurnRunFn.mockImplementation(function* () {
-        yield { type: GeminiEventType.Text, value: 'Here is the answer' };
+        yield { type: GeminiEventType.Content, value: 'Here is the answer' };
       });
 
       const tryCompressSpy = vi
@@ -2766,7 +2766,7 @@ ${JSON.stringify(
       const eventsReceived: string[] = [];
 
       mockTurnRunFn.mockImplementation(function* () {
-        yield { type: GeminiEventType.Text, value: 'Here is your answer!' };
+        yield { type: GeminiEventType.Content, value: 'Here is your answer!' };
       });
 
       // Mock the compression prompt callback
@@ -2776,7 +2776,7 @@ ${JSON.stringify(
         extractedGoals: ['Goal 1', 'Goal 2'],
         shouldPromptUser: true,
         skipReason: undefined,
-        userSelection: undefined,
+        selectedGoal: undefined,
       });
 
       vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
@@ -2799,14 +2799,14 @@ ${JSON.stringify(
         eventsReceived.push(event.type);
       }
 
-      // Assert: Text event should come BEFORE compression dialog is shown
-      const textIndex = eventsReceived.indexOf(GeminiEventType.Text);
+      // Assert: Content event should come BEFORE compression dialog is shown
+      const contentIndex = eventsReceived.indexOf(GeminiEventType.Content);
       const compressionIndex = eventsReceived.indexOf(
         GeminiEventType.ChatCompressed,
       );
 
-      expect(textIndex).toBeGreaterThanOrEqual(0);
-      expect(compressionIndex).toBeGreaterThan(textIndex);
+      expect(contentIndex).toBeGreaterThanOrEqual(0);
+      expect(compressionIndex).toBeGreaterThan(contentIndex);
       expect(mockCompressionPrompt).toHaveBeenCalled();
     });
   });

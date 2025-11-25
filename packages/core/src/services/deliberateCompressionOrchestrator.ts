@@ -46,7 +46,7 @@ export class DeliberateCompressionOrchestrator {
     isSafetyValve: boolean,
   ): Promise<DeliberateCompressionPrepareResult> {
     // Check if deliberate compression is enabled
-    const isEnabled = await config.getDeliberateCompressionEnabled();
+    const isEnabled = await config.isDeliberateCompressionEnabled();
 
     if (!isEnabled) {
       return {

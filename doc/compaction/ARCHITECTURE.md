@@ -45,6 +45,7 @@
 ### Core Logic (Modified Files)
 
 **1. `packages/core/src/core/client.ts`** (GeminiClient)
+
 ```typescript
 // NEW METHODS:
 + shouldTriggerCompression(): { shouldCompress, isSafetyValve }
@@ -62,6 +63,7 @@
 ```
 
 **2. `packages/core/src/services/chatCompressionService.ts`**
+
 ```typescript
 // MODIFIED SIGNATURE:
 ~ compress(chat, promptId, options: CompressionOptions)
@@ -92,6 +94,7 @@
 ```
 
 **3. `packages/core/src/core/prompts.ts`**
+
 ```typescript
 // MODIFIED:
 ~ getChatCompressionPrompt(historyToCompress, userGoal?: string)
@@ -101,6 +104,7 @@
 ```
 
 **4. `packages/core/src/agents/executor.ts`**
+
 ```typescript
 // MODIFIED:
 ~ tryCompressChat() - Pass agent's task as userGoal
@@ -112,14 +116,15 @@
 ### UI Components
 
 **NEW: `packages/cli/src/ui/components/messages/CompressionPrompt.tsx`**
+
 ```typescript
 interface CompressionPromptProps {
-  utilizationPercent: number
-  currentTokens: number
-  goalOptions: string[]  // Extracted from conversation
-  onGoalSelect: (goal: string | 'auto' | 'disable' | 'less-frequent') => void
-  timeoutMs: number  // Default: 30000
-  isSafetyValve: boolean  // Hides opt-out options if true
+  utilizationPercent: number;
+  currentTokens: number;
+  goalOptions: string[]; // Extracted from conversation
+  onGoalSelect: (goal: string | 'auto' | 'disable' | 'less-frequent') => void;
+  timeoutMs: number; // Default: 30000
+  isSafetyValve: boolean; // Hides opt-out options if true
 }
 
 // Displays:
@@ -134,13 +139,14 @@ interface CompressionPromptProps {
 ```
 
 **MODIFIED: `packages/cli/src/ui/components/messages/CompressionMessage.tsx`**
+
 ```typescript
 interface CompressionMessageProps {
   // Existing...
-  userGoal?: string              // NEW
-  messagesPreserved?: number     // NEW
-  messagesCompressed?: number    // NEW
-  goalWasSelected?: boolean      // NEW
+  userGoal?: string; // NEW
+  messagesPreserved?: number; // NEW
+  messagesCompressed?: number; // NEW
+  goalWasSelected?: boolean; // NEW
 }
 
 // Enhanced display:
@@ -153,6 +159,7 @@ interface CompressionMessageProps {
 ### Configuration
 
 **MODIFIED: `packages/cli/src/config/settingsSchema.ts`**
+
 ```typescript
 // NEW SETTINGS:
 + compressionStrategy: 'percentage' | 'since-last-prompt' (default: 'since-last-prompt')
@@ -171,6 +178,7 @@ interface CompressionMessageProps {
 ### Telemetry
 
 **MODIFIED: `packages/core/src/telemetry/loggers.ts`**
+
 ```typescript
 // ENHANCED EVENT:
 ~ logChatCompression({
@@ -207,20 +215,22 @@ interface CompressionMessageProps {
 ### Tests
 
 **NEW: `packages/core/src/services/chatCompressionService.test.ts`** (additions)
+
 ```typescript
-+ describe('shouldTriggerCompression')
-+ describe('extractGoalOptions')
-+ describe('since-last-prompt strategy')
-+ describe('prompt timeout')
++describe('shouldTriggerCompression') +
+  describe('extractGoalOptions') +
+  describe('since-last-prompt strategy') +
+  describe('prompt timeout');
 ```
 
 **NEW: `integration-tests/context-compress-deliberate.test.ts`**
+
 ```typescript
-+ test('deliberate compression with goal selection')
-+ test('timeout fallback to auto-compress')
-+ test('opt-out: disable interactive mode')
-+ test('opt-out: less frequent check-ins')
-+ test('safety valve behavior at 50%')
++test('deliberate compression with goal selection') +
+  test('timeout fallback to auto-compress') +
+  test('opt-out: disable interactive mode') +
+  test('opt-out: less frequent check-ins') +
+  test('safety valve behavior at 50%');
 ```
 
 ## Data Flow
@@ -421,12 +431,13 @@ interface CompressionMessageProps {
 ## State & Preference Storage
 
 ### Runtime State (GeminiClient)
+
 ```typescript
 // Per-session state (not persisted)
 class GeminiClient {
-  private lastCompressionTime: number = 0
-  private messagesSinceLastCompress: number = 0
-  private hasFailedCompressionAttempt: boolean = false
+  private lastCompressionTime: number = 0;
+  private messagesSinceLastCompress: number = 0;
+  private hasFailedCompressionAttempt: boolean = false;
 
   // Resets on session start
   // Updated on each compression
@@ -435,7 +446,8 @@ class GeminiClient {
 
 ### User Preferences (Configuration File)
 
-**Location**: `~/.gemini-cli/config.json` (or project-level `.gemini/config.json`)
+**Location**: `~/.gemini-cli/config.json` (or project-level
+`.gemini/config.json`)
 
 ```json
 {
@@ -443,7 +455,7 @@ class GeminiClient {
   "compressionInteractive": true,
   "compressionPromptTimeout": 30,
   "compressionTriggerTokens": 40000,
-  "compressionTriggerUtilization": 0.50,
+  "compressionTriggerUtilization": 0.5,
   "compressionMinMessagesSinceLastCompress": 25,
   "compressionMinTimeBetweenPrompts": 300,
   "compressionFrequencyMultiplier": 1.5,
@@ -455,6 +467,7 @@ class GeminiClient {
 ```
 
 **Modification Paths**:
+
 1. Direct edit: User edits config file
 2. Settings command: CLI settings interface
 3. Runtime: Code calls `config.setCompressionInteractive(false)`
@@ -462,12 +475,13 @@ class GeminiClient {
 4. Dynamic adjustment: "Check in less often" updates thresholds
 
 **Reading**:
+
 ```typescript
 // In GeminiClient or CompressionService
-const isInteractive = this.config.isCompressionInteractive()
-const tokenThreshold = this.config.getCompressionTriggerTokens()
-const minMessages = this.config.getCompressionMinMessages()
-const multiplier = this.config.getCompressionFrequencyMultiplier()
+const isInteractive = this.config.isCompressionInteractive();
+const tokenThreshold = this.config.getCompressionTriggerTokens();
+const minMessages = this.config.getCompressionMinMessages();
+const multiplier = this.config.getCompressionFrequencyMultiplier();
 ```
 
 ### Telemetry Data (Analytics)
@@ -475,6 +489,7 @@ const multiplier = this.config.getCompressionFrequencyMultiplier()
 **Location**: Sent to telemetry service (not stored locally)
 
 **Usage**:
+
 - Track feature adoption
 - Monitor success rates
 - Identify patterns (e.g., timeout frequency)
@@ -485,27 +500,32 @@ const multiplier = this.config.getCompressionFrequencyMultiplier()
 ## Key Design Decisions
 
 ### 1. Hybrid Trigger Strategy
+
 - **Primary**: 40k absolute tokens (cost optimization)
 - **Safety**: 50% utilization (prevents overflow)
 - **Guards**: 25 messages + 5 minutes (prevents annoyance)
 
 ### 2. Two Preservation Strategies
+
 - **Percentage** (30%): Conservative, for auto-compress
 - **Since-last-prompt**: Aggressive, for goal-focused
 
 ### 3. Multiple-Choice UI
+
 - Fast (single keypress)
 - Shows understanding (extracted goals)
 - Always has escape hatch (auto-compress)
 - Non-blocking (30s timeout)
 
 ### 4. Opt-Out Mechanisms
+
 - **Immediate**: "Auto-compress" option always available
 - **Session**: "Don't ask me again" disables for all future sessions
 - **Gradual**: "Check in less often" uses 1.5x multiplier (adjustable)
 - **Safety valve**: Forces compression at 50% (no opt-out)
 
 ### 5. Non-Breaking Changes
+
 - Old API still works (adds defaults)
 - Existing settings honored
 - Can disable interactive mode → reverts to old behavior
@@ -529,12 +549,14 @@ Telemetry (loggers.ts)
 ## Performance Considerations
 
 ### Goal Extraction Optimization
+
 - **Truncate messages**: Keep start (500 chars) + end (300 chars)
 - **Reduces tokens**: ~70% reduction in extraction payload
 - **Avoids**: Sending full code blocks, tool outputs
 - **Timeout**: 5 seconds max for extraction
 
 ### API Call Economics
+
 ```
 Without deliberate compression (utilization-only):
   - Typical session: $2.75
@@ -571,4 +593,5 @@ Additional cost from goal extraction:
 
 ---
 
-*Architecture for deliberate, learning-focused context compaction in Gemini CLI.*
+_Architecture for deliberate, learning-focused context compaction in Gemini
+CLI._

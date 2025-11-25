@@ -110,7 +110,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
-  onShowCompressionPrompt: (goals: string[]) => Promise<string>,
+  onShowCompressionPrompt?: (goals: string[]) => Promise<string>,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);

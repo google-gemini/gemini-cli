@@ -5,6 +5,7 @@
 ### 1. Multiple Compression Checks in Parallel
 
 **Scenario:**
+
 ```
 T=0:   User sends message A
 T=0.1: sendMessageStream() checks compression → triggers prompt
@@ -15,6 +16,7 @@ T=0.6: sendMessageStream() checks compression again → another prompt?
 **Problem:** Two prompts appear simultaneously, confusing the user
 
 **Mitigation:**
+
 ```typescript
 class GeminiClient {
   private compressionInProgress: boolean = false
@@ -57,6 +59,7 @@ class GeminiClient {
 ### 2. User Sends Message While Prompt Active
 
 **Scenario:**
+
 ```
 ┌─────────────────────────────┐
 │ What are you working on?    │
@@ -71,37 +74,43 @@ User presses Enter
 **Problem:** User's new message conflicts with active prompt
 
 **Mitigation Option A: Queue Messages**
+
 ```typescript
 class GeminiClient {
-  private messageQueue: Array<{message: string, resolve: Function, reject: Function}> = []
-  private compressionPromptActive: boolean = false
+  private messageQueue: Array<{
+    message: string;
+    resolve: Function;
+    reject: Function;
+  }> = [];
+  private compressionPromptActive: boolean = false;
 
   async sendMessageStream(message: string): Promise<Response> {
     // If prompt is active, queue the message
     if (this.compressionPromptActive) {
       return new Promise((resolve, reject) => {
-        this.messageQueue.push({ message, resolve, reject })
-        this.showMessage('Message queued (compression prompt active)...')
-      })
+        this.messageQueue.push({ message, resolve, reject });
+        this.showMessage('Message queued (compression prompt active)...');
+      });
     }
 
     // Normal flow
-    const response = await this.actualSendMessage(message)
+    const response = await this.actualSendMessage(message);
 
     // Process queued messages after compression completes
     if (!this.compressionPromptActive && this.messageQueue.length > 0) {
-      const queued = this.messageQueue.shift()
+      const queued = this.messageQueue.shift();
       if (queued) {
-        queued.resolve(await this.sendMessageStream(queued.message))
+        queued.resolve(await this.sendMessageStream(queued.message));
       }
     }
 
-    return response
+    return response;
   }
 }
 ```
 
 **Mitigation Option B: Cancel Prompt (RECOMMENDED)**
+
 ```typescript
 class GeminiClient {
   private activePromptCancellation?: () => void
@@ -140,6 +149,7 @@ class GeminiClient {
 ### 3. Timeout Fires While User Is Typing
 
 **Scenario:**
+
 ```
 T=0:   Prompt shows: "Select [1-3]:"
 T=28:  User starts typing "1"
@@ -150,6 +160,7 @@ T=30.1: User's "1" keystroke arrives
 **Problem:** User's input arrives after timeout, gets ignored
 
 **Mitigation:**
+
 ```typescript
 // In CompressionPrompt.tsx
 interface PromptState {
@@ -197,6 +208,7 @@ function CompressionPrompt({ timeoutMs, ... }: CompressionPromptProps) {
 ```
 
 **Alternative: Accept Late Input Within Grace Period**
+
 ```typescript
 async promptUserForCurrentGoal(...): Promise<GoalSelection> {
   const GRACE_PERIOD_MS = 2000  // 2 seconds after timeout
@@ -230,6 +242,7 @@ async promptUserForCurrentGoal(...): Promise<GoalSelection> {
 ### 4. Agent Mode vs Interactive Mode Conflict
 
 **Scenario:**
+
 ```
 T=0: User starts agent with task "Implement auth"
 T=1: Agent is running autonomously
@@ -240,37 +253,39 @@ T=3: Interactive prompt appears: "What are you working on?"
 **Problem:** User shouldn't be prompted during agent execution
 
 **Mitigation:**
+
 ```typescript
 class GeminiClient {
-  private isAgentMode: boolean = false
+  private isAgentMode: boolean = false;
 
-  async tryCompressChat(promptId: string, force: boolean = false): Promise<CompressResult> {
+  async tryCompressChat(
+    promptId: string,
+    force: boolean = false,
+  ): Promise<CompressResult> {
     // ... trigger check logic
 
     // Determine if interactive
     const isInteractive =
-      this.config.isCompressionInteractive() &&
-      !force &&
-      !this.isAgentMode  // NEW: Never interactive in agent mode
+      this.config.isCompressionInteractive() && !force && !this.isAgentMode; // NEW: Never interactive in agent mode
 
     if (isInteractive) {
       // Show prompt to user
     } else {
       // Use auto-compress or agent's task as goal
       if (this.isAgentMode && this.currentAgentTask) {
-        userGoal = this.currentAgentTask.description
-        preserveStrategy = 'since-last-prompt'
+        userGoal = this.currentAgentTask.description;
+        preserveStrategy = 'since-last-prompt';
       } else {
-        userGoal = undefined
-        preserveStrategy = 'percentage'
+        userGoal = undefined;
+        preserveStrategy = 'percentage';
       }
     }
   }
 
   // Called by AgentExecutor
   setAgentMode(enabled: boolean, task?: AgentTask) {
-    this.isAgentMode = enabled
-    this.currentAgentTask = task
+    this.isAgentMode = enabled;
+    this.currentAgentTask = task;
   }
 }
 
@@ -278,14 +293,14 @@ class GeminiClient {
 class AgentExecutor {
   async executeTask(task: AgentTask) {
     // Mark client as in agent mode
-    this.client.setAgentMode(true, task)
+    this.client.setAgentMode(true, task);
 
     try {
       // Run agent
-      await this.runAgent(task)
+      await this.runAgent(task);
     } finally {
       // Clear agent mode
-      this.client.setAgentMode(false)
+      this.client.setAgentMode(false);
     }
   }
 }
@@ -294,6 +309,7 @@ class AgentExecutor {
 ### 5. Stale Goal Options (State Changed During Prompt)
 
 **Scenario:**
+
 ```
 T=0:   Compression triggers (42k tokens)
 T=1:   Extract goals: ["Implementing auth", "Adding API"]
@@ -307,6 +323,7 @@ T=10:  User selects "1. Implementing auth" (stale option)
 **Problem:** Extracted goals don't reflect current conversation state
 
 **Mitigation:**
+
 ```typescript
 async tryCompressChat(promptId: string, force: boolean = false): Promise<CompressResult> {
   // Snapshot current state
@@ -344,6 +361,7 @@ async tryCompressChat(promptId: string, force: boolean = false): Promise<Compres
 ```
 
 **Simpler Mitigation: Lock History During Prompt**
+
 ```typescript
 class GeminiClient {
   private historyLocked: boolean = false
@@ -380,6 +398,7 @@ class GeminiClient {
 ### 6. Recursive Compression Trigger
 
 **Scenario:**
+
 ```
 T=0: Compression starts
 T=1: Call model to generate summary
@@ -391,6 +410,7 @@ T=4: sendMessage() internally calls shouldTriggerCompression() → another compr
 **Problem:** Compression might trigger itself recursively
 
 **Mitigation:**
+
 ```typescript
 class GeminiClient {
   private compressionInProgress: boolean = false
@@ -437,6 +457,7 @@ class GeminiClient {
 ### 7. Multiple Prompts from Different Entry Points
 
 **Scenario:**
+
 ```
 Code Path A: client.sendMessage() → check compression
 Code Path B: agent.beforeTurn() → check compression
@@ -448,6 +469,7 @@ If all happen near-simultaneously, multiple prompts?
 **Problem:** Multiple code paths might trigger compression at once
 
 **Mitigation: Single Entry Point with Lock**
+
 ```typescript
 class GeminiClient {
   private compressionLock: Promise<void> | null = null
@@ -485,6 +507,7 @@ class GeminiClient {
 ### 8. User Closes Terminal During Prompt
 
 **Scenario:**
+
 ```
 T=0: Prompt shows: "What are you working on?"
 T=5: User closes terminal / kills process
@@ -494,24 +517,25 @@ T=6: Process dies, no cleanup
 **Problem:** Partial state might be saved (e.g., compressionPromptActive=true)
 
 **Mitigation:**
+
 ```typescript
 class GeminiClient {
   constructor() {
     // Register cleanup on process exit
-    process.on('SIGINT', () => this.cleanup())
-    process.on('SIGTERM', () => this.cleanup())
-    process.on('exit', () => this.cleanup())
+    process.on('SIGINT', () => this.cleanup());
+    process.on('SIGTERM', () => this.cleanup());
+    process.on('exit', () => this.cleanup());
   }
 
   cleanup() {
     // Reset compression state
-    this.compressionInProgress = false
-    this.compressionPromptActive = false
-    this.historyLocked = false
+    this.compressionInProgress = false;
+    this.compressionPromptActive = false;
+    this.historyLocked = false;
 
     // Cancel any active prompt
     if (this.activePromptCancellation) {
-      this.activePromptCancellation()
+      this.activePromptCancellation();
     }
 
     // Don't persist these flags to disk
@@ -522,6 +546,7 @@ class GeminiClient {
 ### 9. Prompt Shown During Error State
 
 **Scenario:**
+
 ```
 T=0: User encounters API error
 T=1: Error message displayed
@@ -533,23 +558,24 @@ T=4: Prompt overlays error message
 **Problem:** Prompt interrupts user's error troubleshooting
 
 **Mitigation:**
+
 ```typescript
 class GeminiClient {
-  private recentErrors: Array<{timestamp: number, error: Error}> = []
+  private recentErrors: Array<{ timestamp: number; error: Error }> = [];
 
   onError(error: Error) {
-    this.recentErrors.push({ timestamp: Date.now(), error })
+    this.recentErrors.push({ timestamp: Date.now(), error });
     // Keep only last 5 minutes
     this.recentErrors = this.recentErrors.filter(
-      e => Date.now() - e.timestamp < 300000
-    )
+      (e) => Date.now() - e.timestamp < 300000,
+    );
   }
 
   private shouldTriggerCompression(): TriggerDecision {
     // Check for recent errors
     const recentErrorCount = this.recentErrors.filter(
-      e => Date.now() - e.timestamp < 60000  // Last minute
-    ).length
+      (e) => Date.now() - e.timestamp < 60000, // Last minute
+    ).length;
 
     if (recentErrorCount >= 2) {
       // User is dealing with errors, don't interrupt
@@ -558,7 +584,7 @@ class GeminiClient {
         isSafetyValve: false,
         reason: 'recent_errors_detected',
         // ...
-      }
+      };
     }
 
     // Normal trigger logic
@@ -570,6 +596,7 @@ class GeminiClient {
 ### 10. Prompt During Streaming Response
 
 **Scenario:**
+
 ```
 T=0: User asks question
 T=1: Model starts streaming response
@@ -580,19 +607,20 @@ T=3: Compression prompt shows while response is streaming
 **Problem:** Prompt interrupts user's reading of response
 
 **Mitigation:**
+
 ```typescript
 class GeminiClient {
-  private isStreaming: boolean = false
+  private isStreaming: boolean = false;
 
   async sendMessageStream(message: string): Promise<Response> {
-    this.isStreaming = true
+    this.isStreaming = true;
 
     try {
       for await (const chunk of this.streamResponse(message)) {
-        yield chunk
+        yield chunk;
       }
     } finally {
-      this.isStreaming = false
+      this.isStreaming = false;
     }
   }
 
@@ -604,7 +632,7 @@ class GeminiClient {
         isSafetyValve: false,
         reason: 'streaming_in_progress',
         // ...
-      }
+      };
     }
 
     // Normal trigger logic
@@ -770,24 +798,24 @@ describe('Compression Guards', () => {
   it('prevents multiple simultaneous compressions', async () => {
     const [result1, result2] = await Promise.all([
       client.tryCompressChat(promptId),
-      client.tryCompressChat(promptId)
-    ])
-    expect([result1.status, result2.status]).toContain(CompressionStatus.NOOP)
-  })
+      client.tryCompressChat(promptId),
+    ]);
+    expect([result1.status, result2.status]).toContain(CompressionStatus.NOOP);
+  });
 
   it('does not trigger during streaming', async () => {
-    client.startStreaming()
-    const decision = client.shouldTriggerCompression()
-    expect(decision.shouldCompress).toBe(false)
-    expect(decision.reason).toBe('streaming_in_progress')
-  })
+    client.startStreaming();
+    const decision = client.shouldTriggerCompression();
+    expect(decision.shouldCompress).toBe(false);
+    expect(decision.reason).toBe('streaming_in_progress');
+  });
 
   it('uses non-interactive mode for agents', async () => {
-    client.setAgentMode(true, { description: 'Test task' })
-    const result = await client.tryCompressChat(promptId)
-    expect(result.selectionMethod).toBe('agent')
-  })
-})
+    client.setAgentMode(true, { description: 'Test task' });
+    const result = await client.tryCompressChat(promptId);
+    expect(result.selectionMethod).toBe('agent');
+  });
+});
 ```
 
 ### Integration Tests for Race Conditions
@@ -796,35 +824,35 @@ describe('Compression Guards', () => {
 describe('Concurrent Message Handling', () => {
   it('queues messages during active prompt', async () => {
     // Trigger compression prompt
-    client.triggerCompression()
+    client.triggerCompression();
 
     // Send message while prompt active
-    const messagePromise = client.sendMessage('New message')
+    const messagePromise = client.sendMessage('New message');
 
     // Message should be queued
-    expect(client.messageQueue.length).toBe(1)
+    expect(client.messageQueue.length).toBe(1);
 
     // Complete prompt
-    client.selectGoal('1')
+    client.selectGoal('1');
 
     // Message should process
-    await messagePromise
-    expect(client.messageQueue.length).toBe(0)
-  })
+    await messagePromise;
+    expect(client.messageQueue.length).toBe(0);
+  });
 
   it('cancels prompt when new message sent', async () => {
-    const promptPromise = client.promptUserForGoal()
+    const promptPromise = client.promptUserForGoal();
 
-    await sleep(1000)  // Wait for prompt to show
+    await sleep(1000); // Wait for prompt to show
 
     // User sends new message
-    await client.sendMessage('Help with database')
+    await client.sendMessage('Help with database');
 
     // Prompt should auto-cancel
-    const result = await promptPromise
-    expect(result.type).toBe('auto')
-  })
-})
+    const result = await promptPromise;
+    expect(result.type).toBe('auto');
+  });
+});
 ```
 
 ### Manual Test Scenarios
@@ -833,28 +861,33 @@ describe('Concurrent Message Handling', () => {
 ## Manual Testing Checklist
 
 ### Scenario 1: Rapid Message Sending
+
 - [ ] Trigger compression prompt
 - [ ] While prompt is showing, send 3 messages rapidly
 - [ ] Verify only one prompt appears
 - [ ] Verify messages are queued or prompt is cancelled
 
 ### Scenario 2: Timeout Edge Cases
+
 - [ ] Trigger prompt, wait 28 seconds
 - [ ] Start typing selection
 - [ ] Verify timeout extends or accepts late input
 - [ ] Verify no double-selection
 
 ### Scenario 3: Agent Mode
+
 - [ ] Start agent task
 - [ ] Verify no interactive prompts during agent execution
 - [ ] Verify compression uses agent's task as goal
 
 ### Scenario 4: Error Recovery
+
 - [ ] Trigger 2-3 API errors
 - [ ] Verify compression doesn't interrupt error handling
 - [ ] Verify compression resumes after errors clear
 
 ### Scenario 5: Streaming Response
+
 - [ ] Ask question that produces long response
 - [ ] While streaming, verify compression doesn't trigger
 - [ ] After streaming completes, verify compression can trigger
@@ -865,22 +898,19 @@ describe('Concurrent Message Handling', () => {
 ## Summary: Critical Guards to Implement
 
 **Must-Have (Phase 1):**
+
 1. ✅ `compressionInProgress` flag - Prevents multiple compressions
 2. ✅ `compressionPromptActive` flag - Prevents multiple prompts
 3. ✅ `compressionLock` - Serializes compression attempts
 4. ✅ `isStreaming` check - Don't interrupt streaming
 5. ✅ `isAgentMode` check - Non-interactive for agents
 
-**Should-Have (Phase 2):**
-6. ✅ Prompt cancellation on new message
-7. ✅ Timeout extension when user interacts
-8. ✅ Stale goal detection
+**Should-Have (Phase 2):** 6. ✅ Prompt cancellation on new message 7. ✅
+Timeout extension when user interacts 8. ✅ Stale goal detection
 
-**Nice-to-Have (Phase 3):**
-9. ✅ Error state awareness
-10. ✅ Process cleanup handlers
-11. ✅ History locking during prompt
+**Nice-to-Have (Phase 3):** 9. ✅ Error state awareness 10. ✅ Process cleanup
+handlers 11. ✅ History locking during prompt
 
 ---
 
-*Concurrency Safety Document - v1.0*
+_Concurrency Safety Document - v1.0_

@@ -2,18 +2,26 @@
 
 ## Overview
 
-The Gemini CLI implements an intelligent chat history compression system (also called "compaction") that automatically summarizes older conversation context when the token count approaches the model's context window limit. This document provides a comprehensive analysis of how compaction works to enable improvements through elicitation.
+The Gemini CLI implements an intelligent chat history compression system (also
+called "compaction") that automatically summarizes older conversation context
+when the token count approaches the model's context window limit. This document
+provides a comprehensive analysis of how compaction works to enable improvements
+through elicitation.
 
 ## Core Architecture
 
 ### Main Components
 
-**Primary Service**: `ChatCompressionService` (`packages/core/src/services/chatCompressionService.ts`)
+**Primary Service**: `ChatCompressionService`
+(`packages/core/src/services/chatCompressionService.ts`)
+
 - Central orchestrator for all compression operations
 - Handles compression logic, validation, and error recovery
 
 **Key Integration Points**:
-1. `GeminiClient.tryCompressChat()` - Automatic compression during message streaming
+
+1. `GeminiClient.tryCompressChat()` - Automatic compression during message
+   streaming
 2. Agent executor - Compression before each agent turn
 3. CLI `/compress` command - Manual user-triggered compression
 
@@ -38,6 +46,7 @@ Compression automatically activates when:
 ### Manual Trigger
 
 Users can force compression via:
+
 - `/compress` or `/summarize` CLI commands
 - Bypasses threshold checks
 - Can retry after failed compression attempts
@@ -57,10 +66,12 @@ The algorithm identifies where to split chat history:
 ```
 
 **Key Parameters**:
+
 - `COMPRESSION_PRESERVE_THRESHOLD = 0.3` (keep latest 30% of history)
 - Uses character count as proxy for tokens (1 token ≈ 4 characters)
 
 **Split Point Rules**:
+
 1. Only split at user message boundaries
 2. Never split if user message has pending function responses
 3. Ensure last message is from the model (protocol requirement)
@@ -97,6 +108,7 @@ The compression prompt requests a structured XML summary:
 ```
 
 **Why Structured XML?**
+
 - Ensures consistent, parseable output
 - Captures different aspects of conversation state
 - Easy for model to reconstruct context from sections
@@ -104,8 +116,10 @@ The compression prompt requests a structured XML summary:
 ### Step 3: Construct New History
 
 The compressed history combines:
+
 1. **Summary message** (as user message with system-like formatting)
-2. **Acknowledgment** (model confirms receipt: "Got it. Thanks for the additional context!")
+2. **Acknowledgment** (model confirms receipt: "Got it. Thanks for the
+   additional context!")
 3. **Preserved recent messages** (latest 30% of original history)
 
 ### Step 4: Validate Compression
@@ -114,11 +128,12 @@ The compressed history combines:
 
 ```typescript
 if (newTokenCount > oldTokenCount) {
-    return CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT
+  return CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT;
 }
 ```
 
 **Failure Scenarios**:
+
 - Summary is longer than original content
 - Token counting error occurs
 - Model generates oversized response
@@ -127,12 +142,12 @@ if (newTokenCount > oldTokenCount) {
 
 **Enum**: `CompressionStatus` (packages/core/src/core/turn.ts:163-175)
 
-| Status | Meaning | User Impact |
-|--------|---------|-------------|
-| `COMPRESSED` | Success | History reduced, more context available |
-| `COMPRESSION_FAILED_INFLATED_TOKEN_COUNT` | Summary too large | Original history retained |
-| `COMPRESSION_FAILED_TOKEN_COUNT_ERROR` | Token calculation failed | Original history retained |
-| `NOOP` | No compression needed | History unchanged |
+| Status                                    | Meaning                  | User Impact                             |
+| ----------------------------------------- | ------------------------ | --------------------------------------- |
+| `COMPRESSED`                              | Success                  | History reduced, more context available |
+| `COMPRESSION_FAILED_INFLATED_TOKEN_COUNT` | Summary too large        | Original history retained               |
+| `COMPRESSION_FAILED_TOKEN_COUNT_ERROR`    | Token calculation failed | Original history retained               |
+| `NOOP`                                    | No compression needed    | History unchanged                       |
 
 ## State Management
 
@@ -141,23 +156,26 @@ if (newTokenCount > oldTokenCount) {
 **Flag**: `hasFailedCompressionAttempt` (GeminiClient)
 
 **Behavior**:
+
 - Set to `true` after first compression failure
 - Prevents repeated failed attempts (wasteful API calls)
 - Can be overridden with `force=true` parameter
 - Reset on successful compression
 
-**Rationale**: If compression fails once, it likely will fail again unless history grows significantly or user forces retry.
+**Rationale**: If compression fails once, it likely will fail again unless
+history grows significantly or user forces retry.
 
 ## Token Counting
 
 ### Threshold Calculation
 
 ```typescript
-const tokenThreshold = modelTokenLimit * compressionThreshold
-const shouldCompress = currentTokenCount > tokenThreshold
+const tokenThreshold = modelTokenLimit * compressionThreshold;
+const shouldCompress = currentTokenCount > tokenThreshold;
 ```
 
 **Example** (with 100k token limit, 0.5 threshold):
+
 - Compression triggers at 50k tokens
 - Preserves ~30k tokens (30%)
 - Compresses ~20k tokens into summary
@@ -167,6 +185,7 @@ const shouldCompress = currentTokenCount > tokenThreshold
 **Heuristic**: 1 token ≈ 4 characters
 
 Used in `findCompressSplitPoint()` for quick estimation:
+
 - Serializes history to JSON
 - Counts characters
 - Divides by 4 to estimate tokens
@@ -176,14 +195,17 @@ Used in `findCompressSplitPoint()` for quick estimation:
 
 ### Compression Message Display
 
-**Component**: `CompressionMessage.tsx` (packages/cli/src/ui/components/messages/)
+**Component**: `CompressionMessage.tsx`
+(packages/cli/src/ui/components/messages/)
 
 **User Feedback**:
+
 - Loading spinner during compression
 - Success: "Chat history compressed from X to Y tokens"
 - Failure messages tailored to scenario:
   - Small history (<50k): "Compression was not beneficial for this history size"
-  - Large history: "Chat history compression did not reduce size. Continuing with full history."
+  - Large history: "Chat history compression did not reduce size. Continuing
+    with full history."
   - Token error: "Could not compress chat history due to a token counting error"
 
 ### Command Interface
@@ -193,6 +215,7 @@ Used in `findCompressSplitPoint()` for quick estimation:
 **Commands**: `/compress`, `/summarize`
 
 **Flow**:
+
 1. User types command
 2. Show loading spinner
 3. Call `tryCompressChat(promptId, force=true)`
@@ -204,6 +227,7 @@ Used in `findCompressSplitPoint()` for quick estimation:
 **Event**: `chat_compression`
 
 **Logged Data**:
+
 - `tokens_before`: Pre-compression token count
 - `tokens_after`: Post-compression token count
 - Logged regardless of success/failure
@@ -214,20 +238,26 @@ Used in `findCompressSplitPoint()` for quick estimation:
 
 ### Issue #1: Incomplete Token Counting (from integration test comments)
 
-**Quote**: "Context compression is broken and doesn't include the system instructions or tool counts, so it thinks compression is beneficial when it is in fact not."
+**Quote**: "Context compression is broken and doesn't include the system
+instructions or tool counts, so it thinks compression is beneficial when it is
+in fact not."
 
 **Impact**:
+
 - Validation may report false positives
-- Compressed history might be larger than expected when system prompt + tools included
+- Compressed history might be larger than expected when system prompt + tools
+  included
 - Could lead to unnecessary compression attempts
 
 **Location**: `integration-tests/context-compress-interactive.test.ts:54-56`
 
 ### Issue #2: Function Response Handling
 
-**Constraint**: Cannot compress if last user message has pending function responses
+**Constraint**: Cannot compress if last user message has pending function
+responses
 
-**Why**: Gemini API protocol requires function responses immediately follow function calls
+**Why**: Gemini API protocol requires function responses immediately follow
+function calls
 
 **Impact**: May delay compression when function calls occur near threshold
 
@@ -238,6 +268,7 @@ Used in `findCompressSplitPoint()` for quick estimation:
 **Current State**: Single monolithic compression prompt
 
 **Potential Improvements**:
+
 - Multi-turn compression dialogue (ask clarifying questions)
 - Task-specific compression strategies (coding vs. Q&A)
 - Progressive compression (compress in stages vs. all-at-once)
@@ -248,6 +279,7 @@ Used in `findCompressSplitPoint()` for quick estimation:
 **Current**: Character-based heuristic, preserves fixed 30%
 
 **Could Improve**:
+
 - Semantic boundary detection (preserve related message clusters)
 - Dynamic preservation percentage based on recent activity
 - Topic modeling to identify natural break points
@@ -258,6 +290,7 @@ Used in `findCompressSplitPoint()` for quick estimation:
 **Current Issue**: Doesn't account for system prompt + tool definitions
 
 **Fixes**:
+
 - Include full prompt overhead in calculations
 - Use actual tokenizer instead of character proxy
 - Account for XML formatting overhead in structured summaries
@@ -265,11 +298,13 @@ Used in `findCompressSplitPoint()` for quick estimation:
 ### 4. Compression Quality Metrics
 
 **Currently Missing**:
+
 - No measure of information loss
 - No validation that summary captures essential context
 - No user feedback mechanism on quality
 
 **Could Add**:
+
 - Benchmark compression on known conversations
 - Measure downstream task performance after compression
 - A/B test different compression strategies
@@ -280,6 +315,7 @@ Used in `findCompressSplitPoint()` for quick estimation:
 **Current**: Fixed threshold (default 50%)
 
 **Could Improve**:
+
 - Model-specific thresholds (larger models tolerate more history)
 - Task-adaptive (compress more aggressively for long-running agents)
 - User behavior learning (adjust based on when user manually compresses)
@@ -289,6 +325,7 @@ Used in `findCompressSplitPoint()` for quick estimation:
 **Current**: All-or-nothing (compress old portion or don't)
 
 **Alternatives**:
+
 - Hierarchical compression (multiple summary layers)
 - Tag preservation (keep certain message types uncompressed)
 - Importance-based sampling (preserve high-value messages)
@@ -298,35 +335,44 @@ Used in `findCompressSplitPoint()` for quick estimation:
 For elicitation and improvement work:
 
 **Core Logic**:
-- `packages/core/src/services/chatCompressionService.ts` - Main compression service
+
+- `packages/core/src/services/chatCompressionService.ts` - Main compression
+  service
 - `packages/core/src/core/prompts.ts:353-411` - Compression prompt template
 - `packages/core/src/core/client.ts:700-732` - Auto-compression in client
 
 **Configuration**:
+
 - `packages/cli/src/config/settingsSchema.ts:691-700` - Settings schema
 - Constants in chatCompressionService.ts (lines 13-14)
 
 **UI/Commands**:
+
 - `packages/cli/src/ui/commands/compressCommand.ts` - Manual compression command
-- `packages/cli/src/ui/components/messages/CompressionMessage.tsx` - Display component
+- `packages/cli/src/ui/components/messages/CompressionMessage.tsx` - Display
+  component
 
 **Tests**:
+
 - `packages/core/src/services/chatCompressionService.test.ts` - Unit tests
 - `integration-tests/context-compress-interactive.test.ts` - Integration tests
 
 ## Testing Compression Changes
 
 **Unit Tests**: Run compression service tests
+
 ```bash
 npm test -- chatCompressionService.test.ts
 ```
 
 **Integration Tests**: Test full CLI flow
+
 ```bash
 npm test -- context-compress-interactive.test.ts
 ```
 
 **Manual Testing**:
+
 1. Start CLI with a model
 2. Have a long conversation (or load long history)
 3. Type `/compress` to manually trigger
@@ -340,12 +386,14 @@ npm test -- context-compress-interactive.test.ts
 1. **Test Current Behavior**: Run compression on diverse conversation types
 2. **Identify Patterns**: What information gets lost? What's over-represented?
 3. **Craft Examples**: Create ideal summaries for representative conversations
-4. **Iterative Prompting**: Use elicitation to refine XML structure and instructions
+4. **Iterative Prompting**: Use elicitation to refine XML structure and
+   instructions
 5. **Validate**: Test on held-out conversations, measure downstream performance
 
 ### For Improving Split Logic:
 
-1. **Analyze Split Points**: Where does current algorithm split in real conversations?
+1. **Analyze Split Points**: Where does current algorithm split in real
+   conversations?
 2. **Manual Annotation**: Mark ideal split points in sample conversations
 3. **Feature Engineering**: What signals indicate good split points?
 4. **A/B Testing**: Compare current vs. improved splitting strategies
@@ -361,7 +409,9 @@ npm test -- context-compress-interactive.test.ts
 
 ## Quick Reference
 
-**Enable/Disable Compression**: Edit settings, change `model.compressionThreshold`
+**Enable/Disable Compression**: Edit settings, change
+`model.compressionThreshold`
+
 - Set to 1.0 to effectively disable (never triggers)
 - Set to 0.2 for aggressive compression (at 20% capacity)
 
@@ -373,4 +423,5 @@ npm test -- context-compress-interactive.test.ts
 
 ---
 
-*Document created for elicitation-driven improvement of the Gemini CLI compression system.*
+_Document created for elicitation-driven improvement of the Gemini CLI
+compression system._

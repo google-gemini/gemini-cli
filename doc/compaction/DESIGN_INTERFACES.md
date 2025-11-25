@@ -1,6 +1,7 @@
 # Deliberate Context Compaction: Interface & Data Flow Design
 
 ## Table of Contents
+
 1. [Core Interfaces](#core-interfaces)
 2. [Method Signatures](#method-signatures)
 3. [Data Flow Scenarios](#data-flow-scenarios)
@@ -21,41 +22,41 @@
  */
 interface CompressionOptions {
   // Existing fields
-  force: boolean
-  model: string
-  config: GeminiClientConfig
-  hasFailedCompressionAttempt: boolean
+  force: boolean;
+  model: string;
+  config: GeminiClientConfig;
+  hasFailedCompressionAttempt: boolean;
 
   // NEW: User's stated goal for trajectory-focused compression
-  userGoal?: string
+  userGoal?: string;
 
   // NEW: Strategy for determining what to preserve
-  preserveStrategy: 'percentage' | 'since-last-prompt'
+  preserveStrategy: 'percentage' | 'since-last-prompt';
 
   // NEW: For 'percentage' strategy, what % to keep (default 0.3)
-  preserveThreshold?: number
+  preserveThreshold?: number;
 
   // NEW: Whether this is interactive mode (affects UI)
-  interactive?: boolean
+  interactive?: boolean;
 }
 
 /**
  * Result of compression operation
  */
 interface CompressResult {
-  status: CompressionStatus
-  newHistory?: Content[]
-  tokensBeforeCompression?: number
-  tokensAfterCompression?: number
+  status: CompressionStatus;
+  newHistory?: Content[];
+  tokensBeforeCompression?: number;
+  tokensAfterCompression?: number;
 
   // NEW: Metadata about compression
-  messagesPreserved?: number
-  messagesCompressed?: number
-  discardedContextSummary?: string  // From model's XML output
+  messagesPreserved?: number;
+  messagesCompressed?: number;
+  discardedContextSummary?: string; // From model's XML output
 
   // NEW: Info about user interaction
-  goalWasSelected?: boolean
-  selectionMethod?: 'manual' | 'timeout' | 'auto' | 'agent'
+  goalWasSelected?: boolean;
+  selectionMethod?: 'manual' | 'timeout' | 'auto' | 'agent';
 }
 
 /**
@@ -65,7 +66,7 @@ enum CompressionStatus {
   COMPRESSED = 'compressed',
   COMPRESSION_FAILED_INFLATED_TOKEN_COUNT = 'compression_failed_inflated_token_count',
   COMPRESSION_FAILED_TOKEN_COUNT_ERROR = 'compression_failed_token_count_error',
-  NOOP = 'noop'
+  NOOP = 'noop',
 }
 ```
 
@@ -78,26 +79,26 @@ enum CompressionStatus {
  * Options extracted from conversation history
  */
 interface GoalExtractionResult {
-  success: boolean
-  goals: string[]  // 3-4 extracted goals
-  durationMs: number
-  error?: Error
+  success: boolean;
+  goals: string[]; // 3-4 extracted goals
+  durationMs: number;
+  error?: Error;
 }
 
 /**
  * Options for message truncation during extraction
  */
 interface TruncationOptions {
-  keepStart: number  // Characters to keep from start
-  keepEnd: number    // Characters to keep from end
+  keepStart: number; // Characters to keep from start
+  keepEnd: number; // Characters to keep from end
 }
 
 /**
  * Validation result for extracted goals
  */
 interface GoalValidation {
-  isValid: boolean
-  reason?: string  // Why invalid
+  isValid: boolean;
+  reason?: string; // Why invalid
 }
 ```
 
@@ -111,41 +112,41 @@ interface GoalValidation {
  */
 interface CompressionPromptProps {
   // Context information
-  utilizationPercent: number  // 0.0 - 1.0
-  currentTokens: number
-  modelMaxTokens: number
+  utilizationPercent: number; // 0.0 - 1.0
+  currentTokens: number;
+  modelMaxTokens: number;
 
   // Goal options (1-3 extracted + special options)
-  goalOptions: string[]
+  goalOptions: string[];
 
   // Callback when user makes selection
-  onGoalSelect: (selection: GoalSelection) => void
+  onGoalSelect: (selection: GoalSelection) => void;
 
   // Timeout configuration
-  timeoutMs: number  // Default: 30000 (30s)
+  timeoutMs: number; // Default: 30000 (30s)
 
   // Safety valve mode (hides opt-out options)
-  isSafetyValve: boolean
+  isSafetyValve: boolean;
 }
 
 /**
  * User's selection from the prompt
  */
 type GoalSelection =
-  | { type: 'goal', value: string }           // Selected goal 1-3 or custom
-  | { type: 'auto' }                          // Auto-compress
-  | { type: 'disable' }                       // Don't ask me again
-  | { type: 'less-frequent' }                 // Check in less often
-  | { type: 'timeout' }                       // No response in time
+  | { type: 'goal'; value: string } // Selected goal 1-3 or custom
+  | { type: 'auto' } // Auto-compress
+  | { type: 'disable' } // Don't ask me again
+  | { type: 'less-frequent' } // Check in less often
+  | { type: 'timeout' }; // No response in time
 
 /**
  * Internal prompt state
  */
 interface PromptState {
-  isWaiting: boolean
-  remainingSeconds: number
-  hasTimedOut: boolean
-  userResponse?: GoalSelection
+  isWaiting: boolean;
+  remainingSeconds: number;
+  hasTimedOut: boolean;
+  userResponse?: GoalSelection;
 }
 ```
 
@@ -158,31 +159,31 @@ interface PromptState {
  * Result of checking if compression should trigger
  */
 interface TriggerDecision {
-  shouldCompress: boolean
-  isSafetyValve: boolean
-  reason?: string  // Why compression triggered or didn't
+  shouldCompress: boolean;
+  isSafetyValve: boolean;
+  reason?: string; // Why compression triggered or didn't
 
   // Diagnostic info
-  currentTokens: number
-  currentUtilization: number
-  messagesSinceLastCompress: number
-  timeSinceLastCompressSeconds: number
+  currentTokens: number;
+  currentUtilization: number;
+  messagesSinceLastCompress: number;
+  timeSinceLastCompressSeconds: number;
 }
 
 /**
  * Guards that prevent too-frequent compression
  */
 interface CompressionGuards {
-  minMessages: number  // Default: 25
-  minTimeBetweenSeconds: number  // Default: 300 (5 min)
+  minMessages: number; // Default: 25
+  minTimeBetweenSeconds: number; // Default: 300 (5 min)
 
   // Current state
-  messagesSinceLastCompress: number
-  timeSinceLastCompressSeconds: number
+  messagesSinceLastCompress: number;
+  timeSinceLastCompressSeconds: number;
 
   // Results
-  messagesGuardPassed: boolean
-  timeGuardPassed: boolean
+  messagesGuardPassed: boolean;
+  timeGuardPassed: boolean;
 }
 ```
 
@@ -196,22 +197,22 @@ interface CompressionGuards {
  */
 interface CompressionSettings {
   // Strategy selection
-  compressionStrategy: 'percentage' | 'since-last-prompt'  // Default: 'since-last-prompt'
+  compressionStrategy: 'percentage' | 'since-last-prompt'; // Default: 'since-last-prompt'
 
   // Interactive mode
-  compressionInteractive: boolean  // Default: true
-  compressionPromptTimeout: number  // Default: 30, range: 10-300 seconds
+  compressionInteractive: boolean; // Default: true
+  compressionPromptTimeout: number; // Default: 30, range: 10-300 seconds
 
   // Trigger thresholds
-  compressionTriggerTokens: number  // Default: 40000, range: 10k-200k
-  compressionTriggerUtilization: number  // Default: 0.50, range: 0.3-0.95
+  compressionTriggerTokens: number; // Default: 40000, range: 10k-200k
+  compressionTriggerUtilization: number; // Default: 0.50, range: 0.3-0.95
 
   // Anti-annoyance guards
-  compressionMinMessagesSinceLastCompress: number  // Default: 25, range: 5-100
-  compressionMinTimeBetweenPrompts: number  // Default: 300 (5min), range: 60-1800
+  compressionMinMessagesSinceLastCompress: number; // Default: 25, range: 5-100
+  compressionMinTimeBetweenPrompts: number; // Default: 300 (5min), range: 60-1800
 
   // Frequency adjustment
-  compressionFrequencyMultiplier: number  // Default: 1.5, range: 1.2-3.0
+  compressionFrequencyMultiplier: number; // Default: 1.5, range: 1.2-3.0
 }
 
 /**
@@ -221,19 +222,19 @@ interface GeminiClientConfig {
   // Existing methods...
 
   // NEW: Compression configuration accessors
-  getCompressionStrategy(): 'percentage' | 'since-last-prompt'
-  isCompressionInteractive(): boolean
-  getCompressionPromptTimeout(): number
-  getCompressionTriggerTokens(): number
-  getCompressionTriggerUtilization(): number
-  getCompressionMinMessages(): number
-  getCompressionMinTimeBetweenPrompts(): number
-  getCompressionFrequencyMultiplier(): number
+  getCompressionStrategy(): 'percentage' | 'since-last-prompt';
+  isCompressionInteractive(): boolean;
+  getCompressionPromptTimeout(): number;
+  getCompressionTriggerTokens(): number;
+  getCompressionTriggerUtilization(): number;
+  getCompressionMinMessages(): number;
+  getCompressionMinTimeBetweenPrompts(): number;
+  getCompressionFrequencyMultiplier(): number;
 
   // NEW: Setters for runtime adjustment
-  setCompressionInteractive(enabled: boolean): void
-  setCompressionTriggerTokens(tokens: number): void
-  setCompressionMinMessages(messages: number): void
+  setCompressionInteractive(enabled: boolean): void;
+  setCompressionTriggerTokens(tokens: number): void;
+  setCompressionMinMessages(messages: number): void;
 }
 ```
 
@@ -246,43 +247,43 @@ interface GeminiClientConfig {
  * Enhanced compression telemetry event
  */
 interface ChatCompressionEvent {
-  event: 'chat_compression'
+  event: 'chat_compression';
 
   // Existing fields
-  tokens_before: number
-  tokens_after: number
+  tokens_before: number;
+  tokens_after: number;
 
   // NEW: Compression metadata
-  preserve_strategy: 'percentage' | 'since-last-prompt'
-  messages_preserved: number
-  messages_compressed: number
-  had_user_goal: boolean
-  interactive_mode: boolean
-  utilization_at_trigger: number
+  preserve_strategy: 'percentage' | 'since-last-prompt';
+  messages_preserved: number;
+  messages_compressed: number;
+  had_user_goal: boolean;
+  interactive_mode: boolean;
+  utilization_at_trigger: number;
 
   // NEW: Goal extraction tracking
-  goal_selection_method?: 'manual' | 'timeout' | 'auto' | 'agent'
-  goal_extraction_success?: boolean
-  goal_extraction_duration_ms?: number
-  prompt_timeout_occurred?: boolean
+  goal_selection_method?: 'manual' | 'timeout' | 'auto' | 'agent';
+  goal_extraction_success?: boolean;
+  goal_extraction_duration_ms?: number;
+  prompt_timeout_occurred?: boolean;
 
   // NEW: Trigger tracking
-  trigger_type?: 'absolute_tokens' | 'utilization_threshold'
-  tokens_at_trigger?: number
-  messages_since_last_compress?: number
-  time_since_last_compress_seconds?: number
+  trigger_type?: 'absolute_tokens' | 'utilization_threshold';
+  tokens_at_trigger?: number;
+  messages_since_last_compress?: number;
+  time_since_last_compress_seconds?: number;
 
   // NEW: Opt-out tracking
-  user_selected_disable?: boolean
-  user_selected_less_frequent?: boolean
-  was_safety_valve?: boolean
+  user_selected_disable?: boolean;
+  user_selected_less_frequent?: boolean;
+  was_safety_valve?: boolean;
 
   // NEW: Frequency adjustment tracking
-  frequency_multiplier_applied?: number
-  cumulative_frequency_reduction?: number
-  new_token_threshold?: number
-  new_message_threshold?: number
-  times_less_frequent_selected?: number
+  frequency_multiplier_applied?: number;
+  cumulative_frequency_reduction?: number;
+  new_token_threshold?: number;
+  new_message_threshold?: number;
+  times_less_frequent_selected?: number;
 }
 ```
 
@@ -295,22 +296,22 @@ interface ChatCompressionEvent {
  * Result of finding where to split history
  */
 interface SplitPointResult {
-  historyToCompress: Content[]
-  historyToKeep: Content[]
+  historyToCompress: Content[];
+  historyToKeep: Content[];
 
   // Metadata
-  splitIndex: number
-  tokensToCompress: number  // Estimated
-  tokensToKeep: number      // Estimated
+  splitIndex: number;
+  tokensToCompress: number; // Estimated
+  tokensToKeep: number; // Estimated
 }
 
 /**
  * Options for split point calculation
  */
 interface SplitPointOptions {
-  strategy: 'percentage' | 'since-last-prompt'
-  preserveThreshold?: number  // For 'percentage' strategy
-  minMessagesToCompress?: number  // Don't compress if too few
+  strategy: 'percentage' | 'since-last-prompt';
+  preserveThreshold?: number; // For 'percentage' strategy
+  minMessagesToCompress?: number; // Don't compress if too few
 }
 ```
 
@@ -320,21 +321,21 @@ interface SplitPointOptions {
 
 ### GeminiClient (packages/core/src/core/client.ts)
 
-```typescript
+````typescript
 class GeminiClient {
   // NEW: Runtime state
-  private lastCompressionTime: number = 0
-  private messagesSinceLastCompress: number = 0
-  private lessFrequentSelectionCount: number = 0
+  private lastCompressionTime: number = 0;
+  private messagesSinceLastCompress: number = 0;
+  private lessFrequentSelectionCount: number = 0;
 
   /**
    * Check if compression should trigger
    * Called before every message send
    */
   private shouldTriggerCompression(): TriggerDecision {
-    const currentTokens = this.getCurrentTokenCount()
-    const modelMaxTokens = this.getModelMaxTokens()
-    const utilization = currentTokens / modelMaxTokens
+    const currentTokens = this.getCurrentTokenCount();
+    const modelMaxTokens = this.getModelMaxTokens();
+    const utilization = currentTokens / modelMaxTokens;
 
     // Check safety valve (50% utilization)
     if (utilization >= this.config.getCompressionTriggerUtilization()) {
@@ -345,25 +346,29 @@ class GeminiClient {
         currentTokens,
         currentUtilization: utilization,
         messagesSinceLastCompress: this.messagesSinceLastCompress,
-        timeSinceLastCompressSeconds: (Date.now() - this.lastCompressionTime) / 1000
-      }
+        timeSinceLastCompressSeconds:
+          (Date.now() - this.lastCompressionTime) / 1000,
+      };
     }
 
     // Check absolute token threshold
     if (currentTokens >= this.config.getCompressionTriggerTokens()) {
       // Check anti-annoyance guards
-      const guards = this.checkCompressionGuards()
+      const guards = this.checkCompressionGuards();
 
       if (!guards.messagesGuardPassed || !guards.timeGuardPassed) {
         return {
           shouldCompress: false,
           isSafetyValve: false,
-          reason: guards.messagesGuardPassed ? 'time_guard_failed' : 'message_guard_failed',
+          reason: guards.messagesGuardPassed
+            ? 'time_guard_failed'
+            : 'message_guard_failed',
           currentTokens,
           currentUtilization: utilization,
           messagesSinceLastCompress: this.messagesSinceLastCompress,
-          timeSinceLastCompressSeconds: (Date.now() - this.lastCompressionTime) / 1000
-        }
+          timeSinceLastCompressSeconds:
+            (Date.now() - this.lastCompressionTime) / 1000,
+        };
       }
 
       return {
@@ -373,8 +378,9 @@ class GeminiClient {
         currentTokens,
         currentUtilization: utilization,
         messagesSinceLastCompress: this.messagesSinceLastCompress,
-        timeSinceLastCompressSeconds: (Date.now() - this.lastCompressionTime) / 1000
-      }
+        timeSinceLastCompressSeconds:
+          (Date.now() - this.lastCompressionTime) / 1000,
+      };
     }
 
     return {
@@ -384,17 +390,18 @@ class GeminiClient {
       currentTokens,
       currentUtilization: utilization,
       messagesSinceLastCompress: this.messagesSinceLastCompress,
-      timeSinceLastCompressSeconds: (Date.now() - this.lastCompressionTime) / 1000
-    }
+      timeSinceLastCompressSeconds:
+        (Date.now() - this.lastCompressionTime) / 1000,
+    };
   }
 
   /**
    * Check if anti-annoyance guards pass
    */
   private checkCompressionGuards(): CompressionGuards {
-    const minMessages = this.config.getCompressionMinMessages()
-    const minTimeSeconds = this.config.getCompressionMinTimeBetweenPrompts()
-    const timeSinceLastSeconds = (Date.now() - this.lastCompressionTime) / 1000
+    const minMessages = this.config.getCompressionMinMessages();
+    const minTimeSeconds = this.config.getCompressionMinTimeBetweenPrompts();
+    const timeSinceLastSeconds = (Date.now() - this.lastCompressionTime) / 1000;
 
     return {
       minMessages,
@@ -402,89 +409,98 @@ class GeminiClient {
       messagesSinceLastCompress: this.messagesSinceLastCompress,
       timeSinceLastCompressSeconds: timeSinceLastSeconds,
       messagesGuardPassed: this.messagesSinceLastCompress >= minMessages,
-      timeGuardPassed: this.lastCompressionTime === 0 || timeSinceLastSeconds >= minTimeSeconds
-    }
+      timeGuardPassed:
+        this.lastCompressionTime === 0 ||
+        timeSinceLastSeconds >= minTimeSeconds,
+    };
   }
 
   /**
    * Extract 3-4 potential goals from recent conversation
    * Uses truncation to reduce token cost
    */
-  private async extractGoalOptions(history: Content[]): Promise<GoalExtractionResult> {
-    const startTime = Date.now()
+  private async extractGoalOptions(
+    history: Content[],
+  ): Promise<GoalExtractionResult> {
+    const startTime = Date.now();
 
     try {
       // Take last 10-15 exchanges (30 messages)
-      const recentHistory = history.slice(-30)
+      const recentHistory = history.slice(-30);
 
       // Truncate assistant messages to save tokens
-      const compactHistory = recentHistory.map(message => {
+      const compactHistory = recentHistory.map((message) => {
         if (message.role === 'user') {
-          return message  // Keep full user messages
+          return message; // Keep full user messages
         } else {
           return this.truncateMiddle(message, {
             keepStart: 500,
-            keepEnd: 300
-          })
+            keepEnd: 300,
+          });
         }
-      })
+      });
 
       // Call model with extraction prompt
-      const prompt = this.buildGoalExtractionPrompt()
+      const prompt = this.buildGoalExtractionPrompt();
       const response = await this.chat.sendMessage([
         { role: 'user', parts: [{ text: prompt }] },
-        { role: 'user', parts: [{ text: JSON.stringify(compactHistory) }] }
-      ])
+        { role: 'user', parts: [{ text: JSON.stringify(compactHistory) }] },
+      ]);
 
       // Parse response
-      const goals = this.parseGoalsFromResponse(response.text())
+      const goals = this.parseGoalsFromResponse(response.text());
 
       // Validate goals
-      const validGoals = goals.filter(goal => this.validateGoal(goal).isValid)
+      const validGoals = goals.filter(
+        (goal) => this.validateGoal(goal).isValid,
+      );
 
       // Ensure we have at least some goals
       if (validGoals.length === 0) {
         return {
           success: false,
           goals: this.getFallbackGoals(),
-          durationMs: Date.now() - startTime
-        }
+          durationMs: Date.now() - startTime,
+        };
       }
 
       return {
         success: true,
-        goals: validGoals.slice(0, 3),  // Max 3
-        durationMs: Date.now() - startTime
-      }
+        goals: validGoals.slice(0, 3), // Max 3
+        durationMs: Date.now() - startTime,
+      };
     } catch (error) {
       return {
         success: false,
         goals: this.getFallbackGoals(),
         durationMs: Date.now() - startTime,
-        error: error as Error
-      }
+        error: error as Error,
+      };
     }
   }
 
   /**
    * Truncate message to keep start and end only
    */
-  private truncateMiddle(message: Content, options: TruncationOptions): Content {
-    const text = this.extractTextFromMessage(message)
+  private truncateMiddle(
+    message: Content,
+    options: TruncationOptions,
+  ): Content {
+    const text = this.extractTextFromMessage(message);
 
     if (text.length <= options.keepStart + options.keepEnd) {
-      return message  // No truncation needed
+      return message; // No truncation needed
     }
 
-    const start = text.slice(0, options.keepStart)
-    const end = text.slice(-options.keepEnd)
-    const omitted = text.length - options.keepStart - options.keepEnd
-    const truncated = `${start}\n\n[... ${omitted} chars omitted ...]\n\n${end}`
+    const start = text.slice(0, options.keepStart);
+    const end = text.slice(-options.keepEnd);
+    const omitted = text.length - options.keepStart - options.keepEnd;
+    const truncated = `${start}\n\n[... ${omitted} chars omitted ...]\n\n${end}`;
 
     return {
       ...message,
-      parts: [{ text: truncated }]
-    }
+      parts: [{ text: truncated }],
+    };
   }
 
   /**
@@ -492,18 +508,18 @@ class GeminiClient {
    */
   private validateGoal(goal: string): GoalValidation {
     if (goal.length < 10) {
-      return { isValid: false, reason: 'too_short' }
+      return { isValid: false, reason: 'too_short' };
     }
     if (goal.length > 100) {
-      return { isValid: false, reason: 'too_long' }
+      return { isValid: false, reason: 'too_long' };
     }
     if (goal.includes('```')) {
-      return { isValid: false, reason: 'contains_code_block' }
+      return { isValid: false, reason: 'contains_code_block' };
     }
     if (goal.match(/^\d+\./)) {
-      return { isValid: false, reason: 'numbered_list_artifact' }
+      return { isValid: false, reason: 'numbered_list_artifact' };
     }
-    return { isValid: true }
+    return { isValid: true };
   }
 
   /**
@@ -513,8 +529,8 @@ class GeminiClient {
     return [
       'Continue current task',
       'Debug recent errors',
-      'Implement new feature'
-    ]
+      'Implement new feature',
+    ];
   }
 
   /**
@@ -523,9 +539,9 @@ class GeminiClient {
    */
   private async promptUserForCurrentGoal(
     triggerDecision: TriggerDecision,
-    goalOptions: string[]
+    goalOptions: string[],
   ): Promise<GoalSelection> {
-    const timeoutMs = this.config.getCompressionPromptTimeout() * 1000
+    const timeoutMs = this.config.getCompressionPromptTimeout() * 1000;
 
     // Create promise for user input
     const userInputPromise = this.showCompressionPrompt({
@@ -535,33 +551,33 @@ class GeminiClient {
       goalOptions,
       timeoutMs,
       isSafetyValve: triggerDecision.isSafetyValve,
-      onGoalSelect: (selection) => selection
-    })
+      onGoalSelect: (selection) => selection,
+    });
 
     // Create promise for timeout
     const timeoutPromise = new Promise<GoalSelection>((resolve) => {
-      setTimeout(() => resolve({ type: 'timeout' }), timeoutMs)
-    })
+      setTimeout(() => resolve({ type: 'timeout' }), timeoutMs);
+    });
 
     // Race them
-    const selection = await Promise.race([userInputPromise, timeoutPromise])
+    const selection = await Promise.race([userInputPromise, timeoutPromise]);
 
     // Handle timeout
     if (selection.type === 'timeout') {
-      this.showTimeoutMessage()
-      return { type: 'auto' }
+      this.showTimeoutMessage();
+      return { type: 'auto' };
     }
 
     // Handle "Other" option (custom input)
     if (selection.type === 'goal' && selection.value === 'OTHER') {
-      const customGoal = await this.promptForCustomGoal()
+      const customGoal = await this.promptForCustomGoal();
       if (!customGoal || customGoal.trim().length === 0) {
-        return { type: 'auto' }
+        return { type: 'auto' };
       }
-      return { type: 'goal', value: customGoal }
+      return { type: 'goal', value: customGoal };
     }
 
-    return selection
+    return selection;
   }
 
   /**
@@ -571,118 +587,129 @@ class GeminiClient {
   private handleOptOutSelection(selection: GoalSelection): GoalSelection {
     if (selection.type === 'disable') {
       // Disable interactive mode permanently
-      this.config.setCompressionInteractive(false)
-      this.showMessage('Interactive compression disabled. Future compressions will be automatic.')
-      this.showMessage('Re-enable in settings: compressionInteractive = true')
+      this.config.setCompressionInteractive(false);
+      this.showMessage(
+        'Interactive compression disabled. Future compressions will be automatic.',
+      );
+      this.showMessage('Re-enable in settings: compressionInteractive = true');
 
       // Use auto for this compression
-      return { type: 'auto' }
+      return { type: 'auto' };
     }
 
     if (selection.type === 'less-frequent') {
       // Apply multiplier to thresholds
-      const multiplier = this.config.getCompressionFrequencyMultiplier()
-      const currentTokens = this.config.getCompressionTriggerTokens()
-      const currentMessages = this.config.getCompressionMinMessages()
+      const multiplier = this.config.getCompressionFrequencyMultiplier();
+      const currentTokens = this.config.getCompressionTriggerTokens();
+      const currentMessages = this.config.getCompressionMinMessages();
 
       const newTokens = Math.min(
         Math.round(currentTokens * multiplier),
-        200000  // Cap at 200k
-      )
+        200000, // Cap at 200k
+      );
       const newMessages = Math.min(
         Math.round(currentMessages * multiplier),
-        100  // Cap at 100
-      )
+        100, // Cap at 100
+      );
 
-      this.config.setCompressionTriggerTokens(newTokens)
-      this.config.setCompressionMinMessages(newMessages)
+      this.config.setCompressionTriggerTokens(newTokens);
+      this.config.setCompressionMinMessages(newMessages);
 
-      this.lessFrequentSelectionCount++
-      const cumulativeMultiplier = Math.pow(multiplier, this.lessFrequentSelectionCount)
+      this.lessFrequentSelectionCount++;
+      const cumulativeMultiplier = Math.pow(
+        multiplier,
+        this.lessFrequentSelectionCount,
+      );
 
       this.showMessage(
         `Check-ins ${multiplier}x less frequent:\n` +
-        `  Tokens: ${currentTokens / 1000}k → ${newTokens / 1000}k\n` +
-        `  Messages: ${currentMessages} → ${newMessages}\n` +
-        `  Cumulative: ${cumulativeMultiplier.toFixed(1)}x less frequent`
-      )
+          `  Tokens: ${currentTokens / 1000}k → ${newTokens / 1000}k\n` +
+          `  Messages: ${currentMessages} → ${newMessages}\n` +
+          `  Cumulative: ${cumulativeMultiplier.toFixed(1)}x less frequent`,
+      );
 
       // Suggest disabling if selected many times
       if (this.lessFrequentSelectionCount >= 3) {
         this.showMessage(
           `Tip: You've selected "less frequent" ${this.lessFrequentSelectionCount} times. ` +
-          `Consider "Don't ask me again" for fully autonomous compression.`
-        )
+            `Consider "Don't ask me again" for fully autonomous compression.`,
+        );
       }
 
       // Use auto for this compression
-      return { type: 'auto' }
+      return { type: 'auto' };
     }
 
-    return selection
+    return selection;
   }
 
   /**
    * Main compression trigger
    * Modified to include interactive flow
    */
-  async tryCompressChat(promptId: string, force: boolean = false): Promise<CompressResult> {
+  async tryCompressChat(
+    promptId: string,
+    force: boolean = false,
+  ): Promise<CompressResult> {
     // Check if compression should trigger
-    const decision = this.shouldTriggerCompression()
+    const decision = this.shouldTriggerCompression();
 
     if (!decision.shouldCompress && !force) {
       return {
         status: CompressionStatus.NOOP,
         messagesPreserved: 0,
-        messagesCompressed: 0
-      }
+        messagesCompressed: 0,
+      };
     }
 
     // Get chat history
-    const chat = await this.chatManager.getChat(promptId)
-    const history = chat.history
+    const chat = await this.chatManager.getChat(promptId);
+    const history = chat.history;
 
     // Determine if we should do interactive prompt
-    const isInteractive = this.config.isCompressionInteractive() && !force
+    const isInteractive = this.config.isCompressionInteractive() && !force;
 
-    let userGoal: string | undefined
-    let preserveStrategy: 'percentage' | 'since-last-prompt'
-    let selectionMethod: 'manual' | 'timeout' | 'auto' | 'agent' = 'auto'
-    let goalExtractionResult: GoalExtractionResult | undefined
+    let userGoal: string | undefined;
+    let preserveStrategy: 'percentage' | 'since-last-prompt';
+    let selectionMethod: 'manual' | 'timeout' | 'auto' | 'agent' = 'auto';
+    let goalExtractionResult: GoalExtractionResult | undefined;
 
     if (isInteractive) {
       // Extract potential goals
-      goalExtractionResult = await this.extractGoalOptions(history)
+      goalExtractionResult = await this.extractGoalOptions(history);
 
       if (goalExtractionResult.success) {
         // Prompt user for selection
-        let selection = await this.promptUserForCurrentGoal(decision, goalExtractionResult.goals)
+        let selection = await this.promptUserForCurrentGoal(
+          decision,
+          goalExtractionResult.goals,
+        );
 
         // Handle opt-outs
-        selection = this.handleOptOutSelection(selection)
+        selection = this.handleOptOutSelection(selection);
 
         // Process selection
         if (selection.type === 'goal') {
-          userGoal = selection.value
-          preserveStrategy = 'since-last-prompt'
-          selectionMethod = 'manual'
+          userGoal = selection.value;
+          preserveStrategy = 'since-last-prompt';
+          selectionMethod = 'manual';
         } else if (selection.type === 'timeout') {
-          preserveStrategy = 'percentage'
-          selectionMethod = 'timeout'
+          preserveStrategy = 'percentage';
+          selectionMethod = 'timeout';
         } else {
           // 'auto'
-          preserveStrategy = 'percentage'
-          selectionMethod = 'auto'
+          preserveStrategy = 'percentage';
+          selectionMethod = 'auto';
         }
       } else {
         // Extraction failed, fall back to auto
-        preserveStrategy = 'percentage'
-        selectionMethod = 'auto'
+        preserveStrategy = 'percentage';
+        selectionMethod = 'auto';
       }
     } else {
       // Non-interactive: use configured strategy
-      preserveStrategy = this.config.getCompressionStrategy()
-      selectionMethod = 'auto'
+      preserveStrategy = this.config.getCompressionStrategy();
+      selectionMethod = 'auto';
     }
 
     // Call compression service
@@ -694,16 +721,16 @@ class GeminiClient {
       userGoal,
       preserveStrategy,
       preserveThreshold: preserveStrategy === 'percentage' ? 0.3 : undefined,
-      interactive: isInteractive
-    })
+      interactive: isInteractive,
+    });
 
     // Update state on success
     if (result.status === CompressionStatus.COMPRESSED) {
-      this.lastCompressionTime = Date.now()
-      this.messagesSinceLastCompress = 0
-      this.hasFailedCompressionAttempt = false
+      this.lastCompressionTime = Date.now();
+      this.messagesSinceLastCompress = 0;
+      this.hasFailedCompressionAttempt = false;
     } else {
-      this.hasFailedCompressionAttempt = true
+      this.hasFailedCompressionAttempt = true;
     }
 
     // Log telemetry
@@ -720,30 +747,35 @@ class GeminiClient {
       goal_extraction_success: goalExtractionResult?.success,
       goal_extraction_duration_ms: goalExtractionResult?.durationMs,
       prompt_timeout_occurred: selectionMethod === 'timeout',
-      trigger_type: decision.reason as 'absolute_tokens' | 'utilization_threshold',
+      trigger_type: decision.reason as
+        | 'absolute_tokens'
+        | 'utilization_threshold',
       tokens_at_trigger: decision.currentTokens,
       messages_since_last_compress: decision.messagesSinceLastCompress,
       time_since_last_compress_seconds: decision.timeSinceLastCompressSeconds,
       was_safety_valve: decision.isSafetyValve,
-      user_selected_disable: false,  // Set in handleOptOutSelection
-      user_selected_less_frequent: false,  // Set in handleOptOutSelection
-      frequency_multiplier_applied: selectionMethod === 'auto' ? undefined : this.config.getCompressionFrequencyMultiplier(),
+      user_selected_disable: false, // Set in handleOptOutSelection
+      user_selected_less_frequent: false, // Set in handleOptOutSelection
+      frequency_multiplier_applied:
+        selectionMethod === 'auto'
+          ? undefined
+          : this.config.getCompressionFrequencyMultiplier(),
       new_token_threshold: this.config.getCompressionTriggerTokens(),
       new_message_threshold: this.config.getCompressionMinMessages(),
-      times_less_frequent_selected: this.lessFrequentSelectionCount
-    })
+      times_less_frequent_selected: this.lessFrequentSelectionCount,
+    });
 
-    return result
+    return result;
   }
 
   /**
    * Called on each new message to track state
    */
   onNewMessage(): void {
-    this.messagesSinceLastCompress++
+    this.messagesSinceLastCompress++;
   }
 }
-```
+````
 
 ### ChatCompressionService (packages/core/src/services/chatCompressionService.ts)
 
@@ -756,46 +788,46 @@ class ChatCompressionService {
   async compress(
     chat: GenerativeModel | GoogleGenerativeAI,
     promptId: string,
-    options: CompressionOptions
+    options: CompressionOptions,
   ): Promise<CompressResult> {
-    const history = await this.getHistory(chat)
+    const history = await this.getHistory(chat);
 
     // Find split point
     const splitResult = this.findCompressSplitPoint(history, {
       strategy: options.preserveStrategy,
       preserveThreshold: options.preserveThreshold,
-      minMessagesToCompress: 5
-    })
+      minMessagesToCompress: 5,
+    });
 
     if (!splitResult) {
       return {
         status: CompressionStatus.NOOP,
         messagesPreserved: history.length,
-        messagesCompressed: 0
-      }
+        messagesCompressed: 0,
+      };
     }
 
     // Get token counts before
-    const tokensBeforeCompression = await this.countTokens(history)
+    const tokensBeforeCompression = await this.countTokens(history);
 
     // Generate compression prompt
     const compressionPrompt = this.buildCompressionPrompt(
       splitResult.historyToCompress,
-      options.userGoal
-    )
+      options.userGoal,
+    );
 
     // Call model to generate summary
-    const summaryResponse = await chat.sendMessage(compressionPrompt)
-    const summary = summaryResponse.text()
+    const summaryResponse = await chat.sendMessage(compressionPrompt);
+    const summary = summaryResponse.text();
 
     // Construct new history
     const newHistory = [
       ...this.createSummaryMessages(summary),
-      ...splitResult.historyToKeep
-    ]
+      ...splitResult.historyToKeep,
+    ];
 
     // Count tokens after
-    const tokensAfterCompression = await this.countTokens(newHistory)
+    const tokensAfterCompression = await this.countTokens(newHistory);
 
     // Validate: ensure compression actually reduced tokens
     if (tokensAfterCompression >= tokensBeforeCompression) {
@@ -804,12 +836,12 @@ class ChatCompressionService {
         tokensBeforeCompression,
         tokensAfterCompression,
         messagesPreserved: history.length,
-        messagesCompressed: 0
-      }
+        messagesCompressed: 0,
+      };
     }
 
     // Extract discarded context summary from XML
-    const discardedSummary = this.extractDiscardedContextSummary(summary)
+    const discardedSummary = this.extractDiscardedContextSummary(summary);
 
     // Success!
     return {
@@ -821,8 +853,8 @@ class ChatCompressionService {
       messagesCompressed: splitResult.historyToCompress.length,
       discardedContextSummary: discardedSummary,
       goalWasSelected: !!options.userGoal,
-      selectionMethod: options.interactive ? 'manual' : 'auto'
-    }
+      selectionMethod: options.interactive ? 'manual' : 'auto',
+    };
   }
 
   /**
@@ -831,16 +863,16 @@ class ChatCompressionService {
    */
   private findCompressSplitPoint(
     history: Content[],
-    options: SplitPointOptions
+    options: SplitPointOptions,
   ): SplitPointResult | null {
     if (history.length < 4) {
-      return null  // Too short to compress
+      return null; // Too short to compress
     }
 
     if (options.strategy === 'since-last-prompt') {
-      return this.findSinceLastPromptSplit(history, options)
+      return this.findSinceLastPromptSplit(history, options);
     } else {
-      return this.findPercentageSplit(history, options)
+      return this.findPercentageSplit(history, options);
     }
   }
 
@@ -850,38 +882,38 @@ class ChatCompressionService {
    */
   private findSinceLastPromptSplit(
     history: Content[],
-    options: SplitPointOptions
+    options: SplitPointOptions,
   ): SplitPointResult | null {
     // Find last user message
-    let lastUserIndex = -1
+    let lastUserIndex = -1;
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i].role === 'user') {
-        lastUserIndex = i
-        break
+        lastUserIndex = i;
+        break;
       }
     }
 
     if (lastUserIndex <= 0) {
-      return null  // No valid split point
+      return null; // No valid split point
     }
 
     // Check if we're compressing enough messages
-    const messagesToCompress = lastUserIndex
+    const messagesToCompress = lastUserIndex;
     if (messagesToCompress < (options.minMessagesToCompress || 5)) {
-      return null  // Not worth compressing
+      return null; // Not worth compressing
     }
 
     // Split the history
-    const historyToCompress = history.slice(0, lastUserIndex)
-    const historyToKeep = history.slice(lastUserIndex)
+    const historyToCompress = history.slice(0, lastUserIndex);
+    const historyToKeep = history.slice(lastUserIndex);
 
     return {
       historyToCompress,
       historyToKeep,
       splitIndex: lastUserIndex,
       tokensToCompress: this.estimateTokens(historyToCompress),
-      tokensToKeep: this.estimateTokens(historyToKeep)
-    }
+      tokensToKeep: this.estimateTokens(historyToKeep),
+    };
   }
 
   /**
@@ -890,47 +922,47 @@ class ChatCompressionService {
    */
   private findPercentageSplit(
     history: Content[],
-    options: SplitPointOptions
+    options: SplitPointOptions,
   ): SplitPointResult | null {
-    const preserveThreshold = options.preserveThreshold || 0.3
+    const preserveThreshold = options.preserveThreshold || 0.3;
 
     // Calculate total tokens (estimate via character count / 4)
-    const totalChars = JSON.stringify(history).length
-    const estimatedTotalTokens = totalChars / 4
-    const tokensToPreserve = estimatedTotalTokens * preserveThreshold
+    const totalChars = JSON.stringify(history).length;
+    const estimatedTotalTokens = totalChars / 4;
+    const tokensToPreserve = estimatedTotalTokens * preserveThreshold;
 
     // Find split point that preserves ~30% of tokens
-    let currentChars = 0
-    let splitIndex = history.length
+    let currentChars = 0;
+    let splitIndex = history.length;
 
     for (let i = history.length - 1; i >= 0; i--) {
-      const messageChars = JSON.stringify(history[i]).length
-      currentChars += messageChars
+      const messageChars = JSON.stringify(history[i]).length;
+      currentChars += messageChars;
 
       if (currentChars / 4 >= tokensToPreserve) {
         // Found enough preserved tokens
         // Ensure we split at user message boundary
         if (history[i].role === 'user') {
-          splitIndex = i
-          break
+          splitIndex = i;
+          break;
         }
       }
     }
 
     if (splitIndex === 0 || splitIndex === history.length) {
-      return null  // No valid split
+      return null; // No valid split
     }
 
-    const historyToCompress = history.slice(0, splitIndex)
-    const historyToKeep = history.slice(splitIndex)
+    const historyToCompress = history.slice(0, splitIndex);
+    const historyToKeep = history.slice(splitIndex);
 
     return {
       historyToCompress,
       historyToKeep,
       splitIndex,
       tokensToCompress: this.estimateTokens(historyToCompress),
-      tokensToKeep: this.estimateTokens(historyToKeep)
-    }
+      tokensToKeep: this.estimateTokens(historyToKeep),
+    };
   }
 
   /**
@@ -938,26 +970,26 @@ class ChatCompressionService {
    */
   private buildCompressionPrompt(
     historyToCompress: Content[],
-    userGoal?: string
+    userGoal?: string,
   ): string {
-    let prompt = ''
+    let prompt = '';
 
     // Add user goal context if provided
     if (userGoal) {
-      prompt += `The user has indicated they are currently working on:\n`
-      prompt += `<current_goal>\n${userGoal}\n</current_goal>\n\n`
-      prompt += `When creating your summary, prioritize information relevant to this goal.\n`
-      prompt += `De-emphasize or omit details unrelated to the current trajectory.\n\n`
+      prompt += `The user has indicated they are currently working on:\n`;
+      prompt += `<current_goal>\n${userGoal}\n</current_goal>\n\n`;
+      prompt += `When creating your summary, prioritize information relevant to this goal.\n`;
+      prompt += `De-emphasize or omit details unrelated to the current trajectory.\n\n`;
     }
 
     // Add base compression prompt from prompts.ts
-    prompt += getChatCompressionPrompt()
+    prompt += getChatCompressionPrompt();
 
     // Add the history to compress
-    prompt += `\n\nHistory to compress:\n`
-    prompt += JSON.stringify(historyToCompress)
+    prompt += `\n\nHistory to compress:\n`;
+    prompt += JSON.stringify(historyToCompress);
 
-    return prompt
+    return prompt;
   }
 
   /**
@@ -967,25 +999,33 @@ class ChatCompressionService {
     return [
       {
         role: 'user',
-        parts: [{
-          text: `[Previous conversation summary]\n\n${summary}`
-        }]
+        parts: [
+          {
+            text: `[Previous conversation summary]\n\n${summary}`,
+          },
+        ],
       },
       {
         role: 'model',
-        parts: [{
-          text: 'Got it. Thanks for the additional context!'
-        }]
-      }
-    ]
+        parts: [
+          {
+            text: 'Got it. Thanks for the additional context!',
+          },
+        ],
+      },
+    ];
   }
 
   /**
    * Extract <discarded_context_summary> from XML output
    */
-  private extractDiscardedContextSummary(xmlSummary: string): string | undefined {
-    const match = xmlSummary.match(/<discarded_context_summary>(.*?)<\/discarded_context_summary>/s)
-    return match ? match[1].trim() : undefined
+  private extractDiscardedContextSummary(
+    xmlSummary: string,
+  ): string | undefined {
+    const match = xmlSummary.match(
+      /<discarded_context_summary>(.*?)<\/discarded_context_summary>/s,
+    );
+    return match ? match[1].trim() : undefined;
   }
 }
 ```
@@ -1680,37 +1720,37 @@ RESULT: Compression completed without user interaction
 ```typescript
 class GeminiClient {
   // Compression state (reset on session start)
-  private lastCompressionTime: number = 0
-  private messagesSinceLastCompress: number = 0
-  private lessFrequentSelectionCount: number = 0
-  private hasFailedCompressionAttempt: boolean = false
+  private lastCompressionTime: number = 0;
+  private messagesSinceLastCompress: number = 0;
+  private lessFrequentSelectionCount: number = 0;
+  private hasFailedCompressionAttempt: boolean = false;
 
   // Updated on every message
   onNewMessage() {
-    this.messagesSinceLastCompress++
+    this.messagesSinceLastCompress++;
   }
 
   // Reset after successful compression
   onCompressionSuccess() {
-    this.lastCompressionTime = Date.now()
-    this.messagesSinceLastCompress = 0
-    this.hasFailedCompressionAttempt = false
+    this.lastCompressionTime = Date.now();
+    this.messagesSinceLastCompress = 0;
+    this.hasFailedCompressionAttempt = false;
   }
 
   // Set on compression failure
   onCompressionFailure() {
-    this.hasFailedCompressionAttempt = true
+    this.hasFailedCompressionAttempt = true;
   }
 
   // Increment when user selects "less frequent"
   onLessFrequentSelected() {
-    this.lessFrequentSelectionCount++
+    this.lessFrequentSelectionCount++;
   }
 
   // Reset when user re-enables interactive mode
   onInteractiveModeEnabled() {
     if (this.config.isCompressionInteractive()) {
-      this.lessFrequentSelectionCount = 0
+      this.lessFrequentSelectionCount = 0;
     }
   }
 }
@@ -1744,13 +1784,13 @@ class GeminiClient {
 1. **User edits config file** → Next session reads new values
 2. **Runtime adjustment** (e.g., "less frequent"):
    ```typescript
-   config.setCompressionTriggerTokens(60000)
+   config.setCompressionTriggerTokens(60000);
    // → Writes to config.json immediately
    // → Takes effect for next compression check
    ```
 3. **Disable interactive**:
    ```typescript
-   config.setCompressionInteractive(false)
+   config.setCompressionInteractive(false);
    // → Writes to config.json
    // → Future compressions skip prompt
    ```
@@ -1814,8 +1854,8 @@ Session Start
 try {
   const result = await Promise.race([
     this.callModelForExtraction(),
-    timeout(5000)  // 5 second timeout
-  ])
+    timeout(5000), // 5 second timeout
+  ]);
 
   if (!result) {
     // Timeout occurred
@@ -1823,8 +1863,8 @@ try {
       success: false,
       goals: this.getFallbackGoals(),
       durationMs: 5000,
-      error: new Error('Extraction timeout')
-    }
+      error: new Error('Extraction timeout'),
+    };
   }
 } catch (error) {
   // Network error or API error
@@ -1832,8 +1872,8 @@ try {
     success: false,
     goals: this.getFallbackGoals(),
     durationMs: Date.now() - startTime,
-    error: error as Error
-  }
+    error: error as Error,
+  };
 }
 
 // Flow continues with fallback goals
@@ -1844,16 +1884,16 @@ try {
 
 ```typescript
 // In extractGoalOptions()
-const goals = this.parseGoalsFromResponse(response.text())
-const validGoals = goals.filter(goal => this.validateGoal(goal).isValid)
+const goals = this.parseGoalsFromResponse(response.text());
+const validGoals = goals.filter((goal) => this.validateGoal(goal).isValid);
 
 if (validGoals.length === 0) {
   // All goals invalid
   return {
     success: false,
-    goals: this.getFallbackGoals(),  // ["Continue current task", ...]
-    durationMs: Date.now() - startTime
-  }
+    goals: this.getFallbackGoals(), // ["Continue current task", ...]
+    durationMs: Date.now() - startTime,
+  };
 }
 
 // Flow continues with fallback goals
@@ -1863,15 +1903,12 @@ if (validGoals.length === 0) {
 
 ```typescript
 // In promptUserForCurrentGoal()
-const selection = await Promise.race([
-  userInputPromise,
-  timeout(30000)
-])
+const selection = await Promise.race([userInputPromise, timeout(30000)]);
 
 if (selection.type === 'timeout') {
-  this.showTimeoutMessage()
+  this.showTimeoutMessage();
   // Auto-select "auto-compress"
-  return { type: 'auto' }
+  return { type: 'auto' };
 }
 
 // Flow continues with conservative compression
@@ -1889,17 +1926,17 @@ if (tokensAfterCompression >= tokensBeforeCompression) {
     tokensBeforeCompression,
     tokensAfterCompression,
     messagesPreserved: history.length,
-    messagesCompressed: 0
-  }
+    messagesCompressed: 0,
+  };
 }
 
 // Back in tryCompressChat()
 if (result.status !== CompressionStatus.COMPRESSED) {
-  this.hasFailedCompressionAttempt = true
+  this.hasFailedCompressionAttempt = true;
   // Show error message to user
-  this.showCompressionError(result.status)
+  this.showCompressionError(result.status);
   // Continue with original history
-  return result
+  return result;
 }
 ```
 
@@ -1908,8 +1945,8 @@ if (result.status !== CompressionStatus.COMPRESSED) {
 ```typescript
 // In compress()
 try {
-  const summaryResponse = await chat.sendMessage(compressionPrompt)
-  const summary = summaryResponse.text()
+  const summaryResponse = await chat.sendMessage(compressionPrompt);
+  const summary = summaryResponse.text();
   // ... continue
 } catch (error) {
   // API error - return failure
@@ -1918,8 +1955,8 @@ try {
     tokensBeforeCompression,
     tokensAfterCompression: 0,
     messagesPreserved: history.length,
-    messagesCompressed: 0
-  }
+    messagesCompressed: 0,
+  };
 }
 
 // Flow continues without compression
@@ -1931,15 +1968,15 @@ try {
 ```typescript
 // In promptUserForCurrentGoal()
 if (selection.type === 'goal' && selection.value === 'OTHER') {
-  const customGoal = await this.promptForCustomGoal()
+  const customGoal = await this.promptForCustomGoal();
 
   if (!customGoal || customGoal.trim().length === 0) {
     // User provided no input - fall back to auto
-    this.showMessage('No goal provided, using auto-compress')
-    return { type: 'auto' }
+    this.showMessage('No goal provided, using auto-compress');
+    return { type: 'auto' };
   }
 
-  return { type: 'goal', value: customGoal }
+  return { type: 'goal', value: customGoal };
 }
 ```
 
@@ -1950,17 +1987,19 @@ if (selection.type === 'goal' && selection.value === 'OTHER') {
 try {
   this.writeConfigFile({
     ...this.config,
-    compressionTriggerTokens: newValue
-  })
+    compressionTriggerTokens: newValue,
+  });
 } catch (error) {
   // Config write failed
-  console.error('Failed to persist config:', error)
+  console.error('Failed to persist config:', error);
 
   // Apply in-memory for this session
-  this.inMemoryConfig.compressionTriggerTokens = newValue
+  this.inMemoryConfig.compressionTriggerTokens = newValue;
 
   // Show warning to user
-  this.showWarning('Settings applied for this session only (could not save to disk)')
+  this.showWarning(
+    'Settings applied for this session only (could not save to disk)',
+  );
 }
 ```
 
@@ -2014,4 +2053,5 @@ function CompressionMessage({ status, error, ...props }: CompressionMessageProps
 
 ---
 
-*Design document v1.0 - Defines interfaces and data flow for deliberate context compaction*
+_Design document v1.0 - Defines interfaces and data flow for deliberate context
+compaction_

@@ -575,14 +575,15 @@ export class Config {
     this.experiments = params.experiments;
 
     // Deliberate Context Compaction
+    // TODO: TEMPORARY VALUES FOR TESTING - REVERT BEFORE MERGE
     this.compressionInteractive = params.compressionInteractive ?? true;
     this.compressionPromptTimeout = params.compressionPromptTimeout ?? 30;
-    this.compressionTriggerTokens = params.compressionTriggerTokens ?? 40000;
+    this.compressionTriggerTokens = params.compressionTriggerTokens ?? 1000; // TEMP: was 40000
     this.compressionTriggerUtilization =
       params.compressionTriggerUtilization ?? 0.5;
-    this.compressionMinMessages = params.compressionMinMessages ?? 25;
+    this.compressionMinMessages = params.compressionMinMessages ?? 2; // TEMP: was 25
     this.compressionMinTimeBetweenPrompts =
-      params.compressionMinTimeBetweenPrompts ?? 300;
+      params.compressionMinTimeBetweenPrompts ?? 5; // TEMP: was 300
     this.compressionFrequencyMultiplier =
       params.compressionFrequencyMultiplier ?? 1.5;
 
@@ -1163,7 +1164,7 @@ export class Config {
   // The list of explicitly enabled extensions, if any were given, may contain
   // the string "none".
   getEnabledExtensions(): string[] {
-    return this._enabledLoader.getExtensions();
+    return this._enabledExtensions;
   }
 
   getEnableExtensionReloading(): boolean {
@@ -1260,10 +1261,24 @@ export class Config {
   }
 
   /**
+   * Set absolute token threshold for triggering compression.
+   */
+  setCompressionTriggerTokens(value: number): void {
+    this.compressionTriggerTokens = value;
+  }
+
+  /**
    * Get utilization threshold for safety valve compression (default: 0.5 = 50%)
    */
   getCompressionTriggerUtilization(): number {
     return this.compressionTriggerUtilization;
+  }
+
+  /**
+   * Set utilization threshold for safety valve compression.
+   */
+  setCompressionTriggerUtilization(value: number): void {
+    this.compressionTriggerUtilization = value;
   }
 
   /**
@@ -1274,10 +1289,24 @@ export class Config {
   }
 
   /**
+   * Set minimum messages required between compressions.
+   */
+  setCompressionMinMessages(value: number): void {
+    this.compressionMinMessages = value;
+  }
+
+  /**
    * Get minimum time in seconds between compressions (default: 300 = 5 minutes)
    */
   getCompressionMinTimeBetweenPrompts(): number {
     return this.compressionMinTimeBetweenPrompts;
+  }
+
+  /**
+   * Set minimum time in seconds between compressions.
+   */
+  setCompressionMinTimeBetweenPrompts(value: number): void {
+    this.compressionMinTimeBetweenPrompts = value;
   }
 
   /**
@@ -1288,6 +1317,13 @@ export class Config {
   }
 
   /**
+   * Set multiplier for adjusting compression frequency.
+   */
+  setCompressionFrequencyMultiplier(value: number): void {
+    this.compressionFrequencyMultiplier = value;
+  }
+
+  /**
    * Check if deliberate compression is enabled (default: true)
    */
   isDeliberateCompressionEnabled(): boolean {
@@ -1295,10 +1331,31 @@ export class Config {
   }
 
   /**
+   * Check if interactive compression prompts are enabled (alias for isDeliberateCompressionEnabled)
+   */
+  isCompressionInteractive(): boolean {
+    return this.compressionInteractive;
+  }
+
+  /**
+   * Set if deliberate compression is enabled.
+   */
+  setCompressionInteractive(value: boolean): void {
+    this.compressionInteractive = value;
+  }
+
+  /**
    * Get timeout for compression prompt in seconds (default: 30)
    */
   getCompressionPromptTimeout(): number {
     return this.compressionPromptTimeout;
+  }
+
+  /**
+   * Set timeout for compression prompt in seconds.
+   */
+  setCompressionPromptTimeout(value: number): void {
+    this.compressionPromptTimeout = value;
   }
 
   /**
