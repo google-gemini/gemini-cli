@@ -164,6 +164,21 @@ Slash commands provide meta-level control over the CLI itself.
   - **Note:** Only available if checkpointing is configured via
     [settings](../get-started/configuration.md). See
     [Checkpointing documentation](../cli/checkpointing.md) for more details.
+- **`/resume`**
+  - **Description:** Browse and resume previous conversation sessions. Opens an
+    interactive session browser where you can search, filter, and select from
+    automatically saved conversations.
+  - **Features:**
+    - **Session Browser:** Interactive interface showing all saved sessions with
+      timestamps, message counts, and first user message for context
+    - **Search:** Use `/` to search through conversation content across all
+      sessions
+    - **Sorting:** Sort sessions by date or message count
+    - **Management:** Delete unwanted sessions directly from the browser
+    - **Resume:** Select any session to resume and continue the conversation
+  - **Note:** All conversations are automatically saved as you chat - no manual
+    saving required. See [Session Management](../cli/session-management.md) for
+    complete details.
 
 - [**`/settings`**](./settings.md)
   - **Description:** Open the settings editor to view and modify Gemini CLI

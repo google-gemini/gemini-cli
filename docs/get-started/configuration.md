@@ -882,7 +882,12 @@ of v0.3.0:
 {
   "general": {
     "vimMode": true,
-    "preferredEditor": "code"
+    "preferredEditor": "code",
+    "sessionRetention": {
+      "enabled": true,
+      "maxAge": "30d",
+      "maxCount": 100
+    }
   },
   "ui": {
     "theme": "GitHub",
@@ -1118,6 +1123,24 @@ for that specific session.
   - Example: `gemini -e my-extension -e my-other-extension`
 - **`--list-extensions`** (**`-l`**):
   - Lists all available extensions and exits.
+- **`--resume [session_id]`** (**`-r [session_id]`**):
+  - Resume a previous chat session. Use "latest" for the most recent session,
+    provide a session index number, or provide a full session UUID.
+  - If no session_id is provided, defaults to "latest".
+  - Example: `gemini --resume 5` or `gemini --resume latest` or
+    `gemini --resume a1b2c3d4-e5f6-7890-abcd-ef1234567890` or `gemini --resume`
+  - See [Session Management](../cli/session-management.md) for more details.
+- **`--list-sessions`**:
+  - List all available chat sessions for the current project and exit.
+  - Shows session indices, dates, message counts, and preview of first user
+    message.
+  - Example: `gemini --list-sessions`
+- **`--delete-session <identifier>`**:
+  - Delete a specific chat session by its index number or full session UUID.
+  - Use `--list-sessions` first to see available sessions, their indices, and
+    UUIDs.
+  - Example: `gemini --delete-session 3` or
+    `gemini --delete-session a1b2c3d4-e5f6-7890-abcd-ef1234567890`
 - **`--include-directories <dir1,dir2,...>`**:
   - Includes additional directories in the workspace for multi-directory
     support.
