@@ -43,6 +43,47 @@ const EVENT_MAPPING: Record<string, HookEventName> = {
   Stop: HookEventName.AfterAgent,
 };
 
+/**
+ * Tool name mappings from Claude Code to Gemini CLI
+ * Used to transform matcher patterns in hook configurations
+ */
+const TOOL_NAME_MAPPING: Record<string, string> = {
+  // File operations
+  Edit: 'replace',
+  MultiEdit: 'replace',
+  Write: 'write_file',
+  Read: 'read_file',
+  Glob: 'glob',
+  Grep: 'search_file_content',
+
+  // Shell and system
+  Bash: 'run_shell_command',
+
+  // Task management
+  TodoWrite: 'write_todos',
+
+  // Web operations
+  WebFetch: 'web_fetch',
+  WebSearch: 'google_web_search',
+};
+
+/**
+ * Transform a Claude Code matcher pattern to Gemini CLI format
+ * Handles patterns like "Edit|MultiEdit|Write" -> "replace|write_file"
+ */
+function transformMatcher(matcher: string | undefined): string | undefined {
+  if (!matcher || matcher === '*') return matcher;
+
+  // Split by | and transform each tool name
+  const tools = matcher.split('|').map((tool) => tool.trim());
+  const transformedTools = tools.map((tool) => TOOL_NAME_MAPPING[tool] || tool);
+
+  // Remove duplicates (e.g., Edit|MultiEdit both map to 'replace')
+  const uniqueTools = [...new Set(transformedTools)];
+
+  return uniqueTools.join('|');
+}
+
 export const migrateCommand: CommandModule = {
   command: 'migrate',
   describe: 'Migrate hooks from Claude Code configuration',
@@ -92,6 +133,35 @@ export const migrateCommand: CommandModule = {
               command = command.replace('.claude/hooks', '.gemini/hooks');
             }
 
+            // Warn about scripts that may need updates for field differences
+            if (command.endsWith('.sh') || command.endsWith('.py')) {
+              const scriptPath = command.replace(/^~/, homedir());
+              if (fs.existsSync(scriptPath)) {
+                try {
+                  const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
+                  // Check for Claude-specific field access patterns
+                  if (
+                    scriptContent.includes('.message') &&
+                    !scriptContent.includes('.prompt')
+                  ) {
+                    console.warn(
+                      `  ⚠️  Warning: ${command} uses '.message' - Gemini uses '.prompt' for user input`,
+                    );
+                  }
+                  if (scriptContent.includes('tool_name')) {
+                    console.warn(
+                      `  ℹ️  Note: ${command} accesses tool_name - tool names differ between Claude and Gemini`,
+                    );
+                    console.warn(
+                      `      Consider using ~/.gemini/hooks/utils/claude-compat-shim.sh for compatibility`,
+                    );
+                  }
+                } catch {
+                  // Ignore read errors
+                }
+              }
+            }
+
             return {
               type: HookType.Command,
               command,
@@ -99,9 +169,18 @@ export const migrateCommand: CommandModule = {
               timeout: hook.timeout ? hook.timeout * 1000 : undefined,
             };
           });
+
+          // Transform matcher to use Gemini tool names
+          const transformedMatcher = transformMatcher(def.matcher);
+          if (def.matcher && transformedMatcher !== def.matcher) {
+            console.log(
+              `  📝 Transformed matcher: "${def.matcher}" → "${transformedMatcher}"`,
+            );
+          }
+
           return {
             hooks,
-            matcher: def.matcher,
+            matcher: transformedMatcher,
           };
         });
       }
@@ -158,8 +237,17 @@ export const migrateCommand: CommandModule = {
       loadedSettings.setValue(SettingScope.User, 'hooks', newHooks);
       loadedSettings.setValue(SettingScope.User, 'tools', newTools);
 
-      console.log('Successfully migrated hooks to ~/.gemini/settings.json');
-      console.log(`Enabled ${Object.keys(geminiHooks).length} hook events.`);
+      console.log(
+        '\n✅ Successfully migrated hooks to ~/.gemini/settings.json',
+      );
+      console.log(`   Enabled ${Object.keys(geminiHooks).length} hook events.`);
+      console.log('\n📚 Important differences to note:');
+      console.log('   • User input: Claude uses .message, Gemini uses .prompt');
+      console.log('   • Tool names differ (see tool mapping above)');
+      console.log('   • Timeouts: converted from seconds to milliseconds');
+      console.log(
+        '\n💡 Tip: Source ~/.gemini/hooks/utils/claude-compat-shim.sh in your scripts for compatibility',
+      );
     } catch (error) {
       console.error('Failed to migrate hooks:', error);
       throw error;
