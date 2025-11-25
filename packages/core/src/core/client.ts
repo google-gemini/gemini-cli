@@ -498,6 +498,11 @@ export class GeminiClient {
       this.currentSequenceModel = null;
     }
     this.sessionTurnCount++;
+
+    // Track messages for compression guard (only count top-level user messages)
+    if (isTopLevelCall) {
+      this.messagesSinceLastCompress++;
+    }
     if (
       this.config.getMaxSessionTurns() > 0 &&
       this.sessionTurnCount > this.config.getMaxSessionTurns()
