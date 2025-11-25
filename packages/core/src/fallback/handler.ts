@@ -98,7 +98,7 @@ export async function handleFallback(
         );
     }
   } catch (handlerError) {
-    console.error('Fallback UI handler failed:', handlerError);
+    debugLogger.error('Fallback UI handler failed:', handlerError);
     return null;
   }
 }
