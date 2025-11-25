@@ -15,6 +15,7 @@ exports[`Core System Prompt (prompts.ts) > should append userMemory with separat
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
+
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -117,6 +118,7 @@ exports[`Core System Prompt (prompts.ts) > should handle git instructions when i
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
+
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -213,6 +215,7 @@ exports[`Core System Prompt (prompts.ts) > should handle git instructions when i
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
+
 
 # Primary Workflows
 
@@ -326,6 +329,7 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
+
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -422,6 +426,7 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
+
 
 # Primary Workflows
 
@@ -520,6 +525,7 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
+
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -616,6 +622,7 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
+
 
 # Primary Workflows
 
@@ -714,6 +721,7 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
+
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -811,6 +819,7 @@ exports[`Core System Prompt (prompts.ts) > should return the interactive avoidan
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
 
+
 # Primary Workflows
 
 ## Software Engineering Tasks
@@ -907,6 +916,7 @@ exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for p
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.
+- **Do not call tools in silence:** You must provide to the user very short and concise natural explanation (one sentence) before calling tools.
 
 # Primary Workflows
 
