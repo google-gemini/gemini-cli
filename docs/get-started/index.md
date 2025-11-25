@@ -29,7 +29,7 @@ For more installation options, see [Gemini CLI Installation](./installation.md).
 ## Authenticate
 
 To begin using Gemini CLI, you must authenticate with a Google service. In most
-cases, you can simply log in with your existing Google account:
+cases, you can log in with your existing Google account:
 
 1. Run Gemini CLI after installation:
    ```bash

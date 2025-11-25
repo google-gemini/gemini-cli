@@ -4,8 +4,8 @@ To use Gemini CLI, you'll need to authenticate with Google. This guide helps you
 quickly find the best way to sign in based on your account type and how you're
 using the CLI.
 
-For most users, we recommend starting Gemini CLI in interactive
-mode and logging in with your personal Google account.
+For most users, we recommend starting Gemini CLI and logging in with your
+personal Google account.
 
 ## Choose your authentication method <a id="auth-methods"></a>
 
@@ -62,7 +62,7 @@ Most individual Google accounts (free and paid) don't require a
 Google Cloud project for authentication. However, you'll need to set a Google
 Cloud project when you meet at least one of the following conditions:
 
-- You are using a Company, School, or Google Workspace account.
+- You are using a company, school, or Google Workspace account.
 - You are using a Gemini Code Assist license from the Google Developer Program.
 - You are using a license from a Gemini Code Assist subscription.
 
@@ -76,7 +76,7 @@ key from Google AI Studio.
 To authenticate and use Gemini CLI with a Gemini API key:
 
 1. Obtain your API key from
-  [Google AI Studio](https://aistudio.google.com/app/apikey)
+  [Google AI Studio](https://aistudio.google.com/app/apikey).
   
 2. Set the `GEMINI_API_KEY` environment variable to your key. For example:
 
@@ -291,8 +291,8 @@ Variables are loaded from the first file found, not merged.
 
 ## Running in Google Cloud environments <a id="cloud-env"></a>
 
-When running Gemini CLI within certain Google Cloud environments, authentication is
-typically automatic.
+When running Gemini CLI within certain Google Cloud environments, authentication
+is automatic.
 
 In a Google Cloud Shell environment, Gemini CLI typically authenticates
 automatically using your Cloud Shell credentials. In Compute Engine
