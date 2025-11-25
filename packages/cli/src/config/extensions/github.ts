@@ -95,7 +95,16 @@ export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
     }
   }
   // Default to a github repo path, so `source` can be just an org/repo
-  const parsedUrl = URL.parse(source, 'https://github.com');
+  let parsedUrl: URL;
+  try {
+    // Use the standard URL constructor for backward compatibility.
+    parsedUrl = new URL(source, 'https://github.com');
+  } catch (e) {
+    // Throw a TypeError to maintain a consistent error contract for invalid URLs.
+    // This avoids a breaking change for consumers who might expect a TypeError.
+    throw new TypeError(`Invalid repo URL: ${source}`, { cause: e });
+  }
+
   if (!parsedUrl) {
     throw new Error(`Invalid repo URL: ${source}`);
   }
