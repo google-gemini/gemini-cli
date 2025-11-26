@@ -105,4 +105,26 @@ describe('calculateRequestTokenCount', () => {
     );
     expect(count).toBe(0);
   });
+
+  it('should fallback to local estimation when countTokens API fails', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+      new Error('API error'),
+    );
+    const request = [
+      { text: 'Hello' },
+      { inlineData: { mimeType: 'image/png', data: 'data' } },
+    ];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    // Should fallback to estimation:
+    // 'Hello': 5 chars * 0.25 = 1.25
+    // inlineData: JSON.stringify length / 4
+    expect(count).toBeGreaterThan(0);
+    expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+  });
 });

@@ -969,10 +969,7 @@ ${JSON.stringify(
       // Should NOT call countTokens (it's text only)
       expect(countTokensSpy).not.toHaveBeenCalled();
 
-      // We can't directly inspect the calculated token count from outside `sendMessageStream` easily
-      // without spying on a private method or checking the 'ContextWindowWillOverflow' event if we force a limit.
-      // However, we can unit test `calculateRequestTokenCount` if we export it or test it via a side effect.
-      // Since it is not exported, I will test it by checking if it triggers overflow warning with a small limit.
+      // The actual token calculation is unit tested in tokenCalculation.test.ts
     });
 
     it('should return the turn instance after the stream is complete', async () => {

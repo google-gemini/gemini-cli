@@ -7,6 +7,13 @@
 import type { PartListUnion, Part } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 
+// Token estimation constants
+// ASCII characters (0-127) are roughly 4 chars per token
+const ASCII_TOKENS_PER_CHAR = 0.25;
+// Non-ASCII characters (including CJK) are often 1-2 tokens per char.
+// We use 1.3 as a conservative estimate to avoid underestimation.
+const NON_ASCII_TOKENS_PER_CHAR = 1.3;
+
 /**
  * Estimates token count for parts synchronously using a heuristic.
  * - Text: character-based heuristic (ASCII vs CJK).
@@ -17,14 +24,10 @@ export function estimateTokenCountSync(parts: Part[]): number {
   for (const part of parts) {
     if (typeof part.text === 'string') {
       for (const char of part.text) {
-        // Simple heuristic:
-        // ASCII characters (0-127) are roughly 4 chars per token -> 0.25 tokens/char
-        // Non-ASCII characters (including CJK) are often 1-2 tokens per char.
-        // We use 1.3 as a conservative estimate for non-ASCII to avoid underestimation.
         if (char.codePointAt(0)! <= 127) {
-          totalTokens += 0.25;
+          totalTokens += ASCII_TOKENS_PER_CHAR;
         } else {
-          totalTokens += 1.3;
+          totalTokens += NON_ASCII_TOKENS_PER_CHAR;
         }
       }
     } else {
@@ -60,11 +63,16 @@ export async function calculateRequestTokenCount(
   });
 
   if (hasMedia) {
-    const response = await contentGenerator.countTokens({
-      model,
-      contents: [{ role: 'user', parts }],
-    });
-    return response.totalTokens ?? 0;
+    try {
+      const response = await contentGenerator.countTokens({
+        model,
+        contents: [{ role: 'user', parts }],
+      });
+      return response.totalTokens ?? 0;
+    } catch {
+      // Fallback to local estimation if the API call fails
+      return estimateTokenCountSync(parts);
+    }
   }
 
   return estimateTokenCountSync(parts);
