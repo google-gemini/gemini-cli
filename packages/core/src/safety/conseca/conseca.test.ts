@@ -37,6 +37,7 @@ describe('ConsecaSafetyChecker', () => {
     // We can't easily reset private state without a helper or recreating.
     // For now, we rely on the fact that we can set a new prompt.
     mockConfig = {
+      safety: { enableConseca: true },
       getToolRegistry: vi.fn().mockReturnValue({
         getFunctionDeclarations: vi.fn().mockReturnValue([]),
       }),
@@ -67,8 +68,27 @@ describe('ConsecaSafetyChecker', () => {
     };
 
     const result = await checker.check(input);
-    expect(result).toBeDefined();
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+  });
+
+  it('should return ALLOW if enableConseca is false', async () => {
+    const disabledConfig = {
+      safety: { enableConseca: false },
+    } as unknown as Config;
+    checker.setConfig(disabledConfig);
+
+    const input: SafetyCheckInput = {
+      protocolVersion: '1.0.0',
+      toolCall: { name: 'testTool' },
+      context: {
+        environment: { cwd: '/tmp', workspaces: [] },
+      },
+    };
+
+    const result = await checker.check(input);
+    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+    expect(result.reason).toBe('Conseca is disabled');
+    expect(policyGenerator.generatePolicy).not.toHaveBeenCalled();
   });
 
   it('getPolicy should return cached policy if user prompt matches', async () => {
