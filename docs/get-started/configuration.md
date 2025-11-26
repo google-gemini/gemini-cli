@@ -600,6 +600,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show color in shell output.
   - **Default:** `false`
 
+- **`tools.shell.inactivityTimeout`** (number):
+  - **Description:** The maximum time in seconds allowed without output from the
+    shell command. Defaults to 5 minutes.
+  - **Default:** `300`
+
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
     considered safe (e.g., read-only operations).

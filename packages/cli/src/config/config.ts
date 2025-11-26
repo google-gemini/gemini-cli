@@ -643,6 +643,7 @@ export async function loadCliConfig(
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell:
       settings.tools?.shell?.enableInteractiveShell ?? true,
+    shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
