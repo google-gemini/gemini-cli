@@ -26,7 +26,18 @@ const DEFAULT_COMPRESSION_THRESHOLD = 0.5; // 50%
  * @param model - The model name to determine token limits
  */
 export function useContextTracking(model: string): ContextTrackingState {
-  const [tokenCount, setTokenCount] = useState<number>(0);
+  // Initialize state with callback to avoid unnecessary re-render on mount
+  const [tokenCount, setTokenCount] = useState<number>(() => {
+    const initialCount = uiTelemetryService.getLastPromptTokenCount();
+    if (
+      typeof initialCount === 'number' &&
+      !isNaN(initialCount) &&
+      initialCount >= 0
+    ) {
+      return initialCount;
+    }
+    return 0;
+  });
 
   const maxTokens = tokenLimit(model);
   const compressionThreshold = maxTokens * DEFAULT_COMPRESSION_THRESHOLD;
@@ -57,16 +68,6 @@ export function useContextTracking(model: string): ContextTrackingState {
 
     // Subscribe to updates
     uiTelemetryService.on('update', handleUpdate);
-
-    // Set initial state
-    const initialCount = uiTelemetryService.getLastPromptTokenCount();
-    if (
-      typeof initialCount === 'number' &&
-      !isNaN(initialCount) &&
-      initialCount >= 0
-    ) {
-      setTokenCount(initialCount);
-    }
 
     // Cleanup on unmount
     return () => {

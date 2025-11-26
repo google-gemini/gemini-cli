@@ -133,9 +133,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { setEmbeddedShellFocused } = useUIActions();
   const uiState = useUIState();
   const { mainAreaWidth } = uiState;
-
-  // Context tracking for border color and progress
-  const { zone, percentage } = useContextTracking(uiState.currentModel);
+  const { percentage } = useContextTracking(uiState.currentModel);
 
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
@@ -1001,20 +999,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     </Box>
   ) : null;
 
-  // Determine border color based on focus and status
-  const borderColor =
-    isShellFocused && !isEmbeddedShellFocused
-      ? (statusColor ?? theme.border.focused)
-      : theme.border.default;
-
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
       <ProgressBorder
         width={mainAreaWidth}
         percentage={percentage}
-        zone={zone}
-        borderColor={borderColor}
+        borderColor={
+          isShellFocused && !isEmbeddedShellFocused
+            ? (statusColor ?? theme.border.focused)
+            : theme.border.default
+        }
         minHeight={3}
         paddingX={1}
       >

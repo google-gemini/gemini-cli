@@ -7,14 +7,11 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
-import type { ContextZone } from '../hooks/useContextTracking.js';
 
 export interface ProgressBorderProps {
   children: React.ReactNode;
   width: number;
   percentage: number;
-  zone: ContextZone;
   borderColor: string;
   minHeight?: number;
   paddingX?: number;
@@ -46,7 +43,6 @@ export const ProgressBorder: React.FC<ProgressBorderProps> = ({
   children,
   width,
   percentage,
-  zone,
   borderColor,
   minHeight = 3,
   paddingX = 1,
@@ -57,13 +53,8 @@ export const ProgressBorder: React.FC<ProgressBorderProps> = ({
     100,
   );
 
-  // Choose color based on zone
-  const progressColor =
-    zone === 'red'
-      ? theme.status.error
-      : zone === 'yellow'
-        ? theme.status.warning
-        : borderColor;
+  // Progress bar always uses the same color as the border
+  const progressColor = borderColor;
 
   // Calculate how many characters should be filled
   // Subtract 2 for the corner characters
