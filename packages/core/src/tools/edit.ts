@@ -201,9 +201,30 @@ class EditToolInvocation
           type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
         };
       } else if (occurrences === 0) {
+        // Provide detailed guidance for zero occurrences with similarity hints
+        const oldStringPreview =
+          finalOldString.length > 100
+            ? finalOldString.substring(0, 100) + '...'
+            : finalOldString;
+
+        // Try to find similar content as a hint
+        const similarContentHint = this.findSimilarContent(
+          currentContent,
+          finalOldString,
+        );
+        const similarityNote = similarContentHint
+          ? `\n\nPossibly similar content found (may help locate the issue):\n"${similarContentHint}"`
+          : '';
+
         error = {
           display: `Failed to edit, could not find the string to replace.`,
-          raw: `Failed to edit, 0 occurrences found for old_string in ${this.resolvedPath}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
+          raw: `Failed to edit, 0 occurrences found for old_string in ${this.resolvedPath}. The exact text was not found. Common causes:
+1. File content changed - Use ${READ_FILE_TOOL_NAME} to get current content
+2. Whitespace mismatch - Ensure spaces, tabs, and newlines match exactly
+3. Indentation differs - Copy indentation precisely from current file
+4. Context insufficient - Include at least 3 lines before and after
+5. String was escaped - Use literal unescaped strings
+Searched for: "${oldStringPreview}"${similarityNote}`,
           type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
         };
       } else if (occurrences !== expectedReplacements) {
@@ -474,6 +495,82 @@ class EditToolInvocation
     if (!fs.existsSync(dirName)) {
       fs.mkdirSync(dirName, { recursive: true });
     }
+  }
+
+  /**
+   * Attempts to find similar content in the file that might help locate the intended edit.
+   * Uses basic string similarity to suggest close matches.
+   * @param fileContent The current file content
+   * @param searchString The string that wasn't found
+   * @returns A similar string from the file, or null if none found
+   */
+  private findSimilarContent(
+    fileContent: string | null,
+    searchString: string,
+  ): string | null {
+    if (!fileContent || !searchString || searchString.length < 10) {
+      return null;
+    }
+
+    // Extract first meaningful line from search string (for comparison)
+    const searchLines = searchString
+      .split('\n')
+      .filter((l) => l.trim().length > 3);
+    if (searchLines.length === 0) return null;
+
+    const searchFirstLine = searchLines[0].trim();
+    const fileLines = fileContent.split('\n');
+
+    // Find lines with high similarity to first search line
+    let bestMatch: { line: string; index: number; score: number } | null = null;
+
+    for (let i = 0; i < fileLines.length; i++) {
+      const fileLine = fileLines[i].trim();
+      if (fileLine.length < 3) continue;
+
+      // Simple similarity: count matching characters
+      const similarity = this.calculateSimilarity(searchFirstLine, fileLine);
+
+      if (similarity > 0.5 && (!bestMatch || similarity > bestMatch.score)) {
+        bestMatch = { line: fileLines[i], index: i, score: similarity };
+      }
+    }
+
+    if (bestMatch && bestMatch.score > 0.5) {
+      // Return context around the match (3 lines before and after)
+      const start = Math.max(0, bestMatch.index - 1);
+      const end = Math.min(fileLines.length, bestMatch.index + 3);
+      const contextLines = fileLines.slice(start, end);
+      const preview = contextLines.join('\n');
+      return preview.length > 150 ? preview.substring(0, 150) + '...' : preview;
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculates simple character-level similarity between two strings
+   */
+  private calculateSimilarity(str1: string, str2: string): number {
+    if (str1 === str2) return 1.0;
+    if (str1.length === 0 || str2.length === 0) return 0;
+
+    // Normalize whitespace for comparison
+    const s1 = str1.replace(/\s+/g, ' ').toLowerCase();
+    const s2 = str2.replace(/\s+/g, ' ').toLowerCase();
+
+    if (s1 === s2) return 0.95; // High score but not perfect (whitespace differs)
+
+    // Count matching substrings
+    const minLen = Math.min(s1.length, s2.length);
+    const maxLen = Math.max(s1.length, s2.length);
+    let matches = 0;
+
+    for (let i = 0; i < minLen; i++) {
+      if (s1[i] === s2[i]) matches++;
+    }
+
+    return matches / maxLen;
   }
 }
 

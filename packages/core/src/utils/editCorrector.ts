@@ -254,21 +254,24 @@ export async function ensureCorrectEdit(
           geminiClient,
         );
 
-        // Add a 1-second buffer to account for timing inaccuracies. If the file
-        // was modified more than a second after the last edit tool was run, we
+        // Add a 2-second buffer to account for timing inaccuracies. If the file
+        // was modified more than 2 seconds after the last edit tool was run, we
         // can assume it was modified by something else.
         if (lastEditedByUsTime > 0) {
-          const stats = fs.statSync(filePath);
-          const diff = stats.mtimeMs - lastEditedByUsTime;
-          if (diff > 2000) {
-            // Hard coded for 2 seconds
-            // This file was edited sooner
-            const result: CorrectedEditResult = {
-              params: { ...originalParams },
-              occurrences: 0, // Explicitly 0 as LLM failed
-            };
-            editCorrectionCache.set(cacheKey, result);
-            return result;
+          try {
+            const stats = await fs.promises.stat(filePath);
+            const diff = stats.mtimeMs - lastEditedByUsTime;
+            if (diff > 2000) {
+              // File was edited externally after our last edit
+              const result: CorrectedEditResult = {
+                params: { ...originalParams },
+                occurrences: 0, // Explicitly 0 - file modified externally
+              };
+              editCorrectionCache.set(cacheKey, result);
+              return result;
+            }
+          } catch (_err) {
+            // If stat fails, continue with LLM correction attempt
           }
         }
       }
