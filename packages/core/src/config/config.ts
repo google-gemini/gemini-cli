@@ -297,6 +297,7 @@ export interface ConfigParameters {
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
+  shellToolInactivityTimeout?: number;
   fakeResponses?: string;
   recordResponses?: string;
   ptyInfo?: string;
@@ -411,6 +412,7 @@ export class Config {
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
+  private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
@@ -547,6 +549,8 @@ export class Config {
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
+    this.shellToolInactivityTimeout =
+      (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
@@ -1306,6 +1310,10 @@ export class Config {
 
   getEnableShellOutputEfficiency(): boolean {
     return this.enableShellOutputEfficiency;
+  }
+
+  getShellToolInactivityTimeout(): number {
+    return this.shellToolInactivityTimeout;
   }
 
   getShellExecutionConfig(): ShellExecutionConfig {
