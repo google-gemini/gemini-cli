@@ -14,5 +14,5 @@ export interface McpAuthProvider extends OAuthClientProvider {
   /**
    * Returns custom headers to be added to the request.
    */
-  getRequestHeaders(): Promise<Record<string, string>>;
+  getRequestHeaders?(): Promise<Record<string, string>>;
 }

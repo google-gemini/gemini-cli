@@ -645,7 +645,7 @@ describe('mcp-client', () => {
         expect(headers['X-Goog-User-Project']).toBe('provider-project');
       });
 
-      it('should prioritize config headers over provider headers', async () => {
+      it('should prioritize provider headers over config headers', async () => {
         const mockGetRequestHeaders = vi.fn().mockResolvedValue({
           'X-Goog-User-Project': 'provider-project',
         });
@@ -672,7 +672,7 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const headers = (transport as any)._requestInit?.headers;
-        expect(headers['X-Goog-User-Project']).toBe('config-project');
+        expect(headers['X-Goog-User-Project']).toBe('provider-project');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {

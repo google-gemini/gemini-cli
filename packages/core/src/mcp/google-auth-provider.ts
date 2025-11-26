@@ -135,10 +135,19 @@ export class GoogleCredentialProvider implements McpAuthProvider {
    * Returns custom headers to be added to the request.
    */
   async getRequestHeaders(): Promise<Record<string, string>> {
-    const quotaProjectId = await this.getQuotaProjectId();
     const headers: Record<string, string> = {};
-    if (quotaProjectId) {
-      headers['X-Goog-User-Project'] = quotaProjectId;
+    const configHeaders = this.config?.headers ?? {};
+    const userProjectHeaderKey = Object.keys(configHeaders).find(
+      (key) => key.toLowerCase() === 'x-goog-user-project',
+    );
+
+    if (userProjectHeaderKey) {
+      headers['X-Goog-User-Project'] = configHeaders[userProjectHeaderKey];
+    } else {
+      const quotaProjectId = await this.getQuotaProjectId();
+      if (quotaProjectId) {
+        headers['X-Goog-User-Project'] = quotaProjectId;
+      }
     }
     return headers;
   }

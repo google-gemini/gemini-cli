@@ -410,12 +410,12 @@ async function handleAutomaticOAuth(
  */
 function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
-  defaultHeaders: Record<string, string>,
+  headers: Record<string, string>,
 ): RequestInit {
   return {
     headers: {
-      ...defaultHeaders,
       ...mcpServerConfig.headers,
+      ...headers,
     },
   };
 }
@@ -1337,8 +1337,9 @@ export async function createTransport(
 
   if (mcpServerConfig.httpUrl || mcpServerConfig.url) {
     const authProvider = createAuthProvider(mcpServerConfig);
-    const customHeaders = (await authProvider?.getRequestHeaders()) ?? {};
-    const headers: Record<string, string> = { ...customHeaders };
+    const headers: Record<string, string> = {
+      ...((await authProvider?.getRequestHeaders?.()) ?? {}),
+    };
 
     if (authProvider === undefined) {
       // Check if we have OAuth configuration or stored tokens

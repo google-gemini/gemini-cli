@@ -23,13 +23,6 @@ function createIamApiUrl(targetSA: string): string {
 }
 
 export class ServiceAccountImpersonationProvider implements McpAuthProvider {
-  /**
-   * Returns custom headers to be added to the request.
-   */
-  async getRequestHeaders(): Promise<Record<string, string>> {
-    return {};
-  }
-
   private readonly targetServiceAccount: string;
   private readonly targetAudience: string; // OAuth Client Id
   private readonly auth: GoogleAuth;
