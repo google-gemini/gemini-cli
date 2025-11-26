@@ -48,6 +48,7 @@ import { useAlternateBuffer } from './useAlternateBuffer.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
+  logout: () => void;
   openThemeDialog: () => void;
   openEditorDialog: () => void;
   openPrivacyNotice: () => void;
@@ -395,6 +396,10 @@ export const useSlashCommandProcessor = (
                     },
                     Date.now(),
                   );
+                  return { type: 'handled' };
+                case 'logout':
+                  actions.logout();
+                  actions.openAuthDialog();
                   return { type: 'handled' };
                 case 'dialog':
                   switch (result.dialog) {

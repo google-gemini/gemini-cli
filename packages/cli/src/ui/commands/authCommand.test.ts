@@ -112,11 +112,11 @@ describe('authCommand', () => {
       expect(mockStripThoughts).toHaveBeenCalled();
     });
 
-    it('should return dialog action to show auth selection menu', async () => {
+    it('should return logout action to signal explicit state change', async () => {
       const logoutCommand = authCommand.subCommands?.[1];
       const result = await logoutCommand!.action!(mockContext, '');
 
-      expect(result).toEqual({ type: 'dialog', dialog: 'auth' });
+      expect(result).toEqual({ type: 'logout' });
     });
 
     it('should handle missing config gracefully', async () => {
@@ -125,7 +125,7 @@ describe('authCommand', () => {
 
       const result = await logoutCommand!.action!(mockContext, '');
 
-      expect(result).toEqual({ type: 'dialog', dialog: 'auth' });
+      expect(result).toEqual({ type: 'logout' });
     });
   });
 });
