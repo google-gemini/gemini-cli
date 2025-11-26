@@ -488,7 +488,10 @@ describe('mcp-client', () => {
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport._url.href).toBe('http://test-server/');
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
+        );
       });
 
       it('with headers', async () => {
@@ -501,7 +504,10 @@ describe('mcp-client', () => {
           false,
         );
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
-        expect(transport._url.href).toBe('http://test-server/');
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
+        );
         const authHeader = transport._requestInit?.headers?.['Authorization'];
         expect(authHeader).toBe('derp');
       });
@@ -517,7 +523,10 @@ describe('mcp-client', () => {
           false,
         );
         expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport._url.href).toBe('http://test-server/');
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
+        );
       });
 
       it('with headers', async () => {
@@ -530,7 +539,10 @@ describe('mcp-client', () => {
           false,
         );
         expect(transport).toBeInstanceOf(SSEClientTransport);
-        expect(transport._url.href).toBe('http://test-server/');
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
+        );
         const authHeader = transport._requestInit?.headers?.['Authorization'];
         expect(authHeader).toBe('derp');
       });
