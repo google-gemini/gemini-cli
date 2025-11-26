@@ -43,8 +43,12 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import type { Content } from '@google/genai';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+const SHELL_TIMEOUT_MS = 60000; // 1 minute initial timeout
+const ANALYSIS_TIMEOUT_MS = 30000;
 
 export interface ShellToolParams {
   command: string;
@@ -129,6 +133,102 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return confirmationDetails;
   }
 
+  private async analyzeProcess(
+    command: string,
+    output: string | AnsiOutput,
+    durationMs: number,
+    abortSignal: AbortSignal,
+  ): Promise<{ action: 'cancel' | 'wait'; reason: string; timeout?: number }> {
+    const recentOutput =
+      typeof output === 'string' ? output : JSON.stringify(output);
+    // Truncate output if too long (keep head and tail)
+    const truncatedOutput =
+      recentOutput.length > 2000
+        ? recentOutput.slice(0, 1000) +
+          '\n...[truncated]...\n' +
+          recentOutput.slice(-1000)
+        : recentOutput;
+
+    const prompt = `You are a strict classification engine. Your ONLY function is to analyze the state of a running shell command and output a JSON object.
+
+Rules:
+1. Output MUST be raw JSON.
+2. Do NOT wrap the output in markdown code blocks (no \`\`\`json).
+3. Do NOT include any conversational text, reasoning, or explanations.
+
+Analyze the following command execution:
+
+Duration: ${Math.round(durationMs / 1000)} seconds
+Command: "${command}"
+Recent Output:
+"""
+${truncatedOutput}
+"""
+
+Determine the status based on these criteria:
+- CANCEL if: It is stuck waiting for user input, running an infinite loop without progress, or stuck.
+- WAIT if: It is a valid long-running task (build, install, download, processing).
+
+Return this exact JSON structure:
+{
+  "action": "cancel" | "wait",
+  "reason": "User-facing explanation of why",
+  "timeout": number // Optional: Suggested wait time in ms (e.g., 300000)
+}`;
+    const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
+
+    try {
+      // We use the DEFAULT_GEMINI_FLASH_MODEL for quick and cheap analysis.
+      // We also set a short timeout via abortSignal to ensure the analysis itself doesn't hang.
+      const response = await this.config.getContentGenerator().generateContent(
+        {
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          contents,
+          config: {
+            responseMimeType: 'application/json',
+            abortSignal,
+          },
+        },
+        // We don't have a specific prompt ID here, so we use a generic one or omit it if the API allows.
+        // Assuming the signature matches generateContent(request, promptId?)
+        'shell-analysis',
+      );
+
+      const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!responseText) {
+        return { action: 'wait', reason: 'Failed to get analysis from LLM' };
+      }
+
+      try {
+        const result = JSON.parse(responseText);
+        return {
+          action: result.action === 'cancel' ? 'cancel' : 'wait',
+          reason: result.reason || 'No reason provided',
+          timeout:
+            typeof result.timeout === 'number'
+              ? result.timeout
+              : typeof result.timeout === 'string' &&
+                  !isNaN(Number(result.timeout))
+                ? Number(result.timeout)
+                : undefined,
+        };
+      } catch (parseError) {
+        debugLogger.error(
+          `Failed to parse JSON from shell analysis model. Raw output: "${responseText}"`,
+          parseError,
+        );
+        return {
+          action: 'wait',
+          reason: 'Analysis response was not valid JSON',
+        };
+      }
+    } catch (e) {
+      debugLogger.error('Error analyzing shell process:', e);
+      return { action: 'wait', reason: 'Error during analysis' };
+    }
+  }
+
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
@@ -149,6 +249,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
       .randomBytes(6)
       .toString('hex')}.tmp`;
     const tempFilePath = path.join(os.tmpdir(), tempFileName);
+
+    const internalAbortController = new AbortController();
+    const abortHandler = () => internalAbortController.abort();
+    signal.addEventListener('abort', abortHandler);
+
+    let monitorTimeout: NodeJS.Timeout | undefined;
 
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
@@ -211,13 +317,88 @@ export class ShellToolInvocation extends BaseToolInvocation<
               lastUpdateTime = Date.now();
             }
           },
-          signal,
+          internalAbortController.signal,
           this.config.getEnableInteractiveShell(),
           shellExecutionConfig ?? {},
         );
 
       if (pid && setPidCallback) {
         setPidCallback(pid);
+      }
+
+      // Start the monitoring loop
+      const startTime = Date.now();
+      let currentTimeout = SHELL_TIMEOUT_MS;
+      let analysisResult:
+        | { action: 'cancel' | 'wait'; reason: string }
+        | undefined;
+      let commandFinished = false;
+
+      // We wrap the result promise to track its state
+      resultPromise.finally(() => {
+        commandFinished = true;
+      });
+
+      while (!commandFinished) {
+        // Wait for either the command to finish or the timeout to fire
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+          monitorTimeout = setTimeout(() => resolve(true), currentTimeout);
+        });
+
+        // We use a wrapper for resultPromise that resolves to false when the command finishes
+        const raceResult = await Promise.race([
+          resultPromise.then(() => false),
+          timeoutPromise,
+        ]);
+
+        if (monitorTimeout) {
+          clearTimeout(monitorTimeout);
+          monitorTimeout = undefined;
+        }
+
+        if (raceResult === false) {
+          // Command finished naturally (or was aborted externally)
+          break;
+        }
+
+        // Timeout occurred.
+
+        // Trigger analysis.
+        // We use a separate short signal for the analysis so we don't hang forever if the LLM is unresponsive.
+        const analysisSignalController = new AbortController();
+        const analysisSignalTimeout = setTimeout(
+          () => analysisSignalController.abort(),
+          ANALYSIS_TIMEOUT_MS,
+        ); // 30s timeout for analysis
+
+        try {
+          const analysis = await this.analyzeProcess(
+            this.params.command,
+            cumulativeOutput,
+            Date.now() - startTime,
+            analysisSignalController.signal,
+          );
+          clearTimeout(analysisSignalTimeout);
+
+          if (analysis.action === 'cancel') {
+            analysisResult = analysis;
+            internalAbortController.abort();
+            break; // Monitoring loop ends; main logic will handle the aborted result
+          } else {
+            if (analysis.timeout && analysis.timeout > 0) {
+              currentTimeout = analysis.timeout;
+            } else {
+              currentTimeout = SHELL_TIMEOUT_MS;
+            }
+            debugLogger.log(
+              `Shell monitor: Continuing wait for ${currentTimeout}ms. Reason: ${analysis.reason}`,
+            );
+          }
+        } catch (e) {
+          clearTimeout(analysisSignalTimeout);
+          debugLogger.error('Shell monitor analysis failed', e);
+          // Default to waiting same interval if analysis fails
+        }
       }
 
       const result = await resultPromise;
@@ -239,7 +420,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           }
         } else {
-          if (!signal.aborted) {
+          if (!signal.aborted && !internalAbortController.signal.aborted) {
+            // Only log error if it wasn't aborted, as aborting might interrupt pgrep
             debugLogger.error('missing pgrep output');
           }
         }
@@ -248,6 +430,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let llmContent = '';
       if (result.aborted) {
         llmContent = 'Command was cancelled by user before it could complete.';
+
+        if (analysisResult) {
+          llmContent = `Command was automatically cancelled by the model.`;
+        }
+
         if (result.output.trim()) {
           llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
         } else {
@@ -280,7 +467,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         if (result.output.trim()) {
           returnDisplayMessage = result.output;
-        } else {
+        }
+
+        if (result.aborted && analysisResult) {
+          const reason = `\n\nThe command was automatically cancelled by the model with the following reason: ${analysisResult.reason}`;
+          returnDisplayMessage += reason;
+        } else if (!returnDisplayMessage) {
           if (result.aborted) {
             returnDisplayMessage = 'Command cancelled by user.';
           } else if (result.signal) {
@@ -296,7 +488,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
           // returnDisplayMessage will remain empty, which is fine.
         }
       }
-
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
       const executionError = result.error
         ? {
@@ -330,6 +521,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
       }
+      if (monitorTimeout) {
+        clearTimeout(monitorTimeout);
+      }
+      signal.removeEventListener('abort', abortHandler);
     }
   }
 
