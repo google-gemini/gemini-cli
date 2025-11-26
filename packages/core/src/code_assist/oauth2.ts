@@ -237,13 +237,20 @@ async function initOauthClient(
   } else {
     const webLogin = await authWithWeb(client);
 
+    // Always write auth URL directly to stderr to ensure it's visible in headless environments
+    // This bypasses any stdout/stderr patching that might suppress the output
+    const authMessage =
+      `\n\nCode Assist login required.\n` +
+      `Attempting to open authentication page in your browser.\n` +
+      `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`;
+    
+    writeToStderr(authMessage);
+    
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
-      message:
-        `\n\nCode Assist login required.\n` +
-        `Attempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
+      message: authMessage,
     });
+    
     try {
       // Attempt to open the authentication URL in the default browser.
       // We do not use the `wait` option here because the main script's execution
@@ -255,27 +262,33 @@ async function initOauthClient(
       // in a minimal Docker container), it will emit an unhandled 'error' event,
       // causing the entire Node.js process to crash.
       childProcess.on('error', (error) => {
+        const errorMsg =
+          `Failed to open browser with error: ${getErrorMessage(error)}\n` +
+          `Please visit the URL above or run again with NO_BROWSER=true set.\n`;
+        writeToStderr(errorMsg);
         coreEvents.emit(CoreEvent.UserFeedback, {
           severity: 'error',
-          message:
-            `Failed to open browser with error: ${getErrorMessage(error)}\n` +
-            `Please try running again with NO_BROWSER=true set.`,
+          message: errorMsg,
         });
       });
     } catch (err) {
+      const errorMsg =
+        `Failed to open browser with error: ${getErrorMessage(err)}\n` +
+        `Please visit the URL above or run again with NO_BROWSER=true set.\n`;
+      writeToStderr(errorMsg);
       coreEvents.emit(CoreEvent.UserFeedback, {
         severity: 'error',
-        message:
-          `Failed to open browser with error: ${getErrorMessage(err)}\n` +
-          `Please try running again with NO_BROWSER=true set.`,
+        message: errorMsg,
       });
-      throw new FatalAuthenticationError(
-        `Failed to open browser: ${getErrorMessage(err)}`,
-      );
+      // Don't throw here - let the user complete auth manually via the URL
+      // The loginCompletePromise will handle timeout if auth never completes
     }
+    
+    const waitingMsg = 'Waiting for authentication...\n';
+    writeToStderr(waitingMsg);
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
-      message: 'Waiting for authentication...\n',
+      message: waitingMsg,
     });
 
     // Add timeout to prevent infinite waiting when browser tab gets stuck
