@@ -341,7 +341,7 @@ export class ClearcutLogger {
 
     if (this.hashedGHRepositoryName) {
       baseMetadata.push({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
         value: this.hashedGHRepositoryName,
       });
     }

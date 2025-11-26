@@ -198,7 +198,7 @@ export enum EventMetadataKey {
   GEMINI_CLI_EXPERIMENT_IDS = 131,
 
   // Logs the repository name of the GitHub Action that triggered the session.
-  GEMINI_CLI_GH_REPOSITORY_NAME = 132,
+  GEMINI_CLI_GH_REPOSITORY_NAME_HASH = 132,
 
   // ==========================================================================
   // Loop Detected Event Keys

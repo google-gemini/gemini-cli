@@ -436,7 +436,7 @@ describe('ClearcutLogger', () => {
       const repositoryMetadata = event?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
       );
       expect(repositoryMetadata).toBeDefined();
       expect(repositoryMetadata?.value).toMatch(/^[a-f0-9]{64}$/);
@@ -453,12 +453,12 @@ describe('ClearcutLogger', () => {
       const hash1 = event1?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
       )?.value;
       const hash2 = event2?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
       )?.value;
 
       expect(hash1).toBeDefined();
@@ -473,7 +473,7 @@ describe('ClearcutLogger', () => {
       const hash1 = event1?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
       )?.value;
 
       vi.stubEnv('GITHUB_REPOSITORY', 'google/other-repo');
@@ -483,7 +483,7 @@ describe('ClearcutLogger', () => {
       const hash2 = event2?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
       )?.value;
 
       expect(hash1).toBeDefined();
@@ -499,7 +499,7 @@ describe('ClearcutLogger', () => {
       const hasRepository = event?.event_metadata[0].some(
         (item) =>
           item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME,
+          EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
       );
       expect(hasRepository).toBe(false);
     });
