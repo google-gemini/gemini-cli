@@ -179,6 +179,9 @@ export const Composer = () => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
+          hideContextPercentage={
+            settings.merged.ui?.footer?.hideContextPercentage ?? true
+          }
         />
       )}
 

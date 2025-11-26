@@ -85,6 +85,7 @@ export interface InputPromptProps {
   popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  hideContextPercentage?: boolean;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -127,6 +128,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  hideContextPercentage = true,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -1012,6 +1014,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         minHeight={3}
         paddingX={1}
+        hideContextPercentage={hideContextPercentage}
       >
         <Box flexDirection="row" alignItems="flex-start">
           <Text

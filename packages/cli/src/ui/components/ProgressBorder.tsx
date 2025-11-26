@@ -15,6 +15,7 @@ export interface ProgressBorderProps {
   borderColor: string;
   minHeight?: number;
   paddingX?: number;
+  hideContextPercentage?: boolean;
 }
 
 // Characters for the border
@@ -46,12 +47,13 @@ export const ProgressBorder: React.FC<ProgressBorderProps> = ({
   borderColor,
   minHeight = 3,
   paddingX = 1,
+  hideContextPercentage = true,
 }) => {
   // Calculate visual percentage (0-100% maps to 0-200% visual)
-  const visualPercentage = Math.min(
-    (percentage / COMPRESSION_THRESHOLD_PERCENTAGE) * 100,
-    100,
-  );
+  // Only calculate if we're showing the progress
+  const visualPercentage = hideContextPercentage
+    ? 0
+    : Math.min((percentage / COMPRESSION_THRESHOLD_PERCENTAGE) * 100, 100);
 
   // Progress bar always uses the same color as the border
   const progressColor = borderColor;
@@ -59,7 +61,9 @@ export const ProgressBorder: React.FC<ProgressBorderProps> = ({
   // Calculate how many characters should be filled
   // Subtract 2 for the corner characters
   const availableWidth = Math.max(0, width - 2);
-  const filledWidth = Math.round((availableWidth * visualPercentage) / 100);
+  const filledWidth = hideContextPercentage
+    ? 0
+    : Math.round((availableWidth * visualPercentage) / 100);
   const emptyWidth = availableWidth - filledWidth;
 
   // Build top border (memoized to avoid rebuilding on every render)
