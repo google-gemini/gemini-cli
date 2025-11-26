@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { openBrowserSecurely } from './secure-browser-launcher.js';
+import { POWERSHELL_CONSTRAINED_LANGUAGE_ENV } from './shell-utils.js';
 
 // Create mock function using vi.hoisted
 const mockExecFile = vi.hoisted(() => vi.fn());
@@ -23,6 +24,7 @@ describe('secure-browser-launcher', () => {
     vi.clearAllMocks();
     mockExecFile.mockResolvedValue({ stdout: '', stderr: '' });
     originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+    delete process.env[POWERSHELL_CONSTRAINED_LANGUAGE_ENV];
   });
 
   afterEach(() => {
@@ -112,7 +114,11 @@ describe('secure-browser-launcher', () => {
           '-Command',
           `Start-Process '${maliciousUrl.replace(/'/g, "''")}'`,
         ],
-        expect.any(Object),
+        expect.objectContaining({
+          env: expect.objectContaining({
+            __PSLockdownPolicy: '4',
+          }),
+        }),
       );
     });
 
