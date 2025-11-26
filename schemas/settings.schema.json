@@ -6,6 +6,12 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "title": "Schema",
+      "description": "The URL of the JSON schema for this settings file. Used by editors for validation and autocompletion.",
+      "type": "string",
+      "default": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json"
+    },
     "mcpServers": {
       "title": "MCP Servers",
       "description": "Configuration for MCP servers.",
@@ -1256,6 +1262,13 @@
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
           "markdownDescription": "Enables extension loading/unloading within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "isModelAvailabilityServiceEnabled": {
+          "title": "Enable Model Availability Service",
+          "description": "Enable model routing using new availability service.",
+          "markdownDescription": "Enable model routing using new availability service.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

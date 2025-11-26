@@ -123,6 +123,7 @@ export interface OpenDialogActionReturn {
     | 'editor'
     | 'privacy'
     | 'settings'
+    | 'sessionBrowser'
     | 'model'
     | 'permissions';
 }
