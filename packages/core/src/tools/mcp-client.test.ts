@@ -487,15 +487,17 @@ describe('mcp-client', () => {
           false,
         );
 
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: { headers: {} },
-          }),
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -503,14 +505,13 @@ describe('mcp-client', () => {
           },
           false,
         );
-
-        expect(transport).toEqual(
-          new StreamableHTTPClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
+        const authHeader = transport._requestInit?.headers?.['Authorization'];
+        expect(authHeader).toBe('derp');
       });
     });
 
@@ -523,15 +524,17 @@ describe('mcp-client', () => {
           },
           false,
         );
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
-            requestInit: { headers: {} },
-          }),
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
       });
 
       it('with headers', async () => {
-        const transport = await createTransport(
+        // We need this to be an any type because we dig into its private state.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const transport: any = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -539,14 +542,13 @@ describe('mcp-client', () => {
           },
           false,
         );
-
-        expect(transport).toEqual(
-          new SSEClientTransport(new URL('http://test-server'), {
-            requestInit: {
-              headers: { Authorization: 'derp' },
-            },
-          }),
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        expect(transport).toHaveProperty(
+          '_url',
+          new URL('http://test-server/'),
         );
+        const authHeader = transport._requestInit?.headers?.['Authorization'];
+        expect(authHeader).toBe('derp');
       });
     });
 

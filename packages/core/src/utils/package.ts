@@ -15,13 +15,26 @@ export type PackageJson = BasePackageJson & {
   };
 };
 
+/**
+ * Reads package.json from the current directory or any parent directory.
+ *
+ * @param cwd - The directory to start searching from (searches upward to filesystem root)
+ * @returns The package.json object if found, or `undefined` if no package.json exists
+ *          in the directory hierarchy. This is expected behavior when called from
+ *          directories outside of a Node.js project.
+ *
+ * @example
+ * ```ts
+ * const pkg = await getPackageJson(__dirname);
+ * const version = pkg?.version ?? 'unknown';
+ * ```
+ */
 export async function getPackageJson(
   cwd: string,
 ): Promise<PackageJson | undefined> {
   const result = await readPackageUp({ cwd });
   if (!result) {
-    // TODO: Maybe bubble this up as an error.
-    return;
+    return undefined;
   }
 
   return result.packageJson;

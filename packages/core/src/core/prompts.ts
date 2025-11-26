@@ -24,6 +24,7 @@ import type { Config } from '../config/config.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
+import { getEffectiveModel, PREVIEW_GEMINI_MODEL } from '../config/models.js';
 
 export function resolvePathFromEnv(envVar?: string): {
   isSwitch: boolean;
@@ -102,6 +103,21 @@ export function getCoreSystemPrompt(
       throw new Error(`missing system prompt file '${systemMdPath}'`);
     }
   }
+
+  // TODO(joshualitt): Replace with system instructions on model configs.
+  const desiredModel = getEffectiveModel(
+    config.isInFallbackMode(),
+    config.getModel(),
+    config.getPreviewFeatures(),
+  );
+
+  const isGemini3 = desiredModel === PREVIEW_GEMINI_MODEL;
+
+  const mandatesVariant = isGemini3
+    ? `
+- **Do not call tools in silence:** You must provide to the user very short and concise natural explanation (one sentence) before calling tools.`
+    : ``;
+
   const enableCodebaseInvestigator = config
     .getToolRegistry()
     .getAllToolNames()
@@ -129,7 +145,7 @@ export function getCoreSystemPrompt(
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.`,
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandatesVariant}`,
 
       primaryWorkflows_prefix: `
 # Primary Workflows
@@ -211,8 +227,14 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 ## Tone and Style (CLI Interaction)
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
-- **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
-- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.${(function () {
+        if (isGemini3) {
+          return '';
+        } else {
+          return `
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.`;
+        }
+      })()}
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
