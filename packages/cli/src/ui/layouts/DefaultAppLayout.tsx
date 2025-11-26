@@ -22,6 +22,7 @@ export const DefaultAppLayout: React.FC = () => {
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
+
   // If in alternate buffer mode, need to leave room to draw the scrollbar on
   // the right side of the terminal.
   const width = isAlternateBuffer

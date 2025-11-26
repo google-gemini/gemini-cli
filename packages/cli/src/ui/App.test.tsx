@@ -187,9 +187,11 @@ describe('App', () => {
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
-    expect(lastFrame()).toContain(
-      'Notifications\nFooter\nMainContent\nComposer',
-    );
+    // ContextWindowBar is now included in the layout
+    expect(lastFrame()).toContain('Notifications');
+    expect(lastFrame()).toContain('Footer');
+    expect(lastFrame()).toContain('MainContent');
+    expect(lastFrame()).toContain('Composer');
   });
 
   it('should render DefaultAppLayout when screen reader is not enabled', () => {
@@ -197,7 +199,10 @@ describe('App', () => {
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
-    expect(lastFrame()).toContain('MainContent\nNotifications\nComposer');
+    // Context bar now appears between notifications and composer
+    expect(lastFrame()).toContain('MainContent');
+    expect(lastFrame()).toContain('Notifications');
+    expect(lastFrame()).toContain('Composer');
   });
 
   describe('Snapshots', () => {

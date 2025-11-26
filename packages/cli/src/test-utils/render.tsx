@@ -83,6 +83,15 @@ export const simulateClick = async (
   });
 };
 
+// Create stable mock objects for getGeminiClient
+const mockChat = {
+  getLastPromptTokenCount: () => 0,
+};
+
+const mockGeminiClient = {
+  getChat: () => mockChat,
+};
+
 const mockConfig = {
   getModel: () => 'gemini-pro',
   getTargetDir: () =>
@@ -91,6 +100,7 @@ const mockConfig = {
   isTrustedFolder: () => true,
   getIdeMode: () => false,
   getEnableInteractiveShell: () => true,
+  getGeminiClient: () => mockGeminiClient,
 };
 
 const configProxy = new Proxy(mockConfig, {

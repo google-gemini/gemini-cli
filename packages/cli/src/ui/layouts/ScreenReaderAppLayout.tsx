@@ -32,6 +32,7 @@ export const ScreenReaderAppLayout: React.FC = () => {
       <Box flexGrow={1} overflow="hidden">
         <MainContent />
       </Box>
+
       {uiState.dialogsVisible ? (
         <DialogManager
           terminalWidth={uiState.terminalWidth}
