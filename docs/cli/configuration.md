@@ -464,6 +464,18 @@ the `excludedProjectEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
+- **`GEMINI_CLI_CUSTOM_HEADERS`**:
+  - Adds extra HTTP headers to Gemini API and Code Assist requests.
+  - Accepts a comma-separated list of `Name: value` pairs.
+  - Example:
+    `export GEMINI_CLI_CUSTOM_HEADERS="X-My-Header: foo, X-Trace-ID: abc123"`.
+- **`GEMINI_API_KEY_AUTH_MECHANISM`**:
+  - Specifies how the API key should be sent for authentication when using
+    `AuthType.USE_GEMINI` or `AuthType.USE_VERTEX_AI`.
+  - Valid values are `x-goog-api-key` (default) or `bearer`.
+  - If set to `bearer`, the API key will be sent in the
+    `Authorization: Bearer <key>` header.
+  - Example: `export GEMINI_API_KEY_AUTH_MECHANISM="bearer"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
