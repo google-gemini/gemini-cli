@@ -1,0 +1,43 @@
+{
+  "general": {
+    "disableAutoUpdate": true,
+    "previewFeatures": false
+  },
+  "telemetry": {
+    "enabled": true,
+    "target": "local",
+    "otlpEndpoint": "",
+    "outfile": "/Users/edilmo/git/forks/gemini-cli/.integration-tests/1764144712632/should-modify-tool-selection-with-beforetoolselection-hooks/telemetry.log"
+  },
+  "security": {
+    "auth": {
+      "selectedType": "gemini-api-key"
+    }
+  },
+  "ui": {
+    "useAlternateBuffer": true
+  },
+  "model": "gemini-2.5-pro",
+  "sandbox": false,
+  "ide": {
+    "enabled": false,
+    "hasSeenNudge": true
+  },
+  "debugMode": true,
+  "tools": {
+    "enableHooks": true
+  },
+  "hooks": {
+    "BeforeToolSelection": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/edilmo/git/forks/gemini-cli/.integration-tests/1764144712632/should-modify-tool-selection-with-beforetoolselection-hooks/before_tool_selection_hook.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}
