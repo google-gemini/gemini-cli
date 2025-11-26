@@ -137,7 +137,11 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@modelcontextprotocol/sdk": "^1.15.1",
+=======
+    "@modelcontextprotocol/sdk": "^1.23.0",
+>>>>>>> d2a6cff4d (Update dependency for modelcontextprotocol/sdk to 1.23.0 (#13827))
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "zod": "^3.25.76"

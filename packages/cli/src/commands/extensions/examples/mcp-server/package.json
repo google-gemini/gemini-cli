@@ -12,7 +12,11 @@
     "@types/node": "^20.11.25"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@modelcontextprotocol/sdk": "^1.11.0",
+=======
+    "@modelcontextprotocol/sdk": "^1.23.0",
+>>>>>>> d2a6cff4d (Update dependency for modelcontextprotocol/sdk to 1.23.0 (#13827))
     "zod": "^3.22.4"
   }
 }

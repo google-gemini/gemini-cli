@@ -26,7 +26,11 @@
     "@google/genai": "1.30.0",
     "@iarna/toml": "^2.2.5",
     "@joshua.litt/get-ripgrep": "^0.0.3",
+<<<<<<< HEAD
     "@modelcontextprotocol/sdk": "^1.11.0",
+=======
+    "@modelcontextprotocol/sdk": "^1.23.0",
+>>>>>>> d2a6cff4d (Update dependency for modelcontextprotocol/sdk to 1.23.0 (#13827))
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.203.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.203.0",

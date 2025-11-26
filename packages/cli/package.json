@@ -31,7 +31,11 @@
     "@google/gemini-cli-core": "file:../core",
     "@google/genai": "1.30.0",
     "@iarna/toml": "^2.2.5",
+<<<<<<< HEAD
     "@modelcontextprotocol/sdk": "^1.15.1",
+=======
+    "@modelcontextprotocol/sdk": "^1.23.0",
+>>>>>>> d2a6cff4d (Update dependency for modelcontextprotocol/sdk to 1.23.0 (#13827))
     "@types/update-notifier": "^6.0.8",
     "ansi-regex": "^6.2.2",
     "clipboardy": "^5.0.0",
