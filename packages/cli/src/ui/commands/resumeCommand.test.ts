@@ -55,14 +55,12 @@ describe('resumeCommand', () => {
     });
   });
 
-  it('returns error message when no identifier is provided', async () => {
+  it('opens session browser when no identifier is provided', async () => {
     const result = await resumeCommand.action?.(mockContext, '');
 
     expect(result).toStrictEqual({
-      type: 'message',
-      messageType: 'error',
-      content:
-        'Missing session identifier. Usage: /resume <number|uuid|latest>. Use --list-sessions to see available sessions.',
+      type: 'dialog',
+      dialog: 'sessionBrowser',
     });
   });
 

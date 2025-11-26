@@ -76,7 +76,7 @@ async function resumeFromIdentifier(
 export const resumeCommand: SlashCommand = {
   name: 'resume',
   description:
-    'Resume an auto-saved session. Usage: /resume <number|uuid|latest>. Use --list-sessions to see available sessions.',
+    'Resume an auto-saved session. Usage: /resume [number|uuid|latest]. Run without arguments to open the session browser.',
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
@@ -85,10 +85,8 @@ export const resumeCommand: SlashCommand = {
     const identifier = (args || '').trim();
     if (!identifier) {
       return {
-        type: 'message',
-        messageType: 'error',
-        content:
-          'Missing session identifier. Usage: /resume <number|uuid|latest>. Use --list-sessions to see available sessions.',
+        type: 'dialog',
+        dialog: 'sessionBrowser',
       };
     }
 
