@@ -549,7 +549,8 @@ Searched for: "${oldStringPreview}"${similarityNote}`,
   }
 
   /**
-   * Calculates simple character-level similarity between two strings
+   * Calculates similarity between two strings using Longest Common Substring.
+   * This provides a more robust measure than simple prefix matching.
    */
   private calculateSimilarity(str1: string, str2: string): number {
     if (str1 === str2) return 1.0;
@@ -561,16 +562,26 @@ Searched for: "${oldStringPreview}"${similarityNote}`,
 
     if (s1 === s2) return 0.95; // High score but not perfect (whitespace differs)
 
-    // Count matching substrings
-    const minLen = Math.min(s1.length, s2.length);
-    const maxLen = Math.max(s1.length, s2.length);
-    let matches = 0;
+    // Use dynamic programming to find the longest common substring
+    // This correctly identifies similarities anywhere in the strings
+    const m = Array(s1.length + 1)
+      .fill(0)
+      .map(() => Array(s2.length + 1).fill(0));
+    let longest = 0;
 
-    for (let i = 0; i < minLen; i++) {
-      if (s1[i] === s2[i]) matches++;
+    for (let i = 1; i <= s1.length; i++) {
+      for (let j = 1; j <= s2.length; j++) {
+        if (s1[i - 1] === s2[j - 1]) {
+          m[i][j] = m[i - 1][j - 1] + 1;
+          if (m[i][j] > longest) {
+            longest = m[i][j];
+          }
+        }
+      }
     }
 
-    return matches / maxLen;
+    // Normalize by the average length of the two strings for a score between 0 and 1
+    return (2 * longest) / (s1.length + s2.length);
   }
 }
 
