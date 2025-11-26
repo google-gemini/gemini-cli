@@ -145,6 +145,7 @@ vi.mock('../agents/subagent-tool-wrapper.js', () => ({
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
   emitModelChanged: vi.fn(),
+  emitConsoleLog: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
@@ -160,11 +161,16 @@ vi.mock('../utils/fetch.js', () => ({
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { uiTelemetryService } from '../telemetry/index.js';
+import { getCodeAssistServer } from '../code_assist/codeAssist.js';
+import { getExperiments } from '../code_assist/experiments/experiments.js';
+import type { CodeAssistServer } from '../code_assist/server.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
   tokenLimit: vi.fn(),
 }));
+vi.mock('../code_assist/codeAssist.js');
+vi.mock('../code_assist/experiments/experiments.js');
 
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
@@ -362,6 +368,23 @@ describe('Server Config (config.ts)', () => {
       ).toHaveBeenCalledWith();
     });
 
+    it('should strip thoughts when switching from GenAI to Vertex AI', async () => {
+      const config = new Config(baseParams);
+
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        async (_: Config, authType: AuthType | undefined) =>
+          ({ authType }) as unknown as ContentGeneratorConfig,
+      );
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
+
+      expect(
+        config.getGeminiClient().stripThoughtsFromHistory,
+      ).toHaveBeenCalledWith();
+    });
+
     it('should not strip thoughts when switching from Vertex to GenAI', async () => {
       const config = new Config(baseParams);
 
@@ -377,6 +400,78 @@ describe('Server Config (config.ts)', () => {
       expect(
         config.getGeminiClient().stripThoughtsFromHistory,
       ).not.toHaveBeenCalledWith();
+    });
+  });
+
+  describe('Preview Features Logic in refreshAuth', () => {
+    beforeEach(() => {
+      // Set up default mock behavior for these functions before each test
+      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+      vi.mocked(getExperiments).mockResolvedValue({
+        flags: {},
+        experimentIds: [],
+      });
+    });
+
+    it('should enable preview features for Google auth when remote flag is true', async () => {
+      // Override the default mock for this specific test
+      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer); // Simulate Google auth by returning a truthy value
+      vi.mocked(getExperiments).mockResolvedValue({
+        flags: {
+          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: true },
+        },
+        experimentIds: [],
+      });
+      const config = new Config({ ...baseParams, previewFeatures: undefined });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getPreviewFeatures()).toBe(true);
+    });
+
+    it('should disable preview features for Google auth when remote flag is false', async () => {
+      // Override the default mock
+      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer);
+      vi.mocked(getExperiments).mockResolvedValue({
+        flags: {
+          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: false },
+        },
+        experimentIds: [],
+      });
+      const config = new Config({ ...baseParams, previewFeatures: undefined });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getPreviewFeatures()).toBe(undefined);
+    });
+
+    it('should disable preview features for Google auth when remote flag is missing', async () => {
+      // Override the default mock for getCodeAssistServer, the getExperiments mock is already correct
+      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer);
+      const config = new Config({ ...baseParams, previewFeatures: undefined });
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      expect(config.getPreviewFeatures()).toBe(undefined);
+    });
+
+    it('should not change preview features or model if it is already set to true', async () => {
+      const initialModel = 'some-other-model';
+      const config = new Config({
+        ...baseParams,
+        previewFeatures: true,
+        model: initialModel,
+      });
+      // It doesn't matter which auth method we use here, the logic should exit early
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getPreviewFeatures()).toBe(true);
+      expect(config.getModel()).toBe(initialModel);
+    });
+
+    it('should not change preview features or model if it is already set to false', async () => {
+      const initialModel = 'some-other-model';
+      const config = new Config({
+        ...baseParams,
+        previewFeatures: false,
+        model: initialModel,
+      });
+      await config.refreshAuth(AuthType.USE_GEMINI);
+      expect(config.getPreviewFeatures()).toBe(false);
+      expect(config.getModel()).toBe(initialModel);
     });
   });
 
@@ -652,99 +747,6 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(paramsWithUndefinedRipgrep);
       expect(config.getUseRipgrep()).toBe(true);
-    });
-  });
-
-  describe('Model Router with Auth', () => {
-    it('should disable model router by default for oauth-personal', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should enable model router by default for other auth types', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should disable model router for specified auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should enable model router for other auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [],
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(true);
-    });
-
-    it('should keep model router disabled when useModelRouter is false', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: false,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getUseModelRouter()).toBe(false);
-    });
-
-    it('should keep the user-chosen model after refreshAuth, even when model router is disabled for the auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      const chosenModel = 'gemini-1.5-pro-latest';
-      config.setModel(chosenModel);
-
-      await config.refreshAuth(AuthType.USE_GEMINI);
-
-      expect(config.getUseModelRouter()).toBe(false);
-      expect(config.getModel()).toBe(chosenModel);
-    });
-
-    it('should keep the user-chosen model after refreshAuth, when model router is enabled for the auth type', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        disableModelRouterForAuth: [AuthType.USE_GEMINI],
-      });
-      const chosenModel = 'gemini-1.5-pro-latest';
-      config.setModel(chosenModel);
-
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-
-      expect(config.getUseModelRouter()).toBe(true);
-      expect(config.getModel()).toBe(chosenModel);
-    });
-
-    it('should NOT switch to auto model if cli provides specific model, even if router is enabled', async () => {
-      const config = new Config({
-        ...baseParams,
-        useModelRouter: true,
-        model: 'gemini-flash-latest',
-      });
-
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-
-      expect(config.getUseModelRouter()).toBe(true);
-      expect(config.getModel()).toBe('gemini-flash-latest');
     });
   });
 

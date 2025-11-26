@@ -18,6 +18,7 @@ import {
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface InstallArgs {
   path: string;
@@ -78,5 +79,6 @@ export const linkCommand: CommandModule = {
       path: argv['path'] as string,
       consent: argv['consent'] as boolean | undefined,
     });
+    await exitCli();
   },
 };
