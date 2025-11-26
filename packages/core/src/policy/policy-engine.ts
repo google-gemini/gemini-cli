@@ -59,7 +59,9 @@ function ruleMatches(
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
-    if (isWildcardPattern(rule.toolName)) {
+    if (rule.toolName === '*') {
+      // Match all tools
+    } else if (isWildcardPattern(rule.toolName)) {
       const prefix = getWildcardPrefix(rule.toolName);
       if (serverName !== undefined) {
         // Robust check: if serverName is provided, it MUST match the prefix exactly.
