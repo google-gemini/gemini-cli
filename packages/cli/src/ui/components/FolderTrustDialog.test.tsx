@@ -9,6 +9,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import { vi } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
+import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -61,7 +62,9 @@ describe('FolderTrustDialog', () => {
       );
     });
     await waitFor(() => {
-      expect(mockedExit).toHaveBeenCalledWith(1);
+      expect(mockedExit).toHaveBeenCalledWith(
+        ExitCodes.FATAL_CANCELLATION_ERROR,
+      );
     });
     expect(onSelect).not.toHaveBeenCalled();
   });

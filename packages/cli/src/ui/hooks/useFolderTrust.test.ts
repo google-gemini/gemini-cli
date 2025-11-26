@@ -14,7 +14,7 @@ import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
 
 const mockedCwd = vi.hoisted(() => vi.fn());
 const mockedExit = vi.hoisted(() => vi.fn());
@@ -266,7 +266,7 @@ describe('useFolderTrust', () => {
     expect(result.current.isFolderTrustDialogOpen).toBe(false); // Dialog should close
   });
 
-  it('should emit feedback on failure to set value', () => {
+  it('should emit feedback on failure to set value', async () => {
     isWorkspaceTrustedSpy.mockReturnValue({
       isTrusted: undefined,
       source: undefined,
@@ -283,12 +283,12 @@ describe('useFolderTrust', () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
-    vi.runAllTimers();
+    await vi.runAllTimersAsync();
 
     expect(emitFeedbackSpy).toHaveBeenCalledWith(
       'error',
       'Failed to save trust settings. Exiting Gemini CLI.',
     );
-    expect(mockedExit).toHaveBeenCalledWith(1);
+    expect(mockedExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
   });
 });
