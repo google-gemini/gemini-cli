@@ -818,11 +818,12 @@ const SETTINGS_SCHEMA = {
     properties: {
       enableConseca: {
         type: 'boolean',
-        label: 'Enable Conseca',
+        label: 'Enable Context-Aware Safety',
         category: 'Safety',
         requiresRestart: true,
         default: false,
-        description: 'Enable the Conseca in-process safety checker.',
+        description:
+          'Enable the context-aware safety checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
         showInDialog: true,
       },
     },
