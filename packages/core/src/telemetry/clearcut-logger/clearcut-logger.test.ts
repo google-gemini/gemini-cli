@@ -492,8 +492,8 @@ describe('ClearcutLogger', () => {
     });
 
     it('does not include repository when GITHUB_REPOSITORY is not set', () => {
-      const { logger } = setup({});
       vi.stubEnv('GITHUB_REPOSITORY', undefined);
+      const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
       const hasRepository = event?.event_metadata[0].some(
