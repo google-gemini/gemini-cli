@@ -15,8 +15,6 @@ import type { ContentGenerator } from '../core/contentGenerator.js';
 export function estimateTokenCountSync(parts: Part[]): number {
   let totalTokens = 0;
   for (const part of parts) {
-    // Check for string type to correctly handle empty strings ("") as text
-    // (which have 0 tokens) rather than falling back to JSON stringification.
     if (typeof part.text === 'string') {
       for (const char of part.text) {
         // Simple heuristic:
@@ -56,7 +54,10 @@ export async function calculateRequestTokenCount(
       : [request];
 
   // Use countTokens API only for heavy media parts that are hard to estimate.
-  const hasMedia = parts.some((p) => 'inlineData' in p || 'fileData' in p);
+  const hasMedia = parts.some((p) => {
+    const isMedia = 'inlineData' in p || 'fileData' in p;
+    return isMedia;
+  });
 
   if (hasMedia) {
     const response = await contentGenerator.countTokens({

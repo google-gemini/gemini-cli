@@ -15,7 +15,7 @@ describe('calculateRequestTokenCount', () => {
 
   const model = 'gemini-pro';
 
-  it('should use countTokens API for non-text requests', async () => {
+  it('should use countTokens API for media requests (images/files)', async () => {
     vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
       totalTokens: 100,
     });
@@ -29,6 +29,23 @@ describe('calculateRequestTokenCount', () => {
 
     expect(count).toBe(100);
     expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+  });
+
+  it('should estimate tokens locally for tool calls', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockClear();
+    const request = [{ functionCall: { name: 'foo', args: { bar: 'baz' } } }];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    // Estimation logic: JSON.stringify(part).length / 4
+    // JSON: {"functionCall":{"name":"foo","args":{"bar":"baz"}}}
+    // Length: ~53 chars. 53 / 4 = 13.25 -> 13.
+    expect(count).toBeGreaterThan(0);
+    expect(mockContentGenerator.countTokens).not.toHaveBeenCalled();
   });
 
   it('should estimate tokens locally for simple ASCII text', async () => {
