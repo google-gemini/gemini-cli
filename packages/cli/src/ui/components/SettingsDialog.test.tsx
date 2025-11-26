@@ -323,7 +323,7 @@ describe('SettingsDialog', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Disable Auto Update');
+        expect(lastFrame()).toContain('Enable Auto Update');
       });
 
       // Navigate up
