@@ -218,6 +218,10 @@ export class McpClient {
   getServerConfig(): MCPServerConfig {
     return this.serverConfig;
   }
+
+  getInstructions(): string | undefined {
+    return this.client?.getInstructions();
+  }
 }
 
 /**

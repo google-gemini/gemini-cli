@@ -193,4 +193,55 @@ describe('McpClientManager', () => {
       );
     });
   });
+
+  describe('getMcpInstructions', () => {
+    it('should only return instructions from servers with useInstructions: true', async () => {
+      // Override McpClient mock for this test to return distinct objects based on config
+      vi.mocked(McpClient).mockImplementation(
+        (name, config) =>
+          ({
+            connect: vi.fn(),
+            discover: vi.fn(),
+            disconnect: vi.fn(),
+            getServerConfig: vi.fn().mockReturnValue(config),
+            getInstructions: vi
+              .fn()
+              .mockReturnValue(`Instructions for ${name}`),
+          }) as unknown as McpClient,
+      );
+
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+
+      // 1. Configured server with useInstructions: true
+      mockConfig.getMcpServers.mockReturnValue({
+        'enabled-server': {
+          useInstructions: true,
+        },
+        'disabled-server': {
+          useInstructions: false,
+        },
+        'default-server': {
+          // undefined should be treated as false
+        },
+      });
+      await manager.startConfiguredMcpServers();
+
+      const instructions = manager.getMcpInstructions();
+
+      expect(instructions).toContain(
+        "# Instructions for MCP Server 'enabled-server'",
+      );
+      expect(instructions).toContain('Instructions for enabled-server');
+
+      expect(instructions).not.toContain(
+        "# Instructions for MCP Server 'disabled-server'",
+      );
+      expect(instructions).not.toContain('Instructions for disabled-server');
+
+      expect(instructions).not.toContain(
+        "# Instructions for MCP Server 'default-server'",
+      );
+      expect(instructions).not.toContain('Instructions for default-server');
+    });
+  });
 });
