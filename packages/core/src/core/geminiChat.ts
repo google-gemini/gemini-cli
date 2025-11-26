@@ -293,9 +293,9 @@ export class GeminiChat {
     this.history.push(userContent);
     const requestContents = this.getHistory(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
-    return (async function* () {
+    const streamWithRetries = async function* (
+      this: GeminiChat,
+    ): AsyncGenerator<StreamEvent, void, void> {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
 
@@ -303,7 +303,7 @@ export class GeminiChat {
         // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
         // when probing the Preview Model.
         if (
-          self.config.isPreviewModelFallbackMode() &&
+          this.config.isPreviewModelFallbackMode() &&
           model === PREVIEW_GEMINI_MODEL
         ) {
           maxAttempts = 1;
@@ -320,7 +320,7 @@ export class GeminiChat {
               generateContentConfig.temperature = 1;
             }
 
-            const stream = await self.makeApiCallAndProcessStream(
+            const stream = await this.makeApiCallAndProcessStream(
               model,
               generateContentConfig,
               requestContents,
@@ -341,7 +341,7 @@ export class GeminiChat {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 logContentRetry(
-                  self.config,
+                  this.config,
                   new ContentRetryEvent(
                     attempt,
                     (error as InvalidStreamError).type,
@@ -369,7 +369,7 @@ export class GeminiChat {
             isGemini2Model(model)
           ) {
             logContentRetryFailure(
-              self.config,
+              this.config,
               new ContentRetryFailureEvent(
                 maxAttempts,
                 (lastError as InvalidStreamError).type,
@@ -383,15 +383,17 @@ export class GeminiChat {
           // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
           if (
             model === PREVIEW_GEMINI_MODEL &&
-            !self.config.isPreviewModelBypassMode()
+            !this.config.isPreviewModelBypassMode()
           ) {
-            self.config.setPreviewModelFallbackMode(false);
+            this.config.setPreviewModelFallbackMode(false);
           }
         }
       } finally {
         streamDoneResolver!();
       }
-    })();
+    };
+
+    return streamWithRetries.call(this);
   }
 
   private async makeApiCallAndProcessStream(
@@ -409,21 +411,18 @@ export class GeminiChat {
     let lastConfig: GenerateContentConfig = generateContentConfig;
     let lastContentsToUse: Content[] = requestContents;
 
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
-
     const apiCall = async () => {
       let modelToUse = getEffectiveModel(
-        self.config.isInFallbackMode(),
+        this.config.isInFallbackMode(),
         model,
-        self.config.getPreviewFeatures(),
+        this.config.getPreviewFeatures(),
       );
 
       // Preview Model Bypass Logic:
       // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
       // IF the effective model is currently Preview Model.
       if (
-        self.config.isPreviewModelBypassMode() &&
+        this.config.isPreviewModelBypassMode() &&
         modelToUse === PREVIEW_GEMINI_MODEL
       ) {
         modelToUse = DEFAULT_GEMINI_MODEL;
@@ -434,8 +433,8 @@ export class GeminiChat {
         ...generateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
-        systemInstruction: self.systemInstruction,
-        tools: self.tools,
+        systemInstruction: this.systemInstruction,
+        tools: this.tools,
       };
 
       // TODO(joshualitt): Clean this up with model configs.
@@ -460,8 +459,8 @@ export class GeminiChat {
           : requestContents;
 
       // Fire BeforeModel and BeforeToolSelection hooks if enabled
-      const hooksEnabled = self.config.getEnableHooks();
-      const messageBus = self.config.getMessageBus();
+      const hooksEnabled = this.config.getEnableHooks();
+      const messageBus = this.config.getMessageBus();
       if (hooksEnabled && messageBus) {
         // Fire BeforeModel hook
         const beforeModelResult = await fireBeforeModelHook(messageBus, {
@@ -523,7 +522,7 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
-      return self.config.getContentGenerator().generateContentStream(
+      return this.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
           contents: contentsToUse,
@@ -557,7 +556,11 @@ export class GeminiChat {
       contents: lastContentsToUse,
     };
 
-    return this.processStreamResponse(effectiveModel, streamResponse, originalRequest);
+    return this.processStreamResponse(
+      effectiveModel,
+      streamResponse,
+      originalRequest,
+    );
   }
 
   /**
