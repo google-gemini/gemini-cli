@@ -48,6 +48,10 @@ import { ShellToolInvocation } from '../tools/shell.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  fireToolNotificationHook,
+  executeToolWithHooks,
+} from './coreToolHookTriggers.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -867,6 +871,13 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            // Fire Notification hook before showing confirmation to user
+            const messageBus = this.config.getMessageBus();
+            const hooksEnabled = this.config.getEnableHooks();
+            if (hooksEnabled && messageBus) {
+              await fireToolNotificationHook(messageBus, confirmationDetails);
+            }
+
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
@@ -1103,6 +1114,8 @@ export class CoreToolScheduler {
             : undefined;
 
         const shellExecutionConfig = this.config.getShellExecutionConfig();
+        const hooksEnabled = this.config.getEnableHooks();
+        const messageBus = this.config.getMessageBus();
 
         await runInDevTraceSpan(
           {
@@ -1127,15 +1140,23 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
               );
             } else {
-              promise = invocation.execute(
+              promise = executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
+                messageBus,
+                hooksEnabled,
                 liveOutputCallback,
                 shellExecutionConfig,
               );
