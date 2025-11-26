@@ -29,11 +29,20 @@ Evaluate the tool call against the policy.
 1. Check if the tool is allowed.
 2. Check if the arguments match the constraints.
 3. Output a JSON object with:
-   - "decision": "allow" or "deny".
+   - "decision": "allow", "deny", or "ask_user".
    - "reason": A brief explanation.
 
 Output strictly JSON.
 `;
+
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
+import type { Schema } from '@google/genai';
+
+const EnforcementResultSchema = z.object({
+  decision: z.enum(['allow', 'deny', 'ask_user']),
+  reason: z.string(),
+});
 
 /**
  * Enforces the security policy for a given tool call.
@@ -86,6 +95,9 @@ export async function enforcePolicy(
         model,
         config: {
           responseMimeType: 'application/json',
+          responseSchema: zodToJsonSchema(EnforcementResultSchema, {
+            target: 'openApi3',
+          }) as unknown as Schema,
         },
         contents: [
           {
@@ -114,36 +126,19 @@ export async function enforcePolicy(
         error: 'Empty response from policy enforcer',
       };
     }
-    // TODO: Remove this redundancy after verifying that LLM always returns JSON.
-    let cleanText = responseText;
-    // Extract JSON from code block if present
-    const match = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (match) {
-      cleanText = match[1];
-    } else {
-      // Fallback: try to find the first '{' and last '}'
-      const firstOpen = responseText.indexOf('{');
-      const lastClose = responseText.lastIndexOf('}');
-      if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
-        cleanText = responseText.substring(firstOpen, lastClose + 1);
-      }
-    }
 
     try {
-      const parsed = JSON.parse(cleanText);
+      const parsed = JSON.parse(responseText);
       debugLogger.debug(`[Conseca] Enforcement Parsed:`, parsed);
 
       let decision: SafetyCheckDecision;
       switch (parsed.decision) {
-        case 'ALLOW':
         case 'allow':
           decision = SafetyCheckDecision.ALLOW;
           break;
-        case 'ASK_USER':
         case 'ask_user':
           decision = SafetyCheckDecision.ASK_USER;
           break;
-        case 'DENY':
         case 'deny':
         default:
           decision = SafetyCheckDecision.DENY;
@@ -158,11 +153,11 @@ export async function enforcePolicy(
       return {
         decision: SafetyCheckDecision.ALLOW,
         reason: 'JSON Parse Error in enforcement response',
-        error: `JSON Parse Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Cleaned JSON: ${cleanText}`,
+        error: `JSON Parse Error: ${parseError instanceof Error ? parseError.message : String(parseError)}. Raw: ${responseText}`,
       };
     }
   } catch (error) {
-    console.error('Policy enforcement failed:', error);
+    debugLogger.error('Policy enforcement failed:', error);
     return {
       decision: SafetyCheckDecision.ALLOW,
       reason: 'Policy enforcement failed',

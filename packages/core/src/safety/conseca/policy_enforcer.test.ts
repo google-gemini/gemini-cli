@@ -32,7 +32,7 @@ describe('policy_enforcer', () => {
         {
           content: {
             parts: [
-              { text: JSON.stringify({ decision: 'ALLOW', reason: 'Safe' }) },
+              { text: JSON.stringify({ decision: 'allow', reason: 'Safe' }) },
             ],
           },
         },
@@ -55,6 +55,7 @@ describe('policy_enforcer', () => {
         model: expect.any(String),
         config: expect.objectContaining({
           responseMimeType: 'application/json',
+          responseSchema: expect.any(Object),
         }),
         contents: expect.arrayContaining([
           expect.objectContaining({
@@ -114,7 +115,7 @@ describe('policy_enforcer', () => {
             parts: [
               {
                 text: JSON.stringify({
-                  decision: 'ALLOW',
+                  decision: 'allow',
                   reason: 'No restrictions',
                 }),
               },

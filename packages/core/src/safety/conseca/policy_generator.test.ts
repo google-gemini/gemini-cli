@@ -36,7 +36,18 @@ describe('policy_generator', () => {
       candidates: [
         {
           content: {
-            parts: [{ text: JSON.stringify(mockPolicy) }],
+            parts: [
+              {
+                text: JSON.stringify({
+                  policies: [
+                    {
+                      tool_name: 'read_file',
+                      policy: mockPolicy.read_file,
+                    },
+                  ],
+                }),
+              },
+            ],
           },
         },
       ],
@@ -54,6 +65,7 @@ describe('policy_generator', () => {
         model: expect.any(String),
         config: expect.objectContaining({
           responseMimeType: 'application/json',
+          responseSchema: expect.any(Object),
         }),
         contents: expect.any(Array),
       }),
